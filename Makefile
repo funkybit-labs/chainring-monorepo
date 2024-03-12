@@ -9,4 +9,4 @@ local_containers:
 	./gradlew jibDockerBuild
 
 publish_containers:
-	AWS_PROFILE=devops AWS_SDK_LOAD_CONFIG=true ./gradlew jib
+	AWS_SDK_LOAD_CONFIG=true ./gradlew jib

@@ -4,10 +4,8 @@
         <Console name="Console" target="SYSTEM_OUT">
             <NewRelicMaskingLayout/>
         </Console>
-        <PagerDutyErrorReporter name="PagerDutyErrorReporter" />
         <Async name="AsyncAppender">
             <AppenderRef ref="Console"/>
-            <AppenderRef ref="PagerDutyErrorReporter" level="error"/>
         </Async>
     </Appenders>
     <Loggers>

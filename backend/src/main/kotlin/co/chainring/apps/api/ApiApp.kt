@@ -36,15 +36,8 @@ val requestContexts = RequestContexts()
 class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.db) {
     override val logger = KotlinLogging.logger {}
 
-    // CORS policy to allow web-based wallet integrations
-    private val corsPolicy = CorsPolicy(
-        originPolicy = OriginPolicy.AllowAll(),
-        headers = listOf(),
-        methods = listOf(Method.GET, Method.POST),
-    )
     private val server = ServerFilters.InitialiseRequestContext(requestContexts)
         .then(HttpTransactionLogger(logger))
-        .then(ServerFilters.Cors(corsPolicy))
         .then(RequestProcessingExceptionHandler(logger))
         .then(
             routes(

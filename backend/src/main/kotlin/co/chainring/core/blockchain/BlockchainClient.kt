@@ -7,8 +7,8 @@ import org.web3j.protocol.http.HttpService
 import org.web3j.tx.gas.DefaultGasProvider
 
 data class BlockchainClientConfig(
-    val url: String = "http://localhost:8545", // Anvil node
-    val privateKeyHex: String = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", // Anvil node's predefined address
+    val url: String = System.getenv("EVM_NETWORK_URL") ?: "http://localhost:8545",
+    val privateKeyHex: String = System.getenv("EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY") ?: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
     val gasProvider: DefaultGasProvider = DefaultGasProvider(),
 )
 

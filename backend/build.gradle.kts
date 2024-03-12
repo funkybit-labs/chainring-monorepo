@@ -128,7 +128,7 @@ tasks.clean {
 
 jib {
     to {
-        image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/repository/chainring"
+        image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/repository"
         credHelper.helper = "ecr-login"
         tags = setOf("${version}-${System.getenv("BUILD_NUMBER") ?: "1"}")
     }
