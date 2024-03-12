@@ -10,6 +10,10 @@ variable "cidr_prefix" {
   default = "10.30"
 }
 
+variable "zone" {
+  default = "chainring.co"
+}
+
 terraform {
   required_version = "1.5.7"
 

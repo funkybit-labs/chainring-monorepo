@@ -34,8 +34,10 @@ module "api" {
   subnet_id_2 = module.vpc.private_subnet_id_2
   vpc         = module.vpc.vpc
   allow_inbound = true
-  hostnames = ["test.chainring.co"]
+  hostnames = ["${local.name_prefix}-api.${data.terraform_remote_state.shared.outputs.zone.name}"]
   lb_https_listener_arn = module.alb.https_listener_arn
+  lb_dns_name = module.alb.dns_name
+  zone = data.terraform_remote_state.shared.outputs.zone
   tcp_ports = [9000]
 }
 
@@ -47,4 +49,10 @@ module "rds" {
   instance_class = "db.t3.medium"
   security_groups = [module.api.security_group_id]
   vpc = module.vpc.vpc
+}
+
+module "web" {
+  source = "../modules/web"
+  name_prefix = local.name_prefix
+  zone = data.terraform_remote_state.shared.outputs.zone
 }
