@@ -36,4 +36,10 @@ variable "health_check" {
   default = "/health"
 }
 variable "app_ecs_task_role" {}
+variable "zone" {
+  default = {}
+}
+variable "lb_dns_name" {
+  default = ""
+}
 data "aws_caller_identity" "current" {}

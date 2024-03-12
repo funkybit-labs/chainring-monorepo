@@ -1,6 +1,6 @@
 locals {
   http_api_port = 9000
-  account_id = data.aws_caller_identity.current.account_id
+  account_id    = data.aws_caller_identity.current.account_id
   port_mappings = flatten([for port in var.tcp_ports : { containerPort = port, hostPort = port, protocol = "tcp" }])
 }
 
@@ -77,7 +77,7 @@ resource "aws_security_group_rule" "vault_api_ecs_task_egress" {
 }
 
 resource "aws_security_group_rule" "security_group_ingress" {
-  count = var.allow_inbound ? 1 : 0
+  count             = var.allow_inbound ? 1 : 0
   security_group_id = aws_security_group.security_group.id
 
   type        = "ingress"
@@ -147,11 +147,11 @@ resource "aws_ecs_task_definition" "task" {
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          "awslogs-group": "firelens-container",
-          "awslogs-region": var.aws_region,
-          "awslogs-create-group": "true",
-          "awslogs-stream-prefix": "${var.name_prefix}-${var.task_name}",
-          "mode": "non-blocking"
+          "awslogs-group" : "firelens-container",
+          "awslogs-region" : var.aws_region,
+          "awslogs-create-group" : "true",
+          "awslogs-stream-prefix" : "${var.name_prefix}-${var.task_name}",
+          "mode" : "non-blocking"
         }
       }
     }, var.include_command ? { command = [var.task_name] } : {}),
@@ -189,3 +189,11 @@ resource "aws_ecs_service" "service" {
   }
 }
 
+resource "aws_route53_record" "dns" {
+  for_each = toset(var.hostnames)
+  zone_id  = var.zone.zone_id
+  name     = each.value
+  type     = "CNAME"
+  ttl      = "300"
+  records  = [var.lb_dns_name]
+}

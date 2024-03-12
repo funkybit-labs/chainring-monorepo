@@ -5,7 +5,7 @@ variable "instance_class" {
   default = "db.r5.large"
 }
 variable "security_groups" {
-  type = list(string)
+  type    = list(string)
   default = []
 }
 variable "vpc" {}
