@@ -1,4 +1,4 @@
-package co.chainring.generated;
+package co.chainring.contracts.generated;
 
 import java.math.BigInteger;
 import java.util.Arrays;

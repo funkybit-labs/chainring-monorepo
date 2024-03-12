@@ -74,8 +74,8 @@ application {
     mainClass.set("co.chainring.MainKt")
 }
 
-// brew install solidity
 val compileSolidity by tasks.registering(Exec::class) {
+    // requires solidity compiler (brew install solidity)
     commandLine(
         "bash", "-c", """
             solc --bin --abi --optimize --overwrite -o ${buildDir}/contracts ${projectDir}/src/main/solidity/*.sol
@@ -86,9 +86,8 @@ val compileSolidity by tasks.registering(Exec::class) {
     }
 }
 
-//brew tap web3j/web3j
-//brew install web3j
-val generateWeb3jWrappers by tasks.registering(Exec::class) {
+val web3jGenerate by tasks.registering(Exec::class) {
+    // requires web3j (brew tap web3j/web3j && brew install web3j)
     dependsOn(compileSolidity)
     doFirst {
         val contractsDir = File("${buildDir}/contracts")
@@ -100,25 +99,13 @@ val generateWeb3jWrappers by tasks.registering(Exec::class) {
                 // Create java wrappers for each contract
                 commandLine(
                     "bash", "-c", """
-                        web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${projectDir}/src/main/java -p co.chainring.generated
+                        web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${projectDir}/src/main/java -p co.chainring.contracts.generated
                     """.trimIndent()
                 )
             }
     }
     doLast {
         println("Web3j contract wrappers generated successfully for all contracts.")
-    }
-}
-
-tasks.clean {
-    doLast {
-        val generatedWrapperDir = File("${projectDir}/src/main/java/co/chainring/generated")
-        val contractsBuildDir = File("${buildDir}/contracts")
-
-        println("Cleaning generated wrappers and compiled contracts...")
-
-        generatedWrapperDir.deleteRecursively()
-        contractsBuildDir.deleteRecursively()
     }
 }
 

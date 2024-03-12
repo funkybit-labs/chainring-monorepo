@@ -1,6 +1,6 @@
 package co.chainring.core.blockchain
 
-import co.chainring.generated.Chainring
+import co.chainring.contracts.generated.Chainring
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.http.HttpService

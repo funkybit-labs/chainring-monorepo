@@ -1,4 +1,7 @@
 
+web3j_generate:
+	./gradlew web3jGenerate
+
 anvil:
 	docker build -t foundry-anvil -f ./anvil/Dockerfile .
 

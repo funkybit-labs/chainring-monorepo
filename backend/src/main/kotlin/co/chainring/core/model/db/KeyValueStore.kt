@@ -13,8 +13,8 @@ object KeyValueStore : Table("key_value_store") {
 
     fun getValue(key: String): String? {
         return KeyValueStore
-            .slice(value)
-            .select(
+            .select(value)
+            .where(
                 KeyValueStore.key.eq(key),
             ).singleOrNull()
             ?.let { it[value] }
