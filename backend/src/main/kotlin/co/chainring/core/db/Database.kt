@@ -37,13 +37,17 @@ fun Database.Companion.connect(config: DbConfig): Database =
             maxTotal = config.maxConnections
             setMaxWait(Duration.ofMillis(config.maxConnectionWaitingTimeMs))
         },
-        databaseConfig = DatabaseConfig.Companion.invoke {
-            defaultRepetitionAttempts = 1
-            useNestedTransactions = true
-        },
+        databaseConfig =
+            DatabaseConfig.Companion.invoke {
+                defaultRepetitionAttempts = 1
+                useNestedTransactions = true
+            },
     )
 
-fun Transaction.notifyDbListener(channel: String, payload: String? = null) {
+fun Transaction.notifyDbListener(
+    channel: String,
+    payload: String? = null,
+) {
     exec(
         listOfNotNull(
             "NOTIFY $channel",
@@ -52,6 +56,7 @@ fun Transaction.notifyDbListener(channel: String, payload: String? = null) {
     )
 }
 
-val migrations = listOf(
-    V1_KeyValueStore(),
-)
+val migrations =
+    listOf(
+        V1_KeyValueStore(),
+    )

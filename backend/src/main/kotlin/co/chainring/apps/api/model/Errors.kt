@@ -29,7 +29,10 @@ val jsonWithDefaults = Json { encodeDefaults = true }
 
 class RequestProcessingError(val errorResponse: Response) : Exception("Error during API request processing")
 
-fun errorResponse(status: Status, error: ApiError): Response =
+fun errorResponse(
+    status: Status,
+    error: ApiError,
+): Response =
     Response(status)
         .body(jsonWithDefaults.encodeToString(ApiErrors(listOf(error))))
         .with(Header.CONTENT_TYPE of ContentType.APPLICATION_JSON)

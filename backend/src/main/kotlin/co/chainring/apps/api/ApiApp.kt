@@ -14,9 +14,6 @@ import org.http4k.core.RequestContexts
 import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.core.then
-import org.http4k.filter.AllowAll
-import org.http4k.filter.CorsPolicy
-import org.http4k.filter.OriginPolicy
 import org.http4k.filter.ServerFilters
 import org.http4k.routing.bind
 import org.http4k.routing.routes
@@ -36,20 +33,23 @@ val requestContexts = RequestContexts()
 class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.db) {
     override val logger = KotlinLogging.logger {}
 
-    private val server = ServerFilters.InitialiseRequestContext(requestContexts)
-        .then(HttpTransactionLogger(logger))
-        .then(RequestProcessingExceptionHandler(logger))
-        .then(
-            routes(
-                "/health" bind Method.GET to { Response(Status.OK) },
-                "/v1" bind contract {
-                    routes += listOf(
-                        ConfigRoutes.getConfiguration(),
-                    )
-                },
-            ),
-        )
-        .asServer(Netty(config.httpPort, ServerConfig.StopMode.Graceful(ofSeconds(1))))
+    private val server =
+        ServerFilters.InitialiseRequestContext(requestContexts)
+            .then(HttpTransactionLogger(logger))
+            .then(RequestProcessingExceptionHandler(logger))
+            .then(
+                routes(
+                    "/health" bind Method.GET to { Response(Status.OK) },
+                    "/v1" bind
+                        contract {
+                            routes +=
+                                listOf(
+                                    ConfigRoutes.getConfiguration(),
+                                )
+                        },
+                ),
+            )
+            .asServer(Netty(config.httpPort, ServerConfig.StopMode.Graceful(ofSeconds(1))))
 
     override fun start() {
         logger.info { "Starting" }

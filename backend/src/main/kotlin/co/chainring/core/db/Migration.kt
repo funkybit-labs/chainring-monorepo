@@ -18,8 +18,9 @@ abstract class Migration {
     val version: Int
 
     init {
-        val groups = Regex("^V(\\d+)_(.*)$").matchEntire(this::class.simpleName!!)?.groupValues
-            ?: throw IllegalArgumentException("Migration class name doesn't match convention")
+        val groups =
+            Regex("^V(\\d+)_(.*)$").matchEntire(this::class.simpleName!!)?.groupValues
+                ?: throw IllegalArgumentException("Migration class name doesn't match convention")
         version = groups[1].toInt()
         name = groups[2]
     }
@@ -47,7 +48,10 @@ class MigrationEntity(id: EntityID<Int>) : IntEntity(id) {
     var executedAt by Migrations.executedAt
 }
 
-fun Database.upgrade(migrations: List<Migration>, logger: KLogger) {
+fun Database.upgrade(
+    migrations: List<Migration>,
+    logger: KLogger,
+) {
     fun checkVersions(migrations: List<Migration>) {
         val sorted = migrations.map { it.version }.sorted()
         if ((1..migrations.size).toList() != sorted) {
@@ -65,11 +69,16 @@ fun Database.upgrade(migrations: List<Migration>, logger: KLogger) {
                 logger.info { "Empty database found, creating table for migrations" }
                 create(Migrations)
             }
-            false -> throw IllegalStateException("Tried to run migrations against a non-empty database without a Migrations table. This is not supported.")
+            false -> throw IllegalStateException(
+                "Tried to run migrations against a non-empty database without a Migrations table. This is not supported.",
+            )
         }
     }
 
-    fun shouldRun(latestVersion: Int?, migration: Migration): Boolean {
+    fun shouldRun(
+        latestVersion: Int?,
+        migration: Migration,
+    ): Boolean {
         val run = latestVersion?.let { migration.version > it } ?: true
         if (!run) {
             logger.debug { "Skipping migration version ${migration.version}: ${migration.name}" }
@@ -81,10 +90,11 @@ fun Database.upgrade(migrations: List<Migration>, logger: KLogger) {
 
     logger.info { "Running migrations on database ${this.url}" }
 
-    val latestVersion = transaction {
-        createTableIfNotExists()
-        MigrationEntity.all().maxByOrNull { it.version }?.version?.value
-    }
+    val latestVersion =
+        transaction {
+            createTableIfNotExists()
+            MigrationEntity.all().maxByOrNull { it.version }?.version?.value
+        }
 
     logger.info { "Database version before migrations: $latestVersion" }
 
@@ -96,11 +106,12 @@ fun Database.upgrade(migrations: List<Migration>, logger: KLogger) {
                 // to avoid errors when multiple instance of the app are trying to migrate the database
                 // we insert a migration record with ON CONFLICT DO NOTHING
                 // and only if the record was actually inserted we apply the respective schema changes
-                val shouldRun = Migrations.insertIgnoreAndGetId {
-                    it[id] = EntityID(migration.version, Migrations)
-                    it[name] = migration.name
-                    it[executedAt] = Clock.System.now()
-                } != null
+                val shouldRun =
+                    Migrations.insertIgnoreAndGetId {
+                        it[id] = EntityID(migration.version, Migrations)
+                        it[name] = migration.name
+                        it[executedAt] = Clock.System.now()
+                    } != null
 
                 if (shouldRun) {
                     logger.info { "Running migration version ${migration.version}: ${migration.name}" }

@@ -32,6 +32,9 @@ object HttpTransactionLogger {
             }
         }
 
-    private fun headerInfo(tx: HttpTransaction, headerName: String, label: String) =
-        tx.request.header(headerName)?.let { " $label $it" } ?: ""
+    private fun headerInfo(
+        tx: HttpTransaction,
+        headerName: String,
+        label: String,
+    ) = tx.request.header(headerName)?.let { " $label $it" } ?: ""
 }

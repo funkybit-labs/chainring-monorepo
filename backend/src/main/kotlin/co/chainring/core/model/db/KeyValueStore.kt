@@ -8,7 +8,6 @@ import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.upsert
 
 object KeyValueStore : Table("key_value_store") {
-
     var key = varchar("key", length = 10485760).uniqueIndex()
     var value = varchar("value", length = 10485760).nullable()
 
@@ -21,7 +20,10 @@ object KeyValueStore : Table("key_value_store") {
             ?.let { it[value] }
     }
 
-    fun setValue(key: String, value: String?) {
+    fun setValue(
+        key: String,
+        value: String?,
+    ) {
         KeyValueStore.upsert {
             it[KeyValueStore.key] = key
             it[KeyValueStore.value] = value
@@ -32,7 +34,10 @@ object KeyValueStore : Table("key_value_store") {
         return getValue(key)?.let { Instant.fromEpochMilliseconds(it.toLong()) }
     }
 
-    fun setInstant(key: String, value: Instant?) {
+    fun setInstant(
+        key: String,
+        value: Instant?,
+    ) {
         setValue(key, value?.toEpochMilliseconds().toString())
     }
 

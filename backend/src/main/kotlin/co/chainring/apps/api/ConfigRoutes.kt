@@ -25,19 +25,22 @@ object ConfigRoutes {
             summary = "Retrive configuration"
             returning(
                 Status.OK,
-                responseBody to ConfigurationApiResponse(
-                    contractAddress = "",
-                ),
+                responseBody to
+                    ConfigurationApiResponse(
+                        contractAddress = "",
+                    ),
             )
         } bindContract Method.GET to { _ ->
             transaction {
                 when (val contractAddress = KeyValueStore.getValue(CONTRACT_ADDRESS_KEY)) {
                     null -> Response(Status.NOT_FOUND)
-                    else -> Response(Status.OK).with(
-                        responseBody of ConfigurationApiResponse(
-                            contractAddress = contractAddress,
-                        ),
-                    )
+                    else ->
+                        Response(Status.OK).with(
+                            responseBody of
+                                ConfigurationApiResponse(
+                                    contractAddress = contractAddress,
+                                ),
+                        )
                 }
             }
         }
