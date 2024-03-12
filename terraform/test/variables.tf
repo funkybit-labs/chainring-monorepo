@@ -10,6 +10,15 @@ variable "cidr_prefix" {
   default = "10.10"
 }
 
+data "terraform_remote_state" "shared" {
+  backend   = "s3"
+  config = {
+    bucket = "chainring-terraform-state"
+    key    = "shared/main.tfstate"
+    region = var.aws_region
+  }
+}
+
 terraform {
   required_version = "1.5.7"
 

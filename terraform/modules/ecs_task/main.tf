@@ -189,3 +189,11 @@ resource "aws_ecs_service" "service" {
   }
 }
 
+resource "aws_route53_record" "dns" {
+  for_each = toset(var.hostnames)
+  zone_id = var.zone.zone_id
+  name = each.value
+  type = "CNAME"
+  ttl = "300"
+  records = [var.lb_dns_name]
+}
