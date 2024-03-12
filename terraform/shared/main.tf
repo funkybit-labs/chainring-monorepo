@@ -22,7 +22,7 @@ resource "aws_ecr_repository" "anvil" {
 
 moved {
   from = aws_ecr_repository.ecr
-  to = aws_ecr_repository.backend
+  to   = aws_ecr_repository.backend
 }
 
 resource "aws_route53_zone" "zone" {

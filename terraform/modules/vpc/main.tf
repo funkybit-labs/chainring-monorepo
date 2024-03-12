@@ -5,7 +5,7 @@ resource "aws_vpc" "vpc" {
 
 moved {
   from = aws_vpc.my_vpc
-  to = aws_vpc.vpc
+  to   = aws_vpc.vpc
 }
 
 # Create public subnet
@@ -50,7 +50,7 @@ resource "aws_route_table" "public_route_table" {
 
 # Associate public route table with public subnet
 resource "aws_route_table_association" "public_subnet_association" {
-  count  = var.create_public ? 1 : 0
+  count          = var.create_public ? 1 : 0
   subnet_id      = aws_subnet.public_subnet[0].id
   route_table_id = aws_route_table.public_route_table[0].id
 }

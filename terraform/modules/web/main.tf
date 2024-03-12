@@ -1,7 +1,7 @@
 locals {
-  account_id = data.aws_caller_identity.current.account_id
+  account_id       = data.aws_caller_identity.current.account_id
   web_s3_origin_id = "web-origin-id"
-  domain_name = "${var.name_prefix}.${var.zone.name}"
+  domain_name      = "${var.name_prefix}.${var.zone.name}"
 }
 
 resource "aws_s3_bucket" "web" {
@@ -20,7 +20,7 @@ resource "aws_cloudfront_distribution" "web" {
     domain_name              = aws_s3_bucket.web.bucket_regional_domain_name
     origin_access_control_id = aws_cloudfront_origin_access_control.web.id
     origin_id                = local.web_s3_origin_id
-    origin_path              = "/"
+    origin_path              = ""
   }
 
   enabled             = true
@@ -72,10 +72,10 @@ resource "aws_s3_bucket_policy" "web" {
     Version = "2012-10-17",
     Statement = concat(
       [{
-        Sid = "AllowCloudFrontServicePrincipalReadOnly",
+        Sid    = "AllowCloudFrontServicePrincipalReadOnly",
         Effect = "Allow",
         Principal = {
-          "Service": "cloudfront.amazonaws.com"
+          "Service" : "cloudfront.amazonaws.com"
         },
         Action = [
           "s3:GetObject"
@@ -84,8 +84,8 @@ resource "aws_s3_bucket_policy" "web" {
           "arn:aws:s3:::${aws_s3_bucket.web.id}/*"
         ],
         Condition = {
-          "StringEquals": {
-            "AWS:SourceArn": "arn:aws:cloudfront::${local.account_id}:distribution/${aws_cloudfront_distribution.web.id}"
+          "StringEquals" : {
+            "AWS:SourceArn" : "arn:aws:cloudfront::${local.account_id}:distribution/${aws_cloudfront_distribution.web.id}"
           }
         }
       }]
@@ -95,8 +95,8 @@ resource "aws_s3_bucket_policy" "web" {
 
 resource "aws_route53_record" "dns" {
   zone_id = var.zone.zone_id
-  name = local.domain_name
-  type = "CNAME"
-  ttl = "300"
+  name    = local.domain_name
+  type    = "CNAME"
+  ttl     = "300"
   records = [aws_cloudfront_distribution.web.domain_name]
 }
