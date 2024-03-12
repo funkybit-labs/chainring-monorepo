@@ -9,17 +9,10 @@ resource "aws_security_group" "db_security_group" {
   description = "${var.name_prefix} DB security group"
 
   ingress {
-    from_port = 5432
-    to_port = 5432
-    protocol = "tcp"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
     security_groups = var.security_groups
-  }
-
-  ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = ["38.125.187.6/32"]
   }
 
   egress {
@@ -31,16 +24,18 @@ resource "aws_security_group" "db_security_group" {
 }
 
 resource "aws_rds_cluster" "db_cluster" {
-  cluster_identifier           = "db-cluster"
-  engine                       = "aurora-postgresql"
-  engine_version               = "16.1"
-  manage_master_user_password  = true
-  master_username              = "chainring"
-  database_name                = "chainring"
-  db_subnet_group_name         = aws_db_subnet_group.db_subnet_group.name
-  backup_retention_period      = 7
-  preferred_backup_window      = "08:00-08:30"
-  skip_final_snapshot          = true
+  cluster_identifier          = "db-cluster"
+  engine                      = "aurora-postgresql"
+  engine_version              = "16.1"
+  manage_master_user_password = true
+  master_username             = "chainring"
+  database_name               = "chainring"
+  db_subnet_group_name        = aws_db_subnet_group.db_subnet_group.name
+  backup_retention_period     = 7
+  preferred_backup_window     = "08:00-08:30"
+  skip_final_snapshot         = true
+  storage_encrypted           = true
+  vpc_security_group_ids      = [aws_security_group.db_security_group.id]
 
   tags = {
     Name = "${var.name_prefix}-db-cluster"
@@ -48,12 +43,12 @@ resource "aws_rds_cluster" "db_cluster" {
 }
 
 resource "aws_rds_cluster_instance" "db_instance" {
-  count                     = 2
-  identifier                = "aurora-instance-${count.index + 1}"
-  instance_class            = var.instance_class
-  cluster_identifier        = aws_rds_cluster.db_cluster.id
-  engine                    = "aurora-postgresql"
-  engine_version            = "16.1"
-  publicly_accessible       = false
-  db_subnet_group_name      = aws_db_subnet_group.db_subnet_group.name
+  count                = 2
+  identifier           = "db-instance-${count.index + 1}"
+  instance_class       = var.instance_class
+  cluster_identifier   = aws_rds_cluster.db_cluster.id
+  engine               = "aurora-postgresql"
+  engine_version       = "16.1"
+  publicly_accessible  = false
+  db_subnet_group_name = aws_db_subnet_group.db_subnet_group.name
 }

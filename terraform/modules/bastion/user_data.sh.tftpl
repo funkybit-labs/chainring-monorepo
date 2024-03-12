@@ -1,0 +1,3 @@
+#!/bin/bash
+# shellcheck disable=SC2154
+echo "${ssh_authorized_keys}" | base64 -d >> /home/ec2-user/.ssh/authorized_keys
