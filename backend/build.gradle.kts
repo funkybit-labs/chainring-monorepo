@@ -74,10 +74,6 @@ application {
     mainClass.set("co.chainring.MainKt")
 }
 
-tasks.compileKotlin {
-    dependsOn("generateWeb3jWrappers")
-}
-
 // brew install solidity
 val compileSolidity by tasks.registering(Exec::class) {
     commandLine(
@@ -128,7 +124,7 @@ tasks.clean {
 
 jib {
     to {
-        image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/repository"
+        image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/backend"
         credHelper.helper = "ecr-login"
         tags = setOf("${version}-${System.getenv("BUILD_NUMBER") ?: "1"}")
     }
