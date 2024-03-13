@@ -70,26 +70,49 @@ resource "aws_s3_bucket_policy" "web" {
 
   policy = jsonencode({
     Version = "2012-10-17",
-    Statement = concat(
-      [{
-        Sid    = "AllowCloudFrontServicePrincipalReadOnly",
+    Statement = [{
+      Sid    = "AllowCloudFrontServicePrincipalReadOnly",
+      Effect = "Allow",
+      Principal = {
+        "Service" : "cloudfront.amazonaws.com"
+      },
+      Action = [
+        "s3:GetObject"
+      ],
+      Resource = [
+        "arn:aws:s3:::${aws_s3_bucket.web.id}/*"
+      ],
+      Condition = {
+        "StringEquals" : {
+          "AWS:SourceArn" : "arn:aws:cloudfront::${local.account_id}:distribution/${aws_cloudfront_distribution.web.id}"
+        }
+      }
+    },
+      {
+        Sid = "AllowCIList",
+        Effect =  "Allow",
+        Principal = {
+          "AWS": var.ci_role_arn
+        },
+        Action = ["s3:ListBucket", "s3:GetBucketLocation"],
+        Resource = "arn:aws:s3:::${aws_s3_bucket.web.id}"
+      },
+      {
+        Sid = "AllowCIWrite",
         Effect = "Allow",
         Principal = {
-          "Service" : "cloudfront.amazonaws.com"
+          "AWS": var.ci_role_arn
         },
         Action = [
-          "s3:GetObject"
+          "s3:PutObject",
+          "s3:PutObjectAcl",
+          "s3:GetObject",
+          "s3:GetObjectAcl"
         ],
         Resource = [
           "arn:aws:s3:::${aws_s3_bucket.web.id}/*"
-        ],
-        Condition = {
-          "StringEquals" : {
-            "AWS:SourceArn" : "arn:aws:cloudfront::${local.account_id}:distribution/${aws_cloudfront_distribution.web.id}"
-          }
-        }
+        ]
       }]
-    )
   })
 }
 
