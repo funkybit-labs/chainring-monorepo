@@ -1,4 +1,5 @@
 name: Web UI build
+
 on:
   push:
     branches: [ "main" ]
@@ -8,7 +9,9 @@ on:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
-
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -51,5 +54,19 @@ jobs:
       - name: build
         working-directory: ./web-ui
         run: pnpm run build
-        
-  
+      - name: Install aws-cli
+        uses: unfor19/install-aws-cli-action@v1
+        if: ${{ github.event_name == 'push' }}
+        with:
+          arch: amd64
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.2
+        if: ${{ github.event_name == 'push' }}
+        with:
+          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::851725450525:oidc-provider/token.actions.githubusercontent.com
+      - name: Deploy to test environment
+        working-directory: ./web-ui
+        if: ${{ github.event_name == 'push' }}
+        run: aws s3 sync dist/ s3://test-chainring-web/
+          
