@@ -64,7 +64,7 @@ jobs:
         if: ${{ github.event_name == 'push' }}
         with:
           aws-region: us-east-2
-          role-to-assume: arn:aws:iam::851725450525:oidc-provider/token.actions.githubusercontent.com
+          role-to-assume: arn:aws:iam::851725450525:role/terraform-20240313150351606400000001
       - name: Deploy to test environment
         working-directory: ./web-ui
         if: ${{ github.event_name == 'push' }}
