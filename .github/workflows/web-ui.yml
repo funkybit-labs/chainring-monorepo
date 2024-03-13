@@ -6,7 +6,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  cache-and-install:
+  test-and-build:
     runs-on: ubuntu-latest
 
     steps:
@@ -39,25 +39,17 @@ jobs:
       - name: Install dependencies
         working-directory: ./web-ui
         run: pnpm install
-  check:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web-ui
-    steps:
       - name: Lint
+        working-directory: ./web-ui
         run: pnpm run lint
       - name: Typecheck
+        working-directory: ./web-ui
         run: pnpm run typecheck
       - name: Test
+        working-directory: ./web-ui
         run: pnpm run test --run
-  build:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web-ui
-    steps:
       - name: build
+        working-directory: ./web-ui
         run: pnpm run build
         
   
