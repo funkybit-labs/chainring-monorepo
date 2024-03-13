@@ -47,6 +47,17 @@ variable "dns_zone" {
   default= "chainring.co."
 }
 
+variable "publickey" {
+  type        = string
+  description = "Public key for access lightsail instance"
+  default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO9/S8kIxj/lD2DFO8tBWfE2QoyP0tu5AqQf52KlLj8w sburke@chainring.co"
+}
+
+variable "publickey-name" {
+  type        = string
+  default     = "chainring-web"
+}
+
 terraform {
   required_version = "1.5.7"
 

@@ -8,4 +8,7 @@ module "lightsail" {
   bundle_id = var.bundle_id
   static_ip_name = var.static_ip_name
   dns_zone = var.dns_zone
+  publickey-name = var.publickey-name
+  publickey = var.publickey
 }
+

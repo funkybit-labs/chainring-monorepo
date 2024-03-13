@@ -37,8 +37,10 @@ variable "static_ip_name" {
 
 variable "publickey" {
   type        = string
-  description = "Public key for access lightsail instance"
-  default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO9/S8kIxj/lD2DFO8tBWfE2QoyP0tu5AqQf52KlLj8w sburke@chainring.co"
+ }
+
+variable "publickey-name" {
+  type        = string
 }
 
 variable "dns_zone" {

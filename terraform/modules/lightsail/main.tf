@@ -4,6 +4,8 @@ resource "aws_lightsail_instance" "lightsail" {
   ip_address_type   = var.ip_address_type
   blueprint_id      = var.blueprint
   bundle_id         = var.bundle_id
+  key_pair_name     = var.publickey-name
+
 
   add_on {
     type          = "AutoSnapshot"
@@ -22,7 +24,7 @@ resource "aws_lightsail_static_ip_attachment" "lightsail" {
 }
 
 resource "aws_lightsail_key_pair" "default_key_pair" {
-  name       = "importing"
+  name       = var.publickey-name
 
   public_key = var.publickey
 }
@@ -61,16 +63,16 @@ resource "aws_route53_record" "domain_root" {
 
 resource "aws_route53_record" "www" {
   zone_id = "${data.aws_route53_zone.primary_hosted_zone.zone_id}"
-  name    = "www.${data.aws_route53_zone.primary_hosted_zone.name}"
-  type    = "A"
+  name    = "www"
+  type    = "CNAME"
   ttl     = "300"
-  records = ["${aws_lightsail_static_ip.lightsail.ip_address}"]
+  records = ["${data.aws_route53_zone.primary_hosted_zone.name}"]
 }
 
 resource "aws_route53_record" "w3dev" {
   zone_id = "${data.aws_route53_zone.primary_hosted_zone.zone_id}"
-  name    = "w3dev.${data.aws_route53_zone.primary_hosted_zone.name}"
-  type    = "A"
+  name    = "w3dev"
+  type    = "CNAME"
   ttl     = "300"
-  records = ["${aws_lightsail_static_ip.lightsail.ip_address}"]
+  records = ["${data.aws_route53_zone.primary_hosted_zone.name}"]
 }
