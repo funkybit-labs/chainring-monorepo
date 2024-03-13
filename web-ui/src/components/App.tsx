@@ -2,9 +2,9 @@ import logo from 'assets/logo.svg'
 
 function App() {
   return (
-    <div className="h-screen flex items-center justify-center bg-red-900 pb-48 pt-48">
+    <div className="flex h-screen items-center justify-center bg-red-900 py-48">
       <div className="flex flex-col items-center">
-        <img className="my-4 inline-block w-36 h-36" src={logo} />
+        <img className="my-4 inline-block size-36" src={logo} />
 
         <h1 className="text-6xl font-bold tracking-tight text-gray-100">
           ChainRing
@@ -16,7 +16,7 @@ function App() {
 
         <a
           href="#"
-          className="my-8 inline-block rounded-md border border-transparent bg-gray-100 px-8 py-3 text-center font-medium text-black hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-700 focus:ring-inset"
+          className="my-8 inline-block rounded-md border border-transparent bg-gray-100 px-8 py-3 text-center font-medium text-black hover:bg-gray-200 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-gray-700"
         >
           Connect wallet
         </a>
