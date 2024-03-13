@@ -59,6 +59,10 @@ module "rds" {
   vpc             = module.vpc.vpc
 }
 
+module "github_oidc" {
+  source = "../modules/github_oidc"
+}
+
 module "web" {
   source      = "../modules/web"
   name_prefix = local.name_prefix
@@ -66,4 +70,5 @@ module "web" {
   providers = {
     aws.us_east_1 = aws.us_east_1
   }
+  ci_role_arn = module.github_oidc.role
 }

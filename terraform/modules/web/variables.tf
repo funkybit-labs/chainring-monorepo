@@ -1,5 +1,6 @@
 variable "name_prefix" {}
 variable "zone" {}
+variable "ci_role_arn" {}
 data "aws_caller_identity" "current" {}
 data "aws_acm_certificate" "chainring" {
   domain    = "*.chainring.co"
