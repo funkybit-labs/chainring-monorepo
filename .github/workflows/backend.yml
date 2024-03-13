@@ -46,6 +46,8 @@ jobs:
     #
     # - name: Build with Gradle 8.5
     #   run: gradle build
+    - name: Check with Gradle Wrapper
+      run: ./gradlew check
 
   dependency-submission:
 
