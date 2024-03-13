@@ -1,3 +1,5 @@
 .terraform
 *.iml
 .idea
+.gradle
+build

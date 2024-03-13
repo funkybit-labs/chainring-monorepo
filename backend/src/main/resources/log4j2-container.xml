@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration packages="co.chainring.core.utils" status="INFO">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <NewRelicMaskingLayout/>
+        </Console>
+        <Async name="AsyncAppender">
+            <AppenderRef ref="Console"/>
+        </Async>
+    </Appenders>
+    <Loggers>
+        <Logger name="co.chainring" level="debug" additivity="false">
+            <AppenderRef ref="AsyncAppender"/>
+        </Logger>
+        <Root level="error">
+            <AppenderRef ref="AsyncAppender"/>
+        </Root>
+    </Loggers>
+</Configuration>

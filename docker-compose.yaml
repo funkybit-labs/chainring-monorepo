@@ -1,0 +1,24 @@
+version: '3.1'
+
+services:
+  anvil:
+    image: anvil # custom image (./anvil/Dockerfile)
+    container_name: anvil
+    restart: always
+    ports:
+      - "8545:8545"
+    volumes:
+      - anvil-data:/root/.foundry
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: chainring
+      POSTGRES_PASSWORD: chainring
+      POSTGRES_DB: chainring
+      PGUSER: chainring # is used by psql inside container
+    ports:
+      - "5432:5432"
+
+volumes:
+  anvil-data:
