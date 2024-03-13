@@ -1,7 +1,10 @@
 package co.chainring.apps.api
 
 import co.chainring.apps.api.model.ConfigurationApiResponse
-import co.chainring.core.model.db.KeyValueStore
+import co.chainring.apps.api.model.DeployedContract
+import co.chainring.core.model.Address
+import co.chainring.core.model.db.Chain
+import co.chainring.core.model.db.DeployedSmartContractEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.meta
@@ -15,7 +18,6 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 object ConfigRoutes {
     private val logger = KotlinLogging.logger {}
-    const val CONTRACT_ADDRESS_KEY = "contract_address"
 
     fun getConfiguration(): ContractRoute {
         val responseBody = Body.auto<ConfigurationApiResponse>().toLens()
@@ -27,22 +29,34 @@ object ConfigRoutes {
                 Status.OK,
                 responseBody to
                     ConfigurationApiResponse(
-                        contractAddress = "",
+                        addresses =
+                            listOf(
+                                DeployedContract(
+                                    chain = Chain.Ethereum,
+                                    name = "Exchange",
+                                    address = Address("0x0000000000000000000000000000000000000000"),
+                                ),
+                            ),
                     ),
             )
         } bindContract Method.GET to { _ ->
-            transaction {
-                when (val contractAddress = KeyValueStore.getValue(CONTRACT_ADDRESS_KEY)) {
-                    null -> Response(Status.NOT_FOUND)
-                    else ->
-                        Response(Status.OK).with(
-                            responseBody of
-                                ConfigurationApiResponse(
-                                    contractAddress = contractAddress,
-                                ),
+            val addresses =
+                transaction {
+                    DeployedSmartContractEntity.validContracts().map {
+                        DeployedContract(
+                            chain = it.chain,
+                            name = it.name,
+                            address = it.address,
                         )
+                    }
                 }
-            }
+
+            Response(Status.OK).with(
+                responseBody of
+                    ConfigurationApiResponse(
+                        addresses = addresses,
+                    ),
+            )
         }
     }
 }

@@ -1,3 +1,4 @@
+.PHONY: docker
 
 web3j_generate:
 	./gradlew web3jGenerate

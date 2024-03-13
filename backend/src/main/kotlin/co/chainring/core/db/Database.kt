@@ -1,6 +1,6 @@
 package co.chainring.core.db
 
-import co.chainring.core.model.db.migrations.V1_KeyValueStore
+import co.chainring.core.model.db.migrations.V1_DeployedSmartContract
 import org.apache.commons.dbcp2.BasicDataSource
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.DatabaseConfig
@@ -58,5 +58,5 @@ fun Transaction.notifyDbListener(
 
 val migrations =
     listOf(
-        V1_KeyValueStore(),
+        V1_DeployedSmartContract(),
     )

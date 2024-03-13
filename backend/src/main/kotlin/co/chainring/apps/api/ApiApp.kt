@@ -1,12 +1,11 @@
 package co.chainring.apps.api
 
 import co.chainring.apps.BaseApp
-import co.chainring.apps.api.ConfigRoutes.CONTRACT_ADDRESS_KEY
 import co.chainring.apps.api.middleware.HttpTransactionLogger
 import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
 import co.chainring.core.blockchain.BlockchainClient
+import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.db.DbConfig
-import co.chainring.core.model.db.KeyValueStore
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.contract
 import org.http4k.core.Method
@@ -20,17 +19,17 @@ import org.http4k.routing.routes
 import org.http4k.server.Netty
 import org.http4k.server.ServerConfig
 import org.http4k.server.asServer
-import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Duration.ofSeconds
 
 data class ApiAppConfig(
     val httpPort: Int = System.getenv("HTTP_PORT")?.toIntOrNull() ?: 9000,
-    val db: DbConfig = DbConfig(),
+    val dbConfig: DbConfig = DbConfig(),
+    val blockchainClientConfig: BlockchainClientConfig = BlockchainClientConfig(),
 )
 
 val requestContexts = RequestContexts()
 
-class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.db) {
+class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     override val logger = KotlinLogging.logger {}
 
     private val server =
@@ -51,20 +50,14 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.db) {
             )
             .asServer(Netty(config.httpPort, ServerConfig.StopMode.Graceful(ofSeconds(1))))
 
+    private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
+
     override fun start() {
         logger.info { "Starting" }
         super.start()
+        blockchainClient.updateContracts()
         server.start()
         logger.info { "Started" }
-
-        logger.info { "Deploying chainring contract" }
-        val address = BlockchainClient().deployChainringContract()
-
-        transaction {
-            KeyValueStore.setValue(CONTRACT_ADDRESS_KEY, address)
-        }
-
-        logger.info { "Chainring contract deployed" }
     }
 
     override fun stop() {
