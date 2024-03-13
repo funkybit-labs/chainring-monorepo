@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./web-ui
+        working-directory: web-ui
     steps:
       - name: Lint
         run: pnpm run lint
@@ -53,9 +53,10 @@ jobs:
         run: pnpm run test --run
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-ui
     steps:
-      - name: chdir
-        run: cd web-ui
       - name: build
         run: pnpm run build
         
