@@ -4,7 +4,7 @@ web3j_generate:
 	./gradlew web3jGenerate
 
 anvil:
-	docker build -t foundry-anvil -f ./docker/anvil/Dockerfile .
+	docker build -t anvil -f ./docker/anvil/Dockerfile .
 
 docker:
 	docker-compose down --remove-orphans && docker-compose up -d
