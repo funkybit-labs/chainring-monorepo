@@ -20,8 +20,7 @@ jobs:
     permissions:
       # needed for aws credentials
       id-token: write
-      # needed for persistent build-number
-      contents: write
+      contents: read
 
     steps:
     - uses: actions/checkout@v4
@@ -62,12 +61,9 @@ jobs:
       with:
         aws-region: us-east-2
         role-to-assume: arn:aws:iam::851725450525:role/terraform-20240313150351606400000001
-    - uses: einaregilsson/build-number@v1
-      with:
-        token: ${{ github.token }}
     - name: Publish to ECR
       if: ${{ github.event_name == 'push' }}
-      run: make publish_containers
+      run: BUILD_NUMBER=$GITHUB_RUN_NUMBER make publish_containers
 
   dependency-submission:
 
