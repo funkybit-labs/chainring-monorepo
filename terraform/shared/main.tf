@@ -2,6 +2,25 @@ module "github_oidc" {
   source = "../modules/github_oidc"
 }
 
+resource "aws_iam_role_policy" "auth" {
+  role   = module.github_oidc.role.name
+  policy = <<EOF
+{
+    "Version": "2008-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowGetAuthorizationToken",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:GetAuthorizationToken"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+EOF
+}
+
 resource "aws_ecr_repository" "backend" {
   name                 = "backend"
   image_tag_mutability = "MUTABLE"
@@ -23,7 +42,7 @@ resource "aws_ecr_repository_policy" "backend" {
             "Sid": "AllowPushPull",
             "Effect": "Allow",
             "Principal": {
-                "AWS": "${module.github_oidc.role}"
+                "AWS": "${module.github_oidc.role.arn}"
             },
             "Action": [
                 "ecr:GetDownloadUrlForLayer",
@@ -32,8 +51,7 @@ resource "aws_ecr_repository_policy" "backend" {
                 "ecr:PutImage",
                 "ecr:InitiateLayerUpload",
                 "ecr:UploadLayerPart",
-                "ecr:CompleteLayerUpload",
-                "ecr:GetAuthorizationToken"
+                "ecr:CompleteLayerUpload"
             ]
         }
     ]
@@ -62,7 +80,7 @@ resource "aws_ecr_repository_policy" "anvil" {
             "Sid": "AllowPushPull",
             "Effect": "Allow",
             "Principal": {
-                "AWS": "${module.github_oidc.role}"
+                "AWS": "${module.github_oidc.role.arn}"
             },
             "Action": [
                 "ecr:GetDownloadUrlForLayer",
@@ -71,8 +89,7 @@ resource "aws_ecr_repository_policy" "anvil" {
                 "ecr:PutImage",
                 "ecr:InitiateLayerUpload",
                 "ecr:UploadLayerPart",
-                "ecr:CompleteLayerUpload",
-                "ecr:GetAuthorizationToken"
+                "ecr:CompleteLayerUpload"
             ]
         }
     ]
