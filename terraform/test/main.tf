@@ -26,7 +26,7 @@ module "api" {
   source                = "../modules/ecs_task"
   name_prefix           = local.name_prefix
   task_name             = "api"
-  image                 = "chainring"
+  image                 = "backend"
   ecs_cluster_id        = module.ecs.cluster.id
   app_ecs_task_role     = module.ecs.app_ecs_task_role
   aws_region            = var.aws_region
@@ -59,10 +59,6 @@ module "rds" {
   vpc             = module.vpc.vpc
 }
 
-module "github_oidc" {
-  source = "../modules/github_oidc"
-}
-
 module "web" {
   source      = "../modules/web"
   name_prefix = local.name_prefix
@@ -70,5 +66,5 @@ module "web" {
   providers = {
     aws.us_east_1 = aws.us_east_1
   }
-  ci_role_arn = module.github_oidc.role
+  ci_role_arn = data.terraform_remote_state.shared.outputs.ci_role_arn
 }
