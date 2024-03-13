@@ -1,0 +1,8 @@
+[
+  {
+    "Type": "fixed-response",
+    "FixedResponseConfig": {
+      "StatusCode": "418"
+    }
+  }
+]
