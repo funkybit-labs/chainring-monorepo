@@ -18,8 +18,10 @@ jobs:
 
     runs-on: ubuntu-latest
     permissions:
+      # needed for aws credentials
       id-token: write
-      contents: read
+      # needed for persistent build-number
+      contents: write
 
     steps:
     - uses: actions/checkout@v4
