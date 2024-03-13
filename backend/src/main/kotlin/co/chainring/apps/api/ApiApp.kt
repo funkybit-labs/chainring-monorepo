@@ -55,8 +55,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     override fun start() {
         logger.info { "Starting" }
         super.start()
-        blockchainClient.updateContracts()
         server.start()
+        blockchainClient.updateContracts()
         logger.info { "Started" }
     }
 

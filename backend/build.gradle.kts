@@ -25,7 +25,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
 
     // Blockchain client
-    implementation("org.web3j:core:4.10.0") // 4.11 introduces dependency (tech.pegasys:jc-kzg-4844) that is published to cloudsmith repository (tech.pegasys:jc-kzg-4844, https://github.com/web3j/web3j/issues/2013)
+    implementation("org.web3j:core:4.10.0") // 4.11 introduces dependency (tech.pegasys:jc-kzg-4844) that is published to cloudsmith repository (https://github.com/web3j/web3j/issues/2013)
 
     // Database
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
