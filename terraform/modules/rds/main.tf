@@ -52,3 +52,30 @@ resource "aws_rds_cluster_instance" "db_instance" {
   publicly_accessible  = false
   db_subnet_group_name = aws_db_subnet_group.db_subnet_group.name
 }
+
+locals {
+  account_id = data.aws_caller_identity.current.account_id
+}
+
+resource "aws_secretsmanager_secret_policy" "ci_db_password_access" {
+  secret_arn = aws_rds_cluster.db_cluster.master_user_secret[0].secret_arn
+  policy     = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+          "secretsmanager:GetSecretValue"
+      ],
+      "Principal": {
+        "AWS": "${var.ci_role_arn}"
+      },
+      "Resource": [
+        "${aws_rds_cluster.db_cluster.master_user_secret[0].secret_arn}"
+      ]
+    }
+  ]
+}
+EOF
+}
