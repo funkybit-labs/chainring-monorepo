@@ -21,7 +21,7 @@ class V1_DeployedSmartContract : Migration() {
         val name = varchar("name", 10485760)
         val chain =
             customEnumeration(
-                "status",
+                "chain",
                 "Chain",
                 { value -> V1_Chain.valueOf(value as String) },
                 { PGEnum("Chain", it) },
