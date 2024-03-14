@@ -9,4 +9,4 @@ RUN /root/.foundry/bin/foundryup
 EXPOSE 8545
 
 # Entrypoint 
-CMD ["/root/.foundry/bin/anvil", "--block-time", "1", "--host", "0.0.0.0", "--port", "8545"]
+CMD ["/root/.foundry/bin/anvil", "--block-time", "1", "--host", "0.0.0.0", "--port", "8545", "--load-state", "anvil_state.json", "--dump-state", "anvil_state.json"]

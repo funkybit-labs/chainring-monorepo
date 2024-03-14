@@ -53,7 +53,7 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
       ],
       "Resource": [
         "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:${var.name_prefix}/${var.task_name}/*",
-        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*",
+        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*"
       ]
     }
   ]
@@ -157,6 +157,17 @@ resource "aws_ecs_task_definition" "task" {
       }
     }, var.include_command ? { command = [var.task_name] } : {}),
   ])
+  dynamic "volume" {
+    for_each = aws_efs_file_system.task_efs_volume
+    content {
+      name = "${var.name_prefix}-${var.task_name}-efs-volume"
+      efs_volume_configuration {
+        file_system_id     = aws_efs_file_system.task_efs_volume[0].id
+        root_directory     = "/"
+        transit_encryption = "ENABLED"
+      }
+    }
+  }
 }
 
 
@@ -197,4 +208,17 @@ resource "aws_route53_record" "dns" {
   type     = "CNAME"
   ttl      = "300"
   records  = [var.lb_dns_name]
+}
+
+resource "aws_efs_file_system" "task_efs_volume" {
+  count = var.mount_efs_volume ? 1 : 0
+  creation_token = "${var.name_prefix}-${var.task_name}-efs"
+}
+
+resource "aws_efs_mount_target" "task_efs_mount_target" {
+  count = var.mount_efs_volume ? 1 : 0
+
+  file_system_id = aws_efs_file_system.task_efs_volume[0].id
+  subnet_id      = var.subnet_id_1
+  security_groups = [aws_security_group.security_group.id]
 }

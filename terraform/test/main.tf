@@ -59,6 +59,7 @@ module "anvil" {
   lb_dns_name           = module.alb.dns_name
   zone                  = data.terraform_remote_state.shared.outputs.zone
   tcp_ports             = [8545]
+  mount_efs_volume      = true
 }
 
 module "bastion" {

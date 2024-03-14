@@ -42,4 +42,7 @@ variable "zone" {
 variable "lb_dns_name" {
   default = ""
 }
+variable "mount_efs_volume" {
+  default = false
+}
 data "aws_caller_identity" "current" {}
