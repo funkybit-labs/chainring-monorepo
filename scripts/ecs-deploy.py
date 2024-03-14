@@ -83,7 +83,7 @@ class ChainringDeploymentManager:
                 'inferenceAccelerators'
             ] if key in task_def}
             primary_container = new_task_def['containerDefinitions'][0]
-            service_config = env_config['services'][service_name]
+            service_config = env_config['services'][service_name.removeprefix(f"{args.env}-")]
             primary_container['image'] = f"{service_config['image']}:{image_tag}"
 
             service_env = service_config.get('environment')
@@ -101,15 +101,14 @@ class ChainringDeploymentManager:
             else:
                 primary_container['environment'] = []
 
-            #if service_name.startswith('vault-'):
-            #    primary_container['environment'].append({
-            #        'name': 'ENV_NAME',
-            #        'value': env_name
-            #    })
-            #    primary_container['environment'].append({
-            #        'name': 'APP_NAME',
-            #        'value': service_name.removeprefix('vault-')
-            #    })
+            primary_container['environment'].append({
+                'name': 'ENV_NAME',
+                'value': env_name
+            })
+            primary_container['environment'].append({
+                'name': 'APP_NAME',
+                'value': service_name.removeprefix('vault-')
+            })
 
             if 'secrets' in service_config:
                 primary_container['secrets'] = [
@@ -127,8 +126,6 @@ class ChainringDeploymentManager:
                 service=service_name,
                 taskDefinition=new_task_def_arn
             )
-
-        self.update_deeplink_content(env_name, env_config)
 
     def switch_to_holding(self, env_name):
         print(f"Setting up holding page for environment: {env_name}")

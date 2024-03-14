@@ -61,11 +61,11 @@ ECS_EXEC_POLICY
 }
 
 resource "aws_security_group" "security_group" {
-  name   = "${var.name_prefix}-ecs-task"
+  name   = "${var.name_prefix}-${var.task_name}-ecs-task"
   vpc_id = var.vpc.id
 }
 
-resource "aws_security_group_rule" "vault_api_ecs_task_egress" {
+resource "aws_security_group_rule" "ecs_task_egress" {
   security_group_id = aws_security_group.security_group.id
 
   type             = "egress"
