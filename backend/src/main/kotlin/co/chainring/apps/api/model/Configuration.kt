@@ -6,12 +6,21 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class ConfigurationApiResponse(
-    val addresses: List<DeployedContract>,
+    val contracts: List<DeployedContract>,
+    val erc20Tokens: List<ERC20Token>,
 )
 
 @Serializable
 data class DeployedContract(
     val chain: Chain,
     val name: String,
+    val address: Address,
+)
+
+@Serializable
+data class ERC20Token(
+    val chain: Chain,
+    val name: String,
+    val symbol: String,
     val address: Address,
 )

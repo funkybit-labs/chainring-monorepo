@@ -26,13 +26,12 @@ object DeployedSmartContractTable : GUIDTable<ContractId>("deployed_smart_contra
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
     val name = varchar("name", 10485760)
-    val chain =
-        customEnumeration(
-            "status",
-            "Chain",
-            { value -> Chain.valueOf(value as String) },
-            { PGEnum("Chain", it) },
-        )
+    val chain = customEnumeration(
+        "chain",
+        "Chain",
+        { value -> Chain.valueOf(value as String) },
+        { PGEnum("Chain", it) },
+    )
     val address = varchar("address", 10485760)
     val deprecated = bool("deprecated")
 

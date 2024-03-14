@@ -1,6 +1,7 @@
 package co.chainring.core.db
 
 import co.chainring.core.model.db.migrations.V1_DeployedSmartContract
+import co.chainring.core.model.db.migrations.V2_ERC20Token
 import org.apache.commons.dbcp2.BasicDataSource
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.DatabaseConfig
@@ -37,11 +38,10 @@ fun Database.Companion.connect(config: DbConfig): Database =
             maxTotal = config.maxConnections
             setMaxWait(Duration.ofMillis(config.maxConnectionWaitingTimeMs))
         },
-        databaseConfig =
-            DatabaseConfig.Companion.invoke {
-                defaultRepetitionAttempts = 1
-                useNestedTransactions = true
-            },
+        databaseConfig = DatabaseConfig.Companion.invoke {
+            defaultRepetitionAttempts = 1
+            useNestedTransactions = true
+        },
     )
 
 fun Transaction.notifyDbListener(
@@ -56,7 +56,7 @@ fun Transaction.notifyDbListener(
     )
 }
 
-val migrations =
-    listOf(
-        V1_DeployedSmartContract(),
-    )
+val migrations = listOf(
+    V1_DeployedSmartContract(),
+    V2_ERC20Token(),
+)
