@@ -76,14 +76,14 @@ application {
 }
 
 jib {
-/*    from {
+    from {
         platforms {
             platform {
-                architecture = 'amd64'
-                os = 'linux'
+                architecture = "amd64"
+                os = "linux"
             }
         }
-    }*/
+    }
 
     to {
         image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/backend"

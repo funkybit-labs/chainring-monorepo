@@ -10,7 +10,9 @@ import org.jetbrains.exposed.sql.DatabaseConfig
 import org.jetbrains.exposed.sql.Transaction
 import java.lang.System.getenv
 import java.time.Duration
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class DbCredentials(
     val username: String,
     val password: String,
