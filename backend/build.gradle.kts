@@ -75,47 +75,6 @@ application {
     mainClass.set("co.chainring.MainKt")
 }
 
-val compileContracts by tasks.registering(Exec::class) {
-    // requires solidity compiler (brew install solidity)
-    commandLine(
-        "bash", "-c", """
-            forge build --root "${projectDir}/contracts" --out "${buildDir}/contracts" 
-        """.trimIndent()
-    )
-    doLast {
-        println("Solidity contracts compiled successfully.")
-    }
-}
-
-val web3jGenerate by tasks.registering(Exec::class) {
-    // requires web3j (brew tap web3j/web3j && brew install web3j)
-    dependsOn(compileContracts)
-    doFirst {
-        val contractFiles = File("${projectDir}/contracts/src").listFiles {  _, name -> name.endsWith(".sol") }.map { it.name } +
-                listOf("ERC1967Proxy.sol", "UUPSUpgradeable.sol")
-        val contractsBuildDir = File("${buildDir}/contracts")
-        contractsBuildDir.listFiles { _, name -> contractFiles.contains(name) }
-            ?.map { dirFile -> File(dirFile.absolutePath, "${dirFile.nameWithoutExtension}.json") }
-            ?.forEach { jsonFile ->
-                val abiFile = File(jsonFile.absolutePath.replace(".json", ".abi"))
-                val binFile = File(jsonFile.absolutePath.replace(".json", ".bin"))
-                val json = groovy.json.JsonSlurper().parseText(jsonFile.readText()) as Map<String, String>
-                abiFile.writeText("${groovy.json.JsonOutput.toJson(json["abi"] as ArrayList<*>)}")
-                val byteCode: String = groovy.json.JsonOutput.toJson((json["bytecode"] as Map<String, String>)["object"])!!
-                binFile.writeText(byteCode.replace("0x", "").replace("\"", ""))
-                // Create java wrappers for each contract
-                commandLine(
-                    "bash", "-c", """
-                        web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${projectDir}/src/main/java -p co.chainring.contracts.generated
-                    """.trimIndent()
-                )
-            }
-    }
-    doLast {
-        println("Web3j contract wrappers generated successfully for all contracts.")
-    }
-}
-
 jib {
     to {
         image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/backend"
