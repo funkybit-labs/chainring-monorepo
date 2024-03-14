@@ -18,6 +18,8 @@ jobs:
 
     runs-on: ubuntu-latest
     permissions:
+      # needed for aws credentials
+      id-token: write
       contents: read
 
     steps:
@@ -48,6 +50,20 @@ jobs:
     #   run: gradle build
     - name: Check with Gradle Wrapper
       run: ./gradlew check
+    - name: Install aws-cli
+      uses: unfor19/install-aws-cli-action@v1
+      if: ${{ github.event_name == 'push' }}
+      with:
+        arch: amd64
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4.0.2
+      if: ${{ github.event_name == 'push' }}
+      with:
+        aws-region: us-east-2
+        role-to-assume: arn:aws:iam::851725450525:role/terraform-20240313150351606400000001
+    - name: Publish to ECR
+      if: ${{ github.event_name == 'push' }}
+      run: BUILD_NUMBER=$GITHUB_RUN_NUMBER make publish_containers
 
   dependency-submission:
 
