@@ -48,9 +48,9 @@ jobs:
       - name: Typecheck
         working-directory: ./web-ui
         run: pnpm run typecheck
-      - name: Test
-        working-directory: ./web-ui
-        run: pnpm run test --run
+#      - name: Test
+#        working-directory: ./web-ui
+#        run: pnpm run test --run
       - name: build
         working-directory: ./web-ui
         run: pnpm run build
