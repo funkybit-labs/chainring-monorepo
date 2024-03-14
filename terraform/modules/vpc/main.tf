@@ -43,7 +43,7 @@ resource "aws_internet_gateway" "igw" {
 resource "aws_route" "private_egress" {
   route_table_id         = aws_route_table.private.id
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.igw.id
+  nat_gateway_id         = aws_nat_gateway.vpc_nat[0].id
 }
 
 resource "aws_route_table_association" "private-1" {
@@ -54,6 +54,17 @@ resource "aws_route_table_association" "private-1" {
 resource "aws_route_table_association" "private-2" {
   subnet_id      = aws_subnet.private_subnet_2.id
   route_table_id = aws_route_table.private.id
+}
+resource "aws_eip" "vpc-nat-1a" {
+  depends_on = [aws_internet_gateway.igw]
+  vpc        = true
+}
+
+resource "aws_nat_gateway" "vpc_nat" {
+  count         = var.create_public ? 1 : 0
+  allocation_id = aws_eip.vpc-nat-1a.id
+  subnet_id     = aws_subnet.public_subnet[0].id
+  depends_on    = [aws_internet_gateway.igw]
 }
 
 # Create route table for public subnet
