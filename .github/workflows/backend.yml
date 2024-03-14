@@ -64,8 +64,9 @@ jobs:
     - name: Test DB access
       run: |
         ssh -o StrictHostKeyChecking=no -L 5434:db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com:5432 ec2-user@test-bastion.chainring.co -N &
-        sleep 2
-        PGPASSWORD=$(aws --region us-east-2 secretsmanager get-secret-value --secret-id 'arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-32e6d3b7-0fd7-43f6-b108-4648afcf69c1-NgwNkC' | jq '.SecretString' | awk -F\\ '{print $8}' | sed 's/^"//') psql --port=5434 --host=localhost --user=chainring -c "SELECT 1"
+        sleep 2  # to give the SSH tunnel time to be set up
+        PGPASSWORD=$(aws --region us-east-2 secretsmanager get-secret-value --secret-id 'arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-32e6d3b7-0fd7-43f6-b108-4648afcf69c1-NgwNkC' | jq -r '.SecretString' | jq -r '.password') \
+          psql --port=5434 --host=localhost --user=chainring -c "SELECT 1"
     - name: Check with Gradle Wrapper
       run: ./gradlew check
 
