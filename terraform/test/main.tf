@@ -78,6 +78,8 @@ module "rds" {
   instance_class  = "db.t3.medium"
   security_groups = [module.api.security_group_id, module.bastion.security_group.id]
   vpc             = module.vpc.vpc
+  aws_region      = var.aws_region
+  ci_role_arn     = data.terraform_remote_state.shared.outputs.ci_role_arn
 }
 
 module "web" {

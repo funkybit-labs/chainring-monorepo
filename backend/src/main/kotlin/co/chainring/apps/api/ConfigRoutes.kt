@@ -57,7 +57,7 @@ object ConfigRoutes {
                                 DeployedContract(
                                     chain = it.chain,
                                     name = it.name,
-                                    address = it.address,
+                                    address = it.proxyAddress ?: it.implementationAddress,
                                 )
                             },
                             erc20Tokens = ERC20TokenEntity.all().map {

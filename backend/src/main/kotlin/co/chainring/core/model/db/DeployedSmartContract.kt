@@ -6,6 +6,8 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 
 @Serializable
@@ -32,7 +34,9 @@ object DeployedSmartContractTable : GUIDTable<ContractId>("deployed_smart_contra
         { value -> Chain.valueOf(value as String) },
         { PGEnum("Chain", it) },
     )
-    val address = varchar("address", 10485760)
+    val proxyAddress = varchar("proxy_address", 10485760).nullable()
+    val implementationAddress = varchar("implementation_address", 10485760)
+    val version = integer("version").nullable()
     val deprecated = bool("deprecated")
 
     init {
@@ -51,15 +55,30 @@ class DeployedSmartContractEntity(guid: EntityID<ContractId>) : GUIDEntity<Contr
         fun create(
             name: String,
             chain: Chain,
-            address: Address,
+            proxyAddress: Address,
+            implementationAddress: Address,
+            version: Int,
         ) = DeployedSmartContractEntity.new(ContractId.generate()) {
             this.createdAt = Clock.System.now()
             this.createdBy = "system"
             this.name = name
             this.chain = chain
-            this.address = address
+            this.proxyAddress = proxyAddress
+            this.implementationAddress = implementationAddress
+            this.version = version
             this.deprecated = false
         }
+
+        fun findLastDeployedContractByNameAndChain(
+            name: String,
+            chain: Chain,
+        ): DeployedSmartContractEntity? =
+            DeployedSmartContractEntity
+                .find {
+                    DeployedSmartContractTable.name.eq(name) and DeployedSmartContractTable.chain.eq(chain)
+                }
+                .orderBy(DeployedSmartContractTable.createdAt to SortOrder.DESC)
+                .firstOrNull()
 
         fun validContracts(): List<DeployedSmartContractEntity> =
             DeployedSmartContractEntity
@@ -73,9 +92,14 @@ class DeployedSmartContractEntity(guid: EntityID<ContractId>) : GUIDEntity<Contr
     var createdBy by DeployedSmartContractTable.createdBy
     var name by DeployedSmartContractTable.name
     var chain by DeployedSmartContractTable.chain
-    var address by DeployedSmartContractTable.address.transform(
+    var proxyAddress by DeployedSmartContractTable.proxyAddress.transform(
+        toColumn = { it?.value },
+        toReal = { it?.let { Address(it) } },
+    )
+    var implementationAddress by DeployedSmartContractTable.implementationAddress.transform(
         toColumn = { it.value },
         toReal = { Address(it) },
     )
+    var version by DeployedSmartContractTable.version
     var deprecated by DeployedSmartContractTable.deprecated
 }
