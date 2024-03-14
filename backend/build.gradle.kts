@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.util.ArrayList
 
 plugins {
     kotlin("jvm") version "1.9.23"
@@ -72,41 +73,6 @@ tasks.withType<KotlinCompile> {
 
 application {
     mainClass.set("co.chainring.MainKt")
-}
-
-val compileSolidity by tasks.registering(Exec::class) {
-    // requires solidity compiler (brew install solidity)
-    commandLine(
-        "bash", "-c", """
-            solc --bin --abi --optimize --overwrite -o ${buildDir}/contracts ${projectDir}/src/main/solidity/*.sol
-        """.trimIndent()
-    )
-    doLast {
-        println("Solidity contracts compiled successfully.")
-    }
-}
-
-val web3jGenerate by tasks.registering(Exec::class) {
-    // requires web3j (brew tap web3j/web3j && brew install web3j)
-    dependsOn(compileSolidity)
-    doFirst {
-        val contractsDir = File("${buildDir}/contracts")
-        contractsDir.listFiles { _, name -> name.endsWith(".abi") }
-            ?.forEach { abiFile ->
-                val contractName = abiFile.nameWithoutExtension
-                val binFile = File(contractsDir, "$contractName.bin")
-
-                // Create java wrappers for each contract
-                commandLine(
-                    "bash", "-c", """
-                        web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${projectDir}/src/main/java -p co.chainring.contracts.generated
-                    """.trimIndent()
-                )
-            }
-    }
-    doLast {
-        println("Web3j contract wrappers generated successfully for all contracts.")
-    }
 }
 
 jib {
