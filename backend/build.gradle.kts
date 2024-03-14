@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.util.ArrayList
 
 plugins {
     kotlin("jvm") version "1.9.23"
@@ -74,11 +75,11 @@ application {
     mainClass.set("co.chainring.MainKt")
 }
 
-val compileSolidity by tasks.registering(Exec::class) {
+val compileContracts by tasks.registering(Exec::class) {
     // requires solidity compiler (brew install solidity)
     commandLine(
         "bash", "-c", """
-            solc --bin --abi --optimize --overwrite -o ${buildDir}/contracts ${projectDir}/src/main/solidity/*.sol
+            forge build --root "${projectDir}/contracts" --out "${buildDir}/contracts" 
         """.trimIndent()
     )
     doLast {
@@ -88,14 +89,20 @@ val compileSolidity by tasks.registering(Exec::class) {
 
 val web3jGenerate by tasks.registering(Exec::class) {
     // requires web3j (brew tap web3j/web3j && brew install web3j)
-    dependsOn(compileSolidity)
+    dependsOn(compileContracts)
     doFirst {
-        val contractsDir = File("${buildDir}/contracts")
-        contractsDir.listFiles { _, name -> name.endsWith(".abi") }
-            ?.forEach { abiFile ->
-                val contractName = abiFile.nameWithoutExtension
-                val binFile = File(contractsDir, "$contractName.bin")
-
+        val contractFiles = File("${projectDir}/contracts/src").listFiles {  _, name -> name.endsWith(".sol") }.map { it.name } +
+                listOf("ERC1967Proxy.sol", "UUPSUpgradeable.sol")
+        val contractsBuildDir = File("${buildDir}/contracts")
+        contractsBuildDir.listFiles { _, name -> contractFiles.contains(name) }
+            ?.map { dirFile -> File(dirFile.absolutePath, "${dirFile.nameWithoutExtension}.json") }
+            ?.forEach { jsonFile ->
+                val abiFile = File(jsonFile.absolutePath.replace(".json", ".abi"))
+                val binFile = File(jsonFile.absolutePath.replace(".json", ".bin"))
+                val json = groovy.json.JsonSlurper().parseText(jsonFile.readText()) as Map<String, String>
+                abiFile.writeText("${groovy.json.JsonOutput.toJson(json["abi"] as ArrayList<*>)}")
+                val byteCode: String = groovy.json.JsonOutput.toJson((json["bytecode"] as Map<String, String>)["object"])!!
+                binFile.writeText(byteCode.replace("0x", "").replace("\"", ""))
                 // Create java wrappers for each contract
                 commandLine(
                     "bash", "-c", """
