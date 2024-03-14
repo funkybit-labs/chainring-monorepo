@@ -1,5 +1,5 @@
 locals {
-  http_api_port = 9000
+  http_api_port = var.allow_inbound ? var.tcp_ports[0] : 0
   account_id    = data.aws_caller_identity.current.account_id
   port_mappings = flatten([for port in var.tcp_ports : { containerPort = port, hostPort = port, protocol = "tcp" }])
 }
@@ -64,6 +64,9 @@ ECS_EXEC_POLICY
 resource "aws_security_group" "security_group" {
   name   = "${var.name_prefix}-${var.task_name}-ecs-task"
   vpc_id = var.vpc.id
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_security_group_rule" "ecs_task_egress" {
@@ -189,10 +192,13 @@ resource "aws_ecs_service" "service" {
     assign_public_ip = false
   }
 
-  load_balancer {
-    target_group_arn = aws_alb_target_group.target_group[0].arn
-    container_name   = "${var.name_prefix}-${var.task_name}"
-    container_port   = local.http_api_port
+  dynamic "load_balancer" {
+    for_each = var.allow_inbound ? [0] : []
+    content {
+      target_group_arn = aws_alb_target_group.target_group[0].arn
+      container_name   = "${var.name_prefix}-${var.task_name}"
+      container_port   = local.http_api_port
+    }
   }
 
   lifecycle {
