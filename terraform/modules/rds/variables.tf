@@ -9,3 +9,6 @@ variable "security_groups" {
   default = []
 }
 variable "vpc" {}
+variable "aws_region" {}
+variable "ci_role_arn" {}
+data aws_caller_identity "current" {}
