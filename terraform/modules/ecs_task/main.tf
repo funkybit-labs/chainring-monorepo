@@ -161,11 +161,11 @@ resource "aws_ecs_task_definition" "task" {
     }, var.include_command ? { command = [var.task_name] } : {}),
   ])
   dynamic "volume" {
-    for_each = aws_efs_file_system.task_efs_volume
+    for_each = aws_efs_file_system.task_efs_file_system
     content {
       name = "${var.name_prefix}-${var.task_name}-efs-volume"
       efs_volume_configuration {
-        file_system_id     = aws_efs_file_system.task_efs_volume[0].id
+        file_system_id     = aws_efs_file_system.task_efs_file_system[0].id
         root_directory     = "/"
         transit_encryption = "ENABLED"
       }
@@ -216,15 +216,54 @@ resource "aws_route53_record" "dns" {
   records  = [var.lb_dns_name]
 }
 
-resource "aws_efs_file_system" "task_efs_volume" {
+resource "aws_efs_file_system" "task_efs_file_system" {
   count = var.mount_efs_volume ? 1 : 0
+
   creation_token = "${var.name_prefix}-${var.task_name}-efs"
 }
 
-resource "aws_efs_mount_target" "task_efs_mount_target" {
+resource "aws_security_group" "task_efs_security_group" {
   count = var.mount_efs_volume ? 1 : 0
 
-  file_system_id = aws_efs_file_system.task_efs_volume[0].id
+  name   = "${var.name_prefix}-${var.task_name}-efs-sg"
+  vpc_id = var.vpc.id
+}
+
+resource "aws_security_group_rule" "task_efs_security_group_egress" {
+  count = var.mount_efs_volume ? 1 : 0
+
+  security_group_id = aws_security_group.task_efs_security_group[0].id
+  type             = "egress"
+  protocol         = "-1"
+  from_port        = 0
+  to_port          = 0
+  cidr_blocks      = ["0.0.0.0/0"]
+  ipv6_cidr_blocks = ["::/0"]
+}
+
+resource "aws_security_group_rule" "task_efs_security_group_ingress" {
+  count = var.mount_efs_volume ? 1 : 0
+
+  security_group_id = aws_security_group.task_efs_security_group[0].id
+  type        = "ingress"
+  from_port   = 2049
+  to_port     = 2049
+  protocol    = "tcp"
+  cidr_blocks = [var.vpc.cidr_block]
+}
+
+resource "aws_efs_mount_target" "task_efs_mount_target_subnet_1" {
+  count = var.mount_efs_volume ? 1 : 0
+
+  file_system_id = aws_efs_file_system.task_efs_file_system[0].id
   subnet_id      = var.subnet_id_1
-  security_groups = [aws_security_group.security_group.id]
+  security_groups = [aws_security_group.task_efs_security_group[0].id]
+}
+
+resource "aws_efs_mount_target" "task_efs_mount_target_subnet_2" {
+  count = var.mount_efs_volume ? 1 : 0
+
+  file_system_id = aws_efs_file_system.task_efs_file_system[0].id
+  subnet_id      = var.subnet_id_2
+  security_groups = [aws_security_group.task_efs_security_group[0].id]
 }

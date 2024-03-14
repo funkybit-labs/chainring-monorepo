@@ -1,6 +1,8 @@
 # Create VPC
 resource "aws_vpc" "vpc" {
   cidr_block = "${var.cidr_prefix}.0.0/16"
+
+  enable_dns_hostnames = var.enable_dns_hostnames
 }
 
 moved {

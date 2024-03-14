@@ -110,6 +110,15 @@ val web3jGenerate by tasks.registering(Exec::class) {
 }
 
 jib {
+/*    from {
+        platforms {
+            platform {
+                architecture = 'amd64'
+                os = 'linux'
+            }
+        }
+    }*/
+
     to {
         image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/backend"
         credHelper.helper = "ecr-login"
