@@ -107,7 +107,7 @@ class ChainringDeploymentManager:
             })
             primary_container['environment'].append({
                 'name': 'APP_NAME',
-                'value': service_name.removeprefix('vault-')
+                'value': service_name.removeprefix(f"{args.env}-")
             })
 
             if 'secrets' in service_config:
