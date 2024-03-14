@@ -31,10 +31,29 @@ resource "aws_subnet" "private_subnet_2" {
   availability_zone = "${var.aws_region}b"
 }
 
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.vpc.id
+}
+
 # Internet Gateway for public subnet
 resource "aws_internet_gateway" "igw" {
-  count  = var.create_public ? 1 : 0
   vpc_id = aws_vpc.vpc.id
+}
+
+resource "aws_route" "private_egress" {
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.igw.id
+}
+
+resource "aws_route_table_association" "private-1" {
+  subnet_id      = aws_subnet.private_subnet.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "private-2" {
+  subnet_id      = aws_subnet.private_subnet_2.id
+  route_table_id = aws_route_table.private.id
 }
 
 # Create route table for public subnet
@@ -44,7 +63,7 @@ resource "aws_route_table" "public_route_table" {
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw[0].id
+    gateway_id = aws_internet_gateway.igw.id
   }
 }
 
