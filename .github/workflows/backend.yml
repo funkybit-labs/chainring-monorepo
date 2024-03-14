@@ -61,6 +61,10 @@ jobs:
       with:
         aws-region: us-east-2
         role-to-assume: arn:aws:iam::851725450525:role/terraform-20240313150351606400000001
+    - name: Login to Amazon ECR
+      if: ${{ github.event_name == 'push' }}
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
     - name: Publish to ECR
       if: ${{ github.event_name == 'push' }}
       run: BUILD_NUMBER=$GITHUB_RUN_NUMBER make publish_containers
