@@ -8,8 +8,7 @@ services:
     count: 1
     environment: test
     secrets:
-      #DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-32e6d3b7-0fd7-43f6-b108-4648afcf69c1-NgwNkC
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:test/api/copy-of-rds-credentials-fgQFzD
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-32e6d3b7-0fd7-43f6-b108-4648afcf69c1-NgwNkC
   anvil:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
     count: 1
