@@ -1,3 +1,0 @@
-[submodule "backend/contracts"]
-	path = backend/contracts
-	url = git@github.com:Chainring-Inc/chainring-contracts.git
