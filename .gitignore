@@ -3,3 +3,6 @@
 .idea
 .gradle
 build
+cache
+broadcast
+lib

@@ -23,3 +23,6 @@ publish_containers:
 
 ui_server:
 	cd web-ui && pnpm run dev
+
+local_init:
+	scripts/local/local_init.sh
