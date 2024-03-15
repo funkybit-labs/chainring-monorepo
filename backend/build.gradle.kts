@@ -41,6 +41,7 @@ dependencies {
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
     implementation("org.apache.logging.log4j:log4j-api:$log4j2Version")
     implementation("org.apache.logging.log4j:log4j-core:$log4j2Version")
+    implementation("org.apache.logging.log4j:log4j-layout-template-json:$log4j2Version")
     implementation("org.apache.logging.log4j:log4j-slf4j2-impl:$log4j2Version")
 
     // for REST services

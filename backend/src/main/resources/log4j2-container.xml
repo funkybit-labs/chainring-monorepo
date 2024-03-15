@@ -2,7 +2,7 @@
 <Configuration packages="co.chainring.core.utils" status="INFO">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
-            <NewRelicMaskingLayout/>
+            <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json"/>
         </Console>
         <Async name="AsyncAppender">
             <AppenderRef ref="Console"/>
