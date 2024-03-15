@@ -1,5 +1,5 @@
 locals {
-  http_api_port = 9000
+  http_api_port = var.allow_inbound ? var.tcp_ports[0] : 0
   account_id    = data.aws_caller_identity.current.account_id
   port_mappings = flatten([for port in var.tcp_ports : { containerPort = port, hostPort = port, protocol = "tcp" }])
 }
@@ -52,7 +52,8 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
           "secretsmanager:GetSecretValue"
       ],
       "Resource": [
-        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:${var.name_prefix}/${var.task_name}/*"
+        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:${var.name_prefix}/${var.task_name}/*",
+        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*"
       ]
     }
   ]
@@ -61,11 +62,14 @@ ECS_EXEC_POLICY
 }
 
 resource "aws_security_group" "security_group" {
-  name   = "${var.name_prefix}-ecs-task"
+  name   = "${var.name_prefix}-${var.task_name}-ecs-task"
   vpc_id = var.vpc.id
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
-resource "aws_security_group_rule" "vault_api_ecs_task_egress" {
+resource "aws_security_group_rule" "ecs_task_egress" {
   security_group_id = aws_security_group.security_group.id
 
   type             = "egress"
@@ -101,7 +105,7 @@ resource "aws_alb_target_group" "target_group" {
     healthy_threshold   = "2"
     interval            = "10"
     protocol            = "HTTP"
-    matcher             = "200"
+    matcher             = var.health_check_status
     timeout             = "3"
     path                = var.health_check
     unhealthy_threshold = "3"
@@ -134,28 +138,49 @@ resource "aws_ecs_task_definition" "task" {
   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
   task_role_arn            = var.app_ecs_task_role.arn
   container_definitions = jsonencode([
-    merge({
-      name         = "${var.name_prefix}-${var.task_name}"
-      image        = "${local.account_id}.dkr.ecr.us-east-1.amazonaws.com/${var.image}:latest"
-      essential    = true
-      portMappings = local.port_mappings
-      cpu          = 0
-      mountPoints  = []
-      volumesFrom  = []
-      environment  = []
-      secrets      = []
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          "awslogs-group" : "firelens-container",
-          "awslogs-region" : var.aws_region,
-          "awslogs-create-group" : "true",
-          "awslogs-stream-prefix" : "${var.name_prefix}-${var.task_name}",
-          "mode" : "non-blocking"
+    merge(
+      {
+        name         = "${var.name_prefix}-${var.task_name}"
+        image        = "${local.account_id}.dkr.ecr.us-east-1.amazonaws.com/${var.image}:latest"
+        essential    = true
+        portMappings = local.port_mappings
+        cpu          = 0
+        volumesFrom      = []
+        environment      = []
+        secrets          = []
+        logConfiguration = {
+          logDriver = "awslogs"
+          options   = {
+            "awslogs-group" : "firelens-container",
+            "awslogs-region" : var.aws_region,
+            "awslogs-create-group" : "true",
+            "awslogs-stream-prefix" : "${var.name_prefix}-${var.task_name}",
+            "mode" : "non-blocking"
+          }
         }
-      }
-    }, var.include_command ? { command = [var.task_name] } : {}),
+      },
+      var.include_command ? { command = [var.task_name] } : {},
+      var.mount_efs_volume ? {
+        mountPoints = [
+          {
+            "containerPath" : "/data",
+            "sourceVolume" : "${var.name_prefix}-${var.task_name}-efs-volume"
+          }
+        ]
+      } : { mountPoints = [] }
+    ),
   ])
+  dynamic "volume" {
+    for_each = aws_efs_file_system.task_efs_file_system
+    content {
+      name = "${var.name_prefix}-${var.task_name}-efs-volume"
+      efs_volume_configuration {
+        file_system_id     = aws_efs_file_system.task_efs_file_system[0].id
+        root_directory     = "/"
+        transit_encryption = "ENABLED"
+      }
+    }
+  }
 }
 
 
@@ -177,10 +202,13 @@ resource "aws_ecs_service" "service" {
     assign_public_ip = false
   }
 
-  load_balancer {
-    target_group_arn = aws_alb_target_group.target_group[0].arn
-    container_name   = "${var.name_prefix}-${var.task_name}"
-    container_port   = local.http_api_port
+  dynamic "load_balancer" {
+    for_each = var.allow_inbound ? [0] : []
+    content {
+      target_group_arn = aws_alb_target_group.target_group[0].arn
+      container_name   = "${var.name_prefix}-${var.task_name}"
+      container_port   = local.http_api_port
+    }
   }
 
   lifecycle {
@@ -196,4 +224,56 @@ resource "aws_route53_record" "dns" {
   type     = "CNAME"
   ttl      = "300"
   records  = [var.lb_dns_name]
+}
+
+resource "aws_efs_file_system" "task_efs_file_system" {
+  count = var.mount_efs_volume ? 1 : 0
+
+  creation_token = "${var.name_prefix}-${var.task_name}-efs"
+}
+
+resource "aws_security_group" "task_efs_security_group" {
+  count = var.mount_efs_volume ? 1 : 0
+
+  name   = "${var.name_prefix}-${var.task_name}-efs-sg"
+  vpc_id = var.vpc.id
+}
+
+resource "aws_security_group_rule" "task_efs_security_group_egress" {
+  count = var.mount_efs_volume ? 1 : 0
+
+  security_group_id = aws_security_group.task_efs_security_group[0].id
+  type             = "egress"
+  protocol         = "-1"
+  from_port        = 0
+  to_port          = 0
+  cidr_blocks      = ["0.0.0.0/0"]
+  ipv6_cidr_blocks = ["::/0"]
+}
+
+resource "aws_security_group_rule" "task_efs_security_group_ingress" {
+  count = var.mount_efs_volume ? 1 : 0
+
+  security_group_id = aws_security_group.task_efs_security_group[0].id
+  type        = "ingress"
+  from_port   = 2049
+  to_port     = 2049
+  protocol    = "tcp"
+  cidr_blocks = [var.vpc.cidr_block]
+}
+
+resource "aws_efs_mount_target" "task_efs_mount_target_subnet_1" {
+  count = var.mount_efs_volume ? 1 : 0
+
+  file_system_id = aws_efs_file_system.task_efs_file_system[0].id
+  subnet_id      = var.subnet_id_1
+  security_groups = [aws_security_group.task_efs_security_group[0].id]
+}
+
+resource "aws_efs_mount_target" "task_efs_mount_target_subnet_2" {
+  count = var.mount_efs_volume ? 1 : 0
+
+  file_system_id = aws_efs_file_system.task_efs_file_system[0].id
+  subnet_id      = var.subnet_id_2
+  security_groups = [aws_security_group.task_efs_security_group[0].id]
 }

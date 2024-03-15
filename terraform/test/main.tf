@@ -11,8 +11,8 @@ locals {
 module "alb" {
   source      = "../modules/alb"
   name_prefix = local.name_prefix
-  subnet_id_1 = module.vpc.private_subnet_id_1
-  subnet_id_2 = module.vpc.private_subnet_id_2
+  subnet_id_1 = module.vpc.public_subnet_id_1
+  subnet_id_2 = module.vpc.public_subnet_id_2
   vpc         = module.vpc.vpc
 }
 
@@ -41,11 +41,34 @@ module "api" {
   tcp_ports             = [9000]
 }
 
+module "anvil" {
+  source                = "../modules/ecs_task"
+  name_prefix           = local.name_prefix
+  task_name             = "anvil"
+  image                 = "anvil"
+  ecs_cluster_id        = module.ecs.cluster.id
+  app_ecs_task_role     = module.ecs.app_ecs_task_role
+  aws_region            = var.aws_region
+  subnet_id_1           = module.vpc.private_subnet_id_1
+  subnet_id_2           = module.vpc.private_subnet_id_2
+  vpc                   = module.vpc.vpc
+  allow_inbound         = true
+  hostnames             = ["${local.name_prefix}-anvil.${data.terraform_remote_state.shared.outputs.zone.name}"]
+  lb_https_listener_arn = module.alb.https_listener_arn
+  lb_priority           = 101
+  lb_dns_name           = module.alb.dns_name
+  zone                  = data.terraform_remote_state.shared.outputs.zone
+  tcp_ports             = [8545]
+  health_check          = "/"
+  health_check_status   = "400"
+  mount_efs_volume      = true
+}
+
 module "bastion" {
   source      = "../modules/bastion"
   name_prefix = local.name_prefix
   vpc         = module.vpc.vpc
-  subnet_id   = module.vpc.public_subnet_id
+  subnet_id   = module.vpc.public_subnet_id_1
   zone        = data.terraform_remote_state.shared.outputs.zone
 }
 

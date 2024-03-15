@@ -3,6 +3,8 @@ package co.chainring.core.db
 import co.chainring.core.model.db.migrations.V1_DeployedSmartContract
 import co.chainring.core.model.db.migrations.V2_ERC20Token
 import co.chainring.core.model.db.migrations.V3_UpdateDeployedSmartContract
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.apache.commons.dbcp2.BasicDataSource
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.DatabaseConfig
@@ -10,9 +12,19 @@ import org.jetbrains.exposed.sql.Transaction
 import java.lang.System.getenv
 import java.time.Duration
 
+@Serializable
+data class DbCredentials(
+    val username: String,
+    val password: String,
+)
+
 data class DbConfig(
-    val user: String = getenv("DB_USER") ?: "chainring",
-    val password: String = getenv("DB_PASSWORD") ?: "chainring",
+    val credentials: DbCredentials =
+        getenv("DB_CREDENTIALS")?.let { Json.decodeFromString<DbCredentials>(it) }
+            ?: DbCredentials(
+                username = "chainring",
+                password = "chainring",
+            ),
     val name: String = getenv("DB_NAME") ?: "chainring",
     val driver: String = "org.postgresql.Driver",
     val host: String = getenv("DB_HOST") ?: "localhost",
@@ -30,8 +42,8 @@ fun Database.Companion.connect(config: DbConfig): Database =
         BasicDataSource().apply {
             driverClassName = config.driver
             url = "jdbc:postgresql://${config.host}:${config.port}/${config.name}"
-            this.password = config.password
-            this.username = config.user
+            this.password = config.credentials.password
+            this.username = config.credentials.username
             validationQuery = config.validationQuery
             initialSize = config.initialPoolSize
             minIdle = config.minIdleConnections

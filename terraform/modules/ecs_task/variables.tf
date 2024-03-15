@@ -35,11 +35,17 @@ variable "lb_priority" {
 variable "health_check" {
   default = "/health"
 }
+variable "health_check_status" {
+  default = "200"
+}
 variable "app_ecs_task_role" {}
 variable "zone" {
   default = {}
 }
 variable "lb_dns_name" {
   default = ""
+}
+variable "mount_efs_volume" {
+  default = false
 }
 data "aws_caller_identity" "current" {}

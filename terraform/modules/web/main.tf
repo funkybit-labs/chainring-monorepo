@@ -76,12 +76,8 @@ resource "aws_s3_bucket_policy" "web" {
       Principal = {
         "Service" : "cloudfront.amazonaws.com"
       },
-      Action = [
-        "s3:GetObject"
-      ],
-      Resource = [
-        "arn:aws:s3:::${aws_s3_bucket.web.id}/*"
-      ],
+      Action = "s3:GetObject",
+      Resource = "arn:aws:s3:::${aws_s3_bucket.web.id}/*",
       Condition = {
         "StringEquals" : {
           "AWS:SourceArn" : "arn:aws:cloudfront::${local.account_id}:distribution/${aws_cloudfront_distribution.web.id}"

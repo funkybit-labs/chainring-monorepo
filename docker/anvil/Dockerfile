@@ -6,7 +6,11 @@ WORKDIR /usr/src/app
 RUN curl -L https://foundry.paradigm.xyz | bash
 RUN /root/.foundry/bin/foundryup
 
+# initialize directory for efs mount
+RUN mkdir -p /data
+
 EXPOSE 8545
 
-# Entrypoint 
-CMD ["/root/.foundry/bin/anvil", "--block-time", "1", "--host", "0.0.0.0", "--port", "8545", "--chain-id", "1337"]
+# Entrypoint
+COPY entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]

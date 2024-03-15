@@ -3,5 +3,5 @@ output "zone" {
 }
 
 output "ci_role_arn" {
-  value = module.github_oidc.role
+  value = module.github_oidc.role.arn
 }
