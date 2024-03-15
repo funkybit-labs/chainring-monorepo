@@ -1,7 +1,7 @@
-.PHONY: docker, anvil_image
+.PHONY: contracts
 
-web3j_generate:
-	./gradlew web3jGenerate
+contracts:
+	./gradlew compileContractsAndGenerateWrappers
 
 anvil_image:
 	cd docker/anvil && docker build -t anvil -f ./Dockerfile .&& cd ../..

@@ -13,6 +13,9 @@ import org.http4k.core.RequestContexts
 import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.core.then
+import org.http4k.filter.AllowAll
+import org.http4k.filter.CorsPolicy
+import org.http4k.filter.OriginPolicy
 import org.http4k.filter.ServerFilters
 import org.http4k.routing.bind
 import org.http4k.routing.routes
@@ -32,23 +35,29 @@ val requestContexts = RequestContexts()
 class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     override val logger = KotlinLogging.logger {}
 
-    private val server =
-        ServerFilters.InitialiseRequestContext(requestContexts)
-            .then(HttpTransactionLogger(logger))
-            .then(RequestProcessingExceptionHandler(logger))
-            .then(
-                routes(
-                    "/health" bind Method.GET to { Response(Status.OK) },
-                    "/v1" bind
-                        contract {
-                            routes +=
-                                listOf(
-                                    ConfigRoutes.getConfiguration(),
-                                )
-                        },
-                ),
-            )
-            .asServer(Netty(config.httpPort, ServerConfig.StopMode.Graceful(ofSeconds(1))))
+    private val corsPolicy = CorsPolicy(
+        originPolicy = OriginPolicy.AllowAll(),
+        headers = listOf(),
+        methods = listOf(Method.GET, Method.POST),
+    )
+
+    private val server = ServerFilters.InitialiseRequestContext(requestContexts)
+        .then(ServerFilters.Cors(corsPolicy))
+        .then(HttpTransactionLogger(logger))
+        .then(RequestProcessingExceptionHandler(logger))
+        .then(
+            routes(
+                "/health" bind Method.GET to { Response(Status.OK) },
+                "/v1" bind
+                    contract {
+                        routes +=
+                            listOf(
+                                ConfigRoutes.getConfiguration(),
+                            )
+                    },
+            ),
+        )
+        .asServer(Netty(config.httpPort, ServerConfig.StopMode.Graceful(ofSeconds(1))))
 
     private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
 
