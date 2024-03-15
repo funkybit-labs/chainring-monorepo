@@ -1,10 +1,10 @@
-.PHONY: docker
+.PHONY: docker, anvil_image
 
 web3j_generate:
 	./gradlew web3jGenerate
 
 anvil_image:
-	docker build -t anvil -f ./docker/anvil/Dockerfile .
+	cd docker/anvil && docker build -t anvil -f ./Dockerfile .&& cd ../..
 
 stop_containers:
 	docker-compose down --remove-orphans

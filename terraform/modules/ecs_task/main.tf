@@ -138,27 +138,37 @@ resource "aws_ecs_task_definition" "task" {
   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
   task_role_arn            = var.app_ecs_task_role.arn
   container_definitions = jsonencode([
-    merge({
-      name         = "${var.name_prefix}-${var.task_name}"
-      image        = "${local.account_id}.dkr.ecr.us-east-1.amazonaws.com/${var.image}:latest"
-      essential    = true
-      portMappings = local.port_mappings
-      cpu          = 0
-      mountPoints  = []
-      volumesFrom  = []
-      environment  = []
-      secrets      = []
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          "awslogs-group" : "firelens-container",
-          "awslogs-region" : var.aws_region,
-          "awslogs-create-group" : "true",
-          "awslogs-stream-prefix" : "${var.name_prefix}-${var.task_name}",
-          "mode" : "non-blocking"
+    merge(
+      {
+        name         = "${var.name_prefix}-${var.task_name}"
+        image        = "${local.account_id}.dkr.ecr.us-east-1.amazonaws.com/${var.image}:latest"
+        essential    = true
+        portMappings = local.port_mappings
+        cpu          = 0
+        volumesFrom      = []
+        environment      = []
+        secrets          = []
+        logConfiguration = {
+          logDriver = "awslogs"
+          options   = {
+            "awslogs-group" : "firelens-container",
+            "awslogs-region" : var.aws_region,
+            "awslogs-create-group" : "true",
+            "awslogs-stream-prefix" : "${var.name_prefix}-${var.task_name}",
+            "mode" : "non-blocking"
+          }
         }
-      }
-    }, var.include_command ? { command = [var.task_name] } : {}),
+      },
+      var.include_command ? { command = [var.task_name] } : {},
+      var.mount_efs_volume ? {
+        mountPoints = [
+          {
+            "containerPath" : "/data",
+            "sourceVolume" : "${var.name_prefix}-${var.task_name}-efs-volume"
+          }
+        ]
+      } : { mountPoints = [] }
+    ),
   ])
   dynamic "volume" {
     for_each = aws_efs_file_system.task_efs_file_system
