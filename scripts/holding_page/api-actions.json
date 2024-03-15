@@ -2,7 +2,9 @@
   {
     "Type": "fixed-response",
     "FixedResponseConfig": {
-      "StatusCode": "418"
+      "StatusCode": "418",
+      "ContentType": "application/json",
+      "MessageBody": "{\"error\":{\"code\":418,\"message\":\"I'm a teapot\"}}"
     }
   }
 ]

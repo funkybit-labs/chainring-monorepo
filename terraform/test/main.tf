@@ -11,8 +11,8 @@ locals {
 module "alb" {
   source      = "../modules/alb"
   name_prefix = local.name_prefix
-  subnet_id_1 = module.vpc.private_subnet_id_1
-  subnet_id_2 = module.vpc.private_subnet_id_2
+  subnet_id_1 = module.vpc.public_subnet_id_1
+  subnet_id_2 = module.vpc.public_subnet_id_2
   vpc         = module.vpc.vpc
 }
 
@@ -66,7 +66,7 @@ module "bastion" {
   source      = "../modules/bastion"
   name_prefix = local.name_prefix
   vpc         = module.vpc.vpc
-  subnet_id   = module.vpc.public_subnet_id
+  subnet_id   = module.vpc.public_subnet_id_1
   zone        = data.terraform_remote_state.shared.outputs.zone
 }
 

@@ -19,6 +19,14 @@ resource "aws_subnet" "public_subnet" {
   map_public_ip_on_launch = true
 }
 
+resource "aws_subnet" "public_subnet_2" {
+  count                   = var.create_public ? 1 : 0
+  vpc_id                  = aws_vpc.vpc.id
+  cidr_block              = "${var.cidr_prefix}.4.0/24"
+  availability_zone       = "${var.aws_region}b"
+  map_public_ip_on_launch = true
+}
+
 # Create private subnet
 resource "aws_subnet" "private_subnet" {
   vpc_id            = aws_vpc.vpc.id
