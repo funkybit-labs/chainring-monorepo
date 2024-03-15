@@ -94,3 +94,9 @@ resource "aws_route_table_association" "public_subnet_association" {
   subnet_id      = aws_subnet.public_subnet[0].id
   route_table_id = aws_route_table.public_route_table[0].id
 }
+
+resource "aws_route_table_association" "public_subnet_association_2" {
+  count          = var.create_public ? 1 : 0
+  subnet_id      = aws_subnet.public_subnet_2[0].id
+  route_table_id = aws_route_table.public_route_table[0].id
+}
