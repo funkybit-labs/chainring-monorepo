@@ -59,6 +59,8 @@ module "anvil" {
   lb_dns_name           = module.alb.dns_name
   zone                  = data.terraform_remote_state.shared.outputs.zone
   tcp_ports             = [8545]
+  health_check          = "/"
+  health_check_status   = "400"
   mount_efs_volume      = true
 }
 
