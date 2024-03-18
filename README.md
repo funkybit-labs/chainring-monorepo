@@ -26,6 +26,18 @@ Open http://localhost:3000 in your browser
 make anvil_logs
 ```
 
+Deploy mock ERC20 token contracts and mint coins to the default anvil wallets
+
+```
+make local_init
+```
+
+Before running local_init make sure to update the submodules in the project
+
+```
+git submodule update --init --recursive
+```
+
 ## Connecting a wallet
 
 1. Go to https://metamask.io and follow the instructions to install the browser extension
