@@ -54,3 +54,10 @@ jobs:
       - name: Deploy to ${{ inputs.environment }} environment
         working-directory: ./web-ui
         run: aws s3 sync dist/ s3://${{ inputs.environment }}-chainring-web/
+      - name: invalidate cloudfront cache
+        run: |
+          aws cloudfront list-distributions --query DistributionList.Items[].ARN | jq -c -r '.[]' | while read arn; do
+            if [[ $(aws cloudfront list-tags-for-resource --resource $arn --query 'Tags.Items[?Key=="environment"][].Value|[0]') == "${{ inputs.environment }}" ]]; then
+              aws cloudfront create-invalidation --distribution-id $(echo $arn | sed 's/.*\///') --paths "/*";
+            fi
+          done
