@@ -1,0 +1,69 @@
+name: Build Backend and push to ECR
+
+on:
+  # Manual trigger from the UI
+  workflow_dispatch:
+
+  # Call from another workflow (CI)
+  workflow_call:
+    outputs:
+      docker_image_tag:
+        description: "Docker image tag pushed to ECR"
+        value: ${{ jobs.publish_to_ecr.outputs.docker_image_tag }}
+
+jobs:
+  build_backend:
+    name: Gradle Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup JDK
+        uses: ./.github/actions/setup-java-17
+      - name: Build with Gradle Wrapper
+        run: ./gradlew build
+      - name: Check with Gradle Wrapper
+        run: ./gradlew check
+
+  publish_to_ecr:
+    if: ${{ github.event_name == 'push' }}
+    name: Publish to ECR
+    needs: [ build_backend ]
+    runs-on: ubuntu-latest
+    outputs:
+      docker_image_tag: ${{ steps.print-tag.outputs.docker_image_tag }}
+    permissions:
+      id-token: write # needed for aws credentials
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup JDK
+        uses: ./.github/actions/setup-java-17
+      - name: Setup AWS
+        uses: ./.github/actions/setup-aws
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Publish to ECR
+        run: make publish_containers
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+      - name: print image tag
+        id: print-tag
+        run: |
+          echo "docker_image_tag=$(./gradlew printImageTag -q | grep IMAGE_TAG | cut -d'=' -f2)" >> $GITHUB_OUTPUT
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+
+
+  submit_dependencies:
+    if: ${{ github.event_name == 'push' }}
+    name: Dependency submission
+    runs-on: ubuntu-latest
+    needs: [ build_backend ]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      # Generates and submits a dependency graph, enabling Dependabot Alerts for all project dependencies.
+      # See: https://github.com/gradle/actions/blob/main/dependency-submission/README.md
+      - name: Generate and submit dependency graph
+        uses: gradle/actions/dependency-submission@417ae3ccd767c252f5661f1ace9f835f9654f2b5 # v3.1.0

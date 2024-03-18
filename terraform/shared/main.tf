@@ -15,6 +15,25 @@ resource "aws_iam_role_policy" "auth" {
                 "ecr:GetAuthorizationToken"
             ],
             "Resource": "*"
+        },
+        {
+            "Sid": "AllowDeployToEcs",
+            "Effect": "Allow",
+            "Action": [
+                "ecs:DescribeServices",
+                "ecs:DescribeTaskDefinition",
+                "ecs:RegisterTaskDefinition",
+                "iam:PassRole",
+                "ecs:UpdateService",
+                "elasticloadbalancing:DescribeLoadBalancers",
+                "elasticloadbalancing:DescribeListeners",
+                "elasticloadbalancing:DescribeRules",
+                "elasticloadbalancing:DescribeTags",
+                "elasticloadbalancing:CreateRule",
+                "elasticloadbalancing:DeleteRule",
+                "elasticloadbalancing:AddTags"
+            ],
+            "Resource": "*"
         }
     ]
 }

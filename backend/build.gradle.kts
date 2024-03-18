@@ -76,7 +76,9 @@ application {
     mainClass.set("co.chainring.MainKt")
 }
 
+val buildNumber = System.getenv("BUILD_NUMBER") ?: "1"
 jib {
+
     from {
         platforms {
             platform {
@@ -89,7 +91,7 @@ jib {
     to {
         image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/backend"
         credHelper.helper = "ecr-login"
-        tags = setOf("${version}-${System.getenv("BUILD_NUMBER") ?: "1"}")
+        tags = setOf("${version}-${buildNumber}")
     }
 
     container {
@@ -102,11 +104,12 @@ jib {
             "-Dlog4j2.formatMsgNoLookups=True"
         )
 
-        environment = mapOf(
-            "VERSION" to version.toString(),
-            "BUILD_NUMBER" to (System.getenv("BUILD_NUMBER") ?: "1")
-        )
-
         creationTime.set("USE_CURRENT_TIMESTAMP")
+    }
+}
+
+tasks.register("printImageTag") {
+    doLast {
+        println("IMAGE_TAG=${version}-${buildNumber}")
     }
 }

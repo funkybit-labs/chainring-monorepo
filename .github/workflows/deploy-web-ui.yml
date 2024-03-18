@@ -1,0 +1,56 @@
+name: Deploy Web UI
+
+on:
+  # Manual trigger from the UI
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options:
+          - test
+          - prod
+
+  # Call from another workflow (CI)
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+
+# only one running deploy job per environment
+concurrency:
+  group: web-ui-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy_web_ui:
+    name: Deploy Web UI
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      # needed for aws credentials
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node-js-20
+      - name: Install dependencies
+        working-directory: ./web-ui
+        run: pnpm install
+      - name: Lint
+        working-directory: ./web-ui
+        run: pnpm run lint
+      - name: Typecheck
+        working-directory: ./web-ui
+        run: pnpm run typecheck
+      - name: build
+        working-directory: ./web-ui
+        run: pnpm run build --mode staging
+      - name: Setup AWS
+        uses: ./.github/actions/setup-aws
+      - name: Deploy to ${{ inputs.environment }} environment
+        working-directory: ./web-ui
+        run: aws s3 sync dist/ s3://${{ inputs.environment }}-chainring-web/
