@@ -7,11 +7,16 @@ import co.chainring.core.model.Address
 import co.chainring.core.model.db.Chain
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
+import okhttp3.MediaType
+import okhttp3.OkHttpClient
+import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.http.HttpService
-import org.web3j.tx.gas.DefaultGasProvider
+import org.web3j.tx.RawTransactionManager
+import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import java.math.BigInteger
 
 enum class ContractType {
@@ -24,14 +29,81 @@ data class BlockchainClientConfig(
         System.getenv(
             "EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY",
         ) ?: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-    val gasProvider: DefaultGasProvider = DefaultGasProvider(),
-)
+    val deploymentPollingInterval: Long = longValue("DEPLOYMENT_POLLING_INTERVAL", 1000L),
+    val contractCreationLimit: BigInteger = bigIntegerValue("CONTRACT_CREATION_LIMIT", BigInteger.valueOf(5_000_000)),
+    val contractInvocationLimit: BigInteger = bigIntegerValue("CONTRACT_INVOCATION_LIMIT", BigInteger.valueOf(1_000_000)),
+    val defaultMaxPriorityFeePerGas: BigInteger = bigIntegerValue("DEFAULT_MAX_PRIORITY_FEE_PER_GAS", BigInteger.valueOf(5_000_000_000)),
+    val enableWeb3jLogging: Boolean = (System.getenv("ENABLE_WEB3J_LOGGING") ?: "true") == "true",
+) {
+    companion object {
+        fun longValue(name: String, defaultValue: Long): Long {
+            return try {
+                System.getenv(name)?.toLong() ?: defaultValue
+            } catch (e: Exception) {
+                defaultValue
+            }
+        }
+
+        fun bigIntegerValue(name: String, defaultValue: BigInteger): BigInteger {
+            return try {
+                System.getenv(name)?.let { BigInteger(it) } ?: defaultValue
+            } catch (e: Exception) {
+                defaultValue
+            }
+        }
+    }
+}
 
 class BlockchainClient(private val config: BlockchainClientConfig = BlockchainClientConfig()) {
-    private val web3j = Web3j.build(HttpService(config.url))
+    private val web3j = Web3j.build(httpService(config.url, config.enableWeb3jLogging))
     private val credentials = Credentials.create(config.privateKeyHex)
+    private val chainId = web3j.ethChainId().send().chainId.toLong()
+    private val transactionManager = RawTransactionManager(
+        web3j,
+        credentials,
+        chainId,
+        PollingTransactionReceiptProcessor(
+            web3j,
+            config.deploymentPollingInterval,
+            // 2 minutes max for tx to be processed
+            (1200000 / config.deploymentPollingInterval).toInt(),
+        ),
+    )
 
-    val logger = KotlinLogging.logger {}
+    private val gasProvider = GasProvider(
+        contractCreationLimit = config.contractCreationLimit,
+        contractInvocationLimit = config.contractInvocationLimit,
+        defaultMaxPriorityFeePerGas = config.defaultMaxPriorityFeePerGas,
+        chainId = chainId,
+        web3j = web3j,
+    )
+
+    companion object {
+
+        val logger = KotlinLogging.logger {}
+        fun httpService(url: String, logging: Boolean): HttpService {
+            val builder = OkHttpClient.Builder()
+            if (logging) {
+                builder.addInterceptor {
+                    val request = it.request()
+                    val requestCopy = request.newBuilder().build()
+                    val requestBuffer = Buffer()
+                    requestCopy.body?.writeTo(requestBuffer)
+                    logger.debug {
+                        ">> ${request.method} ${request.url} | ${requestBuffer.readUtf8()}"
+                    }
+                    val response = it.proceed(request)
+                    val contentType: MediaType? = response.body!!.contentType()
+                    val content = response.body!!.string()
+                    logger.debug {
+                        "<< ${response.code} | $content"
+                    }
+                    response.newBuilder().body(content.toResponseBody(contentType)).build()
+                }
+            }
+            return HttpService(url, builder.build())
+        }
+    }
 
     fun updateContracts() {
         logger.info { "Updating deprecated contracts" }
@@ -66,7 +138,7 @@ class BlockchainClient(private val config: BlockchainClientConfig = BlockchainCl
         val (implementationContractAddress, version) =
             when (contractType) {
                 ContractType.Exchange -> {
-                    val implementationContract = Exchange.deploy(web3j, credentials, config.gasProvider).send()
+                    val implementationContract = Exchange.deploy(web3j, transactionManager, gasProvider).send()
                     Pair(
                         Address(implementationContract.contractAddress),
                         implementationContract.version.send().toInt(),
@@ -80,8 +152,8 @@ class BlockchainClient(private val config: BlockchainClientConfig = BlockchainCl
                 UUPSUpgradeable.load(
                     existingProxyAddress.value,
                     web3j,
-                    credentials,
-                    config.gasProvider,
+                    transactionManager,
+                    gasProvider,
                 ).upgradeToAndCall(implementationContractAddress.value, ByteArray(0), BigInteger.ZERO).send()
                 existingProxyAddress
             } else {
@@ -90,8 +162,8 @@ class BlockchainClient(private val config: BlockchainClientConfig = BlockchainCl
                 val proxyContract =
                     ERC1967Proxy.deploy(
                         web3j,
-                        credentials,
-                        config.gasProvider,
+                        transactionManager,
+                        gasProvider,
                         BigInteger.ZERO,
                         implementationContractAddress.value,
                         ByteArray(0),
@@ -99,7 +171,7 @@ class BlockchainClient(private val config: BlockchainClientConfig = BlockchainCl
                 logger.debug { "Deploying initialize for $contractType" }
                 when (contractType) {
                     ContractType.Exchange -> {
-                        Exchange.load(proxyContract.contractAddress, web3j, credentials, config.gasProvider).initialize().send()
+                        Exchange.load(proxyContract.contractAddress, web3j, transactionManager, gasProvider).initialize().send()
                     }
                 }
                 Address(proxyContract.contractAddress)
