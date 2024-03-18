@@ -1,0 +1,53 @@
+name: Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build_push_backend:
+    name: Build Backend and push to ECR
+    permissions:
+      id-token: write # needed for aws credentials
+      contents: write
+    uses: ./.github/workflows/build-push-backend.yml
+
+  build_frontend:
+    name: Build web UI
+    uses: ./.github/workflows/build-web-ui.yml
+
+  deploy_backend:
+    name: Deploy Backend
+    if: ${{ github.event_name == 'push' }}
+    needs: [ build_push_backend, build_frontend ]
+    permissions:
+      id-token: write # needed for aws credentials
+      contents: read
+    uses: ./.github/workflows/deploy-backend.yml
+    with:
+      action: upgrade
+      environment: test
+      tag: ${{ needs.build_push_backend.outputs.docker_image_tag }}
+
+  deploy_web_ui:
+    name: Deploy Web UI
+    if: ${{ github.event_name == 'push' }}
+    needs: [ build_push_backend, build_frontend ]
+    permissions:
+      id-token: write # needed for aws credentials
+      contents: read
+    uses: ./.github/workflows/deploy-web-ui.yml
+    with:
+      environment: test
+
+  integration_tests:
+    name: Run integration tests
+    needs: [ deploy_backend, deploy_web_ui ]
+    if: ${{ github.event_name == 'push' }}
+    permissions:
+      id-token: write # needed for aws credentials
+      contents: read
+    uses: ./.github/workflows/integration-tests.yml
+    secrets: inherit # needs access to secrets.CI_BASTION_KEY

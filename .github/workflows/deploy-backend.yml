@@ -1,0 +1,65 @@
+name: Deploy Backend
+
+on:
+  # Manual trigger from the UI
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action'
+        required: true
+        type: choice
+        options: [ 'stop', 'start', 'upgrade', 'switch-to-holding', 'switch-to-app' ]
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options: [ 'test', 'prod' ]
+      tag:
+        description: 'Backend image tag'
+        required: true
+        type: string
+
+  # Call from another workflow (CI)
+  workflow_call:
+    inputs:
+      action:
+        description: 'Action'
+        required: true
+        type: string
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
+      tag:
+        description: 'Backend image tag'
+        required: true
+        type: string
+
+# only one running deploy job per environment
+concurrency:
+  group: backend-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy_backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      # needed for aws credentials
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      - name: Setup AWS
+        uses: ./.github/actions/setup-aws
+      - name: Deploy to ${{ inputs.environment }} environment
+        run: |
+          cd scripts
+          test -d venv || python3 -m venv venv
+          . ./venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
+          python3 ecs-deploy.py ${{ inputs.action }} --env ${{ inputs.environment }} --services api --tag ${{ inputs.tag }}
