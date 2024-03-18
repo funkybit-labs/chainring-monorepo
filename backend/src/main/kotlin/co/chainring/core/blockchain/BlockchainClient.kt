@@ -29,11 +29,11 @@ data class BlockchainClientConfig(
         System.getenv(
             "EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY",
         ) ?: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-    val deploymentPollingInterval: Long = longValue("DEPLOYMENT_POLLING_INTERVAL", 1000L),
+    val deploymentPollingIntervalInMs: Long = longValue("DEPLOYMENT_POLLING_INTERVAL_MS", 1000L),
     val maxPollingAttempts: Long = longValue("MAX_POLLING_ATTEMPTS", 120L),
     val contractCreationLimit: BigInteger = bigIntegerValue("CONTRACT_CREATION_LIMIT", BigInteger.valueOf(5_000_000)),
     val contractInvocationLimit: BigInteger = bigIntegerValue("CONTRACT_INVOCATION_LIMIT", BigInteger.valueOf(1_000_000)),
-    val defaultMaxPriorityFeePerGas: BigInteger = bigIntegerValue("DEFAULT_MAX_PRIORITY_FEE_PER_GAS", BigInteger.valueOf(5_000_000_000)),
+    val defaultMaxPriorityFeePerGasInWei: BigInteger = bigIntegerValue("DEFAULT_MAX_PRIORITY_FEE_PER_GAS_WEI", BigInteger.valueOf(5_000_000_000)),
     val enableWeb3jLogging: Boolean = (System.getenv("ENABLE_WEB3J_LOGGING") ?: "true") == "true",
 ) {
     companion object {
@@ -65,7 +65,7 @@ class BlockchainClient(private val config: BlockchainClientConfig = BlockchainCl
         chainId,
         PollingTransactionReceiptProcessor(
             web3j,
-            config.deploymentPollingInterval,
+            config.deploymentPollingIntervalInMs,
             config.maxPollingAttempts.toInt(),
         ),
     )
@@ -73,7 +73,7 @@ class BlockchainClient(private val config: BlockchainClientConfig = BlockchainCl
     private val gasProvider = GasProvider(
         contractCreationLimit = config.contractCreationLimit,
         contractInvocationLimit = config.contractInvocationLimit,
-        defaultMaxPriorityFeePerGas = config.defaultMaxPriorityFeePerGas,
+        defaultMaxPriorityFeePerGas = config.defaultMaxPriorityFeePerGasInWei,
         chainId = chainId,
         web3j = web3j,
     )
