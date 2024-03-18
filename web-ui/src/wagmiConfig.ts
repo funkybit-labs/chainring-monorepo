@@ -1,7 +1,7 @@
 import { createConfig, http } from 'wagmi'
-import { mainnet, localhost } from 'wagmi/chains'
 import { walletConnect, injected, coinbaseWallet } from 'wagmi/connectors'
 import { createWeb3Modal } from '@web3modal/wagmi/react'
+import { defineChain } from 'viem'
 
 export const walletConnectProjectId = '03908a0893516a0f391370f3a9349b8e'
 
@@ -12,11 +12,23 @@ const walletConnectMetadata = {
   icons: ['https://avatars.githubusercontent.com/u/37784886']
 }
 
+export const chain = defineChain({
+  id: parseInt(import.meta.env.ENV_CHAIN_ID),
+  name: import.meta.env.ENV_CHAIN_NAME,
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ether',
+    symbol: 'ETH'
+  },
+  rpcUrls: {
+    default: { http: [import.meta.env.ENV_CHAIN_JSON_RPC_URL] }
+  }
+})
+
 export const wagmiConfig = createConfig({
-  chains: [mainnet, localhost],
+  chains: [chain],
   transports: {
-    [mainnet.id]: http(),
-    [localhost.id]: http()
+    [chain.id]: http()
   },
   connectors: [
     walletConnect({

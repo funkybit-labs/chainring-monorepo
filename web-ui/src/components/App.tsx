@@ -1,7 +1,11 @@
 import logo from 'assets/logo.svg'
-import { useAccount, useBalance } from 'wagmi'
+import { useAccount, useBalance, useReadContract } from 'wagmi'
 import { useWeb3Modal } from '@web3modal/wagmi/react'
 import Spinner from 'components/Spinner'
+import { ExchangeAbi } from 'contracts'
+import { useQuery } from '@tanstack/react-query'
+import { Address } from 'viem'
+import { getConfiguration } from 'ApiClient'
 
 function App() {
   const account = useAccount()
@@ -41,10 +45,22 @@ function WelcomeScreen() {
 }
 
 function HomeScreen() {
+  const configQuery = useQuery({
+    queryKey: ['configuration'],
+    queryFn: getConfiguration
+  })
+
+  const exchangeContractAddress = (configQuery.data?.contracts || []).find(
+    (c) => c.name == 'Exchange'
+  )?.address
+
   return (
     <div className="flex h-screen items-center justify-center bg-red-900 py-48">
       <div className="rounded-lg bg-gray-500/50 p-24 text-white">
         <WalletBalance />
+        {exchangeContractAddress && (
+          <ExchangeContractVersion address={exchangeContractAddress} />
+        )}
       </div>
     </div>
   )
@@ -70,6 +86,32 @@ function WalletBalance() {
       <div className="my-4 text-xl font-medium">
         {data.formatted} {data.symbol}
       </div>
+    </div>
+  )
+}
+
+function ExchangeContractVersion({ address }: { address: Address }) {
+  const {
+    isPending,
+    error,
+    data: version
+  } = useReadContract({
+    abi: ExchangeAbi,
+    address: address,
+    functionName: 'getVersion'
+  })
+
+  if (isPending) {
+    return <Spinner size={12} />
+  }
+
+  if (error) {
+    return 'Failed to get contract version'
+  }
+
+  return (
+    <div className="flex flex-col items-center">
+      <div>Exchange contract version: {version.toString()}</div>
     </div>
   )
 }
