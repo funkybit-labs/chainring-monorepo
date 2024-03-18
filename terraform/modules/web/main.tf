@@ -63,6 +63,10 @@ resource "aws_cloudfront_distribution" "web" {
     acm_certificate_arn            = data.aws_acm_certificate.chainring.arn
     cloudfront_default_certificate = false
   }
+
+  tags = {
+    environment = var.name_prefix
+  }
 }
 
 resource "aws_s3_bucket_policy" "web" {
