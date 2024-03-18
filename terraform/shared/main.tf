@@ -34,6 +34,15 @@ resource "aws_iam_role_policy" "auth" {
                 "elasticloadbalancing:AddTags"
             ],
             "Resource": "*"
+        },
+        {
+            "Sid": "AllowCloudFrontCacheInvalidation",
+            "Effect": "Allow",
+            "Action": [
+                "cloudfront:ListDistributions",
+                "cloudfront:ListTagsForResource"
+            ],
+            "Resource": "*"
         }
     ]
 }
