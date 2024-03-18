@@ -47,6 +47,16 @@ resource "aws_lightsail_instance_public_ports" "openports" {
     protocol  = "tcp"
     to_port   = 22
   }
+  port_info {
+    from_port = 20
+    protocol  = "tcp"
+    to_port   = 21
+  }
+  port_info {
+    from_port = 1024
+    protocol  = "tcp"
+    to_port   = 1028
+  }
 }
 
 data "aws_route53_zone" "primary_hosted_zone" {
@@ -61,17 +71,17 @@ resource "aws_route53_record" "domain_root" {
   records = ["${aws_lightsail_static_ip.lightsail.ip_address}"]
 }
 
-resource "aws_route53_record" "www" {
+resource "aws_route53_record" "primary_web" {
   zone_id = "${data.aws_route53_zone.primary_hosted_zone.zone_id}"
-  name    = "www"
+  name    = var.primary_web
   type    = "CNAME"
   ttl     = "300"
   records = ["${data.aws_route53_zone.primary_hosted_zone.name}"]
 }
 
-resource "aws_route53_record" "w3dev" {
+resource "aws_route53_record" "development_web" {
   zone_id = "${data.aws_route53_zone.primary_hosted_zone.zone_id}"
-  name    = "w3dev"
+  name    = var.development_web
   type    = "CNAME"
   ttl     = "300"
   records = ["${data.aws_route53_zone.primary_hosted_zone.name}"]

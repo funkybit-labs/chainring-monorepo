@@ -10,5 +10,7 @@ module "lightsail" {
   dns_zone = var.dns_zone
   publickey-name = var.publickey-name
   publickey = var.publickey
+  development_web = var.development_web
+  primary_web = var.primary_web
 }
 

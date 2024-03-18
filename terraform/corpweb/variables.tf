@@ -47,6 +47,16 @@ variable "dns_zone" {
   default= "chainring.co."
 }
 
+variable "primary_web" {
+  type = string
+  default = "www"
+}
+
+variable "development_web" {
+  type = string
+  default = "w3dev"
+}
+
 variable "publickey" {
   type        = string
   description = "Public key for access lightsail instance"

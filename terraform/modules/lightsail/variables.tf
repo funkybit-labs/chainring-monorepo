@@ -48,3 +48,13 @@ variable "dns_zone" {
   description = "primary existing dns zone to attach to this instance"
 }
 
+variable "primary_web" {
+  type        = string
+  description = "CNAME hostname for primary web address, usually www"
+}
+
+variable "development_web" {
+  type = string
+  description = "CNAME hostname for development web address"
+}
+
