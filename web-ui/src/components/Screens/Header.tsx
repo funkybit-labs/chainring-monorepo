@@ -1,9 +1,9 @@
-import logo from '../../assets/logo.svg'
-import logoName from '../../assets/chainring-logo-name.png'
-import { Button } from '../common/Button'
+import logo from 'assets/logo.svg'
+import logoName from 'assets/chainring-logo-name.png'
 import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { useAccount } from 'wagmi'
-import { addressDisplay } from '../../utils'
+import { addressDisplay } from 'utils'
+import { Button } from 'components/common/Button'
 
 export function Header() {
   const { open: openWalletConnectModal } = useWeb3Modal()

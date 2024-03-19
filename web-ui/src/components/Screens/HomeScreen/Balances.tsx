@@ -8,8 +8,8 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import DepositModal from 'components/Screens/HomeScreen/Balances/DepositModal'
 import WithdrawalModal from 'components/Screens/HomeScreen/Balances/WithdrawalModal'
-import { Button } from '../../common/Button'
-import { Widget } from '../Widget'
+import { Widget } from 'components/Screens/Widget'
+import { Button } from 'components/common/Button'
 
 export default function Balances({
   walletAddress,
