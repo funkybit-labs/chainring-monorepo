@@ -87,7 +87,7 @@ export default function WithdrawalModal({
     <Modal isOpen={isOpen} close={close} onClosed={onClosed}>
       <Dialog.Title
         as="h3"
-        className="text-lg font-medium leading-6 text-gray-900"
+        className="text-gray-900 text-lg font-medium leading-6"
       >
         Withdraw {token.symbol}
       </Dialog.Title>
@@ -105,7 +105,7 @@ export default function WithdrawalModal({
                   onChange={onAmountChange}
                 />
 
-                <p className="mt-1 text-center text-sm text-gray-500">
+                <p className="text-gray-500 mt-1 text-center text-sm">
                   Available balance: {formatUnits(data, token.decimals)}
                 </p>
 

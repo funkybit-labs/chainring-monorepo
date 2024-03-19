@@ -23,7 +23,7 @@ export default function Balances({
       <div className="mb-2 text-center text-xl font-medium text-white">
         Balances
       </div>
-      <div className="w-full rounded-lg bg-gray-500/50 p-8 text-white">
+      <div className="bg-gray-500/50 w-full rounded-lg p-8 text-white">
         <BalancesTable
           walletAddress={walletAddress}
           exchangeContractAddress={exchangeContractAddress}

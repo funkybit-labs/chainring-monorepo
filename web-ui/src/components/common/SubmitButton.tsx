@@ -28,7 +28,7 @@ export default function SubmitButton({
       </button>
 
       {error && (
-        <div className="mt-2 text-center text-sm text-red-500">{error}</div>
+        <div className="text-red-500 mt-2 text-center text-sm">{error}</div>
       )}
     </>
   )

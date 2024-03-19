@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getConfiguration } from 'ApiClient'
 import { useAccount } from 'wagmi'
 import Balances from 'components/Screens/HomeScreen/Balances'
-import {Header} from "./Header";
+import { Header } from './Header'
 
 export default function HomeScreen() {
   const configQuery = useQuery({
@@ -19,11 +19,10 @@ export default function HomeScreen() {
 
   return (
     <div className="h-screen bg-gradient-to-b from-lightBackground to-darkBackground">
-      <Header/>
-      <div className="flex flex-col h-screen w-screen">
-        <div>
-        </div>
-        <div className="flex h-screen items-center justify-center bg-red-900 py-48">
+      <Header />
+      <div className="flex h-screen w-screen flex-col">
+        <div></div>
+        <div className="bg-red-900 flex h-screen items-center justify-center py-48">
           <div className="flex flex-col items-center gap-4">
             {walletAddress && exchangeContractAddress && (
               <>
