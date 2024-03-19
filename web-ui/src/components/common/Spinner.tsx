@@ -1,14 +1,12 @@
 import { classNames } from 'utils'
 
-export default function Spinner({ size }: { size: number }) {
+export default function Spinner() {
   return (
     <div role="status">
       <svg
         aria-hidden="true"
         className={classNames(
-          'text-gray-200 animate-spin dark:text-gray-600 fill-red-500',
-          `w-${size}`,
-          `h-${size}`
+          'text-gray-200 animate-spin dark:text-gray-600 fill-red-500'
         )}
         viewBox="0 0 100 101"
         fill="none"

@@ -51,3 +51,7 @@ git submodule update --init --recursive
    - In account selector click "+ Add account or hardware wallet"
    - Select "Import account" option
    - Enter one of the private keys Anvil prints on the startup, e.g `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
+4. Let Metamask know about ERC20Mock coins:
+   - Open Metamask, go to "Tokens" -> "Import tokens"
+   - Enter USDC contract addresses e.g `0x7ef8E99980Da5bcEDcF7C10f41E55f759F6A174B` and click "Next"
+   - Repeat for DAI (`0x239745750870104a7EC6126c89156D773088286c`)

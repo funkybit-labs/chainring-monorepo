@@ -13,11 +13,12 @@ export type ERC20Token = {
   name: string
   symbol: string
   address: Address
+  decimals: number
 }
 
 export type ConfigurationApiResponse = {
-  contracts: [DeployedContract]
-  erc20Tokens: [ERC20Token]
+  contracts: DeployedContract[]
+  erc20Tokens: ERC20Token[]
 }
 
 export async function getConfiguration(): Promise<ConfigurationApiResponse> {

@@ -23,4 +23,5 @@ data class ERC20Token(
     val name: String,
     val symbol: String,
     val address: Address,
+    val decimals: UByte,
 )
