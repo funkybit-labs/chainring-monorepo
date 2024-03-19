@@ -1,6 +1,6 @@
 package co.chainring.apps.api.model
 
-import co.chainring.core.model.Market
+import co.chainring.core.model.Instrument
 import co.chainring.core.model.OrderId
 import co.chainring.core.model.Symbol
 import kotlinx.datetime.Instant
@@ -67,72 +67,68 @@ object Order {
 
 @Serializable
 @OptIn(ExperimentalSerializationApi::class)
-@JsonClassDiscriminator("action")
-sealed class OrderApiRequest {
-    @Serializable
-    @JsonClassDiscriminator("type")
-    @SerialName("create")
-    sealed class Create {
-        abstract val nonce: String
-        abstract val market: co.chainring.core.model.Market
-        abstract val side: Order.Side
-        abstract val timeInForce: Order.TimeInForce
-        abstract val amount: BigDecimalJson
-
-        @Serializable
-        @SerialName("market")
-        data class Market(
-            override val nonce: String,
-            override val market: co.chainring.core.model.Market,
-            override val side: Order.Side,
-            override val timeInForce: Order.TimeInForce,
-            override val amount: BigDecimalJson,
-        ) : Create()
-
-        @Serializable
-        @SerialName("limit")
-        data class Limit(
-            override val nonce: String,
-            override val market: co.chainring.core.model.Market,
-            override val side: Order.Side,
-            override val timeInForce: Order.TimeInForce,
-            override val amount: BigDecimalJson,
-            val price: BigDecimalJson,
-        ) : Create()
-    }
+@JsonClassDiscriminator("type")
+sealed class CreateOrderApiRequest {
+    abstract val nonce: String
+    abstract val instrument: Instrument
+    abstract val side: Order.Side
+    abstract val timeInForce: Order.TimeInForce
+    abstract val amount: BigDecimalJson
 
     @Serializable
-    @JsonClassDiscriminator("type")
-    @SerialName("update")
-    sealed class Update {
-        abstract val orderId: OrderId
-        abstract val timeInForce: Order.TimeInForce?
-        abstract val amount: BigDecimalJson?
-
-        @Serializable
-        @SerialName("market")
-        data class Market(
-            override val orderId: OrderId,
-            override val timeInForce: Order.TimeInForce? = null,
-            override val amount: BigDecimalJson? = null,
-        ) : Update()
-
-        @Serializable
-        @SerialName("limit")
-        data class Limit(
-            override val orderId: OrderId,
-            override val timeInForce: Order.TimeInForce? = null,
-            override val amount: BigDecimalJson? = null,
-            val price: BigDecimalJson?,
-        ) : Update()
-    }
+    @SerialName("market")
+    data class Market(
+        override val nonce: String,
+        override val instrument: Instrument,
+        override val side: Order.Side,
+        override val timeInForce: Order.TimeInForce,
+        override val amount: BigDecimalJson,
+    ) : CreateOrderApiRequest()
 
     @Serializable
-    @SerialName("delete")
-    data class Delete(
-        val orderId: OrderId,
-    )
+    @SerialName("limit")
+    data class Limit(
+        override val nonce: String,
+        override val instrument: Instrument,
+        override val side: Order.Side,
+        override val timeInForce: Order.TimeInForce,
+        override val amount: BigDecimalJson,
+        val price: BigDecimalJson,
+    ) : CreateOrderApiRequest()
 }
+
+@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@JsonClassDiscriminator(
+    "type",
+)
+sealed class UpdateOrderApiRequest() {
+    abstract val orderId: OrderId
+    abstract val timeInForce: Order.TimeInForce?
+    abstract val amount: BigDecimalJson?
+
+    @Serializable
+    @SerialName("market")
+    data class Market(
+        override val orderId: OrderId,
+        override val timeInForce: Order.TimeInForce? = null,
+        override val amount: BigDecimalJson? = null,
+    ) : UpdateOrderApiRequest()
+
+    @Serializable
+    @SerialName("limit")
+    data class Limit(
+        override val orderId: OrderId,
+        override val timeInForce: Order.TimeInForce? = null,
+        override val amount: BigDecimalJson? = null,
+        val price: BigDecimalJson?,
+    ) : UpdateOrderApiRequest()
+}
+
+@Serializable
+data class DeleteUpdateOrderApiRequest(
+    val orderId: OrderId,
+)
 
 @Serializable
 @OptIn(ExperimentalSerializationApi::class)
@@ -140,7 +136,7 @@ sealed class OrderApiRequest {
 sealed class OrderApiResponse {
     abstract val orderId: OrderId
     abstract val status: Order.Status
-    abstract val market: Market
+    abstract val instrument: Instrument
     abstract val side: Order.Side
     abstract val amount: BigDecimalJson
     abstract val timeInForce: Order.TimeInForce
@@ -149,10 +145,10 @@ sealed class OrderApiResponse {
 
     @Serializable
     @SerialName("market")
-    data class MarketOrder(
+    data class Market(
         override val orderId: OrderId,
         override val status: Order.Status,
-        override val market: Market,
+        override val instrument: Instrument,
         override val side: Order.Side,
         override val amount: BigDecimalJson,
         override val timeInForce: Order.TimeInForce,
@@ -165,7 +161,7 @@ sealed class OrderApiResponse {
     data class Limit(
         override val orderId: OrderId,
         override val status: Order.Status,
-        override val market: Market,
+        override val instrument: Instrument,
         override val side: Order.Side,
         override val amount: BigDecimalJson,
         val price: BigDecimalJson,
@@ -176,8 +172,10 @@ sealed class OrderApiResponse {
 }
 
 @Serializable
-data class OrdersApiRequest(
-    val orders: List<OrderApiRequest>,
+data class BatchOrdersApiRequest(
+    val createOrders: List<CreateOrderApiRequest>,
+    val updateOrders: List<UpdateOrderApiRequest>,
+    val deleteOrders: List<DeleteUpdateOrderApiRequest>,
 )
 
 @Serializable

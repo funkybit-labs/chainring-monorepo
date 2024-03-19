@@ -1,10 +1,11 @@
 package co.chainring.apps.api
 
-import co.chainring.apps.api.model.OrderApiRequest
+import co.chainring.apps.api.model.BatchOrdersApiRequest
+import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.OrderApiResponse
-import co.chainring.apps.api.model.OrdersApiRequest
 import co.chainring.apps.api.model.OrdersApiResponse
 import co.chainring.apps.api.model.TradesApiResponse
+import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.core.model.OrderId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Instant
@@ -31,7 +32,7 @@ object OrderRoutes {
     private val orderIdPathParam = Path.map(::OrderId, OrderId::value).of("orderOd", "Order Id")
 
     fun createOrder(): ContractRoute {
-        val requestBody = Body.auto<OrderApiRequest.Create>().toLens()
+        val requestBody = Body.auto<CreateOrderApiRequest>().toLens()
         val responseBody = Body.auto<OrderApiResponse>().toLens()
 
         return "orders" meta {
@@ -42,7 +43,7 @@ object OrderRoutes {
                 responseBody to Examples.marketOrderResponse,
             )
         } bindContract Method.POST to { request ->
-            val apiRequest: OrderApiRequest.Create = requestBody(request)
+            val apiRequest: CreateOrderApiRequest = requestBody(request)
 
             logger.debug {
                 Json.encodeToString(apiRequest)
@@ -55,7 +56,7 @@ object OrderRoutes {
     }
 
     fun updateOrder(): ContractRoute {
-        val requestBody = Body.auto<OrderApiRequest.Update>().toLens()
+        val requestBody = Body.auto<UpdateOrderApiRequest>().toLens()
         val responseBody = Body.auto<OrderApiResponse>().toLens()
 
         return "orders" / orderIdPathParam meta {
@@ -67,7 +68,7 @@ object OrderRoutes {
             )
         } bindContract Method.PATCH to { orderId ->
             fun handle(request: Request): Response {
-                val apiRequest: OrderApiRequest.Update = requestBody(request)
+                val apiRequest: UpdateOrderApiRequest = requestBody(request)
 
                 logger.debug { orderId }
                 logger.debug { Json.encodeToString(apiRequest) }
@@ -148,14 +149,14 @@ object OrderRoutes {
     }
 
     fun batchOrders(): ContractRoute {
-        val requestBody = Body.auto<OrdersApiRequest>().toLens()
+        val requestBody = Body.auto<BatchOrdersApiRequest>().toLens()
         val responseBody = Body.auto<OrdersApiResponse>().toLens()
 
         return "batch/orders" meta {
             operationId = "batch-orders"
             summary = "Manage orders in batch"
         } bindContract Method.POST to { request ->
-            val apiRequest: OrdersApiRequest = requestBody(request)
+            val apiRequest: BatchOrdersApiRequest = requestBody(request)
 
             logger.debug {
                 Json.encodeToString(apiRequest)

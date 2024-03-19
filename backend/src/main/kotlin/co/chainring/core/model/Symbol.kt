@@ -8,4 +8,4 @@ value class Symbol(val value: String)
 
 @Serializable
 @JvmInline
-value class Market(val value: String)
+value class Instrument(val value: String)

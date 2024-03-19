@@ -4,17 +4,17 @@ import co.chainring.apps.api.model.Balance
 import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrderApiResponse
-import co.chainring.core.model.Market
+import co.chainring.core.model.Instrument
 import co.chainring.core.model.OrderId
 import co.chainring.core.model.Symbol
 import kotlinx.datetime.Clock
 
 object Examples {
 
-    val marketOrderResponse = OrderApiResponse.MarketOrder(
+    val marketOrderResponse = OrderApiResponse.Market(
         orderId = OrderId.generate(),
         status = Order.Status.Open,
-        market = Market("BTC/ETH"),
+        instrument = Instrument("BTC/ETH"),
         side = Order.Side.Buy,
         amount = BigDecimalJson("0.1"),
         timeInForce = Order.TimeInForce.GoodTillCancelled,
