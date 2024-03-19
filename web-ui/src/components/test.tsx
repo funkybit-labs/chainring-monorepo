@@ -1,29 +1,27 @@
 import { render, screen } from '@testing-library/react'
 
 import App from './App'
+import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
+import {WagmiProvider} from "wagmi";
+import {wagmiConfig} from "../wagmiConfig";
 
 describe('<App />', () => {
   it('should render the App', () => {
-    const { container } = render(<App />)
+    const { container } = render(
+      <WagmiProvider config={wagmiConfig}>
+        <QueryClientProvider client={new QueryClient()}><App /></QueryClientProvider>
+      </WagmiProvider>
+    )
 
     expect(
-      screen.getByRole('heading', {
-        name: /ChainRing/i,
-        level: 1
+      screen.getAllByAltText('ChainRing')[0]
+    ).toBeInTheDocument()
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Connect Wallet'
       })
     ).toBeInTheDocument()
-
-    expect(
-      screen.getByText(/The first cross-chain DEX built on Bitcoin/i)
-    ).toBeInTheDocument()
-
-    expect(
-      screen.getByRole('link', {
-        name: 'Connect wallet'
-      })
-    ).toBeInTheDocument()
-
-    expect(screen.getByRole('img')).toBeInTheDocument()
 
     expect(container.firstChild).toBeInTheDocument()
   })
