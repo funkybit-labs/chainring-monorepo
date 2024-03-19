@@ -4,10 +4,20 @@ import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { useAccount } from 'wagmi'
 import { addressDisplay } from 'utils'
 import { Button } from 'components/common/Button'
+import { useEffect, useState } from 'react'
 
 export function Header() {
   const { open: openWalletConnectModal } = useWeb3Modal()
   const account = useAccount()
+  const [name, setName] = useState<string>()
+  const [icon, setIcon] = useState<string>()
+
+  useEffect(() => {
+    if (account.isConnected && account.connector) {
+      setIcon(account.connector.icon)
+      setName(account.connector.name)
+    }
+  }, [account.isConnected])
 
   return (
     <div className="fixed flex h-20 w-full flex-row place-items-center justify-between bg-neutralGray p-0">
@@ -22,13 +32,24 @@ export function Header() {
       <span className="m-2">
         {account.isConnected ? (
           <Button
-            caption={() => addressDisplay(account.address ?? '0x')}
+            caption={() => (
+              <span>
+                {icon && (
+                  <img
+                    className="inline-block size-8 mr-2"
+                    src={icon}
+                    alt={name ?? ''}
+                  />
+                )}
+                {addressDisplay(account.address ?? '0x')}
+              </span>
+            )}
             onClick={() => openWalletConnectModal({ view: 'Account' })}
             disabled={false}
           />
         ) : (
           <Button
-            caption={() => 'Connect Wallet'}
+            caption={() => <>'Connect Wallet'</>}
             onClick={() => openWalletConnectModal({ view: 'Networks' })}
             disabled={false}
           />
