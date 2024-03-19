@@ -4,6 +4,7 @@ import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.DeployedContract
 import co.chainring.apps.api.model.ERC20Token
 import co.chainring.core.model.Address
+import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.Chain
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.ERC20TokenEntity
@@ -42,7 +43,7 @@ object ConfigRoutes {
                             ERC20Token(
                                 chain = Chain.Ethereum,
                                 name = "USD Coin",
-                                symbol = "USDC",
+                                symbol = Symbol("USDC"),
                                 address = Address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
                                 decimals = 18u,
                             ),

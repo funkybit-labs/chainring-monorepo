@@ -1,6 +1,7 @@
 package co.chainring.core.model.db
 
 import co.chainring.core.model.Address
+import co.chainring.core.model.Symbol
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
@@ -43,7 +44,7 @@ object ERC20TokenTable : GUIDTable<ERC20TokenId>("erc20_token", ::ERC20TokenId) 
 class ERC20TokenEntity(guid: EntityID<ERC20TokenId>) : GUIDEntity<ERC20TokenId>(guid) {
     companion object : EntityClass<ERC20TokenId, ERC20TokenEntity>(ERC20TokenTable) {
         fun create(
-            symbol: String,
+            symbol: Symbol,
             name: String,
             chain: Chain,
             address: Address,
@@ -63,7 +64,10 @@ class ERC20TokenEntity(guid: EntityID<ERC20TokenId>) : GUIDEntity<ERC20TokenId>(
     var createdAt by ERC20TokenTable.createdAt
     var createdBy by ERC20TokenTable.createdBy
     var name by ERC20TokenTable.name
-    var symbol by ERC20TokenTable.symbol
+    var symbol by ERC20TokenTable.symbol.transform(
+        toColumn = { it.value },
+        toReal = { Symbol(it) },
+    )
     var chain by ERC20TokenTable.chain
     var address by ERC20TokenTable.address.transform(
         toColumn = { it.value },

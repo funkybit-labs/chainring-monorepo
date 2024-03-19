@@ -1,6 +1,7 @@
 package co.chainring.apps.api.model
 
 import co.chainring.core.model.Address
+import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.Chain
 import kotlinx.serialization.Serializable
 
@@ -21,7 +22,7 @@ data class DeployedContract(
 data class ERC20Token(
     val chain: Chain,
     val name: String,
-    val symbol: String,
+    val symbol: Symbol,
     val address: Address,
     val decimals: UByte,
 )

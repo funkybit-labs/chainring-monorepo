@@ -53,6 +53,19 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                         routes +=
                             listOf(
                                 ConfigRoutes.getConfiguration(),
+                                OrderRoutes.createOrder(),
+                                OrderRoutes.updateOrder(),
+                                OrderRoutes.cancelOrder(),
+                                OrderRoutes.getOrder(),
+                                OrderRoutes.listOrders(),
+                                OrderRoutes.cancelOpenOrders(),
+                                OrderRoutes.batchOrders(),
+                                OrderRoutes.listTrades(),
+                                BalanceRoutes.getBalances(),
+
+                                // http api + websocket
+                                // GET /v1/market/market_id/order-book
+                                // GET /v1/market/market_id/transactions
                             )
                     },
             ),
