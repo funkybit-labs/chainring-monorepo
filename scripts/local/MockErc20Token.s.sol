@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import {ERC20Mock} from "openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol";
+import {ERC20Mock} from "./ERC20Mock.sol";
 
 contract MockERC20TokenScript is Script {
     string [] internal walletAddresses = [
@@ -23,7 +23,7 @@ contract MockERC20TokenScript is Script {
     function run() public {
         uint amount = 200000e18;
         vm.startBroadcast();
-        ERC20Mock token = new ERC20Mock();
+        ERC20Mock token = new ERC20Mock(string.concat(vm.envString("TOKEN_SYMBOL"), " coin"), vm.envString("TOKEN_SYMBOL"));
         console.log("{\"deployAddress\": \"%s\"}", address(token));
         for (uint i = 0; i < walletAddresses.length; i++) {
             token.mint(vm.parseAddress(walletAddresses[i]), amount);

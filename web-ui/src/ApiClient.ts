@@ -16,8 +16,8 @@ export type ERC20Token = {
 }
 
 export type ConfigurationApiResponse = {
-  contracts: [DeployedContract]
-  erc20Tokens: [ERC20Token]
+  contracts: DeployedContract[]
+  erc20Tokens: ERC20Token[]
 }
 
 export async function getConfiguration(): Promise<ConfigurationApiResponse> {
