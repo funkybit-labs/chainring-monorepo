@@ -53,25 +53,14 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                         routes +=
                             listOf(
                                 ConfigRoutes.getConfiguration(),
-
-                                // POST /v1/orders
                                 OrderRoutes.createOrder(),
-                                // PATCH /v1/orders/order_id
                                 OrderRoutes.updateOrder(),
-                                // DELETE /v1/orders/order_id
-                                OrderRoutes.deleteOrder(),
-                                // GET /v1/orders/order_id
+                                OrderRoutes.cancelOrder(),
                                 OrderRoutes.getOrder(),
-                                // GET /v1/orders
                                 OrderRoutes.listOrders(),
-                                // DELETE /v1/orders
                                 OrderRoutes.cancelOpenOrders(),
-                                // POST /v1/batch/orders
                                 OrderRoutes.batchOrders(),
-                                // GET /v1/trades
                                 OrderRoutes.listTrades(),
-
-                                // GET /v1/balances
                                 BalanceRoutes.getBalances(),
 
                                 // http api + websocket

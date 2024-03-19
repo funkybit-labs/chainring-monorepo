@@ -19,7 +19,7 @@ object BalanceRoutes {
 
         return "balances" meta {
             operationId = "get-balances"
-            summary = "Get order"
+            summary = "Get balances"
             returning(
                 Status.OK,
                 responseBody to BalancesApiResponse(

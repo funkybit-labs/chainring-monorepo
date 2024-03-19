@@ -17,7 +17,7 @@ object Examples {
         instrument = Instrument("BTC/ETH"),
         side = Order.Side.Buy,
         amount = BigDecimalJson("0.1"),
-        timeInForce = Order.TimeInForce.GoodTillCancelled,
+        originalAmount = BigDecimalJson("0.1"),
         execution = null,
         timing = Order.Timing(
             createdAt = Clock.System.now(),

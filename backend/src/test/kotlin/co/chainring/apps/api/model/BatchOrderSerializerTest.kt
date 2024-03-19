@@ -15,7 +15,6 @@ class BatchOrderSerializerTest {
         instrument = Instrument("BTC/ETH"),
         side = Order.Side.Buy,
         amount = BigDecimalJson("0.1"),
-        timeInForce = Order.TimeInForce.GoodTillCancelled,
     )
 
     private val updateLimitOrderRequest = UpdateOrderApiRequest.Limit(

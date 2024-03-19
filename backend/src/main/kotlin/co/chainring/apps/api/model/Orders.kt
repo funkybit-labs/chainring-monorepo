@@ -72,7 +72,6 @@ sealed class CreateOrderApiRequest {
     abstract val nonce: String
     abstract val instrument: Instrument
     abstract val side: Order.Side
-    abstract val timeInForce: Order.TimeInForce
     abstract val amount: BigDecimalJson
 
     @Serializable
@@ -81,7 +80,6 @@ sealed class CreateOrderApiRequest {
         override val nonce: String,
         override val instrument: Instrument,
         override val side: Order.Side,
-        override val timeInForce: Order.TimeInForce,
         override val amount: BigDecimalJson,
     ) : CreateOrderApiRequest()
 
@@ -91,18 +89,16 @@ sealed class CreateOrderApiRequest {
         override val nonce: String,
         override val instrument: Instrument,
         override val side: Order.Side,
-        override val timeInForce: Order.TimeInForce,
         override val amount: BigDecimalJson,
+        val timeInForce: Order.TimeInForce,
         val price: BigDecimalJson,
     ) : CreateOrderApiRequest()
 }
 
 @Serializable
 @OptIn(ExperimentalSerializationApi::class)
-@JsonClassDiscriminator(
-    "type",
-)
-sealed class UpdateOrderApiRequest() {
+@JsonClassDiscriminator("type")
+sealed class UpdateOrderApiRequest {
     abstract val id: OrderId
     abstract val timeInForce: Order.TimeInForce?
     abstract val amount: BigDecimalJson?
@@ -139,7 +135,7 @@ sealed class OrderApiResponse {
     abstract val instrument: Instrument
     abstract val side: Order.Side
     abstract val amount: BigDecimalJson
-    abstract val timeInForce: Order.TimeInForce
+    abstract val originalAmount: BigDecimalJson
     abstract val execution: Order.Execution?
     abstract val timing: Order.Timing
 
@@ -151,7 +147,7 @@ sealed class OrderApiResponse {
         override val instrument: Instrument,
         override val side: Order.Side,
         override val amount: BigDecimalJson,
-        override val timeInForce: Order.TimeInForce,
+        override val originalAmount: BigDecimalJson,
         override val execution: Order.Execution? = null,
         override val timing: Order.Timing,
     ) : OrderApiResponse()
@@ -164,8 +160,9 @@ sealed class OrderApiResponse {
         override val instrument: Instrument,
         override val side: Order.Side,
         override val amount: BigDecimalJson,
+        override val originalAmount: BigDecimalJson,
         val price: BigDecimalJson,
-        override val timeInForce: Order.TimeInForce,
+        val timeInForce: Order.TimeInForce,
         override val execution: Order.Execution? = null,
         override val timing: Order.Timing,
     ) : OrderApiResponse()

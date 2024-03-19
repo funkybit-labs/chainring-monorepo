@@ -81,10 +81,10 @@ object OrderRoutes {
         }
     }
 
-    fun deleteOrder(): ContractRoute {
+    fun cancelOrder(): ContractRoute {
         return "orders" / orderIdPathParam meta {
-            operationId = "delete-order"
-            summary = "Delete order"
+            operationId = "cancel-order"
+            summary = "Cancel order"
             returning(
                 Status.NO_CONTENT,
             )
@@ -141,8 +141,8 @@ object OrderRoutes {
 
     fun cancelOpenOrders(): ContractRoute {
         return "orders" meta {
-            operationId = "delete-all-orders"
-            summary = "Delete all open orders"
+            operationId = "cancel-open-orders"
+            summary = "Cancel open orders"
         } bindContract Method.DELETE to { _ ->
             Response(Status.OK)
         }
@@ -176,10 +176,10 @@ object OrderRoutes {
         return "trades" meta {
             operationId = "list-trades"
             summary = "List trades"
-            queries += Query.string().optional("since-timestamp", "Return trader executed before provided timestamp")
+            queries += Query.string().optional("before-timestamp", "Return trades executed before provided timestamp")
             queries += Query.string().optional("limit", "Number of trades to return")
         } bindContract Method.GET to { request ->
-            val timestamp = request.query("since-timestamp")?.toInstant() ?: Instant.DISTANT_FUTURE
+            val timestamp = request.query("before-timestamp")?.toInstant() ?: Instant.DISTANT_FUTURE
             val limit = request.query("limit")?.toInt() ?: 100
 
             Response(Status.OK).with(
