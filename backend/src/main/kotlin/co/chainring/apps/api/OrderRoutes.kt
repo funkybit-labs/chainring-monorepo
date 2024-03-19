@@ -60,7 +60,7 @@ object OrderRoutes {
         val responseBody = Body.auto<OrderApiResponse>().toLens()
 
         return "orders" / orderIdPathParam meta {
-            operationId = "patch-order"
+            operationId = "update-order"
             summary = "Update order"
             returning(
                 Status.OK,
@@ -176,10 +176,10 @@ object OrderRoutes {
         return "trades" meta {
             operationId = "get-trades"
             summary = "Get trades"
-            queries += Query.string().optional("timestamp", "Timestamp of the earliest trade received by the client")
+            queries += Query.string().optional("since-timestamp", "Return trader executed before provided timestamp")
             queries += Query.string().optional("limit", "Number of trades to return")
         } bindContract Method.GET to { request ->
-            val timestamp = request.query("timestamp")?.toInstant() ?: Instant.DISTANT_FUTURE
+            val timestamp = request.query("since-timestamp")?.toInstant() ?: Instant.DISTANT_FUTURE
             val limit = request.query("limit")?.toInt() ?: 100
 
             Response(Status.OK).with(
