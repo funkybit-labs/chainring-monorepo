@@ -1,5 +1,9 @@
 export default [
     {
+        "type": "receive",
+        "stateMutability": "payable"
+    },
+    {
         "type": "function",
         "name": "UPGRADE_INTERFACE_VERSION",
         "inputs": [
@@ -86,6 +90,25 @@ export default [
     },
     {
         "type": "function",
+        "name": "nativeBalances",
+        "inputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
         "name": "owner",
         "inputs": [
             
@@ -165,6 +188,21 @@ export default [
         "name": "withdraw",
         "inputs": [
             {
+                "name": "_amount",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "outputs": [
+            
+        ],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "withdraw",
+        "inputs": [
+            {
                 "name": "_token",
                 "type": "address",
                 "internalType": "address"
@@ -182,9 +220,26 @@ export default [
     },
     {
         "type": "event",
-        "name": "DepositCreated",
+        "name": "Deposit",
         "inputs": [
-            
+            {
+                "name": "from",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address"
+            },
+            {
+                "name": "token",
+                "type": "address",
+                "indexed": false,
+                "internalType": "address"
+            },
+            {
+                "name": "amount",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256"
+            }
         ],
         "anonymous": false
     },
@@ -235,10 +290,22 @@ export default [
     },
     {
         "type": "event",
-        "name": "WithdrawalCreated",
+        "name": "Withdrawal",
         "inputs": [
             {
-                "name": "",
+                "name": "to",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address"
+            },
+            {
+                "name": "token",
+                "type": "address",
+                "indexed": false,
+                "internalType": "address"
+            },
+            {
+                "name": "amount",
                 "type": "uint256",
                 "indexed": false,
                 "internalType": "uint256"
@@ -273,6 +340,17 @@ export default [
         "name": "ERC1967NonPayable",
         "inputs": [
             
+        ]
+    },
+    {
+        "type": "error",
+        "name": "ErrorInsufficientBalance",
+        "inputs": [
+            {
+                "name": "",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
         ]
     },
     {
