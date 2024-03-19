@@ -4,7 +4,6 @@ import { BaseError, useConfig, useReadContract, useWriteContract } from 'wagmi'
 import { ExchangeAbi } from 'contracts'
 import { useState } from 'react'
 import { waitForTransactionReceipt } from 'wagmi/actions'
-import { Dialog } from '@headlessui/react'
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
@@ -84,14 +83,12 @@ export default function WithdrawalModal({
   }
 
   return (
-    <Modal isOpen={isOpen} close={close} onClosed={onClosed}>
-      <Dialog.Title
-        as="h3"
-        className="text-lg font-medium leading-6 text-darkGray"
-      >
-        Withdraw {token.symbol}
-      </Dialog.Title>
-
+    <Modal
+      isOpen={isOpen}
+      close={close}
+      onClosed={onClosed}
+      title={`Withdraw ${token.symbol}`}
+    >
       <div className="h-52 overflow-y-auto">
         <ModalAsyncContent
           query={availableBalanceQuery}

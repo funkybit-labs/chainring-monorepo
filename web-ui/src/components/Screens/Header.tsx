@@ -10,7 +10,7 @@ export function Header() {
   const account = useAccount()
 
   return (
-    <div className="flex h-20 w-full flex-row place-items-center justify-between bg-neutralGray p-0">
+    <div className="fixed flex h-20 w-full flex-row place-items-center justify-between bg-neutralGray p-0">
       <span>
         <img className="m-2 inline-block size-16" src={logo} alt="ChainRing" />
         <img

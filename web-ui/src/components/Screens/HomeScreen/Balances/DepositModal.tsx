@@ -4,7 +4,6 @@ import { BaseError, useConfig, useReadContract, useWriteContract } from 'wagmi'
 import { ERC20Abi, ExchangeAbi } from 'contracts'
 import { useState } from 'react'
 import { waitForTransactionReceipt } from 'wagmi/actions'
-import { Dialog } from '@headlessui/react'
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
@@ -103,14 +102,12 @@ export default function DepositModal({
   }
 
   return (
-    <Modal isOpen={isOpen} close={close} onClosed={onClosed}>
-      <Dialog.Title
-        as="h3"
-        className="text-lg font-medium leading-6 text-darkGray"
-      >
-        Deposit {token.symbol}
-      </Dialog.Title>
-
+    <Modal
+      isOpen={isOpen}
+      close={close}
+      onClosed={onClosed}
+      title={`Deposit ${token.symbol}`}
+    >
       <div className="h-52 overflow-y-auto">
         <ModalAsyncContent
           query={walletBalanceQuery}

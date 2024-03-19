@@ -1,9 +1,14 @@
 /** @type {import('tailwindcss').Config} */
+const defaultTheme = require('tailwindcss/defaultTheme')
 
 export default {
   content: ['./src/**/*.{mjs,js,ts,jsx,tsx}'],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['"Roboto Mono"', ...defaultTheme.fontFamily.sans]
+      }
+    },
     colors: {
       lightBackground: "#B5CBCD",
       darkBackground: "#66B0B6",
