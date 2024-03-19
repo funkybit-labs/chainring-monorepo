@@ -1,7 +1,7 @@
-import { classNames } from '../../utils'
+import { classNames } from 'utils'
 
 type Props = {
-  caption: () => string
+  caption: () => JSX.Element
   onClick: () => void
   disabled: boolean
 }
