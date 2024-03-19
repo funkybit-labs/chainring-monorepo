@@ -6,8 +6,7 @@ import { useAccount } from 'wagmi'
 import { addressDisplay } from '../../utils'
 
 export function Header() {
-  const { open: openWalletConnectModal, close: closeWalletConnection } =
-    useWeb3Modal()
+  const { open: openWalletConnectModal } = useWeb3Modal()
   const account = useAccount()
 
   return (

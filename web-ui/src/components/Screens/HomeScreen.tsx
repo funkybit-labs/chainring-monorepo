@@ -22,7 +22,7 @@ export default function HomeScreen() {
       <Header />
       <div className="flex h-screen w-screen flex-col">
         <div></div>
-        <div className="bg-red-900 flex h-screen items-center justify-center py-48">
+        <div className="flex h-screen items-center justify-center py-48">
           <div className="flex flex-col items-center gap-4">
             {walletAddress && exchangeContractAddress && (
               <>

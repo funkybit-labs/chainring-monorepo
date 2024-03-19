@@ -106,7 +106,7 @@ export default function DepositModal({
     <Modal isOpen={isOpen} close={close} onClosed={onClosed}>
       <Dialog.Title
         as="h3"
-        className="text-gray-900 text-lg font-medium leading-6"
+        className="text-lg font-medium leading-6 text-darkGray"
       >
         Deposit {token.symbol}
       </Dialog.Title>
@@ -123,7 +123,7 @@ export default function DepositModal({
                   disabled={submitPhase !== null}
                   onChange={onAmountChange}
                 />
-                <p className="text-gray-500 mt-1 text-center text-sm">
+                <p className="mt-1 text-center text-sm text-neutralGray">
                   Available balance: {formatUnits(data, token.decimals)}
                 </p>
 

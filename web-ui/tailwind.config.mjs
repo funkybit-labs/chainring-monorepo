@@ -14,7 +14,8 @@ export default {
       green: "#10A327",
       brightGreen: "#1cd23a",
       red: "#7F1D1D",
-      brightRed: "#a12222"
+      brightRed: "#a12222",
+      black: "#111",
     }
   },
   plugins: [

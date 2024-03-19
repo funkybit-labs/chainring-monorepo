@@ -3,11 +3,12 @@ import { ERC20Token } from 'ApiClient'
 import { useBlockNumber, useReadContracts } from 'wagmi'
 import { ExchangeAbi } from 'contracts'
 import Spinner from 'components/common/Spinner'
-import { classNames, isNotNullable } from 'utils'
+import { isNotNullable } from 'utils'
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import DepositModal from 'components/Screens/HomeScreen/Balances/DepositModal'
 import WithdrawalModal from 'components/Screens/HomeScreen/Balances/WithdrawalModal'
+import { Button } from '../../common/Button'
 
 export default function Balances({
   walletAddress,
@@ -23,7 +24,7 @@ export default function Balances({
       <div className="mb-2 text-center text-xl font-medium text-white">
         Balances
       </div>
-      <div className="bg-gray-500/50 w-full rounded-lg p-8 text-white">
+      <div className="w-full rounded-lg bg-black p-8 text-white">
         <BalancesTable
           walletAddress={walletAddress}
           exchangeContractAddress={exchangeContractAddress}
@@ -124,15 +125,15 @@ function BalancesTable({
                   )}
                 </td>
                 <td className="py-1 pr-2">
-                  <BalanceButton
-                    caption="Deposit"
+                  <Button
+                    caption={() => 'Deposit'}
                     onClick={() => openDepositModal(tokenBalance.token)}
                     disabled={false}
                   />
                 </td>
                 <td className="py-1">
-                  <BalanceButton
-                    caption="Withdraw"
+                  <Button
+                    caption={() => 'Withdraw'}
                     onClick={() => openWithdrawModal(tokenBalance.token)}
                     disabled={tokenBalance.amount === 0n}
                   />
@@ -165,29 +166,5 @@ function BalancesTable({
         />
       )}
     </>
-  )
-}
-
-function BalanceButton({
-  caption,
-  onClick,
-  disabled = false
-}: {
-  caption: string
-  onClick: () => void
-  disabled: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={classNames(
-        'inline-block rounded-md border border-transparent px-2 py-1 text-xs text-center font-medium bg-gray-100 text-black focus:outline-none focus:ring-1 focus:ring-inset focus:ring-gray-700',
-        disabled ? 'opacity-50' : 'hover:bg-gray-200'
-      )}
-    >
-      {caption}
-    </button>
   )
 }
