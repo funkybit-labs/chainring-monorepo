@@ -1,15 +1,7 @@
-import { useAccount } from 'wagmi'
-import WelcomeScreen from 'components/Screens/WelcomeScreen'
-import HomeScreen from 'components/Screens/HomeScreen'
+import HomeScreen from './Screens/HomeScreen'
 
 function App() {
-  const account = useAccount()
-
-  if (account.isConnected) {
-    return <HomeScreen />
-  } else {
-    return <WelcomeScreen />
-  }
+  return <HomeScreen />
 }
 
 export default App
