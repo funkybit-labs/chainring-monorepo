@@ -125,14 +125,14 @@ function BalancesTable({
                 </td>
                 <td className="px-2 py-1">
                   <Button
-                    caption={() => <>'Deposit'</>}
+                    caption={() => <>Deposit</>}
                     onClick={() => openDepositModal(tokenBalance.token)}
                     disabled={false}
                   />
                 </td>
                 <td className="py-1 pl-2">
                   <Button
-                    caption={() => <>'Withdraw'</>}
+                    caption={() => <>Withdraw</>}
                     onClick={() => openWithdrawModal(tokenBalance.token)}
                     disabled={tokenBalance.amount === 0n}
                   />

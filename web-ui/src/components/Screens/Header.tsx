@@ -17,7 +17,7 @@ export function Header() {
       setIcon(account.connector.icon)
       setName(account.connector.name)
     }
-  }, [account.isConnected])
+  }, [account.isConnected, account.connector])
 
   return (
     <div className="fixed flex h-20 w-full flex-row place-items-center justify-between bg-neutralGray p-0">
@@ -36,7 +36,7 @@ export function Header() {
               <span>
                 {icon && (
                   <img
-                    className="inline-block size-8 mr-2"
+                    className="mr-2 inline-block size-8"
                     src={icon}
                     alt={name ?? ''}
                   />
@@ -49,7 +49,7 @@ export function Header() {
           />
         ) : (
           <Button
-            caption={() => <>'Connect Wallet'</>}
+            caption={() => <>Connect Wallet</>}
             onClick={() => openWalletConnectModal({ view: 'Networks' })}
             disabled={false}
           />
