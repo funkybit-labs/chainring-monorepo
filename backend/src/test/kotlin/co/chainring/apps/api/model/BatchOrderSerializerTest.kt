@@ -19,7 +19,7 @@ class BatchOrderSerializerTest {
     )
 
     private val updateLimitOrderRequest = UpdateOrderApiRequest.Limit(
-        orderId = OrderId.generate(),
+        id = OrderId.generate(),
         amount = BigDecimalJson("0.1"),
         price = BigDecimalJson("101"),
         timeInForce = Order.TimeInForce.GoodTillCancelled,

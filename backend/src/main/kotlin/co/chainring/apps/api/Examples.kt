@@ -12,7 +12,7 @@ import kotlinx.datetime.Clock
 object Examples {
 
     val marketOrderResponse = OrderApiResponse.Market(
-        orderId = OrderId.generate(),
+        id = OrderId.generate(),
         status = Order.Status.Open,
         instrument = Instrument("BTC/ETH"),
         side = Order.Side.Buy,

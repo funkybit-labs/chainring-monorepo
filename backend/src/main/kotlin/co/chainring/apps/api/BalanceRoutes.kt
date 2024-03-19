@@ -17,16 +17,16 @@ object BalanceRoutes {
     fun balances(): ContractRoute {
         val responseBody = Body.auto<BalancesApiResponse>().toLens()
 
-        return "orders" meta {
-            operationId = "create-orders"
-            summary = "Create order"
+        return "balances" meta {
+            operationId = "get-balances"
+            summary = "Get order"
             returning(
                 Status.OK,
                 responseBody to BalancesApiResponse(
                     listOf(Examples.BTCBalance, Examples.ETHBalance),
                 ),
             )
-        } bindContract Method.POST to { _ ->
+        } bindContract Method.GET to { _ ->
             Response(Status.OK).with(
                 responseBody of BalancesApiResponse(
                     listOf(Examples.BTCBalance, Examples.ETHBalance),

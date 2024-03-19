@@ -103,14 +103,14 @@ sealed class CreateOrderApiRequest {
     "type",
 )
 sealed class UpdateOrderApiRequest() {
-    abstract val orderId: OrderId
+    abstract val id: OrderId
     abstract val timeInForce: Order.TimeInForce?
     abstract val amount: BigDecimalJson?
 
     @Serializable
     @SerialName("market")
     data class Market(
-        override val orderId: OrderId,
+        override val id: OrderId,
         override val timeInForce: Order.TimeInForce? = null,
         override val amount: BigDecimalJson? = null,
     ) : UpdateOrderApiRequest()
@@ -118,7 +118,7 @@ sealed class UpdateOrderApiRequest() {
     @Serializable
     @SerialName("limit")
     data class Limit(
-        override val orderId: OrderId,
+        override val id: OrderId,
         override val timeInForce: Order.TimeInForce? = null,
         override val amount: BigDecimalJson? = null,
         val price: BigDecimalJson?,
@@ -134,7 +134,7 @@ data class DeleteUpdateOrderApiRequest(
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("type")
 sealed class OrderApiResponse {
-    abstract val orderId: OrderId
+    abstract val id: OrderId
     abstract val status: Order.Status
     abstract val instrument: Instrument
     abstract val side: Order.Side
@@ -146,7 +146,7 @@ sealed class OrderApiResponse {
     @Serializable
     @SerialName("market")
     data class Market(
-        override val orderId: OrderId,
+        override val id: OrderId,
         override val status: Order.Status,
         override val instrument: Instrument,
         override val side: Order.Side,
@@ -159,7 +159,7 @@ sealed class OrderApiResponse {
     @Serializable
     @SerialName("limit")
     data class Limit(
-        override val orderId: OrderId,
+        override val id: OrderId,
         override val status: Order.Status,
         override val instrument: Instrument,
         override val side: Order.Side,

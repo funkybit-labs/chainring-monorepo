@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Trade(
-    val tradeId: TradeId,
+    val id: TradeId,
     val orderId: OrderId,
     val instrument: Instrument,
     val side: Order.Side,

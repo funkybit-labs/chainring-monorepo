@@ -75,7 +75,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                                 BalanceRoutes.balances(),
 
                                 // http api + websocket
-                                // GET /v1/market/market_id/order_book
+                                // GET /v1/market/market_id/order-book
                                 // GET /v1/market/market_id/transactions
                             )
                     },
