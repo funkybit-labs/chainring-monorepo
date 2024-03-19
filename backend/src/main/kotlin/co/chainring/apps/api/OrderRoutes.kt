@@ -36,7 +36,7 @@ object OrderRoutes {
         val responseBody = Body.auto<OrderApiResponse>().toLens()
 
         return "orders" meta {
-            operationId = "create-orders"
+            operationId = "create-order"
             summary = "Create order"
             returning(
                 Status.CREATED,
