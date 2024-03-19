@@ -24,11 +24,13 @@ export function Header() {
           <Button
             caption={() => addressDisplay(account.address ?? '0x')}
             onClick={() => openWalletConnectModal({ view: 'Account' })}
+            disabled={false}
           />
         ) : (
           <Button
             caption={() => 'Connect Wallet'}
             onClick={() => openWalletConnectModal({ view: 'Networks' })}
+            disabled={false}
           />
         )}
       </span>
