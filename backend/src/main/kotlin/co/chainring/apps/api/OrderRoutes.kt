@@ -118,12 +118,12 @@ object OrderRoutes {
         }
     }
 
-    fun getOrders(): ContractRoute {
+    fun listOrders(): ContractRoute {
         val responseBody = Body.auto<OrdersApiResponse>().toLens()
 
         return "orders" meta {
-            operationId = "retrieve-all-orders"
-            summary = "Retrieve all open orders"
+            operationId = "list-orders"
+            summary = "List orders"
             returning(
                 Status.OK,
                 responseBody to OrdersApiResponse(
@@ -170,12 +170,12 @@ object OrderRoutes {
         }
     }
 
-    fun getTrades(): ContractRoute {
+    fun listTrades(): ContractRoute {
         val responseBody = Body.auto<TradesApiResponse>().toLens()
 
         return "trades" meta {
-            operationId = "get-trades"
-            summary = "Get trades"
+            operationId = "list-trades"
+            summary = "List trades"
             queries += Query.string().optional("since-timestamp", "Return trader executed before provided timestamp")
             queries += Query.string().optional("limit", "Number of trades to return")
         } bindContract Method.GET to { request ->

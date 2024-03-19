@@ -14,7 +14,7 @@ import org.http4k.format.KotlinxSerialization.auto
 object BalanceRoutes {
     private val logger = KotlinLogging.logger {}
 
-    fun balances(): ContractRoute {
+    fun getBalances(): ContractRoute {
         val responseBody = Body.auto<BalancesApiResponse>().toLens()
 
         return "balances" meta {
