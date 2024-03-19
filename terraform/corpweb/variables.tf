@@ -17,13 +17,6 @@ variable "instance_name" {
   default = "corpweb"
 }
 
-variable "ip_address_type" {
-  type        = string
-  description = "The IP address type of the Lightsail Instance. Valid Values: dualstack | ipv4"
-
-  default = "ipv4"
-}
-
 variable "blueprint" {
   type        = string
   description = "Blueprints listed by the AWS cli - aws lightsail get-blueprints"
