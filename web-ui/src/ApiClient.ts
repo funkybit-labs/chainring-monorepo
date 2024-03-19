@@ -13,6 +13,7 @@ export type ERC20Token = {
   name: string
   symbol: string
   address: Address
+  decimals: number
 }
 
 export type ConfigurationApiResponse = {

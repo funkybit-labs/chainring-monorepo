@@ -23,14 +23,14 @@ object ERC20TokenTable : GUIDTable<ERC20TokenId>("erc20_token", ::ERC20TokenId) 
     val createdBy = varchar("created_by", 10485760)
     val name = varchar("name", 10485760)
     val symbol = varchar("symbol", 10485760)
-    val chain =
-        customEnumeration(
-            "chain",
-            "Chain",
-            { value -> Chain.valueOf(value as String) },
-            { PGEnum("Chain", it) },
-        )
+    val chain = customEnumeration(
+        "chain",
+        "Chain",
+        { value -> Chain.valueOf(value as String) },
+        { PGEnum("Chain", it) },
+    )
     val address = varchar("address", 10485760)
+    val decimals = ubyte("decimals")
 
     init {
         uniqueIndex(
@@ -69,4 +69,5 @@ class ERC20TokenEntity(guid: EntityID<ERC20TokenId>) : GUIDEntity<ERC20TokenId>(
         toColumn = { it.value },
         toReal = { Address(it) },
     )
+    var decimals by ERC20TokenTable.decimals
 }

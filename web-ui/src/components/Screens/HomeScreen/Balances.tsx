@@ -118,7 +118,10 @@ function BalancesTable({
               <tr key={tokenBalance.token.address}>
                 <td className="pr-2">{tokenBalance.token.symbol}</td>
                 <td className="w-full min-w-48 pr-2 text-right">
-                  {formatUnits(tokenBalance.amount, 18)}
+                  {formatUnits(
+                    tokenBalance.amount,
+                    tokenBalance.token.decimals
+                  )}
                 </td>
                 <td className="py-1 pr-2">
                   <BalanceButton

@@ -54,7 +54,7 @@ export default function DepositModal({
       if (walletBalanceQuery.data === undefined) {
         return false
       } else {
-        const parsedAmount = parseUnits(amount, 18)
+        const parsedAmount = parseUnits(amount, token.decimals)
         return parsedAmount > 0 && parsedAmount <= walletBalanceQuery.data
       }
     } catch {
@@ -63,7 +63,7 @@ export default function DepositModal({
   })()
 
   async function onSubmit() {
-    const parsedAmount = parseUnits(amount, 18)
+    const parsedAmount = parseUnits(amount, token.decimals)
     if (canSubmit) {
       try {
         setSubmitPhase('waitingForAllowanceApproval')
@@ -120,10 +120,11 @@ export default function DepositModal({
                 <AmountInput
                   value={amount}
                   symbol={token.symbol}
+                  disabled={submitPhase !== null}
                   onChange={onAmountChange}
                 />
                 <p className="mt-1 text-center text-sm text-gray-500">
-                  Available balance: {formatUnits(data, 18)}
+                  Available balance: {formatUnits(data, token.decimals)}
                 </p>
 
                 <SubmitButton
