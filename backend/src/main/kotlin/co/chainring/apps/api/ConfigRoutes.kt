@@ -3,6 +3,7 @@ package co.chainring.apps.api
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.DeployedContract
 import co.chainring.apps.api.model.ERC20Token
+import co.chainring.apps.api.model.NativeToken
 import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.Chain
@@ -48,6 +49,14 @@ object ConfigRoutes {
                                 decimals = 18u,
                             ),
                         ),
+                        nativeTokens = listOf(
+                            NativeToken(
+                                chain = Chain.Ethereum,
+                                name = "Ethereum",
+                                symbol = "ETH",
+                                decimals = 18u,
+                            ),
+                        ),
                     ),
             )
         } bindContract Method.GET to { _ ->
@@ -71,6 +80,14 @@ object ConfigRoutes {
                                     decimals = 18u,
                                 )
                             },
+                            nativeTokens = listOf(
+                                NativeToken(
+                                    chain = Chain.Ethereum,
+                                    name = "Ethereum",
+                                    symbol = "ETH",
+                                    decimals = 18u,
+                                ),
+                            ),
                         ),
                 )
             }

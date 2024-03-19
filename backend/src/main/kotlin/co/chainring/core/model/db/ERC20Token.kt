@@ -48,6 +48,7 @@ class ERC20TokenEntity(guid: EntityID<ERC20TokenId>) : GUIDEntity<ERC20TokenId>(
             name: String,
             chain: Chain,
             address: Address,
+            decimals: UByte,
         ) = ERC20TokenEntity.new(ERC20TokenId(chain, address)) {
             this.createdAt = Clock.System.now()
             this.createdBy = "system"
@@ -55,6 +56,7 @@ class ERC20TokenEntity(guid: EntityID<ERC20TokenId>) : GUIDEntity<ERC20TokenId>(
             this.name = name
             this.chain = chain
             this.address = address
+            this.decimals = decimals
         }
 
         override fun all(): SizedIterable<ERC20TokenEntity> =

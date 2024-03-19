@@ -1,0 +1,36 @@
+name: Deploy Backend
+
+on:
+  # Manual trigger from the UI
+  workflow_dispatch:
+
+  # Call from another workflow (CI)
+  workflow_call:
+
+# only one running pre deploy job
+concurrency:
+  group: deprecate-contracts
+  cancel-in-progress: false
+
+jobs:
+  deprecate_contracts:
+    name: Deprecate Contracts
+    runs-on: ubuntu-latest
+    permissions:
+      # needed for aws credentials
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup AWS
+        uses: ./.github/actions/setup-aws
+      - name: Configure SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CI_BASTION_KEY }}
+      - name: Mark contracts as deprecated
+        run: |
+          ssh -o StrictHostKeyChecking=no -L 5434:db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com:5432 ec2-user@test-bastion.chainring.co -N &
+          sleep 2  # to give the SSH tunnel time to be set up
+          PGPASSWORD=$(aws --region us-east-2 secretsmanager get-secret-value --secret-id 'arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-32e6d3b7-0fd7-43f6-b108-4648afcf69c1-NgwNkC' | jq -r '.SecretString' | jq -r '.password') \
+            psql --port=5434 --host=localhost --user=chainring -c "update deployed_smart_contract set deprecated='t' where deprecated='f'"

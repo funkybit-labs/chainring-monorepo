@@ -45,7 +45,8 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
     data class Contract(
         val nameInBuildDir: String,
         val generateJavaWrapper: Boolean,
-        val generateTypescriptAbi: Boolean
+        val generateTypescriptAbi: Boolean,
+        val generateJavaTestWrapper: Boolean = false,
     ) {
         val typeScriptAbiName = "${File(nameInBuildDir).nameWithoutExtension}Abi"
     }
@@ -71,6 +72,12 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
             generateJavaWrapper = true,
             generateTypescriptAbi = true
         ),
+        Contract(
+            nameInBuildDir = "ERC20Mock.sol",
+            generateJavaWrapper = false,
+            generateTypescriptAbi = false,
+            generateJavaTestWrapper = true
+        ),
     )
 
     println("Building Solidity contracts")
@@ -86,6 +93,7 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
     }
 
     val javaWrappersOutputDir = File("${projectDir}/backend/src/main/java")
+    val javaTestWrappersOutputDir = File("${projectDir}/integrationtests/src/test/java")
     val typeScriptAbiOutputDir = File("${projectDir}/web-ui/src/contracts")
 
     contracts.forEach { contract ->
@@ -119,6 +127,21 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
                     "bash",
                     "-c",
                     "web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${javaWrappersOutputDir.absolutePath} -p co.chainring.contracts.generated"
+                )
+            }.also {
+                if (it.exitValue == 127) {
+                    throw Exception("Web3j is missing, please run 'brew tap web3j/web3j && brew install web3j' to install")
+                }
+            }
+        }
+
+        if (contract.generateJavaTestWrapper) {
+            exec {
+                isIgnoreExitValue = true
+                commandLine(
+                    "bash",
+                    "-c",
+                    "web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${javaTestWrappersOutputDir.absolutePath} -p co.chainring.contracts.generated"
                 )
             }.also {
                 if (it.exitValue == 127) {
