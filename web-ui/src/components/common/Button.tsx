@@ -10,8 +10,8 @@ export function Button({ caption, onClick, disabled }: Props) {
     <button
       disabled={disabled}
       className={classNames(
-        'border-transparent rounded-lg bg-darkGray p-2 px-4 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-inset',
-        disabled ? 'text-neutralGray' : 'text-white'
+        'border-transparent rounded-lg bg-darkGray p-2 px-4 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray',
+        disabled ? 'text-neutralGray' : 'text-white hover:bg-mutedGray'
       )}
       onClick={onClick}
     >

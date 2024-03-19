@@ -17,10 +17,10 @@ export default function SubmitButton({
         type="button"
         disabled={disabled}
         className={classNames(
-          'mt-4 w-full inline-flex justify-center rounded-md border border-transparent px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-1 focus:ring-inset',
+          'mt-4 w-full inline-flex justify-center rounded-md border border-lightBackground px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-1 focus:ring-inset',
           disabled
             ? 'bg-neutralGray focus:ring-mutedGray'
-            : 'bg-green hover:bg-brightGreen focus:ring-brightGreen'
+            : 'bg-green hover:bg-brightGreen focus:ring-lightBackground'
         )}
         onClick={onClick}
       >

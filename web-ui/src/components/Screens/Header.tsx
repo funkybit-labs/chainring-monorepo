@@ -1,16 +1,16 @@
-import logo from '../../assets/logo.svg'
-import logoName from '../../assets/chainring-logo-name.png'
-import { Button } from '../common/Button'
+import logo from 'assets/logo.svg'
+import logoName from 'assets/chainring-logo-name.png'
 import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { useAccount } from 'wagmi'
-import { addressDisplay } from '../../utils'
+import { addressDisplay } from 'utils'
+import { Button } from 'components/common/Button'
 
 export function Header() {
   const { open: openWalletConnectModal } = useWeb3Modal()
   const account = useAccount()
 
   return (
-    <div className="flex h-20 w-full flex-row place-items-center justify-between bg-neutralGray p-0">
+    <div className="fixed flex h-20 w-full flex-row place-items-center justify-between bg-neutralGray p-0">
       <span>
         <img className="m-2 inline-block size-16" src={logo} alt="ChainRing" />
         <img

@@ -8,7 +8,8 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import DepositModal from 'components/Screens/HomeScreen/Balances/DepositModal'
 import WithdrawalModal from 'components/Screens/HomeScreen/Balances/WithdrawalModal'
-import { Button } from '../../common/Button'
+import { Widget } from 'components/Screens/Widget'
+import { Button } from 'components/common/Button'
 
 export default function Balances({
   walletAddress,
@@ -20,18 +21,16 @@ export default function Balances({
   erc20TokenContracts: ERC20Token[]
 }) {
   return (
-    <div>
-      <div className="mb-2 text-center text-xl font-medium text-white">
-        Balances
-      </div>
-      <div className="w-full rounded-lg bg-black p-8 text-white">
+    <Widget
+      title={'Balances'}
+      contents={
         <BalancesTable
           walletAddress={walletAddress}
           exchangeContractAddress={exchangeContractAddress}
           erc20TokenContracts={erc20TokenContracts}
         />
-      </div>
-    </div>
+      }
+    />
   )
 }
 
@@ -117,21 +116,21 @@ function BalancesTable({
           {balances.map((tokenBalance) => {
             return (
               <tr key={tokenBalance.token.address}>
-                <td className="pr-2">{tokenBalance.token.symbol}</td>
-                <td className="w-full min-w-48 pr-2 text-right">
+                <td className="min-w-12 pr-2">{tokenBalance.token.symbol}</td>
+                <td className="min-w-12 px-4 text-left">
                   {formatUnits(
                     tokenBalance.amount,
                     tokenBalance.token.decimals
                   )}
                 </td>
-                <td className="py-1 pr-2">
+                <td className="px-2 py-1">
                   <Button
                     caption={() => 'Deposit'}
                     onClick={() => openDepositModal(tokenBalance.token)}
                     disabled={false}
                   />
                 </td>
-                <td className="py-1">
+                <td className="py-1 pl-2">
                   <Button
                     caption={() => 'Withdraw'}
                     onClick={() => openWithdrawModal(tokenBalance.token)}
