@@ -1,4 +1,5 @@
 import { Widget } from 'components/common/Widget'
+import { calculateTickSpacing } from 'utils/orderBookUtils'
 
 export function OrderBook() {
   const orderBook = {
@@ -47,21 +48,7 @@ export function OrderBook() {
     barHeight * (orderBook.buy.length + orderBook.sell.length)
   const sellStartY =
     graphStartY + lastPriceHeight + barHeight * orderBook.buy.length
-  function calculateSpacing() {
-    // we want to pick "nice" tick numbers which are round-ish numbers but which mostly fill the available space
-    let adjustment = 1
-    let spacing = Math.floor((adjustment * maxSize) / gridLines) / adjustment
-    // calculate the error from using this tick size
-    let spacingError = maxSize - gridLines * spacing
-    while (spacingError >= maxSize / gridLines) {
-      adjustment = adjustment * 2
-      spacing = Math.floor((adjustment * maxSize) / gridLines) / adjustment
-      spacingError = maxSize - gridLines * spacing
-    }
-    return spacing
-  }
-
-  const gridSpacing = calculateSpacing()
+  const gridSpacing = calculateTickSpacing(0, maxSize, gridLines)
   const ticks = []
   for (let i = 0; i <= gridLines; i++) {
     ticks.push(i * gridSpacing)
