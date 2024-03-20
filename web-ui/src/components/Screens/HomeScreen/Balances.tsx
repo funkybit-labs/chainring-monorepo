@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import DepositModal from 'components/Screens/HomeScreen/Balances/DepositModal'
 import WithdrawalModal from 'components/Screens/HomeScreen/Balances/WithdrawalModal'
-import { Widget } from 'components/Screens/Widget'
+import { Widget } from 'components/common/Widget'
 import { Button } from 'components/common/Button'
 
 export default function Balances({
