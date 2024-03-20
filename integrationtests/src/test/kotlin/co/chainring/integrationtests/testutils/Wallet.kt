@@ -3,7 +3,6 @@ package co.chainring.integrationtests.testutils
 import co.chainring.apps.api.model.DeployedContract
 import co.chainring.apps.api.model.ERC20Token
 import co.chainring.contracts.generated.Exchange
-import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.model.Address
 import org.web3j.protocol.core.methods.response.TransactionReceipt
@@ -15,12 +14,12 @@ data class TestWalletKeypair(
 )
 
 class Wallet(
+    val blockchainClient: TestBlockchainClient,
     val walletKeypair: TestWalletKeypair,
     val contracts: List<DeployedContract>,
     val erc20Tokens: List<ERC20Token>,
 ) {
 
-    private val blockchainClient = TestBlockchainClient(BlockchainClientConfig().copy(privateKeyHex = walletKeypair.privateKeyHex))
     private val exchangeContractAddress = contracts.first { it.name == ContractType.Exchange.name }.address
     private val exchangeContract: Exchange = blockchainClient.loadExchangeContract(exchangeContractAddress)
 

@@ -1,6 +1,5 @@
 import React, { Fragment } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
-import { QueryObserverBaseResult } from '@tanstack/react-query'
 import Spinner from 'components/common/Spinner'
 
 export function Modal({
@@ -64,16 +63,19 @@ export function Modal({
   )
 }
 
-export function ModalAsyncContent<QData>({
-  query,
+export function ModalAsyncContent<T>({
+  asyncData,
   success,
   error
 }: {
-  query: QueryObserverBaseResult<QData>
-  success: (data: QData) => JSX.Element
+  asyncData:
+    | { status: 'pending' }
+    | { status: 'error' }
+    | { status: 'success'; data: T }
+  success: (data: T) => JSX.Element
   error: () => JSX.Element
 }) {
-  switch (query.status) {
+  switch (asyncData.status) {
     case 'pending':
       return (
         <div className="flex h-full items-center justify-center">
@@ -87,6 +89,6 @@ export function ModalAsyncContent<QData>({
         <div className="flex h-full items-center justify-center">{error()}</div>
       )
     case 'success':
-      return success(query.data!)
+      return success(asyncData.data)
   }
 }

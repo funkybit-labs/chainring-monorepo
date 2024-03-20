@@ -4,7 +4,7 @@ import co.chainring.contracts.generated.ERC1967Proxy
 import co.chainring.contracts.generated.Exchange
 import co.chainring.contracts.generated.UUPSUpgradeable
 import co.chainring.core.model.Address
-import co.chainring.core.model.db.Chain
+import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
 import okhttp3.MediaType
@@ -25,6 +25,7 @@ enum class ContractType {
 
 data class BlockchainClientConfig(
     val url: String = System.getenv("EVM_NETWORK_URL") ?: "http://localhost:8545",
+    val chainId: ChainId = chainIdValue("EVN_CHAIN_ID", ChainId(1337u)),
     val privateKeyHex: String =
         System.getenv(
             "EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY",
@@ -48,6 +49,14 @@ data class BlockchainClientConfig(
         fun bigIntegerValue(name: String, defaultValue: BigInteger): BigInteger {
             return try {
                 System.getenv(name)?.let { BigInteger(it) } ?: defaultValue
+            } catch (e: Exception) {
+                defaultValue
+            }
+        }
+
+        fun chainIdValue(name: String, defaultValue: ChainId): ChainId {
+            return try {
+                System.getenv(name)?.let { ChainId(it.toUInt()) } ?: defaultValue
             } catch (e: Exception) {
                 defaultValue
             }
@@ -107,10 +116,10 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
 
     fun updateContracts() {
         transaction {
-            DeployedSmartContractEntity.validContracts().map { it.name }
+            DeployedSmartContractEntity.validContracts(config.chainId).map { it.name }
 
             ContractType.entries.forEach {
-                DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, Chain.Ethereum)?.let { deployedContract ->
+                DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, config.chainId)?.let { deployedContract ->
                     if (deployedContract.deprecated) {
                         logger.info { "Upgrading contract: $it" }
                         deployOrUpgradeWithProxy(it, deployedContract.proxyAddress)
@@ -175,7 +184,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
         logger.debug { "Creating db entry for $contractType" }
         DeployedSmartContractEntity.create(
             name = contractType.name,
-            chain = Chain.Ethereum,
+            chainId = config.chainId,
             implementationAddress = implementationContractAddress,
             proxyAddress = proxyAddress,
             version = version,

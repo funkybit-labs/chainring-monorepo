@@ -5,7 +5,6 @@ import co.chainring.apps.api.ApiAppConfig
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.db.DbConfig
-import co.chainring.core.model.db.Chain
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.ERC20TokenEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -36,7 +35,7 @@ class AppUnderTestRunner : BeforeAllCallback {
                         if (!isIntegrationRun) {
                             apiApp.startServer()
                             transaction {
-                                DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, Chain.Ethereum)?.deprecated = true
+                                DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, blockchainClient.config.chainId)?.deprecated = true
                             }
                             apiApp.updateContracts()
                         }
@@ -47,7 +46,7 @@ class AppUnderTestRunner : BeforeAllCallback {
                             .pollInterval(Duration.ofMillis(100))
                             .atMost(Duration.ofMillis(30000L))
                             .until {
-                                transaction { DeployedSmartContractEntity.validContracts().map { it.name } == listOf(ContractType.Exchange.name) }
+                                transaction { DeployedSmartContractEntity.validContracts(blockchainClient.config.chainId).map { it.name } == listOf(ContractType.Exchange.name) }
                             }
 
                         // if we have no USDC mock ERC20 contract, deploy it.

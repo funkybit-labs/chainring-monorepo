@@ -14,9 +14,15 @@ export default function HomeScreen() {
   const wallet = useAccount()
   const walletAddress = wallet.address
 
-  const exchangeContractAddress = (configQuery.data?.contracts || []).find(
+  const chainConfig = configQuery.data?.chains.find(
+    (chain) => chain.id == wallet.chainId
+  )
+  const exchangeContract = chainConfig?.contracts?.find(
     (c) => c.name == 'Exchange'
-  )?.address
+  )
+
+  const nativeToken = chainConfig?.nativeToken
+  const erc20Tokens = chainConfig?.erc20Tokens
 
   return (
     <div className="h-screen bg-gradient-to-b from-lightBackground to-darkBackground">
@@ -29,15 +35,19 @@ export default function HomeScreen() {
         </div>
         <div className="flex px-4 pt-24">
           <div className="flex flex-col items-center gap-4">
-            {walletAddress && exchangeContractAddress && (
-              <>
-                <Balances
-                  exchangeContractAddress={exchangeContractAddress}
-                  walletAddress={walletAddress}
-                  erc20TokenContracts={configQuery.data?.erc20Tokens || []}
-                />
-              </>
-            )}
+            {walletAddress &&
+              exchangeContract &&
+              erc20Tokens &&
+              nativeToken && (
+                <>
+                  <Balances
+                    walletAddress={walletAddress}
+                    exchangeContractAddress={exchangeContract.address}
+                    nativeToken={nativeToken}
+                    erc20Tokens={erc20Tokens}
+                  />
+                </>
+              )}
           </div>
         </div>
       </div>

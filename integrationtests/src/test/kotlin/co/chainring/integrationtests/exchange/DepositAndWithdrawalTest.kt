@@ -1,11 +1,13 @@
 package co.chainring.integrationtests.exchange
 
 import co.chainring.core.blockchain.BlockchainClient
+import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.model.Address
-import co.chainring.core.model.db.Chain
+import co.chainring.core.model.Symbol
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
+import co.chainring.integrationtests.testutils.TestBlockchainClient
 import co.chainring.integrationtests.testutils.TestWalletKeypair
 import co.chainring.integrationtests.testutils.Wallet
 import co.chainring.integrationtests.testutils.toFundamentalUnits
@@ -24,29 +26,29 @@ class DepositAndWithdrawalTest {
         Address("0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f"),
     )
 
+    private val blockchainClient = TestBlockchainClient(BlockchainClientConfig().copy(privateKeyHex = walletKeypair.privateKeyHex))
+
     @Test
     fun testConfiguration() {
         val apiClient = ApiClient()
-        val config = apiClient.getConfiguration()
+        val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.config.chainId }!!
         assertEquals(config.contracts.size, 1)
         assertEquals(config.contracts[0].name, ContractType.Exchange.name)
-        assertEquals(config.contracts[0].chain, Chain.Ethereum)
         val client = BlockchainClient().loadExchangeContract(config.contracts[0].address)
         assertEquals(client.version.send().toInt(), 1)
         val usdcToken = config.erc20Tokens.firstOrNull { it.symbol.value == "USDC" }
         assertNotNull(usdcToken)
 
-        val nativeToken = config.nativeTokens.firstOrNull { it.chain == Chain.Ethereum }
-        assertNotNull(nativeToken)
-        assertEquals("ETH", nativeToken!!.symbol)
-        assertEquals(18.toUByte(), nativeToken.decimals)
+        assertNotNull(config.nativeToken)
+        assertEquals(Symbol("ETH"), config.nativeToken.symbol)
+        assertEquals(18.toUByte(), config.nativeToken.decimals)
     }
 
     @Test
     fun testERC20DepositsAndWithdrawals() {
         val apiClient = ApiClient()
-        val config = apiClient.getConfiguration()
-        val wallet = Wallet(walletKeypair, config.contracts, config.erc20Tokens)
+        val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.config.chainId }!!
+        val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.erc20Tokens)
         val decimals = config.erc20Tokens.first { it.symbol.value == "USDC" }.decimals.toInt()
 
         // mint some USDC
@@ -71,9 +73,9 @@ class DepositAndWithdrawalTest {
     @Test
     fun testNativeDepositsAndWithdrawals() {
         val apiClient = ApiClient()
-        val config = apiClient.getConfiguration()
-        val wallet = Wallet(walletKeypair, config.contracts, config.erc20Tokens)
-        val decimals = config.nativeTokens.first { it.chain == Chain.Ethereum }.decimals.toInt()
+        val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.config.chainId }!!
+        val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.erc20Tokens)
+        val decimals = config.nativeToken.decimals.toInt()
 
         val startingWalletBalance = wallet.getWalletNativeBalance()
         val startingExchangeBalance = wallet.getExchangeNativeBalance()

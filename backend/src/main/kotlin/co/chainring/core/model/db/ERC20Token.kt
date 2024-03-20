@@ -6,7 +6,6 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.SizedIterable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.selectAll
@@ -14,7 +13,7 @@ import org.jetbrains.exposed.sql.selectAll
 @Serializable
 @JvmInline
 value class ERC20TokenId(override val value: String) : EntityId {
-    constructor(chain: Chain, address: Address) : this("${chain.name.lowercase()}_erc20_${address.value}")
+    constructor(chainId: ChainId, address: Address) : this("erc20_${chainId}_${address.value}")
 
     override fun toString(): String = value
 }
@@ -24,19 +23,14 @@ object ERC20TokenTable : GUIDTable<ERC20TokenId>("erc20_token", ::ERC20TokenId) 
     val createdBy = varchar("created_by", 10485760)
     val name = varchar("name", 10485760)
     val symbol = varchar("symbol", 10485760)
-    val chain = customEnumeration(
-        "chain",
-        "Chain",
-        { value -> Chain.valueOf(value as String) },
-        { PGEnum("Chain", it) },
-    )
+    val chainId = reference("chain_id", ChainTable)
     val address = varchar("address", 10485760)
     val decimals = ubyte("decimals")
 
     init {
         uniqueIndex(
             customIndexName = "erc20_token_address_chain",
-            columns = arrayOf(address, chain),
+            columns = arrayOf(address, chainId),
         )
     }
 }
@@ -46,21 +40,26 @@ class ERC20TokenEntity(guid: EntityID<ERC20TokenId>) : GUIDEntity<ERC20TokenId>(
         fun create(
             symbol: Symbol,
             name: String,
-            chain: Chain,
+            chainId: ChainId,
             address: Address,
             decimals: UByte,
-        ) = ERC20TokenEntity.new(ERC20TokenId(chain, address)) {
+        ) = ERC20TokenEntity.new(ERC20TokenId(chainId, address)) {
             this.createdAt = Clock.System.now()
             this.createdBy = "system"
             this.symbol = symbol
             this.name = name
-            this.chain = chain
+            this.chainId = EntityID(chainId, ChainTable)
             this.address = address
             this.decimals = decimals
         }
 
-        override fun all(): SizedIterable<ERC20TokenEntity> =
-            wrapRows(table.selectAll().orderBy(table.id, SortOrder.ASC).notForUpdate())
+        fun forChain(chainId: ChainId): List<ERC20TokenEntity> =
+            wrapRows(
+                ERC20TokenTable.selectAll()
+                    .where { ERC20TokenTable.chainId.eq(chainId) }
+                    .orderBy(table.id, SortOrder.ASC)
+                    .notForUpdate(),
+            ).toList()
     }
 
     var createdAt by ERC20TokenTable.createdAt
@@ -70,7 +69,7 @@ class ERC20TokenEntity(guid: EntityID<ERC20TokenId>) : GUIDEntity<ERC20TokenId>(
         toColumn = { it.value },
         toReal = { Symbol(it) },
     )
-    var chain by ERC20TokenTable.chain
+    var chainId by ERC20TokenTable.chainId
     var address by ERC20TokenTable.address.transform(
         toColumn = { it.value },
         toReal = { Address(it) },

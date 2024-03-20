@@ -20,20 +20,11 @@ value class ContractId(override val value: String) : EntityId {
     override fun toString(): String = value
 }
 
-enum class Chain {
-    Ethereum,
-}
-
 object DeployedSmartContractTable : GUIDTable<ContractId>("deployed_smart_contract", ::ContractId) {
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
     val name = varchar("name", 10485760)
-    val chain = customEnumeration(
-        "chain",
-        "Chain",
-        { value -> Chain.valueOf(value as String) },
-        { PGEnum("Chain", it) },
-    )
+    val chainId = reference("chain_id", ChainTable)
     val proxyAddress = varchar("proxy_address", 10485760).nullable()
     val implementationAddress = varchar("implementation_address", 10485760)
     val version = integer("version").nullable()
@@ -42,7 +33,7 @@ object DeployedSmartContractTable : GUIDTable<ContractId>("deployed_smart_contra
     init {
         uniqueIndex(
             customIndexName = "deployed_smart_contract_name_chain",
-            columns = arrayOf(name, chain),
+            columns = arrayOf(name, chainId),
             filterCondition = {
                 deprecated.eq(false)
             },
@@ -54,7 +45,7 @@ class DeployedSmartContractEntity(guid: EntityID<ContractId>) : GUIDEntity<Contr
     companion object : EntityClass<ContractId, DeployedSmartContractEntity>(DeployedSmartContractTable) {
         fun create(
             name: String,
-            chain: Chain,
+            chainId: ChainId,
             proxyAddress: Address,
             implementationAddress: Address,
             version: Int,
@@ -62,7 +53,7 @@ class DeployedSmartContractEntity(guid: EntityID<ContractId>) : GUIDEntity<Contr
             this.createdAt = Clock.System.now()
             this.createdBy = "system"
             this.name = name
-            this.chain = chain
+            this.chainId = EntityID(chainId, ChainTable)
             this.proxyAddress = proxyAddress
             this.implementationAddress = implementationAddress
             this.version = version
@@ -71,19 +62,19 @@ class DeployedSmartContractEntity(guid: EntityID<ContractId>) : GUIDEntity<Contr
 
         fun findLastDeployedContractByNameAndChain(
             name: String,
-            chain: Chain,
+            chainId: ChainId,
         ): DeployedSmartContractEntity? =
             DeployedSmartContractEntity
                 .find {
-                    DeployedSmartContractTable.name.eq(name) and DeployedSmartContractTable.chain.eq(chain)
+                    DeployedSmartContractTable.name.eq(name) and DeployedSmartContractTable.chainId.eq(chainId)
                 }
                 .orderBy(DeployedSmartContractTable.createdAt to SortOrder.DESC)
                 .firstOrNull()
 
-        fun validContracts(): List<DeployedSmartContractEntity> =
+        fun validContracts(chainId: ChainId): List<DeployedSmartContractEntity> =
             DeployedSmartContractEntity
                 .find {
-                    DeployedSmartContractTable.deprecated.eq(false)
+                    DeployedSmartContractTable.chainId.eq(chainId) and DeployedSmartContractTable.deprecated.eq(false)
                 }
                 .toList()
     }
@@ -91,7 +82,7 @@ class DeployedSmartContractEntity(guid: EntityID<ContractId>) : GUIDEntity<Contr
     var createdAt by DeployedSmartContractTable.createdAt
     var createdBy by DeployedSmartContractTable.createdBy
     var name by DeployedSmartContractTable.name
-    var chain by DeployedSmartContractTable.chain
+    var chainId by DeployedSmartContractTable.chainId
     var proxyAddress by DeployedSmartContractTable.proxyAddress.transform(
         toColumn = { it?.value },
         toReal = { it?.let { Address(it) } },
