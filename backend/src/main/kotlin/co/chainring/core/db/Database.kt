@@ -22,6 +22,12 @@ data class DbCredentials(
 data class DbConfig(
     val credentials: DbCredentials =
         getenv("DB_CREDENTIALS")?.let { Json.decodeFromString<DbCredentials>(it) }
+            ?: getenv("DB_PASSWORD")?.let {
+                DbCredentials(
+                    username = "chainring",
+                    password = it,
+                )
+            }
             ?: DbCredentials(
                 username = "chainring",
                 password = "chainring",
@@ -34,7 +40,9 @@ data class DbConfig(
     val minIdleConnections: Int = getenv("DB_MIN_IDLE_CONNECTIONS")?.toIntOrNull() ?: 15,
     val maxIdleConnections: Int = getenv("DB_MAX_IDLE_CONNECTIONS")?.toIntOrNull() ?: 25,
     val maxConnections: Int = getenv("DB_MAX_CONNECTIONS")?.toIntOrNull() ?: 25,
-    val maxConnectionWaitingTimeMs: Long = getenv("DB_MAX_CONNECTION_WAITING_TIME_MS")?.toLongOrNull() ?: 10_0000,
+    val maxConnectionWaitingTimeMs: Long = getenv(
+        "DB_MAX_CONNECTION_WAITING_TIME_MS",
+    )?.toLongOrNull() ?: 10_0000,
     val validationQuery: String = getenv("DB_VALIDATION_QUERY") ?: "select 1",
 )
 

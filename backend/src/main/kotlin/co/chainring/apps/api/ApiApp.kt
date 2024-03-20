@@ -75,11 +75,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
 
     override fun start() {
-        logger.info { "Starting" }
-        super.start()
-        server.start()
-        blockchainClient.updateContracts()
-        logger.info { "Started" }
+        startServer()
+        updateContracts()
     }
 
     override fun stop() {
@@ -87,5 +84,16 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         super.stop()
         server.stop()
         logger.info { "Stopped" }
+    }
+
+    fun startServer() {
+        logger.info { "Starting" }
+        super.start()
+        server.start()
+        logger.info { "Started" }
+    }
+
+    fun updateContracts() {
+        blockchainClient.updateContracts()
     }
 }

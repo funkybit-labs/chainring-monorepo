@@ -18,10 +18,20 @@ jobs:
     name: Build web UI
     uses: ./.github/workflows/build-web-ui.yml
 
+  deprecate_contracts:
+    name: Deprecate Contracts
+    if: ${{ github.event_name == 'push' }}
+    needs: [ build_push_backend, build_frontend ]
+    permissions:
+      id-token: write # needed for aws credentials
+      contents: read
+    uses: ./.github/workflows/deprecate-contracts.yml
+    secrets: inherit # needs access to secrets.CI_BASTION_KEY
+
   deploy_backend:
     name: Deploy Backend
     if: ${{ github.event_name == 'push' }}
-    needs: [ build_push_backend, build_frontend ]
+    needs: [ build_push_backend, build_frontend, deprecate_contracts ]
     permissions:
       id-token: write # needed for aws credentials
       contents: read

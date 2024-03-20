@@ -55,11 +55,11 @@ data class BlockchainClientConfig(
     }
 }
 
-class BlockchainClient(private val config: BlockchainClientConfig = BlockchainClientConfig()) {
-    private val web3j = Web3j.build(httpService(config.url, config.enableWeb3jLogging))
-    private val credentials = Credentials.create(config.privateKeyHex)
-    private val chainId = web3j.ethChainId().send().chainId.toLong()
-    private val transactionManager = RawTransactionManager(
+open class BlockchainClient(private val config: BlockchainClientConfig = BlockchainClientConfig()) {
+    protected val web3j = Web3j.build(httpService(config.url, config.enableWeb3jLogging))
+    protected val credentials = Credentials.create(config.privateKeyHex)
+    protected val chainId = web3j.ethChainId().send().chainId.toLong()
+    protected val transactionManager = RawTransactionManager(
         web3j,
         credentials,
         chainId,
@@ -70,7 +70,7 @@ class BlockchainClient(private val config: BlockchainClientConfig = BlockchainCl
         ),
     )
 
-    private val gasProvider = GasProvider(
+    protected val gasProvider = GasProvider(
         contractCreationLimit = config.contractCreationLimit,
         contractInvocationLimit = config.contractInvocationLimit,
         defaultMaxPriorityFeePerGas = config.defaultMaxPriorityFeePerGasInWei,
@@ -106,19 +106,16 @@ class BlockchainClient(private val config: BlockchainClientConfig = BlockchainCl
     }
 
     fun updateContracts() {
-        logger.info { "Updating deprecated contracts" }
-
         transaction {
             DeployedSmartContractEntity.validContracts().map { it.name }
 
             ContractType.entries.forEach {
-                DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, Chain.Ethereum)?.let {
-                        deployedContract ->
+                DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, Chain.Ethereum)?.let { deployedContract ->
                     if (deployedContract.deprecated) {
                         logger.info { "Upgrading contract: $it" }
                         deployOrUpgradeWithProxy(it, deployedContract.proxyAddress)
                     } else {
-                        logger.info { "Skipping contract: $it" }
+                        deployedContract
                     }
                 } ?: run {
                     logger.info { "Deploying contract: $it" }
@@ -126,8 +123,6 @@ class BlockchainClient(private val config: BlockchainClientConfig = BlockchainCl
                 }
             }
         }
-
-        logger.info { "Contracts update finished successfully" }
     }
 
     private fun deployOrUpgradeWithProxy(
@@ -186,5 +181,9 @@ class BlockchainClient(private val config: BlockchainClientConfig = BlockchainCl
             version = version,
         )
         logger.debug { "Deployment complete for $contractType" }
+    }
+
+    fun loadExchangeContract(address: Address): Exchange {
+        return Exchange.load(address.value, web3j, transactionManager, gasProvider)
     }
 }

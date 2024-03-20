@@ -7,3 +7,4 @@ pluginManagement {
 
 rootProject.name = "chainring"
 include("backend")
+include("integrationtests")
