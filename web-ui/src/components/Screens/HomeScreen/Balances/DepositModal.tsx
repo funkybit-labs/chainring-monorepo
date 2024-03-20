@@ -1,17 +1,18 @@
 import { Address, formatUnits, parseUnits } from 'viem'
 import { BaseError, useConfig, useWriteContract } from 'wagmi'
 import { ERC20Abi, ExchangeAbi } from 'contracts'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   getBalance,
   readContract,
   sendTransaction,
   waitForTransactionReceipt
 } from 'wagmi/actions'
-import { AsyncData, Modal, ModalAsyncContent } from 'components/common/Modal'
+import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
 import { Token } from 'ApiClient'
+import { useQuery } from '@tanstack/react-query'
 
 export default function DepositModal({
   exchangeContractAddress,
@@ -29,16 +30,12 @@ export default function DepositModal({
   onClosed: () => void
 }) {
   const config = useConfig()
-  const [walletBalance, setWalletBalance] = useState<AsyncData<bigint>>({
-    status: 'pending'
-  })
 
-  useEffect(() => {
-    setWalletBalance({ status: 'pending' })
-
-    const balancePromise =
-      'address' in token
-        ? readContract(config, {
+  const walletBalanceQuery = useQuery({
+    queryKey: ['walletBalance', token.symbol],
+    queryFn: async function () {
+      return 'address' in token
+        ? await readContract(config, {
             abi: ERC20Abi,
             address: token.address,
             functionName: 'balanceOf',
@@ -47,15 +44,8 @@ export default function DepositModal({
         : getBalance(config, {
             address: walletAddress
           }).then((res) => res.value)
-
-    balancePromise
-      .then((amount) => {
-        setWalletBalance({ status: 'success', data: amount })
-      })
-      .catch(() => {
-        setWalletBalance({ status: 'error' })
-      })
-  }, [config, walletAddress, token])
+    }
+  })
 
   const [amount, setAmount] = useState('')
   const [submitPhase, setSubmitPhase] = useState<
@@ -76,9 +66,9 @@ export default function DepositModal({
     if (submitPhase !== null) return false
 
     try {
-      if ('data' in walletBalance) {
+      if (walletBalanceQuery.status == 'success') {
         const parsedAmount = parseUnits(amount, token.decimals)
-        const availableAmount = walletBalance.data
+        const availableAmount = walletBalanceQuery.data
         return parsedAmount > 0 && parsedAmount <= availableAmount
       } else {
         return false
@@ -148,8 +138,8 @@ export default function DepositModal({
     >
       <div className="h-52 overflow-y-auto">
         <ModalAsyncContent
-          asyncData={walletBalance}
-          success={(data) => {
+          asyncData={walletBalanceQuery}
+          success={(walletBalance) => {
             return (
               <>
                 <AmountInput
@@ -159,7 +149,8 @@ export default function DepositModal({
                   onChange={onAmountChange}
                 />
                 <p className="mt-1 text-center text-sm text-neutralGray">
-                  Available balance: {formatUnits(data, token.decimals)}
+                  Available balance:{' '}
+                  {formatUnits(walletBalance, token.decimals)}
                 </p>
 
                 <SubmitButton

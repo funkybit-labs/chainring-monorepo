@@ -63,17 +63,15 @@ export function Modal({
   )
 }
 
-export type AsyncData<T> =
-  | { status: 'pending' }
-  | { status: 'error' }
-  | { status: 'success'; data: T }
-
 export function ModalAsyncContent<T>({
   asyncData,
   success,
   error
 }: {
-  asyncData: AsyncData<T>
+  asyncData:
+    | { status: 'pending' }
+    | { status: 'error' }
+    | { status: 'success'; data: T }
   success: (data: T) => JSX.Element
   error: () => JSX.Element
 }) {

@@ -1,12 +1,13 @@
 import { Address, formatUnits, parseUnits } from 'viem'
 import { BaseError, useConfig, useWriteContract } from 'wagmi'
 import { ExchangeAbi } from 'contracts'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { readContract, waitForTransactionReceipt } from 'wagmi/actions'
-import { AsyncData, Modal, ModalAsyncContent } from 'components/common/Modal'
+import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
 import { Token } from 'ApiClient'
+import { useQuery } from '@tanstack/react-query'
 
 export default function WithdrawalModal({
   exchangeContractAddress,
@@ -24,36 +25,25 @@ export default function WithdrawalModal({
   onClosed: () => void
 }) {
   const config = useConfig()
-  const [availableBalance, setAvailableBalance] = useState<AsyncData<bigint>>({
-    status: 'pending'
-  })
 
-  useEffect(() => {
-    setAvailableBalance({ status: 'pending' })
-
-    const balancePromise =
-      'address' in token
-        ? readContract(config, {
+  const availableBalanceQuery = useQuery({
+    queryKey: ['availableBalance', token.symbol],
+    queryFn: async function () {
+      return 'address' in token
+        ? await readContract(config, {
             abi: ExchangeAbi,
             address: exchangeContractAddress,
             functionName: 'balances',
             args: [walletAddress, token.address]
           })
-        : readContract(config, {
+        : await readContract(config, {
             abi: ExchangeAbi,
             address: exchangeContractAddress,
             functionName: 'nativeBalances',
             args: [walletAddress]
           })
-
-    balancePromise
-      .then((amount) => {
-        setAvailableBalance({ status: 'success', data: amount })
-      })
-      .catch(() => {
-        setAvailableBalance({ status: 'error' })
-      })
-  }, [config, exchangeContractAddress, walletAddress, token])
+    }
+  })
 
   const [amount, setAmount] = useState('')
   const [submitPhase, setSubmitPhase] = useState<
@@ -70,9 +60,9 @@ export default function WithdrawalModal({
     if (submitPhase !== null) return false
 
     try {
-      if ('data' in availableBalance) {
+      if (availableBalanceQuery.status == 'success') {
         const parsedAmount = parseUnits(amount, token.decimals)
-        return parsedAmount > 0 && parsedAmount <= availableBalance.data
+        return parsedAmount > 0 && parsedAmount <= availableBalanceQuery.data
       } else {
         return false
       }
@@ -123,8 +113,8 @@ export default function WithdrawalModal({
     >
       <div className="h-52 overflow-y-auto">
         <ModalAsyncContent
-          asyncData={availableBalance}
-          success={(data) => {
+          asyncData={availableBalanceQuery}
+          success={(availableBalance) => {
             return (
               <>
                 <AmountInput
@@ -135,7 +125,8 @@ export default function WithdrawalModal({
                 />
 
                 <p className="mt-1 text-center text-sm text-darkGray">
-                  Available balance: {formatUnits(data, token.decimals)}
+                  Available balance:{' '}
+                  {formatUnits(availableBalance, token.decimals)}
                 </p>
 
                 <SubmitButton
