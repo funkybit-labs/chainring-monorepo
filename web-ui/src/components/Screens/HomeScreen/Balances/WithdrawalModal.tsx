@@ -1,12 +1,12 @@
 import { Address, formatUnits, parseUnits } from 'viem'
-import { ERC20Token } from 'ApiClient'
-import { BaseError, useConfig, useReadContract, useWriteContract } from 'wagmi'
+import { BaseError, useConfig, useWriteContract } from 'wagmi'
 import { ExchangeAbi } from 'contracts'
-import { useState } from 'react'
-import { waitForTransactionReceipt } from 'wagmi/actions'
-import { Modal, ModalAsyncContent } from 'components/common/Modal'
+import { useEffect, useState } from 'react'
+import { readContract, waitForTransactionReceipt } from 'wagmi/actions'
+import { AsyncData, Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
+import { Token } from 'ApiClient'
 
 export default function WithdrawalModal({
   exchangeContractAddress,
@@ -18,17 +18,42 @@ export default function WithdrawalModal({
 }: {
   exchangeContractAddress: Address
   walletAddress: Address
-  token: ERC20Token
+  token: Token
   isOpen: boolean
   close: () => void
   onClosed: () => void
 }) {
-  const availableBalanceQuery = useReadContract({
-    abi: ExchangeAbi,
-    address: exchangeContractAddress,
-    functionName: 'balances',
-    args: [walletAddress, token.address]
+  const config = useConfig()
+  const [availableBalance, setAvailableBalance] = useState<AsyncData<bigint>>({
+    status: 'pending'
   })
+
+  useEffect(() => {
+    setAvailableBalance({ status: 'pending' })
+
+    const balancePromise =
+      'address' in token
+        ? readContract(config, {
+            abi: ExchangeAbi,
+            address: exchangeContractAddress,
+            functionName: 'balances',
+            args: [walletAddress, token.address]
+          })
+        : readContract(config, {
+            abi: ExchangeAbi,
+            address: exchangeContractAddress,
+            functionName: 'nativeBalances',
+            args: [walletAddress]
+          })
+
+    balancePromise
+      .then((amount) => {
+        setAvailableBalance({ status: 'success', data: amount })
+      })
+      .catch(() => {
+        setAvailableBalance({ status: 'error' })
+      })
+  }, [config, exchangeContractAddress, walletAddress, token])
 
   const [amount, setAmount] = useState('')
   const [submitPhase, setSubmitPhase] = useState<
@@ -36,7 +61,6 @@ export default function WithdrawalModal({
   >(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const { writeContractAsync } = useWriteContract()
-  const config = useConfig()
 
   function onAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
     setAmount(e.target.value)
@@ -46,11 +70,11 @@ export default function WithdrawalModal({
     if (submitPhase !== null) return false
 
     try {
-      if (availableBalanceQuery.data === undefined) {
-        return false
-      } else {
+      if ('data' in availableBalance) {
         const parsedAmount = parseUnits(amount, token.decimals)
-        return parsedAmount > 0 && parsedAmount <= availableBalanceQuery.data
+        return parsedAmount > 0 && parsedAmount <= availableBalance.data
+      } else {
+        return false
       }
     } catch {
       return false
@@ -62,12 +86,20 @@ export default function WithdrawalModal({
     if (canSubmit) {
       try {
         setSubmitPhase('waitingForTxApproval')
-        const hash = await writeContractAsync({
-          abi: ExchangeAbi,
-          address: exchangeContractAddress,
-          functionName: 'withdraw',
-          args: [token.address, parsedAmount]
-        })
+        const hash =
+          'address' in token
+            ? await writeContractAsync({
+                abi: ExchangeAbi,
+                address: exchangeContractAddress,
+                functionName: 'withdraw',
+                args: [token.address, parsedAmount]
+              })
+            : await writeContractAsync({
+                abi: ExchangeAbi,
+                address: exchangeContractAddress,
+                functionName: 'withdraw',
+                args: [parsedAmount]
+              })
 
         setSubmitPhase('waitingForTxReceipt')
         await waitForTransactionReceipt(config, { hash })
@@ -91,7 +123,7 @@ export default function WithdrawalModal({
     >
       <div className="h-52 overflow-y-auto">
         <ModalAsyncContent
-          query={availableBalanceQuery}
+          asyncData={availableBalance}
           success={(data) => {
             return (
               <>

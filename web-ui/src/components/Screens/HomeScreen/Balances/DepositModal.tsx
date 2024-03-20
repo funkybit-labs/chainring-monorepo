@@ -1,12 +1,17 @@
 import { Address, formatUnits, parseUnits } from 'viem'
-import { ERC20Token } from 'ApiClient'
-import { BaseError, useConfig, useReadContract, useWriteContract } from 'wagmi'
+import { BaseError, useConfig, useWriteContract } from 'wagmi'
 import { ERC20Abi, ExchangeAbi } from 'contracts'
-import { useState } from 'react'
-import { waitForTransactionReceipt } from 'wagmi/actions'
-import { Modal, ModalAsyncContent } from 'components/common/Modal'
+import { useEffect, useState } from 'react'
+import {
+  getBalance,
+  readContract,
+  sendTransaction,
+  waitForTransactionReceipt
+} from 'wagmi/actions'
+import { AsyncData, Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
+import { Token } from 'ApiClient'
 
 export default function DepositModal({
   exchangeContractAddress,
@@ -18,17 +23,39 @@ export default function DepositModal({
 }: {
   exchangeContractAddress: Address
   walletAddress: Address
-  token: ERC20Token
+  token: Token
   isOpen: boolean
   close: () => void
   onClosed: () => void
 }) {
-  const walletBalanceQuery = useReadContract({
-    abi: ERC20Abi,
-    address: token.address,
-    functionName: 'balanceOf',
-    args: [walletAddress]
+  const config = useConfig()
+  const [walletBalance, setWalletBalance] = useState<AsyncData<bigint>>({
+    status: 'pending'
   })
+
+  useEffect(() => {
+    setWalletBalance({ status: 'pending' })
+
+    const balancePromise =
+      'address' in token
+        ? readContract(config, {
+            abi: ERC20Abi,
+            address: token.address,
+            functionName: 'balanceOf',
+            args: [walletAddress]
+          })
+        : getBalance(config, {
+            address: walletAddress
+          }).then((res) => res.value)
+
+    balancePromise
+      .then((amount) => {
+        setWalletBalance({ status: 'success', data: amount })
+      })
+      .catch(() => {
+        setWalletBalance({ status: 'error' })
+      })
+  }, [config, walletAddress, token])
 
   const [amount, setAmount] = useState('')
   const [submitPhase, setSubmitPhase] = useState<
@@ -40,7 +67,6 @@ export default function DepositModal({
   >(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const { writeContractAsync } = useWriteContract()
-  const config = useConfig()
 
   function onAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
     setAmount(e.target.value)
@@ -50,11 +76,12 @@ export default function DepositModal({
     if (submitPhase !== null) return false
 
     try {
-      if (walletBalanceQuery.data === undefined) {
-        return false
-      } else {
+      if ('data' in walletBalance) {
         const parsedAmount = parseUnits(amount, token.decimals)
-        return parsedAmount > 0 && parsedAmount <= walletBalanceQuery.data
+        const availableAmount = walletBalance.data
+        return parsedAmount > 0 && parsedAmount <= availableAmount
+      } else {
+        return false
       }
     } catch {
       return false
@@ -65,31 +92,42 @@ export default function DepositModal({
     const parsedAmount = parseUnits(amount, token.decimals)
     if (canSubmit) {
       try {
-        setSubmitPhase('waitingForAllowanceApproval')
-        const approveHash = await writeContractAsync({
-          abi: ERC20Abi,
-          address: token.address,
-          functionName: 'approve',
-          args: [exchangeContractAddress, parsedAmount]
-        })
+        if ('address' in token) {
+          setSubmitPhase('waitingForAllowanceApproval')
+          const approveHash = await writeContractAsync({
+            abi: ERC20Abi,
+            address: token.address,
+            functionName: 'approve',
+            args: [exchangeContractAddress, parsedAmount]
+          })
 
-        setSubmitPhase('waitingForAllowanceReceipt')
-        await waitForTransactionReceipt(config, {
-          hash: approveHash
-        })
+          setSubmitPhase('waitingForAllowanceReceipt')
+          await waitForTransactionReceipt(config, {
+            hash: approveHash
+          })
 
-        setSubmitPhase('waitingForDepositApproval')
-        const depositHash = await writeContractAsync({
-          abi: ExchangeAbi,
-          address: exchangeContractAddress,
-          functionName: 'deposit',
-          args: [token.address, parsedAmount]
-        })
+          setSubmitPhase('waitingForDepositApproval')
+          const depositHash = await writeContractAsync({
+            abi: ExchangeAbi,
+            address: exchangeContractAddress,
+            functionName: 'deposit',
+            args: [token.address, parsedAmount]
+          })
 
-        setSubmitPhase('waitingForDepositReceipt')
-        await waitForTransactionReceipt(config, {
-          hash: depositHash
-        })
+          setSubmitPhase('waitingForDepositReceipt')
+          await waitForTransactionReceipt(config, {
+            hash: depositHash
+          })
+        } else {
+          setSubmitPhase('waitingForDepositApproval')
+          const hash = await sendTransaction(config, {
+            to: exchangeContractAddress,
+            value: parsedAmount
+          })
+
+          setSubmitPhase('waitingForDepositReceipt')
+          await waitForTransactionReceipt(config, { hash })
+        }
 
         close()
       } catch (err) {
@@ -110,7 +148,7 @@ export default function DepositModal({
     >
       <div className="h-52 overflow-y-auto">
         <ModalAsyncContent
-          query={walletBalanceQuery}
+          asyncData={walletBalance}
           success={(data) => {
             return (
               <>
