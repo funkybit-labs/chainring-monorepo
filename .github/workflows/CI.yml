@@ -21,7 +21,7 @@ jobs:
 
   deprecate_contracts:
     name: Deprecate Contracts
-    #if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' }}
     needs: [ build_push_backend, build_frontend ]
     permissions:
       id-token: write # needed for aws credentials
@@ -31,7 +31,7 @@ jobs:
 
   deploy_backend:
     name: Deploy Backend
-    #if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' }}
     needs: [ build_push_backend, build_frontend, deprecate_contracts ]
     permissions:
       id-token: write # needed for aws credentials
@@ -44,7 +44,7 @@ jobs:
 
   deploy_web_ui:
     name: Deploy Web UI
-    #if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' }}
     needs: [ build_push_backend, build_frontend ]
     permissions:
       id-token: write # needed for aws credentials
@@ -56,7 +56,7 @@ jobs:
   integration_tests:
     name: Run integration tests
     needs: [ deploy_backend, deploy_web_ui ]
-    #if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' }}
     permissions:
       id-token: write # needed for aws credentials
       contents: read
