@@ -3,6 +3,7 @@ import { getConfiguration } from 'ApiClient'
 import { useAccount } from 'wagmi'
 import Balances from 'components/Screens/HomeScreen/Balances'
 import { Header } from './Header'
+import { OrderBook } from 'components/Screens/HomeScreen/OrderBook'
 
 export default function HomeScreen() {
   const configQuery = useQuery({
@@ -21,8 +22,12 @@ export default function HomeScreen() {
     <div className="h-screen bg-gradient-to-b from-lightBackground to-darkBackground">
       <Header />
       <div className="flex h-screen w-screen flex-col">
-        <div></div>
-        <div className="flex h-screen items-center justify-center py-48">
+        <div className="flex px-4 pt-24">
+          <div className="flex flex-col gap-4">
+            <OrderBook />
+          </div>
+        </div>
+        <div className="flex px-4 pt-24">
           <div className="flex flex-col items-center gap-4">
             {walletAddress && exchangeContractAddress && (
               <>

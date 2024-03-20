@@ -7,7 +7,7 @@ export function Widget({ title, contents }: Props) {
   return (
     <div>
       <div className="mb-2 text-center text-xl text-black">{title}</div>
-      <div className="min-h-80 w-full min-w-96 rounded-lg bg-black p-8 text-white shadow-lg">
+      <div className="min-h-40 w-full min-w-48 rounded-lg bg-black p-4 text-white shadow-lg">
         {contents}
       </div>
     </div>
