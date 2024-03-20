@@ -19,6 +19,7 @@ jobs:
       # needed for aws credentials
       id-token: write
       contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v4
       - name: Setup JDK
