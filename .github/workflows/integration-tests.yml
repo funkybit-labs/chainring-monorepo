@@ -40,7 +40,15 @@ jobs:
           EVM_NETWORK_URL: https://test-anvil.chainring.co
           INTEGRATION_RUN: 1
           API_URL: https://test-api.chainring.co
-      - name: Store reports
+      - name: Test Report
+        uses: dorny/test-reporter@v1.8.0
+        if: success() || failure()
+        with:
+          name: Deployed Integration Tests
+          path: '**/build/test-results/test/TEST-*.xml'   # Path to test results
+          reporter: java-junit
+          fail-on-empty: 'false'
+      - name: Store Reports
         if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
