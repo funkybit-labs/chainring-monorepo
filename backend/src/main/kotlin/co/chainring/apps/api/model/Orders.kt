@@ -179,3 +179,30 @@ data class BatchOrdersApiRequest(
 data class OrdersApiResponse(
     val orders: List<OrderApiResponse>,
 )
+
+@Serializable
+@SerialName("OrderBook")
+data class OrderBook(
+    val instrument: Instrument,
+    val buy: List<OrderBookEntry>,
+    val sell: List<OrderBookEntry>,
+    val last: LastTrade,
+) : Publishable()
+
+@Serializable
+data class OrderBookEntry(
+    val price: String,
+    val size: BigDecimalJson,
+)
+
+@Serializable
+enum class LastTradeDirection {
+    Up,
+    Down,
+}
+
+@Serializable
+data class LastTrade(
+    val price: String,
+    val direction: LastTradeDirection,
+)

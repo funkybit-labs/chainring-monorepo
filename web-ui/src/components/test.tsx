@@ -4,8 +4,10 @@ import App from './App'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WagmiProvider } from 'wagmi'
 import { wagmiConfig } from 'wagmiConfig'
+import { WebSocket } from 'mock-socket'
 
 describe('<App />', () => {
+  global.WebSocket = WebSocket
   it('should render the App', () => {
     const { container } = render(
       <WagmiProvider config={wagmiConfig}>

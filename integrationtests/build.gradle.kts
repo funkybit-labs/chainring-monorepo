@@ -16,6 +16,7 @@ repositories {
 val exposedVersion = "0.48.0"
 val log4j2Version = "2.23.1"
 val kotlinxSerializationVersion = "1.6.3"
+val http4kVersion = "5.14.0.0"
 
 dependencies {
     testImplementation(kotlin("test"))
@@ -45,6 +46,9 @@ dependencies {
 
     implementation("de.fxlae:typeid-java:0.2.0")
     implementation("org.awaitility:awaitility-kotlin:4.2.0")
+
+    implementation("org.http4k:http4k-format-kotlinx-serialization:$http4kVersion")
+    implementation("org.http4k:http4k-client-websocket:$http4kVersion")
 
     implementation(project(":backend"))
 }

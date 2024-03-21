@@ -1,4 +1,4 @@
-import { crateOrder, CreateOrderRequest, OrderSide } from 'ApiClient'
+import { createOrder, CreateOrderRequest, OrderSide } from 'ApiClient'
 import { classNames } from 'utils'
 import React, { Fragment, useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
@@ -40,7 +40,7 @@ export default function Trade({
   }
 
   const mutation = useMutation({
-    mutationFn: (orderDetails: CreateOrderRequest) => crateOrder(orderDetails)
+    mutationFn: (orderDetails: CreateOrderRequest) => createOrder(orderDetails)
   })
 
   useEffect(() => {
