@@ -1,16 +1,9 @@
-import {
-  CreateOrderRequest,
-  CreateMarketOrder,
-  CreateLimitOrder,
-  OrderApiResponse,
-  OrderSide
-} from 'ApiClient'
-import { classNames } from 'utils'
-import { useEffect, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { Widget } from '../../common/Widget'
+import {crateOrder, CreateLimitOrder, CreateMarketOrder, CreateOrderRequest, OrderSide} from 'ApiClient'
+import {classNames} from 'utils'
+import {useEffect, useState} from 'react'
+import {useMutation} from '@tanstack/react-query'
+import {Widget} from '../../common/Widget'
 import SubmitButton from '../../common/SubmitButton'
-import axios from 'axios'
 
 export default function Trade({
   baseSymbol,
@@ -56,7 +49,7 @@ export default function Trade({
         instrument: baseSymbol + quoteSymbol,
         side: side,
         amount: Number(amount)
-      } as CreateMarketOrder)
+      })
     } else {
       mutation.mutate({
         nonce: 'string',
@@ -66,18 +59,12 @@ export default function Trade({
         amount: Number(amount),
         price: Number(price),
         timeInForce: { type: 'GoodTillCancelled' }
-      } as CreateLimitOrder)
+      })
     }
   }
 
-  const apiBaseUrl = import.meta.env.ENV_API_URL
   const mutation = useMutation({
-    mutationFn: (orderDetails: CreateOrderRequest) => {
-      return axios.post<OrderApiResponse>(
-        `${apiBaseUrl}/v1/orders`,
-        orderDetails
-      )
-    }
+    mutationFn: (orderDetails: CreateOrderRequest) => crateOrder(orderDetails)
   })
 
   return (

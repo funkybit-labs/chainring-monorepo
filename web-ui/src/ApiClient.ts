@@ -1,4 +1,5 @@
 import { Address } from 'viem'
+import axios from "axios";
 
 const apiBaseUrl = import.meta.env.ENV_API_URL
 
@@ -106,4 +107,11 @@ export type OrderApiResponse = MarketOrderApiResponse | LimitOrderApiResponse
 export async function getConfiguration(): Promise<ConfigurationApiResponse> {
   const response = await fetch(`${apiBaseUrl}/v1/config`)
   return (await response.json()) as ConfigurationApiResponse
+}
+
+export function crateOrder(orderDetails: CreateOrderRequest) {
+  return axios.post<OrderApiResponse>(
+    `${apiBaseUrl}/v1/orders`,
+    orderDetails
+  )
 }
