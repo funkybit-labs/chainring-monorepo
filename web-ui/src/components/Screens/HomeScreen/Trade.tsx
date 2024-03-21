@@ -12,8 +12,6 @@ export default function Trade({
   baseSymbol: string
   quoteSymbol: string
 }) {
-  const [isOpen, setIsOpen] = useState(false)
-
   const [side, setSide] = useState(OrderSide.Buy) // 'buy' or 'sell'
   const [price, setPrice] = useState('')
   const [amount, setAmount] = useState('')
@@ -51,12 +49,12 @@ export default function Trade({
         setAmount('')
         setPrice('')
       }
-      const timerId: any = setTimeout(() => {
+      const timerId: NodeJS.Timeout = setTimeout(() => {
         mutation.reset()
       }, 3000)
       return () => clearTimeout(timerId)
     }
-  }, [mutation.isError, mutation.isSuccess])
+  }, [mutation])
 
   function cleanAndFormatNumber(inputValue: string) {
     let cleanedValue = inputValue
@@ -79,7 +77,7 @@ export default function Trade({
       title="Trade"
       contents={
         <>
-          <div className="flex text-center text-l font-medium w-full">
+          <div className="flex w-full text-center text-lg font-medium">
             <div
               className={classNames(
                 'cursor-pointer border-b-2 w-full',
@@ -120,7 +118,7 @@ export default function Trade({
                       onChange={(e) => {
                         setPrice(cleanAndFormatNumber(e.target.value))
                       }}
-                      className="pr-12 bg-black text-white disabled:bg-mutedGray"
+                      className="bg-black pr-12 text-white disabled:bg-mutedGray"
                     />
                     <span className="absolute right-2 top-2 text-white">
                       {quoteSymbol}
@@ -156,7 +154,7 @@ export default function Trade({
                       onChange={(e) => {
                         setAmount(cleanAndFormatNumber(e.target.value))
                       }}
-                      className="pr-12 bg-black text-white disabled:bg-mutedGray"
+                      className="bg-black pr-12 text-white disabled:bg-mutedGray"
                     />
                     <span className="absolute right-2 top-2 text-white">
                       {baseSymbol}
@@ -194,7 +192,7 @@ export default function Trade({
             }`}
           </p>
           <p className="text-center text-white">Fee: 0.05 {quoteSymbol}</p>
-          <div className="text-center pt-3">
+          <div className="pt-3 text-center">
             {mutation.isError ? (
               <div className="text-red">
                 An error occurred: {mutation.error.message}
