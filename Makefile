@@ -27,5 +27,8 @@ ui_server:
 local_init:
 	scripts/local/local_init.sh
 
+lint:
+	./gradlew lintKotlin && cd web-ui && pnpm run lint
+
 format:
 	./gradlew formatKotlin && cd web-ui && pnpm run lint --fix
