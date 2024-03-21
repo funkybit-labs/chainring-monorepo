@@ -1,4 +1,4 @@
-import HomeScreen from './Screens/HomeScreen'
+import HomeScreen from 'components/Screens/HomeScreen'
 
 function App() {
   return <HomeScreen />

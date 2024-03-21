@@ -166,7 +166,7 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
         .also {
             if (it.isNotEmpty()) {
                 File("${typeScriptAbiOutputDir.absolutePath}/index.ts")
-                    .writeText(it.joinToString("\n") { abiName -> "import $abiName from './${abiName}'" } + "\n" + "export { ${it.joinToString(", ")} }\n")
+                    .writeText(it.joinToString("\n") { abiName -> "import $abiName from 'contracts/${abiName}'" } + "\n" + "export { ${it.joinToString(", ")} }\n")
             }
         }
 
