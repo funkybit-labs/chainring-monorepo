@@ -2,8 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { getConfiguration } from 'ApiClient'
 import { useAccount } from 'wagmi'
 import Balances from 'components/Screens/HomeScreen/Balances'
-import { Header } from './Header'
+import { Header } from 'components/Screens/Header'
 import { OrderBook } from 'components/Screens/HomeScreen/OrderBook'
+import Trade from 'components/Screens/HomeScreen/Trade'
 
 export default function HomeScreen() {
   const configQuery = useQuery({
@@ -28,9 +29,19 @@ export default function HomeScreen() {
     <div className="h-screen bg-gradient-to-b from-lightBackground to-darkBackground">
       <Header />
       <div className="flex h-screen w-screen flex-col">
-        <div className="flex px-4 pt-24">
-          <div className="flex flex-col gap-4">
+        <div className="flex gap-4 px-4 pt-24">
+          <div className="flex flex-col">
             <OrderBook />
+          </div>
+          <div className="flex flex-col">
+            {walletAddress &&
+              exchangeContract &&
+              erc20Tokens &&
+              nativeToken && (
+                <>
+                  <Trade baseSymbol={'BTC'} quoteSymbol={'ETH'} />
+                </>
+              )}
           </div>
         </div>
         <div className="flex px-4 pt-24">

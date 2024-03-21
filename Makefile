@@ -22,7 +22,7 @@ publish_containers:
 	AWS_SDK_LOAD_CONFIG=true ./gradlew jib
 
 ui_server:
-	cd web-ui && pnpm run dev
+	cd web-ui && pnpm install && pnpm run dev
 
 local_init:
 	scripts/local/local_init.sh
