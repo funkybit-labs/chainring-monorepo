@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# execute jobs sequentially per branch, needed to keep correct order of deployments
+concurrency:
+  group: ${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   build_push_backend:
     name: Build Backend and push to ECR
