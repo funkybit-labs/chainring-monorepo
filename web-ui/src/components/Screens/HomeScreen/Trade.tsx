@@ -1,9 +1,10 @@
 import { crateOrder, CreateOrderRequest, OrderSide } from 'ApiClient'
 import { classNames } from 'utils'
-import React, { useState } from 'react'
+import React, { Fragment, useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Widget } from 'components/common/Widget'
 import SubmitButton from 'components/common/SubmitButton'
+import { Dialog, Transition } from '@headlessui/react'
 
 export default function Trade({
   baseSymbol,
@@ -44,6 +45,19 @@ export default function Trade({
   const mutation = useMutation({
     mutationFn: (orderDetails: CreateOrderRequest) => crateOrder(orderDetails)
   })
+
+  useEffect(() => {
+    if (mutation.isError || mutation.isSuccess) {
+      if (mutation.isSuccess) {
+        setAmount('')
+        setPrice('')
+      }
+      const timerId: any = setTimeout(() => {
+        mutation.reset()
+      }, 3000)
+      return () => clearTimeout(timerId)
+    }
+  }, [mutation.isError, mutation.isSuccess])
 
   function cleanAndFormatNumber(inputValue: string) {
     let cleanedValue = inputValue
@@ -102,7 +116,7 @@ export default function Trade({
                   <div className="relative">
                     <input
                       value={price}
-                      disabled={isMarketOrder}
+                      disabled={isMarketOrder || mutation.isPending}
                       placeholder={'0.0'}
                       onChange={(e) => {
                         setPrice(cleanAndFormatNumber(e.target.value))
@@ -119,6 +133,7 @@ export default function Trade({
                     <input
                       type="checkbox"
                       checked={isMarketOrder}
+                      disabled={mutation.isPending}
                       onChange={(e) => {
                         setIsMarketOrder(e.target.checked)
                       }}
@@ -138,6 +153,7 @@ export default function Trade({
                     <input
                       placeholder={'0.0'}
                       value={amount}
+                      disabled={mutation.isPending}
                       onChange={(e) => {
                         setAmount(cleanAndFormatNumber(e.target.value))
                       }}
