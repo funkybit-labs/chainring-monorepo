@@ -4,7 +4,6 @@ import React, { Fragment, useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Widget } from 'components/common/Widget'
 import SubmitButton from 'components/common/SubmitButton'
-import { Dialog, Transition } from '@headlessui/react'
 
 export default function Trade({
   baseSymbol,
