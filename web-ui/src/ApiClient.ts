@@ -1,5 +1,5 @@
 import { Address } from 'viem'
-import axios from "axios";
+import axios from 'axios'
 
 const apiBaseUrl = import.meta.env.ENV_API_URL
 
@@ -46,7 +46,7 @@ export type TimeInForce =
 
 export type CreateMarketOrder = {
   nonce: string
-  type: string
+  type: 'market'
   instrument: string
   side: string
   amount: number
@@ -54,7 +54,7 @@ export type CreateMarketOrder = {
 
 export type CreateLimitOrder = {
   nonce: string
-  type: string
+  type: 'limit'
   instrument: string
   side: string
   amount: number
@@ -80,6 +80,7 @@ export type OrderTiming = {
 
 export type MarketOrderApiResponse = {
   id: string
+  type: 'market'
   status: string
   instrument: string
   side: string
@@ -91,6 +92,7 @@ export type MarketOrderApiResponse = {
 
 export type LimitOrderApiResponse = {
   id: string
+  type: 'limit'
   status: string
   instrument: string
   side: string
@@ -110,8 +112,5 @@ export async function getConfiguration(): Promise<ConfigurationApiResponse> {
 }
 
 export function crateOrder(orderDetails: CreateOrderRequest) {
-  return axios.post<OrderApiResponse>(
-    `${apiBaseUrl}/v1/orders`,
-    orderDetails
-  )
+  return axios.post<OrderApiResponse>(`${apiBaseUrl}/v1/orders`, orderDetails)
 }

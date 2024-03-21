@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { getConfiguration } from 'ApiClient'
 import { useAccount } from 'wagmi'
 import Balances from 'components/Screens/HomeScreen/Balances'
-import { Header } from './Header'
-import { OrderBook } from './HomeScreen/OrderBook'
-import Trade from './HomeScreen/Trade'
+import { Header } from 'components/Screens/Header'
+import { OrderBook } from 'components/Screens/HomeScreen/OrderBook'
+import Trade from 'components/Screens/HomeScreen/Trade'
 
 export default function HomeScreen() {
   const configQuery = useQuery({
