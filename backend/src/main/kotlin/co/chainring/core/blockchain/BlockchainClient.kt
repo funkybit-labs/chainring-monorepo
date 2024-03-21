@@ -25,7 +25,6 @@ enum class ContractType {
 
 data class BlockchainClientConfig(
     val url: String = System.getenv("EVM_NETWORK_URL") ?: "http://localhost:8545",
-    val chainId: ChainId = chainIdValue("EVN_CHAIN_ID", ChainId(1337u)),
     val privateKeyHex: String =
         System.getenv(
             "EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY",
@@ -53,25 +52,17 @@ data class BlockchainClientConfig(
                 defaultValue
             }
         }
-
-        fun chainIdValue(name: String, defaultValue: ChainId): ChainId {
-            return try {
-                System.getenv(name)?.let { ChainId(it.toUInt()) } ?: defaultValue
-            } catch (e: Exception) {
-                defaultValue
-            }
-        }
     }
 }
 
 open class BlockchainClient(private val config: BlockchainClientConfig = BlockchainClientConfig()) {
     protected val web3j = Web3j.build(httpService(config.url, config.enableWeb3jLogging))
     protected val credentials = Credentials.create(config.privateKeyHex)
-    protected val chainId = web3j.ethChainId().send().chainId.toLong()
+    val chainId = ChainId(web3j.ethChainId().send().chainId)
     protected val transactionManager = RawTransactionManager(
         web3j,
         credentials,
-        chainId,
+        chainId.value.toLong(),
         PollingTransactionReceiptProcessor(
             web3j,
             config.deploymentPollingIntervalInMs,
@@ -83,7 +74,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
         contractCreationLimit = config.contractCreationLimit,
         contractInvocationLimit = config.contractInvocationLimit,
         defaultMaxPriorityFeePerGas = config.defaultMaxPriorityFeePerGasInWei,
-        chainId = chainId,
+        chainId = chainId.toLong(),
         web3j = web3j,
     )
 
@@ -116,10 +107,10 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
 
     fun updateContracts() {
         transaction {
-            DeployedSmartContractEntity.validContracts(config.chainId).map { it.name }
+            DeployedSmartContractEntity.validContracts(chainId).map { it.name }
 
             ContractType.entries.forEach {
-                DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, config.chainId)?.let { deployedContract ->
+                DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, chainId)?.let { deployedContract ->
                     if (deployedContract.deprecated) {
                         logger.info { "Upgrading contract: $it" }
                         deployOrUpgradeWithProxy(it, deployedContract.proxyAddress)
@@ -184,7 +175,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
         logger.debug { "Creating db entry for $contractType" }
         DeployedSmartContractEntity.create(
             name = contractType.name,
-            chainId = config.chainId,
+            chainId = chainId,
             implementationAddress = implementationContractAddress,
             proxyAddress = proxyAddress,
             version = version,

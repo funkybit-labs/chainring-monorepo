@@ -35,7 +35,7 @@ class AppUnderTestRunner : BeforeAllCallback {
                         if (!isIntegrationRun) {
                             apiApp.startServer()
                             transaction {
-                                DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, blockchainClient.config.chainId)?.deprecated = true
+                                DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, blockchainClient.chainId)?.deprecated = true
                             }
                             apiApp.updateContracts()
                         }
@@ -46,7 +46,7 @@ class AppUnderTestRunner : BeforeAllCallback {
                             .pollInterval(Duration.ofMillis(100))
                             .atMost(Duration.ofMillis(30000L))
                             .until {
-                                transaction { DeployedSmartContractEntity.validContracts(blockchainClient.config.chainId).map { it.name } == listOf(ContractType.Exchange.name) }
+                                transaction { DeployedSmartContractEntity.validContracts(blockchainClient.chainId).map { it.name } == listOf(ContractType.Exchange.name) }
                             }
 
                         // if we have no USDC mock ERC20 contract, deploy it.
