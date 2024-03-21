@@ -45,10 +45,6 @@ export default function Trade({
 
   useEffect(() => {
     if (mutation.isError || mutation.isSuccess) {
-      if (mutation.isSuccess) {
-        setAmount('')
-        setPrice('')
-      }
       const timerId: NodeJS.Timeout = setTimeout(() => {
         mutation.reset()
       }, 3000)
@@ -85,7 +81,7 @@ export default function Trade({
                   ? 'border-b-lightBackground'
                   : 'border-b-darkGray'
               )}
-              onClick={() => setSide(OrderSide.Buy)}
+              onClick={() => !mutation.isPending && setSide(OrderSide.Buy)}
             >
               Buy {baseSymbol}
             </div>
@@ -96,7 +92,7 @@ export default function Trade({
                   ? 'border-b-lightBackground'
                   : 'border-b-darkGray'
               )}
-              onClick={() => setSide(OrderSide.Sell)}
+              onClick={() => !mutation.isPending && setSide(OrderSide.Sell)}
             >
               Sell {baseSymbol}
             </div>
