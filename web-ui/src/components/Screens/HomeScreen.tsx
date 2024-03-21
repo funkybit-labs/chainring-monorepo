@@ -3,7 +3,8 @@ import { getConfiguration } from 'ApiClient'
 import { useAccount } from 'wagmi'
 import Balances from 'components/Screens/HomeScreen/Balances'
 import { Header } from './Header'
-import { OrderBook } from 'components/Screens/HomeScreen/OrderBook'
+import { OrderBook } from "./HomeScreen/OrderBook";
+import Trade from "./HomeScreen/Trade";
 
 export default function HomeScreen() {
   const configQuery = useQuery({
@@ -40,6 +41,7 @@ export default function HomeScreen() {
               erc20Tokens &&
               nativeToken && (
                 <>
+                  <Trade baseSymbol={'BTC'} quoteSymbol={'ETH'}/>
                   <Balances
                     walletAddress={walletAddress}
                     exchangeContractAddress={exchangeContract.address}

@@ -33,6 +33,79 @@ export type ConfigurationApiResponse = {
   chains: Chain[]
 }
 
+export enum OrderSide {
+  Buy = "Buy",
+  Sell = "Sell",
+}
+
+export type TimeInForce =
+  | { type: 'GoodTillCancelled' }
+  | { type: 'GoodTillTime'; timestamp: number }
+  | { type: 'ImmediateOrCancel' }
+
+
+export type CreateMarketOrder = {
+  nonce: string
+  type: string
+  instrument: string
+  side: string
+  amount: number
+}
+
+export type CreateLimitOrder = {
+  nonce: string
+  type: string
+  instrument: string
+  side: string
+  amount: number
+  price: number
+  timeInForce: TimeInForce
+}
+
+export type CreateOrderRequest = CreateMarketOrder | CreateLimitOrder;
+
+
+export type OrderExecution = {
+  fee: number,
+  feeSymbol: string,
+  amountExecuted: number,
+}
+
+export type OrderTiming = {
+  createdAt: string,
+  updatedAt?: string
+  filledAt?: string
+  closedAt?: string
+  expiredAt?: string
+}
+
+export type MarketOrderApiResponse = {
+  id: string;
+  status: string;
+  instrument: string;
+  side: string;
+  amount: number;
+  originalAmount: number;
+  execution?: OrderExecution | null;
+  timing: OrderTiming;
+}
+
+export type LimitOrderApiResponse = {
+  id: string;
+  status: string;
+  instrument: string;
+  side: string;
+  amount: number;
+  price: number;
+  originalAmount: number;
+  execution?: OrderExecution | null;
+  timing: OrderTiming;
+  timeInForce: TimeInForce;
+}
+
+export type OrderApiResponse = MarketOrderApiResponse | LimitOrderApiResponse;
+
+
 export async function getConfiguration(): Promise<ConfigurationApiResponse> {
   const response = await fetch(`${apiBaseUrl}/v1/config`)
   return (await response.json()) as ConfigurationApiResponse
