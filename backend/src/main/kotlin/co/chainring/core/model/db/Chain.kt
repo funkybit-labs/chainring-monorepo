@@ -13,11 +13,14 @@ import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.api.PreparedStatementApi
 import org.jetbrains.exposed.sql.vendors.currentDialect
+import java.math.BigInteger
 
 @Serializable
 @JvmInline
-value class ChainId(val value: UInt) : Comparable<ChainId> {
+value class ChainId(val value: ULong) : Comparable<ChainId> {
+    constructor(bigInt: BigInteger) : this(bigInt.toLong().toULong())
     override fun toString(): String = value.toString()
+    fun toLong(): Long = value.toLong()
     override fun compareTo(other: ChainId): Int = compareValuesBy(this, other) { it.value }
 }
 
@@ -25,10 +28,10 @@ class ChainIdColumnType : ColumnType() {
     override fun sqlType(): String = currentDialect.dataTypeProvider.uintegerType()
     override fun valueFromDB(value: Any): ChainId {
         return when (value) {
-            is UInt -> ChainId(value)
-            is Int -> ChainId(value.toUInt())
-            is Number -> ChainId(value.toLong().toUInt())
-            is String -> ChainId(value.toUInt())
+            is ULong -> ChainId(value)
+            is Long -> ChainId(value.toULong())
+            is Number -> ChainId(value.toLong().toULong())
+            is String -> ChainId(value.toULong())
             else -> error("Unexpected value of type Int: $value of ${value::class.qualifiedName}")
         }
     }

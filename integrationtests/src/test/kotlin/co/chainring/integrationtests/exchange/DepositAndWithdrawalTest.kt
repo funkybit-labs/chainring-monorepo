@@ -31,7 +31,7 @@ class DepositAndWithdrawalTest {
     @Test
     fun testConfiguration() {
         val apiClient = ApiClient()
-        val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.config.chainId }!!
+        val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.chainId }!!
         assertEquals(config.contracts.size, 1)
         assertEquals(config.contracts[0].name, ContractType.Exchange.name)
         val client = BlockchainClient().loadExchangeContract(config.contracts[0].address)
@@ -47,7 +47,7 @@ class DepositAndWithdrawalTest {
     @Test
     fun testERC20DepositsAndWithdrawals() {
         val apiClient = ApiClient()
-        val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.config.chainId }!!
+        val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.chainId }!!
         val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.erc20Tokens)
         val decimals = config.erc20Tokens.first { it.symbol.value == "USDC" }.decimals.toInt()
 
@@ -73,7 +73,7 @@ class DepositAndWithdrawalTest {
     @Test
     fun testNativeDepositsAndWithdrawals() {
         val apiClient = ApiClient()
-        val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.config.chainId }!!
+        val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.chainId }!!
         val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.erc20Tokens)
         val decimals = config.nativeToken.decimals.toInt()
 

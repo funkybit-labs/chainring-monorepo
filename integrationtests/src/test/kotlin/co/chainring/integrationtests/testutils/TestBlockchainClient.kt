@@ -1,6 +1,6 @@
 package co.chainring.integrationtests.testutils
 
-import co.chainring.contracts.generated.ERC20Mock
+import co.chainring.contracts.generated.MockERC20
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.model.Address
@@ -15,13 +15,13 @@ import java.math.BigInteger
 
 class TestBlockchainClient(val config: BlockchainClientConfig = BlockchainClientConfig()) : BlockchainClient(config) {
 
-    fun deployERC20Mock(symbol: String, name: String): ERC20Mock {
-        val contract = ERC20Mock.deploy(web3j, transactionManager, gasProvider, "USDC", "USDC").send()
-        ERC20TokenEntity.create(Symbol("USDC"), name, config.chainId, Address(contract.contractAddress), 18.toUByte())
+    fun deployERC20Mock(symbol: String, name: String): MockERC20 {
+        val contract = MockERC20.deploy(web3j, transactionManager, gasProvider, "USDC", "USDC").send()
+        ERC20TokenEntity.create(Symbol("USDC"), name, chainId, Address(contract.contractAddress), 18.toUByte())
         return contract
     }
 
-    fun loadERC20Mock(address: String) = ERC20Mock.load(address, web3j, transactionManager, gasProvider)
+    fun loadERC20Mock(address: String) = MockERC20.load(address, web3j, transactionManager, gasProvider)
 
     fun getNativeBalance(address: Address) = web3j.ethGetBalance(address.value, DefaultBlockParameter.valueOf("latest")).send().balance
 
