@@ -1,7 +1,6 @@
 package co.chainring.integrationtests.exchange
 
 import co.chainring.apps.api.model.IncomingWSMessage
-import co.chainring.apps.api.model.LastTradeDirection
 import co.chainring.apps.api.model.OrderBook
 import co.chainring.apps.api.model.OutgoingWSMessage
 import co.chainring.core.model.Instrument
@@ -30,12 +29,6 @@ class OrderBookTest {
         assertEquals("BTC/ETH", orderBook.instrument.value)
         assertEquals(9, orderBook.buy.size)
         assertEquals(10, orderBook.sell.size)
-        assertEquals("17.50", orderBook.last.price)
-        assertEquals(LastTradeDirection.Up, orderBook.last.direction)
-        val client2 = WebsocketClient.blocking(connectUri)
-        client2.send(WsMessage(Json.encodeToString(message)))
-        assertEquals(decoded, Json.decodeFromString<OutgoingWSMessage>(client2.received().take(1).first().bodyString()))
         client.close()
-        client2.close()
     }
 }

@@ -37,15 +37,15 @@ class Broadcaster {
         }
     }
 
-    lateinit var timer: Timer
+    private var timer: Timer? = null
 
     fun start() {
         timer = Timer(logger)
-        timer.scheduleAtFixedRate(Duration.ofSeconds(1), stopOnError = true, this::broadcastOrderBook)
+        timer?.scheduleAtFixedRate(Duration.ofSeconds(1), stopOnError = true, this::broadcastOrderBook)
     }
 
     fun stop() {
-        timer.cancel()
+        timer?.cancel()
     }
 
     private fun broadcastOrderBook() {
