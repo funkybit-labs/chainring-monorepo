@@ -72,7 +72,7 @@ export function OrderBook({ ws }: { ws: Websocket }) {
 
   useEffect(() => {
     const subscribe = () => {
-      ws.send(JSON.stringify({ type: 'Subscribe', instrument: 'BTC/ETH' }))
+      ws.send(JSON.stringify({ type: 'Subscribe', marketId: 'BTC/ETH' }))
     }
     ws.addEventListener(WebsocketEvent.reconnect, subscribe)
     if (ws.readyState == WebSocket.OPEN) {
@@ -93,7 +93,7 @@ export function OrderBook({ ws }: { ws: Websocket }) {
       ws.removeEventListener(WebsocketEvent.reconnect, subscribe)
       ws.removeEventListener(WebsocketEvent.open, subscribe)
       if (ws.readyState == WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'Unsubscribe', instrument: 'BTC/ETH' }))
+        ws.send(JSON.stringify({ type: 'Unsubscribe', marketId: 'BTC/ETH' }))
       }
     }
   }, [ws])

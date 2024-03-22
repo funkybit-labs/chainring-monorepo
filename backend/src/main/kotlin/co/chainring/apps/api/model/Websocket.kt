@@ -1,6 +1,6 @@
 package co.chainring.apps.api.model
 
-import co.chainring.core.model.Instrument
+import co.chainring.core.model.db.MarketId
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -13,13 +13,13 @@ sealed class IncomingWSMessage {
     @Serializable
     @SerialName("Subscribe")
     data class Subscribe(
-        val instrument: Instrument,
+        val marketId: MarketId,
     ) : IncomingWSMessage()
 
     @Serializable
     @SerialName("Unsubscribe")
     data class Unsubscribe(
-        val instrument: Instrument,
+        val marketId: MarketId,
     ) : IncomingWSMessage()
 }
 

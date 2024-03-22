@@ -141,7 +141,7 @@ data class OrdersApiResponse(
 @Serializable
 @SerialName("OrderBook")
 data class OrderBook(
-    val instrument: Instrument,
+    val marketId: MarketId,
     val buy: List<OrderBookEntry>,
     val sell: List<OrderBookEntry>,
     val last: LastTrade,
