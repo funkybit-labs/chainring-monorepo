@@ -1,110 +1,136 @@
-import { Address } from 'viem'
-import axios from 'axios'
+import z from 'zod'
+import { Zodios } from '@zodios/core'
 
 export const apiBaseUrl = import.meta.env.ENV_API_URL
 
-export type DeployedContract = {
-  name: string
-  address: Address
-}
+const AddressSchema = z.custom<`0x${string}`>((val: unknown) =>
+  /^0x/.test(val as string)
+)
 
-export type ERC20Token = {
-  name: string
-  symbol: string
-  address: Address
-  decimals: number
-}
+const DeployedContractSchema = z.object({
+  name: z.string(),
+  address: AddressSchema
+})
 
-export type NativeToken = {
-  name: string
-  symbol: string
-  decimals: number
-}
+export type DeployedContract = z.infer<typeof DeployedContractSchema>
+
+const ERC20TokenSchema = z.object({
+  name: z.string(),
+  symbol: z.string(),
+  address: AddressSchema,
+  decimals: z.number()
+})
+
+export type ERC20Token = z.infer<typeof ERC20TokenSchema>
+
+const NativeTokenSchema = z.object({
+  name: z.string(),
+  symbol: z.string(),
+  decimals: z.number()
+})
+export type NativeToken = z.infer<typeof NativeTokenSchema>
 
 export type Token = NativeToken | ERC20Token
 
-export type Chain = {
-  id: number
-  contracts: DeployedContract[]
-  erc20Tokens: ERC20Token[]
-  nativeToken: NativeToken
-}
+const ChainSchema = z.object({
+  id: z.number(),
+  contracts: z.array(DeployedContractSchema),
+  erc20Tokens: z.array(ERC20TokenSchema),
+  nativeToken: NativeTokenSchema
+})
+export type Chain = z.infer<typeof ChainSchema>
 
-export type ConfigurationApiResponse = {
-  chains: Chain[]
-}
+const ConfigurationApiResponseSchema = z.object({
+  chains: z.array(ChainSchema)
+})
+export type ConfigurationApiResponse = z.infer<
+  typeof ConfigurationApiResponseSchema
+>
 
-export enum OrderSide {
-  Buy = 'Buy',
-  Sell = 'Sell'
-}
+const OrderSideSchema = z.enum(['Buy', 'Sell'])
+export type OrderSide = z.infer<typeof OrderSideSchema>
 
-export type TimeInForce =
-  | { type: 'GoodTillCancelled' }
-  | { type: 'GoodTillTime'; timestamp: number }
-  | { type: 'ImmediateOrCancel' }
+const TimeInForceSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('GoodTillCancelled') }),
+  z.object({ type: z.literal('GoodTillTime'), timestamp: z.number() }),
+  z.object({ type: z.literal('ImmediateOrCancel') })
+])
+export type TimeInForce = z.infer<typeof TimeInForceSchema>
 
-export type CreateMarketOrder = {
-  nonce: string
-  type: 'market'
-  instrument: string
-  side: string
-  amount: number
-}
+const CreateMarketOrderSchema = z.object({
+  nonce: z.string(),
+  type: z.literal('market'),
+  instrument: z.string(),
+  side: OrderSideSchema,
+  amount: z.number()
+})
+export type CreateMarketOrder = z.infer<typeof CreateMarketOrderSchema>
 
-export type CreateLimitOrder = {
-  nonce: string
-  type: 'limit'
-  instrument: string
-  side: string
-  amount: number
-  price: number
-  timeInForce: TimeInForce
-}
+const CreateLimitOrderSchema = z.object({
+  nonce: z.string(),
+  type: z.literal('limit'),
+  instrument: z.string(),
+  side: OrderSideSchema,
+  amount: z.number(),
+  price: z.number(),
+  timeInForce: TimeInForceSchema
+})
+export type CreateLimitOrder = z.infer<typeof CreateLimitOrderSchema>
 
-export type CreateOrderRequest = CreateMarketOrder | CreateLimitOrder
+const CreateOrderRequestSchema = z.discriminatedUnion('type', [
+  CreateMarketOrderSchema,
+  CreateLimitOrderSchema
+])
+export type CreateOrderRequest = z.infer<typeof CreateOrderRequestSchema>
 
-export type OrderExecution = {
-  fee: number
-  feeSymbol: string
-  amountExecuted: number
-}
+const OrderExecutionSchema = z.object({
+  fee: z.number(),
+  feeSymbol: z.string(),
+  amountExecuted: z.number()
+})
+export type OrderExecution = z.infer<typeof OrderExecutionSchema>
 
-export type OrderTiming = {
-  createdAt: string
-  updatedAt?: string
-  filledAt?: string
-  closedAt?: string
-  expiredAt?: string
-}
+const OrderTimingSchema = z.object({
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date().optional(),
+  filledAt: z.coerce.date().optional(),
+  closedAt: z.coerce.date().optional(),
+  expiredAt: z.coerce.date().optional()
+})
+export type OrderTiming = z.infer<typeof OrderTimingSchema>
 
-export type MarketOrderApiResponse = {
-  id: string
-  type: 'market'
-  status: string
-  instrument: string
-  side: string
-  amount: number
-  originalAmount: number
-  execution?: OrderExecution | null
-  timing: OrderTiming
-}
+const MarketOrderSchema = z.object({
+  id: z.string(),
+  type: z.literal('market'),
+  status: z.string(),
+  instrument: z.string(),
+  side: OrderSideSchema,
+  amount: z.number(),
+  originalAmount: z.number(),
+  execution: OrderExecutionSchema.optional(),
+  timing: OrderTimingSchema
+})
+export type MarketOrder = z.infer<typeof MarketOrderSchema>
 
-export type LimitOrderApiResponse = {
-  id: string
-  type: 'limit'
-  status: string
-  instrument: string
-  side: string
-  amount: number
-  price: number
-  originalAmount: number
-  execution?: OrderExecution | null
-  timing: OrderTiming
-  timeInForce: TimeInForce
-}
+const LimitOrderSchema = z.object({
+  id: z.string(),
+  type: z.literal('limit'),
+  status: z.string(),
+  instrument: z.string(),
+  side: OrderSideSchema,
+  amount: z.number(),
+  price: z.number(),
+  originalAmount: z.number(),
+  execution: OrderExecutionSchema.optional(),
+  timing: OrderTimingSchema,
+  timeInForce: TimeInForceSchema
+})
+export type LimitOrder = z.infer<typeof LimitOrderSchema>
 
-export type OrderApiResponse = MarketOrderApiResponse | LimitOrderApiResponse
+const OrderSchema = z.discriminatedUnion('type', [
+  MarketOrderSchema,
+  LimitOrderSchema
+])
 
 export type OrderBook = {
   type: 'OrderBook'
@@ -134,11 +160,24 @@ export type Publishable = OrderBook
 
 export type OutgoingWSMessage = Publish
 
-export async function getConfiguration(): Promise<ConfigurationApiResponse> {
-  const response = await fetch(`${apiBaseUrl}/v1/config`)
-  return (await response.json()) as ConfigurationApiResponse
-}
-
-export function createOrder(orderDetails: CreateOrderRequest) {
-  return axios.post<OrderApiResponse>(`${apiBaseUrl}/v1/orders`, orderDetails)
-}
+export const apiClient = new Zodios(apiBaseUrl, [
+  {
+    method: 'get',
+    path: '/v1/config',
+    alias: 'getConfiguration',
+    response: ConfigurationApiResponseSchema
+  },
+  {
+    method: 'post',
+    path: '/v1/orders',
+    alias: 'createOrder',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: CreateOrderRequestSchema
+      }
+    ],
+    response: OrderSchema
+  }
+])

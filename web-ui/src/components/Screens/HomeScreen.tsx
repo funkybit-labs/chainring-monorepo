@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { apiBaseUrl, getConfiguration } from 'ApiClient'
+import { apiClient, apiBaseUrl } from 'ApiClient'
 import { useAccount } from 'wagmi'
 import Balances from 'components/Screens/HomeScreen/Balances'
 import { Header } from 'components/Screens/Header'
@@ -10,7 +10,7 @@ import { ExponentialBackoff, WebsocketBuilder } from 'websocket-ts'
 export default function HomeScreen() {
   const configQuery = useQuery({
     queryKey: ['configuration'],
-    queryFn: getConfiguration
+    queryFn: apiClient.getConfiguration
   })
 
   const wallet = useAccount()
