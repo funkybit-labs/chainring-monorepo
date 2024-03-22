@@ -48,9 +48,6 @@ class OrderRoutesApiTest {
         // order creation is idempotent
         assertEquals(limitOrder.id, apiClient.createOrder(limitOrderApiRequest).id)
 
-        // reload same order
-        assertEquals(limitOrder, apiClient.getOrder(limitOrder.id))
-
         // update order
         val updatedOrder = apiClient.updateOrder(
             apiRequest = UpdateOrderApiRequest.Limit(

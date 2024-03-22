@@ -150,7 +150,7 @@ data class OrderBook(
 @Serializable
 data class OrderBookEntry(
     val price: String,
-    val size: BigIntegerJson,
+    val size: BigDecimalJson,
 )
 
 @Serializable
