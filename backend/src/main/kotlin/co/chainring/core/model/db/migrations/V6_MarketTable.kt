@@ -19,7 +19,7 @@ class V6_MarketTable : Migration() {
             SchemaUtils.createMissingTablesAndColumns(V6_MarketTable)
 
             exec("INSERT INTO market(guid, base_symbol, quote_symbol) VALUES ('USDC/DAI', 'USDC', 'DAI')")
-            exec("INSERT INTO market(guid, base_symbol, quote_symbol) VALUES ('BTC/ETH', 'BTC', 'ETH')")
+            exec("INSERT INTO market(guid, base_symbol, quote_symbol) VALUES ('ETH/USDC', 'ETH', 'USDC')")
         }
     }
 }
