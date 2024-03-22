@@ -1,47 +1,39 @@
 import { Widget } from 'components/common/Widget'
 import { calculateTickSpacing } from 'utils/orderBookUtils'
+import { Fragment, useEffect, useState } from 'react'
+import Spinner from 'components/common/Spinner'
+import { Websocket, WebsocketEvent } from 'websocket-ts'
+import { OrderBook, OutgoingWSMessage } from 'ApiClient'
 
-export function OrderBook() {
-  const orderBook = {
-    last: { price: '17.50', direction: 1 },
-    buy: [
-      { price: '17.75', size: 2.3 },
-      { price: '18.00', size: 2.8 },
-      { price: '18.25', size: 5 },
-      { price: '18.50', size: 10.1 },
-      { price: '18.75', size: 9.5 },
-      { price: '19.00', size: 12.4 },
-      { price: '19.50', size: 14.2 },
-      { price: '20.00', size: 15.3 },
-      { price: '20.50', size: 19 }
-    ],
-    sell: [
-      { price: '17.25', size: 2.1 },
-      { price: '17.00', size: 5 },
-      { price: '16.75', size: 5.4 },
-      { price: '16.50', size: 7.5 },
-      { price: '16.25', size: 10.1 },
-      { price: '16.00', size: 7.5 },
-      { price: '15.50', size: 12.4 },
-      { price: '15.00', size: 11.3 },
-      { price: '14.50', size: 14 },
-      { price: '14.00', size: 19.5 }
-    ]
-  }
+type OrderBookParameters = {
+  bookWidth: number
+  gridLines: number
+  graphStartX: number
+  graphEndX: number
+  graphWidth: number
+  graphStartY: number
+  barHeight: number
+  lastPriceHeight: number
+  maxSize: number
+  bookHeight: number
+  sellStartY: number
+  gridSpacing: number
+  ticks: number[]
+}
 
-  const maxSize = Math.max(
-    ...orderBook.sell.map((l) => l.size),
-    ...orderBook.buy.map((l) => l.size)
-  )
-
+function calculateParameters(orderBook: OrderBook): OrderBookParameters {
   const bookWidth = 400
-  const gridLines = 7
+  const gridLines = 6
   const graphStartX = 60
   const graphEndX = bookWidth - 20
   const graphWidth = graphEndX - graphStartX
   const graphStartY = 20
   const barHeight = 18
   const lastPriceHeight = 50
+  const maxSize = Math.max(
+    ...orderBook.sell.map((l) => l.size),
+    ...orderBook.buy.map((l) => l.size)
+  )
   const bookHeight =
     graphStartY +
     lastPriceHeight +
@@ -49,91 +41,161 @@ export function OrderBook() {
   const sellStartY =
     graphStartY + lastPriceHeight + barHeight * orderBook.buy.length
   const gridSpacing = calculateTickSpacing(0, maxSize, gridLines)
-  const ticks = []
+
+  const ticks: number[] = []
   for (let i = 0; i <= gridLines; i++) {
     ticks.push(i * gridSpacing)
   }
+
+  return {
+    bookWidth,
+    gridLines,
+    graphStartX,
+    graphEndX,
+    graphWidth,
+    graphStartY,
+    barHeight,
+    lastPriceHeight,
+    // we adjust the max size to be the grid line past the last one, which keeps the grid lines
+    // more stable as the values move around
+    maxSize: gridSpacing * (gridLines + 1),
+    bookHeight,
+    sellStartY,
+    gridSpacing,
+    ticks
+  }
+}
+
+export function OrderBook({ ws }: { ws: Websocket }) {
+  const [orderBook, setOrderBook] = useState<OrderBook>()
+  const [params, setParams] = useState<OrderBookParameters>()
+
+  useEffect(() => {
+    const subscribe = () => {
+      ws.send(JSON.stringify({ type: 'Subscribe', instrument: 'BTC/ETH' }))
+    }
+    ws.addEventListener(WebsocketEvent.reconnect, subscribe)
+    if (ws.readyState == WebSocket.OPEN) {
+      subscribe()
+    } else {
+      ws.addEventListener(WebsocketEvent.open, subscribe)
+    }
+    const handleMessage = (ws: Websocket, event: MessageEvent) => {
+      const message = JSON.parse(event.data) as OutgoingWSMessage
+      if (message.type == 'Publish' && message.data.type == 'OrderBook') {
+        setParams(calculateParameters(message.data))
+        setOrderBook(message.data)
+      }
+    }
+    ws.addEventListener(WebsocketEvent.message, handleMessage)
+    return () => {
+      ws.removeEventListener(WebsocketEvent.message, handleMessage)
+      ws.removeEventListener(WebsocketEvent.reconnect, subscribe)
+      ws.removeEventListener(WebsocketEvent.open, subscribe)
+      if (ws.readyState == WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'Unsubscribe', instrument: 'BTC/ETH' }))
+      }
+    }
+  }, [ws])
+
   return (
     <Widget
       title={'Order Book'}
       contents={
-        <svg width={bookWidth} height={bookHeight}>
-          {orderBook.buy.toReversed().map((l, i) => (
-            <>
-              <text
-                x={0}
-                y={graphStartY + 4 + (i + 1) * barHeight}
-                fill="white"
-                textAnchor="left"
+        orderBook && params ? (
+          <svg width={params.bookWidth} height={params.bookHeight}>
+            {orderBook.buy.toReversed().map((l, i) => (
+              <Fragment key={`${l.price}`}>
+                <text
+                  x={0}
+                  y={params.graphStartY + 4 + (i + 1) * params.barHeight}
+                  fill="white"
+                  textAnchor="left"
+                >
+                  {l.price}
+                </text>
+                <rect
+                  x={params.graphStartX}
+                  width={params.graphWidth * (l.size / params.maxSize)}
+                  y={params.graphStartY + 8 + i * params.barHeight}
+                  height={params.barHeight}
+                  fill="#10A327"
+                />
+              </Fragment>
+            ))}
+            <text
+              x={0}
+              y={params.sellStartY - 12}
+              fill="white"
+              textAnchor="left"
+              fontSize="24px"
+            >
+              {orderBook.last.price}
+              <tspan
+                fill={orderBook.last.direction == 'Up' ? '#10A327' : '#7F1D1D'}
               >
-                {l.price}
-              </text>
-              <rect
-                x={graphStartX}
-                width={graphWidth * (l.size / maxSize)}
-                y={graphStartY + 8 + i * barHeight}
-                height={barHeight}
-                fill="#10A327"
-              />
-            </>
-          ))}
-          <text
-            x={0}
-            y={sellStartY - 12}
-            fill="white"
-            textAnchor="left"
-            fontSize="24px"
-          >
-            {orderBook.last.price}
-            <tspan fill={orderBook.last.direction == 1 ? '#10A327' : '#7F1D1D'}>
-              {orderBook.last.direction == 1 ? '↑' : '↓'}
-            </tspan>
-          </text>
-          {orderBook.sell.map((l, i) => (
-            <>
-              <text
-                x={0}
-                y={sellStartY + (i + 1) * barHeight - 4}
-                fill="white"
-                textAnchor="left"
-              >
-                {l.price}
-              </text>
-              <rect
-                x={graphStartX}
-                width={graphWidth * (l.size / maxSize)}
-                y={sellStartY + i * barHeight}
-                height={barHeight}
-                fill="#7F1D1D"
-              />
-            </>
-          ))}
-          {ticks.slice(1).map((tick, i) => (
-            <>
-              <text
-                x={graphStartX + (i + 1) * gridSpacing * (graphWidth / maxSize)}
-                y={graphStartY}
-                fill="white"
-                textAnchor="middle"
-              >
-                {tick}
-              </text>
-              <line
-                x1={
-                  graphStartX + (i + 1) * gridSpacing * (graphWidth / maxSize)
-                }
-                y1={graphStartY + 8}
-                x2={
-                  graphStartX + (i + 1) * gridSpacing * (graphWidth / maxSize)
-                }
-                y2={bookHeight}
-                stroke="white"
-                strokeDasharray={4}
-                strokeOpacity={0.7}
-              />
-            </>
-          ))}
-        </svg>
+                {orderBook.last.direction == 'Up' ? '↑' : '↓'}
+              </tspan>
+            </text>
+            {orderBook.sell.map((l, i) => (
+              <Fragment key={`${l.price}`}>
+                <text
+                  x={0}
+                  y={params.sellStartY + (i + 1) * params.barHeight - 4}
+                  fill="white"
+                  textAnchor="left"
+                >
+                  {l.price}
+                </text>
+                <rect
+                  x={params.graphStartX}
+                  width={params.graphWidth * (l.size / params.maxSize)}
+                  y={params.sellStartY + i * params.barHeight}
+                  height={params.barHeight}
+                  fill="#7F1D1D"
+                />
+              </Fragment>
+            ))}
+            {params.ticks.slice(1).map((tick, i) => (
+              <Fragment key={`tick-${i}`}>
+                <text
+                  x={
+                    params.graphStartX +
+                    (i + 1) *
+                      params.gridSpacing *
+                      (params.graphWidth / params.maxSize)
+                  }
+                  y={params.graphStartY}
+                  fill="white"
+                  textAnchor="middle"
+                >
+                  {tick}
+                </text>
+                <line
+                  x1={
+                    params.graphStartX +
+                    (i + 1) *
+                      params.gridSpacing *
+                      (params.graphWidth / params.maxSize)
+                  }
+                  y1={params.graphStartY + 8}
+                  x2={
+                    params.graphStartX +
+                    (i + 1) *
+                      params.gridSpacing *
+                      (params.graphWidth / params.maxSize)
+                  }
+                  y2={params.bookHeight}
+                  stroke="white"
+                  strokeDasharray={4}
+                  strokeOpacity={0.7}
+                />
+              </Fragment>
+            ))}
+          </svg>
+        ) : (
+          <Spinner />
+        )
       }
     />
   )

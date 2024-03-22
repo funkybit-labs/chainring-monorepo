@@ -6,6 +6,7 @@ import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.db.DbConfig
+import co.chainring.core.websocket.Broadcaster
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.contract
 import org.http4k.core.Method
@@ -19,7 +20,9 @@ import org.http4k.filter.OriginPolicy
 import org.http4k.filter.ServerFilters
 import org.http4k.routing.bind
 import org.http4k.routing.routes
+import org.http4k.routing.websockets
 import org.http4k.server.Netty
+import org.http4k.server.PolyHandler
 import org.http4k.server.ServerConfig
 import org.http4k.server.asServer
 import java.time.Duration.ofSeconds
@@ -41,7 +44,9 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         methods = listOf(Method.GET, Method.POST),
     )
 
-    private val server = ServerFilters.InitialiseRequestContext(requestContexts)
+    private val broadcaster = Broadcaster()
+
+    private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
         .then(ServerFilters.Cors(corsPolicy))
         .then(HttpTransactionLogger(logger))
         .then(RequestProcessingExceptionHandler(logger))
@@ -70,18 +75,27 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                     },
             ),
         )
+
+    private val websocketApi = WebsocketApi(broadcaster)
+
+    private val server = PolyHandler(
+        httpHandler,
+        websockets(websocketApi.connect()),
+    )
         .asServer(Netty(config.httpPort, ServerConfig.StopMode.Graceful(ofSeconds(1))))
 
     private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
 
     override fun start() {
         startServer()
+        broadcaster.start()
         updateContracts()
     }
 
     override fun stop() {
         logger.info { "Stopping" }
         super.stop()
+        broadcaster.stop()
         server.stop()
         logger.info { "Stopped" }
     }

@@ -1,7 +1,7 @@
 import { Address } from 'viem'
 import axios from 'axios'
 
-const apiBaseUrl = import.meta.env.ENV_API_URL
+export const apiBaseUrl = import.meta.env.ENV_API_URL
 
 export type DeployedContract = {
   name: string
@@ -99,11 +99,39 @@ export type LimitOrderApiResponse = {
 
 export type OrderApiResponse = MarketOrderApiResponse | LimitOrderApiResponse
 
+export type OrderBook = {
+  type: 'OrderBook'
+  buy: OrderBookEntry[]
+  sell: OrderBookEntry[]
+  last: LastTrade
+}
+
+export type OrderBookEntry = {
+  price: string
+  size: number
+}
+
+export type LastTradeDirection = 'Up' | 'Down'
+
+export type LastTrade = {
+  price: string
+  direction: LastTradeDirection
+}
+
+export type Publish = {
+  type: 'Publish'
+  data: Publishable
+}
+
+export type Publishable = OrderBook
+
+export type OutgoingWSMessage = Publish
+
 export async function getConfiguration(): Promise<ConfigurationApiResponse> {
   const response = await fetch(`${apiBaseUrl}/v1/config`)
   return (await response.json()) as ConfigurationApiResponse
 }
 
-export function crateOrder(orderDetails: CreateOrderRequest) {
+export function createOrder(orderDetails: CreateOrderRequest) {
   return axios.post<OrderApiResponse>(`${apiBaseUrl}/v1/orders`, orderDetails)
 }

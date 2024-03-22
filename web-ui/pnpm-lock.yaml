@@ -41,6 +41,9 @@ dependencies:
   wagmi:
     specifier: ^2.5.11
     version: 2.5.11(@tanstack/react-query@5.27.5)(@types/react@18.2.64)(react-dom@18.2.0)(react-native@0.73.6)(react@18.2.0)(typescript@5.3.3)(viem@2.8.13)
+  websocket-ts:
+    specifier: ^2.1.5
+    version: 2.1.5
 
 devDependencies:
   '@testing-library/jest-dom':
@@ -94,6 +97,9 @@ devDependencies:
   happy-dom:
     specifier: ^12.10.3
     version: 12.10.3
+  mock-socket:
+    specifier: ^9.3.1
+    version: 9.3.1
   postcss:
     specifier: ^8.4.35
     version: 8.4.35
@@ -8173,6 +8179,11 @@ packages:
       pkg-types: 1.0.3
       ufo: 1.4.0
 
+  /mock-socket@9.3.1:
+    resolution: {integrity: sha512-qxBgB7Qa2sEQgHFjj0dSigq7fX4k6Saisd5Nelwp2q8mlbAFh5dHV9JTTlF8viYJLSSWgMCZFUom8PJcMNBoJw==}
+    engines: {node: '>= 8'}
+    dev: true
+
   /motion@10.16.2:
     resolution: {integrity: sha512-p+PurYqfUdcJZvtnmAqu5fJgV2kR0uLFQuBKtLeFVTrYEVllI99tiOTSefVNYuip9ELTEkepIIDftNdze76NAQ==}
     dependencies:
@@ -10790,6 +10801,10 @@ packages:
     resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
     engines: {node: '>=12'}
     dev: true
+
+  /websocket-ts@2.1.5:
+    resolution: {integrity: sha512-rCNl9w6Hsir1azFm/pbjBEFzLD/gi7Th5ZgOxMifB6STUfTSovYAzryWw0TRvSZ1+Qu1Z5Plw4z42UfTNA9idA==}
+    dev: false
 
   /whatwg-encoding@2.0.0:
     resolution: {integrity: sha512-p41ogyeMUrw3jWclHWTQg1k05DSVXPLcVxRTYsXUk+ZooOCZLcoYgPZ/HL/D/N+uQPOtcp1me1WhBEaX02mhWg==}
