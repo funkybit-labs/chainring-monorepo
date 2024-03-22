@@ -19,7 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 class OrderBookTest {
     @Test
     fun `test order book over websocket`() {
-        val connectUri = Uri.of(apiServerRootUrl.replace("http:", "ws:") + "/connect")
+        val connectUri = Uri.of(apiServerRootUrl.replace("http:", "ws:").replace("https:", "wss:") + "/connect")
         val client = WebsocketClient.blocking(connectUri)
         val message: IncomingWSMessage = IncomingWSMessage.Subscribe(Instrument("BTC/ETH"))
         client.send(WsMessage(Json.encodeToString(message)))
