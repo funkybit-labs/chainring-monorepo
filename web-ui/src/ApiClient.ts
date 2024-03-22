@@ -65,7 +65,7 @@ const CreateLimitOrderSchema = z.object({
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.number(),
-  price: z.number(),
+  price: z.number()
 })
 export type CreateLimitOrder = z.infer<typeof CreateLimitOrderSchema>
 
@@ -114,7 +114,7 @@ const LimitOrderSchema = z.object({
   price: z.number(),
   originalAmount: z.number(),
   execution: OrderExecutionSchema.optional(),
-  timing: OrderTimingSchema,
+  timing: OrderTimingSchema
 })
 export type LimitOrder = z.infer<typeof LimitOrderSchema>
 
