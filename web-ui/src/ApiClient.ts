@@ -39,15 +39,10 @@ export enum OrderSide {
   Sell = 'Sell'
 }
 
-export type TimeInForce =
-  | { type: 'GoodTillCancelled' }
-  | { type: 'GoodTillTime'; timestamp: number }
-  | { type: 'ImmediateOrCancel' }
-
 export type CreateMarketOrder = {
   nonce: string
   type: 'market'
-  instrument: string
+  marketId: string
   side: string
   amount: number
 }
@@ -55,11 +50,10 @@ export type CreateMarketOrder = {
 export type CreateLimitOrder = {
   nonce: string
   type: 'limit'
-  instrument: string
+  marketId: string
   side: string
   amount: number
   price: number
-  timeInForce: TimeInForce
 }
 
 export type CreateOrderRequest = CreateMarketOrder | CreateLimitOrder
@@ -82,7 +76,7 @@ export type MarketOrderApiResponse = {
   id: string
   type: 'market'
   status: string
-  instrument: string
+  marketId: string
   side: string
   amount: number
   originalAmount: number
@@ -94,14 +88,13 @@ export type LimitOrderApiResponse = {
   id: string
   type: 'limit'
   status: string
-  instrument: string
+  marketId: string
   side: string
   amount: number
   price: number
   originalAmount: number
   execution?: OrderExecution | null
   timing: OrderTiming
-  timeInForce: TimeInForce
 }
 
 export type OrderApiResponse = MarketOrderApiResponse | LimitOrderApiResponse

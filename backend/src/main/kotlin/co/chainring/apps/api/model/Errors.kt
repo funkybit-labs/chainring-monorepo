@@ -21,8 +21,12 @@ data class ApiErrors(val errors: List<ApiError>)
 
 @Serializable
 enum class ReasonCode {
+    MarketNotSupported,
+
+    OrderNotFound,
+    OrderIsClosed,
+
     UnexpectedError,
-    TimeoutError,
 }
 
 val jsonWithDefaults = Json { encodeDefaults = true }

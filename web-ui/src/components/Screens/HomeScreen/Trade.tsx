@@ -21,20 +21,19 @@ export default function Trade({
     if (isMarketOrder) {
       mutation.mutate({
         nonce: crypto.randomUUID(),
+        marketId: `${baseSymbol}/${quoteSymbol}`,
         type: 'market',
-        instrument: baseSymbol + quoteSymbol,
         side: side,
         amount: Number(amount)
       })
     } else {
       mutation.mutate({
         nonce: crypto.randomUUID(),
+        marketId: `${baseSymbol}/${quoteSymbol}`,
         type: 'limit',
-        instrument: baseSymbol + quoteSymbol,
         side: side,
         amount: Number(amount),
-        price: Number(price),
-        timeInForce: { type: 'GoodTillCancelled' }
+        price: Number(price)
       })
     }
   }

@@ -1,12 +1,19 @@
 package co.chainring.apps.api
 
+import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.OrderApiResponse
 import co.chainring.apps.api.model.OrdersApiResponse
+import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.TradesApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
-import co.chainring.core.model.OrderId
+import co.chainring.apps.api.model.errorResponse
+import co.chainring.core.model.db.MarketEntity
+import co.chainring.core.model.db.OrderEntity
+import co.chainring.core.model.db.OrderId
+import co.chainring.core.model.db.OrderStatus
+import co.chainring.core.model.db.OrderType
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toInstant
@@ -25,6 +32,7 @@ import org.http4k.format.KotlinxSerialization.auto
 import org.http4k.lens.Path
 import org.http4k.lens.Query
 import org.http4k.lens.string
+import org.jetbrains.exposed.sql.transactions.transaction
 
 object OrderRoutes {
     private val logger = KotlinLogging.logger {}
@@ -38,20 +46,50 @@ object OrderRoutes {
         return "orders" meta {
             operationId = "create-order"
             summary = "Create order"
+            receiving(
+                requestBody to Examples.crateMarketOrderRequest,
+            )
+            receiving(
+                requestBody to Examples.crateLimitOrderRequest,
+            )
             returning(
                 Status.CREATED,
                 responseBody to Examples.marketOrderResponse,
             )
+            returning(
+                Status.CREATED,
+                responseBody to Examples.limitOrderResponse,
+            )
         } bindContract Method.POST to { request ->
             val apiRequest: CreateOrderApiRequest = requestBody(request)
 
-            logger.debug {
-                Json.encodeToString(apiRequest)
-            }
+            transaction {
+                when (val market = MarketEntity.findById(apiRequest.marketId)) {
+                    null -> errorResponse(Status.BAD_REQUEST, ApiError(ReasonCode.MarketNotSupported, "Market is not supported"))
 
-            Response(Status.CREATED).with(
-                responseBody of Examples.marketOrderResponse,
-            )
+                    else -> {
+                        val order = OrderEntity.findByNonce(nonce = apiRequest.nonce)
+                            ?: OrderEntity.create(
+                                nonce = apiRequest.nonce,
+                                market = market,
+                                type = when (apiRequest) {
+                                    is CreateOrderApiRequest.Market -> OrderType.Market
+                                    is CreateOrderApiRequest.Limit -> OrderType.Limit
+                                },
+                                side = apiRequest.side,
+                                amount = apiRequest.amount,
+                                price = when (apiRequest) {
+                                    is CreateOrderApiRequest.Market -> null
+                                    is CreateOrderApiRequest.Limit -> apiRequest.price
+                                },
+                            )
+
+                        Response(Status.CREATED).with(
+                            responseBody of order.toOrderResponse(),
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -62,20 +100,44 @@ object OrderRoutes {
         return "orders" / orderIdPathParam meta {
             operationId = "update-order"
             summary = "Update order"
+            receiving(
+                requestBody to Examples.updateMarketOrderRequest,
+            )
+            receiving(
+                requestBody to Examples.updateLimitOrderRequest,
+            )
             returning(
                 Status.OK,
                 responseBody to Examples.marketOrderResponse,
             )
+            returning(
+                Status.OK,
+                responseBody to Examples.limitOrderResponse,
+            )
         } bindContract Method.PATCH to { orderId ->
             fun handle(request: Request): Response {
                 val apiRequest: UpdateOrderApiRequest = requestBody(request)
+                return transaction {
+                    val order = OrderEntity.findById(orderId)
+                    when {
+                        order == null -> errorResponse(Status.NOT_FOUND, ApiError(ReasonCode.OrderNotFound, "Requested order does not exist"))
+                        order.status.isFinal() -> errorResponse(Status.BAD_REQUEST, ApiError(ReasonCode.OrderIsClosed, "Order is already finalized"))
 
-                logger.debug { orderId }
-                logger.debug { Json.encodeToString(apiRequest) }
+                        else -> {
+                            order.update(
+                                amount = apiRequest.amount,
+                                price = when (apiRequest) {
+                                    is UpdateOrderApiRequest.Market -> null
+                                    is UpdateOrderApiRequest.Limit -> apiRequest.price
+                                },
+                            )
 
-                return Response(Status.OK).with(
-                    responseBody of Examples.marketOrderResponse,
-                )
+                            Response(Status.OK).with(
+                                responseBody of order.toOrderResponse(),
+                            )
+                        }
+                    }
+                }
             }
             ::handle
         }
@@ -89,11 +151,21 @@ object OrderRoutes {
                 Status.NO_CONTENT,
             )
         } bindContract Method.DELETE to { orderId ->
-            fun handle(request: Request): Response {
-                logger.debug { orderId }
-                return Response(Status.NO_CONTENT)
+            { _: Request ->
+                transaction {
+                    val order = OrderEntity.findById(orderId)
+                    when {
+                        order == null -> errorResponse(Status.NOT_FOUND, ApiError(ReasonCode.OrderNotFound, "Requested order does not exist"))
+                        order.status == OrderStatus.Cancelled -> Response(Status.NO_CONTENT)
+                        order.status.isFinal() -> errorResponse(Status.BAD_REQUEST, ApiError(ReasonCode.OrderIsClosed, "Order is already finalized"))
+
+                        else -> {
+                            order.cancel()
+                            Response(Status.NO_CONTENT)
+                        }
+                    }
+                }
             }
-            ::handle
         }
     }
 
@@ -107,14 +179,21 @@ object OrderRoutes {
                 Status.OK,
                 responseBody to Examples.marketOrderResponse,
             )
+            returning(
+                Status.OK,
+                responseBody to Examples.limitOrderResponse,
+            )
         } bindContract Method.GET to { orderId ->
-            fun handle(request: Request): Response {
-                logger.debug { orderId }
-                return Response(Status.OK).with(
-                    responseBody of Examples.marketOrderResponse,
-                )
+            { _: Request ->
+                transaction {
+                    when (val order = OrderEntity.findById(orderId)) {
+                        null -> errorResponse(Status.NOT_FOUND, ApiError(ReasonCode.OrderNotFound, "Requested order does not exist"))
+                        else -> Response(Status.OK).with(
+                            responseBody of order.toOrderResponse(),
+                        )
+                    }
+                }
             }
-            ::handle
         }
     }
 
@@ -127,13 +206,17 @@ object OrderRoutes {
             returning(
                 Status.OK,
                 responseBody to OrdersApiResponse(
-                    orders = listOf(Examples.marketOrderResponse),
+                    orders = listOf(Examples.marketOrderResponse, Examples.limitOrderResponse),
                 ),
             )
         } bindContract Method.GET to { _ ->
+            val orders = transaction {
+                // TODO filter by current user
+                OrderEntity.findAll()
+            }
             Response(Status.OK).with(
                 responseBody of OrdersApiResponse(
-                    listOf(Examples.marketOrderResponse),
+                    orders = orders.map { it.toOrderResponse() },
                 ),
             )
         }
@@ -144,7 +227,11 @@ object OrderRoutes {
             operationId = "cancel-open-orders"
             summary = "Cancel open orders"
         } bindContract Method.DELETE to { _ ->
-            Response(Status.OK)
+            transaction {
+                // TODO filter by current user
+                OrderEntity.cancelAll()
+            }
+            Response(Status.NO_CONTENT)
         }
     }
 

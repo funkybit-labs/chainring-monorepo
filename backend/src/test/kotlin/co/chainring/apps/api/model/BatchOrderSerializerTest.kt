@@ -1,7 +1,8 @@
 package co.chainring.apps.api.model
 
-import co.chainring.core.model.Instrument
-import co.chainring.core.model.OrderId
+import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OrderId
+import co.chainring.core.model.db.OrderSide
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -12,8 +13,8 @@ class BatchOrderSerializerTest {
 
     private val createMarketOrderRequest = CreateOrderApiRequest.Market(
         nonce = "123",
-        instrument = Instrument("BTC/ETH"),
-        side = Order.Side.Buy,
+        marketId = MarketId("BTC/ETH"),
+        side = OrderSide.Buy,
         amount = BigDecimalJson("0.1"),
     )
 
@@ -21,7 +22,6 @@ class BatchOrderSerializerTest {
         id = OrderId.generate(),
         amount = BigDecimalJson("0.1"),
         price = BigDecimalJson("101"),
-        timeInForce = Order.TimeInForce.GoodTillCancelled,
     )
 
     @Test

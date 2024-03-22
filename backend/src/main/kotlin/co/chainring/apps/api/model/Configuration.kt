@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ConfigurationApiResponse(
     val chains: List<Chain>,
+    val markets: List<Market>,
 )
 
 @Serializable
@@ -37,4 +38,11 @@ data class NativeToken(
     val name: String,
     val symbol: Symbol,
     val decimals: UByte,
+)
+
+@Serializable
+data class Market(
+    val id: String,
+    val baseSymbol: Symbol,
+    val quoteSymbol: Symbol,
 )
