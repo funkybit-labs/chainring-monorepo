@@ -17,11 +17,11 @@ import java.math.BigInteger
 // kotlin does not have default serializers for BigDecimal/BigInteger type
 // Adding serializers and type aliases for convenience
 typealias BigDecimalJson =
-        @Serializable(with = BigDecimalSerializer::class)
-        BigDecimal
+    @Serializable(with = BigDecimalSerializer::class)
+    BigDecimal
 typealias BigIntegerJson =
-        @Serializable(with = BigIntegerSerializer::class)
-        BigInteger
+    @Serializable(with = BigIntegerSerializer::class)
+    BigInteger
 
 @OptIn(ExperimentalSerializationApi::class)
 private object BigDecimalSerializer : KSerializer<BigDecimal> {
