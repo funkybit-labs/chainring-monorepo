@@ -4,7 +4,6 @@ import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.model.Address
-import co.chainring.core.model.Symbol
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.TestBlockchainClient
@@ -36,20 +35,20 @@ class DepositAndWithdrawalTest {
         assertEquals(config.contracts[0].name, ContractType.Exchange.name)
         val client = BlockchainClient().loadExchangeContract(config.contracts[0].address)
         assertEquals(client.version.send().toInt(), 1)
-        val usdcToken = config.erc20Tokens.firstOrNull { it.symbol.value == "USDC" }
+        val usdcToken = config.symbols.firstOrNull { it.name == "USDC" }
         assertNotNull(usdcToken)
 
-        assertNotNull(config.nativeToken)
-        assertEquals(Symbol("ETH"), config.nativeToken.symbol)
-        assertEquals(18.toUByte(), config.nativeToken.decimals)
+        val nativeToken = config.symbols.first { it.contractAddress == null }
+        assertEquals("ETH", nativeToken.name)
+        assertEquals(18.toUByte(), nativeToken.decimals)
     }
 
     @Test
     fun testERC20DepositsAndWithdrawals() {
         val apiClient = ApiClient()
         val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.chainId }!!
-        val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.erc20Tokens)
-        val decimals = config.erc20Tokens.first { it.symbol.value == "USDC" }.decimals.toInt()
+        val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.symbols)
+        val decimals = config.symbols.first { it.name == "USDC" }.decimals.toInt()
 
         // mint some USDC
         val startingUsdcWalletBalance = wallet.getWalletERC20Balance("USDC")
@@ -74,8 +73,8 @@ class DepositAndWithdrawalTest {
     fun testNativeDepositsAndWithdrawals() {
         val apiClient = ApiClient()
         val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.chainId }!!
-        val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.erc20Tokens)
-        val decimals = config.nativeToken.decimals.toInt()
+        val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.symbols)
+        val decimals = config.symbols.first { it.contractAddress == null }.decimals.toInt()
 
         val startingWalletBalance = wallet.getWalletNativeBalance()
         val startingExchangeBalance = wallet.getExchangeNativeBalance()

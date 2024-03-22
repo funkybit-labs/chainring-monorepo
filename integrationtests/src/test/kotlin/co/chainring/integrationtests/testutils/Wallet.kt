@@ -1,7 +1,7 @@
 package co.chainring.integrationtests.testutils
 
 import co.chainring.apps.api.model.DeployedContract
-import co.chainring.apps.api.model.ERC20Token
+import co.chainring.apps.api.model.Symbol
 import co.chainring.contracts.generated.Exchange
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.model.Address
@@ -17,7 +17,7 @@ class Wallet(
     val blockchainClient: TestBlockchainClient,
     val walletKeypair: TestWalletKeypair,
     val contracts: List<DeployedContract>,
-    val erc20Tokens: List<ERC20Token>,
+    val erc20Tokens: List<Symbol>,
 ) {
 
     private val exchangeContractAddress = contracts.first { it.name == ContractType.Exchange.name }.address
@@ -36,7 +36,7 @@ class Wallet(
     }
 
     fun getExchangeERC20Balance(symbol: String): BigInteger {
-        return exchangeContract.balances(walletKeypair.address.value, erc20Token(symbol).address.value).send()
+        return exchangeContract.balances(walletKeypair.address.value, erc20TokenAddress(symbol)).send()
     }
 
     fun getExchangeNativeBalance(): BigInteger {
@@ -45,11 +45,11 @@ class Wallet(
 
     fun depositERC20(symbol: String, amount: BigInteger): TransactionReceipt {
         loadErc20Contract(symbol).approve(exchangeContractAddress.value, amount).send()
-        return exchangeContract.deposit(erc20Token(symbol).address.value, amount).send()
+        return exchangeContract.deposit(erc20TokenAddress(symbol), amount).send()
     }
 
     fun withdrawERC20(symbol: String, amount: BigInteger): TransactionReceipt {
-        return exchangeContract.withdraw(erc20Token(symbol).address.value, amount).send()
+        return exchangeContract.withdraw(erc20TokenAddress(symbol), amount).send()
     }
 
     fun withdrawNative(amount: BigInteger): TransactionReceipt {
@@ -60,7 +60,8 @@ class Wallet(
         return blockchainClient.depositNative(exchangeContractAddress, amount)
     }
 
-    private fun loadErc20Contract(symbol: String) = blockchainClient.loadERC20Mock(erc20Token(symbol).address.value)
+    private fun loadErc20Contract(symbol: String) = blockchainClient.loadERC20Mock(erc20TokenAddress(symbol))
 
-    private fun erc20Token(symbol: String) = erc20Tokens.first { it.symbol.value == symbol }
+    private fun erc20TokenAddress(symbol: String) =
+        erc20Tokens.first { it.name == symbol && it.contractAddress != null }.contractAddress!!.value
 }

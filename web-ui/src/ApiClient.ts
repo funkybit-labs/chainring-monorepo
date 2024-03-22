@@ -14,29 +14,19 @@ const DeployedContractSchema = z.object({
 
 export type DeployedContract = z.infer<typeof DeployedContractSchema>
 
-const ERC20TokenSchema = z.object({
+const SymbolSchema = z.object({
   name: z.string(),
-  symbol: z.string(),
-  address: AddressSchema,
+  description: z.string(),
+  contractAddress: AddressSchema.nullable(),
   decimals: z.number()
 })
 
-export type ERC20Token = z.infer<typeof ERC20TokenSchema>
-
-const NativeTokenSchema = z.object({
-  name: z.string(),
-  symbol: z.string(),
-  decimals: z.number()
-})
-export type NativeToken = z.infer<typeof NativeTokenSchema>
-
-export type Token = NativeToken | ERC20Token
+export type TradingSymbol = z.infer<typeof SymbolSchema>
 
 const ChainSchema = z.object({
   id: z.number(),
   contracts: z.array(DeployedContractSchema),
-  erc20Tokens: z.array(ERC20TokenSchema),
-  nativeToken: NativeTokenSchema
+  symbols: z.array(SymbolSchema)
 })
 export type Chain = z.infer<typeof ChainSchema>
 
@@ -90,10 +80,10 @@ export type OrderExecution = z.infer<typeof OrderExecutionSchema>
 
 const OrderTimingSchema = z.object({
   createdAt: z.coerce.date(),
-  updatedAt: z.coerce.date().optional(),
-  filledAt: z.coerce.date().optional(),
-  closedAt: z.coerce.date().optional(),
-  expiredAt: z.coerce.date().optional()
+  updatedAt: z.coerce.date().nullable(),
+  filledAt: z.coerce.date().nullable(),
+  closedAt: z.coerce.date().nullable(),
+  expiredAt: z.coerce.date().nullable()
 })
 export type OrderTiming = z.infer<typeof OrderTimingSchema>
 

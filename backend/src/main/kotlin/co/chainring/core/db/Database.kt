@@ -8,6 +8,7 @@ import co.chainring.core.model.db.migrations.V5_ChainTable
 import co.chainring.core.model.db.migrations.V6_MarketTable
 import co.chainring.core.model.db.migrations.V7_OrderTable
 import co.chainring.core.model.db.migrations.V8_ExecutionsAndTrades
+import co.chainring.core.model.db.migrations.V9_SymbolTable
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.apache.commons.dbcp2.BasicDataSource
@@ -91,4 +92,5 @@ val migrations = listOf(
     V6_MarketTable(),
     V7_OrderTable(),
     V8_ExecutionsAndTrades(),
+    V9_SymbolTable(),
 )

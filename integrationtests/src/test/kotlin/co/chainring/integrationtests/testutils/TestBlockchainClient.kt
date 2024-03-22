@@ -4,8 +4,7 @@ import co.chainring.contracts.generated.MockERC20
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.model.Address
-import co.chainring.core.model.Symbol
-import co.chainring.core.model.db.ERC20TokenEntity
+import co.chainring.core.model.db.SymbolEntity
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.Transfer
@@ -14,9 +13,9 @@ import java.math.BigInteger
 
 class TestBlockchainClient(val config: BlockchainClientConfig = BlockchainClientConfig()) : BlockchainClient(config) {
 
-    fun deployERC20Mock(symbol: String, name: String): MockERC20 {
-        val contract = MockERC20.deploy(web3j, transactionManager, gasProvider, "USDC", "USDC").send()
-        ERC20TokenEntity.create(Symbol("USDC"), name, chainId, Address(contract.contractAddress), 18.toUByte())
+    fun deployERC20Mock(symbol: String, description: String): MockERC20 {
+        val contract = MockERC20.deploy(web3j, transactionManager, gasProvider, description, symbol).send()
+        SymbolEntity.create(symbol, chainId, Address(contract.contractAddress), 18.toUByte(), description)
         return contract
     }
 

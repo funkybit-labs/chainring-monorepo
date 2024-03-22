@@ -3,16 +3,14 @@ package co.chainring.apps.api
 import co.chainring.apps.api.model.Chain
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.DeployedContract
-import co.chainring.apps.api.model.ERC20Token
 import co.chainring.apps.api.model.Market
-import co.chainring.apps.api.model.NativeToken
+import co.chainring.apps.api.model.Symbol
 import co.chainring.core.model.Address
-import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainEntity
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
-import co.chainring.core.model.db.ERC20TokenEntity
 import co.chainring.core.model.db.MarketEntity
+import co.chainring.core.model.db.SymbolEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.meta
@@ -46,18 +44,19 @@ object ConfigRoutes {
                                         address = Address("0x0000000000000000000000000000000000000000"),
                                     ),
                                 ),
-                                erc20Tokens = listOf(
-                                    ERC20Token(
-                                        name = "USD Coin",
-                                        symbol = Symbol("USDC"),
-                                        address = Address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
+                                symbols = listOf(
+                                    Symbol(
+                                        name = "ETH",
+                                        description = "Ethereum",
+                                        contractAddress = null,
                                         decimals = 18u,
                                     ),
-                                ),
-                                nativeToken = NativeToken(
-                                    name = "Ethereum",
-                                    symbol = Symbol("ETH"),
-                                    decimals = 18u,
+                                    Symbol(
+                                        name = "USDC",
+                                        description = "USD Coin",
+                                        contractAddress = Address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
+                                        decimals = 18u,
+                                    ),
                                 ),
                             ),
                         ),
@@ -84,26 +83,21 @@ object ConfigRoutes {
                                             address = it.proxyAddress ?: it.implementationAddress,
                                         )
                                     },
-                                    erc20Tokens = ERC20TokenEntity.forChain(chain.id.value).map {
-                                        ERC20Token(
+                                    symbols = SymbolEntity.forChain(chain.id.value).map {
+                                        Symbol(
                                             name = it.name,
-                                            symbol = it.symbol,
-                                            address = it.address,
+                                            description = it.description,
+                                            contractAddress = it.contractAddress,
                                             decimals = 18u,
                                         )
                                     },
-                                    nativeToken = NativeToken(
-                                        name = chain.nativeTokenName,
-                                        symbol = chain.nativeTokenSymbol,
-                                        decimals = chain.nativeTokenDecimals,
-                                    ),
                                 )
                             },
                             markets = MarketEntity.all().map { market ->
                                 Market(
                                     id = market.id.value.toString(),
-                                    baseSymbol = Symbol(market.baseSymbol),
-                                    quoteSymbol = Symbol(market.quoteSymbol),
+                                    baseSymbol = Symbol(market.baseSymbolGuid),
+                                    quoteSymbol = Symbol(market.quoteSymbolGuid),
                                 )
                             },
                         ),

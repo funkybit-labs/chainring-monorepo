@@ -6,7 +6,7 @@ import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.db.DbConfig
 import co.chainring.core.model.db.DeployedSmartContractEntity
-import co.chainring.core.model.db.ERC20TokenEntity
+import co.chainring.core.model.db.SymbolEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.awaitility.kotlin.await
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -51,10 +51,10 @@ class AppUnderTestRunner : BeforeAllCallback {
 
                         // if we have no USDC mock ERC20 contract, deploy it.
                         transaction {
-                            val allTokens = transaction {
-                                ERC20TokenEntity.all()
+                            val allSymbols = transaction {
+                                SymbolEntity.all()
                             }
-                            if (allTokens.firstOrNull { it.symbol.value == "USDC" } == null) {
+                            if (allSymbols.firstOrNull { it.name == "USDC" } == null) {
                                 blockchainClient.deployERC20Mock("USDC", "USD Coin")
                             }
                         }

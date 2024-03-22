@@ -1,5 +1,5 @@
 import { Address, formatUnits } from 'viem'
-import { Token, ERC20Token, NativeToken } from 'ApiClient'
+import { TradingSymbol } from 'ApiClient'
 import { useBlockNumber, useReadContract, useReadContracts } from 'wagmi'
 import { ExchangeAbi } from 'contracts'
 import Spinner from 'components/common/Spinner'
@@ -14,13 +14,11 @@ import { Button } from 'components/common/Button'
 export default function Balances({
   walletAddress,
   exchangeContractAddress,
-  nativeToken,
-  erc20Tokens
+  symbols
 }: {
   walletAddress: Address
   exchangeContractAddress: Address
-  nativeToken: NativeToken
-  erc20Tokens: ERC20Token[]
+  symbols: TradingSymbol[]
 }) {
   return (
     <Widget
@@ -29,8 +27,7 @@ export default function Balances({
         <BalancesTable
           walletAddress={walletAddress}
           exchangeContractAddress={exchangeContractAddress}
-          nativeToken={nativeToken}
-          erc20Tokens={erc20Tokens}
+          symbols={symbols}
         />
       }
     />
@@ -40,20 +37,25 @@ export default function Balances({
 function BalancesTable({
   walletAddress,
   exchangeContractAddress,
-  nativeToken,
-  erc20Tokens
+  symbols
 }: {
   walletAddress: Address
   exchangeContractAddress: Address
-  erc20Tokens: ERC20Token[]
-  nativeToken: NativeToken
+  symbols: TradingSymbol[]
 }) {
   const queryClient = useQueryClient()
-  const [depositToken, setDepositToken] = useState<Token | null>(null)
+  const [depositSymbol, setDepositSymbol] = useState<TradingSymbol | null>(null)
   const [showDepositModal, setShowDepositModal] = useState<boolean>(false)
 
-  const [withdrawToken, setWithdrawToken] = useState<Token | null>(null)
+  const [withdrawSymbol, setWithdrawSymbol] = useState<TradingSymbol | null>(
+    null
+  )
   const [showWithdrawalModal, setShowWithdrawalModal] = useState<boolean>(false)
+
+  const nativeSymbol = symbols.find((symbol) => symbol.contractAddress == null)
+  const erc20Symbols = symbols.filter(
+    (symbol) => symbol.contractAddress != null
+  )
 
   const nativeBalanceQuery = useReadContract({
     abi: ExchangeAbi,
@@ -63,12 +65,12 @@ function BalancesTable({
   })
 
   const erc20TokenBalancesQuery = useReadContracts({
-    contracts: erc20Tokens.map((token) => {
+    contracts: erc20Symbols.map((symbol) => {
       return {
         abi: ExchangeAbi,
         address: exchangeContractAddress,
         functionName: 'balances',
-        args: [walletAddress, token.address]
+        args: [walletAddress, symbol.contractAddress]
       }
     })
   })
@@ -100,23 +102,24 @@ function BalancesTable({
   if (
     nativeBalanceQuery.error ||
     erc20TokenBalancesQuery.error ||
-    erc20TokenBalancesQuery.data.some((br) => br.status === 'failure')
+    erc20TokenBalancesQuery.data.some((br) => br.status === 'failure') ||
+    nativeSymbol == undefined
   ) {
     return 'Failed to get balances'
   }
 
   const balances = [
-    { token: nativeToken, amount: nativeBalanceQuery.data }
+    { symbol: nativeSymbol, amount: nativeBalanceQuery.data }
   ].concat(
-    erc20Tokens
-      .map((token, i) => {
+    erc20Symbols
+      .map((symbol, i) => {
         const tokenBalanceResult = erc20TokenBalancesQuery.data[i]
         const balance = tokenBalanceResult.result
         if (
           tokenBalanceResult.status === 'success' &&
           typeof balance === 'bigint'
         ) {
-          return { token, amount: balance }
+          return { symbol, amount: balance }
         } else {
           return null
         }
@@ -124,13 +127,13 @@ function BalancesTable({
       .filter(isNotNullable)
   )
 
-  function openDepositModal(token: Token) {
-    setDepositToken(token)
+  function openDepositModal(symbol: TradingSymbol) {
+    setDepositSymbol(symbol)
     setShowDepositModal(true)
   }
 
-  function openWithdrawModal(token: Token) {
-    setWithdrawToken(token)
+  function openWithdrawModal(symbol: TradingSymbol) {
+    setWithdrawSymbol(symbol)
     setShowWithdrawalModal(true)
   }
 
@@ -138,28 +141,28 @@ function BalancesTable({
     <>
       <table>
         <tbody>
-          {balances.map((tokenBalance) => {
+          {balances.map((symbolBalance) => {
             return (
-              <tr key={tokenBalance.token.symbol}>
-                <td className="min-w-12 pr-2">{tokenBalance.token.symbol}</td>
+              <tr key={symbolBalance.symbol.name}>
+                <td className="min-w-12 pr-2">{symbolBalance.symbol.name}</td>
                 <td className="min-w-12 px-4 text-left">
                   {formatUnits(
-                    tokenBalance.amount,
-                    tokenBalance.token.decimals
+                    symbolBalance.amount,
+                    symbolBalance.symbol.decimals
                   )}
                 </td>
                 <td className="px-2 py-1">
                   <Button
                     caption={() => <>Deposit</>}
-                    onClick={() => openDepositModal(tokenBalance.token)}
+                    onClick={() => openDepositModal(symbolBalance.symbol)}
                     disabled={false}
                   />
                 </td>
                 <td className="py-1 pl-2">
                   <Button
                     caption={() => <>Withdraw</>}
-                    onClick={() => openWithdrawModal(tokenBalance.token)}
-                    disabled={tokenBalance.amount === 0n}
+                    onClick={() => openWithdrawModal(symbolBalance.symbol)}
+                    disabled={symbolBalance.amount === 0n}
                   />
                 </td>
               </tr>
@@ -168,25 +171,25 @@ function BalancesTable({
         </tbody>
       </table>
 
-      {depositToken && (
+      {depositSymbol && (
         <DepositModal
           isOpen={showDepositModal}
           exchangeContractAddress={exchangeContractAddress}
           walletAddress={walletAddress}
-          token={depositToken}
+          symbol={depositSymbol}
           close={() => setShowDepositModal(false)}
-          onClosed={() => setDepositToken(null)}
+          onClosed={() => setDepositSymbol(null)}
         />
       )}
 
-      {withdrawToken && (
+      {withdrawSymbol && (
         <WithdrawalModal
           isOpen={showWithdrawalModal}
           exchangeContractAddress={exchangeContractAddress}
           walletAddress={walletAddress}
-          token={withdrawToken}
+          symbol={withdrawSymbol}
           close={() => setShowWithdrawalModal(false)}
-          onClosed={() => setWithdrawToken(null)}
+          onClosed={() => setWithdrawSymbol(null)}
         />
       )}
     </>

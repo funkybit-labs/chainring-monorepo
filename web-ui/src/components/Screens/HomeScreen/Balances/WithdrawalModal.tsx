@@ -6,20 +6,20 @@ import { readContract, waitForTransactionReceipt } from 'wagmi/actions'
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import { Token } from 'ApiClient'
+import { TradingSymbol } from 'ApiClient'
 import { useQuery } from '@tanstack/react-query'
 
 export default function WithdrawalModal({
   exchangeContractAddress,
   walletAddress,
-  token,
+  symbol,
   isOpen,
   close,
   onClosed
 }: {
   exchangeContractAddress: Address
   walletAddress: Address
-  token: Token
+  symbol: TradingSymbol
   isOpen: boolean
   close: () => void
   onClosed: () => void
@@ -27,14 +27,14 @@ export default function WithdrawalModal({
   const config = useConfig()
 
   const availableBalanceQuery = useQuery({
-    queryKey: ['availableBalance', token.symbol],
+    queryKey: ['availableBalance', symbol.name],
     queryFn: async function () {
-      return 'address' in token
+      return symbol.contractAddress
         ? await readContract(config, {
             abi: ExchangeAbi,
             address: exchangeContractAddress,
             functionName: 'balances',
-            args: [walletAddress, token.address]
+            args: [walletAddress, symbol.contractAddress]
           })
         : await readContract(config, {
             abi: ExchangeAbi,
@@ -61,7 +61,7 @@ export default function WithdrawalModal({
 
     try {
       if (availableBalanceQuery.status == 'success') {
-        const parsedAmount = parseUnits(amount, token.decimals)
+        const parsedAmount = parseUnits(amount, symbol.decimals)
         return parsedAmount > 0 && parsedAmount <= availableBalanceQuery.data
       } else {
         return false
@@ -72,24 +72,23 @@ export default function WithdrawalModal({
   })()
 
   async function onSubmit() {
-    const parsedAmount = parseUnits(amount, token.decimals)
+    const parsedAmount = parseUnits(amount, symbol.decimals)
     if (canSubmit) {
       try {
         setSubmitPhase('waitingForTxApproval')
-        const hash =
-          'address' in token
-            ? await writeContractAsync({
-                abi: ExchangeAbi,
-                address: exchangeContractAddress,
-                functionName: 'withdraw',
-                args: [token.address, parsedAmount]
-              })
-            : await writeContractAsync({
-                abi: ExchangeAbi,
-                address: exchangeContractAddress,
-                functionName: 'withdraw',
-                args: [parsedAmount]
-              })
+        const hash = symbol.contractAddress
+          ? await writeContractAsync({
+              abi: ExchangeAbi,
+              address: exchangeContractAddress,
+              functionName: 'withdraw',
+              args: [symbol.contractAddress, parsedAmount]
+            })
+          : await writeContractAsync({
+              abi: ExchangeAbi,
+              address: exchangeContractAddress,
+              functionName: 'withdraw',
+              args: [parsedAmount]
+            })
 
         setSubmitPhase('waitingForTxReceipt')
         await waitForTransactionReceipt(config, { hash })
@@ -109,7 +108,7 @@ export default function WithdrawalModal({
       isOpen={isOpen}
       close={close}
       onClosed={onClosed}
-      title={`Withdraw ${token.symbol}`}
+      title={`Withdraw ${symbol.name}`}
     >
       <div className="h-52 overflow-y-auto">
         <ModalAsyncContent
@@ -119,14 +118,14 @@ export default function WithdrawalModal({
               <>
                 <AmountInput
                   value={amount}
-                  symbol={token.symbol}
+                  symbol={symbol.name}
                   disabled={submitPhase !== null}
                   onChange={onAmountChange}
                 />
 
                 <p className="mt-1 text-center text-sm text-darkGray">
                   Available balance:{' '}
-                  {formatUnits(availableBalance, token.decimals)}
+                  {formatUnits(availableBalance, symbol.decimals)}
                 </p>
 
                 <SubmitButton

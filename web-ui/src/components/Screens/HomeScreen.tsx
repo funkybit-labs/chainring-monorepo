@@ -8,6 +8,13 @@ import Trade from 'components/Screens/HomeScreen/Trade'
 import { ExponentialBackoff, WebsocketBuilder } from 'websocket-ts'
 import { Prices } from 'components/Screens/HomeScreen/Prices'
 
+const websocketUrl =
+  apiBaseUrl.replace('http:', 'ws:').replace('https:', 'wss:') + '/connect'
+
+const ws = new WebsocketBuilder(websocketUrl)
+  .withBackoff(new ExponentialBackoff(1000, 4))
+  .build()
+
 export default function HomeScreen() {
   const configQuery = useQuery({
     queryKey: ['configuration'],
@@ -20,17 +27,11 @@ export default function HomeScreen() {
   const chainConfig = configQuery.data?.chains.find(
     (chain) => chain.id == wallet.chainId
   )
+
   const exchangeContract = chainConfig?.contracts?.find(
     (c) => c.name == 'Exchange'
   )
-
-  const nativeToken = chainConfig?.nativeToken
-  const erc20Tokens = chainConfig?.erc20Tokens
-  const ws = new WebsocketBuilder(
-    apiBaseUrl.replace('http:', 'ws:').replace('https:', 'wss:') + '/connect'
-  )
-    .withBackoff(new ExponentialBackoff(1000, 4))
-    .build()
+  const symbols = chainConfig?.symbols
 
   return (
     <div className="h-screen bg-gradient-to-b from-lightBackground to-darkBackground">
@@ -44,31 +45,22 @@ export default function HomeScreen() {
             <Prices ws={ws} />
           </div>
           <div className="flex flex-col">
-            {walletAddress &&
-              exchangeContract &&
-              erc20Tokens &&
-              nativeToken && (
-                <>
-                  <Trade baseSymbol={'ETH'} quoteSymbol={'USDC'} />
-                </>
-              )}
+            {walletAddress && exchangeContract && symbols && (
+              <>
+                <Trade baseSymbol={'ETH'} quoteSymbol={'USDC'} />
+              </>
+            )}
           </div>
-        </div>
-        <div className="flex px-4 pt-24">
-          <div className="flex flex-col items-center gap-4">
-            {walletAddress &&
-              exchangeContract &&
-              erc20Tokens &&
-              nativeToken && (
-                <>
-                  <Balances
-                    walletAddress={walletAddress}
-                    exchangeContractAddress={exchangeContract.address}
-                    nativeToken={nativeToken}
-                    erc20Tokens={erc20Tokens}
-                  />
-                </>
-              )}
+          <div className="flex flex-col">
+            {walletAddress && exchangeContract && symbols && (
+              <>
+                <Balances
+                  walletAddress={walletAddress}
+                  exchangeContractAddress={exchangeContract.address}
+                  symbols={symbols}
+                />
+              </>
+            )}
           </div>
         </div>
       </div>
