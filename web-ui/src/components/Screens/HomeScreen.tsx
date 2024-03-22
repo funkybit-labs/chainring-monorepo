@@ -45,7 +45,7 @@ export default function HomeScreen() {
               erc20Tokens &&
               nativeToken && (
                 <>
-                  <Trade baseSymbol={'BTC'} quoteSymbol={'ETH'} />
+                  <Trade baseSymbol={'ETH'} quoteSymbol={'USDC'} />
                 </>
               )}
           </div>

@@ -6,7 +6,7 @@ import co.chainring.apps.api.model.LastTradeDirection
 import co.chainring.apps.api.model.OrderBook
 import co.chainring.apps.api.model.OrderBookEntry
 import co.chainring.apps.api.model.OutgoingWSMessage
-import co.chainring.core.model.Instrument
+import co.chainring.core.model.db.MarketId
 import co.chainring.core.utils.Timer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.encodeToString
@@ -19,17 +19,17 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.random.Random
 
 class Broadcaster {
-    private val subscriptions = ConcurrentHashMap<Instrument, CopyOnWriteArrayList<Websocket>>()
+    private val subscriptions = ConcurrentHashMap<MarketId, CopyOnWriteArrayList<Websocket>>()
     private val logger = KotlinLogging.logger {}
     private val rnd = Random(0)
 
-    fun subscribe(instrument: Instrument, websocket: Websocket) {
+    fun subscribe(instrument: MarketId, websocket: Websocket) {
         subscriptions.getOrPut(instrument) { CopyOnWriteArrayList<Websocket>() }.add(websocket)
         sendOrderBook(instrument, websocket)
     }
 
-    fun unsubscribe(instrument: Instrument, websocket: Websocket) {
-        subscriptions[instrument]?.remove(websocket)
+    fun unsubscribe(marketId: MarketId, websocket: Websocket) {
+        subscriptions[marketId]?.remove(websocket)
     }
 
     fun unsubscribe(websocket: Websocket) {
@@ -57,11 +57,11 @@ class Broadcaster {
         }
     }
 
-    private fun sendOrderBook(instrument: Instrument, websocket: Websocket) {
+    private fun sendOrderBook(marketId: MarketId, websocket: Websocket) {
         fun stutter() = rnd.nextDouble(-0.5, 0.5)
         val lastStutter = stutter() / 3.0
         val orderBook = OrderBook(
-            instrument = instrument,
+            marketId = marketId,
             last = LastTrade(String.format("%.2f", (17.5 + lastStutter)), if (lastStutter > 0) LastTradeDirection.Up else LastTradeDirection.Down),
             buy = listOf(
                 OrderBookEntry("17.75", BigDecimalJson(2.3 + stutter())),

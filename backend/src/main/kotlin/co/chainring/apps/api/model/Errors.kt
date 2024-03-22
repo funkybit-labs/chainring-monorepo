@@ -21,8 +21,12 @@ data class ApiErrors(val errors: List<ApiError>)
 
 @Serializable
 enum class ReasonCode {
+    MarketNotSupported,
+
+    OrderNotFound,
+    OrderIsClosed,
+
     UnexpectedError,
-    TimeoutError,
 }
 
 val jsonWithDefaults = Json { encodeDefaults = true }
@@ -36,3 +40,10 @@ fun errorResponse(
     Response(status)
         .body(jsonWithDefaults.encodeToString(ApiErrors(listOf(error))))
         .with(Header.CONTENT_TYPE of ContentType.APPLICATION_JSON)
+
+fun notFoundError(reason: ReasonCode, message: String): Response = errorResponse(Status.NOT_FOUND, ApiError(reason, message))
+fun badRequestError(reason: ReasonCode, message: String): Response = errorResponse(Status.BAD_REQUEST, ApiError(reason, message))
+
+val marketNotSupportedError = badRequestError(ReasonCode.MarketNotSupported, "Market is not supported")
+val orderNotFoundError = notFoundError(ReasonCode.OrderNotFound, "Requested order does not exist")
+val orderIsClosedError = badRequestError(ReasonCode.OrderIsClosed, "Order is already finalized")

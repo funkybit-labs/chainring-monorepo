@@ -4,6 +4,7 @@ import co.chainring.apps.api.model.Chain
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.DeployedContract
 import co.chainring.apps.api.model.ERC20Token
+import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.NativeToken
 import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
@@ -11,6 +12,7 @@ import co.chainring.core.model.db.ChainEntity
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.ERC20TokenEntity
+import co.chainring.core.model.db.MarketEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.meta
@@ -59,6 +61,13 @@ object ConfigRoutes {
                                 ),
                             ),
                         ),
+                        markets = listOf(
+                            Market(
+                                id = "USDC/DAI",
+                                baseSymbol = Symbol("USDC"),
+                                quoteSymbol = Symbol("DAI"),
+                            ),
+                        ),
                     ),
             )
         } bindContract Method.GET to { _ ->
@@ -88,6 +97,13 @@ object ConfigRoutes {
                                         symbol = chain.nativeTokenSymbol,
                                         decimals = chain.nativeTokenDecimals,
                                     ),
+                                )
+                            },
+                            markets = MarketEntity.all().map { market ->
+                                Market(
+                                    id = market.id.value.toString(),
+                                    baseSymbol = Symbol(market.baseSymbol),
+                                    quoteSymbol = Symbol(market.quoteSymbol),
                                 )
                             },
                         ),

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Widget } from 'components/common/Widget'
 import SubmitButton from 'components/common/SubmitButton'
+import { parseUnits } from 'viem'
 
 export default function Trade({
   baseSymbol,
@@ -21,20 +22,19 @@ export default function Trade({
     if (isMarketOrder) {
       mutation.mutate({
         nonce: crypto.randomUUID(),
+        marketId: `${baseSymbol}/${quoteSymbol}`,
         type: 'market',
-        instrument: baseSymbol + quoteSymbol,
         side: side,
-        amount: Number(amount)
+        amount: Number(parseUnits(amount, 18))
       })
     } else {
       mutation.mutate({
         nonce: crypto.randomUUID(),
+        marketId: `${baseSymbol}/${quoteSymbol}`,
         type: 'limit',
-        instrument: baseSymbol + quoteSymbol,
         side: side,
-        amount: Number(amount),
-        price: Number(price),
-        timeInForce: { type: 'GoodTillCancelled' }
+        amount: Number(parseUnits(amount, 18)),
+        price: Number(parseUnits(price, 18))
       })
     }
   }

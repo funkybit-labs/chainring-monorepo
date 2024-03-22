@@ -50,17 +50,10 @@ export type ConfigurationApiResponse = z.infer<
 const OrderSideSchema = z.enum(['Buy', 'Sell'])
 export type OrderSide = z.infer<typeof OrderSideSchema>
 
-const TimeInForceSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('GoodTillCancelled') }),
-  z.object({ type: z.literal('GoodTillTime'), timestamp: z.number() }),
-  z.object({ type: z.literal('ImmediateOrCancel') })
-])
-export type TimeInForce = z.infer<typeof TimeInForceSchema>
-
 const CreateMarketOrderSchema = z.object({
   nonce: z.string(),
   type: z.literal('market'),
-  instrument: z.string(),
+  marketId: z.string(),
   side: OrderSideSchema,
   amount: z.number()
 })
@@ -69,11 +62,10 @@ export type CreateMarketOrder = z.infer<typeof CreateMarketOrderSchema>
 const CreateLimitOrderSchema = z.object({
   nonce: z.string(),
   type: z.literal('limit'),
-  instrument: z.string(),
+  marketId: z.string(),
   side: OrderSideSchema,
   amount: z.number(),
-  price: z.number(),
-  timeInForce: TimeInForceSchema
+  price: z.number()
 })
 export type CreateLimitOrder = z.infer<typeof CreateLimitOrderSchema>
 
@@ -103,7 +95,7 @@ const MarketOrderSchema = z.object({
   id: z.string(),
   type: z.literal('market'),
   status: z.string(),
-  instrument: z.string(),
+  marketId: z.string(),
   side: OrderSideSchema,
   amount: z.number(),
   originalAmount: z.number(),
@@ -116,14 +108,13 @@ const LimitOrderSchema = z.object({
   id: z.string(),
   type: z.literal('limit'),
   status: z.string(),
-  instrument: z.string(),
+  marketId: z.string(),
   side: OrderSideSchema,
   amount: z.number(),
   price: z.number(),
   originalAmount: z.number(),
   execution: OrderExecutionSchema.optional(),
-  timing: OrderTimingSchema,
-  timeInForce: TimeInForceSchema
+  timing: OrderTimingSchema
 })
 export type LimitOrder = z.infer<typeof LimitOrderSchema>
 
