@@ -14,11 +14,12 @@ import kotlinx.serialization.json.Json
 import org.http4k.websocket.Websocket
 import org.http4k.websocket.WsMessage
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.random.Random
 
 class Broadcaster {
-    private val subscriptions = mutableMapOf<Instrument, CopyOnWriteArrayList<Websocket>>()
+    private val subscriptions = ConcurrentHashMap<Instrument, CopyOnWriteArrayList<Websocket>>()
     private val logger = KotlinLogging.logger {}
     private val rnd = Random(0)
 

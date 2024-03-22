@@ -1,6 +1,6 @@
 import { Widget } from 'components/common/Widget'
 import { calculateTickSpacing } from 'utils/orderBookUtils'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import Spinner from 'components/common/Spinner'
 import { Websocket, WebsocketEvent } from 'websocket-ts'
 import { OrderBook, OutgoingWSMessage } from 'ApiClient'
@@ -80,16 +80,6 @@ export function OrderBook({ ws }: { ws: Websocket }) {
     } else {
       ws.addEventListener(WebsocketEvent.open, subscribe)
     }
-    return () => {
-      ws.removeEventListener(WebsocketEvent.reconnect, subscribe)
-      ws.removeEventListener(WebsocketEvent.open, subscribe)
-      if (ws.readyState == WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'Unsubscribe', instrument: 'BTC/ETH' }))
-      }
-    }
-  }, [ws])
-
-  useEffect(() => {
     const handleMessage = (ws: Websocket, event: MessageEvent) => {
       const message = JSON.parse(event.data) as OutgoingWSMessage
       if (message.type == 'Publish' && message.data.type == 'OrderBook') {
@@ -100,6 +90,11 @@ export function OrderBook({ ws }: { ws: Websocket }) {
     ws.addEventListener(WebsocketEvent.message, handleMessage)
     return () => {
       ws.removeEventListener(WebsocketEvent.message, handleMessage)
+      ws.removeEventListener(WebsocketEvent.reconnect, subscribe)
+      ws.removeEventListener(WebsocketEvent.open, subscribe)
+      if (ws.readyState == WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'Unsubscribe', instrument: 'BTC/ETH' }))
+      }
     }
   }, [ws])
 
@@ -110,7 +105,7 @@ export function OrderBook({ ws }: { ws: Websocket }) {
         orderBook && params ? (
           <svg width={params.bookWidth} height={params.bookHeight}>
             {orderBook.buy.toReversed().map((l, i) => (
-              <>
+              <Fragment key={`${l.price}`}>
                 <text
                   x={0}
                   y={params.graphStartY + 4 + (i + 1) * params.barHeight}
@@ -126,7 +121,7 @@ export function OrderBook({ ws }: { ws: Websocket }) {
                   height={params.barHeight}
                   fill="#10A327"
                 />
-              </>
+              </Fragment>
             ))}
             <text
               x={0}
@@ -143,7 +138,7 @@ export function OrderBook({ ws }: { ws: Websocket }) {
               </tspan>
             </text>
             {orderBook.sell.map((l, i) => (
-              <>
+              <Fragment key={`${l.price}`}>
                 <text
                   x={0}
                   y={params.sellStartY + (i + 1) * params.barHeight - 4}
@@ -159,10 +154,10 @@ export function OrderBook({ ws }: { ws: Websocket }) {
                   height={params.barHeight}
                   fill="#7F1D1D"
                 />
-              </>
+              </Fragment>
             ))}
             {params.ticks.slice(1).map((tick, i) => (
-              <>
+              <Fragment key={`tick-${i}`}>
                 <text
                   x={
                     params.graphStartX +
@@ -195,7 +190,7 @@ export function OrderBook({ ws }: { ws: Websocket }) {
                   strokeDasharray={4}
                   strokeOpacity={0.7}
                 />
-              </>
+              </Fragment>
             ))}
           </svg>
         ) : (
