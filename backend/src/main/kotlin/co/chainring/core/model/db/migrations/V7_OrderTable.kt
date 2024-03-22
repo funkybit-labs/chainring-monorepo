@@ -58,9 +58,9 @@ class V7_OrderTable : Migration() {
             { value -> V7_OrderSide.valueOf(value as String) },
             { PGEnum("OrderSide", it) },
         )
-        val amount = decimal("amount", 30, 18)
-        val originalAmount = decimal("original_amount", 30, 18)
-        val price = decimal("price", 30, 18).nullable()
+        val amount = decimal("amount", 30, 0)
+        val originalAmount = decimal("original_amount", 30, 0)
+        val price = decimal("price", 30, 0).nullable()
         val updatedAt = timestamp("updated_at").nullable()
         val updatedBy = varchar("updated_by", 10485760).nullable()
         val closedAt = timestamp("closed_at").nullable()

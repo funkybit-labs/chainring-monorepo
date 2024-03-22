@@ -7,8 +7,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Balance(
     val symbol: Symbol,
-    val total: BigDecimalJson,
-    val available: BigDecimalJson,
+    val total: BigIntegerJson,
+    val available: BigIntegerJson,
     val lastUpdated: Instant,
 )
 

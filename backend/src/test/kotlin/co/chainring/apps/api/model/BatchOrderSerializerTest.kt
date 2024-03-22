@@ -15,13 +15,13 @@ class BatchOrderSerializerTest {
         nonce = "123",
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
-        amount = BigDecimalJson("0.1"),
+        amount = BigIntegerJson("100000"),
     )
 
     private val updateLimitOrderRequest = UpdateOrderApiRequest.Limit(
         id = OrderId.generate(),
-        amount = BigDecimalJson("0.1"),
-        price = BigDecimalJson("101"),
+        amount = BigIntegerJson("1000"),
+        price = BigIntegerJson("101000"),
     )
 
     @Test

@@ -9,7 +9,7 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.update
-import java.math.BigDecimal
+import java.math.BigInteger
 
 @Serializable
 @JvmInline
@@ -69,9 +69,9 @@ object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
         { value -> OrderSide.valueOf(value as String) },
         { PGEnum("OrderSide", it) },
     )
-    val amount = decimal("amount", 30, 18)
-    val originalAmount = decimal("original_amount", 30, 18)
-    val price = decimal("price", 30, 18).nullable()
+    val amount = decimal("amount", 30, 0)
+    val originalAmount = decimal("original_amount", 30, 0)
+    val price = decimal("price", 30, 0).nullable()
     val updatedAt = timestamp("updated_at").nullable()
     val updatedBy = varchar("updated_by", 10485760).nullable()
     val closedAt = timestamp("closed_at").nullable()
@@ -120,8 +120,8 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             market: MarketEntity,
             type: OrderType,
             side: OrderSide,
-            amount: BigDecimal,
-            price: BigDecimal?,
+            amount: BigInteger,
+            price: BigInteger?,
         ) = OrderEntity.new(OrderId.generate()) {
             val now = Clock.System.now()
             this.nonce = nonce
@@ -155,7 +155,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         }
     }
 
-    fun update(amount: BigDecimal, price: BigDecimal?) {
+    fun update(amount: BigInteger, price: BigInteger?) {
         val now = Clock.System.now()
         this.updatedAt = now
         this.amount = amount
@@ -176,9 +176,18 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
     var status by OrderTable.status
     var type by OrderTable.type
     var side by OrderTable.side
-    var amount by OrderTable.amount
-    var originalAmount by OrderTable.originalAmount
-    var price by OrderTable.price
+    var amount by OrderTable.amount.transform(
+        toReal = { it.toBigInteger() },
+        toColumn = { it.toBigDecimal() },
+    )
+    var originalAmount by OrderTable.originalAmount.transform(
+        toReal = { it.toBigInteger() },
+        toColumn = { it.toBigDecimal() },
+    )
+    var price by OrderTable.price.transform(
+        toReal = { it?.toBigInteger() },
+        toColumn = { it?.toBigDecimal() },
+    )
     var updatedAt by OrderTable.updatedAt
     var updatedBy by OrderTable.updatedBy
     var closedAt by OrderTable.closedAt

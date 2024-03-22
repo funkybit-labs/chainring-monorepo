@@ -13,6 +13,7 @@ import co.chainring.integrationtests.testutils.AbnormalApiResponseException
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.apiError
+import co.chainring.integrationtests.testutils.toFundamentalUnits
 import kotlinx.datetime.Clock
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -25,17 +26,15 @@ import kotlin.test.assertIs
 
 @ExtendWith(AppUnderTestRunner::class)
 class OrderRoutesApiTest {
-
     @Test
     fun `CRUD order`() {
         val apiClient = ApiClient()
-
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
             nonce = UUID.randomUUID().toString(),
             marketId = MarketId("USDC/DAI"),
             side = OrderSide.Buy,
-            amount = BigDecimal("0.01"),
-            price = BigDecimal("0.02"),
+            amount = BigDecimal("1").toFundamentalUnits(18),
+            price = BigDecimal("2").toFundamentalUnits(18),
         )
         val limitOrder = apiClient.createOrder(limitOrderApiRequest)
 
@@ -56,13 +55,13 @@ class OrderRoutesApiTest {
         val updatedOrder = apiClient.updateOrder(
             apiRequest = UpdateOrderApiRequest.Limit(
                 id = limitOrder.id,
-                amount = BigDecimal("0.03"),
-                price = BigDecimal("0.04"),
+                amount = BigDecimal("3").toFundamentalUnits(18),
+                price = BigDecimal("4").toFundamentalUnits(18),
             ),
         )
         assertIs<OrderApiResponse.Limit>(updatedOrder)
-        assertEquals(BigDecimal("0.03"), updatedOrder.amount)
-        assertEquals(BigDecimal("0.04"), updatedOrder.price)
+        assertEquals(BigDecimal("3").toFundamentalUnits(18), updatedOrder.amount)
+        assertEquals(BigDecimal("4").toFundamentalUnits(18), updatedOrder.price)
 
         // cancel order is idempotent
         apiClient.cancelOrder(limitOrder.id)
@@ -80,8 +79,8 @@ class OrderRoutesApiTest {
                 apiClient.updateOrder(
                     apiRequest = UpdateOrderApiRequest.Limit(
                         id = OrderId.generate(),
-                        amount = BigDecimal("0.03"),
-                        price = BigDecimal("0.04"),
+                        amount = BigDecimal("3").toFundamentalUnits(18),
+                        price = BigDecimal("4").toFundamentalUnits(18),
                     ),
                 )
             },
@@ -103,8 +102,8 @@ class OrderRoutesApiTest {
                 nonce = Clock.System.now().toEpochMilliseconds().toString(),
                 marketId = MarketId("USDC/DAI"),
                 side = OrderSide.Buy,
-                amount = BigDecimal("0.01"),
-                price = BigDecimal("0.02"),
+                amount = BigDecimal("1").toFundamentalUnits(18),
+                price = BigDecimal("2").toFundamentalUnits(18),
             ),
         )
         apiClient.cancelOrder(limitOrder.id)
@@ -112,8 +111,8 @@ class OrderRoutesApiTest {
             apiClient.updateOrder(
                 apiRequest = UpdateOrderApiRequest.Limit(
                     id = limitOrder.id,
-                    amount = BigDecimal("0.03"),
-                    price = BigDecimal("0.04"),
+                    amount = BigDecimal("3").toFundamentalUnits(18),
+                    price = BigDecimal("4").toFundamentalUnits(18),
                 ),
             )
         }.also {
@@ -133,8 +132,8 @@ class OrderRoutesApiTest {
             nonce = Clock.System.now().toEpochMilliseconds().toString(),
             marketId = MarketId("USDC/DAI"),
             side = OrderSide.Buy,
-            amount = BigDecimal("0.01"),
-            price = BigDecimal("0.02"),
+            amount = BigDecimal("1").toFundamentalUnits(18),
+            price = BigDecimal("2").toFundamentalUnits(18),
         )
         repeat(times = 10) {
             apiClient.createOrder(limitOrderApiRequest.copy(nonce = UUID.randomUUID().toString()))

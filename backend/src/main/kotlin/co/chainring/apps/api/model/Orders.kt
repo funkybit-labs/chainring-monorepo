@@ -15,9 +15,9 @@ object Order {
 
     @Serializable
     data class Execution(
-        val fee: BigDecimalJson,
+        val fee: BigIntegerJson,
         val feeSymbol: Symbol,
-        val amountExecuted: BigDecimalJson,
+        val amountExecuted: BigIntegerJson,
     )
 
     @Serializable
@@ -35,7 +35,7 @@ sealed class CreateOrderApiRequest {
     abstract val nonce: String
     abstract val marketId: MarketId
     abstract val side: OrderSide
-    abstract val amount: BigDecimalJson
+    abstract val amount: BigIntegerJson
 
     @Serializable
     @SerialName("market")
@@ -43,7 +43,7 @@ sealed class CreateOrderApiRequest {
         override val nonce: String,
         override val marketId: MarketId,
         override val side: OrderSide,
-        override val amount: BigDecimalJson,
+        override val amount: BigIntegerJson,
     ) : CreateOrderApiRequest()
 
     @Serializable
@@ -52,8 +52,8 @@ sealed class CreateOrderApiRequest {
         override val nonce: String,
         override val marketId: MarketId,
         override val side: OrderSide,
-        override val amount: BigDecimalJson,
-        val price: BigDecimalJson,
+        override val amount: BigIntegerJson,
+        val price: BigIntegerJson,
     ) : CreateOrderApiRequest()
 }
 
@@ -62,21 +62,21 @@ sealed class CreateOrderApiRequest {
 @JsonClassDiscriminator("type")
 sealed class UpdateOrderApiRequest {
     abstract val id: OrderId
-    abstract val amount: BigDecimalJson
+    abstract val amount: BigIntegerJson
 
     @Serializable
     @SerialName("market")
     data class Market(
         override val id: OrderId,
-        override val amount: BigDecimalJson,
+        override val amount: BigIntegerJson,
     ) : UpdateOrderApiRequest()
 
     @Serializable
     @SerialName("limit")
     data class Limit(
         override val id: OrderId,
-        override val amount: BigDecimalJson,
-        val price: BigDecimalJson,
+        override val amount: BigIntegerJson,
+        val price: BigIntegerJson,
     ) : UpdateOrderApiRequest()
 }
 
@@ -93,8 +93,8 @@ sealed class OrderApiResponse {
     abstract val status: OrderStatus
     abstract val marketId: MarketId
     abstract val side: OrderSide
-    abstract val amount: BigDecimalJson
-    abstract val originalAmount: BigDecimalJson
+    abstract val amount: BigIntegerJson
+    abstract val originalAmount: BigIntegerJson
     abstract val execution: Order.Execution?
     abstract val timing: Order.Timing
 
@@ -105,8 +105,8 @@ sealed class OrderApiResponse {
         override val status: OrderStatus,
         override val marketId: MarketId,
         override val side: OrderSide,
-        override val amount: BigDecimalJson,
-        override val originalAmount: BigDecimalJson,
+        override val amount: BigIntegerJson,
+        override val originalAmount: BigIntegerJson,
         override val execution: Order.Execution? = null,
         override val timing: Order.Timing,
     ) : OrderApiResponse()
@@ -118,9 +118,9 @@ sealed class OrderApiResponse {
         override val status: OrderStatus,
         override val marketId: MarketId,
         override val side: OrderSide,
-        override val amount: BigDecimalJson,
-        override val originalAmount: BigDecimalJson,
-        val price: BigDecimalJson,
+        override val amount: BigIntegerJson,
+        override val originalAmount: BigIntegerJson,
+        val price: BigIntegerJson,
         override val execution: Order.Execution? = null,
         override val timing: Order.Timing,
     ) : OrderApiResponse()
@@ -150,7 +150,7 @@ data class OrderBook(
 @Serializable
 data class OrderBookEntry(
     val price: String,
-    val size: BigDecimalJson,
+    val size: BigIntegerJson,
 )
 
 @Serializable

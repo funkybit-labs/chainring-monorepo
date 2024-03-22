@@ -23,13 +23,13 @@ object BalanceRoutes {
             returning(
                 Status.OK,
                 responseBody to BalancesApiResponse(
-                    listOf(Examples.BTCBalance, Examples.ETHBalance),
+                    listOf(Examples.USDCBalance, Examples.ETHBalance),
                 ),
             )
         } bindContract Method.GET to { _ ->
             Response(Status.OK).with(
                 responseBody of BalancesApiResponse(
-                    listOf(Examples.BTCBalance, Examples.ETHBalance),
+                    listOf(Examples.USDCBalance, Examples.ETHBalance),
                 ),
             )
         }

@@ -14,10 +14,10 @@ data class Trade(
     val orderId: OrderId,
     val marketId: MarketId,
     val side: OrderSide,
-    val amount: BigDecimalJson,
-    val price: BigDecimalJson,
+    val amount: BigIntegerJson,
+    val price: BigIntegerJson,
     val executionTime: Instant,
-    val fee: BigDecimalJson,
+    val fee: BigIntegerJson,
     val feeSymbol: Symbol,
 )
 

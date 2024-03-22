@@ -1,7 +1,7 @@
 package co.chainring.apps.api
 
 import co.chainring.apps.api.model.Balance
-import co.chainring.apps.api.model.BigDecimalJson
+import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrderApiResponse
@@ -17,37 +17,37 @@ object Examples {
 
     val crateMarketOrderRequest = CreateOrderApiRequest.Market(
         nonce = "123",
-        marketId = MarketId("USDC/DAI"),
+        marketId = MarketId("ETH/USDC"),
         side = OrderSide.Buy,
-        amount = BigDecimalJson("0.1"),
+        amount = BigIntegerJson("100"),
     )
 
     val crateLimitOrderRequest = CreateOrderApiRequest.Limit(
         nonce = "123",
-        marketId = MarketId("USDC/DAI"),
+        marketId = MarketId("ETH/USDC"),
         side = OrderSide.Buy,
-        amount = BigDecimalJson("0.1"),
-        price = BigDecimalJson("0.1"),
+        amount = BigIntegerJson("100"),
+        price = BigIntegerJson("100"),
     )
 
     val updateMarketOrderRequest = UpdateOrderApiRequest.Market(
         id = OrderId("123"),
-        amount = BigDecimalJson("0.1"),
+        amount = BigIntegerJson("100"),
     )
 
     val updateLimitOrderRequest = UpdateOrderApiRequest.Limit(
         id = OrderId("123"),
-        amount = BigDecimalJson("0.1"),
-        price = BigDecimalJson("0.1"),
+        amount = BigIntegerJson("100"),
+        price = BigIntegerJson("100"),
     )
 
     val marketOrderResponse = OrderApiResponse.Market(
         id = OrderId.generate(),
         status = OrderStatus.Open,
-        marketId = MarketId("USDC/DAI"),
+        marketId = MarketId("ETH/USDC"),
         side = OrderSide.Buy,
-        amount = BigDecimalJson("0.1"),
-        originalAmount = BigDecimalJson("0.1"),
+        amount = BigIntegerJson("100"),
+        originalAmount = BigIntegerJson("100"),
         execution = null,
         timing = Order.Timing(
             createdAt = Clock.System.now(),
@@ -57,28 +57,28 @@ object Examples {
     val limitOrderResponse = OrderApiResponse.Limit(
         id = OrderId.generate(),
         status = OrderStatus.Open,
-        marketId = MarketId("USDC/DAI"),
+        marketId = MarketId("ETH/USDC"),
         side = OrderSide.Buy,
-        amount = BigDecimalJson("0.1"),
-        price = BigDecimalJson("0.1"),
-        originalAmount = BigDecimalJson("0.1"),
+        amount = BigIntegerJson("100"),
+        price = BigIntegerJson("100"),
+        originalAmount = BigIntegerJson("100"),
         execution = null,
         timing = Order.Timing(
             createdAt = Clock.System.now(),
         ),
     )
 
-    val BTCBalance = Balance(
-        symbol = Symbol("BTC"),
-        total = BigDecimalJson("1"),
-        available = BigDecimalJson("0.5"),
+    val USDCBalance = Balance(
+        symbol = Symbol("USDC"),
+        total = BigIntegerJson("0"),
+        available = BigIntegerJson("0"),
         lastUpdated = Clock.System.now(),
     )
 
     val ETHBalance = Balance(
         symbol = Symbol("ETH"),
-        total = BigDecimalJson("0"),
-        available = BigDecimalJson("0"),
+        total = BigIntegerJson("1000000000000"),
+        available = BigIntegerJson("500000"),
         lastUpdated = Clock.System.now(),
     )
 }

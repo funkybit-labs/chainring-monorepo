@@ -1,6 +1,5 @@
 package co.chainring.core.websocket
 
-import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.apps.api.model.LastTrade
 import co.chainring.apps.api.model.LastTradeDirection
 import co.chainring.apps.api.model.OrderBook
@@ -13,6 +12,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.http4k.websocket.Websocket
 import org.http4k.websocket.WsMessage
+import java.math.BigDecimal
+import java.math.BigInteger
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -58,36 +59,40 @@ class Broadcaster {
     }
 
     private fun sendOrderBook(marketId: MarketId, websocket: Websocket) {
-        fun stutter() = rnd.nextDouble(-0.5, 0.5)
+        fun stutter() = rnd.nextLong(-500000, 500000)
         val lastStutter = stutter() / 3.0
         val orderBook = OrderBook(
             marketId = marketId,
             last = LastTrade(String.format("%.2f", (17.5 + lastStutter)), if (lastStutter > 0) LastTradeDirection.Up else LastTradeDirection.Down),
             buy = listOf(
-                OrderBookEntry("17.75", BigDecimalJson(2.3 + stutter())),
-                OrderBookEntry("18.00", BigDecimalJson(2.8 + stutter())),
-                OrderBookEntry("18.25", BigDecimalJson(5 + stutter())),
-                OrderBookEntry("18.50", BigDecimalJson(10.1 + stutter())),
-                OrderBookEntry("18.75", BigDecimalJson(9.5 + stutter())),
-                OrderBookEntry("19.00", BigDecimalJson(12.4 + stutter())),
-                OrderBookEntry("19.50", BigDecimalJson(14.2 + stutter())),
-                OrderBookEntry("20.00", BigDecimalJson(15.3 + stutter())),
-                OrderBookEntry("20.50", BigDecimalJson(19 + stutter())),
+                OrderBookEntry("17.75", BigInteger.valueOf(2300000 + stutter())),
+                OrderBookEntry("18.00", BigInteger.valueOf(2800000 + stutter())),
+                OrderBookEntry("18.25", BigInteger.valueOf(5000000 + stutter())),
+                OrderBookEntry("18.50", BigInteger.valueOf(10100000 + stutter())),
+                OrderBookEntry("18.75", BigInteger.valueOf(9500000 + stutter())),
+                OrderBookEntry("19.00", BigInteger.valueOf(12400000 + stutter())),
+                OrderBookEntry("19.50", BigInteger.valueOf(14200000 + stutter())),
+                OrderBookEntry("20.00", BigInteger.valueOf(15300000 + stutter())),
+                OrderBookEntry("20.50", BigInteger.valueOf(19000000 + stutter())),
             ),
             sell = listOf(
-                OrderBookEntry("17.25", BigDecimalJson(2.1 + stutter())),
-                OrderBookEntry("17.00", BigDecimalJson(5 + stutter())),
-                OrderBookEntry("16.75", BigDecimalJson(5.4 + stutter())),
-                OrderBookEntry("16.50", BigDecimalJson(7.5 + stutter())),
-                OrderBookEntry("16.25", BigDecimalJson(10.1 + stutter())),
-                OrderBookEntry("16.00", BigDecimalJson(7.5 + stutter())),
-                OrderBookEntry("15.50", BigDecimalJson(12.4 + stutter())),
-                OrderBookEntry("15.00", BigDecimalJson(11.3 + stutter())),
-                OrderBookEntry("14.50", BigDecimalJson(14 + stutter())),
-                OrderBookEntry("14.00", BigDecimalJson(19.5 + stutter())),
+                OrderBookEntry("17.25", BigInteger.valueOf(2100000 + stutter())),
+                OrderBookEntry("17.00", BigInteger.valueOf(5000000 + stutter())),
+                OrderBookEntry("16.75", BigInteger.valueOf(5400000 + stutter())),
+                OrderBookEntry("16.50", BigInteger.valueOf(7500000 + stutter())),
+                OrderBookEntry("16.25", BigInteger.valueOf(1010000 + stutter())),
+                OrderBookEntry("16.00", BigInteger.valueOf(7500000 + stutter())),
+                OrderBookEntry("15.50", BigInteger.valueOf(12400000 + stutter())),
+                OrderBookEntry("15.00", BigInteger.valueOf(11300000 + stutter())),
+                OrderBookEntry("14.50", BigInteger.valueOf(14000000 + stutter())),
+                OrderBookEntry("14.00", BigInteger.valueOf(19500000 + stutter())),
             ),
         )
         val response: OutgoingWSMessage = OutgoingWSMessage.Publish(orderBook)
         websocket.send(WsMessage(Json.encodeToString(response)))
+    }
+
+    private fun BigDecimal.toFundamentalUnits(decimals: Int): BigInteger {
+        return (this * BigDecimal("1e$decimals")).toBigInteger()
     }
 }

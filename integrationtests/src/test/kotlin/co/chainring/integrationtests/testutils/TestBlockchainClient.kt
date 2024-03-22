@@ -10,7 +10,6 @@ import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.Transfer
 import org.web3j.utils.Convert
-import java.math.BigDecimal
 import java.math.BigInteger
 
 class TestBlockchainClient(val config: BlockchainClientConfig = BlockchainClientConfig()) : BlockchainClient(config) {
@@ -34,8 +33,4 @@ class TestBlockchainClient(val config: BlockchainClientConfig = BlockchainClient
             config.contractCreationLimit,
         ).send()
     }
-}
-
-fun BigDecimal.toFundamentalUnits(decimals: Int): BigInteger {
-    return (this * BigDecimal("1e$decimals")).toBigInteger()
 }
