@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { getConfiguration } from 'ApiClient'
+import { apiBaseUrl, getConfiguration } from 'ApiClient'
 import { useAccount } from 'wagmi'
 import Balances from 'components/Screens/HomeScreen/Balances'
 import { Header } from 'components/Screens/Header'
 import { OrderBook } from 'components/Screens/HomeScreen/OrderBook'
 import Trade from 'components/Screens/HomeScreen/Trade'
+import { ExponentialBackoff, WebsocketBuilder } from 'websocket-ts'
 
 export default function HomeScreen() {
   const configQuery = useQuery({
@@ -24,6 +25,11 @@ export default function HomeScreen() {
 
   const nativeToken = chainConfig?.nativeToken
   const erc20Tokens = chainConfig?.erc20Tokens
+  const ws = new WebsocketBuilder(
+    apiBaseUrl.replace('http:', 'ws:').replace('https:', 'wss:') + '/connect'
+  )
+    .withBackoff(new ExponentialBackoff(1000, 4))
+    .build()
 
   return (
     <div className="h-screen bg-gradient-to-b from-lightBackground to-darkBackground">
@@ -31,7 +37,7 @@ export default function HomeScreen() {
       <div className="flex h-screen w-screen flex-col">
         <div className="flex gap-4 px-4 pt-24">
           <div className="flex flex-col">
-            <OrderBook />
+            <OrderBook ws={ws} />
           </div>
           <div className="flex flex-col">
             {walletAddress &&
