@@ -1,5 +1,6 @@
 package co.chainring.core.model.db
 
+import co.chainring.core.model.Symbol
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
@@ -7,6 +8,7 @@ import org.jetbrains.exposed.dao.id.EntityID
 @Serializable
 @JvmInline
 value class MarketId(override val value: String) : EntityId {
+    constructor(baseSymbol: Symbol, quoteSymbol: Symbol) : this("$baseSymbol/$quoteSymbol")
     override fun toString(): String = value
 }
 

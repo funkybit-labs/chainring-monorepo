@@ -1,14 +1,14 @@
 package co.chainring.apps.api
 
-import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.OrderApiResponse
 import co.chainring.apps.api.model.OrdersApiResponse
-import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.TradesApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
-import co.chainring.apps.api.model.errorResponse
+import co.chainring.apps.api.model.marketNotSupportedError
+import co.chainring.apps.api.model.orderIsClosedError
+import co.chainring.apps.api.model.orderNotFoundError
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderId
@@ -65,7 +65,7 @@ object OrderRoutes {
 
             transaction {
                 when (val market = MarketEntity.findById(apiRequest.marketId)) {
-                    null -> errorResponse(Status.BAD_REQUEST, ApiError(ReasonCode.MarketNotSupported, "Market is not supported"))
+                    null -> marketNotSupportedError
 
                     else -> {
                         val order = OrderEntity.findByNonce(nonce = apiRequest.nonce)
@@ -120,8 +120,8 @@ object OrderRoutes {
                 return transaction {
                     val order = OrderEntity.findById(orderId)
                     when {
-                        order == null -> errorResponse(Status.NOT_FOUND, ApiError(ReasonCode.OrderNotFound, "Requested order does not exist"))
-                        order.status.isFinal() -> errorResponse(Status.BAD_REQUEST, ApiError(ReasonCode.OrderIsClosed, "Order is already finalized"))
+                        order == null -> orderNotFoundError
+                        order.status.isFinal() -> orderIsClosedError
 
                         else -> {
                             order.update(
@@ -155,9 +155,9 @@ object OrderRoutes {
                 transaction {
                     val order = OrderEntity.findById(orderId)
                     when {
-                        order == null -> errorResponse(Status.NOT_FOUND, ApiError(ReasonCode.OrderNotFound, "Requested order does not exist"))
+                        order == null -> orderNotFoundError
                         order.status == OrderStatus.Cancelled -> Response(Status.NO_CONTENT)
-                        order.status.isFinal() -> errorResponse(Status.BAD_REQUEST, ApiError(ReasonCode.OrderIsClosed, "Order is already finalized"))
+                        order.status.isFinal() -> orderIsClosedError
 
                         else -> {
                             order.cancel()
@@ -187,7 +187,7 @@ object OrderRoutes {
             { _: Request ->
                 transaction {
                     when (val order = OrderEntity.findById(orderId)) {
-                        null -> errorResponse(Status.NOT_FOUND, ApiError(ReasonCode.OrderNotFound, "Requested order does not exist"))
+                        null -> orderNotFoundError
                         else -> Response(Status.OK).with(
                             responseBody of order.toOrderResponse(),
                         )
