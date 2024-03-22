@@ -1,6 +1,6 @@
-import { createOrder, CreateOrderRequest, OrderSide } from 'ApiClient'
+import { apiClient, OrderSide } from 'ApiClient'
 import { classNames } from 'utils'
-import React, { Fragment, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Widget } from 'components/common/Widget'
 import SubmitButton from 'components/common/SubmitButton'
@@ -12,7 +12,7 @@ export default function Trade({
   baseSymbol: string
   quoteSymbol: string
 }) {
-  const [side, setSide] = useState(OrderSide.Buy) // 'buy' or 'sell'
+  const [side, setSide] = useState<OrderSide>('Buy') // 'buy' or 'sell'
   const [price, setPrice] = useState('')
   const [amount, setAmount] = useState('')
   const [isMarketOrder, setIsMarketOrder] = useState(false)
@@ -39,7 +39,7 @@ export default function Trade({
   }
 
   const mutation = useMutation({
-    mutationFn: (orderDetails: CreateOrderRequest) => createOrder(orderDetails)
+    mutationFn: apiClient.createOrder
   })
 
   useEffect(() => {
@@ -76,22 +76,20 @@ export default function Trade({
             <div
               className={classNames(
                 'cursor-pointer border-b-2 w-full',
-                side == OrderSide.Buy
-                  ? 'border-b-lightBackground'
-                  : 'border-b-darkGray'
+                side == 'Buy' ? 'border-b-lightBackground' : 'border-b-darkGray'
               )}
-              onClick={() => !mutation.isPending && setSide(OrderSide.Buy)}
+              onClick={() => !mutation.isPending && setSide('Buy')}
             >
               Buy {baseSymbol}
             </div>
             <div
               className={classNames(
                 'cursor-pointer border-b-2 w-full',
-                side == OrderSide.Sell
+                side == 'Sell'
                   ? 'border-b-lightBackground'
                   : 'border-b-darkGray'
               )}
-              onClick={() => !mutation.isPending && setSide(OrderSide.Sell)}
+              onClick={() => !mutation.isPending && setSide('Sell')}
             >
               Sell {baseSymbol}
             </div>
@@ -180,9 +178,7 @@ export default function Trade({
             />
           </p>
           <p className="text-center text-white">
-            {`${
-              side == OrderSide.Buy ? 'Buying' : 'Selling'
-            } ${amount} ${baseSymbol} ${
+            {`${side == 'Buy' ? 'Buying' : 'Selling'} ${amount} ${baseSymbol} ${
               isMarketOrder ? '(market order) ' : `for ${price} ${quoteSymbol}`
             }`}
           </p>
