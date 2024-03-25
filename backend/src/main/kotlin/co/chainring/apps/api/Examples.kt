@@ -51,13 +51,13 @@ object Examples {
         originalAmount = BigIntegerJson("100"),
         executions = listOf(
             Order.Execution(
-                timestamp =  Clock.System.now(),
+                timestamp = Clock.System.now(),
                 amount = BigIntegerJson("50"),
                 price = BigIntegerJson("500"),
                 role = ExecutionRole.Maker,
                 feeAmount = BigIntegerJson("0"),
                 feeSymbol = Symbol("ETH"),
-            )
+            ),
         ),
         timing = Order.Timing(
             createdAt = Clock.System.now(),
