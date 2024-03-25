@@ -1,4 +1,5 @@
 import { calculateTickSpacing } from 'utils/orderBookUtils'
+import { mergeOHLC } from 'utils/pricesUtils'
 
 describe('OrderBookUtils', () => {
   it('should work for different values', () => {
@@ -17,5 +18,60 @@ describe('OrderBookUtils', () => {
     expect(calculateTickSpacing(10000, 30000, 4)).toBe(5000)
     expect(calculateTickSpacing(10000, 30000, 3)).toBe(7500)
     expect(calculateTickSpacing(10000, 30000, 2)).toBe(10000)
+  })
+})
+
+describe('PricesUtils', () => {
+  function ohlc(
+    startMs: number,
+    durationMs: number,
+    open: number,
+    high: number,
+    low: number,
+    close: number
+  ) {
+    return {
+      start: new Date(startMs),
+      open,
+      high,
+      low,
+      close,
+      durationMs
+    }
+  }
+
+  it('should work as a no-op', () => {
+    expect(mergeOHLC([ohlc(1000, 1000, 2, 4, 1, 3)], 1000)).toStrictEqual([
+      ohlc(1000, 1000, 2, 4, 1, 3)
+    ])
+  })
+  it('should adjust start to beginning of duration boundary', () => {
+    expect(mergeOHLC([ohlc(1001, 1000, 2, 4, 1, 3)], 1000)).toStrictEqual([
+      ohlc(1000, 1000, 2, 4, 1, 3)
+    ])
+  })
+  it('should adjust end to end of duration boundary', () => {
+    expect(mergeOHLC([ohlc(1234, 1743, 2, 4, 1, 3)], 1000)).toStrictEqual([
+      ohlc(1000, 1000, 2, 4, 1, 3)
+    ])
+  })
+  it('should merge two together', () => {
+    expect(
+      mergeOHLC(
+        [ohlc(1000, 500, 2, 4, 1, 3), ohlc(1500, 500, 3, 5, 0, 4)],
+        1000
+      )
+    ).toStrictEqual([ohlc(1000, 1000, 2, 5, 0, 4)])
+  })
+  it('should fill-in any gaps', () => {
+    expect(
+      mergeOHLC(
+        [ohlc(1000, 500, 2, 4, 1, 3), ohlc(2500, 500, 3, 5, 0, 4)],
+        1000
+      )
+    ).toStrictEqual([
+      ohlc(1000, 1000, 2, 4, 1, 3),
+      ohlc(2000, 1000, 3, 5, 0, 4)
+    ])
   })
 })

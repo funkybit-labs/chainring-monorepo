@@ -123,31 +123,57 @@ const OrderSchema = z.discriminatedUnion('type', [
   LimitOrderSchema
 ])
 
-export type OrderBook = {
-  type: 'OrderBook'
-  buy: OrderBookEntry[]
-  sell: OrderBookEntry[]
-  last: LastTrade
-}
+const OrderBookEntrySchema = z.object({
+  price: z.string(),
+  size: z.number()
+})
+export type OrderBookEntry = z.infer<typeof OrderBookEntrySchema>
 
-export type OrderBookEntry = {
-  price: string
-  size: number
-}
+const DirectionSchema = z.enum(['Up', 'Down'])
+export type Direction = z.infer<typeof DirectionSchema>
 
-export type LastTradeDirection = 'Up' | 'Down'
+const LastTradeSchema = z.object({
+  price: z.string(),
+  direction: DirectionSchema
+})
+export type LastTrade = z.infer<typeof LastTradeSchema>
 
-export type LastTrade = {
-  price: string
-  direction: LastTradeDirection
-}
+const OrderBookSchema = z.object({
+  type: z.literal('OrderBook'),
+  buy: z.array(OrderBookEntrySchema),
+  sell: z.array(OrderBookEntrySchema),
+  last: LastTradeSchema
+})
+export type OrderBook = z.infer<typeof OrderBookSchema>
+
+const OHLCSchema = z.object({
+  start: z.date(),
+  durationMs: z.number(),
+  open: z.number(),
+  high: z.number(),
+  low: z.number(),
+  close: z.number(),
+  incomplete: z.boolean().optional()
+})
+export type OHLC = z.infer<typeof OHLCSchema>
+
+const PricesSchema = z.object({
+  type: z.literal('Prices'),
+  full: z.boolean(),
+  ohlc: z.array(OHLCSchema)
+})
+export type Prices = z.infer<typeof PricesSchema>
 
 export type Publish = {
   type: 'Publish'
   data: Publishable
 }
 
-export type Publishable = OrderBook
+const PublishableSchema = z.discriminatedUnion('type', [
+  OrderBookSchema,
+  PricesSchema
+])
+export type Publishable = z.infer<typeof PublishableSchema>
 
 export type OutgoingWSMessage = Publish
 

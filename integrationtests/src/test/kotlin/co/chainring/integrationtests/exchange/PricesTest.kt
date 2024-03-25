@@ -1,8 +1,8 @@
 package co.chainring.integrationtests.exchange
 
 import co.chainring.apps.api.model.IncomingWSMessage
-import co.chainring.apps.api.model.OrderBook
 import co.chainring.apps.api.model.OutgoingWSMessage
+import co.chainring.apps.api.model.Prices
 import co.chainring.apps.api.model.SubscriptionTopic
 import co.chainring.core.model.db.MarketId
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
@@ -17,19 +17,18 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 
 @ExtendWith(AppUnderTestRunner::class)
-class OrderBookTest {
+class PricesTest {
     @Test
-    fun `test order book over websocket`() {
+    fun `test prices over websocket`() {
         val connectUri = Uri.of(apiServerRootUrl.replace("http:", "ws:").replace("https:", "wss:") + "/connect")
         val client = WebsocketClient.blocking(connectUri)
-        val message: IncomingWSMessage = IncomingWSMessage.Subscribe(MarketId("BTC/ETH"), SubscriptionTopic.OrderBook)
+        val message: IncomingWSMessage = IncomingWSMessage.Subscribe(MarketId("BTC/ETH"), SubscriptionTopic.Prices)
         client.send(WsMessage(Json.encodeToString(message)))
         val received = client.received().take(1).first()
         val decoded = Json.decodeFromString<OutgoingWSMessage>(received.bodyString())
-        val orderBook = (decoded as OutgoingWSMessage.Publish).data as OrderBook
-        assertEquals("BTC/ETH", orderBook.marketId.value)
-        assertEquals(9, orderBook.buy.size)
-        assertEquals(10, orderBook.sell.size)
+        val prices = (decoded as OutgoingWSMessage.Publish).data as Prices
+        assertEquals("BTC/ETH", prices.market.value)
+        assertEquals(12 * 24 * 7, prices.ohlc.size)
         client.close()
     }
 }
