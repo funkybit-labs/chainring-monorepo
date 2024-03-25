@@ -1,6 +1,5 @@
 package co.chainring.core.model.db
 
-import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.apps.api.model.Trade
 import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
@@ -57,7 +56,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             amount = this.trade.amount,
             price = this.trade.price,
             feeAmount = this.feeAmount,
-            feeSymbol = this.feeSymbol
+            feeSymbol = this.feeSymbol,
         )
     }
 
