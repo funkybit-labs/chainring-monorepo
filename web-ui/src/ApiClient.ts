@@ -30,8 +30,16 @@ const ChainSchema = z.object({
 })
 export type Chain = z.infer<typeof ChainSchema>
 
+const MarketSchema = z.object({
+  id: z.string(),
+  baseSymbol: z.string(),
+  quoteSymbol: z.string()
+})
+export type Market = z.infer<typeof MarketSchema>
+
 const ConfigurationApiResponseSchema = z.object({
-  chains: z.array(ChainSchema)
+  chains: z.array(ChainSchema),
+  markets: z.array(MarketSchema)
 })
 export type ConfigurationApiResponse = z.infer<
   typeof ConfigurationApiResponseSchema

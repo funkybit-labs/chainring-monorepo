@@ -34,6 +34,6 @@ data class Symbol(
 @Serializable
 data class Market(
     val id: String,
-    val baseSymbol: Symbol,
-    val quoteSymbol: Symbol,
+    val baseSymbol: String,
+    val quoteSymbol: String,
 )

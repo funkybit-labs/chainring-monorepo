@@ -63,6 +63,13 @@ class ChainEntity(id: EntityID<ChainId>) : Entity<ChainId>(id) {
     var name by ChainTable.name
 
     companion object : EntityClass<ChainId, ChainEntity>(ChainTable) {
+        fun create(
+            id: ChainId,
+            name: String,
+        ) = ChainEntity.new(id) {
+            this.name = name
+        }
+
         override fun all(): SizedIterable<ChainEntity> =
             wrapRows(table.selectAll().orderBy(table.id, SortOrder.ASC).notForUpdate())
     }

@@ -35,31 +35,34 @@ class V9_SymbolTable : Migration() {
         transaction {
             SchemaUtils.createMissingTablesAndColumns(V9_SymbolTable)
 
-            exec(
-                """
-                INSERT INTO symbol(guid, name, chain_id, contract_address, decimals, description, created_at, created_by)
-                VALUES('s_eth_1337', 'ETH', 1337, NULL, 18, 'Ethereum', NOW(), 'system');
-                
-                INSERT INTO symbol(guid, name, chain_id, contract_address, decimals, description, created_at, created_by)
-                SELECT 
-                    CONCAT('s_', LOWER(erc20_token.symbol), '_', erc20_token.chain_id),
-                    erc20_token.symbol,
-                    erc20_token.chain_id,
-                    erc20_token.address,
-                    erc20_token.decimals,
-                    erc20_token.name,
-                    NOW(), 
-                    'system'
-                FROM erc20_token;
-                """.trimIndent(),
-            )
-
             exec("DROP TABLE erc20_token")
             exec("ALTER TABLE chain DROP COLUMN native_token_symbol")
             exec("ALTER TABLE chain DROP COLUMN native_token_name")
             exec("ALTER TABLE chain DROP COLUMN native_token_decimals")
 
-            exec("ALTER TABLE market ADD COLUMN ")
+            // Deleting the data here since we want all seed data to be created by
+            // a seed script and not via migrations
+            exec(
+                """
+                DELETE FROM trade;
+                DELETE FROM order_execution;
+                DELETE FROM "order";
+                DELETE FROM market;
+                DELETE FROM chain;
+                """,
+            )
+
+            exec(
+                """
+                ALTER TABLE market ADD COLUMN base_symbol_guid CHARACTER VARYING(10485760) NOT NULL;
+                ALTER TABLE market ADD COLUMN quote_symbol_guid CHARACTER VARYING(10485760) NOT NULL;
+                ALTER TABLE market DROP COLUMN base_symbol;
+                ALTER TABLE market DROP COLUMN quote_symbol;
+                
+                ALTER TABLE market ADD CONSTRAINT market_base_symbol_guid__guid FOREIGN KEY (base_symbol_guid) REFERENCES symbol (guid);
+                ALTER TABLE market ADD CONSTRAINT market_quote_symbol_guid__guid FOREIGN KEY (quote_symbol_guid) REFERENCES symbol (guid);
+                """,
+            )
         }
     }
 }

@@ -20,6 +20,7 @@ import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.core.with
 import org.http4k.format.KotlinxSerialization.auto
+import org.jetbrains.exposed.dao.with
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object ConfigRoutes {
@@ -63,8 +64,8 @@ object ConfigRoutes {
                         markets = listOf(
                             Market(
                                 id = "USDC/DAI",
-                                baseSymbol = Symbol("USDC"),
-                                quoteSymbol = Symbol("DAI"),
+                                baseSymbol = "USDC",
+                                quoteSymbol = "DAI",
                             ),
                         ),
                     ),
@@ -96,8 +97,8 @@ object ConfigRoutes {
                             markets = MarketEntity.all().map { market ->
                                 Market(
                                     id = market.id.value.toString(),
-                                    baseSymbol = Symbol(market.baseSymbolGuid),
-                                    quoteSymbol = Symbol(market.quoteSymbolGuid),
+                                    baseSymbol = market.baseSymbol.name,
+                                    quoteSymbol = market.quoteSymbol.name,
                                 )
                             },
                         ),

@@ -66,7 +66,13 @@ function calculateParameters(orderBook: OrderBook): OrderBookParameters {
   }
 }
 
-export function OrderBook({ ws }: { ws: Websocket }) {
+export function OrderBook({
+  ws,
+  marketId
+}: {
+  ws: Websocket
+  marketId: string
+}) {
   const [orderBook, setOrderBook] = useState<OrderBook>()
   const [params, setParams] = useState<OrderBookParameters>()
 
@@ -75,7 +81,7 @@ export function OrderBook({ ws }: { ws: Websocket }) {
       ws.send(
         JSON.stringify({
           type: 'Subscribe',
-          marketId: 'BTC/ETH',
+          marketId,
           topic: 'OrderBook'
         })
       )
@@ -105,13 +111,13 @@ export function OrderBook({ ws }: { ws: Websocket }) {
         ws.send(
           JSON.stringify({
             type: 'Unsubscribe',
-            marketId: 'BTC/ETH',
+            marketId,
             topic: 'OrderBook'
           })
         )
       }
     }
-  }, [ws])
+  }, [ws, marketId])
 
   return (
     <Widget
