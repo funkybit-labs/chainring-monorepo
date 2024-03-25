@@ -6,6 +6,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 
+enum class SubscriptionTopic {
+    OrderBook,
+    Prices,
+}
+
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("type")
 @Serializable
@@ -14,12 +19,14 @@ sealed class IncomingWSMessage {
     @SerialName("Subscribe")
     data class Subscribe(
         val marketId: MarketId,
+        val topic: SubscriptionTopic,
     ) : IncomingWSMessage()
 
     @Serializable
     @SerialName("Unsubscribe")
     data class Unsubscribe(
         val marketId: MarketId,
+        val topic: SubscriptionTopic,
     ) : IncomingWSMessage()
 }
 

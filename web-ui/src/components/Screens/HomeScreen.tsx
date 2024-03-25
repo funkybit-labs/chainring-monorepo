@@ -6,6 +6,7 @@ import { Header } from 'components/Screens/Header'
 import { OrderBook } from 'components/Screens/HomeScreen/OrderBook'
 import Trade from 'components/Screens/HomeScreen/Trade'
 import { ExponentialBackoff, WebsocketBuilder } from 'websocket-ts'
+import { Prices } from 'components/Screens/HomeScreen/Prices'
 
 export default function HomeScreen() {
   const configQuery = useQuery({
@@ -38,6 +39,9 @@ export default function HomeScreen() {
         <div className="flex gap-4 px-4 pt-24">
           <div className="flex flex-col">
             <OrderBook ws={ws} />
+          </div>
+          <div className="flex flex-col">
+            <Prices ws={ws} />
           </div>
           <div className="flex flex-col">
             {walletAddress &&
