@@ -21,6 +21,7 @@ data class Trade(
     val feeSymbol: Symbol,
 )
 
+@Serializable
 data class TradesApiResponse(
     val trades: List<Trade>,
 )
@@ -35,6 +36,7 @@ data class PublicTrade(
     val side: OrderSide,
 )
 
+@Serializable
 data class PublicTradesApiResponse(
     val trades: List<PublicTrade>,
 )

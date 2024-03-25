@@ -1,5 +1,6 @@
 package co.chainring.core.model.db
 
+import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.apps.api.model.Trade
 import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
@@ -47,7 +48,17 @@ object OrderExecutionTable : GUIDTable<ExecutionId>("order_execution", ::Executi
 
 class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId>(guid) {
     fun toTradeResponse(): Trade {
-        TODO("Not yet implemented")
+        return Trade(
+            id = this.trade.guid.value,
+            orderId = this.orderGuid.value,
+            marketId = this.order.marketGuid.value,
+            timestamp = this.timestamp,
+            side = this.order.side,
+            amount = this.trade.amount,
+            price = this.trade.price,
+            feeAmount = this.feeAmount,
+            feeSymbol = this.feeSymbol
+        )
     }
 
     companion object : EntityClass<ExecutionId, OrderExecutionEntity>(OrderExecutionTable) {
