@@ -1,6 +1,7 @@
 package co.chainring.apps.api.model
 
 import co.chainring.core.model.Symbol
+import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
@@ -15,9 +16,12 @@ object Order {
 
     @Serializable
     data class Execution(
-        val fee: BigIntegerJson,
+        val timestamp: Instant,
+        val amount: BigIntegerJson,
+        val price: BigIntegerJson,
+        val role: ExecutionRole,
+        val feeAmount: BigIntegerJson,
         val feeSymbol: Symbol,
-        val amountExecuted: BigIntegerJson,
     )
 
     @Serializable
@@ -95,7 +99,7 @@ sealed class OrderApiResponse {
     abstract val side: OrderSide
     abstract val amount: BigIntegerJson
     abstract val originalAmount: BigIntegerJson
-    abstract val execution: Order.Execution?
+    abstract val executions: List<Order.Execution>
     abstract val timing: Order.Timing
 
     @Serializable
@@ -107,7 +111,7 @@ sealed class OrderApiResponse {
         override val side: OrderSide,
         override val amount: BigIntegerJson,
         override val originalAmount: BigIntegerJson,
-        override val execution: Order.Execution? = null,
+        override val executions: List<Order.Execution>,
         override val timing: Order.Timing,
     ) : OrderApiResponse()
 
@@ -121,7 +125,7 @@ sealed class OrderApiResponse {
         override val amount: BigIntegerJson,
         override val originalAmount: BigIntegerJson,
         val price: BigIntegerJson,
-        override val execution: Order.Execution? = null,
+        override val executions: List<Order.Execution>,
         override val timing: Order.Timing,
     ) : OrderApiResponse()
 }
