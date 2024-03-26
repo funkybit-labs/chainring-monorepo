@@ -7,8 +7,8 @@ import co.chainring.apps.api.model.OHLC
 import co.chainring.apps.api.model.OrderBook
 import co.chainring.apps.api.model.OrderBookEntry
 import co.chainring.apps.api.model.OutgoingWSMessage
-import co.chainring.apps.api.model.SubscriptionTopic
 import co.chainring.apps.api.model.Prices
+import co.chainring.apps.api.model.SubscriptionTopic
 import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.WsTrades
 import co.chainring.core.model.Symbol
@@ -53,11 +53,11 @@ class Broadcaster {
         }.getOrPut(topic) {
             Subscriptions()
         }.addIfAbsent(websocket)
-        val lastStutter = rnd.nextDouble(-0.5, 0.5) / 3.0
+
         when (topic) {
             SubscriptionTopic.OrderBook -> sendOrderBook(market, websocket)
             SubscriptionTopic.Prices -> sendPrices(market, websocket)
-            SubscriptionTopic.Trades -> sendTrades(market, websocket, lastStutter)
+            SubscriptionTopic.Trades -> sendTrades(market, websocket)
         }
     }
 
@@ -86,16 +86,14 @@ class Broadcaster {
 
     private fun publishData() {
         subscriptions.forEach { (marketId, topicSubscriptions) ->
-            val lastStutter = rnd.nextDouble(-0.5, 0.5) / 3.0
-
             topicSubscriptions[SubscriptionTopic.OrderBook]?.forEach { websocket ->
-                sendOrderBook(marketId, websocket, lastStutter)
+                sendOrderBook(marketId, websocket)
             }
             topicSubscriptions[SubscriptionTopic.Prices]?.forEach { websocket ->
                 sendPrices(marketId, websocket)
             }
             topicSubscriptions[SubscriptionTopic.Trades]?.forEach { websocket ->
-                sendTrades(marketId, websocket, lastStutter)
+                sendTrades(marketId, websocket)
             }
         }
     }
@@ -148,29 +146,9 @@ class Broadcaster {
         websocket.send(WsMessage(Json.encodeToString(response)))
     }
 
-    private fun sendPrices(market: MarketId, websocket: Websocket) {
-        val key = Pair(market, websocket)
-        val fullDump = !lastPricePublish.containsKey(key)
-        val now = Clock.System.now()
-        val prices = if (fullDump) {
-            lastPricePublish[key] = now
-            Prices(
-                market = market,
-                ohlc = mockOHLC(now.minus(7.days), 5.minutes, 12 * 24 * 7, true),
-            )
-        } else {
-            Prices(
-                market = market,
-                ohlc = mockOHLC(lastPricePublish[key]!!, 1.seconds, (now - lastPricePublish[key]!!).inWholeSeconds, false),
-            ).also {
-                lastPricePublish[key] = now
-            }
-        }
-        val response: OutgoingWSMessage = OutgoingWSMessage.Publish(prices)
-        websocket.send(WsMessage(Json.encodeToString(response)))
-    }
+    private fun sendTrades(marketId: MarketId, websocket: Websocket) {
+        val lastStutter = rnd.nextDouble(-0.5, 0.5) / 3.0
 
-    private fun sendTrades(marketId: MarketId, websocket: Websocket, lastStutter: Double) {
         val trades = WsTrades(
             trades = listOf(
                 Trade(
@@ -191,8 +169,9 @@ class Broadcaster {
         websocket.send(WsMessage(Json.encodeToString(response)))
     }
 
-    private fun sendOrderBook(marketId: MarketId, websocket: Websocket, lastStutter: Double) {
+    private fun sendOrderBook(marketId: MarketId, websocket: Websocket) {
         fun stutter() = rnd.nextDouble(-0.5, 0.5)
+        val lastStutter = stutter() / 3.0
         val orderBook = OrderBook(
             marketId = marketId,
             last = LastTrade(String.format("%.2f", (17.5 + lastStutter)), if (lastStutter > 0) LastTradeDirection.Up else LastTradeDirection.Down),
