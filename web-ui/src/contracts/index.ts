@@ -1,3 +1,3 @@
-import ExchangeAbi from './ExchangeAbi'
-import ERC20Abi from './ERC20Abi'
+import ExchangeAbi from 'contracts/ExchangeAbi'
+import ERC20Abi from 'contracts/ERC20Abi'
 export { ExchangeAbi, ERC20Abi }
