@@ -1,4 +1,4 @@
-import { IncomingWSMessage, Trade } from 'ApiClient'
+import { IncomingWSMessage, Trade, TradesSchema } from 'ApiClient'
 import { useEffect, useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import { Websocket, WebsocketEvent } from 'websocket-ts'
@@ -27,9 +27,13 @@ export default function Trades({ ws }: { ws: Websocket }) {
     const handleMessage = (ws: Websocket, event: MessageEvent) => {
       const message = JSON.parse(event.data) as IncomingWSMessage
       if (message.type == 'Publish' && message.data.type == 'Trades') {
-        const incomingTrades = message.data.trades
+        const incomingTrades = TradesSchema.parse(message.data).trades
+        const newTrades = incomingTrades.filter(
+          (incomingTrade) =>
+            !trades.some((currentTrade) => currentTrade.id === incomingTrade.id)
+        )
         setTrades((currentTrades) => {
-          return incomingTrades.concat(currentTrades)
+          return newTrades.concat(currentTrades)
         })
       }
     }
@@ -75,10 +79,11 @@ export default function Trades({ ws }: { ws: Websocket }) {
               <tbody>
                 {trades.map((trade) => {
                   return (
-                    <tr key={trade.id}>
-                      <td className="">
-                        {format(trade.timestamp, 'MM/dd HH:mm:ss')}
-                      </td>
+                    <tr
+                      key={trade.id}
+                      className="duration-200 ease-in-out hover:bg-mutedGray hover:cursor-default"
+                    >
+                      <td>{format(trade.timestamp, 'MM/dd HH:mm:ss')}</td>
                       <td className="pl-4">{trade.side}</td>
                       <td className="pl-4">
                         {formatUnits(BigInt(trade.amount), 18)}

@@ -186,7 +186,7 @@ export const PricesSchema = z.object({
 })
 export type Prices = z.infer<typeof PricesSchema>
 
-const TradesSchema = z.object({
+export const TradesSchema = z.object({
   type: z.literal('Trades'),
   trades: z.array(TradeSchema)
 })
