@@ -4,7 +4,8 @@ import { useAccount } from 'wagmi'
 import Balances from 'components/Screens/HomeScreen/Balances'
 import { Header } from 'components/Screens/Header'
 import { OrderBook } from 'components/Screens/HomeScreen/OrderBook'
-import Trade from 'components/Screens/HomeScreen/Trade'
+import Order from 'components/Screens/HomeScreen/Order'
+import Trades from 'components/Screens/HomeScreen/Trades'
 import { ExponentialBackoff, WebsocketBuilder } from 'websocket-ts'
 import { Prices } from 'components/Screens/HomeScreen/Prices'
 
@@ -36,7 +37,7 @@ export default function HomeScreen() {
     <div className="h-screen bg-gradient-to-b from-lightBackground to-darkBackground">
       <Header />
       <div className="flex h-screen w-screen flex-col">
-        <div className="flex gap-4 px-4 pt-24">
+        <div className="flex flex-row gap-4 px-4 pt-24">
           <div className="flex flex-col">
             <OrderBook ws={ws} />
           </div>
@@ -49,18 +50,19 @@ export default function HomeScreen() {
               erc20Tokens &&
               nativeToken && (
                 <>
-                  <Trade baseSymbol={'ETH'} quoteSymbol={'USDC'} />
+                  <Order baseSymbol={'ETH'} quoteSymbol={'USDC'} />
                 </>
               )}
           </div>
         </div>
         <div className="flex px-4 pt-24">
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-row items-center gap-4">
             {walletAddress &&
               exchangeContract &&
               erc20Tokens &&
               nativeToken && (
                 <>
+                  <Trades ws={ws} />
                   <Balances
                     walletAddress={walletAddress}
                     exchangeContractAddress={exchangeContract.address}

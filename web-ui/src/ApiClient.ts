@@ -75,10 +75,16 @@ const CreateOrderRequestSchema = z.discriminatedUnion('type', [
 ])
 export type CreateOrderRequest = z.infer<typeof CreateOrderRequestSchema>
 
+const ExecutionRoleSchema = z.enum(['Maker', 'Taker'])
+export type ExecutionRole = z.infer<typeof ExecutionRoleSchema>
+
 const OrderExecutionSchema = z.object({
-  fee: z.number(),
-  feeSymbol: z.string(),
-  amountExecuted: z.number()
+  timestamp: z.coerce.date(),
+  amount: z.number(),
+  price: z.number(),
+  role: ExecutionRoleSchema,
+  feeAmount: z.number(),
+  feeSymbol: z.string()
 })
 export type OrderExecution = z.infer<typeof OrderExecutionSchema>
 
@@ -132,6 +138,23 @@ export type OrderBookEntry = z.infer<typeof OrderBookEntrySchema>
 const DirectionSchema = z.enum(['Up', 'Down'])
 export type Direction = z.infer<typeof DirectionSchema>
 
+export type Trade = {
+  id: string
+  timestamp: string
+  orderId: string
+  marketId: string
+  side: OrderSide
+  amount: number
+  price: number
+  feeAmount: number
+  feeSymbol: string
+}
+
+export type Trades = {
+  type: 'Trades'
+  trades: Trade[]
+}
+
 const LastTradeSchema = z.object({
   price: z.string(),
   direction: DirectionSchema
@@ -171,7 +194,8 @@ export type Publish = {
 
 const PublishableSchema = z.discriminatedUnion('type', [
   OrderBookSchema,
-  PricesSchema
+  PricesSchema,
+  TradesSchema
 ])
 export type Publishable = z.infer<typeof PublishableSchema>
 

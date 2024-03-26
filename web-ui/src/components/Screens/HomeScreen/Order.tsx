@@ -6,7 +6,7 @@ import { Widget } from 'components/common/Widget'
 import SubmitButton from 'components/common/SubmitButton'
 import { parseUnits } from 'viem'
 
-export default function Trade({
+export default function Order({
   baseSymbol,
   quoteSymbol
 }: {
@@ -70,7 +70,7 @@ export default function Trade({
 
   return (
     <Widget
-      title="Trade"
+      title="Order"
       contents={
         <>
           <div className="flex w-full text-center text-lg font-medium">

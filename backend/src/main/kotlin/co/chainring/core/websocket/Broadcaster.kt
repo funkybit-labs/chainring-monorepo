@@ -1,6 +1,7 @@
 package co.chainring.core.websocket
 
 import co.chainring.apps.api.model.BigDecimalJson
+import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.apps.api.model.LastTrade
 import co.chainring.apps.api.model.LastTradeDirection
 import co.chainring.apps.api.model.OHLC
@@ -9,11 +10,19 @@ import co.chainring.apps.api.model.OrderBookEntry
 import co.chainring.apps.api.model.OutgoingWSMessage
 import co.chainring.apps.api.model.Prices
 import co.chainring.apps.api.model.SubscriptionTopic
+import co.chainring.apps.api.model.Trade
+import co.chainring.apps.api.model.WsTrades
+import co.chainring.core.model.Symbol
+import co.chainring.core.model.TradeId
 import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OrderId
+import co.chainring.core.model.db.OrderSide
+import co.chainring.core.model.db.TradeId
 import co.chainring.core.utils.Timer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import java.math.BigInteger
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.http4k.websocket.Websocket
@@ -23,6 +32,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.max
 import kotlin.math.min
+import kotlinx.datetime.Clock
+import kotlin.math.sin
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
@@ -127,6 +138,28 @@ class Broadcaster {
             }
         }
         val response: OutgoingWSMessage = OutgoingWSMessage.Publish(prices)
+        websocket.send(WsMessage(Json.encodeToString(response)))
+    }
+
+    private fun sendTrades(marketId: MarketId, websocket: Websocket) {
+        fun stutter() = rnd.nextDouble(-0.5, 0.5)
+        val trades = WsTrades(
+            trades = listOf(
+                Trade(
+                    id = TradeId.generate(),
+                    timestamp = Clock.System.now(),
+                    orderId = OrderId.generate(),
+                    marketId = marketId,
+                    side = if (rnd.nextBoolean()) OrderSide.Buy else OrderSide.Sell,
+                    amount = BigIntegerJson(rnd.nextInt().toString()),
+                    price = BigIntegerJson(rnd.nextInt().toString()),
+                    feeAmount = BigInteger.ZERO,
+                    feeSymbol = Symbol(marketId.value.split("/")[0]),
+                )
+            )
+        )
+
+        val response: OutgoingWSMessage = OutgoingWSMessage.Publish(trades)
         websocket.send(WsMessage(Json.encodeToString(response)))
     }
 
