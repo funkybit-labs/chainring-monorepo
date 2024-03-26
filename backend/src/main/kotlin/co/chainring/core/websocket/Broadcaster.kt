@@ -117,11 +117,13 @@ class Broadcaster {
             Prices(
                 market = market,
                 ohlc = mockOHLC(now.minus(7.days), 5.minutes, 12 * 24 * 7, true),
+                full = true,
             )
         } else {
             Prices(
                 market = market,
                 ohlc = mockOHLC(lastPricePublish[key]!!, 1.seconds, (now - lastPricePublish[key]!!).inWholeSeconds, false),
+                full = false,
             ).also {
                 lastPricePublish[key] = now
             }

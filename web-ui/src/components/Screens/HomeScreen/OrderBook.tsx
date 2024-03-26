@@ -3,7 +3,7 @@ import { calculateTickSpacing } from 'utils/orderBookUtils'
 import { Fragment, useEffect, useState } from 'react'
 import Spinner from 'components/common/Spinner'
 import { Websocket, WebsocketEvent } from 'websocket-ts'
-import { OrderBook, OutgoingWSMessage } from 'ApiClient'
+import { OrderBook, IncomingWSMessage, OrderBookSchema } from 'ApiClient'
 
 type OrderBookParameters = {
   bookWidth: number
@@ -87,10 +87,13 @@ export function OrderBook({ ws }: { ws: Websocket }) {
       ws.addEventListener(WebsocketEvent.open, subscribe)
     }
     const handleMessage = (ws: Websocket, event: MessageEvent) => {
-      const message = JSON.parse(event.data) as OutgoingWSMessage
+      const message = JSON.parse(event.data) as IncomingWSMessage
       if (message.type == 'Publish' && message.data.type == 'OrderBook') {
-        setParams(calculateParameters(message.data))
-        setOrderBook(message.data)
+        // note that we don't try to parse IncomingWSMessage via predefined schema in order to support
+        // adding new message types on BE before supporting them on the client-side
+        const orderBook = OrderBookSchema.parse(message.data)
+        setParams(calculateParameters(orderBook))
+        setOrderBook(orderBook)
       }
     }
     ws.addEventListener(WebsocketEvent.message, handleMessage)

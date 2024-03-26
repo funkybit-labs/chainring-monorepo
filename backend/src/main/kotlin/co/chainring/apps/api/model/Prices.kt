@@ -10,6 +10,7 @@ import kotlinx.serialization.Serializable
 data class Prices(
     val market: MarketId,
     val ohlc: List<OHLC>,
+    val full: Boolean,
 ) : Publishable()
 
 @Serializable

@@ -3,7 +3,7 @@ import { calculateTickSpacing } from 'utils/orderBookUtils'
 import React, { Fragment, useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
 import { Websocket, WebsocketEvent } from 'websocket-ts'
-import { Direction, OHLC, OutgoingWSMessage } from 'ApiClient'
+import { Direction, IncomingWSMessage, OHLC, PricesSchema } from 'ApiClient'
 import { mergeOHLC } from 'utils/pricesUtils'
 
 type PriceParameters = {
@@ -93,14 +93,15 @@ export function Prices({ ws }: { ws: Websocket }) {
       ws.addEventListener(WebsocketEvent.open, subscribe)
     }
     const handleMessage = (ws: Websocket, event: MessageEvent) => {
-      const message = JSON.parse(event.data) as OutgoingWSMessage
+      const message = JSON.parse(event.data) as IncomingWSMessage
       if (message.type == 'Publish' && message.data.type == 'Prices') {
-        if (message.data.full) {
-          setOhlc(message.data.ohlc)
+        // note that we don't try to parse IncomingWSMessage via predefined schema in order to support
+        // adding new message types on BE before supporting them on the client-side
+        const prices = PricesSchema.parse(message.data)
+        if (prices.full) {
+          setOhlc(prices.ohlc)
         } else {
-          setOhlc((o) =>
-            message.data.type == 'Prices' ? o.concat([...message.data.ohlc]) : o
-          )
+          setOhlc((o) => o.concat([...prices.ohlc]))
         }
       }
     }
@@ -174,14 +175,13 @@ export function Prices({ ws }: { ws: Websocket }) {
     ): OHLC[] {
       if (ohlc.length > 0) {
         if (latestStart === undefined) {
-          latestStart = new Date(ohlc[ohlc.length - 1].start)
+          latestStart = ohlc[ohlc.length - 1].start
         }
         const earliestStart = new Date(
           latestStart.getTime() - visibleDurationMs(zoom)
         )
         return ohlc.filter((l) => {
-          const dt = new Date(l.start)
-          return dt >= earliestStart && dt < latestStart!
+          return l.start >= earliestStart && l.start < latestStart!
         })
       } else {
         return []
@@ -252,7 +252,7 @@ export function Prices({ ws }: { ws: Websocket }) {
     }
   }
 
-  // calculates the y position based on the proce
+  // calculates the y position based on the price
   function priceToY(params: PriceParameters, price: number) {
     return (
       params.chartEndY -
@@ -289,7 +289,7 @@ export function Prices({ ws }: { ws: Websocket }) {
     ohlc: OHLC,
     lastLabel?: string
   ): string {
-    const date = new Date(ohlc.start)
+    const date = ohlc.start
     if (zoom === 'Week') {
       return weeklyLabel(date)
     } else {
@@ -409,7 +409,7 @@ export function Prices({ ws }: { ws: Websocket }) {
     return (
       !latestStart ||
       latestStart >=
-        new Date(new Date(ohlc[0]?.start).getTime() + panDistance(zoom) * 10)
+        new Date(ohlc[0]?.start?.getTime() + panDistance(zoom) * 10)
     )
   }
 
@@ -421,9 +421,7 @@ export function Prices({ ws }: { ws: Websocket }) {
     return (
       latestStart &&
       latestStart <
-        new Date(
-          new Date(ohlc[ohlc.length - 1]?.start).getTime() - panDistance(zoom)
-        )
+        new Date(ohlc[ohlc.length - 1]?.start?.getTime() - panDistance(zoom))
     )
   }
 
@@ -431,10 +429,8 @@ export function Prices({ ws }: { ws: Websocket }) {
     if (panLeftAllowed()) {
       setLatestStart(
         new Date(
-          (latestStart
-            ? latestStart
-            : new Date(ohlc[ohlc.length - 1]?.start)
-          ).getTime() - panDistance(zoom)
+          (latestStart ? latestStart : ohlc[ohlc.length - 1]!.start).getTime() -
+            panDistance(zoom)
         )
       )
     }
@@ -444,10 +440,8 @@ export function Prices({ ws }: { ws: Websocket }) {
     if (panRightAllowed()) {
       setLatestStart(
         new Date(
-          (latestStart
-            ? latestStart
-            : new Date(ohlc[ohlc.length - 1]?.start)
-          ).getTime() + panDistance(zoom)
+          (latestStart ? latestStart : ohlc[ohlc.length - 1]!.start).getTime() +
+            panDistance(zoom)
         )
       )
     }
@@ -466,8 +460,8 @@ export function Prices({ ws }: { ws: Websocket }) {
 
   // compute the title showing the date range being displayed
   function title(): string {
-    const firstDate = new Date(mergedOhlc[0]?.start)
-    const lastDate = new Date(mergedOhlc[mergedOhlc.length - 1]?.start)
+    const firstDate = mergedOhlc[0]?.start
+    const lastDate = mergedOhlc[mergedOhlc.length - 1]?.start
     let startDate = firstDate
     if (latestStart) {
       startDate = new Date(
