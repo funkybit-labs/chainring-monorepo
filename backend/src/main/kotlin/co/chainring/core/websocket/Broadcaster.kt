@@ -3,12 +3,17 @@ package co.chainring.core.websocket
 import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.apps.api.model.LastTrade
 import co.chainring.apps.api.model.LastTradeDirection
+import co.chainring.apps.api.model.OHLC
 import co.chainring.apps.api.model.OrderBook
 import co.chainring.apps.api.model.OrderBookEntry
 import co.chainring.apps.api.model.OutgoingWSMessage
+import co.chainring.apps.api.model.Prices
+import co.chainring.apps.api.model.SubscriptionTopic
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.utils.Timer
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.http4k.websocket.Websocket
@@ -16,25 +21,44 @@ import org.http4k.websocket.WsMessage
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+
+typealias Subscriptions = CopyOnWriteArrayList<Websocket>
+typealias TopicSubscriptions = ConcurrentHashMap<SubscriptionTopic, Subscriptions>
+typealias MarketSubscriptions = ConcurrentHashMap<MarketId, TopicSubscriptions>
 
 class Broadcaster {
-    private val subscriptions = ConcurrentHashMap<MarketId, CopyOnWriteArrayList<Websocket>>()
+    private val subscriptions = MarketSubscriptions()
+    private val lastPricePublish = mutableMapOf<Pair<MarketId, Websocket>, Instant>()
     private val logger = KotlinLogging.logger {}
     private val rnd = Random(0)
 
-    fun subscribe(instrument: MarketId, websocket: Websocket) {
-        subscriptions.getOrPut(instrument) { CopyOnWriteArrayList<Websocket>() }.add(websocket)
-        sendOrderBook(instrument, websocket)
+    fun subscribe(market: MarketId, topic: SubscriptionTopic, websocket: Websocket) {
+        subscriptions.getOrPut(market) {
+            TopicSubscriptions()
+        }.getOrPut(topic) {
+            Subscriptions()
+        }.addIfAbsent(websocket)
+        when (topic) {
+            SubscriptionTopic.OrderBook -> sendOrderBook(market, websocket)
+            SubscriptionTopic.Prices -> sendPrices(market, websocket)
+        }
     }
 
-    fun unsubscribe(marketId: MarketId, websocket: Websocket) {
-        subscriptions[marketId]?.remove(websocket)
+    fun unsubscribe(marketId: MarketId, topic: SubscriptionTopic, websocket: Websocket) {
+        subscriptions[marketId]?.let { it[topic]?.remove(websocket) }
     }
 
     fun unsubscribe(websocket: Websocket) {
-        subscriptions.values.forEach {
-            it.remove(websocket)
+        subscriptions.values.forEach { topicSubscriptions ->
+            topicSubscriptions.values.forEach {
+                it.remove(websocket)
+            }
         }
     }
 
@@ -42,19 +66,70 @@ class Broadcaster {
 
     fun start() {
         timer = Timer(logger)
-        timer?.scheduleAtFixedRate(Duration.ofSeconds(1), stopOnError = true, this::broadcastOrderBook)
+        timer?.scheduleAtFixedRate(Duration.ofSeconds(1), stopOnError = true, this::publishData)
     }
 
     fun stop() {
         timer?.cancel()
     }
 
-    private fun broadcastOrderBook() {
-        subscriptions.forEach { (instrument, websockets) ->
-            websockets.forEach { websocket ->
-                sendOrderBook(instrument, websocket)
+    private fun publishData() {
+        subscriptions.forEach { (marketId, topicSubscriptions) ->
+            topicSubscriptions[SubscriptionTopic.OrderBook]?.forEach { websocket ->
+                sendOrderBook(marketId, websocket)
+            }
+            topicSubscriptions[SubscriptionTopic.Prices]?.forEach { websocket ->
+                sendPrices(marketId, websocket)
             }
         }
+    }
+
+    private var mockPrice: Double = 17.2
+
+    private fun mockOHLC(startTime: Instant, duration: kotlin.time.Duration, count: Long, full: Boolean): List<OHLC> {
+        fun priceAdjust(range: Double, direction: Int) =
+            1 + (rnd.nextDouble() * range) + when (direction) {
+                0 -> -(range / 2)
+                -1 -> -(2 * range)
+                else -> 0.0
+            }
+        return (0 until count).map { i ->
+            val curPrice = mockPrice
+            val nextPrice = mockPrice * priceAdjust(if (full) 0.001 else 0.0001, 0)
+            mockPrice = nextPrice
+            OHLC(
+                start = startTime.plus((duration.inWholeSeconds * i).seconds),
+                open = curPrice,
+                high = max(curPrice, nextPrice) * priceAdjust(0.0001, 1),
+                low = min(curPrice, nextPrice) * priceAdjust(0.0001, -1),
+                close = nextPrice,
+                durationMs = duration.inWholeMilliseconds,
+            )
+        }
+    }
+
+    private fun sendPrices(market: MarketId, websocket: Websocket) {
+        val key = Pair(market, websocket)
+        val fullDump = !lastPricePublish.containsKey(key)
+        val now = Clock.System.now()
+        val prices = if (fullDump) {
+            lastPricePublish[key] = now
+            Prices(
+                market = market,
+                ohlc = mockOHLC(now.minus(7.days), 5.minutes, 12 * 24 * 7, true),
+                full = true,
+            )
+        } else {
+            Prices(
+                market = market,
+                ohlc = mockOHLC(lastPricePublish[key]!!, 1.seconds, (now - lastPricePublish[key]!!).inWholeSeconds, false),
+                full = false,
+            ).also {
+                lastPricePublish[key] = now
+            }
+        }
+        val response: OutgoingWSMessage = OutgoingWSMessage.Publish(prices)
+        websocket.send(WsMessage(Json.encodeToString(response)))
     }
 
     private fun sendOrderBook(marketId: MarketId, websocket: Websocket) {

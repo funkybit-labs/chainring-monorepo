@@ -33,10 +33,10 @@ class WebsocketApi(private val broadcaster: Broadcaster) {
                 ws.onMessage { wsMessage ->
                     when (val message = messageLens(wsMessage)) {
                         is IncomingWSMessage.Subscribe -> {
-                            broadcaster.subscribe(message.marketId, ws)
+                            broadcaster.subscribe(message.marketId, message.topic, ws)
                         }
                         is IncomingWSMessage.Unsubscribe -> {
-                            broadcaster.unsubscribe(message.marketId, ws)
+                            broadcaster.unsubscribe(message.marketId, message.topic, ws)
                         }
                     }
                 }
