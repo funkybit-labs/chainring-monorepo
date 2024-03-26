@@ -81,7 +81,7 @@ export default function Trades({ ws }: { ws: Websocket }) {
                   return (
                     <tr
                       key={trade.id}
-                      className="duration-200 ease-in-out hover:bg-mutedGray hover:cursor-default"
+                      className="duration-200 ease-in-out hover:cursor-default hover:bg-mutedGray"
                     >
                       <td>{format(trade.timestamp, 'MM/dd HH:mm:ss')}</td>
                       <td className="pl-4">{trade.side}</td>
