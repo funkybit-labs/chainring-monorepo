@@ -4,10 +4,13 @@ import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ApiErrors
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
+import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.OrderApiResponse
 import co.chainring.apps.api.model.OrdersApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
+import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.core.model.db.OrderId
+import co.chainring.core.model.db.WithdrawalId
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -119,6 +122,34 @@ class ApiClient {
 
         return when (httpResponse.code) {
             HttpURLConnection.HTTP_NO_CONTENT -> Unit
+            else -> throw AbnormalApiResponseException(httpResponse)
+        }
+    }
+
+    fun createWithdrawal(apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse {
+        val httpResponse = execute(
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/withdrawals")
+                .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
+                .build(),
+        )
+
+        return when (httpResponse.code) {
+            HttpURLConnection.HTTP_CREATED -> json.decodeFromString<WithdrawalApiResponse>(httpResponse.body?.string()!!)
+            else -> throw AbnormalApiResponseException(httpResponse)
+        }
+    }
+
+    fun getWithdrawal(id: WithdrawalId): WithdrawalApiResponse {
+        val httpResponse = execute(
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/withdrawals/$id")
+                .get()
+                .build(),
+        )
+
+        return when (httpResponse.code) {
+            HttpURLConnection.HTTP_OK -> json.decodeFromString<WithdrawalApiResponse>(httpResponse.body?.string()!!)
             else -> throw AbnormalApiResponseException(httpResponse)
         }
     }
