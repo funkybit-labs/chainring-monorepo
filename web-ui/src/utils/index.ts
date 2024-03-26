@@ -12,3 +12,7 @@ export function addressDisplay(address: string): string {
     '0x' + without0x.slice(0, 4) + '...' + without0x.slice(without0x.length - 4)
   )
 }
+
+;(BigInt.prototype as any).toJSON = function () {
+  return this.toString()
+}

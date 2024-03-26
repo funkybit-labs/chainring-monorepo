@@ -55,7 +55,7 @@ const CreateMarketOrderSchema = z.object({
   type: z.literal('market'),
   marketId: z.string(),
   side: OrderSideSchema,
-  amount: z.number()
+  amount: z.coerce.bigint()
 })
 export type CreateMarketOrder = z.infer<typeof CreateMarketOrderSchema>
 
@@ -64,8 +64,8 @@ const CreateLimitOrderSchema = z.object({
   type: z.literal('limit'),
   marketId: z.string(),
   side: OrderSideSchema,
-  amount: z.number(),
-  price: z.number()
+  amount: z.coerce.bigint(),
+  price: z.coerce.bigint()
 })
 export type CreateLimitOrder = z.infer<typeof CreateLimitOrderSchema>
 
@@ -80,10 +80,10 @@ export type ExecutionRole = z.infer<typeof ExecutionRoleSchema>
 
 const OrderExecutionSchema = z.object({
   timestamp: z.coerce.date(),
-  amount: z.number(),
-  price: z.number(),
+  amount: z.coerce.bigint(),
+  price: z.coerce.bigint(),
   role: ExecutionRoleSchema,
-  feeAmount: z.number(),
+  feeAmount: z.coerce.bigint(),
   feeSymbol: z.string()
 })
 export type OrderExecution = z.infer<typeof OrderExecutionSchema>
@@ -103,8 +103,8 @@ const MarketOrderSchema = z.object({
   status: z.string(),
   marketId: z.string(),
   side: OrderSideSchema,
-  amount: z.number(),
-  originalAmount: z.number(),
+  amount: z.coerce.bigint(),
+  originalAmount: z.coerce.bigint(),
   executions: z.array(OrderExecutionSchema),
   timing: OrderTimingSchema
 })
@@ -116,9 +116,9 @@ const LimitOrderSchema = z.object({
   status: z.string(),
   marketId: z.string(),
   side: OrderSideSchema,
-  amount: z.number(),
-  price: z.number(),
-  originalAmount: z.number(),
+  amount: z.coerce.bigint(),
+  price: z.coerce.bigint(),
+  originalAmount: z.coerce.bigint(),
   executions: z.array(OrderExecutionSchema),
   timing: OrderTimingSchema
 })
@@ -144,9 +144,9 @@ const TradeSchema = z.object({
   orderId: z.string(),
   marketId: z.string(),
   side: OrderSideSchema,
-  amount: z.number(),
-  price: z.number(),
-  feeAmount: z.number(),
+  amount: z.coerce.bigint(),
+  price: z.coerce.bigint(),
+  feeAmount: z.coerce.bigint(),
   feeSymbol: z.string()
 })
 export type Trade = z.infer<typeof TradeSchema>
