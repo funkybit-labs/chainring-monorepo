@@ -52,13 +52,15 @@ class Broadcaster {
 
     fun unsubscribe(marketId: MarketId, topic: SubscriptionTopic, websocket: Websocket) {
         subscriptions[marketId]?.let { it[topic]?.remove(websocket) }
+        lastPricePublish.remove(Pair(marketId, websocket))
     }
 
     fun unsubscribe(websocket: Websocket) {
-        subscriptions.values.forEach { topicSubscriptions ->
+        subscriptions.forEach { (market, topicSubscriptions) ->
             topicSubscriptions.values.forEach {
                 it.remove(websocket)
             }
+            lastPricePublish.remove(Pair(market, websocket))
         }
     }
 
@@ -84,9 +86,14 @@ class Broadcaster {
         }
     }
 
-    private var mockPrice: Double = 17.2
+    private val mockPrices = ConcurrentHashMap(
+        mapOf(
+            MarketId("ETH/USDC") to 17.2,
+            MarketId("USDC/DAI") to 1.05,
+        ),
+    )
 
-    private fun mockOHLC(startTime: Instant, duration: kotlin.time.Duration, count: Long, full: Boolean): List<OHLC> {
+    private fun mockOHLC(marketId: MarketId, startTime: Instant, duration: kotlin.time.Duration, count: Long, full: Boolean): List<OHLC> {
         fun priceAdjust(range: Double, direction: Int) =
             1 + (rnd.nextDouble() * range) + when (direction) {
                 0 -> -(range / 2)
@@ -94,9 +101,9 @@ class Broadcaster {
                 else -> 0.0
             }
         return (0 until count).map { i ->
-            val curPrice = mockPrice
-            val nextPrice = mockPrice * priceAdjust(if (full) 0.001 else 0.0001, 0)
-            mockPrice = nextPrice
+            val curPrice = mockPrices[marketId]!!
+            val nextPrice = curPrice * priceAdjust(if (full) 0.001 else 0.0001, 0)
+            mockPrices[marketId] = nextPrice
             OHLC(
                 start = startTime.plus((duration.inWholeSeconds * i).seconds),
                 open = curPrice,
@@ -116,13 +123,13 @@ class Broadcaster {
             lastPricePublish[key] = now
             Prices(
                 market = market,
-                ohlc = mockOHLC(now.minus(7.days), 5.minutes, 12 * 24 * 7, true),
+                ohlc = mockOHLC(market, now.minus(7.days), 5.minutes, 12 * 24 * 7, true),
                 full = true,
             )
         } else {
             Prices(
                 market = market,
-                ohlc = mockOHLC(lastPricePublish[key]!!, 1.seconds, (now - lastPricePublish[key]!!).inWholeSeconds, false),
+                ohlc = mockOHLC(market, lastPricePublish[key]!!, 1.seconds, (now - lastPricePublish[key]!!).inWholeSeconds, false),
                 full = false,
             ).also {
                 lastPricePublish[key] = now
@@ -133,36 +140,72 @@ class Broadcaster {
     }
 
     private fun sendOrderBook(marketId: MarketId, websocket: Websocket) {
-        fun stutter() = rnd.nextDouble(-0.5, 0.5)
-        val lastStutter = stutter() / 3.0
-        val orderBook = OrderBook(
-            marketId = marketId,
-            last = LastTrade(String.format("%.2f", (17.5 + lastStutter)), if (lastStutter > 0) LastTradeDirection.Up else LastTradeDirection.Down),
-            buy = listOf(
-                OrderBookEntry("17.75", BigDecimalJson(2.3 + stutter())),
-                OrderBookEntry("18.00", BigDecimalJson(2.8 + stutter())),
-                OrderBookEntry("18.25", BigDecimalJson(5 + stutter())),
-                OrderBookEntry("18.50", BigDecimalJson(10.1 + stutter())),
-                OrderBookEntry("18.75", BigDecimalJson(9.5 + stutter())),
-                OrderBookEntry("19.00", BigDecimalJson(12.4 + stutter())),
-                OrderBookEntry("19.50", BigDecimalJson(14.2 + stutter())),
-                OrderBookEntry("20.00", BigDecimalJson(15.3 + stutter())),
-                OrderBookEntry("20.50", BigDecimalJson(19 + stutter())),
-            ),
-            sell = listOf(
-                OrderBookEntry("17.25", BigDecimalJson(2.1 + stutter())),
-                OrderBookEntry("17.00", BigDecimalJson(5 + stutter())),
-                OrderBookEntry("16.75", BigDecimalJson(5.4 + stutter())),
-                OrderBookEntry("16.50", BigDecimalJson(7.5 + stutter())),
-                OrderBookEntry("16.25", BigDecimalJson(10.1 + stutter())),
-                OrderBookEntry("16.00", BigDecimalJson(7.5 + stutter())),
-                OrderBookEntry("15.50", BigDecimalJson(12.4 + stutter())),
-                OrderBookEntry("15.00", BigDecimalJson(11.3 + stutter())),
-                OrderBookEntry("14.50", BigDecimalJson(14 + stutter())),
-                OrderBookEntry("14.00", BigDecimalJson(19.5 + stutter())),
-            ),
-        )
-        val response: OutgoingWSMessage = OutgoingWSMessage.Publish(orderBook)
-        websocket.send(WsMessage(Json.encodeToString(response)))
+        when (marketId.value) {
+            "ETH/USDC" -> {
+                fun stutter() = rnd.nextDouble(-0.5, 0.5)
+                val lastStutter = stutter() / 3.0
+
+                OrderBook(
+                    marketId = marketId,
+                    last = LastTrade(
+                        String.format("%.2f", (17.5 + lastStutter)),
+                        if (lastStutter > 0) LastTradeDirection.Up else LastTradeDirection.Down,
+                    ),
+                    buy = listOf(
+                        OrderBookEntry("17.75", BigDecimalJson(2.3 + stutter())),
+                        OrderBookEntry("18.00", BigDecimalJson(2.8 + stutter())),
+                        OrderBookEntry("18.25", BigDecimalJson(5 + stutter())),
+                        OrderBookEntry("18.50", BigDecimalJson(10.1 + stutter())),
+                        OrderBookEntry("18.75", BigDecimalJson(9.5 + stutter())),
+                        OrderBookEntry("19.00", BigDecimalJson(12.4 + stutter())),
+                        OrderBookEntry("19.50", BigDecimalJson(14.2 + stutter())),
+                        OrderBookEntry("20.00", BigDecimalJson(15.3 + stutter())),
+                        OrderBookEntry("20.50", BigDecimalJson(19 + stutter())),
+                    ),
+                    sell = listOf(
+                        OrderBookEntry("17.25", BigDecimalJson(2.1 + stutter())),
+                        OrderBookEntry("17.00", BigDecimalJson(5 + stutter())),
+                        OrderBookEntry("16.75", BigDecimalJson(5.4 + stutter())),
+                        OrderBookEntry("16.50", BigDecimalJson(7.5 + stutter())),
+                        OrderBookEntry("16.25", BigDecimalJson(10.1 + stutter())),
+                        OrderBookEntry("16.00", BigDecimalJson(7.5 + stutter())),
+                        OrderBookEntry("15.50", BigDecimalJson(12.4 + stutter())),
+                        OrderBookEntry("15.00", BigDecimalJson(11.3 + stutter())),
+                        OrderBookEntry("14.50", BigDecimalJson(14 + stutter())),
+                        OrderBookEntry("14.00", BigDecimalJson(19.5 + stutter())),
+                    ),
+                )
+            }
+            "USDC/DAI" -> {
+                fun stutter() = rnd.nextDouble(-0.01, 0.01)
+                val lastStutter = stutter()
+
+                OrderBook(
+                    marketId = marketId,
+                    last = LastTrade(
+                        String.format("%.2f", (1.03 + lastStutter)),
+                        if (lastStutter > 0) LastTradeDirection.Up else LastTradeDirection.Down,
+                    ),
+                    buy = listOf(
+                        OrderBookEntry("1.05", BigDecimalJson(100 + stutter())),
+                        OrderBookEntry("1.06", BigDecimalJson(200 + stutter())),
+                        OrderBookEntry("1.07", BigDecimalJson(10 + stutter())),
+                        OrderBookEntry("1.08", BigDecimalJson(150 + stutter())),
+                        OrderBookEntry("1.09", BigDecimalJson(20 + stutter())),
+                    ),
+                    sell = listOf(
+                        OrderBookEntry("1.04", BigDecimalJson(120 + stutter())),
+                        OrderBookEntry("1.03", BigDecimalJson(300 + stutter())),
+                        OrderBookEntry("1.02", BigDecimalJson(100 + stutter())),
+                        OrderBookEntry("1.01", BigDecimalJson(50 + stutter())),
+                        OrderBookEntry("1.00", BigDecimalJson(30 + stutter())),
+                    ),
+                )
+            }
+            else -> null
+        }?.also { orderBook ->
+            val response: OutgoingWSMessage = OutgoingWSMessage.Publish(orderBook)
+            websocket.send(WsMessage(Json.encodeToString(response)))
+        }
     }
 }

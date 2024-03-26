@@ -51,6 +51,7 @@ dependencies {
     implementation("org.http4k:http4k-client-websocket:$http4kVersion")
 
     implementation(project(":backend"))
+    testImplementation(project(mapOf("path" to ":")))
 }
 
 tasks.test {

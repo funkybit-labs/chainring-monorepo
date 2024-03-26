@@ -4,9 +4,19 @@ import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { useAccount } from 'wagmi'
 import { addressDisplay } from 'utils'
 import { Button } from 'components/common/Button'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { Market } from 'ApiClient'
+import { MarketSelector } from 'components/Screens/HomeScreen/MarketSelector'
 
-export function Header() {
+export function Header({
+  markets,
+  selectedMarket,
+  onMarketChange
+}: {
+  markets: Market[]
+  selectedMarket: Market | null
+  onMarketChange: (newValue: Market) => void
+}) {
   const { open: openWalletConnectModal } = useWeb3Modal()
   const account = useAccount()
   const [name, setName] = useState<string>()
@@ -29,32 +39,46 @@ export function Header() {
           alt="ChainRing"
         />
       </span>
-      <span className="m-2">
-        {account.isConnected ? (
-          <Button
-            caption={() => (
-              <span>
-                {icon && (
-                  <img
-                    className="mr-2 inline-block size-8"
-                    src={icon}
-                    alt={name ?? ''}
-                  />
-                )}
-                {addressDisplay(account.address ?? '0x')}
-              </span>
-            )}
-            onClick={() => openWalletConnectModal({ view: 'Account' })}
-            disabled={false}
-          />
-        ) : (
-          <Button
-            caption={() => <>Connect Wallet</>}
-            onClick={() => openWalletConnectModal({ view: 'Networks' })}
-            disabled={false}
-          />
+
+      <div className="flex">
+        {selectedMarket && (
+          <div className="flex items-center gap-4">
+            Market:{' '}
+            <MarketSelector
+              markets={markets}
+              selected={selectedMarket}
+              onChange={onMarketChange}
+            />
+          </div>
         )}
-      </span>
+
+        <span className="m-2">
+          {account.isConnected ? (
+            <Button
+              caption={() => (
+                <span>
+                  {icon && (
+                    <img
+                      className="mr-2 inline-block size-8"
+                      src={icon}
+                      alt={name ?? ''}
+                    />
+                  )}
+                  {addressDisplay(account.address ?? '0x')}
+                </span>
+              )}
+              onClick={() => openWalletConnectModal({ view: 'Account' })}
+              disabled={false}
+            />
+          ) : (
+            <Button
+              caption={() => <>Connect Wallet</>}
+              onClick={() => openWalletConnectModal({ view: 'Networks' })}
+              disabled={false}
+            />
+          )}
+        </span>
+      </div>
     </div>
   )
 }

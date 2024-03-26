@@ -24,6 +24,7 @@ tasks.withType<KotlinCompile> {
 }
 
 val log4j2Version = "2.23.1"
+val exposedVersion = "0.48.0"
 
 dependencies {
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
@@ -33,6 +34,18 @@ dependencies {
 
     implementation("org.awaitility:awaitility-kotlin:4.2.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Database
+    implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-dao:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-kotlin-datetime:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-json:$exposedVersion")
+    implementation("org.postgresql:postgresql:42.3.9")
+    implementation("org.apache.commons:commons-dbcp2:2.12.0")
+
+    // Blockchain client
+    implementation("org.web3j:core:4.10.0") // 4.11 introduces dependency (tech.pegasys:jc-kzg-4844) that is published to cloudsmith repository (https://github.com/web3j/web3j/issues/2013)
 
     implementation(project(":backend"))
 }
@@ -47,6 +60,7 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
         val generateJavaWrapper: Boolean,
         val generateTypescriptAbi: Boolean,
         val generateJavaTestWrapper: Boolean = false,
+        val generateJavaWrapperForFixtures: Boolean = false,
     ) {
         val typeScriptAbiName = "${File(nameInBuildDir).nameWithoutExtension}Abi"
     }
@@ -76,7 +90,8 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
             nameInBuildDir = "MockERC20.sol",
             generateJavaWrapper = false,
             generateTypescriptAbi = false,
-            generateJavaTestWrapper = true
+            generateJavaTestWrapper = true,
+            generateJavaWrapperForFixtures = true
         ),
     )
 
@@ -92,8 +107,9 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
         }
     }
 
-    val javaWrappersOutputDir = File("${projectDir}/backend/src/main/java")
+    val javaBackendWrappersOutputDir = File("${projectDir}/backend/src/main/java")
     val javaTestWrappersOutputDir = File("${projectDir}/integrationtests/src/test/java")
+    val javaWrappersOutputDir = File("${projectDir}/src/main/java")
     val typeScriptAbiOutputDir = File("${projectDir}/web-ui/src/contracts")
 
     contracts.forEach { contract ->
@@ -126,7 +142,7 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
                 commandLine(
                     "bash",
                     "-c",
-                    "web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${javaWrappersOutputDir.absolutePath} -p co.chainring.contracts.generated"
+                    "web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${javaBackendWrappersOutputDir.absolutePath} -p co.chainring.contracts.generated"
                 )
             }.also {
                 if (it.exitValue == 127) {
@@ -142,6 +158,21 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
                     "bash",
                     "-c",
                     "web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${javaTestWrappersOutputDir.absolutePath} -p co.chainring.contracts.generated"
+                )
+            }.also {
+                if (it.exitValue == 127) {
+                    throw Exception("Web3j is missing, please run 'brew tap web3j/web3j && brew install web3j' to install")
+                }
+            }
+        }
+
+        if (contract.generateJavaWrapperForFixtures) {
+            exec {
+                isIgnoreExitValue = true
+                commandLine(
+                    "bash",
+                    "-c",
+                    "web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${javaWrappersOutputDir.absolutePath} -p co.chainring.contracts.generated"
                 )
             }.also {
                 if (it.exitValue == 127) {

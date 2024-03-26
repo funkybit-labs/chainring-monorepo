@@ -69,7 +69,7 @@ function calculateParameters(ohlc: OHLC[]): PriceParameters {
   }
 }
 
-export function Prices({ ws }: { ws: Websocket }) {
+export function Prices({ ws, marketId }: { ws: Websocket; marketId: string }) {
   const [zoom, setZoom] = useState<ZoomLevels>('Week')
   const [latestStart, setLatestStart] = useState<Date | undefined>()
   const [ohlc, setOhlc] = useState<OHLC[]>([])
@@ -81,7 +81,7 @@ export function Prices({ ws }: { ws: Websocket }) {
       ws.send(
         JSON.stringify({
           type: 'Subscribe',
-          marketId: 'BTC/ETH',
+          marketId,
           topic: 'Prices'
         })
       )
@@ -114,13 +114,13 @@ export function Prices({ ws }: { ws: Websocket }) {
         ws.send(
           JSON.stringify({
             type: 'Unsubscribe',
-            marketId: 'BTC/ETH',
+            marketId,
             topic: 'Prices'
           })
         )
       }
     }
-  }, [ws])
+  }, [ws, marketId])
 
   // Allow keyboard zoom and pan
   useEffect(() => {

@@ -11,20 +11,20 @@ import {
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import { Token } from 'ApiClient'
+import { TradingSymbol } from 'ApiClient'
 import { useQuery } from '@tanstack/react-query'
 
 export default function DepositModal({
   exchangeContractAddress,
   walletAddress,
-  token,
+  symbol,
   isOpen,
   close,
   onClosed
 }: {
   exchangeContractAddress: Address
   walletAddress: Address
-  token: Token
+  symbol: TradingSymbol
   isOpen: boolean
   close: () => void
   onClosed: () => void
@@ -32,12 +32,12 @@ export default function DepositModal({
   const config = useConfig()
 
   const walletBalanceQuery = useQuery({
-    queryKey: ['walletBalance', token.symbol],
+    queryKey: ['walletBalance', symbol.name],
     queryFn: async function () {
-      return 'address' in token
+      return symbol.contractAddress
         ? await readContract(config, {
             abi: ERC20Abi,
-            address: token.address,
+            address: symbol.contractAddress,
             functionName: 'balanceOf',
             args: [walletAddress]
           })
@@ -67,7 +67,7 @@ export default function DepositModal({
 
     try {
       if (walletBalanceQuery.status == 'success') {
-        const parsedAmount = parseUnits(amount, token.decimals)
+        const parsedAmount = parseUnits(amount, symbol.decimals)
         const availableAmount = walletBalanceQuery.data
         return parsedAmount > 0 && parsedAmount <= availableAmount
       } else {
@@ -79,14 +79,14 @@ export default function DepositModal({
   })()
 
   async function onSubmit() {
-    const parsedAmount = parseUnits(amount, token.decimals)
+    const parsedAmount = parseUnits(amount, symbol.decimals)
     if (canSubmit) {
       try {
-        if ('address' in token) {
+        if (symbol.contractAddress) {
           setSubmitPhase('waitingForAllowanceApproval')
           const approveHash = await writeContractAsync({
             abi: ERC20Abi,
-            address: token.address,
+            address: symbol.contractAddress,
             functionName: 'approve',
             args: [exchangeContractAddress, parsedAmount]
           })
@@ -101,7 +101,7 @@ export default function DepositModal({
             abi: ExchangeAbi,
             address: exchangeContractAddress,
             functionName: 'deposit',
-            args: [token.address, parsedAmount]
+            args: [symbol.contractAddress, parsedAmount]
           })
 
           setSubmitPhase('waitingForDepositReceipt')
@@ -134,7 +134,7 @@ export default function DepositModal({
       isOpen={isOpen}
       close={close}
       onClosed={onClosed}
-      title={`Deposit ${token.symbol}`}
+      title={`Deposit ${symbol.name}`}
     >
       <div className="h-52 overflow-y-auto">
         <ModalAsyncContent
@@ -144,13 +144,13 @@ export default function DepositModal({
               <>
                 <AmountInput
                   value={amount}
-                  symbol={token.symbol}
+                  symbol={symbol.name}
                   disabled={submitPhase !== null}
                   onChange={onAmountChange}
                 />
                 <p className="mt-1 text-center text-sm text-neutralGray">
                   Available balance:{' '}
-                  {formatUnits(walletBalance, token.decimals)}
+                  {formatUnits(walletBalance, symbol.decimals)}
                 </p>
 
                 <SubmitButton
