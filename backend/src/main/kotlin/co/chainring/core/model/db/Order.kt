@@ -2,11 +2,13 @@ package co.chainring.core.model.db
 
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrderApiResponse
+import co.chainring.core.model.Address
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.update
 import java.math.BigInteger
@@ -39,7 +41,8 @@ enum class OrderStatus {
     Partial,
     Filled,
     Cancelled,
-    Expired, ;
+    Expired,
+    ;
 
     fun isFinal(): Boolean {
         return this in listOf(Filled, Cancelled, Expired)
@@ -51,6 +54,7 @@ object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
     val marketGuid = reference("market_guid", MarketTable).index()
+    val ownerAddress = varchar("owner_address", 10485760).index()
     val status = customEnumeration(
         "status",
         "OrderStatus",
@@ -88,7 +92,16 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 side = this.side,
                 amount = this.amount,
                 originalAmount = this.originalAmount,
-                execution = null,
+                executions = OrderExecutionEntity.findForOrder(this).map { execution ->
+                    Order.Execution(
+                        timestamp = execution.timestamp,
+                        amount = execution.trade.amount,
+                        price = execution.trade.price,
+                        role = execution.role,
+                        feeAmount = execution.feeAmount,
+                        feeSymbol = execution.feeSymbol,
+                    )
+                },
                 timing = Order.Timing(
                     createdAt = this.createdAt,
                     updatedAt = this.updatedAt,
@@ -104,7 +117,16 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 amount = this.amount,
                 originalAmount = this.originalAmount,
                 price = this.price!!,
-                execution = null,
+                executions = OrderExecutionEntity.findForOrder(this).map { execution ->
+                    Order.Execution(
+                        timestamp = execution.timestamp,
+                        amount = execution.trade.amount,
+                        price = execution.trade.price,
+                        role = execution.role,
+                        feeAmount = execution.feeAmount,
+                        feeSymbol = execution.feeSymbol,
+                    )
+                },
                 timing = Order.Timing(
                     createdAt = this.createdAt,
                     updatedAt = this.updatedAt,
@@ -118,6 +140,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         fun create(
             nonce: String,
             market: MarketEntity,
+            ownerAddress: Address,
             type: OrderType,
             side: OrderSide,
             amount: BigInteger,
@@ -128,6 +151,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             this.createdAt = now
             this.createdBy = "system"
             this.market = market
+            this.ownerAddress = ownerAddress
             this.status = OrderStatus.Open
             this.type = type
             this.side = side
@@ -142,13 +166,17 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             }.firstOrNull()
         }
 
-        fun findAll(): List<OrderEntity> {
-            return OrderEntity.all().toList()
+        fun listOrders(ownerAddress: Address): List<OrderEntity> {
+            return OrderEntity.find {
+                OrderTable.ownerAddress.eq(ownerAddress.value)
+            }.toList()
         }
 
-        fun cancelAll() {
+        fun cancelAll(ownerAddress: Address) {
             val now = Clock.System.now()
-            OrderTable.update({ OrderTable.status.inList(listOf(OrderStatus.Open, OrderStatus.Partial)) }) {
+            OrderTable.update({
+                OrderTable.status.inList(listOf(OrderStatus.Open, OrderStatus.Partial)) and OrderTable.ownerAddress.eq(ownerAddress.value)
+            }) {
                 it[this.status] = OrderStatus.Cancelled
                 it[this.closedAt] = now
             }
@@ -172,6 +200,10 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
     var createdAt by OrderTable.createdAt
     var createdBy by OrderTable.createdBy
     var marketGuid by OrderTable.marketGuid
+    var ownerAddress by OrderTable.ownerAddress.transform(
+        toReal = { Address(it) },
+        toColumn = { it.value },
+    )
     var market by MarketEntity referencedOn OrderTable.marketGuid
     var status by OrderTable.status
     var type by OrderTable.type

@@ -1,5 +1,6 @@
 package co.chainring.apps.api
 
+import co.chainring.apps.api.middleware.principal
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.OrderApiResponse
@@ -11,6 +12,7 @@ import co.chainring.apps.api.model.orderIsClosedError
 import co.chainring.apps.api.model.orderNotFoundError
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.OrderEntity
+import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.OrderType
@@ -72,6 +74,7 @@ object OrderRoutes {
                             ?: OrderEntity.create(
                                 nonce = apiRequest.nonce,
                                 market = market,
+                                ownerAddress = request.principal,
                                 type = when (apiRequest) {
                                     is CreateOrderApiRequest.Market -> OrderType.Market
                                     is CreateOrderApiRequest.Limit -> OrderType.Limit
@@ -209,14 +212,13 @@ object OrderRoutes {
                     orders = listOf(Examples.marketOrderResponse, Examples.limitOrderResponse),
                 ),
             )
-        } bindContract Method.GET to { _ ->
+        } bindContract Method.GET to { request: Request ->
             val orders = transaction {
-                // TODO filter by current user
-                OrderEntity.findAll()
+                OrderEntity.listOrders(request.principal).map { it.toOrderResponse() }
             }
             Response(Status.OK).with(
                 responseBody of OrdersApiResponse(
-                    orders = orders.map { it.toOrderResponse() },
+                    orders = orders,
                 ),
             )
         }
@@ -226,10 +228,9 @@ object OrderRoutes {
         return "orders" meta {
             operationId = "cancel-open-orders"
             summary = "Cancel open orders"
-        } bindContract Method.DELETE to { _ ->
+        } bindContract Method.DELETE to { request ->
             transaction {
-                // TODO filter by current user
-                OrderEntity.cancelAll()
+                OrderEntity.cancelAll(request.principal)
             }
             Response(Status.NO_CONTENT)
         }
@@ -269,10 +270,16 @@ object OrderRoutes {
             val timestamp = request.query("before-timestamp")?.toInstant() ?: Instant.DISTANT_FUTURE
             val limit = request.query("limit")?.toInt() ?: 100
 
+            val trades = transaction {
+                OrderExecutionEntity.listExecutions(
+                    ownerAddress = request.principal,
+                    beforeTimestamp = timestamp,
+                    limit = limit,
+                ).map { it.toTradeResponse() }
+            }
+
             Response(Status.OK).with(
-                responseBody of TradesApiResponse(
-                    emptyList(),
-                ),
+                responseBody of TradesApiResponse(trades = trades),
             )
         }
     }
