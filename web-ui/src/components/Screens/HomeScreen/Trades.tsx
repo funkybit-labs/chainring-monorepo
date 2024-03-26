@@ -29,7 +29,7 @@ export default function Trades({ ws }: { ws: Websocket }) {
       if (message.type == 'Publish' && message.data.type == 'Trades') {
         const incomingTrades = message.data.trades
         setTrades((currentTrades) => {
-          return incomingTrades.concat(currentTrades)s
+          return incomingTrades.concat(currentTrades)
         })
       }
     }
