@@ -5,6 +5,21 @@ export default [
     },
     {
         "type": "function",
+        "name": "DOMAIN_SEPARATOR",
+        "inputs": [
+            
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "bytes32",
+                "internalType": "bytes32"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
         "name": "UPGRADE_INTERFACE_VERSION",
         "inputs": [
             
@@ -64,6 +79,51 @@ export default [
     },
     {
         "type": "function",
+        "name": "eip712Domain",
+        "inputs": [
+            
+        ],
+        "outputs": [
+            {
+                "name": "fields",
+                "type": "bytes1",
+                "internalType": "bytes1"
+            },
+            {
+                "name": "name",
+                "type": "string",
+                "internalType": "string"
+            },
+            {
+                "name": "version",
+                "type": "string",
+                "internalType": "string"
+            },
+            {
+                "name": "chainId",
+                "type": "uint256",
+                "internalType": "uint256"
+            },
+            {
+                "name": "verifyingContract",
+                "type": "address",
+                "internalType": "address"
+            },
+            {
+                "name": "salt",
+                "type": "bytes32",
+                "internalType": "bytes32"
+            },
+            {
+                "name": "extensions",
+                "type": "uint256[]",
+                "internalType": "uint256[]"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
         "name": "getVersion",
         "inputs": [
             
@@ -81,7 +141,11 @@ export default [
         "type": "function",
         "name": "initialize",
         "inputs": [
-            
+            {
+                "name": "_submitter",
+                "type": "address",
+                "internalType": "address"
+            }
         ],
         "outputs": [
             
@@ -103,6 +167,25 @@ export default [
                 "name": "",
                 "type": "uint256",
                 "internalType": "uint256"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "nonces",
+        "inputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "uint64",
+                "internalType": "uint64"
             }
         ],
         "stateMutability": "view"
@@ -150,6 +233,51 @@ export default [
     },
     {
         "type": "function",
+        "name": "setSubmitter",
+        "inputs": [
+            {
+                "name": "_submitter",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            
+        ],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "submitTransactions",
+        "inputs": [
+            {
+                "name": "transactions",
+                "type": "bytes[]",
+                "internalType": "bytes[]"
+            }
+        ],
+        "outputs": [
+            
+        ],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "submitter",
+        "inputs": [
+            
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
         "name": "transferOwnership",
         "inputs": [
             {
@@ -162,6 +290,21 @@ export default [
             
         ],
         "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "txProcessedCount",
+        "inputs": [
+            
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "stateMutability": "view"
     },
     {
         "type": "function",
@@ -240,6 +383,14 @@ export default [
                 "indexed": false,
                 "internalType": "uint256"
             }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "EIP712DomainChanged",
+        "inputs": [
+            
         ],
         "anonymous": false
     },
@@ -326,6 +477,35 @@ export default [
     },
     {
         "type": "error",
+        "name": "ECDSAInvalidSignature",
+        "inputs": [
+            
+        ]
+    },
+    {
+        "type": "error",
+        "name": "ECDSAInvalidSignatureLength",
+        "inputs": [
+            {
+                "name": "length",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ]
+    },
+    {
+        "type": "error",
+        "name": "ECDSAInvalidSignatureS",
+        "inputs": [
+            {
+                "name": "s",
+                "type": "bytes32",
+                "internalType": "bytes32"
+            }
+        ]
+    },
+    {
+        "type": "error",
         "name": "ERC1967InvalidImplementation",
         "inputs": [
             {
@@ -340,17 +520,6 @@ export default [
         "name": "ERC1967NonPayable",
         "inputs": [
             
-        ]
-    },
-    {
-        "type": "error",
-        "name": "ErrorInsufficientBalance",
-        "inputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
         ]
     },
     {

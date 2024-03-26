@@ -1,10 +1,15 @@
 package co.chainring.integrationtests.testutils
 
+import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.DeployedContract
 import co.chainring.apps.api.model.Symbol
+import co.chainring.apps.api.model.WithdrawTx
 import co.chainring.contracts.generated.Exchange
 import co.chainring.core.blockchain.ContractType
+import co.chainring.core.evm.EIP712Helper
+import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
+import co.chainring.core.model.EvmSignature
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import java.math.BigInteger
 
@@ -17,7 +22,7 @@ class Wallet(
     val blockchainClient: TestBlockchainClient,
     val walletKeypair: TestWalletKeypair,
     val contracts: List<DeployedContract>,
-    val erc20Tokens: List<Symbol>,
+    val symbols: List<Symbol>,
 ) {
 
     private val exchangeContractAddress = contracts.first { it.name == ContractType.Exchange.name }.address
@@ -52,6 +57,17 @@ class Wallet(
         return exchangeContract.withdraw(erc20TokenAddress(symbol), amount).send()
     }
 
+    fun signWithdraw(symbol: String?, amount: BigInteger, nonceOverride: BigInteger? = null): CreateWithdrawalApiRequest {
+        val nonce = nonceOverride ?: getNonce()
+        val tx = EIP712Transaction.WithdrawTx(walletKeypair.address, symbol?.let { Address(erc20TokenAddress(symbol)) }, amount, nonce.toLong(), EvmSignature.emptySignature())
+        val signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress))
+        return CreateWithdrawalApiRequest(WithdrawTx(tx.sender, tx.token, tx.amount, tx.nonce), signature)
+    }
+
+    fun getNonce(): BigInteger {
+        return exchangeContract.nonces(walletKeypair.address.value).send()
+    }
+
     fun withdrawNative(amount: BigInteger): TransactionReceipt {
         return exchangeContract.withdraw(amount).send()
     }
@@ -63,5 +79,5 @@ class Wallet(
     private fun loadErc20Contract(symbol: String) = blockchainClient.loadERC20Mock(erc20TokenAddress(symbol))
 
     private fun erc20TokenAddress(symbol: String) =
-        erc20Tokens.first { it.name == symbol && it.contractAddress != null }.contractAddress!!.value
+        symbols.first { it.name == symbol && it.contractAddress != null }.contractAddress!!.value
 }

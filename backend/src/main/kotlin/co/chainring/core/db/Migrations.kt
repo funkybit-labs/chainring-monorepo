@@ -1,5 +1,6 @@
 package co.chainring.core.db
 
+import co.chainring.core.model.db.migrations.V10_WithdrawalTable
 import co.chainring.core.model.db.migrations.V1_DeployedSmartContract
 import co.chainring.core.model.db.migrations.V2_ERC20Token
 import co.chainring.core.model.db.migrations.V3_UpdateDeployedSmartContract
@@ -20,4 +21,5 @@ val migrations = listOf(
     V7_OrderTable(),
     V8_ExecutionsAndTrades(),
     V9_SymbolTable(),
+    V10_WithdrawalTable(),
 )

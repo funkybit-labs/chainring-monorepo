@@ -4,6 +4,9 @@ import co.chainring.contracts.generated.MockERC20
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.model.Address
+import co.chainring.core.model.EvmSignature
+import co.chainring.core.utils.toHex
+import org.web3j.crypto.Sign
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.Transfer
@@ -23,5 +26,10 @@ class TestBlockchainClient(val config: BlockchainClientConfig = BlockchainClient
             web3j.ethGasPrice().send().gasPrice,
             config.contractCreationLimit,
         ).send()
+    }
+
+    fun signData(hash: ByteArray): EvmSignature {
+        val signature = Sign.signMessage(hash, credentials.ecKeyPair, false)
+        return EvmSignature((signature.r + signature.s + signature.v).toHex())
     }
 }
