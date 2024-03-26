@@ -9,7 +9,7 @@ on:
 # execute jobs sequentially per branch, needed to keep correct order of deployments
 concurrency:
   group: ${{ github.ref_name }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.ref_name != 'refs/heads/main' }}
 
 jobs:
   build_push_backend:
