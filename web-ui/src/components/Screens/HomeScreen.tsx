@@ -57,20 +57,25 @@ export default function HomeScreen() {
       <div className="flex h-screen w-screen flex-col gap-4 px-4 pt-24">
         <div className="flex gap-4">
           {selectedMarket && (
-            <div className="flex flex-col">
-              <OrderBook ws={ws} marketId={selectedMarket.id} />
-            </div>
+            <>
+              <div className="flex flex-col">
+                <OrderBook ws={ws} marketId={selectedMarket.id} />
+              </div>
+              <div className="flex flex-col">
+                <Prices ws={ws} marketId={selectedMarket.id} />
+              </div>
+              <div className="flex flex-col">
+                {walletAddress && exchangeContract && symbols && (
+                  <>
+                    <Trade
+                      baseSymbol={selectedMarket.baseSymbol}
+                      quoteSymbol={selectedMarket.quoteSymbol}
+                    />
+                  </>
+                )}
+              </div>
+            </>
           )}
-          <div className="flex flex-col">
-            <Prices ws={ws} />
-          </div>
-          <div className="flex flex-col">
-            {walletAddress && exchangeContract && symbols && (
-              <>
-                <Trade baseSymbol={'ETH'} quoteSymbol={'USDC'} />
-              </>
-            )}
-          </div>
         </div>
         <div className="flex gap-4">
           <div className="flex flex-col">

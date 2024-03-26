@@ -1,18 +1,27 @@
 package co.chainring.core.model.db.migrations
 
 import co.chainring.core.db.Migration
-import co.chainring.core.model.db.ChainTable
+import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.ChainIdColumnType
 import co.chainring.core.model.db.GUIDTable
 import co.chainring.core.model.db.SymbolId
+import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.dao.id.IdTable
+import org.jetbrains.exposed.sql.Column
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.transactions.transaction
 
 @Suppress("ClassName")
 class V9_SymbolTable : Migration() {
+    private object V9_ChainTable : IdTable<ChainId>("chain") {
+        override val id: Column<EntityID<ChainId>> = registerColumn<ChainId>("id", ChainIdColumnType()).entityId()
+        override val primaryKey = PrimaryKey(id)
+    }
+
     private object V9_SymbolTable : GUIDTable<SymbolId>("symbol", ::SymbolId) {
         val name = varchar("name", 10485760)
-        val chainId = reference("chain_id", ChainTable)
+        val chainId = reference("chain_id", V9_ChainTable)
         val contractAddress = varchar("contract_address", 10485760).nullable()
         val decimals = ubyte("decimals")
         val description = varchar("description", 10485760)

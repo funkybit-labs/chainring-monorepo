@@ -92,7 +92,7 @@ export default function Trade({
               )}
               onClick={() => !mutation.isPending && setSide('Sell')}
             >
-              Sell {baseSymbol}
+              Sell {quoteSymbol}
             </div>
           </div>
           <table>

@@ -52,13 +52,15 @@ class Broadcaster {
 
     fun unsubscribe(marketId: MarketId, topic: SubscriptionTopic, websocket: Websocket) {
         subscriptions[marketId]?.let { it[topic]?.remove(websocket) }
+        lastPricePublish.remove(Pair(marketId, websocket))
     }
 
     fun unsubscribe(websocket: Websocket) {
-        subscriptions.values.forEach { topicSubscriptions ->
+        subscriptions.forEach { (market, topicSubscriptions) ->
             topicSubscriptions.values.forEach {
                 it.remove(websocket)
             }
+            lastPricePublish.remove(Pair(market, websocket))
         }
     }
 
@@ -84,9 +86,14 @@ class Broadcaster {
         }
     }
 
-    private var mockPrice: Double = 17.2
+    private val mockPrices = ConcurrentHashMap(
+        mapOf(
+            MarketId("ETH/USDC") to 17.2,
+            MarketId("USDC/DAI") to 1.05,
+        ),
+    )
 
-    private fun mockOHLC(startTime: Instant, duration: kotlin.time.Duration, count: Long, full: Boolean): List<OHLC> {
+    private fun mockOHLC(marketId: MarketId, startTime: Instant, duration: kotlin.time.Duration, count: Long, full: Boolean): List<OHLC> {
         fun priceAdjust(range: Double, direction: Int) =
             1 + (rnd.nextDouble() * range) + when (direction) {
                 0 -> -(range / 2)
@@ -94,9 +101,9 @@ class Broadcaster {
                 else -> 0.0
             }
         return (0 until count).map { i ->
-            val curPrice = mockPrice
-            val nextPrice = mockPrice * priceAdjust(if (full) 0.001 else 0.0001, 0)
-            mockPrice = nextPrice
+            val curPrice = mockPrices[marketId]!!
+            val nextPrice = curPrice * priceAdjust(if (full) 0.001 else 0.0001, 0)
+            mockPrices[marketId] = nextPrice
             OHLC(
                 start = startTime.plus((duration.inWholeSeconds * i).seconds),
                 open = curPrice,
@@ -116,13 +123,13 @@ class Broadcaster {
             lastPricePublish[key] = now
             Prices(
                 market = market,
-                ohlc = mockOHLC(now.minus(7.days), 5.minutes, 12 * 24 * 7, true),
+                ohlc = mockOHLC(market, now.minus(7.days), 5.minutes, 12 * 24 * 7, true),
                 full = true,
             )
         } else {
             Prices(
                 market = market,
-                ohlc = mockOHLC(lastPricePublish[key]!!, 1.seconds, (now - lastPricePublish[key]!!).inWholeSeconds, false),
+                ohlc = mockOHLC(market, lastPricePublish[key]!!, 1.seconds, (now - lastPricePublish[key]!!).inWholeSeconds, false),
                 full = false,
             ).also {
                 lastPricePublish[key] = now
