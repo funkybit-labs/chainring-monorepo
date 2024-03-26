@@ -92,7 +92,7 @@ export default function Order({
               )}
               onClick={() => !mutation.isPending && setSide('Sell')}
             >
-              Sell {baseSymbol}
+              Sell {quoteSymbol}
             </div>
           </div>
           <table>

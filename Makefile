@@ -24,8 +24,13 @@ publish_containers:
 ui_server:
 	cd web-ui && pnpm install && pnpm run dev
 
-local_init:
-	scripts/local/local_init.sh
+db_migrate:
+	./gradlew :run --args="db:migrate"
+
+db_seed:
+	./gradlew :run --args="db:seed"
+
+local_init: start_containers contracts db_migrate db_seed
 
 lint:
 	./gradlew lintKotlin && cd web-ui && pnpm run lint

@@ -1,6 +1,5 @@
 package co.chainring.core.model.db
 
-import co.chainring.core.model.Symbol
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.Entity
 import org.jetbrains.exposed.dao.EntityClass
@@ -58,21 +57,19 @@ object ChainTable : IdTable<ChainId>("chain") {
     override val primaryKey = PrimaryKey(id)
 
     val name = varchar("name", 10485760)
-    val nativeTokenSymbol = varchar("native_token_symbol", 10485760)
-    val nativeTokenName = varchar("native_token_name", 10485760)
-    val nativeTokenDecimals = ubyte("native_token_decimals")
 }
 
 class ChainEntity(id: EntityID<ChainId>) : Entity<ChainId>(id) {
     var name by ChainTable.name
-    var nativeTokenSymbol by ChainTable.nativeTokenSymbol.transform(
-        toColumn = { it.value },
-        toReal = { Symbol(it) },
-    )
-    var nativeTokenName by ChainTable.nativeTokenName
-    var nativeTokenDecimals by ChainTable.nativeTokenDecimals
 
     companion object : EntityClass<ChainId, ChainEntity>(ChainTable) {
+        fun create(
+            id: ChainId,
+            name: String,
+        ) = ChainEntity.new(id) {
+            this.name = name
+        }
+
         override fun all(): SizedIterable<ChainEntity> =
             wrapRows(table.selectAll().orderBy(table.id, SortOrder.ASC).notForUpdate())
     }
