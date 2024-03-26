@@ -138,22 +138,18 @@ export type OrderBookEntry = z.infer<typeof OrderBookEntrySchema>
 const DirectionSchema = z.enum(['Up', 'Down'])
 export type Direction = z.infer<typeof DirectionSchema>
 
-export type Trade = {
-  id: string
-  timestamp: string
-  orderId: string
-  marketId: string
-  side: OrderSide
-  amount: number
-  price: number
-  feeAmount: number
-  feeSymbol: string
-}
-
-export type Trades = {
-  type: 'Trades'
-  trades: Trade[]
-}
+const TradeSchema = z.object({
+  id: z.string(),
+  timestamp: z.coerce.date(),
+  orderId: z.string(),
+  marketId: z.string(),
+  side: OrderSideSchema,
+  amount: z.number(),
+  price: z.number(),
+  feeAmount: z.number(),
+  feeSymbol: z.string()
+})
+export type Trade = z.infer<typeof TradeSchema>
 
 const LastTradeSchema = z.object({
   price: z.string(),
@@ -186,6 +182,12 @@ const PricesSchema = z.object({
   ohlc: z.array(OHLCSchema)
 })
 export type Prices = z.infer<typeof PricesSchema>
+
+const TradesSchema = z.object({
+  type: z.literal('Trades'),
+  trades: z.array(TradeSchema)
+})
+export type Trades = z.infer<typeof TradesSchema>
 
 export type Publish = {
   type: 'Publish'

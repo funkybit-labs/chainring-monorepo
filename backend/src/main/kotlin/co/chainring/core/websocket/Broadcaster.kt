@@ -1,7 +1,6 @@
 package co.chainring.core.websocket
 
 import co.chainring.apps.api.model.BigDecimalJson
-import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.apps.api.model.LastTrade
 import co.chainring.apps.api.model.LastTradeDirection
 import co.chainring.apps.api.model.OHLC
@@ -13,7 +12,6 @@ import co.chainring.apps.api.model.SubscriptionTopic
 import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.WsTrades
 import co.chainring.core.model.Symbol
-import co.chainring.core.model.TradeId
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
@@ -22,18 +20,18 @@ import co.chainring.core.utils.Timer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import java.math.BigInteger
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.http4k.websocket.Websocket
 import org.http4k.websocket.WsMessage
+import java.math.BigDecimal
+import java.math.BigInteger
+import java.math.RoundingMode
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.max
 import kotlin.math.min
-import kotlinx.datetime.Clock
-import kotlin.math.sin
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
@@ -55,9 +53,11 @@ class Broadcaster {
         }.getOrPut(topic) {
             Subscriptions()
         }.addIfAbsent(websocket)
+        val lastStutter = rnd.nextDouble(-0.5, 0.5) / 3.0
         when (topic) {
-            SubscriptionTopic.OrderBook -> sendOrderBook(market, websocket)
+            SubscriptionTopic.OrderBook -> sendOrderBook(market, websocket, lastStutter)
             SubscriptionTopic.Prices -> sendPrices(market, websocket)
+            SubscriptionTopic.Trades -> sendTrades(market, websocket, lastStutter)
         }
     }
 
@@ -86,11 +86,16 @@ class Broadcaster {
 
     private fun publishData() {
         subscriptions.forEach { (marketId, topicSubscriptions) ->
+            val lastStutter = rnd.nextDouble(-0.5, 0.5) / 3.0
+
             topicSubscriptions[SubscriptionTopic.OrderBook]?.forEach { websocket ->
-                sendOrderBook(marketId, websocket)
+                sendOrderBook(marketId, websocket, lastStutter)
             }
             topicSubscriptions[SubscriptionTopic.Prices]?.forEach { websocket ->
                 sendPrices(marketId, websocket)
+            }
+            topicSubscriptions[SubscriptionTopic.Trades]?.forEach { websocket ->
+                sendTrades(marketId, websocket, lastStutter)
             }
         }
     }
@@ -141,8 +146,7 @@ class Broadcaster {
         websocket.send(WsMessage(Json.encodeToString(response)))
     }
 
-    private fun sendTrades(marketId: MarketId, websocket: Websocket) {
-        fun stutter() = rnd.nextDouble(-0.5, 0.5)
+    private fun sendTrades(marketId: MarketId, websocket: Websocket, lastStutter: Double) {
         val trades = WsTrades(
             trades = listOf(
                 Trade(
@@ -150,22 +154,21 @@ class Broadcaster {
                     timestamp = Clock.System.now(),
                     orderId = OrderId.generate(),
                     marketId = marketId,
-                    side = if (rnd.nextBoolean()) OrderSide.Buy else OrderSide.Sell,
-                    amount = BigIntegerJson(rnd.nextInt().toString()),
-                    price = BigIntegerJson(rnd.nextInt().toString()),
+                    side = if (lastStutter > 0) OrderSide.Buy else OrderSide.Sell,
+                    amount = BigDecimal(rnd.nextDouble(0.00001, 0.5)).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
+                    price = BigDecimal(17.5 + lastStutter).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
                     feeAmount = BigInteger.ZERO,
                     feeSymbol = Symbol(marketId.value.split("/")[0]),
-                )
-            )
+                ),
+            ),
         )
 
         val response: OutgoingWSMessage = OutgoingWSMessage.Publish(trades)
         websocket.send(WsMessage(Json.encodeToString(response)))
     }
 
-    private fun sendOrderBook(marketId: MarketId, websocket: Websocket) {
+    private fun sendOrderBook(marketId: MarketId, websocket: Websocket, lastStutter: Double) {
         fun stutter() = rnd.nextDouble(-0.5, 0.5)
-        val lastStutter = stutter() / 3.0
         val orderBook = OrderBook(
             marketId = marketId,
             last = LastTrade(String.format("%.2f", (17.5 + lastStutter)), if (lastStutter > 0) LastTradeDirection.Up else LastTradeDirection.Down),
@@ -195,5 +198,9 @@ class Broadcaster {
         )
         val response: OutgoingWSMessage = OutgoingWSMessage.Publish(orderBook)
         websocket.send(WsMessage(Json.encodeToString(response)))
+    }
+
+    fun BigDecimal.toFundamentalUnits(decimals: Int): BigInteger {
+        return (this * BigDecimal("1e$decimals")).toBigInteger()
     }
 }
