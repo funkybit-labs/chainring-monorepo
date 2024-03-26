@@ -4,12 +4,10 @@ import co.chainring.core.db.Migration
 import co.chainring.core.model.db.ExecutionId
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.GUIDTable
-import co.chainring.core.model.db.MarketTable
+import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
-import co.chainring.core.model.db.OrderTable
 import co.chainring.core.model.db.PGEnum
 import co.chainring.core.model.db.TradeId
-import co.chainring.core.model.db.TradeTable
 import co.chainring.core.model.db.enumDeclaration
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -18,6 +16,8 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 @Suppress("ClassName")
 class V8_ExecutionsAndTrades : Migration() {
+
+    object V8_MarketTable : GUIDTable<MarketId>("market", ::MarketId)
 
     object V8_OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
         val ownerAddress = varchar("owner_address", 10485760).nullable().index()
@@ -32,7 +32,7 @@ class V8_ExecutionsAndTrades : Migration() {
 
     object V8_TradeTable : GUIDTable<TradeId>("trade", ::TradeId) {
         val createdAt = timestamp("created_at")
-        val marketGuid = reference("market_guid", MarketTable).index()
+        val marketGuid = reference("market_guid", V8_MarketTable).index()
         val timestamp = timestamp("timestamp")
         val amount = decimal("amount", 30, 0)
         val price = decimal("price", 30, 0)
@@ -54,8 +54,8 @@ class V8_ExecutionsAndTrades : Migration() {
     object V8_OrderExecutionTable : GUIDTable<ExecutionId>("order_execution", ::ExecutionId) {
         val createdAt = timestamp("created_at")
         val timestamp = timestamp("timestamp")
-        val orderGuid = reference("order_guid", OrderTable).index()
-        val tradeGuid = reference("trade_guid", TradeTable).index()
+        val orderGuid = reference("order_guid", V8_OrderTable).index()
+        val tradeGuid = reference("trade_guid", V8_TradeTable).index()
         val role = customEnumeration(
             "role",
             "ExecutionRole",
