@@ -1,4 +1,4 @@
-import { OutgoingWSMessage, Trade } from 'ApiClient'
+import { IncomingWSMessage, Trade } from 'ApiClient'
 import { useEffect, useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import { Websocket, WebsocketEvent } from 'websocket-ts'
@@ -25,11 +25,11 @@ export default function Trades({ ws }: { ws: Websocket }) {
       ws.addEventListener(WebsocketEvent.open, subscribe)
     }
     const handleMessage = (ws: Websocket, event: MessageEvent) => {
-      const message = JSON.parse(event.data) as OutgoingWSMessage
+      const message = JSON.parse(event.data) as IncomingWSMessage
       if (message.type == 'Publish' && message.data.type == 'Trades') {
         const incomingTrades = message.data.trades
         setTrades((currentTrades) => {
-          return incomingTrades.concat(currentTrades)
+          return incomingTrades.concat(currentTrades)s
         })
       }
     }
