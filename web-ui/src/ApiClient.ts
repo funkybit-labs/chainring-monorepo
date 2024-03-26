@@ -157,7 +157,10 @@ const LastTradeSchema = z.object({
 })
 export type LastTrade = z.infer<typeof LastTradeSchema>
 
-const OrderBookSchema = z.object({
+const IncomingWSMessageTypeSchema = z.enum(['OrderBook', 'Prices'])
+export type IncomingWSMessageType = z.infer<typeof IncomingWSMessageTypeSchema>
+
+export const OrderBookSchema = z.object({
   type: z.literal('OrderBook'),
   buy: z.array(OrderBookEntrySchema),
   sell: z.array(OrderBookEntrySchema),
@@ -166,7 +169,7 @@ const OrderBookSchema = z.object({
 export type OrderBook = z.infer<typeof OrderBookSchema>
 
 const OHLCSchema = z.object({
-  start: z.date(),
+  start: z.coerce.date(),
   durationMs: z.number(),
   open: z.number(),
   high: z.number(),
@@ -176,7 +179,7 @@ const OHLCSchema = z.object({
 })
 export type OHLC = z.infer<typeof OHLCSchema>
 
-const PricesSchema = z.object({
+export const PricesSchema = z.object({
   type: z.literal('Prices'),
   full: z.boolean(),
   ohlc: z.array(OHLCSchema)
@@ -201,7 +204,7 @@ const PublishableSchema = z.discriminatedUnion('type', [
 ])
 export type Publishable = z.infer<typeof PublishableSchema>
 
-export type OutgoingWSMessage = Publish
+export type IncomingWSMessage = Publish
 
 export const apiClient = new Zodios(apiBaseUrl, [
   {
