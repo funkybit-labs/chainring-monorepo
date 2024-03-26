@@ -16,7 +16,7 @@ repositories {
 val exposedVersion = "0.48.0"
 val log4j2Version = "2.23.1"
 val kotlinxSerializationVersion = "1.6.3"
-val http4kVersion = "5.14.0.0"
+val http4kVersion = "5.14.1.0"
 
 dependencies {
     testImplementation(kotlin("test"))
@@ -25,7 +25,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinxSerializationVersion")
 
     // Blockchain client
-    implementation("org.web3j:core:4.10.0") // 4.11 introduces dependency (tech.pegasys:jc-kzg-4844) that is published to cloudsmith repository (https://github.com/web3j/web3j/issues/2013)
+    implementation("org.web3j:core:4.10.3") // 4.11 introduces dependency (tech.pegasys:jc-kzg-4844) that is published to cloudsmith repository (https://github.com/web3j/web3j/issues/2013)
 
     // Database
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
@@ -34,7 +34,8 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-kotlin-datetime:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-json:$exposedVersion")
     implementation("org.postgresql:postgresql:42.3.9")
-    implementation("org.apache.commons:commons-dbcp2:2.7.0")
+    implementation("org.apache.commons:commons-compress:1.26.1")
+    implementation("org.apache.commons:commons-dbcp2:2.12.0")
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
