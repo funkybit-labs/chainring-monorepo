@@ -5,7 +5,13 @@ import { Websocket, WebsocketEvent } from 'websocket-ts'
 import { formatUnits } from 'viem'
 import { format } from 'date-fns'
 
-export default function Trades({ ws }: { ws: Websocket }) {
+export default function Trades({
+  ws,
+  marketId
+}: {
+  ws: Websocket
+  marketId: string
+}) {
   const [trades, setTrades] = useState<Trade[]>(() => [])
 
   useEffect(() => {
@@ -13,7 +19,7 @@ export default function Trades({ ws }: { ws: Websocket }) {
       ws.send(
         JSON.stringify({
           type: 'Subscribe',
-          marketId: 'BTC/ETH',
+          marketId: marketId,
           topic: 'Trades'
         })
       )
@@ -28,11 +34,13 @@ export default function Trades({ ws }: { ws: Websocket }) {
       const message = JSON.parse(event.data) as IncomingWSMessage
       if (message.type == 'Publish' && message.data.type == 'Trades') {
         const incomingTrades = TradesSchema.parse(message.data).trades
-        const newTrades = incomingTrades.filter(
-          (incomingTrade) =>
-            !trades.some((currentTrade) => currentTrade.id === incomingTrade.id)
-        )
         setTrades((currentTrades) => {
+          const newTrades = incomingTrades.filter(
+            (incomingTrade) =>
+              !currentTrades.some(
+                (currentTrade) => currentTrade.id === incomingTrade.id
+              )
+          )
           return newTrades.concat(currentTrades)
         })
       }
@@ -46,13 +54,13 @@ export default function Trades({ ws }: { ws: Websocket }) {
         ws.send(
           JSON.stringify({
             type: 'Unsubscribe',
-            marketId: 'BTC/ETH',
+            marketId: marketId,
             topic: 'Trades'
           })
         )
       }
     }
-  }, [ws])
+  }, [ws, marketId])
 
   return (
     <Widget

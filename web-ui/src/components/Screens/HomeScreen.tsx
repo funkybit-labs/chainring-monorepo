@@ -80,9 +80,9 @@ export default function HomeScreen() {
         </div>
         <div className="flex gap-4">
           <div className="flex flex-col">
-            {walletAddress && exchangeContract && symbols && (
+            {selectedMarket && walletAddress && exchangeContract && symbols && (
               <>
-                <Trades ws={ws} />
+                <Trades ws={ws} marketId={selectedMarket.id} />
               </>
             )}
           </div>

@@ -1,4 +1,4 @@
-package co.chainring.integrationtests.testutils
+package co.chainring.core.utils
 
 import java.math.BigDecimal
 import java.math.BigInteger

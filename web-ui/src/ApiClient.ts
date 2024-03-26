@@ -88,10 +88,8 @@ export type OrderExecution = z.infer<typeof OrderExecutionSchema>
 
 const OrderTimingSchema = z.object({
   createdAt: z.coerce.date(),
-  updatedAt: z.coerce.date().nullable(),
-  filledAt: z.coerce.date().nullable(),
-  closedAt: z.coerce.date().nullable(),
-  expiredAt: z.coerce.date().nullable()
+  updatedAt: z.coerce.date().optional(),
+  closedAt: z.coerce.date().optional()
 })
 export type OrderTiming = z.infer<typeof OrderTimingSchema>
 

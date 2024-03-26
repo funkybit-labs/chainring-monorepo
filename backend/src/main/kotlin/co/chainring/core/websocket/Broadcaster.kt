@@ -17,6 +17,7 @@ import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.TradeId
 import co.chainring.core.utils.Timer
+import co.chainring.core.utils.toFundamentalUnits
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -244,9 +245,5 @@ class Broadcaster {
             val response: OutgoingWSMessage = OutgoingWSMessage.Publish(orderBook)
             websocket.send(WsMessage(Json.encodeToString(response)))
         }
-    }
-
-    fun BigDecimal.toFundamentalUnits(decimals: Int): BigInteger {
-        return (this * BigDecimal("1e$decimals")).toBigInteger()
     }
 }

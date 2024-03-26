@@ -12,3 +12,8 @@ export function addressDisplay(address: string): string {
     '0x' + without0x.slice(0, 4) + '...' + without0x.slice(without0x.length - 4)
   )
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+;(BigInt.prototype as any).toJSON = function () {
+  return this.toString()
+}
