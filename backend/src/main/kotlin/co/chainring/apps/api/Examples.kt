@@ -67,6 +67,8 @@ object Examples {
         ),
         timing = Order.Timing(
             createdAt = Clock.System.now(),
+            updatedAt = null,
+            closedAt = null,
         ),
     )
 
@@ -81,6 +83,8 @@ object Examples {
         executions = emptyList(),
         timing = Order.Timing(
             createdAt = Clock.System.now(),
+            updatedAt = null,
+            closedAt = null,
         ),
     )
 

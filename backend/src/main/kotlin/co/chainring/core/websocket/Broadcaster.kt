@@ -9,8 +9,15 @@ import co.chainring.apps.api.model.OrderBookEntry
 import co.chainring.apps.api.model.OutgoingWSMessage
 import co.chainring.apps.api.model.Prices
 import co.chainring.apps.api.model.SubscriptionTopic
+import co.chainring.apps.api.model.Trade
+import co.chainring.apps.api.model.WsTrades
+import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OrderId
+import co.chainring.core.model.db.OrderSide
+import co.chainring.core.model.db.TradeId
 import co.chainring.core.utils.Timer
+import co.chainring.core.utils.toFundamentalUnits
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -18,6 +25,9 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.http4k.websocket.Websocket
 import org.http4k.websocket.WsMessage
+import java.math.BigDecimal
+import java.math.BigInteger
+import java.math.RoundingMode
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -44,9 +54,11 @@ class Broadcaster {
         }.getOrPut(topic) {
             Subscriptions()
         }.addIfAbsent(websocket)
+
         when (topic) {
             SubscriptionTopic.OrderBook -> sendOrderBook(market, websocket)
             SubscriptionTopic.Prices -> sendPrices(market, websocket)
+            SubscriptionTopic.Trades -> sendTrades(market, websocket)
         }
     }
 
@@ -82,6 +94,9 @@ class Broadcaster {
             }
             topicSubscriptions[SubscriptionTopic.Prices]?.forEach { websocket ->
                 sendPrices(marketId, websocket)
+            }
+            topicSubscriptions[SubscriptionTopic.Trades]?.forEach { websocket ->
+                sendTrades(marketId, websocket)
             }
         }
     }
@@ -136,6 +151,29 @@ class Broadcaster {
             }
         }
         val response: OutgoingWSMessage = OutgoingWSMessage.Publish(prices)
+        websocket.send(WsMessage(Json.encodeToString(response)))
+    }
+
+    private fun sendTrades(marketId: MarketId, websocket: Websocket) {
+        val lastStutter = rnd.nextDouble(-0.5, 0.5) / 3.0
+
+        val trades = WsTrades(
+            trades = listOf(
+                Trade(
+                    id = TradeId.generate(),
+                    timestamp = Clock.System.now(),
+                    orderId = OrderId.generate(),
+                    marketId = marketId,
+                    side = if (lastStutter > 0) OrderSide.Buy else OrderSide.Sell,
+                    amount = BigDecimal(rnd.nextDouble(0.00001, 0.5)).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
+                    price = BigDecimal(17.5 + lastStutter).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
+                    feeAmount = BigInteger.ZERO,
+                    feeSymbol = Symbol(marketId.value.split("/")[0]),
+                ),
+            ),
+        )
+
+        val response: OutgoingWSMessage = OutgoingWSMessage.Publish(trades)
         websocket.send(WsMessage(Json.encodeToString(response)))
     }
 

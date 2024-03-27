@@ -7,6 +7,7 @@ import co.chainring.core.model.Address
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
+import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.testutils.AbnormalApiResponseException
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
@@ -14,7 +15,6 @@ import co.chainring.integrationtests.testutils.TestBlockchainClient
 import co.chainring.integrationtests.testutils.TestWalletKeypair
 import co.chainring.integrationtests.testutils.Wallet
 import co.chainring.integrationtests.testutils.apiError
-import co.chainring.integrationtests.testutils.toFundamentalUnits
 import org.awaitility.kotlin.await
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals

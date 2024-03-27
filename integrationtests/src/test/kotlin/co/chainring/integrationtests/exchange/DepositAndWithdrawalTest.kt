@@ -4,12 +4,12 @@ import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.model.Address
+import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.TestBlockchainClient
 import co.chainring.integrationtests.testutils.TestWalletKeypair
 import co.chainring.integrationtests.testutils.Wallet
-import co.chainring.integrationtests.testutils.toFundamentalUnits
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.extension.ExtendWith

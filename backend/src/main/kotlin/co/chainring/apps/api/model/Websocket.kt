@@ -9,6 +9,7 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 enum class SubscriptionTopic {
     OrderBook,
     Prices,
+    Trades,
 }
 
 @OptIn(ExperimentalSerializationApi::class)

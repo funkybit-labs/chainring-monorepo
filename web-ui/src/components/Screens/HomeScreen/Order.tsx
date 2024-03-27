@@ -6,14 +6,14 @@ import { Widget } from 'components/common/Widget'
 import SubmitButton from 'components/common/SubmitButton'
 import { parseUnits } from 'viem'
 
-export default function Trade({
+export default function Order({
   baseSymbol,
   quoteSymbol
 }: {
   baseSymbol: string
   quoteSymbol: string
 }) {
-  const [side, setSide] = useState<OrderSide>('Buy') // 'buy' or 'sell'
+  const [side, setSide] = useState<OrderSide>('Buy')
   const [price, setPrice] = useState('')
   const [amount, setAmount] = useState('')
   const [isMarketOrder, setIsMarketOrder] = useState(false)
@@ -25,7 +25,7 @@ export default function Trade({
         marketId: `${baseSymbol}/${quoteSymbol}`,
         type: 'market',
         side: side,
-        amount: Number(parseUnits(amount, 18))
+        amount: parseUnits(amount, 18)
       })
     } else {
       mutation.mutate({
@@ -33,8 +33,8 @@ export default function Trade({
         marketId: `${baseSymbol}/${quoteSymbol}`,
         type: 'limit',
         side: side,
-        amount: Number(parseUnits(amount, 18)),
-        price: Number(parseUnits(price, 18))
+        amount: parseUnits(amount, 18),
+        price: parseUnits(price, 18)
       })
     }
   }
@@ -70,7 +70,7 @@ export default function Trade({
 
   return (
     <Widget
-      title="Trade"
+      title="Order"
       contents={
         <>
           <div className="flex w-full text-center text-lg font-medium">
@@ -92,7 +92,7 @@ export default function Trade({
               )}
               onClick={() => !mutation.isPending && setSide('Sell')}
             >
-              Sell {quoteSymbol}
+              Sell {baseSymbol}
             </div>
           </div>
           <table>

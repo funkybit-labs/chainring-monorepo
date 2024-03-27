@@ -4,7 +4,8 @@ import { useAccount } from 'wagmi'
 import Balances from 'components/Screens/HomeScreen/Balances'
 import { Header } from 'components/Screens/Header'
 import { OrderBook } from 'components/Screens/HomeScreen/OrderBook'
-import Trade from 'components/Screens/HomeScreen/Trade'
+import Order from 'components/Screens/HomeScreen/Order'
+import Trades from 'components/Screens/HomeScreen/Trades'
 import { ExponentialBackoff, WebsocketBuilder } from 'websocket-ts'
 import { Prices } from 'components/Screens/HomeScreen/Prices'
 import { useEffect, useMemo, useState } from 'react'
@@ -67,7 +68,7 @@ export default function HomeScreen() {
               <div className="flex flex-col">
                 {walletAddress && exchangeContract && symbols && (
                   <>
-                    <Trade
+                    <Order
                       baseSymbol={selectedMarket.baseSymbol}
                       quoteSymbol={selectedMarket.quoteSymbol}
                     />
@@ -78,6 +79,13 @@ export default function HomeScreen() {
           )}
         </div>
         <div className="flex gap-4">
+          <div className="flex flex-col">
+            {selectedMarket && walletAddress && exchangeContract && symbols && (
+              <>
+                <Trades ws={ws} marketId={selectedMarket.id} />
+              </>
+            )}
+          </div>
           <div className="flex flex-col">
             {walletAddress && exchangeContract && symbols && (
               <>
