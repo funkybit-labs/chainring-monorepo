@@ -129,19 +129,18 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
 
     fun updateContracts() {
         transaction {
-            DeployedSmartContractEntity.validContracts(chainId).map { it.name }
+            ContractType.entries.forEach { contractType ->
+                val deployedContract = DeployedSmartContractEntity
+                    .findLastDeployedContractByNameAndChain(contractType.name, chainId)
 
-            ContractType.entries.forEach {
-                DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, chainId)?.let { deployedContract ->
-                    if (deployedContract.deprecated) {
-                        logger.info { "Upgrading contract: $it" }
-                        deployOrUpgradeWithProxy(it, deployedContract.proxyAddress)
-                    } else {
-                        deployedContract
-                    }
-                } ?: run {
-                    logger.info { "Deploying contract: $it" }
-                    deployOrUpgradeWithProxy(it, null)
+                if (deployedContract == null) {
+                    logger.info { "Deploying contract: $contractType" }
+                    deployOrUpgradeWithProxy(contractType, null)
+                } else if (deployedContract.deprecated) {
+                    logger.info { "Upgrading contract: $contractType" }
+                    deployOrUpgradeWithProxy(contractType, deployedContract.proxyAddress)
+                } else {
+                    contractMap[contractType] = deployedContract.proxyAddress
                 }
             }
         }

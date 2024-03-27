@@ -25,7 +25,7 @@ object DeployedSmartContractTable : GUIDTable<ContractId>("deployed_smart_contra
     val createdBy = varchar("created_by", 10485760)
     val name = varchar("name", 10485760)
     val chainId = reference("chain_id", ChainTable)
-    val proxyAddress = varchar("proxy_address", 10485760).nullable()
+    val proxyAddress = varchar("proxy_address", 10485760)
     val implementationAddress = varchar("implementation_address", 10485760)
     val version = integer("version").nullable()
     val deprecated = bool("deprecated")
@@ -84,8 +84,8 @@ class DeployedSmartContractEntity(guid: EntityID<ContractId>) : GUIDEntity<Contr
     var name by DeployedSmartContractTable.name
     var chainId by DeployedSmartContractTable.chainId
     var proxyAddress by DeployedSmartContractTable.proxyAddress.transform(
-        toColumn = { it?.value },
-        toReal = { it?.let { Address(it) } },
+        toColumn = { it.value },
+        toReal = { Address(it) },
     )
     var implementationAddress by DeployedSmartContractTable.implementationAddress.transform(
         toColumn = { it.value },

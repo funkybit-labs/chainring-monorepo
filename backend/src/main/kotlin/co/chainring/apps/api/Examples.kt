@@ -24,14 +24,14 @@ object Examples {
 
     val crateMarketOrderRequest = CreateOrderApiRequest.Market(
         nonce = "123",
-        marketId = MarketId("ETH/USDC"),
+        marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
         amount = BigIntegerJson("100"),
     )
 
     val crateLimitOrderRequest = CreateOrderApiRequest.Limit(
         nonce = "123",
-        marketId = MarketId("ETH/USDC"),
+        marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
         amount = BigIntegerJson("100"),
         price = BigIntegerJson("100"),
@@ -51,7 +51,7 @@ object Examples {
     val marketOrderResponse = OrderApiResponse.Market(
         id = OrderId.generate(),
         status = OrderStatus.Partial,
-        marketId = MarketId("ETH/USDC"),
+        marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
         amount = BigIntegerJson("100"),
         originalAmount = BigIntegerJson("100"),
@@ -75,7 +75,7 @@ object Examples {
     val limitOrderResponse = OrderApiResponse.Limit(
         id = OrderId.generate(),
         status = OrderStatus.Open,
-        marketId = MarketId("ETH/USDC"),
+        marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
         amount = BigIntegerJson("100"),
         price = BigIntegerJson("100"),
