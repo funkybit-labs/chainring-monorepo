@@ -26,6 +26,10 @@ enum class ReasonCode {
     OrderNotFound,
     OrderIsClosed,
 
+    WithdrawalNotFound,
+
+    ContractUpdating,
+    SignatureNotValid,
     UnexpectedError,
 }
 

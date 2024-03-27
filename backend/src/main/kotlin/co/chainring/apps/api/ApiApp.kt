@@ -3,9 +3,11 @@ package co.chainring.apps.api
 import co.chainring.apps.BaseApp
 import co.chainring.apps.api.middleware.HttpTransactionLogger
 import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
+import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.db.DbConfig
+import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.websocket.Broadcaster
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.contract
@@ -25,6 +27,7 @@ import org.http4k.server.Netty
 import org.http4k.server.PolyHandler
 import org.http4k.server.ServerConfig
 import org.http4k.server.asServer
+import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Duration.ofSeconds
 
 data class ApiAppConfig(
@@ -43,6 +46,9 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         headers = listOf("Content-Type"),
         methods = listOf(Method.GET, Method.POST),
     )
+
+    private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
+    private val withdrawalRoutes = WithdrawalRoutes(blockchainClient)
 
     private val broadcaster = Broadcaster()
 
@@ -67,6 +73,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                                 OrderRoutes.batchOrders(),
                                 OrderRoutes.listTrades(),
                                 BalanceRoutes.getBalances(),
+                                withdrawalRoutes.getWithdrawal(),
+                                withdrawalRoutes.createWithdrawal(),
 
                                 // http api + websocket
                                 // GET /v1/market/market_id/order-book
@@ -84,8 +92,6 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     )
         .asServer(Netty(config.httpPort, ServerConfig.StopMode.Graceful(ofSeconds(1))))
 
-    private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
-
     override fun start() {
         startServer()
         broadcaster.start()
@@ -97,6 +103,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         super.stop()
         broadcaster.stop()
         server.stop()
+        blockchainClient.stopTransactionSubmitter()
         logger.info { "Stopped" }
     }
 
@@ -109,5 +116,10 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
 
     fun updateContracts() {
         blockchainClient.updateContracts()
+        blockchainClient.startTransactionSubmitter(
+            transaction {
+                WithdrawalEntity.findPending().map { CreateWithdrawalApiRequest.fromEntity(it).toEip712Transaction() }
+            },
+        )
     }
 }

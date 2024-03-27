@@ -6,6 +6,8 @@ import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.db.DbConfig
 import co.chainring.core.model.db.DeployedSmartContractEntity
+import co.chainring.core.model.db.WithdrawalEntity
+import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.tasks.fixtures.localDevFixtures
 import co.chainring.tasks.seedDatabase
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -37,6 +39,7 @@ class AppUnderTestRunner : BeforeAllCallback {
                             apiApp.startServer()
                             transaction {
                                 DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, blockchainClient.chainId)?.deprecated = true
+                                WithdrawalEntity.findPending().forEach { it.update(WithdrawalStatus.Failed, "restarting test") }
                             }
                             apiApp.updateContracts()
                         }

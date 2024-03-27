@@ -6,13 +6,19 @@ import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrderApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
+import co.chainring.apps.api.model.WithdrawTx
+import co.chainring.apps.api.model.Withdrawal
+import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
+import co.chainring.core.model.db.WithdrawalId
+import co.chainring.core.model.db.WithdrawalStatus
 import kotlinx.datetime.Clock
+import java.math.BigInteger
 
 object Examples {
 
@@ -94,5 +100,17 @@ object Examples {
         total = BigIntegerJson("1000000000000"),
         available = BigIntegerJson("500000"),
         lastUpdated = Clock.System.now(),
+    )
+
+    var withdrawal = Withdrawal(
+        WithdrawalId("id"),
+        WithdrawTx(
+            Address("0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"),
+            Address("0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"),
+            BigInteger("200000"),
+            1,
+        ),
+        WithdrawalStatus.Pending,
+        null,
     )
 }

@@ -6,6 +6,9 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 
 @Serializable
@@ -60,6 +63,11 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
                 .find { SymbolTable.chainId.eq(chainId) }
                 .orderBy(Pair(SymbolTable.name, SortOrder.ASC))
                 .toList()
+
+        fun forChainAndContractAddress(chainId: ChainId, contractAddress: Address?) =
+            SymbolEntity
+                .find { SymbolTable.chainId.eq(chainId).and(contractAddress?.let { SymbolTable.contractAddress.eq(it.value) } ?: SymbolTable.contractAddress.isNull()) }
+                .single()
     }
 
     var name by SymbolTable.name
