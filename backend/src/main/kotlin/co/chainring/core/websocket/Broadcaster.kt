@@ -103,7 +103,7 @@ class Broadcaster {
 
     private val mockPrices = ConcurrentHashMap(
         mapOf(
-            MarketId("ETH/USDC") to 17.2,
+            MarketId("BTC/ETH") to 17.2,
             MarketId("USDC/DAI") to 1.05,
         ),
     )
@@ -179,7 +179,7 @@ class Broadcaster {
 
     private fun sendOrderBook(marketId: MarketId, websocket: Websocket) {
         when (marketId.value) {
-            "ETH/USDC" -> {
+            "BTC/ETH" -> {
                 fun stutter() = rnd.nextDouble(-0.5, 0.5)
                 val lastStutter = stutter() / 3.0
 

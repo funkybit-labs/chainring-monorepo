@@ -35,11 +35,12 @@ class DepositAndWithdrawalTest {
         assertEquals(config.contracts[0].name, ContractType.Exchange.name)
         val client = BlockchainClient().loadExchangeContract(config.contracts[0].address)
         assertEquals(client.version.send().toInt(), 1)
-        val usdcToken = config.symbols.firstOrNull { it.name == "USDC" }
-        assertNotNull(usdcToken)
+
+        assertNotNull(config.symbols.firstOrNull { it.name == "ETH" })
+        assertNotNull(config.symbols.firstOrNull { it.name == "USDC" })
 
         val nativeToken = config.symbols.first { it.contractAddress == null }
-        assertEquals("ETH", nativeToken.name)
+        assertEquals("BTC", nativeToken.name)
         assertEquals(18.toUByte(), nativeToken.decimals)
     }
 

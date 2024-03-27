@@ -22,12 +22,12 @@ class OrderBookTest {
     fun `test order book over websocket`() {
         val connectUri = Uri.of(apiServerRootUrl.replace("http:", "ws:").replace("https:", "wss:") + "/connect")
         val client = WebsocketClient.blocking(connectUri)
-        val message: IncomingWSMessage = IncomingWSMessage.Subscribe(MarketId("ETH/USDC"), SubscriptionTopic.OrderBook)
+        val message: IncomingWSMessage = IncomingWSMessage.Subscribe(MarketId("BTC/ETH"), SubscriptionTopic.OrderBook)
         client.send(WsMessage(Json.encodeToString(message)))
         val received = client.received().take(1).first()
         val decoded = Json.decodeFromString<OutgoingWSMessage>(received.bodyString())
         val orderBook = (decoded as OutgoingWSMessage.Publish).data as OrderBook
-        assertEquals("ETH/USDC", orderBook.marketId.value)
+        assertEquals("BTC/ETH", orderBook.marketId.value)
         assertEquals(9, orderBook.buy.size)
         assertEquals(10, orderBook.sell.size)
         client.close()

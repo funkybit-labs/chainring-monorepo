@@ -21,9 +21,6 @@ local_containers:
 publish_containers:
 	AWS_SDK_LOAD_CONFIG=true ./gradlew jib
 
-ui_server:
-	cd web-ui && pnpm install && pnpm run dev
-
 db_migrate:
 	./gradlew :run --args="db:migrate"
 
@@ -37,3 +34,13 @@ lint:
 
 format:
 	./gradlew formatKotlin && cd web-ui && pnpm run lint --fix
+
+test:
+	./gradlew test
+
+run_backend:
+	./gradlew :run
+
+run_ui:
+	cd web-ui && pnpm install && pnpm run dev
+
