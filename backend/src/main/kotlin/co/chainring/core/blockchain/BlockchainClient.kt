@@ -137,6 +137,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
                         logger.info { "Upgrading contract: $it" }
                         deployOrUpgradeWithProxy(it, deployedContract.proxyAddress)
                     } else {
+                        contractMap[it] = deployedContract.proxyAddress!!
                         deployedContract
                     }
                 } ?: run {
