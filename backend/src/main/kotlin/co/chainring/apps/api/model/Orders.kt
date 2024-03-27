@@ -27,8 +27,8 @@ object Order {
     @Serializable
     data class Timing(
         val createdAt: Instant,
-        val updatedAt: Instant? = null,
-        val closedAt: Instant? = null,
+        val updatedAt: Instant?,
+        val closedAt: Instant?,
     )
 }
 
