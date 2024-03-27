@@ -32,6 +32,9 @@ dependencies:
   buffer:
     specifier: ^6.0.3
     version: 6.0.3
+  cryptocurrency-icons:
+    specifier: ^0.18.1
+    version: 0.18.1
   date-fns:
     specifier: ^3.6.0
     version: 3.6.0
@@ -5558,6 +5561,10 @@ packages:
       public-encrypt: 4.0.3
       randombytes: 2.1.0
       randomfill: 1.0.4
+    dev: false
+
+  /cryptocurrency-icons@0.18.1:
+    resolution: {integrity: sha512-dvR5O8JOmav3559Yb0Igpkia+3vpt/aeNvMu5ZIVUG2Bzpq9wNcOJRIQas49XJrPjtZ98GAEn3aDQO+w7uhS2w==}
     dev: false
 
   /css.escape@1.5.1:
