@@ -20,6 +20,7 @@ import org.http4k.filter.AllowAll
 import org.http4k.filter.CorsPolicy
 import org.http4k.filter.OriginPolicy
 import org.http4k.filter.ServerFilters
+import org.http4k.filter.ZipkinTraces
 import org.http4k.routing.bind
 import org.http4k.routing.routes
 import org.http4k.routing.websockets
@@ -28,6 +29,7 @@ import org.http4k.server.PolyHandler
 import org.http4k.server.ServerConfig
 import org.http4k.server.asServer
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.slf4j.MDC
 import java.time.Duration.ofSeconds
 
 data class ApiAppConfig(
@@ -54,6 +56,16 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
 
     private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
         .then(ServerFilters.Cors(corsPolicy))
+        .then(
+            ServerFilters.RequestTracing(
+                startReportFn = { _, z: ZipkinTraces ->
+                    MDC.put("traceId", z.traceId.value)
+                },
+                endReportFn = { _, _, _ ->
+                    MDC.remove("traceId")
+                },
+            ),
+        )
         .then(HttpTransactionLogger(logger))
         .then(RequestProcessingExceptionHandler(logger))
         .then(
