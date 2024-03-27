@@ -3,8 +3,6 @@ package co.chainring.apps.api.middleware
 import io.github.oshai.kotlinlogging.KLogger
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import org.http4k.core.Filter
 import org.http4k.core.HttpTransaction
 import org.http4k.filter.ResponseFilters
@@ -22,14 +20,14 @@ data class RequestDetails(
     val method: String,
     val uri: String,
     val headers: Map<String, String?>,
-    val body: JsonElement,
+    val body: String,
 )
 
 @Serializable
 data class ResponseDetails(
     val status: String,
     val headers: Map<String, String?>,
-    val body: JsonElement,
+    val body: String,
 )
 
 object HttpTransactionLogger {
@@ -43,18 +41,12 @@ object HttpTransactionLogger {
                     method = tx.request.method.name,
                     uri = tx.request.uri.toString(),
                     headers = tx.request.headers.toMap(),
-                    body = when (val body = tx.request.bodyString()) {
-                        "" -> JsonNull
-                        else -> Json.parseToJsonElement(body)
-                    },
+                    body = tx.request.bodyString(),
                 ),
                 res = ResponseDetails(
                     status = tx.response.status.toString(),
                     headers = tx.response.headers.toMap(),
-                    body = when (val body = tx.response.bodyString()) {
-                        "" -> JsonNull
-                        else -> Json.parseToJsonElement(body)
-                    },
+                    body = tx.response.bodyString(),
                 ),
             )
 
