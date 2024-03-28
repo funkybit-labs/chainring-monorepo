@@ -1,0 +1,17 @@
+syntax = "proto3";
+package sequencer;
+import "order.proto";
+
+option java_multiple_files = true;
+option java_package = "co.chainring.sequencer.proto";
+option java_outer_classname = "SequencerSchema";
+
+message SequencerResponse {
+  string guid = 1;
+  OrderResponse.OrderDisposition disposition = 2;
+}
+
+message Sequenced {
+  string guid = 1;
+  uint64 index = 2;
+}

@@ -1,0 +1,41 @@
+syntax = "proto3";
+package sequencer;
+
+option java_multiple_files = true;
+option java_package = "co.chainring.sequencer.proto";
+option java_outer_classname = "OrderSchema";
+
+message Order {
+  string guid  = 1;
+  string market = 2;
+
+  enum OrderType {
+    MarketBuy = 0;
+    MarketSell = 1;
+    LimitBuy = 2;
+    LimitSell = 3;
+  }
+
+  OrderType orderType = 3;
+  string address = 4;
+  string amount = 5;
+  optional double price = 6;
+}
+
+message Orders {
+  repeated Order orders = 1;
+}
+
+message OrderResponse {
+  string guid = 1;
+  enum OrderDisposition {
+    Filled = 0;
+    PartiallyFilled = 1;
+    Accepted = 2;
+    Rejected = 3;
+    Failed = 4;
+  }
+  OrderDisposition disposition = 2;
+  optional uint64 sequence = 3;
+  uint64 processingTime = 4;
+}

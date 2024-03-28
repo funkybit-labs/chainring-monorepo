@@ -81,7 +81,7 @@ object ConfigRoutes {
                                     contracts = DeployedSmartContractEntity.validContracts(chain.id.value).map {
                                         DeployedContract(
                                             name = it.name,
-                                            address = it.proxyAddress ?: it.implementationAddress,
+                                            address = it.proxyAddress,
                                         )
                                     },
                                     symbols = SymbolEntity.forChain(chain.id.value).map {
