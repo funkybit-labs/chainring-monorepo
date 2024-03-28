@@ -1,10 +1,11 @@
-package co.chainring.apps
+package co.chainring.sequencer.apps
 
-import co.chainring.core.inputQueue
-import co.chainring.core.outputQueue
+import co.chainring.sequencer.core.inputQueue
+import co.chainring.sequencer.core.outputQueue
+import co.chainring.sequencer.proto.Order
+import co.chainring.sequencer.proto.OrderResponse
+import co.chainring.sequencer.proto.sequencerResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
-import sequencer.OrderOuterClass
-import sequencer.sequencerResponse
 import kotlin.concurrent.thread
 
 class SequencerApp : BaseApp() {
@@ -14,20 +15,20 @@ class SequencerApp : BaseApp() {
 
     override fun start() {
         logger.info { "Starting Sequencer App" }
-        sequencerThread = thread(start = true, name = "sequencer", isDaemon = true) {
+        sequencerThread = thread(start = true, name = "sequencer", isDaemon = false) {
             val inputTailer = inputQueue.createTailer("sequencer")
             val outputAppender = outputQueue.acquireAppender()
             while (!stop) {
                 inputTailer.readingDocument().use { dc ->
                     if (dc.isPresent) {
                         dc.wire()?.read()?.bytes { bytes ->
-                            val order = OrderOuterClass.Order.parseFrom(bytes.toByteArray())
+                            val order = Order.parseFrom(bytes.toByteArray())
                             // TODO - process order
                             outputAppender.writingDocument().use {
-                                it.wire()!!.write().bytes(
+                                it.wire()?.write()?.bytes(
                                     sequencerResponse {
                                         guid = order.guid
-                                        disposition = OrderOuterClass.OrderResponse.OrderDisposition.Accepted
+                                        disposition = OrderResponse.OrderDisposition.Accepted
                                     }.toByteArray(),
                                 )
                             }

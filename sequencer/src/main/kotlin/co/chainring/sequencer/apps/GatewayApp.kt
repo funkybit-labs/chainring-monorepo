@@ -1,18 +1,18 @@
-package co.chainring.apps
+package co.chainring.sequencer.apps
 
-import co.chainring.apps.gateway.GatewayGrpcKt
-import co.chainring.core.inputQueue
-import co.chainring.core.outputQueue
-import co.chainring.core.sequencedQueue
+import co.chainring.sequencer.core.inputQueue
+import co.chainring.sequencer.core.outputQueue
+import co.chainring.sequencer.core.sequencedQueue
+import co.chainring.sequencer.proto.GatewayGrpcKt
+import co.chainring.sequencer.proto.Order
+import co.chainring.sequencer.proto.OrderResponse
+import co.chainring.sequencer.proto.SequencerResponse
+import co.chainring.sequencer.proto.orderResponse
+import co.chainring.sequencer.proto.sequenced
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.grpc.Server
 import io.grpc.ServerBuilder
 import net.openhft.chronicle.queue.ExcerptTailer
-import sequencer.OrderOuterClass
-import sequencer.OrderOuterClass.OrderResponse.OrderDisposition
-import sequencer.Sequencer
-import sequencer.orderResponse
-import sequencer.sequenced
 import kotlin.concurrent.getOrSet
 import kotlin.system.measureNanoTime
 
@@ -54,12 +54,12 @@ class GatewayApp(private val config: GatewayConfig = GatewayConfig()) : BaseApp(
         private val outputTailer = ThreadLocal<ExcerptTailer>()
         private val logger = KotlinLogging.logger {}
 
-        override suspend fun addOrder(request: OrderOuterClass.Order): OrderOuterClass.OrderResponse {
+        override suspend fun addOrder(request: Order): OrderResponse {
             var index: Long = 0
             val inputAppender = inputQueue.acquireAppender()
             val sequencedAppender = sequencedQueue.acquireAppender()
             val localTailer = outputTailer.getOrSet { outputQueue.createTailer().toEnd() }
-            var disposition: OrderDisposition? = null
+            var disposition: OrderResponse.OrderDisposition? = null
             val processingTime = measureNanoTime {
                 try {
                     inputAppender.writingDocument().use {
@@ -79,7 +79,7 @@ class GatewayApp(private val config: GatewayConfig = GatewayConfig()) : BaseApp(
                         localTailer.readingDocument().use {
                             if (it.isPresent) {
                                 it.wire()?.read()?.bytes { bytes ->
-                                    val response = Sequencer.SequencerResponse.parseFrom(bytes.toByteArray())
+                                    val response = SequencerResponse.parseFrom(bytes.toByteArray())
                                     if (response.guid == request.guid) {
                                         disposition = response.disposition
                                     }
@@ -93,7 +93,7 @@ class GatewayApp(private val config: GatewayConfig = GatewayConfig()) : BaseApp(
             }
             return orderResponse {
                 guid = request.guid
-                this.disposition = disposition!!
+                this.disposition = disposition ?: OrderResponse.OrderDisposition.Failed
                 sequence = index
                 this.processingTime = processingTime
             }

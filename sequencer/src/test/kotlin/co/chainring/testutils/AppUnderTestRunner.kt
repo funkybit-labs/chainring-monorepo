@@ -1,8 +1,8 @@
 package co.chainring.testutils
 
-import co.chainring.apps.GatewayApp
-import co.chainring.apps.GatewayConfig
-import co.chainring.apps.SequencerApp
+import co.chainring.sequencer.apps.GatewayApp
+import co.chainring.sequencer.apps.GatewayConfig
+import co.chainring.sequencer.apps.SequencerApp
 import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.ExtensionContext
 import org.junit.jupiter.api.extension.ExtensionContext.Store.CloseableResource

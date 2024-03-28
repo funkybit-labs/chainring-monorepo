@@ -1,4 +1,4 @@
-package co.chainring.apps
+package co.chainring.sequencer.apps
 
 import io.github.oshai.kotlinlogging.KLogger
 

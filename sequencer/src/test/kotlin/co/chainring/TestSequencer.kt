@@ -1,14 +1,14 @@
 package co.chainring
 
-import co.chainring.apps.gateway.GatewayGrpcKt
+import co.chainring.sequencer.proto.GatewayGrpcKt
+import co.chainring.sequencer.proto.Order
+import co.chainring.sequencer.proto.OrderResponse
+import co.chainring.sequencer.proto.order
 import co.chainring.testutils.AppUnderTestRunner
 import io.grpc.ManagedChannelBuilder
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import sequencer.OrderOuterClass
-import sequencer.OrderOuterClass.OrderResponse.OrderDisposition
-import sequencer.order
 import java.util.UUID
 
 @ExtendWith(AppUnderTestRunner::class)
@@ -28,10 +28,10 @@ class TestSequencer {
                     amount = "0x12345"
                     price = 17.17
                     address = "0xccCCccCCccCCccCCccCCccCCccCCccCCccCCccCC"
-                    orderType = OrderOuterClass.Order.OrderType.MarketBuy
+                    orderType = Order.OrderType.MarketBuy
                 },
             )
-            assertEquals(OrderDisposition.Accepted, response.disposition)
+            assertEquals(OrderResponse.OrderDisposition.Accepted, response.disposition)
 
             // place another order and see that it gets the next sequence number
             val response2 = stub.addOrder(
@@ -41,10 +41,10 @@ class TestSequencer {
                     amount = "0x54321"
                     price = 18.18
                     address = "0xccCCccCCccCCccCCccCCccCCccCCccCCccCCccCC"
-                    orderType = OrderOuterClass.Order.OrderType.MarketSell
+                    orderType = Order.OrderType.MarketSell
                 },
             )
-            assertEquals(OrderDisposition.Accepted, response2.disposition)
+            assertEquals(OrderResponse.OrderDisposition.Accepted, response2.disposition)
             assertEquals(response.sequence + 1, response2.sequence)
         }
     }

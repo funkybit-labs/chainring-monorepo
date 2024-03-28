@@ -3,8 +3,9 @@ package sequencer;
 import "order.proto";
 
 option java_multiple_files = true;
-option java_package = "co.chainring.apps.gateway";
-option java_outer_classname = "GatewayProto";
+option java_package = "co.chainring.sequencer.proto";
+option java_outer_classname = "GatewaySchema";
+
 service Gateway {
   rpc AddOrder (Order) returns (OrderResponse);
 }

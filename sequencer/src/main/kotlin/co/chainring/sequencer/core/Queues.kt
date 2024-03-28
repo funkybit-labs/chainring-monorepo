@@ -1,4 +1,4 @@
-package co.chainring.core
+package co.chainring.sequencer.core
 
 import net.openhft.chronicle.core.OS
 import net.openhft.chronicle.queue.ChronicleQueue
