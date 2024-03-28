@@ -188,6 +188,28 @@ export const TradesSchema = z.object({
 })
 export type Trades = z.infer<typeof TradesSchema>
 
+const WithdrawTxSchema = z.object({
+  sender: AddressSchema,
+  token: AddressSchema.nullable(),
+  amount: z.coerce.bigint(),
+  nonce: z.coerce.bigint()
+})
+const CreateWithdrawalApiRequestSchema = z.object({
+  tx: WithdrawTxSchema,
+  signature: z.string()
+})
+
+const WithdrawalStatusSchema = z.enum(['Pending', 'Complete', 'Failed'])
+const WithdrawalSchema = z.object({
+  id: z.string(),
+  tx: WithdrawTxSchema,
+  status: WithdrawalStatusSchema,
+  error: z.string().nullable()
+})
+const WithdrawalApiResponseSchema = z.object({
+  withdrawal: WithdrawalSchema
+})
+
 export type Publish = {
   type: 'Publish'
   data: Publishable
@@ -221,5 +243,24 @@ export const apiClient = new Zodios(apiBaseUrl, [
       }
     ],
     response: OrderSchema
+  },
+  {
+    method: 'post',
+    path: '/v1/withdrawals',
+    alias: 'createWithdrawal',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: CreateWithdrawalApiRequestSchema
+      }
+    ],
+    response: WithdrawalApiResponseSchema
+  },
+  {
+    method: 'get',
+    path: '/v1/withdrawals/:id',
+    alias: 'getWithdrawal',
+    response: WithdrawalApiResponseSchema
   }
 ])
