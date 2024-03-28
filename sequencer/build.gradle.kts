@@ -5,6 +5,7 @@ plugins {
     kotlin("jvm")
     id("com.google.protobuf") version "0.9.4"
     id("org.jmailen.kotlinter") version "4.2.0"
+    application
 }
 
 group = "co.censo"
@@ -52,6 +53,11 @@ kotlin {
 java {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
+}
+
+application {
+    mainClass.set("co.chainring.sequencer.MainKt")
+    applicationDefaultJvmArgs = listOf("--illegal-access=permit", "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED")
 }
 
 sourceSets {
