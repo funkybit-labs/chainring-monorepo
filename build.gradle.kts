@@ -1,7 +1,6 @@
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.util.ArrayList
 
 group = "co.chainring"
 version = "1.0"
@@ -21,6 +20,11 @@ application {
 
 tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "17"
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 val log4j2Version = "2.23.1"
@@ -45,7 +49,7 @@ dependencies {
     implementation("org.apache.commons:commons-dbcp2:2.12.0")
 
     // Blockchain client
-    implementation("org.web3j:core:4.10.0") // 4.11 introduces dependency (tech.pegasys:jc-kzg-4844) that is published to cloudsmith repository (https://github.com/web3j/web3j/issues/2013)
+    implementation("org.web3j:core:4.10.3") // 4.11 introduces dependency (tech.pegasys:jc-kzg-4844) that is published to cloudsmith repository (https://github.com/web3j/web3j/issues/2013)
 
     implementation(project(":backend"))
 }

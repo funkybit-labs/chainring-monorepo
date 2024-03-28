@@ -1,0 +1,13 @@
+syntax = "proto3";
+package sequencer;
+import "order.proto";
+
+message SequencerResponse {
+  string guid = 1;
+  OrderResponse.OrderDisposition disposition = 2;
+}
+
+message Sequenced {
+  string guid = 1;
+  uint64 index = 2;
+}
