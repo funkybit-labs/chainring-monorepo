@@ -81,8 +81,10 @@ export function OrderBook({
       ws.send(
         JSON.stringify({
           type: 'Subscribe',
-          marketId,
-          topic: 'OrderBook'
+          topic: {
+            type: 'OrderBook',
+            marketId
+          }
         })
       )
     }
@@ -111,8 +113,10 @@ export function OrderBook({
         ws.send(
           JSON.stringify({
             type: 'Unsubscribe',
-            marketId,
-            topic: 'OrderBook'
+            topic: {
+              type: 'OrderBook',
+              marketId
+            }
           })
         )
       }

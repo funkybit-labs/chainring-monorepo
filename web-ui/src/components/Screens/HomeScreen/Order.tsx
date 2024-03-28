@@ -70,7 +70,7 @@ export default function Order({
 
   return (
     <Widget
-      title="Order"
+      title="Trade"
       contents={
         <>
           <div className="flex w-full text-center text-lg font-medium">

@@ -40,39 +40,35 @@ import kotlin.time.Duration.Companion.seconds
 
 typealias Subscriptions = CopyOnWriteArrayList<Websocket>
 typealias TopicSubscriptions = ConcurrentHashMap<SubscriptionTopic, Subscriptions>
-typealias MarketSubscriptions = ConcurrentHashMap<MarketId, TopicSubscriptions>
 
 class Broadcaster {
-    private val subscriptions = MarketSubscriptions()
+    private val subscriptions = TopicSubscriptions()
     private val lastPricePublish = mutableMapOf<Pair<MarketId, Websocket>, Instant>()
     private val logger = KotlinLogging.logger {}
     private val rnd = Random(0)
 
-    fun subscribe(market: MarketId, topic: SubscriptionTopic, websocket: Websocket) {
-        subscriptions.getOrPut(market) {
-            TopicSubscriptions()
-        }.getOrPut(topic) {
+    fun subscribe(topic: SubscriptionTopic, websocket: Websocket) {
+        subscriptions.getOrPut(topic) {
             Subscriptions()
         }.addIfAbsent(websocket)
 
         when (topic) {
-            SubscriptionTopic.OrderBook -> sendOrderBook(market, websocket)
-            SubscriptionTopic.Prices -> sendPrices(market, websocket)
-            SubscriptionTopic.Trades -> sendTrades(market, websocket)
+            is SubscriptionTopic.OrderBook -> sendOrderBook(topic.marketId, websocket)
+            is SubscriptionTopic.Prices -> sendPrices(topic.marketId, websocket)
+            is SubscriptionTopic.Trades -> sendTrades(websocket)
         }
     }
 
-    fun unsubscribe(marketId: MarketId, topic: SubscriptionTopic, websocket: Websocket) {
-        subscriptions[marketId]?.let { it[topic]?.remove(websocket) }
-        lastPricePublish.remove(Pair(marketId, websocket))
+    fun unsubscribe(topic: SubscriptionTopic, websocket: Websocket) {
+        subscriptions[topic]?.remove(websocket)
+        if (topic is SubscriptionTopic.Prices) {
+            lastPricePublish.remove(Pair(topic.marketId, websocket))
+        }
     }
 
     fun unsubscribe(websocket: Websocket) {
-        subscriptions.forEach { (market, topicSubscriptions) ->
-            topicSubscriptions.values.forEach {
-                it.remove(websocket)
-            }
-            lastPricePublish.remove(Pair(market, websocket))
+        subscriptions.keys.forEach { topic ->
+            unsubscribe(topic, websocket)
         }
     }
 
@@ -88,15 +84,11 @@ class Broadcaster {
     }
 
     private fun publishData() {
-        subscriptions.forEach { (marketId, topicSubscriptions) ->
-            topicSubscriptions[SubscriptionTopic.OrderBook]?.forEach { websocket ->
-                sendOrderBook(marketId, websocket)
-            }
-            topicSubscriptions[SubscriptionTopic.Prices]?.forEach { websocket ->
-                sendPrices(marketId, websocket)
-            }
-            topicSubscriptions[SubscriptionTopic.Trades]?.forEach { websocket ->
-                sendTrades(marketId, websocket)
+        subscriptions.forEach { (topic, websockets) ->
+            when (topic) {
+                is SubscriptionTopic.OrderBook -> sendOrderBook(topic.marketId, websockets)
+                is SubscriptionTopic.Prices -> sendPrices(topic.marketId, websockets)
+                else -> {}
             }
         }
     }
@@ -130,6 +122,10 @@ class Broadcaster {
         }
     }
 
+    private fun sendPrices(market: MarketId, websockets: List<Websocket>) {
+        websockets.forEach { sendPrices(market, it) }
+    }
+
     private fun sendPrices(market: MarketId, websocket: Websocket) {
         val key = Pair(market, websocket)
         val fullDump = !lastPricePublish.containsKey(key)
@@ -154,27 +150,45 @@ class Broadcaster {
         websocket.send(WsMessage(Json.encodeToString(response)))
     }
 
-    private fun sendTrades(marketId: MarketId, websocket: Websocket) {
-        val lastStutter = rnd.nextDouble(-0.5, 0.5) / 3.0
+    private fun sendTrades(websocket: Websocket) {
+        fun generateTrade(timestamp: Instant): Trade {
+            val lastStutter = rnd.nextDouble(-0.5, 0.5) / 3.0
+            val marketId = setOf(MarketId("BTC/ETH"), MarketId("USDC/DAI")).random()
+            val (amount, price) = (
+                when (marketId.value) {
+                    "BTC/ETH" -> Pair(
+                        BigDecimal(rnd.nextDouble(0.00001, 0.5)).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
+                        BigDecimal(17.5 + lastStutter).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
+                    )
+                    "USDC/DAI" -> Pair(
+                        BigDecimal(rnd.nextDouble(1000.00, 10000.00)).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
+                        BigDecimal(1.00 + lastStutter / 10).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
+                    )
+                    else -> null
+                }
+                )!!
 
-        val trades = WsTrades(
-            trades = listOf(
-                Trade(
-                    id = TradeId.generate(),
-                    timestamp = Clock.System.now(),
-                    orderId = OrderId.generate(),
-                    marketId = marketId,
-                    side = if (lastStutter > 0) OrderSide.Buy else OrderSide.Sell,
-                    amount = BigDecimal(rnd.nextDouble(0.00001, 0.5)).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
-                    price = BigDecimal(17.5 + lastStutter).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
-                    feeAmount = BigInteger.ZERO,
-                    feeSymbol = Symbol(marketId.value.split("/")[0]),
-                ),
-            ),
+            return Trade(
+                id = TradeId.generate(),
+                timestamp = timestamp,
+                orderId = OrderId.generate(),
+                marketId = marketId,
+                side = if (lastStutter > 0) OrderSide.Buy else OrderSide.Sell,
+                amount = amount,
+                price = price,
+                feeAmount = BigInteger.ZERO,
+                feeSymbol = Symbol(marketId.value.split("/")[0]),
+            )
+        }
+
+        val message: OutgoingWSMessage = OutgoingWSMessage.Publish(
+            WsTrades((1..100).map { i -> generateTrade(Clock.System.now().minus(i.minutes)) }),
         )
+        websocket.send(WsMessage(Json.encodeToString(message)))
+    }
 
-        val response: OutgoingWSMessage = OutgoingWSMessage.Publish(trades)
-        websocket.send(WsMessage(Json.encodeToString(response)))
+    private fun sendOrderBook(marketId: MarketId, websockets: List<Websocket>) {
+        websockets.forEach { sendOrderBook(marketId, it) }
     }
 
     private fun sendOrderBook(marketId: MarketId, websocket: Websocket) {
