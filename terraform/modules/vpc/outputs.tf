@@ -17,3 +17,7 @@ output "private_subnet_id_2" {
 output "vpc" {
   value = aws_vpc.vpc
 }
+
+output "service_discovery_private_dns_namespace" {
+  value = aws_service_discovery_private_dns_namespace.private
+}

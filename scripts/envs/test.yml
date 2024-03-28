@@ -12,3 +12,6 @@ services:
   anvil:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
     count: 1
+  sequencer:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer
+    count: 1

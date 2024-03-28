@@ -3,6 +3,8 @@ package co.chainring.sequencer.core
 import net.openhft.chronicle.core.OS
 import net.openhft.chronicle.queue.ChronicleQueue
 
-val inputQueue = ChronicleQueue.singleBuilder(OS.getTarget() + "/input").build()
-val outputQueue = ChronicleQueue.singleBuilder(OS.getTarget() + "/output").build()
-val sequencedQueue = ChronicleQueue.singleBuilder(OS.getTarget() + "/sequenced").build()
+val queueHome: String = System.getenv("QUEUE_HOME") ?: OS.getTarget()
+
+val inputQueue = ChronicleQueue.singleBuilder("$queueHome/input").build()
+val outputQueue = ChronicleQueue.singleBuilder("$queueHome/output").build()
+val sequencedQueue = ChronicleQueue.singleBuilder("$queueHome/sequenced").build()
