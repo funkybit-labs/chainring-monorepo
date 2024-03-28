@@ -9,6 +9,7 @@ import Trades from 'components/Screens/HomeScreen/Trades'
 import { ExponentialBackoff, WebsocketBuilder } from 'websocket-ts'
 import { Prices } from 'components/Screens/HomeScreen/Prices'
 import { useEffect, useMemo, useState } from 'react'
+import Spinner from 'components/common/Spinner'
 
 const websocketUrl =
   apiBaseUrl.replace('http:', 'ws:').replace('https:', 'wss:') + '/connect'
@@ -47,58 +48,60 @@ export default function HomeScreen() {
     }
   }, [markets, selectedMarket])
 
-  return (
-    <div className="h-screen bg-gradient-to-b from-lightBackground to-darkBackground">
-      <Header
-        markets={markets}
-        selectedMarket={selectedMarket}
-        onMarketChange={setSelectedMarket}
-      />
+  if (
+    symbols &&
+    markets &&
+    selectedMarket &&
+    walletAddress &&
+    exchangeContract
+  ) {
+    return (
+      <div className="h-screen bg-gradient-to-b from-lightBackground to-darkBackground">
+        <Header
+          markets={markets}
+          selectedMarket={selectedMarket}
+          onMarketChange={setSelectedMarket}
+        />
 
-      <div className="flex h-screen w-screen flex-col gap-4 px-4 pt-24">
-        <div className="flex gap-4">
-          {selectedMarket && (
-            <>
-              <div className="flex flex-col">
-                <OrderBook ws={ws} marketId={selectedMarket.id} />
-              </div>
-              <div className="flex flex-col">
-                <Prices ws={ws} marketId={selectedMarket.id} />
-              </div>
-              <div className="flex flex-col">
-                {walletAddress && exchangeContract && symbols && (
-                  <>
-                    <Order
-                      baseSymbol={selectedMarket.baseSymbol}
-                      quoteSymbol={selectedMarket.quoteSymbol}
-                    />
-                  </>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-        <div className="flex gap-4">
-          <div className="flex flex-col">
-            {selectedMarket && walletAddress && exchangeContract && symbols && (
-              <>
-                <Trades ws={ws} marketId={selectedMarket.id} />
-              </>
-            )}
+        <div className="flex h-screen w-screen flex-col gap-4 px-4 pt-24">
+          <div className="flex gap-4">
+            <div className="flex flex-col">
+              <OrderBook ws={ws} marketId={selectedMarket.id} />
+            </div>
+            <div className="flex flex-col">
+              <Prices ws={ws} marketId={selectedMarket.id} />
+            </div>
+            <div className="flex flex-col">
+              {walletAddress && exchangeContract && symbols && (
+                <>
+                  <Order
+                    baseSymbol={selectedMarket.baseSymbol}
+                    quoteSymbol={selectedMarket.quoteSymbol}
+                  />
+                </>
+              )}
+            </div>
           </div>
-          <div className="flex flex-col">
-            {walletAddress && exchangeContract && symbols && (
-              <>
-                <Balances
-                  walletAddress={walletAddress}
-                  exchangeContractAddress={exchangeContract.address}
-                  symbols={symbols}
-                />
-              </>
-            )}
+          <div className="flex gap-4">
+            <div className="flex flex-col">
+              <Trades ws={ws} marketId={selectedMarket.id} />
+            </div>
+            <div className="flex flex-col">
+              <Balances
+                walletAddress={walletAddress}
+                exchangeContractAddress={exchangeContract.address}
+                symbols={symbols}
+              />
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  )
+    )
+  } else {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gradient-to-b from-lightBackground to-darkBackground">
+        <Spinner />
+      </div>
+    )
+  }
 }

@@ -4,12 +4,13 @@ import { useBlockNumber, useReadContract, useReadContracts } from 'wagmi'
 import { ExchangeAbi } from 'contracts'
 import Spinner from 'components/common/Spinner'
 import { isNotNullable } from 'utils'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import DepositModal from 'components/Screens/HomeScreen/Balances/DepositModal'
 import WithdrawalModal from 'components/Screens/HomeScreen/Balances/WithdrawalModal'
 import { Widget } from 'components/common/Widget'
 import { Button } from 'components/common/Button'
+import SymbolIcon from 'components/common/SymbolIcon'
 
 export default function Balances({
   walletAddress,
@@ -144,7 +145,13 @@ function BalancesTable({
           {balances.map((symbolBalance) => {
             return (
               <tr key={symbolBalance.symbol.name}>
-                <td className="min-w-12 pr-2">{symbolBalance.symbol.name}</td>
+                <td className="min-w-12 pr-2">
+                  <SymbolIcon
+                    symbol={symbolBalance.symbol}
+                    className="mr-2 inline-block size-6"
+                  />
+                  {symbolBalance.symbol.name}
+                </td>
                 <td className="min-w-12 px-4 text-left">
                   {formatUnits(
                     symbolBalance.amount,

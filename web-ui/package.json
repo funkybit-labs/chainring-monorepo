@@ -22,6 +22,7 @@
     "@zodios/core": "^10.9.6",
     "axios": "^1.6.8",
     "buffer": "^6.0.3",
+    "cryptocurrency-icons": "^0.18.1",
     "date-fns": "^3.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
