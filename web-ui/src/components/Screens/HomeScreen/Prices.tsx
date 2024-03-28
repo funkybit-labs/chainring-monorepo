@@ -81,8 +81,10 @@ export function Prices({ ws, marketId }: { ws: Websocket; marketId: string }) {
       ws.send(
         JSON.stringify({
           type: 'Subscribe',
-          marketId,
-          topic: 'Prices'
+          topic: {
+            type: 'Prices',
+            marketId
+          }
         })
       )
     }
@@ -114,8 +116,10 @@ export function Prices({ ws, marketId }: { ws: Websocket; marketId: string }) {
         ws.send(
           JSON.stringify({
             type: 'Unsubscribe',
-            marketId,
-            topic: 'Prices'
+            topic: {
+              type: 'Prices',
+              marketId
+            }
           })
         )
       }

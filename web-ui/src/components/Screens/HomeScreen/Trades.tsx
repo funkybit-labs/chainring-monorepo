@@ -5,13 +5,7 @@ import { Websocket, WebsocketEvent } from 'websocket-ts'
 import { formatUnits } from 'viem'
 import { format } from 'date-fns'
 
-export default function Trades({
-  ws,
-  marketId
-}: {
-  ws: Websocket
-  marketId: string
-}) {
+export default function Trades({ ws }: { ws: Websocket }) {
   const [trades, setTrades] = useState<Trade[]>(() => [])
 
   useEffect(() => {
@@ -19,8 +13,7 @@ export default function Trades({
       ws.send(
         JSON.stringify({
           type: 'Subscribe',
-          marketId: marketId,
-          topic: 'Trades'
+          topic: { type: 'Trades' }
         })
       )
     }
@@ -54,17 +47,16 @@ export default function Trades({
         ws.send(
           JSON.stringify({
             type: 'Unsubscribe',
-            marketId: marketId,
-            topic: 'Trades'
+            topic: { type: 'Trades' }
           })
         )
       }
     }
-  }, [ws, marketId])
+  }, [ws])
 
   return (
     <Widget
-      title={'Trades'}
+      title={'Trade History'}
       contents={
         <>
           <div className="h-96 overflow-auto">

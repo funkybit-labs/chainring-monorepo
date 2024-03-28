@@ -27,9 +27,8 @@ export default function HomeScreen() {
   const wallet = useAccount()
   const walletAddress = wallet.address
 
-  const chainConfig = configQuery.data?.chains.find(
-    (chain) => chain.id == wallet.chainId
-  )
+  const config = configQuery.data
+  const chainConfig = config?.chains.find((chain) => chain.id == wallet.chainId)
 
   const exchangeContract = chainConfig?.contracts?.find(
     (c) => c.name == 'Exchange'
@@ -39,8 +38,8 @@ export default function HomeScreen() {
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
 
   const markets = useMemo(() => {
-    return configQuery.data?.markets || []
-  }, [configQuery.data])
+    return config?.markets || []
+  }, [config?.markets])
 
   useEffect(() => {
     if (markets.length > 0 && selectedMarket == null) {
@@ -48,13 +47,7 @@ export default function HomeScreen() {
     }
   }, [markets, selectedMarket])
 
-  if (
-    symbols &&
-    markets &&
-    selectedMarket &&
-    walletAddress &&
-    exchangeContract
-  ) {
+  if (markets && selectedMarket) {
     return (
       <div className="h-screen bg-gradient-to-b from-lightBackground to-darkBackground">
         <Header
@@ -71,27 +64,27 @@ export default function HomeScreen() {
             <div className="flex flex-col">
               <Prices ws={ws} marketId={selectedMarket.id} />
             </div>
-            <div className="flex flex-col">
-              {walletAddress && exchangeContract && symbols && (
-                <>
-                  <Order
-                    baseSymbol={selectedMarket.baseSymbol}
-                    quoteSymbol={selectedMarket.quoteSymbol}
-                  />
-                </>
-              )}
-            </div>
+            {walletAddress && (
+              <div className="flex flex-col">
+                <Order
+                  baseSymbol={selectedMarket.baseSymbol}
+                  quoteSymbol={selectedMarket.quoteSymbol}
+                />
+              </div>
+            )}
           </div>
           <div className="flex gap-4">
             <div className="flex flex-col">
-              <Trades ws={ws} marketId={selectedMarket.id} />
+              {walletAddress && <Trades ws={ws} />}
             </div>
             <div className="flex flex-col">
-              <Balances
-                walletAddress={walletAddress}
-                exchangeContractAddress={exchangeContract.address}
-                symbols={symbols}
-              />
+              {walletAddress && symbols && exchangeContract && (
+                <Balances
+                  walletAddress={walletAddress}
+                  exchangeContractAddress={exchangeContract.address}
+                  symbols={symbols}
+                />
+              )}
             </div>
           </div>
         </div>
