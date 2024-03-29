@@ -133,3 +133,11 @@ moved {
 resource "aws_route53_zone" "zone" {
   name = var.zone
 }
+
+resource "aws_route53_zone" "zone-finance" {
+  name = "chainring.finance"
+}
+
+resource "aws_route53_zone" "zone-labs" {
+  name = "chainringlabs.com"
+}

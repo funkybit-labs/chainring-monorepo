@@ -24,3 +24,37 @@ resource "aws_route53_record" "ssl-cname" {
   ttl     = "3600"
   records = ["39F0435706010FC8CBE2AF55CBEC8554.9F8D87F56D6B3A493E9C12FACFB037DC.65ef58b9431fe.comodoca.com"]
 }
+
+resource "aws_route53_record" "finance-mx" {
+  zone_id = aws_route53_zone.zone-finance.zone_id
+  name    = ""
+  type = "MX"
+  ttl = "3600"
+  records = ["1 smtp.google.com"]
+}
+
+resource "aws_route53_record" "finance-txt" {
+  name    = ""
+  type    = "TXT"
+  ttl = "3600"
+  zone_id = aws_route53_zone.zone-finance.zone_id
+  records = ["google-site-verification=qSxGq86doLnvngSJ_g-yZWyRIQjY26KhTOf1R8wk3Os",]
+}
+
+resource "aws_route53_record" "labs-mx" {
+  zone_id = aws_route53_zone.zone-labs.zone_id
+  name    = ""
+  type = "MX"
+  ttl = "3600"
+  records = ["1 smtp.google.com"]
+}
+
+resource "aws_route53_record" "labs-txt" {
+  zone_id = aws_route53_zone.zone-labs.zone_id
+  name    = ""
+  type    = "TXT"
+  ttl     = "3600"
+  records = ["google-site-verification=893C55w6EUTpqzu3FSaZL2YAocPa7zXU2VQ2UTnyVwM",
+  ]
+}
+
