@@ -22,6 +22,7 @@ val protobufKotlinVersion = "4.26.0"
 
 dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
     implementation("org.apache.logging.log4j:log4j-api:$log4j2Version")
     implementation("org.apache.logging.log4j:log4j-core:$log4j2Version")

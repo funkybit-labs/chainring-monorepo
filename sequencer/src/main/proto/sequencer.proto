@@ -1,14 +1,63 @@
 syntax = "proto3";
 package sequencer;
+import "bignum.proto";
 import "order.proto";
+import "market.proto";
 
 option java_multiple_files = true;
 option java_package = "co.chainring.sequencer.proto";
 option java_outer_classname = "SequencerSchema";
 
-message SequencerResponse {
+message OrderChanged {
+  uint64 guid = 1;
+  OrderDisposition disposition = 2;
+}
+
+message TradeCreated {
+  uint64 buyGuid = 1;
+  uint64 sellGuid = 2;
+  IntegerValue amount = 3;
+  DecimalValue price = 4;
+}
+
+message BalanceChange {
+  uint64 wallet = 1;
+  string asset = 2;
+  IntegerValue delta = 3;
+}
+
+message MarketCreated {
+  string marketId = 1;
+  DecimalValue tickSize = 2;
+}
+
+message SequencerRequest {
+  enum Request {
+    AddMarket = 0;
+    ApplyOrderBatch = 1;
+  }
   string guid = 1;
-  OrderResponse.OrderDisposition disposition = 2;
+  Request request = 2;
+  optional Market addMarket = 3;
+  optional OrderBatch orderBatch = 4;
+}
+
+enum SequencerError {
+  None = 0;
+  UnknownRequest = 1;
+  MarketExists = 2;
+  UnknownMarket = 3;
+}
+
+message SequencerResponse {
+  uint64 sequence = 1;
+  string guid = 2;
+  uint64 processingTime = 3;
+  optional SequencerError error = 4;
+  repeated OrderChanged ordersChanged = 5;
+  repeated TradeCreated tradesCreated = 6;
+  repeated BalanceChange balancesChanged = 7;
+  repeated MarketCreated marketsCreated = 8;
 }
 
 message Sequenced {

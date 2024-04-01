@@ -4,15 +4,20 @@ import co.chainring.sequencer.core.inputQueue
 import co.chainring.sequencer.core.outputQueue
 import co.chainring.sequencer.core.sequencedQueue
 import co.chainring.sequencer.proto.GatewayGrpcKt
-import co.chainring.sequencer.proto.Order
-import co.chainring.sequencer.proto.OrderResponse
+import co.chainring.sequencer.proto.GatewayResponse
+import co.chainring.sequencer.proto.Market
+import co.chainring.sequencer.proto.OrderBatch
+import co.chainring.sequencer.proto.SequencerRequest
+import co.chainring.sequencer.proto.SequencerRequestKt
 import co.chainring.sequencer.proto.SequencerResponse
-import co.chainring.sequencer.proto.orderResponse
+import co.chainring.sequencer.proto.gatewayResponse
 import co.chainring.sequencer.proto.sequenced
+import co.chainring.sequencer.proto.sequencerRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.grpc.Server
 import io.grpc.ServerBuilder
 import net.openhft.chronicle.queue.ExcerptTailer
+import java.util.UUID
 import kotlin.concurrent.getOrSet
 import kotlin.system.measureNanoTime
 
@@ -54,34 +59,37 @@ class GatewayApp(private val config: GatewayConfig = GatewayConfig()) : BaseApp(
         private val outputTailer = ThreadLocal<ExcerptTailer>()
         private val logger = KotlinLogging.logger {}
 
-        override suspend fun addOrder(request: Order): OrderResponse {
+        private fun toSequencer(requestGuid: String, requestBuilder: SequencerRequestKt.Dsl.() -> Unit): GatewayResponse {
             var index: Long = 0
             val inputAppender = inputQueue.acquireAppender()
             val sequencedAppender = sequencedQueue.acquireAppender()
             val localTailer = outputTailer.getOrSet { outputQueue.createTailer().toEnd() }
-            var disposition: OrderResponse.OrderDisposition? = null
+            var sequencerResponse: SequencerResponse? = null
             val processingTime = measureNanoTime {
+                val guid = UUID.randomUUID().toString()
                 try {
                     inputAppender.writingDocument().use {
-                        it.wire()?.write()?.bytes(request.toByteArray())
+                        it.wire()?.write()?.bytes(
+                            sequencerRequest(requestBuilder).toByteArray(),
+                        )
                         it.close()
                         index = inputAppender.lastIndexAppended()
                     }
                     sequencedAppender.writingDocument().use {
                         it.wire()?.write()?.bytes(
                             sequenced {
-                                guid = request.guid
+                                this.guid = guid
                                 this.index = index
                             }.toByteArray(),
                         )
                     }
-                    while (disposition == null) {
+                    while (sequencerResponse == null) {
                         localTailer.readingDocument().use {
                             if (it.isPresent) {
                                 it.wire()?.read()?.bytes { bytes ->
                                     val response = SequencerResponse.parseFrom(bytes.toByteArray())
-                                    if (response.guid == request.guid) {
-                                        disposition = response.disposition
+                                    if (response.guid == requestGuid) {
+                                        sequencerResponse = response
                                     }
                                 }
                             }
@@ -91,11 +99,28 @@ class GatewayApp(private val config: GatewayConfig = GatewayConfig()) : BaseApp(
                     logger.error(e) { "Could not process transaction" }
                 }
             }
-            return orderResponse {
-                guid = request.guid
-                this.disposition = disposition ?: OrderResponse.OrderDisposition.Failed
-                sequence = index
+            return gatewayResponse {
                 this.processingTime = processingTime
+                sequencerResponse?.let {
+                    this.success = true
+                    this.sequencerResponse = it
+                } ?: run {
+                    this.success = false
+                }
+            }
+        }
+
+        override suspend fun addMarket(request: Market): GatewayResponse {
+            return toSequencer(request.guid) {
+                this.request = SequencerRequest.Request.AddMarket
+                this.addMarket = request
+            }
+        }
+
+        override suspend fun applyOrderBatch(request: OrderBatch): GatewayResponse {
+            return toSequencer(request.guid) {
+                this.request = SequencerRequest.Request.ApplyOrderBatch
+                this.orderBatch = request
             }
         }
     }

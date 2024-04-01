@@ -1,11 +1,20 @@
 syntax = "proto3";
 package sequencer;
 import "order.proto";
+import "market.proto";
+import "sequencer.proto";
 
 option java_multiple_files = true;
 option java_package = "co.chainring.sequencer.proto";
 option java_outer_classname = "GatewaySchema";
 
+message GatewayResponse {
+  bool success = 1;
+  uint64 processingTime = 2;
+  optional SequencerResponse sequencerResponse = 3;
+}
+
 service Gateway {
-  rpc AddOrder (Order) returns (OrderResponse);
+  rpc ApplyOrderBatch (OrderBatch) returns (GatewayResponse);
+  rpc AddMarket (Market) returns (GatewayResponse);
 }
