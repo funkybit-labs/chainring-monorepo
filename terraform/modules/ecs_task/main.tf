@@ -183,6 +183,20 @@ resource "aws_ecs_task_definition" "task" {
   }
 }
 
+resource "aws_service_discovery_service" "service_discovery_service" {
+  name = "${var.name_prefix}-${var.task_name}"
+
+  dns_config {
+    namespace_id = var.service_discovery_private_dns_namespace.id
+
+    dns_records {
+      ttl  = 300
+      type = "A"
+    }
+
+    routing_policy = "MULTIVALUE"
+  }
+}
 
 resource "aws_ecs_service" "service" {
   name            = "${var.name_prefix}-${var.task_name}"
@@ -209,6 +223,10 @@ resource "aws_ecs_service" "service" {
       container_name   = "${var.name_prefix}-${var.task_name}"
       container_port   = local.http_api_port
     }
+  }
+
+  service_registries {
+    registry_arn = aws_service_discovery_service.service_discovery_service.arn
   }
 
   lifecycle {

@@ -48,4 +48,5 @@ variable "lb_dns_name" {
 variable "mount_efs_volume" {
   default = false
 }
+variable "service_discovery_private_dns_namespace" {}
 data "aws_caller_identity" "current" {}
