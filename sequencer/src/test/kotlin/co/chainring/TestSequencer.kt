@@ -28,7 +28,7 @@ class TestSequencer {
         amount: Long,
         price: String?,
         wallet: Long,
-        orderType: Order.OrderType,
+        orderType: Order.Type,
     ) =
         this.applyOrderBatch(
             orderBatch {
@@ -39,7 +39,7 @@ class TestSequencer {
                         this.amount = amount.toBigInteger().toIntegerValue()
                         this.price = price?.toBigDecimal()?.toDecimalValue() ?: BigDecimal.ZERO.toDecimalValue()
                         this.wallet = wallet
-                        this.orderType = orderType
+                        this.type = orderType
                     },
                 )
             },
@@ -53,16 +53,16 @@ class TestSequencer {
         val marketId = "BTC1/ETH1"
         createMarket(stub, marketId)
         // place an order and see that it gets accepted
-        val response = stub.addOrder(marketId, 12345, "17.500", 123456789L, Order.OrderType.LimitBuy)
+        val response = stub.addOrder(marketId, 12345, "17.500", 123456789L, Order.Type.LimitBuy)
         assertEquals(OrderDisposition.Accepted, response.sequencerResponse.ordersChangedList.first().disposition)
 
         // place another order and see that it gets the next sequence number
-        val response2 = stub.addOrder(marketId, 54321, "17.550", 123456789L, Order.OrderType.LimitSell)
+        val response2 = stub.addOrder(marketId, 54321, "17.550", 123456789L, Order.Type.LimitSell)
         assertEquals(OrderDisposition.Accepted, response2.sequencerResponse.ordersChangedList.first().disposition)
         assertEquals(response.sequencerResponse.sequence + 1, response2.sequencerResponse.sequence)
 
         // place a market buy and see that it gets executed
-        val response3 = stub.addOrder(marketId, 43210, null, 555111555L, Order.OrderType.MarketBuy)
+        val response3 = stub.addOrder(marketId, 43210, null, 555111555L, Order.Type.MarketBuy)
         assertEquals(OrderDisposition.Filled, response3.sequencerResponse.ordersChangedList.first().disposition)
         val trade = response3.sequencerResponse.tradesCreatedList.first()
         assertEquals("17.550".toBigDecimal().toDecimalValue(), trade.price)
@@ -71,7 +71,7 @@ class TestSequencer {
         assertEquals(response3.orderGuid(), trade.buyGuid)
 
         // now try a market sell which can only be partially filled and see that it gets executed
-        val response4 = stub.addOrder(marketId, 12346, null, 555111555L, Order.OrderType.MarketSell)
+        val response4 = stub.addOrder(marketId, 12346, null, 555111555L, Order.Type.MarketSell)
         assertEquals(OrderDisposition.PartiallyFilled, response4.sequencerResponse.ordersChangedList.first().disposition)
         val trade2 = response4.sequencerResponse.tradesCreatedList.first()
         assertEquals("17.500".toBigDecimal().toDecimalValue(), trade2.price)
@@ -92,13 +92,13 @@ class TestSequencer {
         val lp1 = 123457689L
         val lp2 = 987654321L
         val tkr = 555555555L
-        val sell1 = stub.addOrder(marketId, 1000, "17.550", lp1, Order.OrderType.LimitSell)
-        val sell2 = stub.addOrder(marketId, 1000, "17.550", lp2, Order.OrderType.LimitSell)
-        val sell3 = stub.addOrder(marketId, 10000, "17.600", lp1, Order.OrderType.LimitSell)
-        val sell4 = stub.addOrder(marketId, 10000, "17.600", lp2, Order.OrderType.LimitSell)
-        val sell5 = stub.addOrder(marketId, 20000, "17.700", lp1, Order.OrderType.LimitSell)
-        val sell6 = stub.addOrder(marketId, 20000, "17.700", lp2, Order.OrderType.LimitSell)
-        val response = stub.addOrder(marketId, 17000, null, tkr, Order.OrderType.MarketBuy)
+        val sell1 = stub.addOrder(marketId, 1000, "17.550", lp1, Order.Type.LimitSell)
+        val sell2 = stub.addOrder(marketId, 1000, "17.550", lp2, Order.Type.LimitSell)
+        val sell3 = stub.addOrder(marketId, 10000, "17.600", lp1, Order.Type.LimitSell)
+        val sell4 = stub.addOrder(marketId, 10000, "17.600", lp2, Order.Type.LimitSell)
+        val sell5 = stub.addOrder(marketId, 20000, "17.700", lp1, Order.Type.LimitSell)
+        val sell6 = stub.addOrder(marketId, 20000, "17.700", lp2, Order.Type.LimitSell)
+        val response = stub.addOrder(marketId, 17000, null, tkr, Order.Type.MarketBuy)
         assertEquals(OrderDisposition.Filled, response.sequencerResponse.ordersChangedList.first().disposition)
         assertEquals(
             listOf(sell1.orderGuid(), sell2.orderGuid(), sell3.orderGuid(), sell4.orderGuid()),
@@ -112,22 +112,37 @@ class TestSequencer {
             listOf("17.550", "17.550", "17.600", "17.600"),
             response.sequencerResponse.tradesCreatedList.map { it.price.toBigDecimal().toString() },
         )
+        // place another market order to exhaust remaining limit orders
+        val response2 = stub.addOrder(marketId, 45000, null, tkr, Order.Type.MarketBuy)
+        assertEquals(OrderDisposition.Filled, response2.sequencerResponse.ordersChangedList.first().disposition)
+        assertEquals(
+            listOf(sell4.orderGuid(), sell5.orderGuid(), sell6.orderGuid()),
+            response2.sequencerResponse.tradesCreatedList.map { it.sellGuid },
+        )
+        assertEquals(
+            listOf(5000, 20000, 20000),
+            response2.sequencerResponse.tradesCreatedList.map { it.amount.toBigInteger().toInt() },
+        )
+        assertEquals(
+            listOf("17.600", "17.700", "17.700"),
+            response2.sequencerResponse.tradesCreatedList.map { it.price.toBigDecimal().toString() },
+        )
     }
 
-    private suspend fun createMarket(stub: GatewayGrpcKt.GatewayCoroutineStub, marketId: String) {
+    private suspend fun createMarket(stub: GatewayGrpcKt.GatewayCoroutineStub, marketId: String, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal = "17.525".toBigDecimal()) {
         val createMarketResponse = stub.addMarket(
             market {
                 this.guid = UUID.randomUUID().toString()
                 this.marketId = marketId
-                this.tickSize = "0.05".toBigDecimal().toDecimalValue()
+                this.tickSize = tickSize.toDecimalValue()
                 this.maxLevels = 1000
                 this.maxOrdersPerLevel = 1000
-                this.lastPrice = "17.525".toBigDecimal().toDecimalValue()
+                this.marketPrice = marketPrice.toDecimalValue()
             },
         )
         assertEquals(1, createMarketResponse.sequencerResponse.marketsCreatedCount)
         val createdMarket = createMarketResponse.sequencerResponse.marketsCreatedList.first()
         assertEquals(marketId, createdMarket.marketId)
-        assertEquals("0.05".toBigDecimal(), createdMarket.tickSize.toBigDecimal())
+        assertEquals(tickSize, createdMarket.tickSize.toBigDecimal())
     }
 }

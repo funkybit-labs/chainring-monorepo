@@ -9,14 +9,14 @@ option java_outer_classname = "OrderSchema";
 message Order {
   uint64 guid  = 1;
 
-  enum OrderType {
+  enum Type {
     MarketBuy = 0;
     MarketSell = 1;
     LimitBuy = 2;
     LimitSell = 3;
   }
 
-  OrderType orderType = 3;
+  Type type = 3;
   uint64 wallet = 4;
   IntegerValue amount = 5;
   optional DecimalValue price = 6; // required for limit orders

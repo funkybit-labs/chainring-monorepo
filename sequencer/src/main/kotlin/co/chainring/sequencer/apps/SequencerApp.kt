@@ -4,6 +4,7 @@ import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.inputQueue
 import co.chainring.sequencer.core.outputQueue
 import co.chainring.sequencer.core.toBigDecimal
+import co.chainring.sequencer.core.toMarketId
 import co.chainring.sequencer.proto.OrderChanged
 import co.chainring.sequencer.proto.SequencerError
 import co.chainring.sequencer.proto.SequencerRequest
@@ -30,17 +31,17 @@ class SequencerApp : BaseApp() {
                         val startTime = System.nanoTime()
                         dc.wire()?.read()?.bytes { bytes ->
                             val request = SequencerRequest.parseFrom(bytes.toByteArray())
-                            val response = when (request.request) {
-                                SequencerRequest.Request.AddMarket -> {
+                            val response = when (request.type) {
+                                SequencerRequest.Type.AddMarket -> {
                                     val market = request.addMarket!!
                                     var error: SequencerError? = null
                                     if (markets.containsKey(market.marketId)) {
                                         error = SequencerError.MarketExists
                                     } else {
                                         markets[market.marketId] = Market(
-                                            market.marketId,
+                                            market.marketId.toMarketId(),
                                             market.tickSize.toBigDecimal(),
-                                            market.lastPrice.toBigDecimal(),
+                                            market.marketPrice.toBigDecimal(),
                                             market.maxLevels,
                                             market.maxOrdersPerLevel,
                                         )
@@ -59,7 +60,7 @@ class SequencerApp : BaseApp() {
                                         }
                                     }
                                 }
-                                SequencerRequest.Request.ApplyOrderBatch -> {
+                                SequencerRequest.Type.ApplyOrderBatch -> {
                                     var ordersChanged: List<OrderChanged> = emptyList()
                                     var trades: List<TradeCreated> = emptyList()
                                     val orderBatch = request.orderBatch!!
@@ -67,7 +68,7 @@ class SequencerApp : BaseApp() {
                                     if (markets.containsKey(orderBatch.marketId)) {
                                         val result = markets[orderBatch.marketId]!!.addOrders(orderBatch.ordersToAddList)
                                         ordersChanged = result.ordersChanged
-                                        trades = result.trades
+                                        trades = result.createdTrades
                                     } else {
                                         error = SequencerError.UnknownMarket
                                     }
@@ -83,7 +84,7 @@ class SequencerApp : BaseApp() {
                                     }
                                 }
 
-                                null, SequencerRequest.Request.UNRECOGNIZED -> {
+                                null, SequencerRequest.Type.UNRECOGNIZED -> {
                                     sequencerResponse {
                                         this.sequence = dc.index()
                                         this.processingTime = System.nanoTime() - startTime

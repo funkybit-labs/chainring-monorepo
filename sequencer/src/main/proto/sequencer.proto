@@ -32,12 +32,12 @@ message MarketCreated {
 }
 
 message SequencerRequest {
-  enum Request {
+  enum Type {
     AddMarket = 0;
     ApplyOrderBatch = 1;
   }
   string guid = 1;
-  Request request = 2;
+  Type type = 2;
   optional Market addMarket = 3;
   optional OrderBatch orderBatch = 4;
 }

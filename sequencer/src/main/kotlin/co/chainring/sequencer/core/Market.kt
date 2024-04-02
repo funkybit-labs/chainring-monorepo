@@ -1,44 +1,50 @@
 package co.chainring.sequencer.core
 
 import co.chainring.sequencer.proto.Order
-import co.chainring.sequencer.proto.Order.OrderType
 import co.chainring.sequencer.proto.OrderChanged
 import co.chainring.sequencer.proto.TradeCreated
 import co.chainring.sequencer.proto.orderChanged
 import co.chainring.sequencer.proto.tradeCreated
 import java.math.BigDecimal
 
-data class MarketAddOrders(
-    val ordersChanged: List<OrderChanged>,
-    val trades: List<TradeCreated>,
-)
+@JvmInline
+value class MarketId(val value: String) {
+    override fun toString(): String = value
+}
+
+fun String.toMarketId() = MarketId(this)
 
 class Market(
-    val marketId: String,
-    val tickSize: BigDecimal,
-    var lastPrice: BigDecimal,
+    val id: MarketId,
+    tickSize: BigDecimal,
+    marketPrice: BigDecimal,
     maxLevels: Int,
     maxOrdersPerLevel: Int,
 ) {
-    fun addOrders(ordersToAddList: List<Order>): MarketAddOrders {
+    data class AddOrdersResult(
+        val ordersChanged: List<OrderChanged>,
+        val createdTrades: List<TradeCreated>,
+    )
+
+    fun addOrders(ordersToAddList: List<Order>): AddOrdersResult {
         val ordersChanged = mutableListOf<OrderChanged>()
-        val trades = mutableListOf<TradeCreated>()
+        val createdTrades = mutableListOf<TradeCreated>()
         ordersToAddList.forEach { order ->
-            val orderResult = orderBook.addOrder(order, lastPrice)
+            val orderResult = orderBook.addOrder(order)
             ordersChanged.add(
                 orderChanged {
                     this.guid = order.guid
                     this.disposition = orderResult.disposition
                 },
             )
-            trades.addAll(
+            createdTrades.addAll(
                 orderResult.executions.map { execution ->
                     tradeCreated {
-                        if (order.orderType == OrderType.MarketBuy) {
+                        if (order.type == Order.Type.MarketBuy) {
                             buyGuid = order.guid
-                            sellGuid = execution.counterGuid
+                            sellGuid = execution.counterGuid.value
                         } else {
-                            buyGuid = execution.counterGuid
+                            buyGuid = execution.counterGuid.value
                             sellGuid = order.guid
                         }
                         amount = execution.amount.toIntegerValue()
@@ -46,12 +52,9 @@ class Market(
                     }
                 },
             )
-            if (orderResult.executions.isNotEmpty()) {
-                lastPrice = orderResult.executions.last().price
-            }
         }
-        return MarketAddOrders(ordersChanged, trades)
+        return AddOrdersResult(ordersChanged, createdTrades)
     }
 
-    val orderBook = OrderBook(maxLevels, maxOrdersPerLevel, tickSize, lastPrice)
+    val orderBook = OrderBook(maxLevels, maxOrdersPerLevel, tickSize, marketPrice)
 }

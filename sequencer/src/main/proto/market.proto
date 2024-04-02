@@ -9,7 +9,7 @@ option java_outer_classname = "MarketSchema";
 message Market {
   string guid = 1;
   string marketId = 2;
-  DecimalValue lastPrice = 3;
+  DecimalValue marketPrice = 3;
   DecimalValue tickSize = 4;
   uint32 maxLevels = 5;
   uint32 maxOrdersPerLevel = 6;

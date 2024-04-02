@@ -60,7 +60,7 @@ class GatewayApp(private val config: GatewayConfig = GatewayConfig()) : BaseApp(
         private val logger = KotlinLogging.logger {}
 
         private fun toSequencer(requestGuid: String, requestBuilder: SequencerRequestKt.Dsl.() -> Unit): GatewayResponse {
-            var index: Long = 0
+            var index: Long
             val inputAppender = inputQueue.acquireAppender()
             val sequencedAppender = sequencedQueue.acquireAppender()
             val localTailer = outputTailer.getOrSet { outputQueue.createTailer().toEnd() }
@@ -112,14 +112,14 @@ class GatewayApp(private val config: GatewayConfig = GatewayConfig()) : BaseApp(
 
         override suspend fun addMarket(request: Market): GatewayResponse {
             return toSequencer(request.guid) {
-                this.request = SequencerRequest.Request.AddMarket
+                this.type = SequencerRequest.Type.AddMarket
                 this.addMarket = request
             }
         }
 
         override suspend fun applyOrderBatch(request: OrderBatch): GatewayResponse {
             return toSequencer(request.guid) {
-                this.request = SequencerRequest.Request.ApplyOrderBatch
+                this.type = SequencerRequest.Type.ApplyOrderBatch
                 this.orderBatch = request
             }
         }
