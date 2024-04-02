@@ -73,7 +73,7 @@ class OrderRoutesApiTest {
         // check that order is included in the orders list sent via websocket
         wsClient = WebsocketClient.blocking()
         wsClient.subscribe(SubscriptionTopic.Orders)
-        assertEquals(initialOrdersOverWs + listOf(limitOrder), wsClient.waitForMessage<Orders>().orders)
+        assertEquals(listOf(limitOrder) + initialOrdersOverWs, wsClient.waitForMessage<Orders>().orders)
 
         // update order
         val updatedOrder = apiClient.updateOrder(

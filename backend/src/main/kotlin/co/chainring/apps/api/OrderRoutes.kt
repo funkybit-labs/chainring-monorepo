@@ -89,8 +89,11 @@ object OrderRoutes {
                                     is CreateOrderApiRequest.Market -> null
                                     is CreateOrderApiRequest.Limit -> apiRequest.price
                                 },
-                            ).toOrderResponse().also {
-                                broadcaster.notify(request.principal, SubscriptionTopic.Orders, OrderCreated(it))
+                            ).let {
+                                it.refresh(flush = true)
+                                val order = it.toOrderResponse()
+                                broadcaster.notify(request.principal, SubscriptionTopic.Orders, OrderCreated(order))
+                                order
                             }
 
                         Response(Status.CREATED).with(
@@ -140,6 +143,7 @@ object OrderRoutes {
                                     is UpdateOrderApiRequest.Limit -> apiRequest.price
                                 },
                             )
+                            orderEntity.refresh(flush = true)
 
                             val order = orderEntity.toOrderResponse().also {
                                 broadcaster.notify(request.principal, SubscriptionTopic.Orders, OrderUpdated(it))
@@ -174,6 +178,7 @@ object OrderRoutes {
 
                         else -> {
                             order.cancel()
+                            order.refresh(flush = true)
                             broadcaster.notify(request.principal, SubscriptionTopic.Orders, OrderUpdated(order.toOrderResponse()))
                             Response(Status.NO_CONTENT)
                         }
@@ -242,8 +247,8 @@ object OrderRoutes {
         } bindContract Method.DELETE to { request ->
             transaction {
                 OrderEntity.cancelAll(request.principal)
-                broadcaster.sendOrders(request.principal)
             }
+            broadcaster.sendOrders(request.principal)
             Response(Status.NO_CONTENT)
         }
     }

@@ -45,9 +45,9 @@ import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger {}
 
-data class AuthenticatedWebsocket(
+data class ConnectedClient(
     val websocket: Websocket,
-    val principal: Address,
+    val principal: Address?,
 ) : Websocket by websocket {
     fun send(message: OutgoingWSMessage) {
         logger.debug { "Sending $message to $principal" }
@@ -55,15 +55,15 @@ data class AuthenticatedWebsocket(
     }
 }
 
-typealias Subscriptions = CopyOnWriteArrayList<AuthenticatedWebsocket>
+typealias Subscriptions = CopyOnWriteArrayList<ConnectedClient>
 typealias TopicSubscriptions = ConcurrentHashMap<SubscriptionTopic, Subscriptions>
 
 class Broadcaster {
     private val subscriptions = TopicSubscriptions()
-    private val lastPricePublish = mutableMapOf<Pair<MarketId, AuthenticatedWebsocket>, Instant>()
+    private val lastPricePublish = mutableMapOf<Pair<MarketId, ConnectedClient>, Instant>()
     private val rnd = Random(0)
 
-    fun subscribe(topic: SubscriptionTopic, websocket: AuthenticatedWebsocket) {
+    fun subscribe(topic: SubscriptionTopic, websocket: ConnectedClient) {
         subscriptions.getOrPut(topic) {
             Subscriptions()
         }.addIfAbsent(websocket)
@@ -76,14 +76,14 @@ class Broadcaster {
         }
     }
 
-    fun unsubscribe(topic: SubscriptionTopic, websocket: AuthenticatedWebsocket) {
+    fun unsubscribe(topic: SubscriptionTopic, websocket: ConnectedClient) {
         subscriptions[topic]?.remove(websocket)
         if (topic is SubscriptionTopic.Prices) {
             lastPricePublish.remove(Pair(topic.marketId, websocket))
         }
     }
 
-    fun unsubscribe(websocket: AuthenticatedWebsocket) {
+    fun unsubscribe(websocket: ConnectedClient) {
         subscriptions.keys.forEach { topic ->
             unsubscribe(topic, websocket)
         }
@@ -139,11 +139,11 @@ class Broadcaster {
         }
     }
 
-    private fun sendPrices(market: MarketId, websockets: List<AuthenticatedWebsocket>) {
+    private fun sendPrices(market: MarketId, websockets: List<ConnectedClient>) {
         websockets.forEach { sendPrices(market, it) }
     }
 
-    private fun sendPrices(market: MarketId, websocket: AuthenticatedWebsocket) {
+    private fun sendPrices(market: MarketId, websocket: ConnectedClient) {
         val key = Pair(market, websocket)
         val fullDump = !lastPricePublish.containsKey(key)
         val now = Clock.System.now()
@@ -166,7 +166,7 @@ class Broadcaster {
         websocket.send(OutgoingWSMessage.Publish(prices))
     }
 
-    private fun sendTrades(websocket: AuthenticatedWebsocket) {
+    private fun sendTrades(websocket: ConnectedClient) {
         fun generateTrade(timestamp: Instant): Trade {
             val lastStutter = rnd.nextDouble(-0.5, 0.5) / 3.0
             val marketId = setOf(MarketId("BTC/ETH"), MarketId("USDC/DAI")).random()
@@ -204,11 +204,11 @@ class Broadcaster {
         )
     }
 
-    private fun sendOrderBook(marketId: MarketId, websockets: List<AuthenticatedWebsocket>) {
+    private fun sendOrderBook(marketId: MarketId, websockets: List<ConnectedClient>) {
         websockets.forEach { sendOrderBook(marketId, it) }
     }
 
-    private fun sendOrderBook(marketId: MarketId, websocket: AuthenticatedWebsocket) {
+    private fun sendOrderBook(marketId: MarketId, websocket: ConnectedClient) {
         when (marketId.value) {
             "BTC/ETH" -> {
                 fun stutter() = rnd.nextDouble(-0.5, 0.5)
@@ -277,15 +277,18 @@ class Broadcaster {
         }
     }
 
-    private fun sendOrders(websocket: AuthenticatedWebsocket) {
-        transaction {
-            websocket.send(
-                OutgoingWSMessage.Publish(
-                    Orders(
-                        OrderEntity.listOrders(websocket.principal).map { it.toOrderResponse() },
+    private fun sendOrders(websocket: ConnectedClient) {
+        if (websocket.principal != null) {
+            transaction {
+                websocket.send(
+                    OutgoingWSMessage.Publish(
+                        Orders(
+                            OrderEntity.listOrders(websocket.principal)
+                                .map { it.toOrderResponse() },
+                        ),
                     ),
-                ),
-            )
+                )
+            }
         }
     }
 
@@ -299,7 +302,7 @@ class Broadcaster {
             ?.send(OutgoingWSMessage.Publish(message))
     }
 
-    private fun findWebsocket(principal: Address, topic: SubscriptionTopic): AuthenticatedWebsocket? =
+    private fun findWebsocket(principal: Address, topic: SubscriptionTopic): ConnectedClient? =
         subscriptions[topic]
             ?.find { it.principal == principal } // TODO: linear search is suboptimal here, consider building an index
 }

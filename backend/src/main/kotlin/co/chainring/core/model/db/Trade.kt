@@ -45,9 +45,8 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
     companion object : EntityClass<TradeId, TradeEntity>(TradeTable) {
 
         fun listTrades(beforeTimestamp: Instant, limit: Int): List<TradeEntity> {
-            return TradeEntity.find {
-                OrderExecutionTable.createdAt.lessEq(beforeTimestamp)
-            }
+            return TradeEntity
+                .find { OrderExecutionTable.createdAt.lessEq(beforeTimestamp) }
                 .orderBy(OrderExecutionTable.createdAt to SortOrder.DESC)
                 .limit(limit)
                 .toList()

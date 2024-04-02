@@ -7,6 +7,7 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.update
@@ -166,9 +167,10 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         }
 
         fun listOrders(ownerAddress: Address): List<OrderEntity> {
-            return OrderEntity.find {
-                OrderTable.ownerAddress.eq(ownerAddress.value)
-            }.toList()
+            return OrderEntity
+                .find { OrderTable.ownerAddress.eq(ownerAddress.value) }
+                .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
+                .toList()
         }
 
         fun cancelAll(ownerAddress: Address) {

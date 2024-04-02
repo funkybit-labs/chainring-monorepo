@@ -2,8 +2,8 @@ package co.chainring.apps.api
 
 import co.chainring.apps.api.middleware.principal
 import co.chainring.apps.api.model.websocket.IncomingWSMessage
-import co.chainring.core.websocket.AuthenticatedWebsocket
 import co.chainring.core.websocket.Broadcaster
+import co.chainring.core.websocket.ConnectedClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.format.KotlinxSerialization.auto
 import org.http4k.routing.RoutingWsHandler
@@ -22,24 +22,24 @@ class WebsocketApi(private val broadcaster: Broadcaster) {
             WsResponse { websocket: Websocket ->
                 logger.debug { "Websocket client connected" }
 
-                val authenticatedWebsocket = AuthenticatedWebsocket(websocket, request.principal)
-                authenticatedWebsocket.onError { t ->
+                val connectedClient = ConnectedClient(websocket, request.principal)
+                connectedClient.onError { t ->
                     logger.warn(t) { "Websocket error" }
                     websocket.close()
                 }
 
-                authenticatedWebsocket.onClose { status ->
+                connectedClient.onClose { status ->
                     logger.debug { "Websocket client disconnected, status: $status" }
-                    broadcaster.unsubscribe(authenticatedWebsocket)
+                    broadcaster.unsubscribe(connectedClient)
                 }
 
-                authenticatedWebsocket.onMessage { wsMessage ->
+                connectedClient.onMessage { wsMessage ->
                     when (val message = messageLens(wsMessage)) {
                         is IncomingWSMessage.Subscribe -> {
-                            broadcaster.subscribe(message.topic, authenticatedWebsocket)
+                            broadcaster.subscribe(message.topic, connectedClient)
                         }
                         is IncomingWSMessage.Unsubscribe -> {
-                            broadcaster.unsubscribe(message.topic, authenticatedWebsocket)
+                            broadcaster.unsubscribe(message.topic, connectedClient)
                         }
                     }
                 }
