@@ -5,7 +5,7 @@ import co.chainring.apps.api.model.ApiErrors
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
-import co.chainring.apps.api.model.OrderApiResponse
+import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.WithdrawalApiResponse
@@ -42,7 +42,7 @@ class ApiClient {
         }
     }
 
-    fun createOrder(apiRequest: CreateOrderApiRequest): OrderApiResponse {
+    fun createOrder(apiRequest: CreateOrderApiRequest): Order {
         val httpResponse = execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders")
@@ -51,12 +51,12 @@ class ApiClient {
         )
 
         return when (httpResponse.code) {
-            HttpURLConnection.HTTP_CREATED -> json.decodeFromString<OrderApiResponse>(httpResponse.body?.string()!!)
+            HttpURLConnection.HTTP_CREATED -> json.decodeFromString<Order>(httpResponse.body?.string()!!)
             else -> throw AbnormalApiResponseException(httpResponse)
         }
     }
 
-    fun updateOrder(apiRequest: UpdateOrderApiRequest): OrderApiResponse {
+    fun updateOrder(apiRequest: UpdateOrderApiRequest): Order {
         val httpResponse = execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders/${apiRequest.id}")
@@ -65,7 +65,7 @@ class ApiClient {
         )
 
         return when (httpResponse.code) {
-            HttpURLConnection.HTTP_OK -> json.decodeFromString<OrderApiResponse>(httpResponse.body?.string()!!)
+            HttpURLConnection.HTTP_OK -> json.decodeFromString<Order>(httpResponse.body?.string()!!)
             else -> throw AbnormalApiResponseException(httpResponse)
         }
     }
@@ -84,7 +84,7 @@ class ApiClient {
         }
     }
 
-    fun getOrder(id: OrderId): OrderApiResponse {
+    fun getOrder(id: OrderId): Order {
         val httpResponse = execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders/$id")
@@ -93,7 +93,7 @@ class ApiClient {
         )
 
         return when (httpResponse.code) {
-            HttpURLConnection.HTTP_OK -> json.decodeFromString<OrderApiResponse>(httpResponse.body?.string()!!)
+            HttpURLConnection.HTTP_OK -> json.decodeFromString<Order>(httpResponse.body?.string()!!)
             else -> throw AbnormalApiResponseException(httpResponse)
         }
     }

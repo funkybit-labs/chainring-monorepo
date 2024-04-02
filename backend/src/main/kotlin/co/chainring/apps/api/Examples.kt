@@ -4,7 +4,6 @@ import co.chainring.apps.api.model.Balance
 import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Order
-import co.chainring.apps.api.model.OrderApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.WithdrawTx
 import co.chainring.apps.api.model.Withdrawal
@@ -48,7 +47,7 @@ object Examples {
         price = BigIntegerJson("100"),
     )
 
-    val marketOrderResponse = OrderApiResponse.Market(
+    val marketOrderResponse = Order.Market(
         id = OrderId.generate(),
         status = OrderStatus.Partial,
         marketId = MarketId("BTC/ETH"),
@@ -72,7 +71,7 @@ object Examples {
         ),
     )
 
-    val limitOrderResponse = OrderApiResponse.Limit(
+    val limitOrderResponse = Order.Limit(
         id = OrderId.generate(),
         status = OrderStatus.Open,
         marketId = MarketId("BTC/ETH"),

@@ -1,6 +1,8 @@
 package co.chainring.apps.api
 
-import co.chainring.apps.api.model.IncomingWSMessage
+import co.chainring.apps.api.middleware.principal
+import co.chainring.apps.api.model.websocket.IncomingWSMessage
+import co.chainring.core.websocket.AuthenticatedWebsocket
 import co.chainring.core.websocket.Broadcaster
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.format.KotlinxSerialization.auto
@@ -16,27 +18,28 @@ class WebsocketApi(private val broadcaster: Broadcaster) {
     private val messageLens = WsMessage.auto<IncomingWSMessage>().toLens()
 
     fun connect(): RoutingWsHandler {
-        return "/connect" bind { _ ->
-            WsResponse { ws: Websocket ->
+        return "/connect" bind { request ->
+            WsResponse { websocket: Websocket ->
                 logger.debug { "Websocket client connected" }
 
-                ws.onError { t ->
+                val authenticatedWebsocket = AuthenticatedWebsocket(websocket, request.principal)
+                authenticatedWebsocket.onError { t ->
                     logger.warn(t) { "Websocket error" }
-                    ws.close()
+                    websocket.close()
                 }
 
-                ws.onClose { status ->
+                authenticatedWebsocket.onClose { status ->
                     logger.debug { "Websocket client disconnected, status: $status" }
-                    broadcaster.unsubscribe(ws)
+                    broadcaster.unsubscribe(authenticatedWebsocket)
                 }
 
-                ws.onMessage { wsMessage ->
+                authenticatedWebsocket.onMessage { wsMessage ->
                     when (val message = messageLens(wsMessage)) {
                         is IncomingWSMessage.Subscribe -> {
-                            broadcaster.subscribe(message.topic, ws)
+                            broadcaster.subscribe(message.topic, authenticatedWebsocket)
                         }
                         is IncomingWSMessage.Unsubscribe -> {
-                            broadcaster.unsubscribe(message.topic, ws)
+                            broadcaster.unsubscribe(message.topic, authenticatedWebsocket)
                         }
                     }
                 }

@@ -76,13 +76,13 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                         routes +=
                             listOf(
                                 ConfigRoutes.getConfiguration(),
-                                OrderRoutes.createOrder(),
-                                OrderRoutes.updateOrder(),
-                                OrderRoutes.cancelOrder(),
+                                OrderRoutes.createOrder(broadcaster),
+                                OrderRoutes.updateOrder(broadcaster),
+                                OrderRoutes.cancelOrder(broadcaster),
                                 OrderRoutes.getOrder(),
                                 OrderRoutes.listOrders(),
-                                OrderRoutes.cancelOpenOrders(),
-                                OrderRoutes.batchOrders(),
+                                OrderRoutes.cancelOpenOrders(broadcaster),
+                                OrderRoutes.batchOrders(broadcaster),
                                 OrderRoutes.listTrades(),
                                 BalanceRoutes.getBalances(),
                                 withdrawalRoutes.getWithdrawal(),

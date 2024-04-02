@@ -3,19 +3,23 @@ package co.chainring.apps.api
 import co.chainring.apps.api.middleware.principal
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
-import co.chainring.apps.api.model.OrderApiResponse
+import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
 import co.chainring.apps.api.model.TradesApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.marketNotSupportedError
 import co.chainring.apps.api.model.orderIsClosedError
 import co.chainring.apps.api.model.orderNotFoundError
+import co.chainring.apps.api.model.websocket.OrderCreated
+import co.chainring.apps.api.model.websocket.OrderUpdated
+import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.OrderType
+import co.chainring.core.websocket.Broadcaster
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toInstant
@@ -41,9 +45,9 @@ object OrderRoutes {
 
     private val orderIdPathParam = Path.map(::OrderId, OrderId::value).of("orderOd", "Order Id")
 
-    fun createOrder(): ContractRoute {
+    fun createOrder(broadcaster: Broadcaster): ContractRoute {
         val requestBody = Body.auto<CreateOrderApiRequest>().toLens()
-        val responseBody = Body.auto<OrderApiResponse>().toLens()
+        val responseBody = Body.auto<Order>().toLens()
 
         return "orders" meta {
             operationId = "create-order"
@@ -70,7 +74,7 @@ object OrderRoutes {
                     null -> marketNotSupportedError
 
                     else -> {
-                        val order = OrderEntity.findByNonce(nonce = apiRequest.nonce)
+                        val order = OrderEntity.findByNonce(nonce = apiRequest.nonce)?.toOrderResponse()
                             ?: OrderEntity.create(
                                 nonce = apiRequest.nonce,
                                 market = market,
@@ -85,10 +89,12 @@ object OrderRoutes {
                                     is CreateOrderApiRequest.Market -> null
                                     is CreateOrderApiRequest.Limit -> apiRequest.price
                                 },
-                            )
+                            ).toOrderResponse().also {
+                                broadcaster.notify(request.principal, SubscriptionTopic.Orders, OrderCreated(it))
+                            }
 
                         Response(Status.CREATED).with(
-                            responseBody of order.toOrderResponse(),
+                            responseBody of order,
                         )
                     }
                 }
@@ -96,9 +102,9 @@ object OrderRoutes {
         }
     }
 
-    fun updateOrder(): ContractRoute {
+    fun updateOrder(broadcaster: Broadcaster): ContractRoute {
         val requestBody = Body.auto<UpdateOrderApiRequest>().toLens()
-        val responseBody = Body.auto<OrderApiResponse>().toLens()
+        val responseBody = Body.auto<Order>().toLens()
 
         return "orders" / orderIdPathParam meta {
             operationId = "update-order"
@@ -121,13 +127,13 @@ object OrderRoutes {
             fun handle(request: Request): Response {
                 val apiRequest: UpdateOrderApiRequest = requestBody(request)
                 return transaction {
-                    val order = OrderEntity.findById(orderId)
+                    val orderEntity = OrderEntity.findById(orderId)
                     when {
-                        order == null -> orderNotFoundError
-                        order.status.isFinal() -> orderIsClosedError
+                        orderEntity == null -> orderNotFoundError
+                        orderEntity.status.isFinal() -> orderIsClosedError
 
                         else -> {
-                            order.update(
+                            orderEntity.update(
                                 amount = apiRequest.amount,
                                 price = when (apiRequest) {
                                     is UpdateOrderApiRequest.Market -> null
@@ -135,8 +141,12 @@ object OrderRoutes {
                                 },
                             )
 
+                            val order = orderEntity.toOrderResponse().also {
+                                broadcaster.notify(request.principal, SubscriptionTopic.Orders, OrderUpdated(it))
+                            }
+
                             Response(Status.OK).with(
-                                responseBody of order.toOrderResponse(),
+                                responseBody of order,
                             )
                         }
                     }
@@ -146,7 +156,7 @@ object OrderRoutes {
         }
     }
 
-    fun cancelOrder(): ContractRoute {
+    fun cancelOrder(broadcaster: Broadcaster): ContractRoute {
         return "orders" / orderIdPathParam meta {
             operationId = "cancel-order"
             summary = "Cancel order"
@@ -154,7 +164,7 @@ object OrderRoutes {
                 Status.NO_CONTENT,
             )
         } bindContract Method.DELETE to { orderId ->
-            { _: Request ->
+            { request: Request ->
                 transaction {
                     val order = OrderEntity.findById(orderId)
                     when {
@@ -164,6 +174,7 @@ object OrderRoutes {
 
                         else -> {
                             order.cancel()
+                            broadcaster.notify(request.principal, SubscriptionTopic.Orders, OrderUpdated(order.toOrderResponse()))
                             Response(Status.NO_CONTENT)
                         }
                     }
@@ -173,7 +184,7 @@ object OrderRoutes {
     }
 
     fun getOrder(): ContractRoute {
-        val responseBody = Body.auto<OrderApiResponse>().toLens()
+        val responseBody = Body.auto<Order>().toLens()
 
         return "orders" / orderIdPathParam meta {
             operationId = "get-order"
@@ -224,19 +235,20 @@ object OrderRoutes {
         }
     }
 
-    fun cancelOpenOrders(): ContractRoute {
+    fun cancelOpenOrders(broadcaster: Broadcaster): ContractRoute {
         return "orders" meta {
             operationId = "cancel-open-orders"
             summary = "Cancel open orders"
         } bindContract Method.DELETE to { request ->
             transaction {
                 OrderEntity.cancelAll(request.principal)
+                broadcaster.sendOrders(request.principal)
             }
             Response(Status.NO_CONTENT)
         }
     }
 
-    fun batchOrders(): ContractRoute {
+    fun batchOrders(broadcaster: Broadcaster): ContractRoute {
         val requestBody = Body.auto<BatchOrdersApiRequest>().toLens()
         val responseBody = Body.auto<OrdersApiResponse>().toLens()
 
@@ -249,6 +261,8 @@ object OrderRoutes {
             logger.debug {
                 Json.encodeToString(apiRequest)
             }
+
+            // TODO: broadcast affected orders
 
             Response(Status.OK).with(
                 responseBody of OrdersApiResponse(

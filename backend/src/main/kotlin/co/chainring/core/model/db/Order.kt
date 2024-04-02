@@ -1,7 +1,6 @@
 package co.chainring.core.model.db
 
 import co.chainring.apps.api.model.Order
-import co.chainring.apps.api.model.OrderApiResponse
 import co.chainring.core.model.Address
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
@@ -83,9 +82,9 @@ object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
 }
 
 class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
-    fun toOrderResponse(): OrderApiResponse {
+    fun toOrderResponse(): Order {
         return when (type) {
-            OrderType.Market -> OrderApiResponse.Market(
+            OrderType.Market -> Order.Market(
                 id = this.id.value,
                 status = this.status,
                 marketId = this.marketGuid.value,
@@ -109,7 +108,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 ),
             )
 
-            OrderType.Limit -> OrderApiResponse.Limit(
+            OrderType.Limit -> Order.Limit(
                 id = this.id.value,
                 status = this.status,
                 marketId = this.marketGuid.value,
