@@ -1,11 +1,12 @@
-module "vpc" {
-  source      = "../modules/vpc"
-  aws_region  = var.aws_region
-  cidr_prefix = var.cidr_prefix
-}
-
 locals {
   name_prefix = "test"
+}
+
+module "vpc" {
+  source      = "../modules/vpc"
+  name_prefix = local.name_prefix
+  aws_region  = var.aws_region
+  cidr_prefix = var.cidr_prefix
 }
 
 module "alb" {
@@ -88,8 +89,28 @@ module "web" {
   source      = "../modules/web"
   name_prefix = local.name_prefix
   zone        = data.terraform_remote_state.shared.outputs.zone
-  providers = {
+  providers   = {
     aws.us_east_1 = aws.us_east_1
   }
   ci_role_arn = data.terraform_remote_state.shared.outputs.ci_role_arn
+}
+
+module "baregate" {
+  source            = "../modules/baregate"
+  name_prefix       = local.name_prefix
+  subnet_id         = module.vpc.private_subnet_id_2
+  vpc               = module.vpc.vpc
+  deployer_key_name = module.bastion.deployer_key_name
+  ecs_cluster_name  = module.ecs.cluster.name
+}
+
+module "sequencer" {
+  source                                  = "../modules/sequencer"
+  name_prefix                             = local.name_prefix
+  aws_region                              = var.aws_region
+  capacity_provider_name                  = module.baregate.capacity_provider_name
+  ecs_cluster_name                        = module.ecs.cluster.name
+  subnet_id                               = module.vpc.private_subnet_id_2
+  vpc                                     = module.vpc.vpc
+  service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
 }

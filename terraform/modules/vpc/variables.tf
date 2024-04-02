@@ -6,3 +6,7 @@ variable "create_public" {
 variable "enable_dns_hostnames" {
   default = true
 }
+variable "zone" {
+  default = "chainring.co"
+}
+variable "name_prefix" {}

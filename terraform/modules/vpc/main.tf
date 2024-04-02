@@ -65,9 +65,10 @@ resource "aws_route_table_association" "private-2" {
   subnet_id      = aws_subnet.private_subnet_2.id
   route_table_id = aws_route_table.private.id
 }
+
 resource "aws_eip" "vpc-nat-1a" {
   depends_on = [aws_internet_gateway.igw]
-  vpc        = true
+  domain     = "vpc"
 }
 
 resource "aws_nat_gateway" "vpc_nat" {
@@ -99,4 +100,10 @@ resource "aws_route_table_association" "public_subnet_association_2" {
   count          = var.create_public ? 1 : 0
   subnet_id      = aws_subnet.public_subnet_2[0].id
   route_table_id = aws_route_table.public_route_table[0].id
+}
+
+resource "aws_service_discovery_private_dns_namespace" "private" {
+  name        = var.zone
+  description = "Private dns namespace for service discovery (${var.name_prefix})"
+  vpc         = aws_vpc.vpc.id
 }

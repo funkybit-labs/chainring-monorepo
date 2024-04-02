@@ -5,6 +5,7 @@ plugins {
     kotlin("jvm")
     id("com.google.protobuf") version "0.9.4"
     id("org.jmailen.kotlinter") version "4.2.0"
+    id("com.google.cloud.tools.jib") version "3.4.1"
     application
 }
 
@@ -93,5 +94,38 @@ protobuf {
                 create("kotlin")
             }
         }
+    }
+}
+
+val buildNumber = System.getenv("BUILD_NUMBER") ?: "1"
+jib {
+    from {
+        platforms {
+            platform {
+                architecture = "amd64"
+                os = "linux"
+            }
+        }
+    }
+
+    to {
+        image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer"
+        credHelper.helper = "ecr-login"
+        tags = setOf("${version}-${buildNumber}")
+    }
+
+    container {
+        jvmFlags = listOf(
+            "-XX:+PrintCommandLineFlags",
+            "-XshowSettings:vm",
+            "-XX:MinRAMPercentage=60.0",
+            "-XX:MaxRAMPercentage=90.0",
+            "-Dlog4j2.configurationFile=log4j2-container.xml",
+            "-Dlog4j2.formatMsgNoLookups=True",
+            "--illegal-access=permit",
+            "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED"
+        )
+
+        creationTime.set("USE_CURRENT_TIMESTAMP")
     }
 }
