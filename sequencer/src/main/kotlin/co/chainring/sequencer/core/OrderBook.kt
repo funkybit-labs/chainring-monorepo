@@ -71,6 +71,7 @@ class OrderBookLevel(var side: BookSide, val price: BigDecimal, val maxOrderCoun
                         counterGuid = curOrder.guid,
                         amount = curOrder.quantity,
                         price = this.price,
+                        counterOrderExhausted = true,
                     ),
                 )
                 remainingAmount -= curOrder.quantity
@@ -81,6 +82,7 @@ class OrderBookLevel(var side: BookSide, val price: BigDecimal, val maxOrderCoun
                         counterGuid = curOrder.guid,
                         amount = remainingAmount,
                         price = this.price,
+                        counterOrderExhausted = false,
                     ),
                 )
                 curOrder.quantity -= remainingAmount
@@ -101,9 +103,10 @@ data class Execution(
     val counterGuid: OrderGuid,
     val amount: BigInteger,
     val price: BigDecimal,
+    val counterOrderExhausted: Boolean,
 )
 
-data class OrderBookAdd(
+data class AddOrderResult(
     val disposition: OrderDisposition,
     val executions: List<Execution>,
 )
@@ -130,7 +133,7 @@ class OrderBook(val maxLevelCount: Int, maxOrderCount: Int, val tickSize: BigDec
     private var maxOfferIx = -1
     private var minBidIx = -1
 
-    private fun handleMarketOrder(order: Order): OrderBookAdd {
+    private fun handleMarketOrder(order: Order): AddOrderResult {
         val originalAmount = order.amount.toBigInteger()
         var remainingAmount = originalAmount
         val executions = mutableListOf<Execution>()
@@ -170,46 +173,46 @@ class OrderBook(val maxLevelCount: Int, maxOrderCount: Int, val tickSize: BigDec
             }
 
             if (remainingAmount > BigInteger.ZERO) {
-                OrderBookAdd(OrderDisposition.PartiallyFilled, executions)
+                AddOrderResult(OrderDisposition.PartiallyFilled, executions)
             } else {
-                OrderBookAdd(OrderDisposition.Filled, executions)
+                AddOrderResult(OrderDisposition.Filled, executions)
             }
         } else {
-            OrderBookAdd(OrderDisposition.Rejected, noExecutions)
+            AddOrderResult(OrderDisposition.Rejected, noExecutions)
         }
     }
 
-    fun addOrder(order: Order): OrderBookAdd {
+    fun addOrder(order: Order): AddOrderResult {
         return if (order.type == Order.Type.LimitSell) {
             val orderPrice = order.price.toBigDecimal()
 
             if (orderPrice <= marketPrice) {
-                OrderBookAdd(OrderDisposition.CrossesMarket, noExecutions)
+                AddOrderResult(OrderDisposition.CrossesMarket, noExecutions)
             } else {
                 val levelIx = (orderPrice - levels[0].price).divideToIntegralValue(tickSize).toInt()
                 if (levelIx > levels.lastIndex) {
-                    OrderBookAdd(OrderDisposition.Rejected, noExecutions)
+                    AddOrderResult(OrderDisposition.Rejected, noExecutions)
                 } else {
                     if (levelIx > maxOfferIx) {
                         maxOfferIx = levelIx
                     }
-                    OrderBookAdd(levels[levelIx].addOrder(order), noExecutions)
+                    AddOrderResult(levels[levelIx].addOrder(order), noExecutions)
                 }
             }
         } else if (order.type == Order.Type.LimitBuy) {
             val orderPrice = order.price.toBigDecimal()
 
             if (orderPrice >= marketPrice) {
-                OrderBookAdd(OrderDisposition.CrossesMarket, noExecutions)
+                AddOrderResult(OrderDisposition.CrossesMarket, noExecutions)
             } else {
                 val levelIx = (orderPrice - levels[0].price).divideToIntegralValue(tickSize).toInt()
                 if (levelIx < 0) {
-                    OrderBookAdd(OrderDisposition.Rejected, noExecutions)
+                    AddOrderResult(OrderDisposition.Rejected, noExecutions)
                 } else {
                     if (levelIx < minBidIx) {
                         minBidIx = levelIx
                     }
-                    OrderBookAdd(levels[levelIx].addOrder(order), noExecutions)
+                    AddOrderResult(levels[levelIx].addOrder(order), noExecutions)
                 }
             }
         } else if (order.type == Order.Type.MarketBuy) {
@@ -217,7 +220,7 @@ class OrderBook(val maxLevelCount: Int, maxOrderCount: Int, val tickSize: BigDec
         } else if (order.type == Order.Type.MarketSell) {
             handleMarketOrder(order)
         } else {
-            OrderBookAdd(OrderDisposition.Rejected, noExecutions)
+            AddOrderResult(OrderDisposition.Rejected, noExecutions)
         }
     }
 }

@@ -2,6 +2,7 @@ package co.chainring.sequencer.core
 
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderChanged
+import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.TradeCreated
 import co.chainring.sequencer.proto.orderChanged
 import co.chainring.sequencer.proto.tradeCreated
@@ -37,8 +38,8 @@ class Market(
                     this.disposition = orderResult.disposition
                 },
             )
-            createdTrades.addAll(
-                orderResult.executions.map { execution ->
+            orderResult.executions.forEach { execution ->
+                createdTrades.add(
                     tradeCreated {
                         if (order.type == Order.Type.MarketBuy) {
                             buyGuid = order.guid
@@ -49,9 +50,15 @@ class Market(
                         }
                         amount = execution.amount.toIntegerValue()
                         price = execution.price.toDecimalValue()
-                    }
-                },
-            )
+                    },
+                )
+                ordersChanged.add(
+                    orderChanged {
+                        this.guid = execution.counterGuid.value
+                        this.disposition = if (execution.counterOrderExhausted) OrderDisposition.Filled else OrderDisposition.PartiallyFilled
+                    },
+                )
+            }
         }
         return AddOrdersResult(ordersChanged, createdTrades)
     }
