@@ -1,0 +1,16 @@
+syntax = "proto3";
+import "bignum.proto";
+package sequencer;
+
+option java_multiple_files = true;
+option java_package = "co.chainring.sequencer.proto";
+option java_outer_classname = "MarketSchema";
+
+message Market {
+  string guid = 1;
+  string marketId = 2;
+  DecimalValue marketPrice = 3;
+  DecimalValue tickSize = 4;
+  uint32 maxLevels = 5;
+  uint32 maxOrdersPerLevel = 6;
+}
