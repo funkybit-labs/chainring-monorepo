@@ -40,6 +40,7 @@ module "api" {
   lb_dns_name           = module.alb.dns_name
   zone                  = data.terraform_remote_state.shared.outputs.zone
   tcp_ports             = [9000]
+  service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
 }
 
 module "anvil" {
@@ -63,6 +64,7 @@ module "anvil" {
   health_check          = "/"
   health_check_status   = "400"
   mount_efs_volume      = true
+  service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
 }
 
 module "bastion" {
