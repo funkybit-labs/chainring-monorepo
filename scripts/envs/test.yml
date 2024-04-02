@@ -8,7 +8,7 @@ services:
     count: 1
     environment: api
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-32e6d3b7-0fd7-43f6-b108-4648afcf69c1-NgwNkC
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-cd1262a5-40ca-4997-9abd-0a2f1855d691-HEAMok
   anvil:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
     count: 1

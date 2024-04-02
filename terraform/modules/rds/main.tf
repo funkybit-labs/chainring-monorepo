@@ -58,7 +58,8 @@ locals {
 }
 
 resource "aws_secretsmanager_secret_policy" "ci_db_password_access" {
-  secret_arn = aws_rds_cluster.db_cluster.master_user_secret[0].secret_arn
+  for_each = toset([for s in aws_rds_cluster.db_cluster.master_user_secret: s.secret_arn])
+  secret_arn = each.value
   policy     = <<EOF
 {
   "Version": "2012-10-17",
@@ -72,7 +73,7 @@ resource "aws_secretsmanager_secret_policy" "ci_db_password_access" {
         "AWS": "${var.ci_role_arn}"
       },
       "Resource": [
-        "${aws_rds_cluster.db_cluster.master_user_secret[0].secret_arn}"
+        "${each.value}"
       ]
     }
   ]
