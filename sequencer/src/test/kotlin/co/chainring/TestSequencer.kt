@@ -63,21 +63,30 @@ class TestSequencer {
 
         // place a market buy and see that it gets executed
         val response3 = stub.addOrder(marketId, 43210, null, 555111555L, Order.Type.MarketBuy)
-        assertEquals(OrderDisposition.Filled, response3.sequencerResponse.ordersChangedList.first().disposition)
+        assertEquals(2, response3.sequencerResponse.ordersChangedCount)
+        val takerOrder = response3.sequencerResponse.ordersChangedList[0]
+        assertEquals(OrderDisposition.Filled, takerOrder.disposition)
+        val makerOrder = response3.sequencerResponse.ordersChangedList[1]
+        assertEquals(OrderDisposition.PartiallyFilled, makerOrder.disposition)
+        assertEquals(response2.orderGuid(), makerOrder.guid)
         val trade = response3.sequencerResponse.tradesCreatedList.first()
         assertEquals("17.550".toBigDecimal().toDecimalValue(), trade.price)
         assertEquals(43210.toBigInteger().toIntegerValue(), trade.amount)
-        assertEquals(response2.orderGuid(), trade.sellGuid)
-        assertEquals(response3.orderGuid(), trade.buyGuid)
+        assertEquals(makerOrder.guid, trade.sellGuid)
+        assertEquals(takerOrder.guid, trade.buyGuid)
 
         // now try a market sell which can only be partially filled and see that it gets executed
         val response4 = stub.addOrder(marketId, 12346, null, 555111555L, Order.Type.MarketSell)
-        assertEquals(OrderDisposition.PartiallyFilled, response4.sequencerResponse.ordersChangedList.first().disposition)
+        assertEquals(2, response4.sequencerResponse.ordersChangedCount)
+        val takerOrder2 = response4.sequencerResponse.ordersChangedList[0]
+        assertEquals(OrderDisposition.PartiallyFilled, takerOrder2.disposition)
+        val makerOrder2 = response4.sequencerResponse.ordersChangedList[1]
+        assertEquals(OrderDisposition.Filled, makerOrder2.disposition)
         val trade2 = response4.sequencerResponse.tradesCreatedList.first()
         assertEquals("17.500".toBigDecimal().toDecimalValue(), trade2.price)
         assertEquals(12345.toBigInteger().toIntegerValue(), trade2.amount)
-        assertEquals(response.orderGuid(), trade2.buyGuid)
-        assertEquals(response4.orderGuid(), trade2.sellGuid)
+        assertEquals(makerOrder2.guid, trade2.buyGuid)
+        assertEquals(takerOrder2.guid, trade2.sellGuid)
     }
 
     private fun GatewayResponse.orderGuid() = this.sequencerResponse.ordersChangedList.first().guid
@@ -99,7 +108,12 @@ class TestSequencer {
         val sell5 = stub.addOrder(marketId, 20000, "17.700", lp1, Order.Type.LimitSell)
         val sell6 = stub.addOrder(marketId, 20000, "17.700", lp2, Order.Type.LimitSell)
         val response = stub.addOrder(marketId, 17000, null, tkr, Order.Type.MarketBuy)
-        assertEquals(OrderDisposition.Filled, response.sequencerResponse.ordersChangedList.first().disposition)
+        assertEquals(5, response.sequencerResponse.ordersChangedCount)
+        assertEquals(OrderDisposition.Filled, response.sequencerResponse.ordersChangedList[0].disposition)
+        assertEquals(OrderDisposition.Filled, response.sequencerResponse.ordersChangedList[1].disposition)
+        assertEquals(OrderDisposition.Filled, response.sequencerResponse.ordersChangedList[2].disposition)
+        assertEquals(OrderDisposition.Filled, response.sequencerResponse.ordersChangedList[3].disposition)
+        assertEquals(OrderDisposition.PartiallyFilled, response.sequencerResponse.ordersChangedList[4].disposition)
         assertEquals(
             listOf(sell1.orderGuid(), sell2.orderGuid(), sell3.orderGuid(), sell4.orderGuid()),
             response.sequencerResponse.tradesCreatedList.map { it.sellGuid },
@@ -114,7 +128,11 @@ class TestSequencer {
         )
         // place another market order to exhaust remaining limit orders
         val response2 = stub.addOrder(marketId, 45000, null, tkr, Order.Type.MarketBuy)
-        assertEquals(OrderDisposition.Filled, response2.sequencerResponse.ordersChangedList.first().disposition)
+        assertEquals(4, response2.sequencerResponse.ordersChangedCount)
+        assertEquals(OrderDisposition.Filled, response2.sequencerResponse.ordersChangedList[0].disposition)
+        assertEquals(OrderDisposition.Filled, response2.sequencerResponse.ordersChangedList[1].disposition)
+        assertEquals(OrderDisposition.Filled, response2.sequencerResponse.ordersChangedList[2].disposition)
+        assertEquals(OrderDisposition.Filled, response2.sequencerResponse.ordersChangedList[3].disposition)
         assertEquals(
             listOf(sell4.orderGuid(), sell5.orderGuid(), sell6.orderGuid()),
             response2.sequencerResponse.tradesCreatedList.map { it.sellGuid },
