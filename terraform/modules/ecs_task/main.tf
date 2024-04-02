@@ -141,7 +141,7 @@ resource "aws_ecs_task_definition" "task" {
     merge(
       {
         name         = "${var.name_prefix}-${var.task_name}"
-        image        = "${local.account_id}.dkr.ecr.us-east-1.amazonaws.com/${var.image}:latest"
+        image        = "${local.account_id}.dkr.ecr.us-east-2.amazonaws.com/${var.image}:latest"
         essential    = true
         portMappings = local.port_mappings
         cpu          = 0

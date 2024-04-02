@@ -195,7 +195,7 @@ if __name__ == "__main__":
     if args.env == 'test':
         region = 'us-east-2'
     elif args.env == 'prod':
-        region = 'eu-central-1'
+        region = 'eu-central-2'
 
     env_config = None
     base = os.path.dirname(__file__)
@@ -221,7 +221,13 @@ if __name__ == "__main__":
             service_manager.wait_for_stable_state(services)
             for service in services:
                 config_service_name = service.removeprefix(f"{args.env}-")
+                if config_service_name == "sequencer":
+                    service_manager.update_instances_count([service], desired_count=0)
+                    service_manager.wait_for_stable_state([service])
                 service_manager.update_instances_count([service], desired_count=env_config['services'][config_service_name]['count'])
+                if config_service_name == "sequencer":
+                    service_manager.update_instances_count([service], desired_count=env_config['services'][config_service_name]['count'])
+                    service_manager.wait_for_stable_state([service])
             service_manager.wait_for_stable_state(services)
             service_manager.switch_to_app(args.env)
         elif args.action == 'stop':

@@ -135,7 +135,7 @@ class OrderBook(val maxLevelCount: Int, maxOrderCount: Int, val tickSize: BigDec
         var remainingAmount = originalAmount
         val executions = mutableListOf<Execution>()
         val maxBidIx = (marketPrice.minus(halfTick) - levels[0].price).divideToIntegralValue(tickSize).toInt()
-        val minOfferIx = (marketPrice.plus(halfTick) - levels[0].price).divideToIntegralValue(tickSize).toInt()
+        val minOfferIx = maxBidIx + 1
         var index = if (order.type == Order.Type.MarketBuy) {
             minOfferIx
         } else {
