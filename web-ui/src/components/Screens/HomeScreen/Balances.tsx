@@ -145,7 +145,7 @@ function BalancesTable({
           {balances.map((symbolBalance) => {
             return (
               <tr key={symbolBalance.symbol.name}>
-                <td className="min-w-12 pr-2">
+                <td className="min-w-12 whitespace-nowrap pr-2">
                   <SymbolIcon
                     symbol={symbolBalance.symbol}
                     className="mr-2 inline-block size-6"
