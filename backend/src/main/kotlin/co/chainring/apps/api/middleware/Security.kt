@@ -21,7 +21,7 @@ import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.core.with
 import org.http4k.lens.RequestContextKey
-import java.util.*
+import java.util.Base64
 
 val signedDidTokenHeader = object : Security {
     override val filter = Filter { next -> wrapWithAuthentication(next) }

@@ -28,7 +28,8 @@ import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
 import java.net.HttpURLConnection
-import java.util.*
+import java.util.Base64
+import java.util.UUID
 
 val apiServerRootUrl = System.getenv("API_URL") ?: "http://localhost:9999"
 val httpClient = OkHttpClient.Builder().build()
