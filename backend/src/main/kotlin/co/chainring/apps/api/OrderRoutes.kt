@@ -12,7 +12,6 @@ import co.chainring.apps.api.model.orderIsClosedError
 import co.chainring.apps.api.model.orderNotFoundError
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
-import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
@@ -92,7 +91,7 @@ object OrderRoutes {
                             ).let {
                                 it.refresh(flush = true)
                                 val order = it.toOrderResponse()
-                                broadcaster.notify(request.principal, SubscriptionTopic.Orders, OrderCreated(order))
+                                broadcaster.notify(request.principal, OrderCreated(order))
                                 order
                             }
 
@@ -146,7 +145,7 @@ object OrderRoutes {
                             orderEntity.refresh(flush = true)
 
                             val order = orderEntity.toOrderResponse().also {
-                                broadcaster.notify(request.principal, SubscriptionTopic.Orders, OrderUpdated(it))
+                                broadcaster.notify(request.principal, OrderUpdated(it))
                             }
 
                             Response(Status.OK).with(
@@ -179,7 +178,7 @@ object OrderRoutes {
                         else -> {
                             order.cancel()
                             order.refresh(flush = true)
-                            broadcaster.notify(request.principal, SubscriptionTopic.Orders, OrderUpdated(order.toOrderResponse()))
+                            broadcaster.notify(request.principal, OrderUpdated(order.toOrderResponse()))
                             Response(Status.NO_CONTENT)
                         }
                     }
