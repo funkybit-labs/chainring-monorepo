@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import java.math.BigDecimal
-import java.util.*
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
@@ -39,9 +39,9 @@ import kotlin.test.assertNotEquals
 class OrderRoutesApiTest {
     @Test
     fun `CRUD order`() {
-        val apiClient = ApiClient()
+        val apiClient = ApiClient.initWallet()
 
-        var wsClient = WebsocketClient.blocking()
+        var wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribe(SubscriptionTopic.Orders)
         val initialOrdersOverWs = wsClient.waitForMessage<Orders>().orders
 
@@ -71,7 +71,7 @@ class OrderRoutesApiTest {
         wsClient.close()
 
         // check that order is included in the orders list sent via websocket
-        wsClient = WebsocketClient.blocking()
+        wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribe(SubscriptionTopic.Orders)
         assertEquals(listOf(limitOrder) + initialOrdersOverWs, wsClient.waitForMessage<Orders>().orders)
 
@@ -103,7 +103,7 @@ class OrderRoutesApiTest {
 
     @Test
     fun `CRUD order error cases`() {
-        val apiClient = ApiClient()
+        val apiClient = ApiClient.initWallet()
 
         // operation on non-existent order
         listOf(
@@ -158,10 +158,10 @@ class OrderRoutesApiTest {
 
     @Test
     fun `list and cancel all open orders`() {
-        val apiClient = ApiClient()
+        val apiClient = ApiClient.initWallet()
         apiClient.cancelOpenOrders()
 
-        val wsClient = WebsocketClient.blocking()
+        val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribe(SubscriptionTopic.Orders)
         val initialOrdersOverWs = wsClient.waitForMessage<Orders>().orders
 

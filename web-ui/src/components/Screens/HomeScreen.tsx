@@ -1,22 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
-import { apiClient, apiBaseUrl, Market } from 'ApiClient'
+import { apiBaseUrl, apiClient, Market } from 'ApiClient'
 import { useAccount } from 'wagmi'
 import Balances from 'components/Screens/HomeScreen/Balances'
 import { Header } from 'components/Screens/Header'
 import { OrderBook } from 'components/Screens/HomeScreen/OrderBook'
 import SubmitOrder from 'components/Screens/HomeScreen/SubmitOrder'
 import TradeHistory from 'components/Screens/HomeScreen/TradeHistory'
-import { ExponentialBackoff, WebsocketBuilder } from 'websocket-ts'
+import { ExponentialBackoff, Websocket, WebsocketBuilder } from 'websocket-ts'
 import { Prices } from 'components/Screens/HomeScreen/Prices'
 import { useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
+import { loadOrIssueDidToken } from 'Auth'
 
 const websocketUrl =
   apiBaseUrl.replace('http:', 'ws:').replace('https:', 'wss:') + '/connect'
-
-const ws = new WebsocketBuilder(websocketUrl)
-  .withBackoff(new ExponentialBackoff(1000, 4))
-  .build()
 
 export default function HomeScreen() {
   const configQuery = useQuery({
@@ -26,6 +23,8 @@ export default function HomeScreen() {
 
   const wallet = useAccount()
   const walletAddress = wallet.address
+
+  const [ws, setWs] = useState<Websocket | null>(null)
 
   const config = configQuery.data
   const chainConfig = config?.chains.find((chain) => chain.id == wallet.chainId)
@@ -42,12 +41,32 @@ export default function HomeScreen() {
   }, [config?.markets])
 
   useEffect(() => {
+    const initWebSocket = async () => {
+      const authQuery =
+        walletAddress && wallet.status == 'connected'
+          ? `?auth=${await loadOrIssueDidToken()}`
+          : ''
+
+      setWs((prevWs) => {
+        if (prevWs != null) {
+          prevWs.close()
+        }
+        return new WebsocketBuilder(websocketUrl + authQuery)
+          .withBackoff(new ExponentialBackoff(1000, 4))
+          .build()
+      })
+    }
+
+    initWebSocket()
+  }, [walletAddress, wallet.status])
+
+  useEffect(() => {
     if (markets.length > 0 && selectedMarket == null) {
       setSelectedMarket(markets[0])
     }
   }, [markets, selectedMarket])
 
-  if (markets && selectedMarket) {
+  if (markets && selectedMarket && ws) {
     return (
       <div className="h-screen bg-gradient-to-b from-lightBackground to-darkBackground">
         <Header

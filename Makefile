@@ -1,4 +1,4 @@
-.PHONY: contracts
+.PHONY: contracts anvil_image start_containers stop_containers
 
 contracts:
 	./gradlew compileContractsAndGenerateWrappers

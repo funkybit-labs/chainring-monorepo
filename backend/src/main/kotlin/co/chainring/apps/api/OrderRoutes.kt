@@ -1,6 +1,7 @@
 package co.chainring.apps.api
 
 import co.chainring.apps.api.middleware.principal
+import co.chainring.apps.api.middleware.signedDidTokenHeader
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Order
@@ -51,6 +52,7 @@ object OrderRoutes {
         return "orders" meta {
             operationId = "create-order"
             summary = "Create order"
+            security = signedDidTokenHeader
             receiving(
                 requestBody to Examples.crateMarketOrderRequest,
             )
@@ -111,6 +113,7 @@ object OrderRoutes {
         return "orders" / orderIdPathParam meta {
             operationId = "update-order"
             summary = "Update order"
+            security = signedDidTokenHeader
             receiving(
                 requestBody to Examples.updateMarketOrderRequest,
             )
@@ -163,6 +166,7 @@ object OrderRoutes {
         return "orders" / orderIdPathParam meta {
             operationId = "cancel-order"
             summary = "Cancel order"
+            security = signedDidTokenHeader
             returning(
                 Status.NO_CONTENT,
             )
@@ -193,6 +197,7 @@ object OrderRoutes {
         return "orders" / orderIdPathParam meta {
             operationId = "get-order"
             summary = "Get order"
+            security = signedDidTokenHeader
             returning(
                 Status.OK,
                 responseBody to Examples.marketOrderResponse,
@@ -221,6 +226,7 @@ object OrderRoutes {
         return "orders" meta {
             operationId = "list-orders"
             summary = "List orders"
+            security = signedDidTokenHeader
             returning(
                 Status.OK,
                 responseBody to OrdersApiResponse(
@@ -243,6 +249,7 @@ object OrderRoutes {
         return "orders" meta {
             operationId = "cancel-open-orders"
             summary = "Cancel open orders"
+            security = signedDidTokenHeader
         } bindContract Method.DELETE to { request ->
             transaction {
                 OrderEntity.cancelAll(request.principal)
@@ -259,6 +266,7 @@ object OrderRoutes {
         return "batch/orders" meta {
             operationId = "batch-orders"
             summary = "Manage orders in batch"
+            security = signedDidTokenHeader
         } bindContract Method.POST to { request ->
             val apiRequest: BatchOrdersApiRequest = requestBody(request)
 
@@ -282,6 +290,7 @@ object OrderRoutes {
         return "trades" meta {
             operationId = "list-trades"
             summary = "List trades"
+            security = signedDidTokenHeader
             queries += Query.string().optional("before-timestamp", "Return trades executed before provided timestamp")
             queries += Query.string().optional("limit", "Number of trades to return")
         } bindContract Method.GET to { request ->

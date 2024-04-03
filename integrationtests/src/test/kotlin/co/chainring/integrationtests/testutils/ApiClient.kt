@@ -1,5 +1,7 @@
 package co.chainring.integrationtests.testutils
 
+import co.chainring.apps.api.middleware.TokenClaims
+import co.chainring.apps.api.middleware.TokenHeader
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ApiErrors
 import co.chainring.apps.api.model.ConfigurationApiResponse
@@ -9,16 +11,25 @@ import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.WithdrawalApiResponse
+import co.chainring.core.evm.ECHelper
+import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.WithdrawalId
+import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import okhttp3.Headers
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import org.web3j.crypto.Credentials
+import org.web3j.crypto.ECKeyPair
+import org.web3j.crypto.Keys
 import java.net.HttpURLConnection
+import java.util.Base64
+import java.util.UUID
 
 val apiServerRootUrl = System.getenv("API_URL") ?: "http://localhost:9999"
 val httpClient = OkHttpClient.Builder().build()
@@ -26,7 +37,80 @@ val applicationJson = "application/json".toMediaType()
 
 class AbnormalApiResponseException(val response: Response) : Exception()
 
-class ApiClient {
+class ApiClient(val ecKeyPair: ECKeyPair?) {
+    val authToken: String? = ecKeyPair?.let { issueAuthToken(ecKeyPair = it) }
+
+    companion object {
+        fun initWallet(
+            ecKeyPair: ECKeyPair? = Keys.createEcKeyPair(),
+        ): ApiClient {
+            return ApiClient(ecKeyPair)
+        }
+
+        fun listOrders(authHeadersProvider: (Request) -> Headers): OrdersApiResponse {
+            val httpResponse = execute(
+                Request.Builder()
+                    .url("$apiServerRootUrl/v1/orders")
+                    .get()
+                    .build().let {
+                        it.addHeaders(authHeadersProvider(it))
+                    },
+            )
+            return if (httpResponse.code == HttpURLConnection.HTTP_OK) {
+                json.decodeFromString<OrdersApiResponse>(httpResponse.body?.string()!!)
+            } else {
+                throw AbnormalApiResponseException(httpResponse)
+            }
+        }
+
+        internal fun authHeaders(ecKeyPair: ECKeyPair): Headers {
+            val didToken = issueAuthToken(ecKeyPair)
+
+            return Headers.Builder()
+                .add(
+                    "Authorization",
+                    "Bearer $didToken",
+                ).build()
+        }
+
+        fun issueAuthToken(
+            ecKeyPair: ECKeyPair = Keys.createEcKeyPair(),
+            issuedAt: Long = Clock.System.now().epochSeconds,
+            expiresAt: Long = issuedAt + 30 * 60,
+            issuer: String = "did:ethr:0x${Keys.getAddress(ecKeyPair)}",
+            audience: String = "chainring",
+        ): String {
+            val header = Json.encodeToString(
+                TokenHeader(
+                    alg = "ES256K",
+                    typ = "JWT",
+                ),
+            )
+            val claims = Json.encodeToString(
+                TokenClaims(
+                    iat = issuedAt,
+                    ext = expiresAt,
+                    iss = issuer,
+                    aud = audience,
+                    tid = UUID.randomUUID().toString(),
+                ),
+            )
+
+            val encodedHeader = base64UrlEncode(header)
+            val encodedClaims = base64UrlEncode(claims)
+            val body = "$encodedHeader.$encodedClaims"
+
+            val messagePrefix = "\u0019Ethereum Signed Message:\n${body.length}"
+            val messageHash = ECHelper.sha3(messagePrefix.toByteArray() + body.toByteArray())
+
+            val signature: EvmSignature = ECHelper.signData(Credentials.create(ecKeyPair), messageHash)
+            val didToken = "$body.${signature.value}"
+            return didToken
+        }
+
+        private fun execute(request: Request): Response =
+            httpClient.newCall(request).execute()
+    }
 
     fun getConfiguration(): ConfigurationApiResponse {
         val httpResponse = execute(
@@ -47,7 +131,8 @@ class ApiClient {
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
-                .build(),
+                .build()
+                .withAuthHeaders(ecKeyPair),
         )
 
         return when (httpResponse.code) {
@@ -61,7 +146,8 @@ class ApiClient {
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders/${apiRequest.id}")
                 .patch(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
-                .build(),
+                .build()
+                .withAuthHeaders(ecKeyPair),
         )
 
         return when (httpResponse.code) {
@@ -75,7 +161,8 @@ class ApiClient {
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders/$id")
                 .delete()
-                .build(),
+                .build()
+                .withAuthHeaders(ecKeyPair),
         )
 
         return when (httpResponse.code) {
@@ -89,7 +176,8 @@ class ApiClient {
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders/$id")
                 .get()
-                .build(),
+                .build()
+                .withAuthHeaders(ecKeyPair),
         )
 
         return when (httpResponse.code) {
@@ -103,7 +191,8 @@ class ApiClient {
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders")
                 .get()
-                .build(),
+                .build()
+                .withAuthHeaders(ecKeyPair),
         )
 
         return when (httpResponse.code) {
@@ -117,7 +206,8 @@ class ApiClient {
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders")
                 .delete()
-                .build(),
+                .build()
+                .withAuthHeaders(ecKeyPair),
         )
 
         return when (httpResponse.code) {
@@ -131,7 +221,8 @@ class ApiClient {
             Request.Builder()
                 .url("$apiServerRootUrl/v1/withdrawals")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
-                .build(),
+                .build()
+                .withAuthHeaders(ecKeyPair),
         )
 
         return when (httpResponse.code) {
@@ -145,7 +236,8 @@ class ApiClient {
             Request.Builder()
                 .url("$apiServerRootUrl/v1/withdrawals/$id")
                 .get()
-                .build(),
+                .build()
+                .withAuthHeaders(ecKeyPair),
         )
 
         return when (httpResponse.code) {
@@ -162,6 +254,13 @@ private val json = Json {
     this.ignoreUnknownKeys = true
 }
 
+fun Request.withAuthHeaders(ecKeyPair: ECKeyPair?): Request =
+    if (ecKeyPair == null) {
+        this
+    } else {
+        addHeaders(ApiClient.authHeaders(ecKeyPair))
+    }
+
 fun Response.apiError(): ApiError? {
     return this.body?.string()?.let {
         try {
@@ -171,3 +270,21 @@ fun Response.apiError(): ApiError? {
         }
     }
 }
+
+private fun Request.addHeaders(headers: Headers): Request =
+    this
+        .newBuilder()
+        .headers(
+            this
+                .headers
+                .newBuilder()
+                .addAll(headers)
+                .build(),
+        ).build()
+
+fun base64UrlEncode(input: String): String {
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(input.toByteArray())
+}
+
+val Headers.Companion.empty: Headers
+    get() = emptyMap<String, String>().toHeaders()

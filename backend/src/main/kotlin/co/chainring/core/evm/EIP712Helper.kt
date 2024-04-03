@@ -1,16 +1,9 @@
 package co.chainring.core.evm
 
 import co.chainring.core.model.Address
-import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
-import co.chainring.core.utils.toHex
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.web3j.crypto.Credentials
-import org.web3j.crypto.ECDSASignature
-import org.web3j.crypto.Keys
-import org.web3j.crypto.Sign
 import org.web3j.crypto.StructuredDataEncoder
-import java.math.BigInteger
 
 object EIP712Helper {
     val logger = KotlinLogging.logger {}
@@ -45,27 +38,5 @@ object EIP712Helper {
             """.trimIndent(),
         )
         return encoder.hashStructuredData()
-    }
-
-    fun signData(credentials: Credentials, hash: ByteArray): EvmSignature {
-        val signature = Sign.signMessage(hash, credentials.ecKeyPair, false)
-        return EvmSignature((signature.r + signature.s + signature.v).toHex())
-    }
-
-    fun isValidSignature(hash: ByteArray, signature: EvmSignature, signerAddress: Address): Boolean {
-        val (r, s) = decodeSignature(signature)
-        val ecdsaSig = ECDSASignature(r, s).toCanonicalised()
-        return setOf(
-            Keys.toChecksumAddress(Keys.getAddress(Sign.recoverFromSignature(0, ecdsaSig, hash))),
-            Keys.toChecksumAddress(Keys.getAddress(Sign.recoverFromSignature(1, ecdsaSig, hash))),
-        ).contains(Keys.toChecksumAddress(signerAddress.value))
-    }
-
-    private fun decodeSignature(signature: EvmSignature): Pair<BigInteger, BigInteger> {
-        val bytes = signature.toByteArray()
-        return Pair(
-            BigInteger(1, bytes.slice(0..31).toByteArray()),
-            BigInteger(1, bytes.slice(32..63).toByteArray()),
-        )
     }
 }

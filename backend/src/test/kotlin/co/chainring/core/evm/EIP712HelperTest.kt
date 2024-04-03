@@ -1,6 +1,5 @@
 package co.chainring.core.evm
 
-import co.chainring.apps.api.model.WithdrawTx
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
@@ -27,8 +26,8 @@ class EIP712HelperTest {
         )
         requests.forEach {
             val hash = EIP712Helper.computeHash(it, chainId, verifyingContract)
-            val signature = EIP712Helper.signData(Credentials.create(privateKeyHex), hash)
-            assertTrue(EIP712Helper.isValidSignature(hash, signature, Address(credentials.address)))
+            val signature = ECHelper.signData(Credentials.create(privateKeyHex), hash)
+            assertTrue(ECHelper.isValidSignature(hash, signature, Address(credentials.address)))
         }
     }
 }

@@ -1,5 +1,7 @@
 import z from 'zod'
 import { Zodios } from '@zodios/core'
+import { pluginToken } from '@zodios/plugins'
+import { loadOrIssueDidToken } from 'Auth'
 
 export const apiBaseUrl = import.meta.env.ENV_API_URL
 
@@ -264,3 +266,14 @@ export const apiClient = new Zodios(apiBaseUrl, [
     response: WithdrawalApiResponseSchema
   }
 ])
+
+apiClient.use(
+  pluginToken({
+    getToken: async () => {
+      return loadOrIssueDidToken()
+    },
+    renewToken: async () => {
+      return loadOrIssueDidToken()
+    }
+  })
+)

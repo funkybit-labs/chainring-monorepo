@@ -1,5 +1,6 @@
 package co.chainring.apps.api
 
+import co.chainring.apps.api.middleware.signedDidTokenHeader
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.Withdrawal
@@ -8,6 +9,7 @@ import co.chainring.apps.api.model.badRequestError
 import co.chainring.apps.api.model.notFoundError
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.ContractType
+import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
@@ -37,6 +39,7 @@ class WithdrawalRoutes(private val blockchainClient: BlockchainClient) {
         return "withdrawals" meta {
             operationId = "withdraw"
             summary = "Withdraw"
+            security = signedDidTokenHeader
             returning(
                 Status.CREATED,
                 responseBody to WithdrawalApiResponse(
@@ -48,7 +51,7 @@ class WithdrawalRoutes(private val blockchainClient: BlockchainClient) {
 
             val contractAddress = blockchainClient.getContractAddress(ContractType.Exchange)
             val isSignatureValid = contractAddress?.let { verifyingContract ->
-                EIP712Helper.isValidSignature(
+                ECHelper.isValidSignature(
                     EIP712Helper.computeHash(
                         withdrawTx,
                         blockchainClient.chainId,
@@ -94,6 +97,7 @@ class WithdrawalRoutes(private val blockchainClient: BlockchainClient) {
         return "withdrawals" / withdrawalIdPathParam meta {
             operationId = "get-withdrawal"
             summary = "Get withdrawal"
+            security = signedDidTokenHeader
             returning(
                 Status.OK,
                 responseBody to WithdrawalApiResponse(
