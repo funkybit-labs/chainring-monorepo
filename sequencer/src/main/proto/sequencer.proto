@@ -3,6 +3,7 @@ package sequencer;
 import "bignum.proto";
 import "order.proto";
 import "market.proto";
+import "balance.proto";
 
 option java_multiple_files = true;
 option java_package = "co.chainring.sequencer.proto";
@@ -35,11 +36,13 @@ message SequencerRequest {
   enum Type {
     AddMarket = 0;
     ApplyOrderBatch = 1;
+    ApplyBalanceBatch = 2;
   }
   string guid = 1;
   Type type = 2;
   optional Market addMarket = 3;
   optional OrderBatch orderBatch = 4;
+  optional BalanceBatch balanceBatch = 5;
 }
 
 enum SequencerError {

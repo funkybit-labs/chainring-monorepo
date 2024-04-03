@@ -27,3 +27,5 @@ fun BigInteger.toIntegerValue(): IntegerValue = IntegerValue.newBuilder()
 fun IntegerValue.toBigInteger(): BigInteger = BigInteger(
     this.value.toByteArray(),
 )
+
+fun sumBigIntegers(a: BigInteger, b: BigInteger) = a + b
