@@ -39,7 +39,7 @@ import kotlin.test.assertNotEquals
 class OrderRoutesApiTest {
     @Test
     fun `CRUD order`() {
-        val apiClient = ApiClient()
+        val apiClient = ApiClient.initWallet()
 
         var wsClient = WebsocketClient.blocking()
         wsClient.subscribe(SubscriptionTopic.Orders)
@@ -103,7 +103,7 @@ class OrderRoutesApiTest {
 
     @Test
     fun `CRUD order error cases`() {
-        val apiClient = ApiClient()
+        val apiClient = ApiClient.initWallet()
 
         // operation on non-existent order
         listOf(
@@ -158,7 +158,7 @@ class OrderRoutesApiTest {
 
     @Test
     fun `list and cancel all open orders`() {
-        val apiClient = ApiClient()
+        val apiClient = ApiClient.initWallet()
         apiClient.cancelOpenOrders()
 
         val wsClient = WebsocketClient.blocking()

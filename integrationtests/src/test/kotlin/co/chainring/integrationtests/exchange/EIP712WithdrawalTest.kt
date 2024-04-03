@@ -38,7 +38,7 @@ class EIP712WithdrawalTest {
 
     @Test
     fun testERC20EIP712Withdrawals() {
-        val apiClient = ApiClient()
+        val apiClient = ApiClient.initWallet()
         val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.chainId }!!
         val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.symbols)
         val decimals = config.symbols.first { it.name == "USDC" }.decimals.toInt()
@@ -68,7 +68,7 @@ class EIP712WithdrawalTest {
 
     @Test
     fun testNativeEIP712Withdrawals() {
-        val apiClient = ApiClient()
+        val apiClient = ApiClient.initWallet()
         val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.chainId }!!
         val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.symbols)
         val decimals = config.symbols.first { it.contractAddress == null }.decimals.toInt()
@@ -94,7 +94,7 @@ class EIP712WithdrawalTest {
 
     @Test
     fun testERC20EIP712Errors() {
-        val apiClient = ApiClient()
+        val apiClient = ApiClient.initWallet()
         val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.chainId }!!
         val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.symbols)
 

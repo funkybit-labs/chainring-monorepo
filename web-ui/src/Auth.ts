@@ -38,7 +38,7 @@ function createDidToken(address: string) {
   })
   const claims = JSON.stringify({
     iat: issuedAt,
-    ext: issuedAt + 30 * 24 * 60,
+    ext: issuedAt + 24 * 60 * 60,
     iss: `did:ethr:${address}`,
     aud: 'chainring',
     tid: uuidv4()

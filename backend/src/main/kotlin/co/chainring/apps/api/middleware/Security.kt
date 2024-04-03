@@ -11,12 +11,8 @@ import co.chainring.core.model.EvmSignature
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import org.http4k.contract.security.Security
 import org.http4k.core.Filter
 import org.http4k.core.HttpHandler
@@ -64,7 +60,7 @@ fun validateDidToken(didToken: String): AuthResult {
     val claims = decodeJwtClaims(message) ?: return authFailure("Invalid token format")
 
     if (!validateTokenExpiry(claims)) {
-        return authFailure("Token is expired or not yet valid")
+        return authFailure("Token is expired or not valid yet")
     }
 
     if (!validateAudience(claims)) {
@@ -80,24 +76,34 @@ fun validateDidToken(didToken: String): AuthResult {
     return authFailure("Invalid signature")
 }
 
-private fun decodeJwtClaims(message: String): JsonObject? =
+private fun decodeJwtClaims(message: String): TokenClaims? =
     message.substringAfter('.').let { encodedClaims ->
         runCatching {
-            Json.parseToJsonElement(String(Base64.getUrlDecoder().decode(encodedClaims))).jsonObject
+            Json.decodeFromString<TokenClaims>(String(Base64.getUrlDecoder().decode(encodedClaims)))
         }.getOrNull()
     }
 
-private fun validateTokenExpiry(claims: JsonObject): Boolean =
-    claims["iat"]?.jsonPrimitive?.longOrNull?.let { it < Clock.System.now().epochSeconds } == true &&
-        claims["ext"]?.jsonPrimitive?.longOrNull?.let { it > Clock.System.now().epochSeconds } == true
+private fun validateTokenExpiry(claims: TokenClaims): Boolean {
+    val currentTime = Clock.System.now().epochSeconds
 
-private fun expiryDate(claims: JsonObject): Instant = claims["ext"]?.jsonPrimitive?.longOrNull?.let { Instant.fromEpochSeconds(it) } ?: Instant.DISTANT_PAST
+    val notExpired = claims.ext - currentTime > -10
+    val issuedBeforeExpiry = claims.ext > claims.iat
+    val maximumDurationIsAcceptable = (claims.ext - claims.iat) < 30 * 24 * 60 * 60
 
-private fun validateAudience(claims: JsonObject): Boolean =
-    claims["aud"]?.jsonPrimitive?.contentOrNull == "chainring"
+    return notExpired && issuedBeforeExpiry && maximumDurationIsAcceptable
+}
 
-private fun extractIssuerAddress(claims: JsonObject): Address? =
-    claims["iss"]?.jsonPrimitive?.content?.substringAfterLast(":")?.let { Address(it) }
+private fun expiryDate(claims: TokenClaims): Instant = claims.ext.let { Instant.fromEpochSeconds(it) }
+
+private fun validateAudience(claims: TokenClaims): Boolean =
+    claims.aud == "chainring"
+
+private fun extractIssuerAddress(claims: TokenClaims): Address? =
+    claims.iss.substringAfterLast(":").let { addressString ->
+        runCatching {
+            Address(addressString)
+        }.getOrNull()
+    }
 
 private fun validateSignature(message: String, signature: String, issuerAddress: Address): Boolean {
     val messagePrefix = "\u0019Ethereum Signed Message:\n${message.length}"
@@ -115,6 +121,21 @@ private fun missingHeader(name: String): AuthResult.Failure =
 
 private fun authFailure(error: String): AuthResult.Failure =
     AuthResult.Failure(unauthorizedResponse(error))
+
+@Serializable
+data class TokenHeader(
+    val alg: String,
+    val typ: String,
+)
+
+@Serializable
+data class TokenClaims(
+    val iat: Long,
+    val ext: Long,
+    val iss: String,
+    val aud: String,
+    val tid: String,
+)
 
 private val logger = KotlinLogging.logger {}
 private const val AUTHORIZATION_SCHEME_PREFIX = "Bearer "
