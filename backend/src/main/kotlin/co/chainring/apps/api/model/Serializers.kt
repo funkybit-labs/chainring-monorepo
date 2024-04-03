@@ -19,12 +19,13 @@ import java.math.BigInteger
 typealias BigDecimalJson =
     @Serializable(with = BigDecimalSerializer::class)
     BigDecimal
+
 typealias BigIntegerJson =
     @Serializable(with = BigIntegerSerializer::class)
     BigInteger
 
 @OptIn(ExperimentalSerializationApi::class)
-private object BigDecimalSerializer : KSerializer<BigDecimal> {
+object BigDecimalSerializer : KSerializer<BigDecimal> {
 
     override val descriptor = PrimitiveSerialDescriptor("java.math.BigDecimal", PrimitiveKind.DOUBLE)
 
@@ -51,7 +52,7 @@ private object BigDecimalSerializer : KSerializer<BigDecimal> {
 }
 
 @OptIn(ExperimentalSerializationApi::class)
-private object BigIntegerSerializer : KSerializer<BigInteger> {
+object BigIntegerSerializer : KSerializer<BigInteger> {
 
     override val descriptor = PrimitiveSerialDescriptor("java.math.BigInteger", PrimitiveKind.LONG)
 

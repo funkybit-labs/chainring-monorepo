@@ -6,7 +6,6 @@ import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.TradeId
 import kotlinx.datetime.Instant
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -21,12 +20,6 @@ data class Trade(
     val feeAmount: BigIntegerJson,
     val feeSymbol: Symbol,
 )
-
-@Serializable
-@SerialName("Trades")
-data class WsTrades(
-    val trades: List<Trade>,
-) : Publishable()
 
 @Serializable
 data class TradesApiResponse(

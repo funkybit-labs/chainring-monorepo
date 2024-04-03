@@ -1,18 +1,24 @@
 package co.chainring.core.websocket
 
 import co.chainring.apps.api.model.BigDecimalJson
-import co.chainring.apps.api.model.LastTrade
-import co.chainring.apps.api.model.LastTradeDirection
-import co.chainring.apps.api.model.OHLC
-import co.chainring.apps.api.model.OrderBook
-import co.chainring.apps.api.model.OrderBookEntry
-import co.chainring.apps.api.model.OutgoingWSMessage
-import co.chainring.apps.api.model.Prices
-import co.chainring.apps.api.model.SubscriptionTopic
 import co.chainring.apps.api.model.Trade
-import co.chainring.apps.api.model.WsTrades
+import co.chainring.apps.api.model.websocket.LastTrade
+import co.chainring.apps.api.model.websocket.LastTradeDirection
+import co.chainring.apps.api.model.websocket.OHLC
+import co.chainring.apps.api.model.websocket.OrderBook
+import co.chainring.apps.api.model.websocket.OrderBookEntry
+import co.chainring.apps.api.model.websocket.OrderCreated
+import co.chainring.apps.api.model.websocket.OrderUpdated
+import co.chainring.apps.api.model.websocket.Orders
+import co.chainring.apps.api.model.websocket.OutgoingWSMessage
+import co.chainring.apps.api.model.websocket.Prices
+import co.chainring.apps.api.model.websocket.Publishable
+import co.chainring.apps.api.model.websocket.SubscriptionTopic
+import co.chainring.apps.api.model.websocket.Trades
+import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.TradeId
@@ -25,6 +31,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.http4k.websocket.Websocket
 import org.http4k.websocket.WsMessage
+import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.RoundingMode
@@ -38,37 +45,66 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-typealias Subscriptions = CopyOnWriteArrayList<Websocket>
+private val logger = KotlinLogging.logger {}
+
+typealias Principal = Address
+
+data class ConnectedClient(
+    val websocket: Websocket,
+    val principal: Principal?,
+) : Websocket by websocket {
+    fun send(message: OutgoingWSMessage) {
+        logger.debug { "Sending $message to $principal" }
+        websocket.send(WsMessage(Json.encodeToString(message)))
+    }
+}
+
+typealias Subscriptions = CopyOnWriteArrayList<ConnectedClient>
 typealias TopicSubscriptions = ConcurrentHashMap<SubscriptionTopic, Subscriptions>
 
 class Broadcaster {
     private val subscriptions = TopicSubscriptions()
-    private val lastPricePublish = mutableMapOf<Pair<MarketId, Websocket>, Instant>()
-    private val logger = KotlinLogging.logger {}
+    private val subscriptionsByPrincipal = ConcurrentHashMap<Principal, TopicSubscriptions>()
+    private val lastPricePublish = mutableMapOf<Pair<MarketId, ConnectedClient>, Instant>()
     private val rnd = Random(0)
 
-    fun subscribe(topic: SubscriptionTopic, websocket: Websocket) {
+    fun subscribe(topic: SubscriptionTopic, client: ConnectedClient) {
         subscriptions.getOrPut(topic) {
             Subscriptions()
-        }.addIfAbsent(websocket)
+        }.addIfAbsent(client)
+
+        client.principal?.also { principal ->
+            subscriptionsByPrincipal.getOrPut(principal) {
+                TopicSubscriptions()
+            }.getOrPut(topic) {
+                Subscriptions()
+            }.addIfAbsent(client)
+        }
 
         when (topic) {
-            is SubscriptionTopic.OrderBook -> sendOrderBook(topic.marketId, websocket)
-            is SubscriptionTopic.Prices -> sendPrices(topic.marketId, websocket)
-            is SubscriptionTopic.Trades -> sendTrades(websocket)
+            is SubscriptionTopic.OrderBook -> sendOrderBook(topic.marketId, client)
+            is SubscriptionTopic.Prices -> sendPrices(topic.marketId, client)
+            is SubscriptionTopic.Trades -> sendTrades(client)
+            is SubscriptionTopic.Orders -> sendOrders(client)
         }
     }
 
-    fun unsubscribe(topic: SubscriptionTopic, websocket: Websocket) {
-        subscriptions[topic]?.remove(websocket)
+    fun unsubscribe(topic: SubscriptionTopic, client: ConnectedClient) {
+        subscriptions[topic]?.remove(client)
         if (topic is SubscriptionTopic.Prices) {
-            lastPricePublish.remove(Pair(topic.marketId, websocket))
+            lastPricePublish.remove(Pair(topic.marketId, client))
+        }
+        client.principal?.also { principal ->
+            subscriptionsByPrincipal[principal]?.get(topic)?.remove(client)
         }
     }
 
-    fun unsubscribe(websocket: Websocket) {
+    fun unsubscribe(client: ConnectedClient) {
         subscriptions.keys.forEach { topic ->
-            unsubscribe(topic, websocket)
+            unsubscribe(topic, client)
+        }
+        client.principal?.also { principal ->
+            subscriptionsByPrincipal.remove(principal)
         }
     }
 
@@ -84,10 +120,10 @@ class Broadcaster {
     }
 
     private fun publishData() {
-        subscriptions.forEach { (topic, websockets) ->
+        subscriptions.forEach { (topic, clients) ->
             when (topic) {
-                is SubscriptionTopic.OrderBook -> sendOrderBook(topic.marketId, websockets)
-                is SubscriptionTopic.Prices -> sendPrices(topic.marketId, websockets)
+                is SubscriptionTopic.OrderBook -> sendOrderBook(topic.marketId, clients)
+                is SubscriptionTopic.Prices -> sendPrices(topic.marketId, clients)
                 else -> {}
             }
         }
@@ -122,12 +158,12 @@ class Broadcaster {
         }
     }
 
-    private fun sendPrices(market: MarketId, websockets: List<Websocket>) {
-        websockets.forEach { sendPrices(market, it) }
+    private fun sendPrices(market: MarketId, clients: List<ConnectedClient>) {
+        clients.forEach { sendPrices(market, it) }
     }
 
-    private fun sendPrices(market: MarketId, websocket: Websocket) {
-        val key = Pair(market, websocket)
+    private fun sendPrices(market: MarketId, client: ConnectedClient) {
+        val key = Pair(market, client)
         val fullDump = !lastPricePublish.containsKey(key)
         val now = Clock.System.now()
         val prices = if (fullDump) {
@@ -146,11 +182,10 @@ class Broadcaster {
                 lastPricePublish[key] = now
             }
         }
-        val response: OutgoingWSMessage = OutgoingWSMessage.Publish(prices)
-        websocket.send(WsMessage(Json.encodeToString(response)))
+        client.send(OutgoingWSMessage.Publish(prices))
     }
 
-    private fun sendTrades(websocket: Websocket) {
+    private fun sendTrades(client: ConnectedClient) {
         fun generateTrade(timestamp: Instant): Trade {
             val lastStutter = rnd.nextDouble(-0.5, 0.5) / 3.0
             val marketId = setOf(MarketId("BTC/ETH"), MarketId("USDC/DAI")).random()
@@ -181,17 +216,18 @@ class Broadcaster {
             )
         }
 
-        val message: OutgoingWSMessage = OutgoingWSMessage.Publish(
-            WsTrades((1..100).map { i -> generateTrade(Clock.System.now().minus(i.minutes)) }),
+        client.send(
+            OutgoingWSMessage.Publish(
+                Trades((1..100).map { i -> generateTrade(Clock.System.now().minus(i.minutes)) }),
+            ),
         )
-        websocket.send(WsMessage(Json.encodeToString(message)))
     }
 
-    private fun sendOrderBook(marketId: MarketId, websockets: List<Websocket>) {
-        websockets.forEach { sendOrderBook(marketId, it) }
+    private fun sendOrderBook(marketId: MarketId, clients: List<ConnectedClient>) {
+        clients.forEach { sendOrderBook(marketId, it) }
     }
 
-    private fun sendOrderBook(marketId: MarketId, websocket: Websocket) {
+    private fun sendOrderBook(marketId: MarketId, client: ConnectedClient) {
         when (marketId.value) {
             "BTC/ETH" -> {
                 fun stutter() = rnd.nextDouble(-0.5, 0.5)
@@ -256,8 +292,42 @@ class Broadcaster {
             }
             else -> null
         }?.also { orderBook ->
-            val response: OutgoingWSMessage = OutgoingWSMessage.Publish(orderBook)
-            websocket.send(WsMessage(Json.encodeToString(response)))
+            client.send(OutgoingWSMessage.Publish(orderBook))
         }
     }
+
+    private fun sendOrders(client: ConnectedClient) {
+        if (client.principal != null) {
+            transaction {
+                client.send(
+                    OutgoingWSMessage.Publish(
+                        Orders(
+                            OrderEntity.listOrders(client.principal)
+                                .map { it.toOrderResponse() },
+                        ),
+                    ),
+                )
+            }
+        }
+    }
+
+    fun sendOrders(principal: Principal) {
+        findClients(principal, SubscriptionTopic.Orders)
+            .forEach { sendOrders(it) }
+    }
+
+    fun notify(principal: Principal, message: Publishable) {
+        val topic = when (message) {
+            is OrderBook -> SubscriptionTopic.OrderBook(message.marketId)
+            is Orders, is OrderCreated, is OrderUpdated -> SubscriptionTopic.Orders
+            is Prices -> SubscriptionTopic.Prices(message.market)
+            is Trades -> SubscriptionTopic.Trades
+        }
+
+        findClients(principal, topic)
+            .forEach { it.send(OutgoingWSMessage.Publish(message)) }
+    }
+
+    private fun findClients(principal: Principal, topic: SubscriptionTopic): List<ConnectedClient> =
+        subscriptionsByPrincipal[principal]?.get(topic) ?: emptyList()
 }

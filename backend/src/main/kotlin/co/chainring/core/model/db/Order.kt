@@ -1,13 +1,13 @@
 package co.chainring.core.model.db
 
 import co.chainring.apps.api.model.Order
-import co.chainring.apps.api.model.OrderApiResponse
 import co.chainring.core.model.Address
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.update
@@ -83,9 +83,9 @@ object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
 }
 
 class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
-    fun toOrderResponse(): OrderApiResponse {
+    fun toOrderResponse(): Order {
         return when (type) {
-            OrderType.Market -> OrderApiResponse.Market(
+            OrderType.Market -> Order.Market(
                 id = this.id.value,
                 status = this.status,
                 marketId = this.marketGuid.value,
@@ -109,7 +109,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 ),
             )
 
-            OrderType.Limit -> OrderApiResponse.Limit(
+            OrderType.Limit -> Order.Limit(
                 id = this.id.value,
                 status = this.status,
                 marketId = this.marketGuid.value,
@@ -167,9 +167,10 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         }
 
         fun listOrders(ownerAddress: Address): List<OrderEntity> {
-            return OrderEntity.find {
-                OrderTable.ownerAddress.eq(ownerAddress.value)
-            }.toList()
+            return OrderEntity
+                .find { OrderTable.ownerAddress.eq(ownerAddress.value) }
+                .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
+                .toList()
         }
 
         fun cancelAll(ownerAddress: Address) {

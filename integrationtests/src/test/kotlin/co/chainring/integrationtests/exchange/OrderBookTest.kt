@@ -1,17 +1,13 @@
 package co.chainring.integrationtests.exchange
 
-import co.chainring.apps.api.model.IncomingWSMessage
-import co.chainring.apps.api.model.OrderBook
-import co.chainring.apps.api.model.OutgoingWSMessage
-import co.chainring.apps.api.model.SubscriptionTopic
+import co.chainring.apps.api.model.websocket.OrderBook
+import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.core.model.db.MarketId
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
-import co.chainring.integrationtests.testutils.apiServerRootUrl
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import co.chainring.integrationtests.testutils.blocking
+import co.chainring.integrationtests.testutils.subscribe
+import co.chainring.integrationtests.testutils.waitForMessage
 import org.http4k.client.WebsocketClient
-import org.http4k.core.Uri
-import org.http4k.websocket.WsMessage
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -20,16 +16,14 @@ import org.junit.jupiter.api.extension.ExtendWith
 class OrderBookTest {
     @Test
     fun `test order book over websocket`() {
-        val connectUri = Uri.of(apiServerRootUrl.replace("http:", "ws:").replace("https:", "wss:") + "/connect")
-        val client = WebsocketClient.blocking(connectUri)
-        val message: IncomingWSMessage = IncomingWSMessage.Subscribe(SubscriptionTopic.OrderBook(MarketId("BTC/ETH")))
-        client.send(WsMessage(Json.encodeToString(message)))
-        val received = client.received().take(1).first()
-        val decoded = Json.decodeFromString<OutgoingWSMessage>(received.bodyString())
-        val orderBook = (decoded as OutgoingWSMessage.Publish).data as OrderBook
+        val client = WebsocketClient.blocking()
+        client.subscribe(SubscriptionTopic.OrderBook(MarketId("BTC/ETH")))
+
+        val orderBook = client.waitForMessage<OrderBook>()
         assertEquals("BTC/ETH", orderBook.marketId.value)
         assertEquals(9, orderBook.buy.size)
         assertEquals(10, orderBook.sell.size)
+
         client.close()
     }
 }
