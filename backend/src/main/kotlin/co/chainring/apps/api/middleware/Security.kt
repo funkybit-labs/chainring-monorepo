@@ -50,11 +50,11 @@ val signedDidTokenHeader = object : Security {
         val authHeader = request.header("Authorization")?.trim()
             ?: return missingHeader("Authorization")
 
-        if (!authHeader.startsWith(authorizationSchemePrefix, ignoreCase = true)) {
+        if (!authHeader.startsWith(AUTHORIZATION_SCHEME_PREFIX, ignoreCase = true)) {
             return authFailure("Invalid authentication scheme")
         }
 
-        return validateDidToken(authHeader.removePrefix(authorizationSchemePrefix))
+        return validateDidToken(authHeader.removePrefix(AUTHORIZATION_SCHEME_PREFIX))
     }
 }
 
@@ -117,7 +117,7 @@ private fun authFailure(error: String): AuthResult.Failure =
     AuthResult.Failure(unauthorizedResponse(error))
 
 private val logger = KotlinLogging.logger {}
-private const val authorizationSchemePrefix = "Bearer "
+private const val AUTHORIZATION_SCHEME_PREFIX = "Bearer "
 sealed class AuthResult {
     data class Success(val address: Address, val expiresAt: Instant) : AuthResult()
     data class Failure(val response: Response) : AuthResult()
@@ -128,9 +128,6 @@ private val principalRequestContextKey =
 
 val Request.principal: Address
     get() = principalRequestContextKey(this) ?: throw RequestProcessingError(unauthorizedResponse("Unauthorized"))
-
-val Request.principalOrNull: Address?
-    get() = principalRequestContextKey(this)
 
 private fun unauthorizedResponse(message: String) = errorResponse(
     Status.UNAUTHORIZED,

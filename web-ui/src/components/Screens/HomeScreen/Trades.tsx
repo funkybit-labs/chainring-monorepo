@@ -5,23 +5,30 @@ import { Websocket, WebsocketEvent } from 'websocket-ts'
 import { formatUnits } from 'viem'
 import { format } from 'date-fns'
 
-export default function Trades({ ws }: { ws: Websocket }) {
+export default function Trades({
+  ws
+}: {
+  ws: {
+    socket: Websocket
+    connectionId: number
+  }
+}) {
   const [trades, setTrades] = useState<Trade[]>(() => [])
 
   useEffect(() => {
     const subscribe = () => {
-      ws.send(
+      ws.socket.send(
         JSON.stringify({
           type: 'Subscribe',
           topic: { type: 'Trades' }
         })
       )
     }
-    ws.addEventListener(WebsocketEvent.reconnect, subscribe)
-    if (ws.readyState == WebSocket.OPEN) {
+    ws.socket.addEventListener(WebsocketEvent.reconnect, subscribe)
+    if (ws.socket.readyState == WebSocket.OPEN) {
       subscribe()
     } else {
-      ws.addEventListener(WebsocketEvent.open, subscribe)
+      ws.socket.addEventListener(WebsocketEvent.open, subscribe)
     }
     const handleMessage = (ws: Websocket, event: MessageEvent) => {
       const message = JSON.parse(event.data) as IncomingWSMessage
@@ -38,13 +45,13 @@ export default function Trades({ ws }: { ws: Websocket }) {
         })
       }
     }
-    ws.addEventListener(WebsocketEvent.message, handleMessage)
+    ws.socket.addEventListener(WebsocketEvent.message, handleMessage)
     return () => {
-      ws.removeEventListener(WebsocketEvent.message, handleMessage)
-      ws.removeEventListener(WebsocketEvent.reconnect, subscribe)
-      ws.removeEventListener(WebsocketEvent.open, subscribe)
-      if (ws.readyState == WebSocket.OPEN) {
-        ws.send(
+      ws.socket.removeEventListener(WebsocketEvent.message, handleMessage)
+      ws.socket.removeEventListener(WebsocketEvent.reconnect, subscribe)
+      ws.socket.removeEventListener(WebsocketEvent.open, subscribe)
+      if (ws.socket.readyState == WebSocket.OPEN) {
+        ws.socket.send(
           JSON.stringify({
             type: 'Unsubscribe',
             topic: { type: 'Trades' }
