@@ -30,7 +30,7 @@ export function Header({
   }, [account.isConnected, account.connector])
 
   return (
-    <div className="fixed flex h-20 w-full flex-row place-items-center justify-between bg-neutralGray p-0">
+    <div className="fixed z-50 flex h-20 w-full flex-row place-items-center justify-between bg-neutralGray p-0">
       <span>
         <img className="m-2 inline-block size-16" src={logo} alt="ChainRing" />
         <img

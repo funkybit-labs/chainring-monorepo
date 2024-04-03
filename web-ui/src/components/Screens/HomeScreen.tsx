@@ -4,8 +4,8 @@ import { useAccount } from 'wagmi'
 import Balances from 'components/Screens/HomeScreen/Balances'
 import { Header } from 'components/Screens/Header'
 import { OrderBook } from 'components/Screens/HomeScreen/OrderBook'
-import Order from 'components/Screens/HomeScreen/Order'
-import Trades from 'components/Screens/HomeScreen/Trades'
+import SubmitOrder from 'components/Screens/HomeScreen/SubmitOrder'
+import TradeHistory from 'components/Screens/HomeScreen/TradeHistory'
 import { ExponentialBackoff, WebsocketBuilder } from 'websocket-ts'
 import { Prices } from 'components/Screens/HomeScreen/Prices'
 import { useEffect, useMemo, useState } from 'react'
@@ -56,7 +56,7 @@ export default function HomeScreen() {
           onMarketChange={setSelectedMarket}
         />
 
-        <div className="flex h-screen w-screen flex-col gap-4 px-4 pt-24">
+        <div className="flex h-screen w-screen flex-col gap-4 overflow-y-scroll px-4 py-24">
           <div className="flex gap-4">
             <div className="flex flex-col">
               <OrderBook ws={ws} marketId={selectedMarket.id} />
@@ -66,7 +66,7 @@ export default function HomeScreen() {
             </div>
             {walletAddress && (
               <div className="flex flex-col">
-                <Order
+                <SubmitOrder
                   baseSymbol={selectedMarket.baseSymbol}
                   quoteSymbol={selectedMarket.quoteSymbol}
                 />
@@ -75,7 +75,7 @@ export default function HomeScreen() {
           </div>
           <div className="flex gap-4">
             <div className="flex flex-col">
-              {walletAddress && <Trades ws={ws} />}
+              {walletAddress && <TradeHistory ws={ws} />}
             </div>
             <div className="flex flex-col">
               {walletAddress && symbols && exchangeContract && (

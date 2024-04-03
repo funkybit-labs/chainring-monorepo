@@ -54,7 +54,6 @@ data class ConnectedClient(
     val principal: Principal?,
 ) : Websocket by websocket {
     fun send(message: OutgoingWSMessage) {
-        logger.debug { "Sending $message to $principal" }
         websocket.send(WsMessage(Json.encodeToString(message)))
     }
 }
