@@ -22,7 +22,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 
 @ExtendWith(AppUnderTestRunner::class)
-class AuthenticationTest {
+class ApiAuthenticationTest {
 
     @Test
     fun `test missing authorization header`() {

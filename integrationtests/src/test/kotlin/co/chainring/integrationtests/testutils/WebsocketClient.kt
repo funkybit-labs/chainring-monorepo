@@ -13,8 +13,8 @@ import org.http4k.core.Uri
 import org.http4k.websocket.WsClient
 import org.http4k.websocket.WsMessage
 
-fun WebsocketClient.blocking(): WsClient =
-    blocking(Uri.of(apiServerRootUrl.replace("http:", "ws:").replace("https:", "wss:") + "/connect"))
+fun WebsocketClient.blocking(auth: String?): WsClient =
+    blocking(Uri.of(apiServerRootUrl.replace("http:", "ws:").replace("https:", "wss:") + "/connect" + (auth?.let { "?auth=$auth" } ?: "")))
 
 fun WsClient.send(message: IncomingWSMessage) {
     send(WsMessage(Json.encodeToString(message)))

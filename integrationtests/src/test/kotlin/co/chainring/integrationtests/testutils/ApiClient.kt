@@ -38,6 +38,7 @@ val applicationJson = "application/json".toMediaType()
 class AbnormalApiResponseException(val response: Response) : Exception()
 
 class ApiClient(val ecKeyPair: ECKeyPair?) {
+    val authToken: String? = ecKeyPair?.let { issueAuthToken(ecKeyPair = it) }
 
     companion object {
         fun initWallet(

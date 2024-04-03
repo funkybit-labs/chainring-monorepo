@@ -41,7 +41,7 @@ class OrderRoutesApiTest {
     fun `CRUD order`() {
         val apiClient = ApiClient.initWallet()
 
-        var wsClient = WebsocketClient.blocking()
+        var wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribe(SubscriptionTopic.Orders)
         val initialOrdersOverWs = wsClient.waitForMessage<Orders>().orders
 
@@ -71,7 +71,7 @@ class OrderRoutesApiTest {
         wsClient.close()
 
         // check that order is included in the orders list sent via websocket
-        wsClient = WebsocketClient.blocking()
+        wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribe(SubscriptionTopic.Orders)
         assertEquals(listOf(limitOrder) + initialOrdersOverWs, wsClient.waitForMessage<Orders>().orders)
 
@@ -161,7 +161,7 @@ class OrderRoutesApiTest {
         val apiClient = ApiClient.initWallet()
         apiClient.cancelOpenOrders()
 
-        val wsClient = WebsocketClient.blocking()
+        val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribe(SubscriptionTopic.Orders)
         val initialOrdersOverWs = wsClient.waitForMessage<Orders>().orders
 
