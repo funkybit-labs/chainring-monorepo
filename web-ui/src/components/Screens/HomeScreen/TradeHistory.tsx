@@ -5,7 +5,7 @@ import { Websocket, WebsocketEvent } from 'websocket-ts'
 import { formatUnits } from 'viem'
 import { format } from 'date-fns'
 
-export default function Trades({ ws }: { ws: Websocket }) {
+export default function TradeHistory({ ws }: { ws: Websocket }) {
   const [trades, setTrades] = useState<Trade[]>(() => [])
 
   useEffect(() => {
@@ -59,23 +59,26 @@ export default function Trades({ ws }: { ws: Websocket }) {
       title={'Trade History'}
       contents={
         <>
-          <div className="h-96 overflow-auto">
-            <table className="w-full text-left text-sm">
-              {
-                <thead>
-                  <tr
-                    key="header"
-                    className="border-b border-b-lightBackground"
-                  >
-                    <td className="min-w-32">Date</td>
-                    <td className="min-w-16 pl-4">Side</td>
-                    <td className="min-w-20 pl-4">Amount</td>
-                    <td className="min-w-20 pl-4">Market</td>
-                    <td className="min-w-20 pl-4">Price</td>
-                    <td className="min-w-20 pl-4">Fee</td>
-                  </tr>
-                </thead>
-              }
+          <div className="h-96 overflow-scroll">
+            <table className="relative w-full text-left text-sm">
+              <thead className="sticky top-0 bg-black">
+                <tr key="header">
+                  <th className="min-w-32">Date</th>
+                  <th className="min-w-16 pl-4">Side</th>
+                  <th className="min-w-20 pl-4">Amount</th>
+                  <th className="min-w-20 pl-4">Market</th>
+                  <th className="min-w-20 pl-4">Price</th>
+                  <th className="min-w-20 pl-4">Fee</th>
+                </tr>
+                <tr key="header-divider">
+                  <th className="h-px bg-lightBackground p-0"></th>
+                  <th className="h-px bg-lightBackground p-0"></th>
+                  <th className="h-px bg-lightBackground p-0"></th>
+                  <th className="h-px bg-lightBackground p-0"></th>
+                  <th className="h-px bg-lightBackground p-0"></th>
+                  <th className="h-px bg-lightBackground p-0"></th>
+                </tr>
+              </thead>
               <tbody>
                 {trades.map((trade) => {
                   return (

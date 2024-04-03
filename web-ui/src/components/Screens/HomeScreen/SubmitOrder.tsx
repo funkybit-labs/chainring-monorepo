@@ -6,7 +6,7 @@ import { Widget } from 'components/common/Widget'
 import SubmitButton from 'components/common/SubmitButton'
 import { parseUnits } from 'viem'
 
-export default function Order({
+export default function SubmitOrder({
   baseSymbol,
   quoteSymbol
 }: {
@@ -18,7 +18,20 @@ export default function Order({
   const [amount, setAmount] = useState('')
   const [isMarketOrder, setIsMarketOrder] = useState(false)
 
-  const submitTrade = () => {
+  const mutation = useMutation({
+    mutationFn: apiClient.createOrder
+  })
+
+  useEffect(() => {
+    if (mutation.isError || mutation.isSuccess) {
+      const timerId: NodeJS.Timeout = setTimeout(() => {
+        mutation.reset()
+      }, 3000)
+      return () => clearTimeout(timerId)
+    }
+  }, [mutation])
+
+  const submitOrder = () => {
     if (isMarketOrder) {
       mutation.mutate({
         nonce: crypto.randomUUID(),
@@ -38,19 +51,6 @@ export default function Order({
       })
     }
   }
-
-  const mutation = useMutation({
-    mutationFn: apiClient.createOrder
-  })
-
-  useEffect(() => {
-    if (mutation.isError || mutation.isSuccess) {
-      const timerId: NodeJS.Timeout = setTimeout(() => {
-        mutation.reset()
-      }, 3000)
-      return () => clearTimeout(timerId)
-    }
-  }, [mutation])
 
   function cleanAndFormatNumber(inputValue: string) {
     let cleanedValue = inputValue
@@ -163,7 +163,7 @@ export default function Order({
               disabled={
                 !((isMarketOrder || price) && amount) || mutation.isPending
               }
-              onClick={submitTrade}
+              onClick={submitOrder}
               error={
                 mutation.isError
                   ? `An error occurred: ${mutation.error.message}`

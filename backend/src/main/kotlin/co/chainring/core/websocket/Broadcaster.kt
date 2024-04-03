@@ -59,8 +59,6 @@ data class ConnectedClient(
         if (validUntil < Clock.System.now()) {
             websocket.close(wsUnauthorized)
         }
-
-        logger.debug { "Sending $message to $principal" }
         websocket.send(WsMessage(Json.encodeToString(message)))
     }
 }
