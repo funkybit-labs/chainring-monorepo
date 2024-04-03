@@ -15,6 +15,7 @@ import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.apps.api.model.websocket.Trades
+import co.chainring.apps.api.wsUnauthorized
 import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.MarketId
@@ -52,8 +53,13 @@ typealias Principal = Address
 data class ConnectedClient(
     val websocket: Websocket,
     val principal: Principal?,
+    val validUntil: Instant,
 ) : Websocket by websocket {
     fun send(message: OutgoingWSMessage) {
+        if (validUntil < Clock.System.now()) {
+            websocket.close(wsUnauthorized)
+        }
+
         logger.debug { "Sending $message to $principal" }
         websocket.send(WsMessage(Json.encodeToString(message)))
     }

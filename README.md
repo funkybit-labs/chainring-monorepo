@@ -15,7 +15,7 @@ make start_containers
 Start web-ui dev server
 
 ```
-make ui_server
+make run_ui
 ```
 
 Open http://localhost:3000 in your browser

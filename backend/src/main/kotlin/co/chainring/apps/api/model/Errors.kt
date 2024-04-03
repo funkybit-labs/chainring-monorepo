@@ -31,6 +31,7 @@ enum class ReasonCode {
     ContractUpdating,
     SignatureNotValid,
     UnexpectedError,
+    AuthenticationError,
 }
 
 val jsonWithDefaults = Json { encodeDefaults = true }
