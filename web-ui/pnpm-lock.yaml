@@ -20,9 +20,6 @@ dependencies:
   '@tanstack/react-query':
     specifier: ^5.27.5
     version: 5.27.5(react@18.2.0)
-  '@types/uuid':
-    specifier: ^9.0.8
-    version: 9.0.8
   '@wagmi/core':
     specifier: ^2.6.10
     version: 2.6.10(@types/react@18.2.64)(react@18.2.0)(typescript@5.3.3)(viem@2.8.13)(zod@3.22.4)
@@ -85,6 +82,9 @@ devDependencies:
   '@types/react-dom':
     specifier: ^18.2.21
     version: 18.2.21
+  '@types/uuid':
+    specifier: ^9.0.8
+    version: 9.0.8
   '@typescript-eslint/eslint-plugin':
     specifier: ^6.21.0
     version: 6.21.0(@typescript-eslint/parser@6.21.0)(eslint@8.57.0)(typescript@5.3.3)
@@ -3645,7 +3645,7 @@ packages:
 
   /@types/uuid@9.0.8:
     resolution: {integrity: sha512-jg+97EGIcY9AGHJJRaaPVgetKDsrTgbRjQ5Msgjh/DQKEFl0DtyRr/VCOyD1T2R1MNeWPK/u7JoGhlDZnKBAfA==}
-    dev: false
+    dev: true
 
   /@types/yargs-parser@21.0.3:
     resolution: {integrity: sha512-I4q9QU9MQv4oEOz4tAHJtNz1cwuLxn2F3xcc2iV5WdqLPpUnj30aUuxt1mAxYTG+oe8CZMV/+6rU4S4gRDzqtQ==}
