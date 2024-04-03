@@ -1,10 +1,11 @@
 import { apiClient, OrderSide } from 'ApiClient'
-import { classNames } from 'utils'
+import { classNames, cleanAndFormatNumberInput } from 'utils'
 import React, { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Widget } from 'components/common/Widget'
 import SubmitButton from 'components/common/SubmitButton'
 import { parseUnits } from 'viem'
+import { isErrorFromAlias } from '@zodios/core'
 
 export default function SubmitOrder({
   baseSymbol,
@@ -31,7 +32,7 @@ export default function SubmitOrder({
     }
   }, [mutation])
 
-  const submitOrder = () => {
+  function submitOrder() {
     if (isMarketOrder) {
       mutation.mutate({
         nonce: crypto.randomUUID(),
@@ -50,22 +51,6 @@ export default function SubmitOrder({
         price: parseUnits(price, 18)
       })
     }
-  }
-
-  function cleanAndFormatNumber(inputValue: string) {
-    let cleanedValue = inputValue
-      .replace(/[^\d.]/g, '') // Remove all non-numeric characters
-      .replace(/^0+(\d)/, '$1') // Leading zeros
-      .replace(/^\./, '0.')
-
-    // multiple decimal points
-    cleanedValue =
-      cleanedValue.split('.')[0] +
-      (cleanedValue.includes('.')
-        ? '.' + cleanedValue.split('.')[1].slice(0, 18)
-        : '')
-
-    return cleanedValue
   }
 
   return (
@@ -110,7 +95,7 @@ export default function SubmitOrder({
                       disabled={isMarketOrder || mutation.isPending}
                       placeholder={'0.0'}
                       onChange={(e) => {
-                        setPrice(cleanAndFormatNumber(e.target.value))
+                        setPrice(cleanAndFormatNumberInput(e.target.value))
                       }}
                       className="bg-black pr-12 text-white disabled:bg-mutedGray"
                     />
@@ -146,7 +131,7 @@ export default function SubmitOrder({
                       value={amount}
                       disabled={mutation.isPending}
                       onChange={(e) => {
-                        setAmount(cleanAndFormatNumber(e.target.value))
+                        setAmount(cleanAndFormatNumberInput(e.target.value))
                       }}
                       className="bg-black pr-12 text-white disabled:bg-mutedGray"
                     />
@@ -166,7 +151,13 @@ export default function SubmitOrder({
               onClick={submitOrder}
               error={
                 mutation.isError
-                  ? `An error occurred: ${mutation.error.message}`
+                  ? isErrorFromAlias(
+                      apiClient.api,
+                      'updateOrder',
+                      mutation.error
+                    )
+                    ? mutation.error.response.data.errors[0].displayMessage
+                    : 'Something went wrong'
                   : ''
               }
               caption={() => {
@@ -185,11 +176,6 @@ export default function SubmitOrder({
           </p>
           <p className="text-center text-white">Fee: 0.05 {quoteSymbol}</p>
           <div className="pt-3 text-center">
-            {mutation.isError ? (
-              <div className="text-red">
-                An error occurred: {mutation.error.message}
-              </div>
-            ) : null}
             {mutation.isSuccess ? (
               <div className="text-green">Order created!</div>
             ) : null}

@@ -13,6 +13,7 @@ import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
 import { TradingSymbol } from 'ApiClient'
 import { useQuery } from '@tanstack/react-query'
+import { cleanAndFormatNumberInput } from 'utils'
 
 export default function DepositModal({
   exchangeContractAddress,
@@ -57,10 +58,6 @@ export default function DepositModal({
   >(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const { writeContractAsync } = useWriteContract()
-
-  function onAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setAmount(e.target.value)
-  }
 
   const canSubmit = (function () {
     if (submitPhase !== null) return false
@@ -141,12 +138,14 @@ export default function DepositModal({
           asyncData={walletBalanceQuery}
           success={(walletBalance) => {
             return (
-              <>
+              <div className="mt-8">
                 <AmountInput
                   value={amount}
                   symbol={symbol.name}
                   disabled={submitPhase !== null}
-                  onChange={onAmountChange}
+                  onChange={(e) =>
+                    setAmount(cleanAndFormatNumberInput(e.target.value))
+                  }
                 />
                 <p className="mt-1 text-center text-sm text-neutralGray">
                   Available balance:{' '}
@@ -172,7 +171,7 @@ export default function DepositModal({
                     }
                   }}
                 />
-              </>
+              </div>
             )
           }}
           error={() => {

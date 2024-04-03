@@ -17,3 +17,19 @@ export function addressDisplay(address: string): string {
 ;(BigInt.prototype as any).toJSON = function () {
   return this.toString()
 }
+
+export function cleanAndFormatNumberInput(inputValue: string) {
+  let cleanedValue = inputValue
+    .replace(/[^\d.]/g, '') // Remove all non-numeric characters
+    .replace(/^0+(\d)/, '$1') // Leading zeros
+    .replace(/^\./, '0.')
+
+  // multiple decimal points
+  cleanedValue =
+    cleanedValue.split('.')[0] +
+    (cleanedValue.includes('.')
+      ? '.' + cleanedValue.split('.')[1].slice(0, 18)
+      : '')
+
+  return cleanedValue
+}
