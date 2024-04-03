@@ -112,5 +112,4 @@ class TestSequencer {
             response2.tradesCreatedList.map { it.price.toBigDecimal().toString() },
         )
     }
-
 }
