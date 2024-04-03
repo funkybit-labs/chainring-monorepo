@@ -8,7 +8,7 @@ import Order from 'components/Screens/HomeScreen/Order'
 import Trades from 'components/Screens/HomeScreen/Trades'
 import { ExponentialBackoff, Websocket, WebsocketBuilder } from 'websocket-ts'
 import { Prices } from 'components/Screens/HomeScreen/Prices'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
 import { loadOrIssueDidToken } from 'Auth'
 
@@ -24,8 +24,7 @@ export default function HomeScreen() {
   const wallet = useAccount()
   const walletAddress = wallet.address
 
-  const wsRef = useRef<Websocket | null>(null)
-  const [wsConnectionId, setWsConnectionId] = useState(0)
+  const [ws, setWs] = useState<Websocket | null>(null)
 
   const config = configQuery.data
   const chainConfig = config?.chains.find((chain) => chain.id == wallet.chainId)
@@ -43,29 +42,22 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const initWebSocket = async () => {
-      if (wsRef.current) {
-        wsRef.current.close()
-      }
-
       const authQuery =
         walletAddress && wallet.status == 'connected'
           ? `?auth=${await loadOrIssueDidToken()}`
           : ''
-      const websocket = new WebsocketBuilder(websocketUrl + authQuery)
-        .withBackoff(new ExponentialBackoff(1000, 4))
-        .build()
 
-      wsRef.current = websocket
-      setWsConnectionId((id) => id + 1)
+      setWs((prevWs) => {
+        if (prevWs != null) {
+          prevWs.close()
+        }
+        return new WebsocketBuilder(websocketUrl + authQuery)
+          .withBackoff(new ExponentialBackoff(1000, 4))
+          .build()
+      })
     }
 
     initWebSocket()
-
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close()
-      }
-    }
   }, [walletAddress, wallet.status])
 
   useEffect(() => {
@@ -74,7 +66,7 @@ export default function HomeScreen() {
     }
   }, [markets, selectedMarket])
 
-  if (markets && selectedMarket && wsRef.current) {
+  if (markets && selectedMarket && ws) {
     return (
       <div className="h-screen bg-gradient-to-b from-lightBackground to-darkBackground">
         <Header
@@ -86,16 +78,10 @@ export default function HomeScreen() {
         <div className="flex h-screen w-screen flex-col gap-4 px-4 pt-24">
           <div className="flex gap-4">
             <div className="flex flex-col">
-              <OrderBook
-                ws={{ socket: wsRef.current, connectionId: wsConnectionId }}
-                marketId={selectedMarket.id}
-              />
+              <OrderBook ws={ws} marketId={selectedMarket.id} />
             </div>
             <div className="flex flex-col">
-              <Prices
-                ws={{ socket: wsRef.current, connectionId: wsConnectionId }}
-                marketId={selectedMarket.id}
-              />
+              <Prices ws={ws} marketId={selectedMarket.id} />
             </div>
             {walletAddress && (
               <div className="flex flex-col">
@@ -108,11 +94,7 @@ export default function HomeScreen() {
           </div>
           <div className="flex gap-4">
             <div className="flex flex-col">
-              {walletAddress && (
-                <Trades
-                  ws={{ socket: wsRef.current, connectionId: wsConnectionId }}
-                />
-              )}
+              {walletAddress && <Trades ws={ws} />}
             </div>
             <div className="flex flex-col">
               {walletAddress && symbols && exchangeContract && (
