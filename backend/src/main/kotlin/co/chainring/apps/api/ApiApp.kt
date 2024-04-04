@@ -66,7 +66,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                 },
             ),
         )
-        .then(HttpTransactionLogger(logger))
+        .then(HttpTransactionLogger())
         .then(RequestProcessingExceptionHandler(logger))
         .then(
             routes(

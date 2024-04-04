@@ -1,55 +1,34 @@
 package co.chainring.apps.api.middleware
 
-import io.github.oshai.kotlinlogging.KLogger
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
+import org.apache.logging.log4j.message.ObjectMessage
 import org.http4k.core.Filter
 import org.http4k.core.HttpTransaction
 import org.http4k.filter.ResponseFilters
 
-@Serializable
-data class HttpRequestLog(
-    val durationMs: Long,
-    val message: String,
-    val req: RequestDetails,
-    val res: ResponseDetails,
-)
-
-@Serializable
-data class RequestDetails(
-    val method: String,
-    val uri: String,
-    val headers: Map<String, String?>,
-    val body: String,
-)
-
-@Serializable
-data class ResponseDetails(
-    val status: String,
-    val headers: Map<String, String?>,
-    val body: String,
-)
-
 object HttpTransactionLogger {
+    private val log4jLogger: Logger = LogManager.getLogger()
 
-    operator fun invoke(logger: KLogger): Filter =
+    operator fun invoke(): Filter =
         ResponseFilters.ReportHttpTransaction { tx: HttpTransaction ->
-            val log = HttpRequestLog(
-                message = "${tx.request.method.name} ${tx.request.uri} returned ${tx.response.status} in ${tx.duration.toMillis()}ms.",
-                durationMs = tx.duration.toMillis(),
-                req = RequestDetails(
-                    method = tx.request.method.name,
-                    uri = tx.request.uri.toString(),
-                    headers = tx.request.headers.toMap(),
-                    body = tx.request.bodyString(),
-                ),
-                res = ResponseDetails(
-                    status = tx.response.status.toString(),
-                    headers = tx.response.headers.toMap(),
-                    body = tx.response.bodyString(),
-                ),
-            )
-
-            logger.info { Json.encodeToString(HttpRequestLog.serializer(), log) }
+            log4jLogger.info(
+                ObjectMessage(
+                    mapOf(
+                        "info" to "${tx.request.method.name} ${tx.request.uri} returned ${tx.response.status} in ${tx.duration.toMillis()}ms.",
+                        "req" to mapOf(
+                            "method" to tx.request.method.name,
+                            "uri" to tx.request.uri.toString(),
+                            "headers" to tx.request.headers.toMap(),
+                            "body" to tx.request.bodyString(),
+                        ),
+                        "res" to mapOf(
+                            "durationMs" to tx.duration.toMillis(),
+                            "status" to tx.response.status.toString(),
+                            "headers" to tx.response.headers.toMap(),
+                            "body" to tx.response.bodyString(),
+                        ),
+                    )
+                ))
         }
 }

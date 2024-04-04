@@ -2,7 +2,12 @@
 <Configuration packages="co.chainring.core.utils" status="INFO">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
-            <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json"/>
+            <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json">
+                <EventTemplateAdditionalField
+                        key="message"
+                        format="JSON"
+                        value='{"$resolver": "message", "stringified": false}'/>/>
+            </JsonTemplateLayout>
         </Console>
         <Async name="AsyncAppender">
             <AppenderRef ref="Console"/>
