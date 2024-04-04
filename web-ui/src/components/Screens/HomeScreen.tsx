@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
 import { loadOrIssueDidToken } from 'Auth'
 import Orders from 'components/Screens/HomeScreen/Orders'
+import TradingSymbols from 'tradingSymbols'
 
 const websocketUrl =
   apiBaseUrl.replace('http:', 'ws:').replace('https:', 'wss:') + '/connect'
@@ -33,7 +34,7 @@ export default function HomeScreen() {
   const exchangeContract = chainConfig?.contracts?.find(
     (c) => c.name == 'Exchange'
   )
-  const symbols = chainConfig?.symbols
+  const symbols = chainConfig ? new TradingSymbols(chainConfig.symbols) : null
 
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
 
@@ -80,13 +81,15 @@ export default function HomeScreen() {
           <div className="flex flex-wrap gap-4">
             <OrderBook ws={ws} marketId={selectedMarket.id} />
             <Prices ws={ws} marketId={selectedMarket.id} />
-            {walletAddress && (
+            {walletAddress && symbols && (
               <SubmitOrder
-                baseSymbol={selectedMarket.baseSymbol}
-                quoteSymbol={selectedMarket.quoteSymbol}
+                baseSymbol={symbols.getByName(selectedMarket.baseSymbol)}
+                quoteSymbol={symbols.getByName(selectedMarket.quoteSymbol)}
               />
             )}
-            {walletAddress && <Orders ws={ws} />}
+            {walletAddress && symbols && (
+              <Orders ws={ws} markets={markets} symbols={symbols} />
+            )}
             {walletAddress && <TradeHistory ws={ws} />}
             {walletAddress && symbols && exchangeContract && (
               <Balances

@@ -1,6 +1,7 @@
 import {
   apiClient,
   IncomingWSMessage,
+  Market,
   Order,
   OrderCreatedSchema,
   OrdersSchema,
@@ -20,8 +21,17 @@ import { classNames, cleanAndFormatNumberInput } from 'utils'
 import { Modal } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
+import TradingSymbols from 'tradingSymbols'
 
-export default function Orders({ ws }: { ws: Websocket }) {
+export default function Orders({
+  ws,
+  markets,
+  symbols
+}: {
+  ws: Websocket
+  markets: Market[]
+  symbols: TradingSymbols
+}) {
   const [orders, setOrders] = useState<Order[]>(() => [])
   const [changedOrder, setChangedOrder] = useState<Order | null>(null)
   const [showChangeModal, setShowChangeModal] = useState<boolean>(false)
@@ -85,11 +95,11 @@ export default function Orders({ ws }: { ws: Websocket }) {
 
   function cancelOrder(id: string) {
     if (confirm('Are you sure you want to cancel your order?')) {
-      mutation.mutate(id)
+      cancelOrderMutation.mutate(id)
     }
   }
 
-  const mutation = useMutation({
+  const cancelOrderMutation = useMutation({
     mutationFn: (id: string) =>
       apiClient.cancelOrder(undefined, { params: { id } }),
     onError: (error) => {
@@ -100,7 +110,7 @@ export default function Orders({ ws }: { ws: Websocket }) {
       )
     },
     onSettled: () => {
-      mutation.reset()
+      cancelOrderMutation.reset()
     }
   })
 
@@ -164,13 +174,13 @@ export default function Orders({ ws }: { ws: Websocket }) {
                             <button
                               className="rounded-lg bg-darkGray px-2 py-0.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray"
                               onClick={() => openEditModal(order)}
-                              disabled={!mutation.isIdle}
+                              disabled={!cancelOrderMutation.isIdle}
                             >
                               Change
                             </button>
                             <button
                               onClick={() => cancelOrder(order.id)}
-                              disabled={!mutation.isIdle}
+                              disabled={!cancelOrderMutation.isIdle}
                             >
                               <TrashIcon className="size-4" />
                             </button>
@@ -188,6 +198,8 @@ export default function Orders({ ws }: { ws: Websocket }) {
             <ChangeOrderModal
               isOpen={showChangeModal}
               order={changedOrder}
+              markets={markets}
+              symbols={symbols}
               close={() => setShowChangeModal(false)}
               onClosed={() => setChangedOrder(null)}
             />
@@ -200,15 +212,23 @@ export default function Orders({ ws }: { ws: Websocket }) {
 
 function ChangeOrderModal({
   order,
+  markets,
+  symbols,
   isOpen,
   close,
   onClosed
 }: {
   order: Order
+  markets: Market[]
+  symbols: TradingSymbols
   isOpen: boolean
   close: () => void
   onClosed: () => void
 }) {
+  const market = markets.find((m) => m.id === order.marketId)!
+  const baseSymbol = symbols.getByName(market.baseSymbol)
+  const quoteSymbol = symbols.getByName(market.quoteSymbol)
+
   const [amount, setAmount] = useState(formatUnits(order.amount, 18))
   const [price, setPrice] = useState(
     order.type == 'limit' ? formatUnits(order.price, 18) : ''
@@ -228,18 +248,16 @@ function ChangeOrderModal({
         ? {
             id: order.id,
             type: 'market',
-            amount: parseUnits(amount, 18)
+            amount: parseUnits(amount, baseSymbol.decimals)
           }
         : {
             id: order.id,
             type: 'limit',
-            amount: parseUnits(amount, 18),
-            price: parseUnits(price, 18)
+            amount: parseUnits(amount, baseSymbol.decimals),
+            price: parseUnits(price, quoteSymbol.decimals)
           }
     )
   }
-
-  const [baseSymbol, quoteSymbol] = order.marketId.split('/')
 
   return (
     <Modal
@@ -256,10 +274,12 @@ function ChangeOrderModal({
             <label className="block">Amount</label>
             <AmountInput
               value={amount}
-              symbol={baseSymbol}
+              symbol={baseSymbol.name}
               disabled={mutation.isPending}
               onChange={(e) =>
-                setAmount(cleanAndFormatNumberInput(e.target.value))
+                setAmount(
+                  cleanAndFormatNumberInput(e.target.value, baseSymbol.decimals)
+                )
               }
             />
           </div>
@@ -269,10 +289,15 @@ function ChangeOrderModal({
               <label className="block">Price</label>
               <AmountInput
                 value={price}
-                symbol={quoteSymbol}
+                symbol={quoteSymbol.name}
                 disabled={mutation.isPending}
                 onChange={(e) =>
-                  setPrice(cleanAndFormatNumberInput(e.target.value))
+                  setPrice(
+                    cleanAndFormatNumberInput(
+                      e.target.value,
+                      quoteSymbol.decimals
+                    )
+                  )
                 }
               />
             </div>

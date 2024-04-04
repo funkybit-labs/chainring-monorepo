@@ -221,7 +221,9 @@ export default function WithdrawalModal({
                   symbol={symbol.name}
                   disabled={submitPhase !== null}
                   onChange={(e) =>
-                    setAmount(cleanAndFormatNumberInput(e.target.value))
+                    setAmount(
+                      cleanAndFormatNumberInput(e.target.value, symbol.decimals)
+                    )
                   }
                 />
 

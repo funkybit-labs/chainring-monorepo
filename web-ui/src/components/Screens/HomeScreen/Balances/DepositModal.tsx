@@ -76,6 +76,7 @@ export default function DepositModal({
   })()
 
   async function onSubmit() {
+    setSubmitError(null)
     const parsedAmount = parseUnits(amount, symbol.decimals)
     if (canSubmit) {
       try {
@@ -144,7 +145,9 @@ export default function DepositModal({
                   symbol={symbol.name}
                   disabled={submitPhase !== null}
                   onChange={(e) =>
-                    setAmount(cleanAndFormatNumberInput(e.target.value))
+                    setAmount(
+                      cleanAndFormatNumberInput(e.target.value, symbol.decimals)
+                    )
                   }
                 />
                 <p className="mt-1 text-center text-sm text-neutralGray">
