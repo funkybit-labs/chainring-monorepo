@@ -19,20 +19,6 @@ data class OrderBookLevelFill(
     val executions: List<Execution>,
 )
 
-@JvmInline
-value class OrderGuid(val value: Long) {
-    override fun toString(): String = value.toString()
-}
-
-fun Long.toOrderGuid() = OrderGuid(this)
-
-@JvmInline
-value class WalletAddress(val value: Long) {
-    override fun toString(): String = value.toString()
-}
-
-fun Long.toWalletAddress() = WalletAddress(this)
-
 data class LevelOrder(
     var guid: OrderGuid,
     var wallet: WalletAddress,
@@ -69,6 +55,7 @@ class OrderBookLevel(var side: BookSide, val price: BigDecimal, val maxOrderCoun
                 executions.add(
                     Execution(
                         counterGuid = curOrder.guid,
+                        counterWallet = curOrder.wallet,
                         amount = curOrder.quantity,
                         price = this.price,
                         counterOrderExhausted = true,
@@ -80,6 +67,7 @@ class OrderBookLevel(var side: BookSide, val price: BigDecimal, val maxOrderCoun
                 executions.add(
                     Execution(
                         counterGuid = curOrder.guid,
+                        counterWallet = curOrder.wallet,
                         amount = remainingAmount,
                         price = this.price,
                         counterOrderExhausted = false,
@@ -101,6 +89,7 @@ class OrderBookLevel(var side: BookSide, val price: BigDecimal, val maxOrderCoun
 
 data class Execution(
     val counterGuid: OrderGuid,
+    val counterWallet: WalletAddress,
     val amount: BigInteger,
     val price: BigDecimal,
     val counterOrderExhausted: Boolean,
