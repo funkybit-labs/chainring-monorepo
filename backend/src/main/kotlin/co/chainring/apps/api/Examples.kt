@@ -21,14 +21,14 @@ import java.math.BigInteger
 
 object Examples {
 
-    val crateMarketOrderRequest = CreateOrderApiRequest.Market(
+    val createMarketOrderRequest = CreateOrderApiRequest.Market(
         nonce = "123",
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
         amount = BigInteger("100"),
     )
 
-    val crateLimitOrderRequest = CreateOrderApiRequest.Limit(
+    val createLimitOrderRequest = CreateOrderApiRequest.Limit(
         nonce = "123",
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,

@@ -54,10 +54,10 @@ object OrderRoutes {
             summary = "Create order"
             security = signedDidTokenHeader
             receiving(
-                requestBody to Examples.crateMarketOrderRequest,
+                requestBody to Examples.createMarketOrderRequest,
             )
             receiving(
-                requestBody to Examples.crateLimitOrderRequest,
+                requestBody to Examples.createLimitOrderRequest,
             )
             returning(
                 Status.CREATED,
