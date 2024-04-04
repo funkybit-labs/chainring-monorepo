@@ -2,11 +2,13 @@ import { getAccount, signMessage } from '@wagmi/core'
 import { wagmiConfig } from 'wagmiConfig'
 import { v4 as uuidv4 } from 'uuid'
 
-export async function loadOrIssueDidToken(): Promise<string> {
+export async function loadAuthToken(
+  forceRefresh: boolean = false
+): Promise<string> {
   const account = getAccount(wagmiConfig)
   if (account.status === 'connected') {
     const existingToken = localStorage.getItem(`did-${account.address}`)
-    if (existingToken) return existingToken
+    if (existingToken && !forceRefresh) return existingToken
 
     const tokenBody = createDidToken(account.address)
     const tokenSignature = await signMessage(wagmiConfig, {

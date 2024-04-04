@@ -1,7 +1,7 @@
 import z from 'zod'
 import { Zodios } from '@zodios/core'
 import { pluginToken } from '@zodios/plugins'
-import { loadOrIssueDidToken } from 'Auth'
+import { loadAuthToken } from 'Auth'
 
 export const apiBaseUrl = import.meta.env.ENV_API_URL
 
@@ -377,10 +377,10 @@ export const apiClient = new Zodios(apiBaseUrl, [
 apiClient.use(
   pluginToken({
     getToken: async () => {
-      return loadOrIssueDidToken()
+      return loadAuthToken()
     },
     renewToken: async () => {
-      return loadOrIssueDidToken()
+      return loadAuthToken(true)
     }
   })
 )
