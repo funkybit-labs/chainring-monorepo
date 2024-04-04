@@ -10,7 +10,7 @@ import { ExponentialBackoff, Websocket, WebsocketBuilder } from 'websocket-ts'
 import { Prices } from 'components/Screens/HomeScreen/Prices'
 import { useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
-import { loadOrIssueDidToken } from 'Auth'
+import { didTokenIsValid, loadOrIssueDidToken } from 'Auth'
 import Orders from 'components/Screens/HomeScreen/Orders'
 import TradingSymbols from 'tradingSymbols'
 import Markets, { Market } from 'markets'
@@ -52,7 +52,12 @@ export default function HomeScreen() {
   }, [configQuery.data, wallet.chainId])
 
   useEffect(() => {
+    let reconnecting = false
+
     const initWebSocket = async () => {
+      if (reconnecting) return
+      reconnecting = true
+
       const authQuery =
         walletAddress && wallet.status == 'connected'
           ? `?auth=${await loadOrIssueDidToken()}`
@@ -64,8 +69,12 @@ export default function HomeScreen() {
         }
         return new WebsocketBuilder(websocketUrl + authQuery)
           .withBackoff(new ExponentialBackoff(1000, 4))
+          .onClose(() => {
+            if (didTokenIsValid()) initWebSocket()
+          })
           .build()
       })
+      reconnecting = false
     }
 
     initWebSocket()
