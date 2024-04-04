@@ -50,6 +50,7 @@ enum SequencerError {
   UnknownRequest = 1;
   MarketExists = 2;
   UnknownMarket = 3;
+  ExceedsLimit = 4;
 }
 
 message SequencerResponse {

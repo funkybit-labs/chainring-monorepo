@@ -7,6 +7,7 @@ import com.google.protobuf.kotlin.toByteString
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.MathContext
+import kotlin.math.pow
 
 fun BigDecimal.toDecimalValue(): DecimalValue = DecimalValue.newBuilder()
     .setScale(this.scale())
@@ -29,3 +30,9 @@ fun IntegerValue.toBigInteger(): BigInteger = BigInteger(
 )
 
 fun sumBigIntegers(a: BigInteger, b: BigInteger) = a + b
+
+fun notional(amount: BigInteger, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int) =
+    (amount.toBigDecimal() * price * 10.0.pow((quoteDecimals - baseDecimals).toDouble()).toBigDecimal()).toBigInteger()
+
+fun notional(amount: IntegerValue, price: DecimalValue, baseDecimals: Int, quoteDecimals: Int) =
+    notional(amount.toBigInteger(), price.toBigDecimal(), baseDecimals, quoteDecimals)

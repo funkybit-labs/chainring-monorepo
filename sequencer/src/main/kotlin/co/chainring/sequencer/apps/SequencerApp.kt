@@ -5,6 +5,7 @@ import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.WalletAddress
 import co.chainring.sequencer.core.inputQueue
+import co.chainring.sequencer.core.notional
 import co.chainring.sequencer.core.outputQueue
 import co.chainring.sequencer.core.sumBigIntegers
 import co.chainring.sequencer.core.toAsset
@@ -13,6 +14,8 @@ import co.chainring.sequencer.core.toBigInteger
 import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.BalanceChange
+import co.chainring.sequencer.proto.Order
+import co.chainring.sequencer.proto.OrderBatch
 import co.chainring.sequencer.proto.OrderChanged
 import co.chainring.sequencer.proto.SequencerError
 import co.chainring.sequencer.proto.SequencerRequest
@@ -78,18 +81,22 @@ class SequencerApp : BaseApp() {
                 if (market == null) {
                     error = SequencerError.UnknownMarket
                 } else {
-                    val result = market.addOrders(orderBatch.ordersToAddList)
-                    ordersChanged = result.ordersChanged
-                    trades = result.createdTrades
-                    balanceChanges = result.balanceChanges
-                    // apply balance changes
-                    balanceChanges.forEach {
-                        balances.getOrPut(it.wallet.toWalletAddress()) {
-                            mutableMapOf()
-                        }.merge(
-                            it.asset.toAsset(),
-                            it.delta.toBigInteger(),
-                        ) { a, b -> BigInteger.ZERO.max(a + b) }
+                    if (withinBalanceLimit(market, orderBatch)) {
+                        val result = market.addOrders(orderBatch.ordersToAddList)
+                        ordersChanged = result.ordersChanged
+                        trades = result.createdTrades
+                        balanceChanges = result.balanceChanges
+                        // apply balance changes
+                        balanceChanges.forEach {
+                            balances.getOrPut(it.wallet.toWalletAddress()) {
+                                mutableMapOf()
+                            }.merge(
+                                it.asset.toAsset(),
+                                it.delta.toBigInteger(),
+                            ) { a, b -> BigInteger.ZERO.max(a + b) }
+                        }
+                    } else {
+                        error = SequencerError.ExceedsLimit
                     }
                 }
                 sequencerResponse {
@@ -160,6 +167,51 @@ class SequencerApp : BaseApp() {
                 }
             }
         }
+    }
+
+    private fun withinBalanceLimit(market: Market, orderBatch: OrderBatch): Boolean {
+        // compute cumulative assets required change from applying all orders in order batch
+        val baseAssetsRequired = mutableMapOf<WalletAddress, BigInteger>()
+        val quoteAssetsRequired = mutableMapOf<WalletAddress, BigInteger>()
+        orderBatch.ordersToAddList.forEach { order ->
+            when (order.type) {
+                Order.Type.LimitSell, Order.Type.MarketSell -> {
+                    baseAssetsRequired.merge(order.wallet.toWalletAddress(), order.amount.toBigInteger(), ::sumBigIntegers)
+                }
+                Order.Type.LimitBuy -> {
+                    quoteAssetsRequired.merge(order.wallet.toWalletAddress(), notional(order.amount, order.price, market.baseDecimals, market.quoteDecimals), ::sumBigIntegers)
+                }
+                Order.Type.MarketBuy -> {
+                    // the quote assets required for a market buy depends on what the clearing price would be
+                    val(clearingPrice, availableQuantity) = market.orderBook.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger())
+                    quoteAssetsRequired.merge(order.wallet.toWalletAddress(), notional(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals), ::sumBigIntegers)
+                }
+                else -> {}
+            }
+        }
+        // TODO CHAIN-81 - handle ordersToChangeList and ordersToCancelList
+
+        baseAssetsRequired.forEach { (wallet, required) ->
+            if (required + market.orderBook.baseAssetsRequired(wallet) > (
+                    balances[wallet]?.get(market.id.baseAsset())
+                        ?: BigInteger.ZERO
+                    )
+            ) {
+                return false
+            }
+        }
+
+        quoteAssetsRequired.forEach { (wallet, required) ->
+            if (required + market.orderBook.quoteAssetsRequired(wallet) > (
+                    balances[wallet]?.get(market.id.quoteAsset())
+                        ?: BigInteger.ZERO
+                    )
+            ) {
+                return false
+            }
+        }
+
+        return true
     }
 
     override fun start() {
