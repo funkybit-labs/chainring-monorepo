@@ -25,6 +25,7 @@ enum class ReasonCode {
 
     OrderNotFound,
     OrderIsClosed,
+    OrderSubmissionFailed,
 
     WithdrawalNotFound,
 

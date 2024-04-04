@@ -2,17 +2,14 @@ package co.chainring.integrationtests.exchange
 
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ReasonCode
-import co.chainring.core.blockchain.BlockchainClientConfig
-import co.chainring.core.model.Address
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.utils.toFundamentalUnits
+import co.chainring.core.utils.toHexBytes
 import co.chainring.integrationtests.testutils.AbnormalApiResponseException
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
-import co.chainring.integrationtests.testutils.TestBlockchainClient
-import co.chainring.integrationtests.testutils.TestWalletKeypair
 import co.chainring.integrationtests.testutils.Wallet
 import co.chainring.integrationtests.testutils.apiError
 import org.awaitility.kotlin.await
@@ -20,6 +17,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
+import org.web3j.crypto.ECKeyPair
 import org.web3j.utils.Numeric
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -29,19 +27,13 @@ import kotlin.test.Test
 @ExtendWith(AppUnderTestRunner::class)
 class EIP712WithdrawalTest {
 
-    private val walletKeypair = TestWalletKeypair(
-        "0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97",
-        Address("0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f"),
-    )
-
-    private val blockchainClient = TestBlockchainClient(BlockchainClientConfig().copy(privateKeyHex = walletKeypair.privateKeyHex))
+    private val walletPrivateKeyHex = "0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97"
 
     @Test
     fun testERC20EIP712Withdrawals() {
-        val apiClient = ApiClient.initWallet()
-        val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.chainId }!!
-        val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.symbols)
-        val decimals = config.symbols.first { it.name == "USDC" }.decimals.toInt()
+        val apiClient = ApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
+        val wallet = Wallet(apiClient)
+        val decimals = wallet.symbols.first { it.name == "USDC" }.decimals.toInt()
 
         // mint some USDC
         val startingUsdcWalletBalance = wallet.getWalletERC20Balance("USDC")
@@ -68,10 +60,9 @@ class EIP712WithdrawalTest {
 
     @Test
     fun testNativeEIP712Withdrawals() {
-        val apiClient = ApiClient.initWallet()
-        val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.chainId }!!
-        val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.symbols)
-        val decimals = config.symbols.first { it.contractAddress == null }.decimals.toInt()
+        val apiClient = ApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
+        val wallet = Wallet(apiClient)
+        val decimals = wallet.symbols.first { it.contractAddress == null }.decimals.toInt()
 
         val startingWalletBalance = wallet.getWalletNativeBalance()
         val startingExchangeBalance = wallet.getExchangeNativeBalance()
@@ -94,9 +85,8 @@ class EIP712WithdrawalTest {
 
     @Test
     fun testERC20EIP712Errors() {
-        val apiClient = ApiClient.initWallet()
-        val config = apiClient.getConfiguration().chains.find { it.id == blockchainClient.chainId }!!
-        val wallet = Wallet(blockchainClient, walletKeypair, config.contracts, config.symbols)
+        val apiClient = ApiClient()
+        val wallet = Wallet(apiClient)
 
         val startingUsdcExchangeBalance = wallet.getExchangeERC20Balance("USDC")
 

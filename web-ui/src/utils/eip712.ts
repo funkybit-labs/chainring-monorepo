@@ -1,5 +1,7 @@
 import { Address } from 'viem'
 
+export const addressZero: Address = '0x0000000000000000000000000000000000000000'
+
 export function getDomain(exchangeContractAddress: Address, chain: number) {
   return {
     name: 'ChainRing Labs',

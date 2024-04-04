@@ -55,7 +55,8 @@ const CreateMarketOrderSchema = z.object({
   type: z.literal('market'),
   marketId: z.string(),
   side: OrderSideSchema,
-  amount: z.coerce.bigint()
+  amount: z.coerce.bigint(),
+  signature: z.string()
 })
 export type CreateMarketOrder = z.infer<typeof CreateMarketOrderSchema>
 
@@ -65,7 +66,8 @@ const CreateLimitOrderSchema = z.object({
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.bigint(),
-  price: z.number()
+  price: z.number(),
+  signature: z.string()
 })
 export type CreateLimitOrder = z.infer<typeof CreateLimitOrderSchema>
 
@@ -121,7 +123,10 @@ const OrderStatusSchema = z.enum([
   'Partial',
   'Filled',
   'Cancelled',
-  'Expired'
+  'Expired',
+  'Failed',
+  'Rejected',
+  'CrossesMarket'
 ])
 export type OrderStatus = z.infer<typeof OrderStatusSchema>
 
@@ -158,7 +163,14 @@ export const OrderSchema = z
     return {
       ...data,
       isFinal: function (): boolean {
-        return ['Filled', 'Cancelled', 'Expired'].includes(data.status)
+        return [
+          'Filled',
+          'Cancelled',
+          'Expired',
+          'Failed',
+          'Rejected',
+          'CrossesMarket'
+        ].includes(data.status)
       }
     }
   })
@@ -197,6 +209,11 @@ const WithdrawalSchema = z.object({
 })
 const WithdrawalApiResponseSchema = z.object({
   withdrawal: WithdrawalSchema
+})
+
+const CreateSequencerDepositSchema = z.object({
+  symbol: z.string(),
+  amount: z.coerce.bigint()
 })
 
 const ApiErrorSchema = z.object({
@@ -289,6 +306,19 @@ export const apiClient = new Zodios(apiBaseUrl, [
     path: '/v1/withdrawals/:id',
     alias: 'getWithdrawal',
     response: WithdrawalApiResponseSchema
+  },
+  {
+    method: 'post',
+    path: '/v1/sequencer-deposits',
+    alias: 'createSequencerDeposit',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: CreateSequencerDepositSchema
+      }
+    ],
+    response: CreateSequencerDepositSchema
   }
 ])
 

@@ -8,6 +8,9 @@ import co.chainring.core.db.DbConfig
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
+import co.chainring.sequencer.apps.GatewayApp
+import co.chainring.sequencer.apps.GatewayConfig
+import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.tasks.fixtures.localDevFixtures
 import co.chainring.tasks.seedDatabase
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -30,6 +33,8 @@ class AppUnderTestRunner : BeforeAllCallback {
                     val logger = KotlinLogging.logger {}
                     private val dbConfig = DbConfig()
                     private val apiApp = ApiApp(ApiAppConfig(httpPort = 9999, dbConfig = dbConfig))
+                    private val gatewayApp = GatewayApp(GatewayConfig(port = 5337))
+                    private val sequencerApp = SequencerApp()
                     private val blockchainClient = TestBlockchainClient(BlockchainClientConfig())
 
                     private val isIntegrationRun = (getenv("INTEGRATION_RUN") ?: "0") == "1"
@@ -42,6 +47,8 @@ class AppUnderTestRunner : BeforeAllCallback {
                                 WithdrawalEntity.findPending().forEach { it.update(WithdrawalStatus.Failed, "restarting test") }
                             }
                             apiApp.updateContracts()
+                            sequencerApp.start()
+                            gatewayApp.start()
                         }
                         // wait for contracts to load
                         await
@@ -60,6 +67,8 @@ class AppUnderTestRunner : BeforeAllCallback {
                     override fun close() {
                         if (!isIntegrationRun) {
                             apiApp.stop()
+                            sequencerApp.stop()
+                            gatewayApp.stop()
                         }
                     }
                 }

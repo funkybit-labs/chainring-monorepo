@@ -21,6 +21,18 @@ val grpcKotlinStubVersion = "1.4.1"
 val grpcProtobufVersion = "1.62.2"
 val protobufKotlinVersion = "4.26.0"
 
+val chronicleJvmArgs = listOf(
+    "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
+    "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+    "--add-exports=jdk.unsupported/sun.misc=ALL-UNNAMED",
+    "--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+    "--add-opens=jdk.compiler/com.sun.tools.javac=ALL-UNNAMED",
+    "--add-opens=java.base/java.lang=ALL-UNNAMED",
+    "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+    "--add-opens=java.base/java.io=ALL-UNNAMED",
+    "--add-opens=java.base/java.util=ALL-UNNAMED"
+)
+
 dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
@@ -38,6 +50,7 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    jvmArgs = chronicleJvmArgs
 }
 tasks {
     // ignore protobuf-generated files (identified by ending with `Kt.kt`)
@@ -49,17 +62,17 @@ tasks {
     }
 }
 kotlin {
-    jvmToolchain(11)
+    jvmToolchain(17)
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 application {
     mainClass.set("co.chainring.sequencer.MainKt")
-    applicationDefaultJvmArgs = listOf("--illegal-access=permit", "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED")
+    applicationDefaultJvmArgs = chronicleJvmArgs
 }
 
 sourceSets {
@@ -122,9 +135,7 @@ jib {
             "-XX:MaxRAMPercentage=90.0",
             "-Dlog4j2.configurationFile=log4j2-container.xml",
             "-Dlog4j2.formatMsgNoLookups=True",
-            "--illegal-access=permit",
-            "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED"
-        )
+        ) + chronicleJvmArgs
 
         creationTime.set("USE_CURRENT_TIMESTAMP")
     }

@@ -18,6 +18,9 @@ repositories {
 val exposedVersion = "0.48.0"
 val http4kVersion = "5.14.1.0"
 val log4j2Version = "2.23.1"
+val grpcKotlinStubVersion = "1.4.1"
+val grpcProtobufVersion = "1.62.2"
+val protobufKotlinVersion = "4.26.0"
 
 dependencies {
     testImplementation(kotlin("test"))
@@ -62,6 +65,13 @@ dependencies {
     implementation("io.github.novacrypto:Base58:2022.01.17")
 
     testImplementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
+
+    implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinStubVersion")
+    implementation("io.grpc:grpc-protobuf:$grpcProtobufVersion")
+    implementation("com.google.protobuf:protobuf-kotlin:$protobufKotlinVersion")
+    implementation("io.grpc:grpc-netty:$grpcProtobufVersion")
+
+    implementation(project(":sequencer"))
 }
 
 tasks.test {

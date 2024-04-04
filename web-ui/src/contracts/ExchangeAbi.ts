@@ -124,6 +124,21 @@ export default [
     },
     {
         "type": "function",
+        "name": "feeAccount",
+        "inputs": [
+            
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
         "name": "getVersion",
         "inputs": [
             
@@ -145,6 +160,16 @@ export default [
                 "name": "_submitter",
                 "type": "address",
                 "internalType": "address"
+            },
+            {
+                "name": "_feeAccount",
+                "type": "address",
+                "internalType": "address"
+            },
+            {
+                "name": "_nativePrecision",
+                "type": "uint8",
+                "internalType": "uint8"
             }
         ],
         "outputs": [
@@ -233,6 +258,21 @@ export default [
     },
     {
         "type": "function",
+        "name": "setFeeAccount",
+        "inputs": [
+            {
+                "name": "_feeAccount",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            
+        ],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
         "name": "setSubmitter",
         "inputs": [
             {
@@ -272,6 +312,25 @@ export default [
                 "name": "",
                 "type": "address",
                 "internalType": "address"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "tokenPrecision",
+        "inputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "uint8",
+                "internalType": "uint8"
             }
         ],
         "stateMutability": "view"
@@ -403,6 +462,104 @@ export default [
                 "type": "uint64",
                 "indexed": false,
                 "internalType": "uint64"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "OrderFilled",
+        "inputs": [
+            {
+                "name": "digest",
+                "type": "bytes32",
+                "indexed": true,
+                "internalType": "bytes32"
+            },
+            {
+                "name": "sender",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address"
+            },
+            {
+                "name": "baseToken",
+                "type": "address",
+                "indexed": false,
+                "internalType": "address"
+            },
+            {
+                "name": "quoteToken",
+                "type": "address",
+                "indexed": false,
+                "internalType": "address"
+            },
+            {
+                "name": "isTaker",
+                "type": "bool",
+                "indexed": false,
+                "internalType": "bool"
+            },
+            {
+                "name": "order",
+                "type": "tuple",
+                "indexed": false,
+                "internalType": "struct IExchange.Order",
+                "components": [
+                    {
+                        "name": "sender",
+                        "type": "address",
+                        "internalType": "address"
+                    },
+                    {
+                        "name": "amount",
+                        "type": "int256",
+                        "internalType": "int256"
+                    },
+                    {
+                        "name": "price",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    },
+                    {
+                        "name": "nonce",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    }
+                ]
+            },
+            {
+                "name": "executionInfo",
+                "type": "tuple",
+                "indexed": false,
+                "internalType": "struct IExchange.ExecutionInfo",
+                "components": [
+                    {
+                        "name": "filledAmount",
+                        "type": "int256",
+                        "internalType": "int256"
+                    },
+                    {
+                        "name": "executionPrice",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    },
+                    {
+                        "name": "fee",
+                        "type": "uint256",
+                        "internalType": "uint256"
+                    },
+                    {
+                        "name": "baseAdjustment",
+                        "type": "int256",
+                        "internalType": "int256"
+                    },
+                    {
+                        "name": "quoteAdjustment",
+                        "type": "int256",
+                        "internalType": "int256"
+                    }
+                ]
             }
         ],
         "anonymous": false

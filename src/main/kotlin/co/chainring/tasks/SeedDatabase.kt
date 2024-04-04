@@ -45,7 +45,7 @@ fun seedDatabase(fixtures: Fixtures, chainRpcUrl: String, privateKey: String) {
              SymbolEntity.findById(SymbolId(symbol.chainId, symbol.name))
                  ?: run {
                      val contractAddress = if (!symbol.isNative && symbol.contractAddress == null) {
-                         val contractAddress = blockchainClient.deployMockERC20(symbol.name)
+                         val contractAddress = blockchainClient.deployMockERC20(symbol.name, symbol.decimals.toBigInteger())
                          println("Deployed MockERC20 contract for ${symbol.name} to address $contractAddress")
                          contractAddress
                      } else {
@@ -56,7 +56,7 @@ fun seedDatabase(fixtures: Fixtures, chainRpcUrl: String, privateKey: String) {
                          symbol.name,
                          symbol.chainId,
                          contractAddress,
-                         decimals = 18u,
+                         decimals = symbol.decimals.toUByte(),
                          description = ""
                      ).also {
                          it.flush()
@@ -143,13 +143,14 @@ private class BlockchainClient(config: BlockchainClientConfig = BlockchainClient
         web3j = web3j,
     )
 
-    fun deployMockERC20(tokenName: String): Address {
+    fun deployMockERC20(tokenName: String, decimals: BigInteger): Address {
         val contract = MockERC20.deploy(
             web3j,
             transactionManager,
             gasProvider,
             "$tokenName Coin",
-            tokenName
+            tokenName,
+            decimals
         ).send()
         return Address(contract.contractAddress)
     }

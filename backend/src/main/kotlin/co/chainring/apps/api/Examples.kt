@@ -7,6 +7,7 @@ import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.WithdrawTx
 import co.chainring.apps.api.model.Withdrawal
 import co.chainring.core.model.Address
+import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
@@ -26,6 +27,7 @@ object Examples {
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
         amount = BigInteger("100"),
+        signature = EvmSignature.emptySignature(),
     )
 
     val createLimitOrderRequest = CreateOrderApiRequest.Limit(
@@ -34,6 +36,7 @@ object Examples {
         side = OrderSide.Buy,
         amount = BigInteger("100"),
         price = BigDecimal("100"),
+        signature = EvmSignature.emptySignature(),
     )
 
     val updateMarketOrderRequest = UpdateOrderApiRequest.Market(

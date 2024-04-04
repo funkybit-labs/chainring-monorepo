@@ -20,7 +20,8 @@ data class Fixtures(
         val name: String,
         val chainId: ChainId,
         val isNative: Boolean,
-        val contractAddress: Address? = null
+        val decimals: Int,
+        val contractAddress: Address? = null,
     )
 
     data class SymbolId(val name: String, val chainId: ChainId)
@@ -45,11 +46,11 @@ val localDevFixtures = Fixtures(
     ),
     symbols = listOf(
         // BTC is the native token since we would be on Bitcoin L2
-        Fixtures.Symbol(name = "BTC", chainId = chainringDevChainId, isNative = true),
+        Fixtures.Symbol(name = "BTC", chainId = chainringDevChainId, isNative = true, 18),
         // ETH is bridged and represented by an ERC20 token
-        Fixtures.Symbol(name = "ETH", chainId = chainringDevChainId, isNative = false),
-        Fixtures.Symbol(name = "USDC", chainId = chainringDevChainId, isNative = false),
-        Fixtures.Symbol(name = "DAI", chainId = chainringDevChainId, isNative = false)
+        Fixtures.Symbol(name = "ETH", chainId = chainringDevChainId, isNative = false, 18),
+        Fixtures.Symbol(name = "USDC", chainId = chainringDevChainId, isNative = false, 6),
+        Fixtures.Symbol(name = "DAI", chainId = chainringDevChainId, isNative = false, 18)
     ),
     markets = listOf(
         Fixtures.Market(
@@ -68,7 +69,7 @@ val localDevFixtures = Fixtures(
             balances = mapOf(
                 Fixtures.SymbolId("BTC", chainringDevChainId) to BigDecimal("10").toFundamentalUnits(18),
                 Fixtures.SymbolId("ETH", chainringDevChainId) to BigDecimal("100").toFundamentalUnits(18),
-                Fixtures.SymbolId("USDC", chainringDevChainId) to BigDecimal("100000").toFundamentalUnits(18),
+                Fixtures.SymbolId("USDC", chainringDevChainId) to BigDecimal("100000").toFundamentalUnits(6),
                 Fixtures.SymbolId("DAI", chainringDevChainId) to BigDecimal("100000").toFundamentalUnits(18),
             )
         ),
@@ -78,7 +79,7 @@ val localDevFixtures = Fixtures(
             balances = mapOf(
                 Fixtures.SymbolId("BTC", chainringDevChainId) to BigDecimal("10").toFundamentalUnits(18),
                 Fixtures.SymbolId("ETH", chainringDevChainId) to BigDecimal("100").toFundamentalUnits(18),
-                Fixtures.SymbolId("USDC", chainringDevChainId) to BigDecimal("100000").toFundamentalUnits(18),
+                Fixtures.SymbolId("USDC", chainringDevChainId) to BigDecimal("100000").toFundamentalUnits(6),
                 Fixtures.SymbolId("DAI", chainringDevChainId) to BigDecimal("100000").toFundamentalUnits(18),
             )
         )

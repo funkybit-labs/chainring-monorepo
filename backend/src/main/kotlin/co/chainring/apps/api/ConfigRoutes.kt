@@ -89,7 +89,7 @@ object ConfigRoutes {
                                             name = it.name,
                                             description = it.description,
                                             contractAddress = it.contractAddress,
-                                            decimals = 18u,
+                                            decimals = it.decimals,
                                         )
                                     },
                                 )

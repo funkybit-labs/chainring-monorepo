@@ -1,51 +1,62 @@
 package co.chainring.integrationtests.testutils
 
+import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.DeployedContract
 import co.chainring.apps.api.model.Symbol
 import co.chainring.apps.api.model.WithdrawTx
 import co.chainring.contracts.generated.Exchange
+import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.utils.toFundamentalUnits
+import co.chainring.core.utils.toHex
+import org.web3j.crypto.ECKeyPair
+import org.web3j.crypto.Keys
 import org.web3j.protocol.core.methods.response.TransactionReceipt
+import java.math.BigDecimal
 import java.math.BigInteger
 
-data class TestWalletKeypair(
-    val privateKeyHex: String,
-    val address: Address,
-)
-
 class Wallet(
-    val blockchainClient: TestBlockchainClient,
-    val walletKeypair: TestWalletKeypair,
+    val walletKeypair: ECKeyPair,
     val contracts: List<DeployedContract>,
     val symbols: List<Symbol>,
 ) {
+
+    companion object {
+        operator fun invoke(apiClient: ApiClient): Wallet {
+            val config = apiClient.getConfiguration().chains.first()
+            return Wallet(apiClient.ecKeyPair, config.contracts, config.symbols)
+        }
+    }
+
+    val blockchainClient = TestBlockchainClient(BlockchainClientConfig().copy(privateKeyHex = walletKeypair.privateKey.toByteArray().toHex()))
+    val address = Address("0x" + Keys.getAddress(walletKeypair))
 
     private val exchangeContractAddress = contracts.first { it.name == ContractType.Exchange.name }.address
     private val exchangeContract: Exchange = blockchainClient.loadExchangeContract(exchangeContractAddress)
 
     fun getWalletERC20Balance(symbol: String): BigInteger {
-        return loadErc20Contract(symbol).balanceOf(walletKeypair.address.value).send()
+        return loadErc20Contract(symbol).balanceOf(address.value).send()
     }
 
     fun mintERC20(symbol: String, amount: BigInteger) {
-        loadErc20Contract(symbol).mint(walletKeypair.address.value, amount).send()
+        loadErc20Contract(symbol).mint(address.value, amount).send()
     }
 
     fun getWalletNativeBalance(): BigInteger {
-        return blockchainClient.getNativeBalance(walletKeypair.address)
+        return blockchainClient.getNativeBalance(address)
     }
 
     fun getExchangeERC20Balance(symbol: String): BigInteger {
-        return exchangeContract.balances(walletKeypair.address.value, erc20TokenAddress(symbol)).send()
+        return exchangeContract.balances(address.value, erc20TokenAddress(symbol)).send()
     }
 
     fun getExchangeNativeBalance(): BigInteger {
-        return exchangeContract.nativeBalances(walletKeypair.address.value).send()
+        return exchangeContract.nativeBalances(address.value).send()
     }
 
     fun depositERC20(symbol: String, amount: BigInteger): TransactionReceipt {
@@ -59,13 +70,34 @@ class Wallet(
 
     fun signWithdraw(symbol: String?, amount: BigInteger, nonceOverride: BigInteger? = null): CreateWithdrawalApiRequest {
         val nonce = nonceOverride ?: getNonce()
-        val tx = EIP712Transaction.WithdrawTx(walletKeypair.address, symbol?.let { Address(erc20TokenAddress(symbol)) }, amount, nonce.toLong(), EvmSignature.emptySignature())
+        val tx = EIP712Transaction.WithdrawTx(address, symbol?.let { Address(erc20TokenAddress(symbol)) }, amount, nonce.toLong(), EvmSignature.emptySignature())
         val signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress))
         return CreateWithdrawalApiRequest(WithdrawTx(tx.sender, tx.token, tx.amount, tx.nonce), signature)
     }
 
+    fun signOrder(request: CreateOrderApiRequest.Limit): CreateOrderApiRequest.Limit {
+        val (baseSymbol, quoteSymbol) = request.marketId.value.split("/")
+        val tx = request.toEip712Transaction(
+            address,
+            symbols.first { it.name == baseSymbol }.contractAddress ?: Address.zero,
+            symbols.first { it.name == quoteSymbol }.contractAddress ?: Address.zero,
+            symbols.first { it.name == quoteSymbol }.decimals.toInt(),
+        )
+        return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
+    }
+
+    fun signOrder(request: CreateOrderApiRequest.Market): CreateOrderApiRequest.Market {
+        val (baseSymbol, quoteSymbol) = request.marketId.value.split("/")
+        val tx = request.toEip712Transaction(
+            address,
+            symbols.first { it.name == baseSymbol }.contractAddress ?: Address.zero,
+            symbols.first { it.name == quoteSymbol }.contractAddress ?: Address.zero,
+        )
+        return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
+    }
+
     fun getNonce(): BigInteger {
-        return exchangeContract.nonces(walletKeypair.address.value).send()
+        return exchangeContract.nonces(address.value).send()
     }
 
     fun withdrawNative(amount: BigInteger): TransactionReceipt {
@@ -75,6 +107,12 @@ class Wallet(
     fun depositNative(amount: BigInteger): TransactionReceipt {
         return blockchainClient.depositNative(exchangeContractAddress, amount)
     }
+
+    fun formatAmount(amount: String, symbol: String): BigInteger {
+        return BigDecimal(amount).toFundamentalUnits(decimals(symbol))
+    }
+
+    fun decimals(symbol: String): Int = symbols.first { it.name == symbol }.decimals.toInt()
 
     private fun loadErc20Contract(symbol: String) = blockchainClient.loadERC20Mock(erc20TokenAddress(symbol))
 

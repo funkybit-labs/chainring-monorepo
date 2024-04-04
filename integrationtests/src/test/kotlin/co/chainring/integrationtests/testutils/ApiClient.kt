@@ -5,6 +5,7 @@ import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ApiErrors
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
+import co.chainring.apps.api.model.CreateSequencerDeposit
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
@@ -39,16 +40,10 @@ val applicationJson = "application/json".toMediaType()
 
 class AbnormalApiResponseException(val response: Response) : Exception()
 
-class ApiClient(val ecKeyPair: ECKeyPair?) {
-    val authToken: String? = ecKeyPair?.let { issueAuthToken(ecKeyPair = it) }
+class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
+    val authToken: String = issueAuthToken(ecKeyPair = ecKeyPair)
 
     companion object {
-        fun initWallet(
-            ecKeyPair: ECKeyPair? = Keys.createEcKeyPair(),
-        ): ApiClient {
-            return ApiClient(ecKeyPair)
-        }
-
         fun listOrders(authHeadersProvider: (Request) -> Headers): OrdersApiResponse {
             val httpResponse = execute(
                 Request.Builder()
@@ -228,6 +223,21 @@ class ApiClient(val ecKeyPair: ECKeyPair?) {
 
         return when (httpResponse.code) {
             HttpURLConnection.HTTP_OK -> json.decodeFromString<WithdrawalApiResponse>(httpResponse.body?.string()!!)
+            else -> throw AbnormalApiResponseException(httpResponse)
+        }
+    }
+
+    fun createSequencerDeposit(apiRequest: CreateSequencerDeposit) {
+        val httpResponse = execute(
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/sequencer-deposits")
+                .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        )
+
+        when (httpResponse.code) {
+            HttpURLConnection.HTTP_CREATED -> {}
             else -> throw AbnormalApiResponseException(httpResponse)
         }
     }

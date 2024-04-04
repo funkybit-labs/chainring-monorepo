@@ -17,6 +17,9 @@ val exposedVersion = "0.48.0"
 val log4j2Version = "2.23.1"
 val kotlinxSerializationVersion = "1.6.3"
 val http4kVersion = "5.14.1.0"
+val grpcKotlinStubVersion = "1.4.1"
+val grpcProtobufVersion = "1.62.2"
+val protobufKotlinVersion = "4.26.0"
 
 dependencies {
     testImplementation(kotlin("test"))
@@ -51,12 +54,29 @@ dependencies {
     implementation("org.http4k:http4k-format-kotlinx-serialization:$http4kVersion")
     implementation("org.http4k:http4k-client-websocket:$http4kVersion")
 
+    implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinStubVersion")
+    implementation("io.grpc:grpc-protobuf:$grpcProtobufVersion")
+    implementation("com.google.protobuf:protobuf-kotlin:$protobufKotlinVersion")
+    implementation("io.grpc:grpc-netty:$grpcProtobufVersion")
+
     implementation(project(":backend"))
+    implementation(project(":sequencer"))
     testImplementation(project(mapOf("path" to ":")))
 }
 
 tasks.test {
     useJUnitPlatform()
+    jvmArgs = listOf(
+        "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
+        "--add-exports=jdk.unsupported/sun.misc=ALL-UNNAMED",
+        "--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+        "--add-opens=jdk.compiler/com.sun.tools.javac=ALL-UNNAMED",
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+        "--add-opens=java.base/java.io=ALL-UNNAMED",
+        "--add-opens=java.base/java.util=ALL-UNNAMED"
+    )
 }
 
 tasks.withType<KotlinCompile> {

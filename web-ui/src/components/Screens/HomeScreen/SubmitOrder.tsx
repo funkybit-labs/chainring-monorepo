@@ -4,16 +4,25 @@ import React, { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Widget } from 'components/common/Widget'
 import SubmitButton from 'components/common/SubmitButton'
-import { parseUnits } from 'viem'
+import { Address, parseUnits } from 'viem'
 import { isErrorFromAlias } from '@zodios/core'
+import { useConfig, useSignTypedData } from 'wagmi'
+import { addressZero, getDomain } from 'utils/eip712'
 
 export default function SubmitOrder({
+  exchangeContractAddress,
+  walletAddress,
   baseSymbol,
   quoteSymbol
 }: {
+  exchangeContractAddress: Address
+  walletAddress: Address
   baseSymbol: TradingSymbol
   quoteSymbol: TradingSymbol
 }) {
+  const config = useConfig()
+  const { signTypedDataAsync } = useSignTypedData()
+
   const [side, setSide] = useState<OrderSide>('Buy')
   const [price, setPrice] = useState('')
   const [amount, setAmount] = useState('')
@@ -32,23 +41,58 @@ export default function SubmitOrder({
     }
   }, [mutation])
 
-  function submitOrder() {
+  async function submitOrder() {
+    const nonce = crypto.randomUUID().replaceAll('-', '')
+    const bigIntAmount = parseUnits(amount, baseSymbol.decimals)
+    const signature = await signTypedDataAsync({
+      types: {
+        EIP712Domain: [
+          { name: 'name', type: 'string' },
+          { name: 'version', type: 'string' },
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' }
+        ],
+        Order: [
+          { name: 'sender', type: 'address' },
+          { name: 'baseToken', type: 'address' },
+          { name: 'quoteToken', type: 'address' },
+          { name: 'amount', type: 'int256' },
+          { name: 'price', type: 'uint256' },
+          { name: 'nonce', type: 'int256' }
+        ]
+      },
+      domain: getDomain(exchangeContractAddress, config.state.chainId),
+      primaryType: 'Order',
+      message: {
+        sender: walletAddress,
+        baseToken: baseSymbol.contractAddress ?? addressZero,
+        quoteToken: quoteSymbol.contractAddress ?? addressZero,
+        amount: side == 'Buy' ? bigIntAmount : -bigIntAmount,
+        price: isMarketOrder
+          ? BigInt(0)
+          : parseUnits(price, baseSymbol.decimals),
+        nonce: BigInt('0x' + nonce)
+      }
+    })
+
     if (isMarketOrder) {
       mutation.mutate({
-        nonce: crypto.randomUUID(),
+        nonce: nonce,
         marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
         type: 'market',
         side: side,
-        amount: parseUnits(amount, baseSymbol.decimals)
+        amount: parseUnits(amount, baseSymbol.decimals).valueOf(),
+        signature: signature
       })
     } else {
       mutation.mutate({
-        nonce: crypto.randomUUID(),
+        nonce: nonce,
         marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
         type: 'limit',
         side: side,
         amount: parseUnits(amount, baseSymbol.decimals),
-        price: Number(price)
+        price: Number(price),
+        signature: signature
       })
     }
   }

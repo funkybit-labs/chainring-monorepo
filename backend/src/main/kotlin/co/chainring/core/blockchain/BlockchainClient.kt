@@ -4,10 +4,11 @@ import co.chainring.contracts.generated.ERC1967Proxy
 import co.chainring.contracts.generated.Exchange
 import co.chainring.contracts.generated.UUPSUpgradeable
 import co.chainring.core.evm.EIP712Transaction
-import co.chainring.core.evm.EIP712TransactionType
 import co.chainring.core.model.Address
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
+import co.chainring.core.model.db.SymbolEntity
+import co.chainring.core.model.db.TradeEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -39,6 +40,10 @@ data class BlockchainClientConfig(
         System.getenv(
             "EVM_SUBMITTER_PRIVATE_KEY",
         ) ?: "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba",
+    val feeAccountAddress: String =
+        System.getenv(
+            "EVM_FEE_ACCOUNT_ADDRESS",
+        ) ?: "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
     val deploymentPollingIntervalInMs: Long = longValue("DEPLOYMENT_POLLING_INTERVAL_MS", 1000L),
     val maxPollingAttempts: Long = longValue("MAX_POLLING_ATTEMPTS", 120L),
     val contractCreationLimit: BigInteger = bigIntegerValue("CONTRACT_CREATION_LIMIT", BigInteger.valueOf(5_000_000)),
@@ -89,7 +94,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
         receiptProcessor,
     )
     private var workerThread: Thread? = null
-    private val txQueue = LinkedBlockingQueue<EIP712Transaction>(10)
+    private val txQueue = LinkedBlockingQueue<List<EIP712Transaction>>(10)
 
     protected val gasProvider = GasProvider(
         contractCreationLimit = config.contractCreationLimit,
@@ -187,7 +192,20 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
                 logger.debug { "Deploying initialize for $contractType" }
                 when (contractType) {
                     ContractType.Exchange -> {
-                        Exchange.load(proxyContract.contractAddress, web3j, transactionManager, gasProvider).initialize(submitterCredentials.address).send()
+                        Exchange.load(
+                            proxyContract.contractAddress,
+                            web3j,
+                            transactionManager,
+                            gasProvider,
+                        ).initialize(
+                            submitterCredentials.address,
+                            config.feeAccountAddress,
+                            transaction {
+                                SymbolEntity.forChain(chainId)
+                                    .firstOrNull { it.contractAddress == null }?.decimals?.toInt()?.toBigInteger()
+                                    ?: BigInteger("18")
+                            },
+                        ).send()
                     }
                 }
                 Address(proxyContract.contractAddress)
@@ -211,49 +229,81 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
 
     fun getContractAddress(contractType: ContractType) = contractMap[contractType]
 
-    fun queueTransaction(tx: EIP712Transaction) {
-        txQueue.put(tx)
+    fun queueTransactions(txs: List<EIP712Transaction>) {
+        if (txs.isNotEmpty()) {
+            txQueue.put(txs)
+        }
     }
 
     fun startTransactionSubmitter(pendingTransactions: List<EIP712Transaction>) {
         logger.debug { "Starting transaction submitter" }
         val exchange = Exchange.load(contractMap[ContractType.Exchange]!!.value, web3j, submitterTransactionManager, gasProvider)
         workerThread = thread(start = true, name = "transaction-processor", isDaemon = true) {
-            logger.debug { "Transaction submitter thread starting" }
-            while (true) {
-                val tx = txQueue.take()
-                val error = try {
-                    logger.debug { "Submitting transaction $tx" }
-                    try {
-                        exchange.submitTransactions(listOf(tx.getTxData())).send()
-                        null
-                    } catch (e: org.web3j.protocol.exceptions.TransactionException) {
-                        e.transactionReceipt.get().revertReason
+            try {
+                logger.debug { "Transaction submitter thread starting" }
+                while (true) {
+                    val txs = txQueue.take()
+
+                    val error = try {
+                        logger.debug { "Submitting ${txs.size} transactions" }
+                        try {
+                            exchange.submitTransactions(txs.map { it.getTxData() }).send()
+                            null
+                        } catch (e: org.web3j.protocol.exceptions.TransactionException) {
+                            e.transactionReceipt.get().revertReason
+                        }
+                    } catch (e: Exception) {
+                        logger.error(e) { "Unhandled exception submitting tx" }
+                        "Unhandled error ${e.message}"
                     }
-                } catch (e: Exception) {
-                    logger.error(e) { "Unhandled exception submitting tx" }
-                    "Unhandled error ${e.message}"
-                }
-                try {
-                    logger.debug { "Finished processing tx - ${error?.let { "failed with $error" } ?: "success"}" }
-                    when (tx.getTransactionType()) {
-                        EIP712TransactionType.Withdraw -> {
-                            transaction {
-                                WithdrawalEntity.findPendingByWalletAndNonce(tx.sender, tx.nonce)
-                                    ?.update(
-                                        status = error?.let { WithdrawalStatus.Failed }
-                                            ?: WithdrawalStatus.Complete,
-                                        error = error,
-                                    )
+                    // TODO when processing a batch need to determine which ones failed, remove it and retry
+                    txs.forEach { tx ->
+                        try {
+                            logger.debug { "Finished processing tx - ${error?.let { "failed with $error" } ?: "success"}" }
+                            when (tx) {
+                                is EIP712Transaction.WithdrawTx -> {
+                                    transaction {
+                                        WithdrawalEntity.findPendingByWalletAndNonce(
+                                            tx.sender,
+                                            tx.nonce,
+                                        )
+                                            ?.update(
+                                                status = error?.let { WithdrawalStatus.Failed }
+                                                    ?: WithdrawalStatus.Complete,
+                                                error = error,
+                                            )
+                                    }
+                                }
+
+                                is EIP712Transaction.Order -> {}
+
+                                is EIP712Transaction.Trade -> {
+                                    transaction {
+                                        TradeEntity.findById(tx.tradeId)?.let { tradeEntity ->
+                                            if (error != null) {
+                                                logger.error { "settlement failed for ${tx.tradeId} - error is <$error>" }
+                                                tradeEntity.failSettlement()
+                                            } else {
+                                                logger.debug { "settlement completed for ${tx.tradeId}" }
+                                                tradeEntity.settle()
+                                            }
+                                        }
+                                    }
+                                }
                             }
+                        } catch (e: Exception) {
+                            logger.error(e) { "Unhandled exception updating tx" }
                         }
                     }
-                } catch (e: Exception) {
-                    logger.error(e) { "Unhandled exception updating tx" }
                 }
+            } catch (ie: InterruptedException) {
+                logger.warn { "existing blockchain handler" }
+                return@thread
+            } catch (e: Exception) {
+                logger.error(e) { "Unhandled exception submitting tx" }
             }
         }
-        pendingTransactions.forEach { txQueue.put(it) }
+        txQueue.put(pendingTransactions)
     }
 
     fun stopTransactionSubmitter() {
