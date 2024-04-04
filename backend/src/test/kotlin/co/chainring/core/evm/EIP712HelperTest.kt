@@ -3,6 +3,7 @@ package co.chainring.core.evm
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.OrderId
 import org.junit.jupiter.api.Test
 import org.web3j.crypto.Credentials
 import java.math.BigInteger
