@@ -28,7 +28,8 @@ object HttpTransactionLogger {
                             "headers" to tx.response.headers.toMap(),
                             "body" to tx.response.bodyString(),
                         ),
-                    )
-                ))
+                    ),
+                ),
+            )
         }
 }
