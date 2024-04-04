@@ -75,6 +75,27 @@ const CreateOrderRequestSchema = z.discriminatedUnion('type', [
 ])
 export type CreateOrderRequest = z.infer<typeof CreateOrderRequestSchema>
 
+const UpdateMarketOrderSchema = z.object({
+  type: z.literal('market'),
+  id: z.string(),
+  amount: z.coerce.bigint()
+})
+export type UpdateMarketOrder = z.infer<typeof UpdateMarketOrderSchema>
+
+const UpdateLimitOrderSchema = z.object({
+  type: z.literal('limit'),
+  id: z.string(),
+  amount: z.coerce.bigint(),
+  price: z.coerce.bigint()
+})
+export type UpdateLimitOrder = z.infer<typeof UpdateLimitOrderSchema>
+
+const UpdateOrderRequestSchema = z.discriminatedUnion('type', [
+  UpdateMarketOrderSchema,
+  UpdateLimitOrderSchema
+])
+export type UpdateOrderRequest = z.infer<typeof UpdateOrderRequestSchema>
+
 const ExecutionRoleSchema = z.enum(['Maker', 'Taker'])
 export type ExecutionRole = z.infer<typeof ExecutionRoleSchema>
 
@@ -95,10 +116,19 @@ const OrderTimingSchema = z.object({
 })
 export type OrderTiming = z.infer<typeof OrderTimingSchema>
 
+const OrderStatusSchema = z.enum([
+  'Open',
+  'Partial',
+  'Filled',
+  'Cancelled',
+  'Expired'
+])
+export type OrderStatus = z.infer<typeof OrderStatusSchema>
+
 const MarketOrderSchema = z.object({
   id: z.string(),
   type: z.literal('market'),
-  status: z.string(),
+  status: OrderStatusSchema,
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
@@ -111,7 +141,7 @@ export type MarketOrder = z.infer<typeof MarketOrderSchema>
 const LimitOrderSchema = z.object({
   id: z.string(),
   type: z.literal('limit'),
-  status: z.string(),
+  status: OrderStatusSchema,
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
@@ -122,10 +152,17 @@ const LimitOrderSchema = z.object({
 })
 export type LimitOrder = z.infer<typeof LimitOrderSchema>
 
-const OrderSchema = z.discriminatedUnion('type', [
-  MarketOrderSchema,
-  LimitOrderSchema
-])
+const OrderSchema = z
+  .discriminatedUnion('type', [MarketOrderSchema, LimitOrderSchema])
+  .transform((data) => {
+    return {
+      ...data,
+      isFinal: function (): boolean {
+        return ['Filled', 'Cancelled', 'Expired'].includes(data.status)
+      }
+    }
+  })
+export type Order = z.infer<typeof OrderSchema>
 
 const OrderBookEntrySchema = z.object({
   price: z.string(),
@@ -154,9 +191,6 @@ const LastTradeSchema = z.object({
   direction: DirectionSchema
 })
 export type LastTrade = z.infer<typeof LastTradeSchema>
-
-const IncomingWSMessageTypeSchema = z.enum(['OrderBook', 'Prices'])
-export type IncomingWSMessageType = z.infer<typeof IncomingWSMessageTypeSchema>
 
 export const OrderBookSchema = z.object({
   type: z.literal('OrderBook'),
@@ -190,6 +224,24 @@ export const TradesSchema = z.object({
 })
 export type Trades = z.infer<typeof TradesSchema>
 
+export const OrdersSchema = z.object({
+  type: z.literal('Orders'),
+  orders: z.array(OrderSchema)
+})
+export type Orders = z.infer<typeof OrdersSchema>
+
+export const OrderCreatedSchema = z.object({
+  type: z.literal('OrderCreated'),
+  order: OrderSchema
+})
+export type OrderCreated = z.infer<typeof OrderCreatedSchema>
+
+export const OrderUpdatedSchema = z.object({
+  type: z.literal('OrderUpdated'),
+  order: OrderSchema
+})
+export type OrderUpdated = z.infer<typeof OrderUpdatedSchema>
+
 const WithdrawTxSchema = z.object({
   sender: AddressSchema,
   token: AddressSchema.nullable(),
@@ -220,11 +272,24 @@ export type Publish = {
 const PublishableSchema = z.discriminatedUnion('type', [
   OrderBookSchema,
   PricesSchema,
-  TradesSchema
+  TradesSchema,
+  OrdersSchema,
+  OrderCreatedSchema,
+  OrderUpdatedSchema
 ])
 export type Publishable = z.infer<typeof PublishableSchema>
 
 export type IncomingWSMessage = Publish
+
+const ApiErrorSchema = z.object({
+  displayMessage: z.string()
+})
+export type ApiError = z.infer<typeof ApiErrorSchema>
+
+const ApiErrorsSchema = z.object({
+  errors: z.array(ApiErrorSchema)
+})
+export type ApiErrors = z.infer<typeof ApiErrorsSchema>
 
 export const apiClient = new Zodios(apiBaseUrl, [
   {
@@ -244,7 +309,49 @@ export const apiClient = new Zodios(apiBaseUrl, [
         schema: CreateOrderRequestSchema
       }
     ],
-    response: OrderSchema
+    response: OrderSchema,
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'patch',
+    path: '/v1/orders/:id',
+    alias: 'updateOrder',
+    parameters: [
+      {
+        name: 'id',
+        type: 'Path',
+        schema: z.string()
+      },
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: UpdateOrderRequestSchema
+      }
+    ],
+    response: OrderSchema,
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'delete',
+    path: '/v1/orders/:id',
+    alias: 'cancelOrder',
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
   },
   {
     method: 'post',

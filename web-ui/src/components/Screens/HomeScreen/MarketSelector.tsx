@@ -1,15 +1,15 @@
 import { Fragment } from 'react'
 import { Listbox, Transition } from '@headlessui/react'
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
-import { Market } from 'ApiClient'
 import SymbolIcon from 'components/common/SymbolIcon'
+import Markets, { Market } from 'markets'
 
 export function MarketSelector({
   markets,
   selected,
   onChange
 }: {
-  markets: Market[]
+  markets: Markets
   selected: Market
   onChange: (newValue: Market) => void
 }) {
@@ -33,9 +33,9 @@ export function MarketSelector({
             leaveTo="opacity-0"
           >
             <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md border border-black bg-neutralGray py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none">
-              {markets.map((market, idx) => (
+              {markets.map((market) => (
                 <Listbox.Option
-                  key={idx}
+                  key={market.id}
                   className={
                     'relative cursor-default select-none py-2 pl-10 pr-4 text-black'
                   }
@@ -71,16 +71,16 @@ function MarketTitle({ market }: { market: Market }) {
   return (
     <div className="flex place-items-center truncate">
       <SymbolIcon
-        symbol={market.baseSymbol}
+        symbol={market.baseSymbol.name}
         className="mr-1 inline-block size-5"
       />
-      {market.baseSymbol}
+      {market.baseSymbol.name}
       <span className="mx-1">/</span>
       <SymbolIcon
-        symbol={market.quoteSymbol}
+        symbol={market.quoteSymbol.name}
         className="mr-1 inline-block size-5"
       />
-      {market.quoteSymbol}
+      {market.quoteSymbol.name}
     </div>
   )
 }

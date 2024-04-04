@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { apiBaseUrl, apiClient, Market } from 'ApiClient'
+import { apiBaseUrl, apiClient } from 'ApiClient'
 import { useAccount } from 'wagmi'
 import Balances from 'components/Screens/HomeScreen/Balances'
 import { Header } from 'components/Screens/Header'
@@ -11,6 +11,9 @@ import { Prices } from 'components/Screens/HomeScreen/Prices'
 import { useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
 import { loadOrIssueDidToken } from 'Auth'
+import Orders from 'components/Screens/HomeScreen/Orders'
+import TradingSymbols from 'tradingSymbols'
+import Markets, { Market } from 'markets'
 
 const websocketUrl =
   apiBaseUrl.replace('http:', 'ws:').replace('https:', 'wss:') + '/connect'
@@ -25,20 +28,28 @@ export default function HomeScreen() {
   const walletAddress = wallet.address
 
   const [ws, setWs] = useState<Websocket | null>(null)
-
-  const config = configQuery.data
-  const chainConfig = config?.chains.find((chain) => chain.id == wallet.chainId)
-
-  const exchangeContract = chainConfig?.contracts?.find(
-    (c) => c.name == 'Exchange'
-  )
-  const symbols = chainConfig?.symbols
-
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
 
-  const markets = useMemo(() => {
-    return config?.markets || []
-  }, [config?.markets])
+  const { exchangeContract, markets, symbols } = useMemo(() => {
+    const config = configQuery.data
+    const chainConfig = config?.chains.find(
+      (chain) => chain.id === wallet.chainId
+    )
+
+    const exchangeContract = chainConfig?.contracts?.find(
+      (c) => c.name == 'Exchange'
+    )
+
+    const symbols = chainConfig ? new TradingSymbols(chainConfig.symbols) : null
+    const markets =
+      config && symbols ? new Markets(config.markets, symbols) : null
+
+    return {
+      exchangeContract,
+      markets,
+      symbols
+    }
+  }, [configQuery.data, wallet.chainId])
 
   useEffect(() => {
     const initWebSocket = async () => {
@@ -61,8 +72,8 @@ export default function HomeScreen() {
   }, [walletAddress, wallet.status])
 
   useEffect(() => {
-    if (markets.length > 0 && selectedMarket == null) {
-      setSelectedMarket(markets[0])
+    if (markets !== null && selectedMarket == null) {
+      setSelectedMarket(markets.first())
     }
   }, [markets, selectedMarket])
 
@@ -76,35 +87,24 @@ export default function HomeScreen() {
         />
 
         <div className="flex h-screen w-screen flex-col gap-4 overflow-y-scroll px-4 py-24">
-          <div className="flex gap-4">
-            <div className="flex flex-col">
-              <OrderBook ws={ws} marketId={selectedMarket.id} />
-            </div>
-            <div className="flex flex-col">
-              <Prices ws={ws} marketId={selectedMarket.id} />
-            </div>
+          <div className="flex flex-wrap gap-4">
+            <OrderBook ws={ws} marketId={selectedMarket.id} />
+            <Prices ws={ws} marketId={selectedMarket.id} />
             {walletAddress && (
-              <div className="flex flex-col">
-                <SubmitOrder
-                  baseSymbol={selectedMarket.baseSymbol}
-                  quoteSymbol={selectedMarket.quoteSymbol}
-                />
-              </div>
+              <SubmitOrder
+                baseSymbol={selectedMarket.baseSymbol}
+                quoteSymbol={selectedMarket.quoteSymbol}
+              />
             )}
-          </div>
-          <div className="flex gap-4">
-            <div className="flex flex-col">
-              {walletAddress && <TradeHistory ws={ws} />}
-            </div>
-            <div className="flex flex-col">
-              {walletAddress && symbols && exchangeContract && (
-                <Balances
-                  walletAddress={walletAddress}
-                  exchangeContractAddress={exchangeContract.address}
-                  symbols={symbols}
-                />
-              )}
-            </div>
+            {walletAddress && <Orders ws={ws} markets={markets} />}
+            {walletAddress && <TradeHistory ws={ws} />}
+            {walletAddress && symbols && exchangeContract && (
+              <Balances
+                walletAddress={walletAddress}
+                exchangeContractAddress={exchangeContract.address}
+                symbols={symbols}
+              />
+            )}
           </div>
         </div>
       </div>
