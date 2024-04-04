@@ -64,8 +64,8 @@ const CreateLimitOrderSchema = z.object({
   type: z.literal('limit'),
   marketId: z.string(),
   side: OrderSideSchema,
-  amount: z.coerce.bigint(),
-  price: z.coerce.bigint()
+  amount: z.bigint(),
+  price: z.number()
 })
 export type CreateLimitOrder = z.infer<typeof CreateLimitOrderSchema>
 
@@ -81,7 +81,7 @@ export type ExecutionRole = z.infer<typeof ExecutionRoleSchema>
 const OrderExecutionSchema = z.object({
   timestamp: z.coerce.date(),
   amount: z.coerce.bigint(),
-  price: z.coerce.bigint(),
+  price: z.coerce.number(),
   role: ExecutionRoleSchema,
   feeAmount: z.coerce.bigint(),
   feeSymbol: z.string()
@@ -115,7 +115,7 @@ const LimitOrderSchema = z.object({
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
-  price: z.coerce.bigint(),
+  price: z.number(),
   originalAmount: z.coerce.bigint(),
   executions: z.array(OrderExecutionSchema),
   timing: OrderTimingSchema
@@ -143,7 +143,7 @@ const TradeSchema = z.object({
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
-  price: z.coerce.bigint(),
+  price: z.number(),
   feeAmount: z.coerce.bigint(),
   feeSymbol: z.string()
 })
