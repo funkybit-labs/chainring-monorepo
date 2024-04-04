@@ -91,5 +91,5 @@ class Market(
         )
     }
 
-    val orderBook = OrderBook(maxLevels, maxOrdersPerLevel, tickSize, marketPrice)
+    val orderBook = OrderBook(maxLevels, maxOrdersPerLevel, tickSize, marketPrice, baseDecimals, quoteDecimals)
 }

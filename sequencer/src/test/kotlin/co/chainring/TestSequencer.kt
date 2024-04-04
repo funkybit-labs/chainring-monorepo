@@ -9,6 +9,7 @@ import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderDisposition
+import co.chainring.sequencer.proto.SequencerError
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.testutils.SequencerClient
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -115,12 +116,17 @@ class TestSequencer {
         val lp1 = 123457689L.toWalletAddress()
         val lp2 = 987654321L.toWalletAddress()
         val tkr = 555555555L.toWalletAddress()
+        sequencer.deposit(lp1, marketId.baseAsset(), BigInteger.valueOf(31000))
+        sequencer.deposit(lp2, marketId.baseAsset(), BigInteger.valueOf(31000))
         val sell1 = sequencer.addOrder(marketId, 1000, "17.550", lp1, Order.Type.LimitSell)
         val sell2 = sequencer.addOrder(marketId, 1000, "17.550", lp2, Order.Type.LimitSell)
         val sell3 = sequencer.addOrder(marketId, 10000, "17.600", lp1, Order.Type.LimitSell)
         val sell4 = sequencer.addOrder(marketId, 10000, "17.600", lp2, Order.Type.LimitSell)
         val sell5 = sequencer.addOrder(marketId, 20000, "17.700", lp1, Order.Type.LimitSell)
         val sell6 = sequencer.addOrder(marketId, 20000, "17.700", lp2, Order.Type.LimitSell)
+        // clearing price would be (2000 * 17.55 + 15000 * 17.6) / 17000 = 17.594
+        // notional is 17000 * 17.594 * 10^10
+        sequencer.deposit(tkr, marketId.quoteAsset(), BigInteger("2990980000000000"))
         val response = sequencer.addOrder(marketId, 17000, null, tkr, Order.Type.MarketBuy)
         assertEquals(5, response.ordersChangedCount)
         assertEquals(OrderDisposition.Filled, response.ordersChangedList[0].disposition)
@@ -141,6 +147,9 @@ class TestSequencer {
             response.tradesCreatedList.map { it.price.toBigDecimal().toString() },
         )
         // place another market order to exhaust remaining limit orders
+        // clearing price would be (5000 * 17.6 + 40000 * 17.7) / 45000 = 17.689
+        // notional is 45000 * 17.689 * 10^10
+        sequencer.deposit(tkr, marketId.quoteAsset(), BigInteger("7960050000000000"))
         val response2 = sequencer.addOrder(marketId, 45000, null, tkr, Order.Type.MarketBuy)
         assertEquals(4, response2.ordersChangedCount)
         assertEquals(OrderDisposition.Filled, response2.ordersChangedList[0].disposition)
@@ -183,5 +192,54 @@ class TestSequencer {
         sequencer.depositsAndWithdrawals(walletAddress, asset, listOf(BigInteger.TEN, BigInteger.ONE.negate()))
         // if it nets to 0, no balance change returned
         sequencer.depositsAndWithdrawals(walletAddress, asset, listOf(BigInteger.TEN.negate(), BigInteger.TEN), null)
+    }
+
+    @Test
+    fun `test limit checking on orders`() {
+        val sequencer = SequencerClient()
+        val rnd = Random(0)
+        val maker = rnd.nextLong().toWalletAddress()
+        val marketId1 = MarketId("BTC3/ETH3")
+        sequencer.createMarket(marketId1)
+        // cannot place a buy or sell limit order without any deposits
+        assertEquals(SequencerError.ExceedsLimit, sequencer.addOrder(marketId1, 1000L, "17.55", maker, Order.Type.LimitSell).error)
+        assertEquals(SequencerError.ExceedsLimit, sequencer.addOrder(marketId1, 1000L, "17.50", maker, Order.Type.LimitBuy).error)
+
+        // deposit some base and can sell
+        sequencer.deposit(maker, marketId1.baseAsset(), BigInteger.valueOf(1000))
+        val response = sequencer.addOrder(marketId1, 1000L, "17.55", maker, Order.Type.LimitSell)
+        assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
+
+        // deposit some quote and can buy
+        sequencer.deposit(maker, marketId1.quoteAsset(), BigDecimal.valueOf(17.50 * 1000 * 10.0.pow(10)).toBigInteger())
+        val response2 = sequencer.addOrder(marketId1, 1000L, "17.50", maker, Order.Type.LimitBuy)
+        assertEquals(OrderDisposition.Accepted, response2.ordersChangedList.first().disposition)
+
+        // but now that we've exhausted our balance we can't add more
+        assertEquals(SequencerError.ExceedsLimit, sequencer.addOrder(marketId1, 1L, "17.55", maker, Order.Type.LimitSell).error)
+        assertEquals(SequencerError.ExceedsLimit, sequencer.addOrder(marketId1, 1L, "0.05", maker, Order.Type.LimitBuy).error)
+
+        // but we can reuse the same liquidity in another market
+        val marketId2 = MarketId("ETH3/USDC3")
+        sequencer.createMarket(marketId2, baseDecimals = 18, quoteDecimals = 6)
+        val response3 = sequencer.addOrder(marketId2, 1000L, "17.50", maker, Order.Type.LimitBuy)
+        assertEquals(OrderDisposition.Accepted, response3.ordersChangedList.first().disposition)
+
+        // if we deposit some more we can add another order
+        sequencer.deposit(maker, marketId1.baseAsset(), BigInteger.TEN)
+        val response4 = sequencer.addOrder(marketId1, 10L, "17.60", maker, Order.Type.LimitSell)
+        assertEquals(OrderDisposition.Accepted, response4.ordersChangedList.first().disposition)
+
+        // but not more
+        assertEquals(SequencerError.ExceedsLimit, sequencer.addOrder(marketId1, 1L, "17.55", maker, Order.Type.LimitSell).error)
+
+        // unless a trade increases the balance
+        val taker = rnd.nextLong().toWalletAddress()
+        sequencer.deposit(taker, marketId1.baseAsset(), BigInteger.TEN)
+        val response5 = sequencer.addOrder(marketId1, 10L, null, taker, Order.Type.MarketSell)
+        assertEquals(OrderDisposition.Filled, response5.ordersChangedList.first().disposition)
+
+        val response6 = sequencer.addOrder(marketId1, 1L, "17.60", maker, Order.Type.LimitSell)
+        assertEquals(OrderDisposition.Accepted, response6.ordersChangedList.first().disposition)
     }
 }
