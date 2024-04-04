@@ -11,7 +11,6 @@ import co.chainring.sequencer.core.toAsset
 import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
 import co.chainring.sequencer.core.toIntegerValue
-import co.chainring.sequencer.core.toMarketId
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.BalanceChange
 import co.chainring.sequencer.proto.OrderChanged
@@ -45,11 +44,13 @@ class SequencerApp : BaseApp() {
                     error = SequencerError.MarketExists
                 } else {
                     markets[marketId] = Market(
-                        market.marketId.toMarketId(),
+                        marketId,
                         market.tickSize.toBigDecimal(),
                         market.marketPrice.toBigDecimal(),
                         market.maxLevels,
                         market.maxOrdersPerLevel,
+                        market.baseDecimals,
+                        market.quoteDecimals,
                     )
                 }
                 sequencerResponse {
@@ -59,7 +60,7 @@ class SequencerApp : BaseApp() {
                     error?.let { this.error = it } ?: run {
                         this.marketsCreated.add(
                             marketCreated {
-                                this.marketId = market.marketId
+                                this.marketId = marketId.value
                                 this.tickSize = market.tickSize
                             },
                         )
@@ -73,8 +74,11 @@ class SequencerApp : BaseApp() {
                 val orderBatch = request.orderBatch!!
                 var error: SequencerError? = null
                 val marketId = MarketId(orderBatch.marketId)
-                if (markets.containsKey(marketId)) {
-                    val result = markets[marketId]!!.addOrders(orderBatch.ordersToAddList)
+                val market = markets[marketId]
+                if (market == null) {
+                    error = SequencerError.UnknownMarket
+                } else {
+                    val result = market.addOrders(orderBatch.ordersToAddList)
                     ordersChanged = result.ordersChanged
                     trades = result.createdTrades
                     balanceChanges = result.balanceChanges
@@ -87,8 +91,6 @@ class SequencerApp : BaseApp() {
                             it.delta.toBigInteger(),
                         ) { a, b -> BigInteger.ZERO.max(a + b) }
                     }
-                } else {
-                    error = SequencerError.UnknownMarket
                 }
                 sequencerResponse {
                     this.sequence = sequence

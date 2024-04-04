@@ -10,7 +10,7 @@ import co.chainring.sequencer.proto.orderChanged
 import co.chainring.sequencer.proto.tradeCreated
 import java.math.BigDecimal
 import java.math.BigInteger
-import java.math.RoundingMode
+import kotlin.math.pow
 
 class Market(
     val id: MarketId,
@@ -18,6 +18,8 @@ class Market(
     marketPrice: BigDecimal,
     maxLevels: Int,
     maxOrdersPerLevel: Int,
+    val baseDecimals: Int,
+    val quoteDecimals: Int,
 ) {
     data class AddOrdersResult(
         val ordersChanged: List<OrderChanged>,
@@ -58,7 +60,10 @@ class Market(
                     },
                 )
                 val wallet = order.wallet.toWalletAddress()
-                val notional = (execution.amount.toBigDecimal() * execution.price).setScale(0, RoundingMode.HALF_UP).toBigIntegerExact()
+                val notional = (
+                    execution.amount.toBigDecimal() * execution.price * 10.0.pow((quoteDecimals - baseDecimals).toDouble())
+                        .toBigDecimal()
+                    ).toBigInteger()
                 val base = id.baseAsset()
                 val quote = id.quoteAsset()
                 val(buyer, seller) = if (order.type == Order.Type.MarketBuy) wallet to execution.counterWallet else execution.counterWallet to wallet

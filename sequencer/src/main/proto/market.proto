@@ -13,4 +13,6 @@ message Market {
   DecimalValue tickSize = 4;
   uint32 maxLevels = 5;
   uint32 maxOrdersPerLevel = 6;
+  uint32 baseDecimals = 7;
+  uint32 quoteDecimals = 8;
 }
