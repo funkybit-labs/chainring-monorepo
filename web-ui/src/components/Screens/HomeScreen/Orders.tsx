@@ -164,12 +164,7 @@ export default function Orders({
                       </td>
                       <td className="pl-4">{order.marketId}</td>
                       <td className="pl-4">
-                        {order.type == 'limit'
-                          ? formatUnits(
-                              order.price,
-                              market.quoteSymbol.decimals
-                            )
-                          : 'MKT'}
+                        {order.type == 'limit' ? order.price : 'MKT'}
                       </td>
                       <td className="pl-4">{order.status}</td>
                       <td className="py-1 pl-4">
@@ -234,7 +229,7 @@ function ChangeOrderModal({
     formatUnits(order.amount, baseSymbol.decimals)
   )
   const [price, setPrice] = useState(
-    order.type == 'limit' ? formatUnits(order.price, quoteSymbol.decimals) : ''
+    order.type == 'limit' ? String(order.price) : ''
   )
 
   const mutation = useMutation({
@@ -257,7 +252,7 @@ function ChangeOrderModal({
             id: order.id,
             type: 'limit',
             amount: parseUnits(amount, baseSymbol.decimals),
-            price: parseUnits(price, quoteSymbol.decimals)
+            price: Number(price)
           }
     )
   }

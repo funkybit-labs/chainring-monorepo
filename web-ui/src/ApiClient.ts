@@ -86,7 +86,7 @@ const UpdateLimitOrderSchema = z.object({
   type: z.literal('limit'),
   id: z.string(),
   amount: z.coerce.bigint(),
-  price: z.coerce.bigint()
+  price: z.number()
 })
 export type UpdateLimitOrder = z.infer<typeof UpdateLimitOrderSchema>
 
