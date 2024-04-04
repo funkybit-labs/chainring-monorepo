@@ -17,3 +17,24 @@ export function addressDisplay(address: string): string {
 ;(BigInt.prototype as any).toJSON = function () {
   return this.toString()
 }
+
+export function cleanAndFormatNumberInput(
+  inputValue: string,
+  decimals: number
+): string {
+  const decimalSeparator = (1.2).toLocaleString()[1] || '.'
+
+  let cleanedValue = inputValue
+    .replace(/[^\d.]/g, '') // Remove all non-numeric characters
+    .replace(/^0+(\d)/, '$1') // Leading zeros
+    .replace(/^\./, `0${decimalSeparator}`)
+
+  // multiple decimal points
+  cleanedValue =
+    cleanedValue.split(decimalSeparator)[0] +
+    (cleanedValue.includes(decimalSeparator)
+      ? '.' + cleanedValue.split(decimalSeparator)[1].slice(0, decimals)
+      : '')
+
+  return cleanedValue
+}

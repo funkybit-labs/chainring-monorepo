@@ -11,6 +11,7 @@ import WithdrawalModal from 'components/Screens/HomeScreen/Balances/WithdrawalMo
 import { Widget } from 'components/common/Widget'
 import { Button } from 'components/common/Button'
 import SymbolIcon from 'components/common/SymbolIcon'
+import TradingSymbols from 'tradingSymbols'
 
 export default function Balances({
   walletAddress,
@@ -19,7 +20,7 @@ export default function Balances({
 }: {
   walletAddress: Address
   exchangeContractAddress: Address
-  symbols: TradingSymbol[]
+  symbols: TradingSymbols
 }) {
   return (
     <Widget
@@ -42,7 +43,7 @@ function BalancesTable({
 }: {
   walletAddress: Address
   exchangeContractAddress: Address
-  symbols: TradingSymbol[]
+  symbols: TradingSymbols
 }) {
   const queryClient = useQueryClient()
   const [depositSymbol, setDepositSymbol] = useState<TradingSymbol | null>(null)
@@ -53,11 +54,6 @@ function BalancesTable({
   )
   const [showWithdrawalModal, setShowWithdrawalModal] = useState<boolean>(false)
 
-  const nativeSymbol = symbols.find((symbol) => symbol.contractAddress == null)
-  const erc20Symbols = symbols.filter(
-    (symbol) => symbol.contractAddress != null
-  )
-
   const nativeBalanceQuery = useReadContract({
     abi: ExchangeAbi,
     address: exchangeContractAddress,
@@ -66,7 +62,7 @@ function BalancesTable({
   })
 
   const erc20TokenBalancesQuery = useReadContracts({
-    contracts: erc20Symbols.map((symbol) => {
+    contracts: symbols.erc20.map((symbol) => {
       return {
         abi: ExchangeAbi,
         address: exchangeContractAddress,
@@ -103,16 +99,15 @@ function BalancesTable({
   if (
     nativeBalanceQuery.error ||
     erc20TokenBalancesQuery.error ||
-    erc20TokenBalancesQuery.data.some((br) => br.status === 'failure') ||
-    nativeSymbol == undefined
+    erc20TokenBalancesQuery.data.some((br) => br.status === 'failure')
   ) {
     return 'Failed to get balances'
   }
 
   const balances = [
-    { symbol: nativeSymbol, amount: nativeBalanceQuery.data }
+    { symbol: symbols.native, amount: nativeBalanceQuery.data }
   ].concat(
-    erc20Symbols
+    symbols.erc20
       .map((symbol, i) => {
         const tokenBalanceResult = erc20TokenBalancesQuery.data[i]
         const balance = tokenBalanceResult.result

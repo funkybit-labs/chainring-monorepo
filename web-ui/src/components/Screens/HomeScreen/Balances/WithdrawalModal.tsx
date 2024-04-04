@@ -13,6 +13,7 @@ import {
   getERC20WithdrawMessage,
   getNativeWithdrawMessage
 } from 'utils/eip712'
+import { cleanAndFormatNumberInput } from 'utils'
 
 export default function WithdrawalModal({
   exchangeContractAddress,
@@ -103,10 +104,6 @@ export default function WithdrawalModal({
     }
     setWithdrawalId(null)
   }, [withdrawalId, withdrawalQuery, close])
-
-  function onAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setAmount(e.target.value)
-  }
 
   function setError(error: string | null) {
     setSubmitError(error)
@@ -218,12 +215,16 @@ export default function WithdrawalModal({
           asyncData={availableBalanceQuery}
           success={(availableBalance) => {
             return (
-              <>
+              <div className="mt-8">
                 <AmountInput
                   value={amount}
                   symbol={symbol.name}
                   disabled={submitPhase !== null}
-                  onChange={onAmountChange}
+                  onChange={(e) =>
+                    setAmount(
+                      cleanAndFormatNumberInput(e.target.value, symbol.decimals)
+                    )
+                  }
                 />
 
                 <p className="mt-1 text-center text-sm text-darkGray">
@@ -250,7 +251,7 @@ export default function WithdrawalModal({
                     }
                   }}
                 />
-              </>
+              </div>
             )
           }}
           error={() => {

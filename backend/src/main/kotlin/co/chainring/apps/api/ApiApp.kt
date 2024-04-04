@@ -46,7 +46,13 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val corsPolicy = CorsPolicy(
         originPolicy = OriginPolicy.AllowAll(),
         headers = listOf("Content-Type", "Authorization"),
-        methods = listOf(Method.GET, Method.POST),
+        methods = listOf(
+            Method.DELETE,
+            Method.GET,
+            Method.PATCH,
+            Method.POST,
+            Method.PUT,
+        ),
     )
 
     private val blockchainClient = BlockchainClient(config.blockchainClientConfig)

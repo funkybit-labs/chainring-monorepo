@@ -1,17 +1,18 @@
-import { apiClient, OrderSide } from 'ApiClient'
-import { classNames } from 'utils'
+import { apiClient, OrderSide, TradingSymbol } from 'ApiClient'
+import { classNames, cleanAndFormatNumberInput } from 'utils'
 import React, { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Widget } from 'components/common/Widget'
 import SubmitButton from 'components/common/SubmitButton'
 import { parseUnits } from 'viem'
+import { isErrorFromAlias } from '@zodios/core'
 
 export default function SubmitOrder({
   baseSymbol,
   quoteSymbol
 }: {
-  baseSymbol: string
-  quoteSymbol: string
+  baseSymbol: TradingSymbol
+  quoteSymbol: TradingSymbol
 }) {
   const [side, setSide] = useState<OrderSide>('Buy')
   const [price, setPrice] = useState('')
@@ -31,11 +32,11 @@ export default function SubmitOrder({
     }
   }, [mutation])
 
-  const submitOrder = () => {
+  function submitOrder() {
     if (isMarketOrder) {
       mutation.mutate({
         nonce: crypto.randomUUID(),
-        marketId: `${baseSymbol}/${quoteSymbol}`,
+        marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
         type: 'market',
         side: side,
         amount: parseUnits(amount, 18)
@@ -43,29 +44,13 @@ export default function SubmitOrder({
     } else {
       mutation.mutate({
         nonce: crypto.randomUUID(),
-        marketId: `${baseSymbol}/${quoteSymbol}`,
+        marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
         type: 'limit',
         side: side,
         amount: parseUnits(amount, 18),
         price: parseUnits(price, 18)
       })
     }
-  }
-
-  function cleanAndFormatNumber(inputValue: string) {
-    let cleanedValue = inputValue
-      .replace(/[^\d.]/g, '') // Remove all non-numeric characters
-      .replace(/^0+(\d)/, '$1') // Leading zeros
-      .replace(/^\./, '0.')
-
-    // multiple decimal points
-    cleanedValue =
-      cleanedValue.split('.')[0] +
-      (cleanedValue.includes('.')
-        ? '.' + cleanedValue.split('.')[1].slice(0, 18)
-        : '')
-
-    return cleanedValue
   }
 
   return (
@@ -81,7 +66,7 @@ export default function SubmitOrder({
               )}
               onClick={() => !mutation.isPending && setSide('Buy')}
             >
-              Buy {baseSymbol}
+              Buy {baseSymbol.name}
             </div>
             <div
               className={classNames(
@@ -92,7 +77,7 @@ export default function SubmitOrder({
               )}
               onClick={() => !mutation.isPending && setSide('Sell')}
             >
-              Sell {baseSymbol}
+              Sell {baseSymbol.name}
             </div>
           </div>
           <table>
@@ -110,12 +95,17 @@ export default function SubmitOrder({
                       disabled={isMarketOrder || mutation.isPending}
                       placeholder={'0.0'}
                       onChange={(e) => {
-                        setPrice(cleanAndFormatNumber(e.target.value))
+                        setPrice(
+                          cleanAndFormatNumberInput(
+                            e.target.value,
+                            quoteSymbol.decimals
+                          )
+                        )
                       }}
                       className="bg-black pr-12 text-white disabled:bg-mutedGray"
                     />
                     <span className="absolute right-2 top-2 text-white">
-                      {quoteSymbol}
+                      {quoteSymbol.name}
                     </span>
                   </div>
                 </td>
@@ -146,12 +136,17 @@ export default function SubmitOrder({
                       value={amount}
                       disabled={mutation.isPending}
                       onChange={(e) => {
-                        setAmount(cleanAndFormatNumber(e.target.value))
+                        setAmount(
+                          cleanAndFormatNumberInput(
+                            e.target.value,
+                            baseSymbol.decimals
+                          )
+                        )
                       }}
                       className="bg-black pr-12 text-white disabled:bg-mutedGray"
                     />
                     <span className="absolute right-2 top-2 text-white">
-                      {baseSymbol}
+                      {baseSymbol.name}
                     </span>
                   </div>
                 </td>
@@ -166,30 +161,35 @@ export default function SubmitOrder({
               onClick={submitOrder}
               error={
                 mutation.isError
-                  ? `An error occurred: ${mutation.error.message}`
+                  ? isErrorFromAlias(
+                      apiClient.api,
+                      'updateOrder',
+                      mutation.error
+                    )
+                    ? mutation.error.response.data.errors[0].displayMessage
+                    : 'Something went wrong'
                   : ''
               }
               caption={() => {
                 if (mutation.isPending) {
                   return 'Submitting order...'
                 } else {
-                  return `${side} ${baseSymbol}`
+                  return `${side} ${baseSymbol.name}`
                 }
               }}
             />
           </p>
           <p className="text-center text-white">
-            {`${side == 'Buy' ? 'Buying' : 'Selling'} ${amount} ${baseSymbol} ${
-              isMarketOrder ? '(market order) ' : `for ${price} ${quoteSymbol}`
+            {`${side == 'Buy' ? 'Buying' : 'Selling'} ${amount} ${
+              baseSymbol.name
+            } ${
+              isMarketOrder
+                ? '(market order) '
+                : `for ${price} ${quoteSymbol.name}`
             }`}
           </p>
-          <p className="text-center text-white">Fee: 0.05 {quoteSymbol}</p>
+          <p className="text-center text-white">Fee: 0.05 {quoteSymbol.name}</p>
           <div className="pt-3 text-center">
-            {mutation.isError ? (
-              <div className="text-red">
-                An error occurred: {mutation.error.message}
-              </div>
-            ) : null}
             {mutation.isSuccess ? (
               <div className="text-green">Order created!</div>
             ) : null}
