@@ -15,7 +15,7 @@ object HttpTransactionLogger {
             log4jLogger.info(
                 ObjectMessage(
                     mapOf(
-                        "info" to "${tx.request.method.name} ${tx.request.uri} returned ${tx.response.status} in ${tx.duration.toMillis()}ms.",
+                        "summary" to "${tx.request.method.name} ${tx.request.uri} returned ${tx.response.status} in ${tx.duration.toMillis()}ms.",
                         "req" to mapOf(
                             "method" to tx.request.method.name,
                             "uri" to tx.request.uri.toString(),
