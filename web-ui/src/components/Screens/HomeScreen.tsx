@@ -33,7 +33,7 @@ export default function HomeScreen() {
   const { exchangeContract, markets, symbols } = useMemo(() => {
     const config = configQuery.data
     const chainConfig = config?.chains.find(
-      (chain) => chain.id === wallet.chainId
+      (chain) => chain.id === (wallet.chainId || config.chains[0]?.id)
     )
 
     const exchangeContract = chainConfig?.contracts?.find(
