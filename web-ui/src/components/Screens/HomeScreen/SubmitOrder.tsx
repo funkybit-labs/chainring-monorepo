@@ -39,7 +39,7 @@ export default function SubmitOrder({
         marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
         type: 'market',
         side: side,
-        amount: parseUnits(amount, 18)
+        amount: parseUnits(amount, baseSymbol.decimals)
       })
     } else {
       mutation.mutate({
@@ -47,8 +47,8 @@ export default function SubmitOrder({
         marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
         type: 'limit',
         side: side,
-        amount: parseUnits(amount, 18),
-        price: parseUnits(price, 18)
+        amount: parseUnits(amount, baseSymbol.decimals),
+        price: parseUnits(price, quoteSymbol.decimals)
       })
     }
   }
