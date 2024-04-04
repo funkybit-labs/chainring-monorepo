@@ -197,11 +197,11 @@ class Broadcaster {
                 when (marketId.value) {
                     "BTC/ETH" -> Pair(
                         BigDecimal(rnd.nextDouble(0.00001, 0.5)).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
-                        BigDecimal(17.5 + lastStutter).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
+                        BigDecimal(17.5 + lastStutter).setScale(5, RoundingMode.UP),
                     )
                     "USDC/DAI" -> Pair(
                         BigDecimal(rnd.nextDouble(1000.00, 10000.00)).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
-                        BigDecimal(1.00 + lastStutter / 10).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
+                        BigDecimal(1.00 + lastStutter / 10).setScale(5, RoundingMode.UP),
                     )
                     else -> null
                 }

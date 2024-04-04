@@ -16,7 +16,7 @@ data class Trade(
     val marketId: MarketId,
     val side: OrderSide,
     val amount: BigIntegerJson,
-    val price: BigIntegerJson,
+    val price: BigDecimalJson,
     val feeAmount: BigIntegerJson,
     val feeSymbol: Symbol,
 )
@@ -31,7 +31,7 @@ data class PublicTrade(
     val timestamp: Instant,
     val marketId: MarketId,
     val amount: BigIntegerJson,
-    val price: BigIntegerJson,
+    val price: BigDecimalJson,
     // taker's order side indicates market direction
     val side: OrderSide,
 )

@@ -2,6 +2,7 @@ package co.chainring.core.db
 
 import co.chainring.core.model.db.migrations.V10_WithdrawalTable
 import co.chainring.core.model.db.migrations.V11_NonNullableDeployedContractProxyAddress
+import co.chainring.core.model.db.migrations.V12_BigDecimalPrice
 import co.chainring.core.model.db.migrations.V1_DeployedSmartContract
 import co.chainring.core.model.db.migrations.V2_ERC20Token
 import co.chainring.core.model.db.migrations.V3_UpdateDeployedSmartContract
@@ -24,4 +25,5 @@ val migrations = listOf(
     V9_SymbolTable(),
     V10_WithdrawalTable(),
     V11_NonNullableDeployedContractProxyAddress(),
+    V12_BigDecimalPrice(),
 )

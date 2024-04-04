@@ -7,6 +7,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import org.junit.jupiter.api.Test
+import java.math.BigDecimal
+import java.math.BigInteger
 import kotlin.test.assertEquals
 
 class BatchOrderSerializerTest {
@@ -15,13 +17,13 @@ class BatchOrderSerializerTest {
         nonce = "123",
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
-        amount = BigIntegerJson("100000"),
+        amount = BigInteger("100000"),
     )
 
     private val updateLimitOrderRequest = UpdateOrderApiRequest.Limit(
         id = OrderId.generate(),
-        amount = BigIntegerJson("1000"),
-        price = BigIntegerJson("101000"),
+        amount = BigInteger("1000"),
+        price = BigDecimal("101000"),
     )
 
     @Test

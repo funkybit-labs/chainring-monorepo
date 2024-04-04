@@ -9,8 +9,8 @@ class V12_BigDecimalPrice : Migration() {
         transaction {
             exec(
                 """
-                    ALTER TABLE "order" ALTER COLUMN price TYPE numeric(30, 18) USING price::numeric(30, 18);
-                    ALTER TABLE trade ALTER COLUMN price TYPE numeric(30, 18) USING price::numeric(30, 18);
+                    ALTER TABLE "order" ALTER COLUMN price TYPE numeric(30, 18) USING (price / 10 ^ 18)::numeric(30, 18);
+                    ALTER TABLE trade ALTER COLUMN price TYPE numeric(30, 18) USING (price / 10 ^ 18)::numeric(30, 18);
                 """.trimIndent(),
             )
         }
