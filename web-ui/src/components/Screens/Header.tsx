@@ -5,15 +5,15 @@ import { useAccount } from 'wagmi'
 import { addressDisplay } from 'utils'
 import { Button } from 'components/common/Button'
 import React, { useEffect, useState } from 'react'
-import { Market } from 'ApiClient'
 import { MarketSelector } from 'components/Screens/HomeScreen/MarketSelector'
+import Markets, { Market } from 'markets'
 
 export function Header({
   markets,
   selectedMarket,
   onMarketChange
 }: {
-  markets: Market[]
+  markets: Markets
   selectedMarket: Market | null
   onMarketChange: (newValue: Market) => void
 }) {

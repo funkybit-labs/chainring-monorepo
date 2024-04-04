@@ -1,7 +1,6 @@
 import {
   apiClient,
   IncomingWSMessage,
-  Market,
   Order,
   OrderCreatedSchema,
   OrdersSchema,
@@ -21,16 +20,14 @@ import { classNames, cleanAndFormatNumberInput } from 'utils'
 import { Modal } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import TradingSymbols from 'tradingSymbols'
+import Markets from 'markets'
 
 export default function Orders({
   ws,
-  markets,
-  symbols
+  markets
 }: {
   ws: Websocket
-  markets: Market[]
-  symbols: TradingSymbols
+  markets: Markets
 }) {
   const [orders, setOrders] = useState<Order[]>(() => [])
   const [changedOrder, setChangedOrder] = useState<Order | null>(null)
@@ -148,6 +145,8 @@ export default function Orders({
               </thead>
               <tbody>
                 {orders.map((order) => {
+                  const market = markets.getById(order.marketId)
+
                   return (
                     <tr
                       key={order.id}
@@ -160,11 +159,16 @@ export default function Orders({
                         {format(order.timing.createdAt, 'MM/dd HH:mm:ss')}
                       </td>
                       <td className="pl-4">{order.side}</td>
-                      <td className="pl-4">{formatUnits(order.amount, 18)}</td>
+                      <td className="pl-4">
+                        {formatUnits(order.amount, market.baseSymbol.decimals)}
+                      </td>
                       <td className="pl-4">{order.marketId}</td>
                       <td className="pl-4">
                         {order.type == 'limit'
-                          ? formatUnits(order.price, 18)
+                          ? formatUnits(
+                              order.price,
+                              market.quoteSymbol.decimals
+                            )
                           : 'MKT'}
                       </td>
                       <td className="pl-4">{order.status}</td>
@@ -199,7 +203,6 @@ export default function Orders({
               isOpen={showChangeModal}
               order={changedOrder}
               markets={markets}
-              symbols={symbols}
               close={() => setShowChangeModal(false)}
               onClosed={() => setChangedOrder(null)}
             />
@@ -213,25 +216,25 @@ export default function Orders({
 function ChangeOrderModal({
   order,
   markets,
-  symbols,
   isOpen,
   close,
   onClosed
 }: {
   order: Order
-  markets: Market[]
-  symbols: TradingSymbols
+  markets: Markets
   isOpen: boolean
   close: () => void
   onClosed: () => void
 }) {
-  const market = markets.find((m) => m.id === order.marketId)!
-  const baseSymbol = symbols.getByName(market.baseSymbol)
-  const quoteSymbol = symbols.getByName(market.quoteSymbol)
+  const market = markets.getById(order.marketId)
+  const baseSymbol = market.baseSymbol
+  const quoteSymbol = market.quoteSymbol
 
-  const [amount, setAmount] = useState(formatUnits(order.amount, 18))
+  const [amount, setAmount] = useState(
+    formatUnits(order.amount, baseSymbol.decimals)
+  )
   const [price, setPrice] = useState(
-    order.type == 'limit' ? formatUnits(order.price, 18) : ''
+    order.type == 'limit' ? formatUnits(order.price, quoteSymbol.decimals) : ''
   )
 
   const mutation = useMutation({
