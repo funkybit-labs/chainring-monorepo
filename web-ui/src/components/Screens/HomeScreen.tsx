@@ -70,7 +70,7 @@ export default function HomeScreen() {
         return new WebsocketBuilder(websocketUrl + authQuery)
           .withBackoff(new ExponentialBackoff(1000, 4))
           .onClose(() => {
-            if (didTokenIsValid()) initWebSocket()
+            if (!didTokenIsValid()) initWebSocket()
           })
           .build()
       })
