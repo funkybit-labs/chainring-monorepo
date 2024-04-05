@@ -27,7 +27,7 @@ message OrderBatch {
   string marketId = 2;
   repeated Order ordersToAdd = 3;
   repeated Order ordersToChange = 4;
-  repeated string ordersToCancel = 5; // order guids
+  repeated uint64 ordersToCancel = 5; // order guids
 }
 
 enum OrderDisposition {

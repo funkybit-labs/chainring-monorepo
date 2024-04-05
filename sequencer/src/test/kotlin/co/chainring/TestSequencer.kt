@@ -6,6 +6,7 @@ import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
 import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
+import co.chainring.sequencer.core.toOrderGuid
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderDisposition
@@ -241,5 +242,97 @@ class TestSequencer {
 
         val response6 = sequencer.addOrder(marketId1, 1L, "17.60", maker, Order.Type.LimitSell)
         assertEquals(OrderDisposition.Accepted, response6.ordersChangedList.first().disposition)
+    }
+
+    @Test
+    fun `test order cancel`() {
+        val sequencer = SequencerClient()
+        val rnd = Random(0)
+        val maker = rnd.nextLong().toWalletAddress()
+        val marketId = MarketId("BTC4/ETH4")
+        sequencer.createMarket(marketId)
+        sequencer.deposit(maker, marketId.baseAsset(), BigInteger.valueOf(1000))
+        val response = sequencer.addOrder(marketId, 1000L, "17.55", maker, Order.Type.LimitSell)
+        assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
+        val response2 = sequencer.cancelOrder(marketId, response.orderGuid())
+        assertEquals(OrderDisposition.Canceled, response2.ordersChangedList.first().disposition)
+        // try canceling an order which has been partially filled
+        val response3 = sequencer.addOrder(marketId, 1000L, "17.55", maker, Order.Type.LimitSell)
+        assertEquals(OrderDisposition.Accepted, response3.ordersChangedList.first().disposition)
+
+        val taker = rnd.nextLong().toWalletAddress()
+        sequencer.deposit(taker, marketId.quoteAsset(), wei(BigDecimal.ONE))
+        val response4 = sequencer.addOrder(marketId, 500L, null, taker, Order.Type.MarketBuy)
+        assertEquals(OrderDisposition.Filled, response4.ordersChangedList.first().disposition)
+        val response5 = sequencer.cancelOrder(marketId, response3.orderGuid())
+        assertEquals(OrderDisposition.Canceled, response5.ordersChangedList.first().disposition)
+    }
+
+    @Test
+    fun `test order change`() {
+        val sequencer = SequencerClient()
+        val rnd = Random(0)
+        val maker = rnd.nextLong().toWalletAddress()
+        val marketId = MarketId("BTC5/ETH5")
+        sequencer.createMarket(marketId)
+        sequencer.deposit(maker, marketId.baseAsset(), BigInteger.valueOf(1000))
+        val response = sequencer.addOrder(marketId, 1000L, "17.55", maker, Order.Type.LimitSell)
+        assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
+
+        // reduce amount
+        val response2 = sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 999L, "17.55")
+        assertEquals(OrderDisposition.Accepted, response2.ordersChangedList.first().disposition)
+
+        // cannot increase amount beyond 1000L since there is not enough collateral
+        assertEquals(SequencerError.ExceedsLimit, sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 1001L, "17.55").error)
+
+        // but can change price
+        val response3 = sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 999L, "17.60")
+        assertEquals(OrderDisposition.Accepted, response3.ordersChangedList.first().disposition)
+
+        // can also add a new order for 1
+        val response4 = sequencer.addOrder(marketId, 1L, "17.55", maker, Order.Type.LimitSell)
+        assertEquals(OrderDisposition.Accepted, response4.ordersChangedList.first().disposition)
+
+        // cannot change the price to cross the book
+        assertEquals(SequencerError.ChangeCrossesMarket, sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 999L, "17.50").error)
+
+        // check for a limit buy
+        sequencer.deposit(maker, marketId.quoteAsset(), wei(BigDecimal.TEN))
+        val response5 = sequencer.addOrder(marketId, sats(BigDecimal.ONE).toLong(), "10.00", maker, Order.Type.LimitBuy)
+        assertEquals(OrderDisposition.Accepted, response5.ordersChangedList.first().disposition)
+
+        // cannot increase amount since we have consumed all the collateral
+        assertEquals(
+            SequencerError.ExceedsLimit,
+            sequencer.changeOrder(
+                marketId,
+                response5.orderGuid().toOrderGuid(),
+                sats(
+                    BigDecimal.ONE,
+                ).toLong() + 1,
+                "10.00",
+            ).error,
+        )
+
+        // also cannot increase price
+        assertEquals(
+            SequencerError.ExceedsLimit,
+            sequencer.changeOrder(
+                marketId,
+                response5.orderGuid().toOrderGuid(),
+                sats(
+                    BigDecimal.ONE,
+                ).toLong(),
+                "10.05",
+            ).error,
+        )
+
+        // but can decrease amount or decrease price
+        val response6 = sequencer.changeOrder(marketId, response5.orderGuid().toOrderGuid(), sats(BigDecimal.ONE).toLong() - 1, "10.00")
+        assertEquals(OrderDisposition.Accepted, response6.ordersChangedList.first().disposition)
+
+        val response7 = sequencer.changeOrder(marketId, response5.orderGuid().toOrderGuid(), sats(BigDecimal.ONE).toLong(), "9.95")
+        assertEquals(OrderDisposition.Accepted, response7.ordersChangedList.first().disposition)
     }
 }

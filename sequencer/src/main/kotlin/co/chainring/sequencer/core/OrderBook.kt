@@ -2,6 +2,7 @@ package co.chainring.sequencer.core
 
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderDisposition
+import co.chainring.sequencer.proto.order
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.concurrent.CopyOnWriteArrayList
@@ -24,29 +25,37 @@ data class LevelOrder(
     var guid: OrderGuid,
     var wallet: WalletAddress,
     var quantity: BigInteger,
-)
+    var levelIx: Int,
+) {
+    fun update(order: Order) {
+        this.guid = order.guid.toOrderGuid()
+        this.wallet = order.wallet.toWalletAddress()
+        this.quantity = order.amount.toBigInteger()
+    }
 
-class OrderBookLevel(var side: BookSide, val price: BigDecimal, val maxOrderCount: Int) {
-    val orders = Array(maxOrderCount) { _ -> LevelOrder(0L.toOrderGuid(), 0L.toWalletAddress(), BigInteger.ZERO) }
+    fun reset() {
+        this.guid = OrderGuid.none
+        this.wallet = WalletAddress.none
+        this.quantity = BigInteger.ZERO
+    }
+}
+
+class OrderBookLevel(levelIx: Int, var side: BookSide, val price: BigDecimal, val maxOrderCount: Int) {
+    val orders = Array(maxOrderCount) { _ -> LevelOrder(0L.toOrderGuid(), 0L.toWalletAddress(), BigInteger.ZERO, levelIx) }
     var totalQuantity = BigInteger.ZERO
     var orderHead = 0
     var orderTail = 0
 
-    fun addOrder(order: Order): Pair<OrderDisposition, Int> {
+    fun addOrder(order: Order): Pair<OrderDisposition, LevelOrder?> {
         val nextTail = (orderTail + 1) % maxOrderCount
         return if (nextTail == orderHead) {
-            OrderDisposition.Rejected to 0
+            OrderDisposition.Rejected to null
         } else {
-            val amount = order.amount.toBigInteger()
-            orders[orderTail].let {
-                it.guid = order.guid.toOrderGuid()
-                it.wallet = order.wallet.toWalletAddress()
-                it.quantity = amount
-            }
-            totalQuantity += amount
-            val orderIx = orderTail
+            val levelOrder = orders[orderTail]
+            levelOrder.update(order)
+            totalQuantity += levelOrder.quantity
             orderTail = nextTail
-            OrderDisposition.Accepted to orderIx
+            OrderDisposition.Accepted to levelOrder
         }
     }
 
@@ -59,12 +68,10 @@ class OrderBookLevel(var side: BookSide, val price: BigDecimal, val maxOrderCoun
             if (remainingAmount >= curOrder.quantity) {
                 executions.add(
                     Execution(
-                        counterGuid = curOrder.guid,
-                        counterWallet = curOrder.wallet,
+                        counterOrder = curOrder,
                         amount = curOrder.quantity,
                         price = this.price,
                         counterOrderExhausted = true,
-                        counterOrderIx = (ix - orderHead) % maxOrderCount,
                     ),
                 )
                 totalQuantity -= curOrder.quantity
@@ -73,12 +80,10 @@ class OrderBookLevel(var side: BookSide, val price: BigDecimal, val maxOrderCoun
             } else {
                 executions.add(
                     Execution(
-                        counterGuid = curOrder.guid,
-                        counterWallet = curOrder.wallet,
+                        counterOrder = curOrder,
                         amount = remainingAmount,
                         price = this.price,
                         counterOrderExhausted = false,
-                        counterOrderIx = (ix - orderHead) % maxOrderCount,
                     ),
                 )
                 totalQuantity -= remainingAmount
@@ -94,15 +99,31 @@ class OrderBookLevel(var side: BookSide, val price: BigDecimal, val maxOrderCoun
             executions,
         )
     }
+
+    fun removeLevelOrder(levelOrder: LevelOrder) {
+        val orderIx = orders.indexOf(levelOrder)
+        totalQuantity -= levelOrder.quantity
+        levelOrder.reset()
+        if (orderIx < orderHead) {
+            // copy from after orderIx to orderTail, and decrement orderTail
+            if (orderIx < orderTail) {
+                System.arraycopy(orders, orderIx + 1, orders, orderIx, orderTail - orderIx)
+            }
+            orderTail = (orderTail - 1) % maxOrderCount
+        } else {
+            if (orderIx > orderHead) {
+                System.arraycopy(orders, orderHead, orders, orderHead + 1, orderIx - orderHead)
+            }
+            orderHead = (orderHead + 1) % maxOrderCount
+        }
+    }
 }
 
 data class Execution(
-    val counterGuid: OrderGuid,
-    val counterWallet: WalletAddress,
+    val counterOrder: LevelOrder,
     val amount: BigInteger,
     val price: BigDecimal,
     val counterOrderExhausted: Boolean,
-    val counterOrderIx: Int,
 )
 
 data class AddOrderResult(
@@ -110,45 +131,40 @@ data class AddOrderResult(
     val executions: List<Execution>,
 )
 
-data class OrderIndex(
-    val levelIx: Int,
-    val orderIx: Int,
-)
-
 // market price must be exactly halfway between two ticks
 class OrderBook(val maxLevelCount: Int, maxOrderCount: Int, val tickSize: BigDecimal, var marketPrice: BigDecimal, val baseDecimals: Int, val quoteDecimals: Int) {
     private val halfTick = tickSize.setScale(tickSize.scale() + 1) / BigDecimal.valueOf(2)
     private val marketIx = min(maxLevelCount / 2, (marketPrice - halfTick).divideToIntegralValue(tickSize).toInt())
-    private val levels = Array(maxLevelCount) { n ->
+    val levels = Array(maxLevelCount) { n ->
         if (n < marketIx) {
             OrderBookLevel(
+                n,
                 BookSide.Buy,
                 marketPrice.minus(tickSize.multiply((marketIx - n - 0.5).toBigDecimal())),
                 maxOrderCount,
             )
         } else {
             OrderBookLevel(
+                n,
                 BookSide.Sell,
                 marketPrice.plus(tickSize.multiply((n - marketIx + 0.5).toBigDecimal())),
                 maxOrderCount,
             )
         }
     }
-    private val buyOrdersByWallet = mutableMapOf<WalletAddress, CopyOnWriteArrayList<OrderIndex>>()
-    private val sellOrdersByWallet = mutableMapOf<WalletAddress, CopyOnWriteArrayList<OrderIndex>>()
+
+    // TODO - change these mutable maps to a HashMap that pre-allocates
+    private val buyOrdersByWallet = mutableMapOf<WalletAddress, CopyOnWriteArrayList<LevelOrder>>()
+    private val sellOrdersByWallet = mutableMapOf<WalletAddress, CopyOnWriteArrayList<LevelOrder>>()
     private var maxOfferIx = -1
     private var minBidIx = -1
+    val ordersByGuid = mutableMapOf<OrderGuid, LevelOrder>()
 
-    fun baseAssetsRequired(wallet: WalletAddress): BigInteger = sellOrdersByWallet[wallet]?.map {
-        val level = levels[it.levelIx]
-        level.orders[it.orderIx].quantity
-    }?.reduce(::sumBigIntegers) ?: BigInteger.ZERO
+    fun baseAssetsRequired(wallet: WalletAddress): BigInteger = sellOrdersByWallet[wallet]?.map { it.quantity }?.reduceOrNull(::sumBigIntegers) ?: BigInteger.ZERO
 
     fun quoteAssetsRequired(wallet: WalletAddress): BigInteger = buyOrdersByWallet[wallet]?.map {
-        val level = levels[it.levelIx]
-        val order = level.orders[it.orderIx]
-        notional(order.quantity, level.price, baseDecimals, quoteDecimals)
-    }?.reduce(::sumBigIntegers) ?: BigInteger.ZERO
+        notional(it.quantity, levels[it.levelIx].price, baseDecimals, quoteDecimals)
+    }?.reduceOrNull(::sumBigIntegers) ?: BigInteger.ZERO
 
     private fun handleMarketOrder(order: Order): AddOrderResult {
         val originalAmount = order.amount.toBigInteger()
@@ -192,12 +208,8 @@ class OrderBook(val maxLevelCount: Int, maxOrderCount: Int, val tickSize: BigDec
             // remove from buy/sell
             executions.forEach {
                 if (it.counterOrderExhausted) {
-                    (if (order.type == Order.Type.MarketBuy) sellOrdersByWallet else buyOrdersByWallet)[it.counterWallet]?.remove(
-                        OrderIndex(
-                            (it.price - levels[0].price).divideToIntegralValue(tickSize).toInt(),
-                            it.counterOrderIx,
-                        ),
-                    )
+                    (if (order.type == Order.Type.MarketBuy) sellOrdersByWallet else buyOrdersByWallet)[it.counterOrder.wallet]?.remove(it.counterOrder)
+                    ordersByGuid.remove(it.counterOrder.guid)
                 }
             }
 
@@ -209,6 +221,20 @@ class OrderBook(val maxLevelCount: Int, maxOrderCount: Int, val tickSize: BigDec
         } else {
             AddOrderResult(OrderDisposition.Rejected, noExecutions)
         }
+    }
+
+    fun removeOrder(guid: OrderGuid): Boolean {
+        return ordersByGuid[guid]?.let { levelOrder ->
+            val level = levels[levelOrder.levelIx]
+            if (level.side == BookSide.Buy) {
+                buyOrdersByWallet[levelOrder.wallet]?.remove(levelOrder)
+            } else {
+                sellOrdersByWallet[levelOrder.wallet]?.remove(levelOrder)
+            }
+            level.removeLevelOrder(levelOrder)
+            ordersByGuid.remove(guid)
+            true
+        } ?: false
     }
 
     fun addOrder(order: Order): AddOrderResult {
@@ -225,11 +251,10 @@ class OrderBook(val maxLevelCount: Int, maxOrderCount: Int, val tickSize: BigDec
                     if (levelIx > maxOfferIx) {
                         maxOfferIx = levelIx
                     }
-                    val(disposition, orderIx) = levels[levelIx].addOrder(order)
+                    val(disposition, levelOrder) = levels[levelIx].addOrder(order)
                     if (disposition == OrderDisposition.Accepted) {
-                        sellOrdersByWallet.getOrPut(order.wallet.toWalletAddress()) { CopyOnWriteArrayList() }.add(
-                            OrderIndex(levelIx, orderIx),
-                        )
+                        sellOrdersByWallet.getOrPut(levelOrder!!.wallet) { CopyOnWriteArrayList() }.add(levelOrder)
+                        ordersByGuid[levelOrder.guid] = levelOrder
                     }
                     AddOrderResult(disposition, noExecutions)
                 }
@@ -247,11 +272,10 @@ class OrderBook(val maxLevelCount: Int, maxOrderCount: Int, val tickSize: BigDec
                     if (levelIx < minBidIx) {
                         minBidIx = levelIx
                     }
-                    val(disposition, orderIx) = levels[levelIx].addOrder(order)
+                    val(disposition, levelOrder) = levels[levelIx].addOrder(order)
                     if (disposition == OrderDisposition.Accepted) {
-                        buyOrdersByWallet.getOrPut(order.wallet.toWalletAddress()) { CopyOnWriteArrayList() }.add(
-                            OrderIndex(levelIx, orderIx),
-                        )
+                        buyOrdersByWallet.getOrPut(levelOrder!!.wallet) { CopyOnWriteArrayList() }.add(levelOrder)
+                        ordersByGuid[levelOrder.guid] = levelOrder
                     }
                     AddOrderResult(disposition, noExecutions)
                 }
@@ -286,5 +310,45 @@ class OrderBook(val maxLevelCount: Int, maxOrderCount: Int, val tickSize: BigDec
         }
         val availableQuantity = amount - remainingAmount
         return Pair(totalPriceUnits / availableQuantity.toBigDecimal(), availableQuantity)
+    }
+
+    // returns baseAsset and quoteAsset reserved by order
+    fun assetsReservedForOrder(levelOrder: LevelOrder): Pair<BigInteger, BigInteger> {
+        val level = levels[levelOrder.levelIx]
+        return if (level.side == BookSide.Buy) {
+            BigInteger.ZERO to notional(levelOrder.quantity, level.price, baseDecimals, quoteDecimals)
+        } else {
+            levelOrder.quantity to BigInteger.ZERO
+        }
+    }
+
+    // this will only change an order's price and quantity
+    // if the price change would alter the book side, no change is made
+    fun changeOrder(orderChange: Order): OrderDisposition? {
+        return ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
+            val level = levels[order.levelIx]
+            val newPrice = orderChange.price.toBigDecimal()
+            if (newPrice == level.price) {
+                val newQuantity = orderChange.amount.toBigInteger()
+                level.totalQuantity += (newQuantity - order.quantity)
+                order.quantity = newQuantity
+                OrderDisposition.Accepted
+            } else if (level.side == BookSide.Buy && newPrice < marketPrice || level.side == BookSide.Sell && newPrice > marketPrice) {
+                val wallet = order.wallet.value
+                removeOrder(order.guid)
+                addOrder(
+                    order {
+                        this.guid = orderChange.guid
+                        this.type = if (level.side == BookSide.Buy) Order.Type.LimitBuy else Order.Type.LimitSell
+                        this.wallet = wallet
+                        this.amount = orderChange.amount
+                        this.price = orderChange.price
+                    },
+                )
+                OrderDisposition.Accepted
+            } else {
+                null
+            }
+        }
     }
 }

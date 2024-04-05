@@ -3,6 +3,7 @@ package co.chainring.testutils
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.core.MarketId
+import co.chainring.sequencer.core.OrderGuid
 import co.chainring.sequencer.core.WalletAddress
 import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
@@ -49,6 +50,47 @@ class SequencerClient {
                 }
             },
         )
+
+    fun changeOrder(
+        marketId: MarketId,
+        guid: OrderGuid,
+        amount: Long,
+        price: String,
+    ) = sequencer.processRequest(
+        sequencerRequest {
+            this.guid = UUID.randomUUID().toString()
+            this.type = SequencerRequest.Type.ApplyOrderBatch
+            this.orderBatch = orderBatch {
+                this.marketId = marketId.value
+                this.ordersToChange.add(
+                    order {
+                        this.guid = guid.value
+                        this.amount = amount.toBigInteger().toIntegerValue()
+                        this.price = price.toBigDecimal().toDecimalValue()
+                    },
+                )
+            }
+        },
+    )
+
+    fun cancelOrder(marketId: MarketId, guid: Long) =
+        sequencer.processRequest(
+            sequencerRequest {
+                this.guid = UUID.randomUUID().toString()
+                this.type = SequencerRequest.Type.ApplyOrderBatch
+                this.orderBatch = orderBatch {
+                    this.marketId = marketId.value
+                    this.ordersToCancel.add(
+                        guid,
+                    )
+                }
+            },
+        )
+
+    fun cancelOrder(
+        marketId: MarketId,
+        guid: OrderGuid,
+    ) = cancelOrder(marketId, guid.value)
 
     fun createMarket(marketId: MarketId, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal = "17.525".toBigDecimal(), baseDecimals: Int = 8, quoteDecimals: Int = 18) {
         val createMarketResponse = sequencer.processRequest(
