@@ -37,7 +37,7 @@ sealed class CreateOrderApiRequest {
         override val marketId: MarketId,
         override val side: OrderSide,
         override val amount: BigIntegerJson,
-        val price: BigIntegerJson,
+        val price: BigDecimalJson,
     ) : CreateOrderApiRequest()
 }
 
@@ -60,7 +60,7 @@ sealed class UpdateOrderApiRequest {
     data class Limit(
         override val id: OrderId,
         override val amount: BigIntegerJson,
-        val price: BigIntegerJson,
+        val price: BigDecimalJson,
     ) : UpdateOrderApiRequest()
 }
 
@@ -104,7 +104,7 @@ sealed class Order {
         override val side: OrderSide,
         override val amount: BigIntegerJson,
         override val originalAmount: BigIntegerJson,
-        val price: BigIntegerJson,
+        val price: BigDecimalJson,
         override val executions: List<Execution>,
         override val timing: Timing,
     ) : Order()
@@ -113,7 +113,7 @@ sealed class Order {
     data class Execution(
         val timestamp: Instant,
         val amount: BigIntegerJson,
-        val price: BigIntegerJson,
+        val price: BigDecimalJson,
         val role: ExecutionRole,
         val feeAmount: BigIntegerJson,
         val feeSymbol: Symbol,

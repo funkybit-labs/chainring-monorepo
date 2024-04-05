@@ -56,7 +56,7 @@ class OrderRoutesApiTest {
             marketId = MarketId("USDC/DAI"),
             side = OrderSide.Buy,
             amount = BigDecimal("1").toFundamentalUnits(18),
-            price = BigDecimal("2").toFundamentalUnits(18),
+            price = BigDecimal("2"),
         )
         val limitOrder = apiClient.createOrder(limitOrderApiRequest)
 
@@ -65,7 +65,7 @@ class OrderRoutesApiTest {
         assertEquals(limitOrder.marketId, limitOrderApiRequest.marketId)
         assertEquals(limitOrder.side, limitOrderApiRequest.side)
         assertEquals(limitOrder.amount, limitOrderApiRequest.amount)
-        assertEquals(limitOrder.price, limitOrderApiRequest.price)
+        assertEquals(0, limitOrder.price.compareTo(limitOrderApiRequest.price))
 
         // order creation is idempotent
         assertEquals(limitOrder.id, apiClient.createOrder(limitOrderApiRequest).id)
@@ -99,12 +99,12 @@ class OrderRoutesApiTest {
             apiRequest = UpdateOrderApiRequest.Limit(
                 id = limitOrder.id,
                 amount = BigDecimal("3").toFundamentalUnits(18),
-                price = BigDecimal("4").toFundamentalUnits(18),
+                price = BigDecimal("4"),
             ),
         )
         assertIs<Order.Limit>(updatedOrder)
         assertEquals(BigDecimal("3").toFundamentalUnits(18), updatedOrder.amount)
-        assertEquals(BigDecimal("4").toFundamentalUnits(18), updatedOrder.price)
+        assertEquals(0, BigDecimal("4").compareTo(updatedOrder.price))
         wsClient.waitForMessage().also { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
@@ -140,7 +140,7 @@ class OrderRoutesApiTest {
                     apiRequest = UpdateOrderApiRequest.Limit(
                         id = OrderId.generate(),
                         amount = BigDecimal("3").toFundamentalUnits(18),
-                        price = BigDecimal("4").toFundamentalUnits(18),
+                        price = BigDecimal("4"),
                     ),
                 )
             },
@@ -163,7 +163,7 @@ class OrderRoutesApiTest {
                 marketId = MarketId("USDC/DAI"),
                 side = OrderSide.Buy,
                 amount = BigDecimal("1").toFundamentalUnits(18),
-                price = BigDecimal("2").toFundamentalUnits(18),
+                price = BigDecimal("2"),
             ),
         )
         apiClient.cancelOrder(limitOrder.id)
@@ -172,7 +172,7 @@ class OrderRoutesApiTest {
                 apiRequest = UpdateOrderApiRequest.Limit(
                     id = limitOrder.id,
                     amount = BigDecimal("3").toFundamentalUnits(18),
-                    price = BigDecimal("4").toFundamentalUnits(18),
+                    price = BigDecimal("4"),
                 ),
             )
         }.also {
@@ -203,7 +203,7 @@ class OrderRoutesApiTest {
             marketId = MarketId("USDC/DAI"),
             side = OrderSide.Buy,
             amount = BigDecimal("1").toFundamentalUnits(18),
-            price = BigDecimal("2").toFundamentalUnits(18),
+            price = BigDecimal("2"),
         )
         repeat(times = 10) {
             apiClient.createOrder(limitOrderApiRequest.copy(nonce = UUID.randomUUID().toString()))

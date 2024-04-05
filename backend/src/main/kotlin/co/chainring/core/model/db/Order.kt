@@ -11,6 +11,7 @@ import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.update
+import java.math.BigDecimal
 import java.math.BigInteger
 
 @Serializable
@@ -75,7 +76,7 @@ object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
     )
     val amount = decimal("amount", 30, 0)
     val originalAmount = decimal("original_amount", 30, 0)
-    val price = decimal("price", 30, 0).nullable()
+    val price = decimal("price", 30, 18).nullable()
     val updatedAt = timestamp("updated_at").nullable()
     val updatedBy = varchar("updated_by", 10485760).nullable()
     val closedAt = timestamp("closed_at").nullable()
@@ -144,7 +145,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             type: OrderType,
             side: OrderSide,
             amount: BigInteger,
-            price: BigInteger?,
+            price: BigDecimal?,
         ) = OrderEntity.new(OrderId.generate()) {
             val now = Clock.System.now()
             this.nonce = nonce
@@ -184,7 +185,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         }
     }
 
-    fun update(amount: BigInteger, price: BigInteger?) {
+    fun update(amount: BigInteger, price: BigDecimal?) {
         val now = Clock.System.now()
         this.updatedAt = now
         this.amount = amount
@@ -217,10 +218,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         toReal = { it.toBigInteger() },
         toColumn = { it.toBigDecimal() },
     )
-    var price by OrderTable.price.transform(
-        toReal = { it?.toBigInteger() },
-        toColumn = { it?.toBigDecimal() },
-    )
+    var price by OrderTable.price
     var updatedAt by OrderTable.updatedAt
     var updatedBy by OrderTable.updatedBy
     var closedAt by OrderTable.closedAt

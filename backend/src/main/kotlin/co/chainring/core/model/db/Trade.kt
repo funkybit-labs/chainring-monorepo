@@ -30,7 +30,7 @@ object TradeTable : GUIDTable<TradeId>("trade", ::TradeId) {
     val marketGuid = reference("market_guid", MarketTable).index()
     val timestamp = timestamp("timestamp")
     val amount = decimal("amount", 30, 0)
-    val price = decimal("price", 30, 0)
+    val price = decimal("price", 30, 18)
     val settlementStatus = customEnumeration(
         "settlement_status",
         "SettlementStatus",
@@ -61,10 +61,7 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
         toReal = { it.toBigInteger() },
         toColumn = { it.toBigDecimal() },
     )
-    var price by TradeTable.price.transform(
-        toReal = { it.toBigInteger() },
-        toColumn = { it.toBigDecimal() },
-    )
+    var price by TradeTable.price
 
     var settlementStatus by TradeTable.settlementStatus
     var settledAt by TradeTable.settledAt

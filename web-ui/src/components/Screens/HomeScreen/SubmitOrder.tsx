@@ -48,7 +48,7 @@ export default function SubmitOrder({
         type: 'limit',
         side: side,
         amount: parseUnits(amount, baseSymbol.decimals),
-        price: parseUnits(price, quoteSymbol.decimals)
+        price: Number(price)
       })
     }
   }

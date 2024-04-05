@@ -1,7 +1,6 @@
 package co.chainring.apps.api
 
 import co.chainring.apps.api.model.Balance
-import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.UpdateOrderApiRequest
@@ -17,34 +16,35 @@ import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
 import kotlinx.datetime.Clock
+import java.math.BigDecimal
 import java.math.BigInteger
 
 object Examples {
 
-    val crateMarketOrderRequest = CreateOrderApiRequest.Market(
+    val createMarketOrderRequest = CreateOrderApiRequest.Market(
         nonce = "123",
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
-        amount = BigIntegerJson("100"),
+        amount = BigInteger("100"),
     )
 
-    val crateLimitOrderRequest = CreateOrderApiRequest.Limit(
+    val createLimitOrderRequest = CreateOrderApiRequest.Limit(
         nonce = "123",
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
-        amount = BigIntegerJson("100"),
-        price = BigIntegerJson("100"),
+        amount = BigInteger("100"),
+        price = BigDecimal("100"),
     )
 
     val updateMarketOrderRequest = UpdateOrderApiRequest.Market(
         id = OrderId("123"),
-        amount = BigIntegerJson("100"),
+        amount = BigInteger("100"),
     )
 
     val updateLimitOrderRequest = UpdateOrderApiRequest.Limit(
         id = OrderId("123"),
-        amount = BigIntegerJson("100"),
-        price = BigIntegerJson("100"),
+        amount = BigInteger("100"),
+        price = BigDecimal("100"),
     )
 
     val marketOrderResponse = Order.Market(
@@ -52,15 +52,15 @@ object Examples {
         status = OrderStatus.Partial,
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
-        amount = BigIntegerJson("100"),
-        originalAmount = BigIntegerJson("100"),
+        amount = BigInteger("100"),
+        originalAmount = BigInteger("100"),
         executions = listOf(
             Order.Execution(
                 timestamp = Clock.System.now(),
-                amount = BigIntegerJson("50"),
-                price = BigIntegerJson("500"),
+                amount = BigInteger("50"),
+                price = BigDecimal("500"),
                 role = ExecutionRole.Maker,
-                feeAmount = BigIntegerJson("0"),
+                feeAmount = BigInteger("0"),
                 feeSymbol = Symbol("ETH"),
             ),
         ),
@@ -76,9 +76,9 @@ object Examples {
         status = OrderStatus.Open,
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
-        amount = BigIntegerJson("100"),
-        price = BigIntegerJson("100"),
-        originalAmount = BigIntegerJson("100"),
+        amount = BigInteger("100"),
+        price = BigDecimal("100"),
+        originalAmount = BigInteger("100"),
         executions = emptyList(),
         timing = Order.Timing(
             createdAt = Clock.System.now(),
@@ -89,15 +89,15 @@ object Examples {
 
     val USDCBalance = Balance(
         symbol = Symbol("USDC"),
-        total = BigIntegerJson("0"),
-        available = BigIntegerJson("0"),
+        total = BigInteger("0"),
+        available = BigInteger("0"),
         lastUpdated = Clock.System.now(),
     )
 
     val ETHBalance = Balance(
         symbol = Symbol("ETH"),
-        total = BigIntegerJson("1000000000000"),
-        available = BigIntegerJson("500000"),
+        total = BigInteger("1000000000000"),
+        available = BigInteger("500000"),
         lastUpdated = Clock.System.now(),
     )
 
