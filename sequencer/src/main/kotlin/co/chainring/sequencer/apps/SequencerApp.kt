@@ -82,7 +82,8 @@ class SequencerApp : BaseApp() {
                 if (market == null) {
                     error = SequencerError.UnknownMarket
                 } else {
-                    if (withinBalanceLimit(market, orderBatch)) {
+                    error = checkLimits(market, orderBatch)
+                    if (error == null) {
                         val result = market.applyOrderBatch(orderBatch)
                         ordersChanged = result.ordersChanged
                         trades = result.createdTrades
@@ -96,8 +97,6 @@ class SequencerApp : BaseApp() {
                                 it.delta.toBigInteger(),
                             ) { a, b -> BigInteger.ZERO.max(a + b) }
                         }
-                    } else {
-                        error = SequencerError.ExceedsLimit
                     }
                 }
                 sequencerResponse {
@@ -170,7 +169,7 @@ class SequencerApp : BaseApp() {
         }
     }
 
-    private fun withinBalanceLimit(market: Market, orderBatch: OrderBatch): Boolean {
+    private fun checkLimits(market: Market, orderBatch: OrderBatch): SequencerError? {
         // compute cumulative assets required change from applying all orders in order batch
         val baseAssetsRequired = mutableMapOf<WalletAddress, BigInteger>()
         val quoteAssetsRequired = mutableMapOf<WalletAddress, BigInteger>()
@@ -200,6 +199,8 @@ class SequencerApp : BaseApp() {
                             orderChange.amount.toBigInteger() - order.quantity,
                             ::sumBigIntegers,
                         )
+                    } else {
+                        return SequencerError.ChangeCrossesMarket
                     }
                 }
                 if (oldQuoteAssets > BigInteger.ZERO) { // LimitBuy
@@ -222,6 +223,8 @@ class SequencerApp : BaseApp() {
                                 ),
                             ::sumBigIntegers,
                         )
+                    } else {
+                        return SequencerError.ChangeCrossesMarket
                     }
                 }
             }
@@ -244,7 +247,7 @@ class SequencerApp : BaseApp() {
                         ?: BigInteger.ZERO
                     )
             ) {
-                return false
+                return SequencerError.ExceedsLimit
             }
         }
 
@@ -254,11 +257,11 @@ class SequencerApp : BaseApp() {
                         ?: BigInteger.ZERO
                     )
             ) {
-                return false
+                return SequencerError.ExceedsLimit
             }
         }
 
-        return true
+        return null
     }
 
     override fun start() {

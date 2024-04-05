@@ -26,7 +26,19 @@ data class LevelOrder(
     var wallet: WalletAddress,
     var quantity: BigInteger,
     var levelIx: Int,
-)
+) {
+    fun update(order: Order) {
+        this.guid = order.guid.toOrderGuid()
+        this.wallet = order.wallet.toWalletAddress()
+        this.quantity = order.amount.toBigInteger()
+    }
+
+    fun reset() {
+        this.guid = OrderGuid.none
+        this.wallet = WalletAddress.none
+        this.quantity = BigInteger.ZERO
+    }
+}
 
 class OrderBookLevel(levelIx: Int, var side: BookSide, val price: BigDecimal, val maxOrderCount: Int) {
     val orders = Array(maxOrderCount) { _ -> LevelOrder(0L.toOrderGuid(), 0L.toWalletAddress(), BigInteger.ZERO, levelIx) }
@@ -39,14 +51,9 @@ class OrderBookLevel(levelIx: Int, var side: BookSide, val price: BigDecimal, va
         return if (nextTail == orderHead) {
             OrderDisposition.Rejected to null
         } else {
-            val amount = order.amount.toBigInteger()
-            orders[orderTail].let {
-                it.guid = order.guid.toOrderGuid()
-                it.wallet = order.wallet.toWalletAddress()
-                it.quantity = amount
-            }
             val levelOrder = orders[orderTail]
-            totalQuantity += amount
+            levelOrder.update(order)
+            totalQuantity += levelOrder.quantity
             orderTail = nextTail
             OrderDisposition.Accepted to levelOrder
         }
@@ -96,6 +103,7 @@ class OrderBookLevel(levelIx: Int, var side: BookSide, val price: BigDecimal, va
     fun removeLevelOrder(levelOrder: LevelOrder) {
         val orderIx = orders.indexOf(levelOrder)
         totalQuantity -= levelOrder.quantity
+        levelOrder.reset()
         if (orderIx < orderHead) {
             // copy from after orderIx to orderTail, and decrement orderTail
             if (orderIx < orderTail) {
@@ -317,8 +325,7 @@ class OrderBook(val maxLevelCount: Int, maxOrderCount: Int, val tickSize: BigDec
     // this will only change an order's price and quantity
     // if the price change would alter the book side, no change is made
     fun changeOrder(orderChange: Order): OrderDisposition? {
-        val order = ordersByGuid[orderChange.guid.toOrderGuid()]
-        return order?.let {
+        return ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
             val level = levels[order.levelIx]
             val newPrice = orderChange.price.toBigDecimal()
             if (newPrice == level.price) {
@@ -327,12 +334,13 @@ class OrderBook(val maxLevelCount: Int, maxOrderCount: Int, val tickSize: BigDec
                 order.quantity = newQuantity
                 OrderDisposition.Accepted
             } else if (level.side == BookSide.Buy && newPrice < marketPrice || level.side == BookSide.Sell && newPrice > marketPrice) {
+                val wallet = order.wallet.value
                 removeOrder(order.guid)
                 addOrder(
                     order {
                         this.guid = orderChange.guid
                         this.type = if (level.side == BookSide.Buy) Order.Type.LimitBuy else Order.Type.LimitSell
-                        this.wallet = order.wallet.value
+                        this.wallet = wallet
                         this.amount = orderChange.amount
                         this.price = orderChange.price
                     },

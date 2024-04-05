@@ -3,6 +3,9 @@ package co.chainring.sequencer.core
 @JvmInline
 value class WalletAddress(val value: Long) {
     override fun toString(): String = value.toString()
+    companion object {
+        val none = WalletAddress(0L)
+    }
 }
 
 fun Long.toWalletAddress() = WalletAddress(this)
@@ -10,6 +13,9 @@ fun Long.toWalletAddress() = WalletAddress(this)
 @JvmInline
 value class OrderGuid(val value: Long) {
     override fun toString(): String = value.toString()
+    companion object {
+        val none = OrderGuid(0L)
+    }
 }
 
 fun Long.toOrderGuid() = OrderGuid(this)

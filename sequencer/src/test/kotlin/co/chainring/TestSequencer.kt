@@ -295,7 +295,7 @@ class TestSequencer {
         assertEquals(OrderDisposition.Accepted, response4.ordersChangedList.first().disposition)
 
         // cannot change the price to cross the book
-        assertEquals(0, sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 999L, "17.50").ordersChangedCount)
+        assertEquals(SequencerError.ChangeCrossesMarket, sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 999L, "17.50").error)
 
         // check for a limit buy
         sequencer.deposit(maker, marketId.quoteAsset(), wei(BigDecimal.TEN))
