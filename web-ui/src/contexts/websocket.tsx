@@ -1,7 +1,7 @@
 import { useEffect, createContext, useRef, useContext } from 'react'
 import { ExponentialBackoff, Websocket, WebsocketBuilder } from 'websocket-ts'
-import { apiBaseUrl } from 'ApiClient'
-import { UseAccountReturnType } from 'wagmi/src/hooks/useAccount'
+import { apiBaseUrl } from 'apiClient'
+import { UseAccountReturnType } from 'wagmi'
 import { loadAuthToken } from 'Auth'
 import {
   IncomingWSMessage,

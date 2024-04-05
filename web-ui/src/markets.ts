@@ -1,4 +1,4 @@
-import { Market as ApiMarket, TradingSymbol } from 'ApiClient'
+import { Market as ApiMarket, TradingSymbol } from 'apiClient'
 import TradingSymbols from 'tradingSymbols'
 
 export type Market = {

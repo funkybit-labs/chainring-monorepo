@@ -1,5 +1,5 @@
 import z from 'zod'
-import { OrderSchema, TradeSchema } from 'ApiClient'
+import { OrderSchema, TradeSchema } from 'apiClient'
 
 export type SubscriptionTopic =
   | { type: 'OrderBook'; marketId: string }

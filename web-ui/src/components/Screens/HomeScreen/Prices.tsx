@@ -4,7 +4,7 @@ import React, { Fragment, useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
 import { Direction, OHLC, pricesTopic, Publishable } from 'websocketMessages'
 import { mergeOHLC } from 'utils/pricesUtils'
-import { useWebsocketSubscription } from 'components/WebsocketContext'
+import { useWebsocketSubscription } from 'contexts/websocket'
 
 type PriceParameters = {
   totalWidth: number

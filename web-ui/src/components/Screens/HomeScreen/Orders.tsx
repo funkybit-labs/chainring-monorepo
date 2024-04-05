@@ -1,4 +1,4 @@
-import { apiClient, Order, UpdateOrderRequest } from 'ApiClient'
+import { apiClient, Order, UpdateOrderRequest } from 'apiClient'
 import { useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import { TrashIcon } from '@heroicons/react/24/outline'
@@ -12,7 +12,7 @@ import { Modal } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
 import Markets from 'markets'
-import { useWebsocketSubscription } from 'components/WebsocketContext'
+import { useWebsocketSubscription } from 'contexts/websocket'
 import { ordersTopic, Publishable } from 'websocketMessages'
 
 export default function Orders({ markets }: { markets: Markets }) {

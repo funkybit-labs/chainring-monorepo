@@ -1,5 +1,5 @@
 import { Address, formatUnits } from 'viem'
-import { TradingSymbol } from 'ApiClient'
+import { TradingSymbol } from 'apiClient'
 import { useBlockNumber, useReadContract, useReadContracts } from 'wagmi'
 import { ExchangeAbi } from 'contracts'
 import Spinner from 'components/common/Spinner'

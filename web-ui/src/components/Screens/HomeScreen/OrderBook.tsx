@@ -3,7 +3,7 @@ import { calculateTickSpacing } from 'utils/orderBookUtils'
 import { Fragment, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
 import { OrderBook, Publishable, orderBookTopic } from 'websocketMessages'
-import { useWebsocketSubscription } from 'components/WebsocketContext'
+import { useWebsocketSubscription } from 'contexts/websocket'
 
 type OrderBookParameters = {
   bookWidth: number

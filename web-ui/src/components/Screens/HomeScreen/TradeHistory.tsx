@@ -3,8 +3,8 @@ import { useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import { formatUnits } from 'viem'
 import { format } from 'date-fns'
-import { Trade } from 'ApiClient'
-import { useWebsocketSubscription } from 'components/WebsocketContext'
+import { Trade } from 'apiClient'
+import { useWebsocketSubscription } from 'contexts/websocket'
 
 export default function TradeHistory() {
   const [trades, setTrades] = useState<Trade[]>(() => [])

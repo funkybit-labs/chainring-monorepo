@@ -1,4 +1,4 @@
-import { OHLC } from 'ApiClient'
+import { OHLC } from 'websocketMessages'
 
 export function mergeOHLC(ohlc: OHLC[], durationMs: number): OHLC[] {
   if (ohlc.length > 0) {

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { apiClient } from 'ApiClient'
+import { apiClient } from 'apiClient'
 import { useAccount } from 'wagmi'
 import Balances from 'components/Screens/HomeScreen/Balances'
 import { Header } from 'components/Screens/Header'
@@ -12,7 +12,7 @@ import Spinner from 'components/common/Spinner'
 import Orders from 'components/Screens/HomeScreen/Orders'
 import TradingSymbols from 'tradingSymbols'
 import Markets, { Market } from 'markets'
-import { WebsocketProvider } from 'components/WebsocketContext'
+import { WebsocketProvider } from 'contexts/websocket'
 
 export default function HomeScreen() {
   const configQuery = useQuery({
