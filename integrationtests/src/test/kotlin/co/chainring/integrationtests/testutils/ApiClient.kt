@@ -91,7 +91,7 @@ class ApiClient(val ecKeyPair: ECKeyPair?) {
             val body: String = Json.encodeToString(message)
             val signature: EvmSignature = ECHelper.signData(Credentials.create(ecKeyPair), EIP712Helper.computeHash(message))
 
-            return "$body.${signature.value}"
+            return "${Base64.getUrlEncoder().encodeToString(body.toByteArray())}.${signature.value}"
         }
 
         private fun execute(request: Request): Response =
