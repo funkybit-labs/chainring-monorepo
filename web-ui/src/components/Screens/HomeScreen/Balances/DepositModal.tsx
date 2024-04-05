@@ -11,7 +11,7 @@ import {
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import { TradingSymbol } from 'ApiClient'
+import { TradingSymbol } from 'apiClient'
 import { useQuery } from '@tanstack/react-query'
 import { cleanAndFormatNumberInput } from 'utils'
 

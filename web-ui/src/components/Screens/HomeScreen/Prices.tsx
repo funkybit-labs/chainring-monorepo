@@ -2,9 +2,9 @@ import { Widget } from 'components/common/Widget'
 import { calculateTickSpacing } from 'utils/orderBookUtils'
 import React, { Fragment, useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
-import { Websocket, WebsocketEvent } from 'websocket-ts'
-import { Direction, IncomingWSMessage, OHLC, PricesSchema } from 'ApiClient'
+import { Direction, OHLC, pricesTopic, Publishable } from 'websocketMessages'
 import { mergeOHLC } from 'utils/pricesUtils'
+import { useWebsocketSubscription } from 'contexts/websocket'
 
 type PriceParameters = {
   totalWidth: number
@@ -69,62 +69,24 @@ function calculateParameters(ohlc: OHLC[]): PriceParameters {
   }
 }
 
-export function Prices({ ws, marketId }: { ws: Websocket; marketId: string }) {
+export function Prices({ marketId }: { marketId: string }) {
   const [zoom, setZoom] = useState<ZoomLevels>('Week')
   const [latestStart, setLatestStart] = useState<Date | undefined>()
   const [ohlc, setOhlc] = useState<OHLC[]>([])
   const [params, setParams] = useState<PriceParameters>()
 
-  useEffect(() => {
-    const subscribe = () => {
-      setOhlc([])
-      ws.send(
-        JSON.stringify({
-          type: 'Subscribe',
-          topic: {
-            type: 'Prices',
-            marketId
-          }
-        })
-      )
-    }
-    ws.addEventListener(WebsocketEvent.reconnect, subscribe)
-    if (ws.readyState == WebSocket.OPEN) {
-      subscribe()
-    } else {
-      ws.addEventListener(WebsocketEvent.open, subscribe)
-    }
-    const handleMessage = (ws: Websocket, event: MessageEvent) => {
-      const message = JSON.parse(event.data) as IncomingWSMessage
-      if (message.type == 'Publish' && message.data.type == 'Prices') {
-        // note that we don't try to parse IncomingWSMessage via predefined schema in order to support
-        // adding new message types on BE before supporting them on the client-side
-        const prices = PricesSchema.parse(message.data)
-        if (prices.full) {
-          setOhlc(prices.ohlc)
+  useWebsocketSubscription({
+    topic: useMemo(() => pricesTopic(marketId), [marketId]),
+    handler: (message: Publishable) => {
+      if (message.type === 'Prices') {
+        if (message.full) {
+          setOhlc(message.ohlc)
         } else {
-          setOhlc((o) => o.concat([...prices.ohlc]))
+          setOhlc((o) => o.concat([...message.ohlc]))
         }
       }
     }
-    ws.addEventListener(WebsocketEvent.message, handleMessage)
-    return () => {
-      ws.removeEventListener(WebsocketEvent.message, handleMessage)
-      ws.removeEventListener(WebsocketEvent.reconnect, subscribe)
-      ws.removeEventListener(WebsocketEvent.open, subscribe)
-      if (ws.readyState == WebSocket.OPEN) {
-        ws.send(
-          JSON.stringify({
-            type: 'Unsubscribe',
-            topic: {
-              type: 'Prices',
-              marketId
-            }
-          })
-        )
-      }
-    }
-  }, [ws, marketId])
+  })
 
   // Allow keyboard zoom and pan
   useEffect(() => {
