@@ -2,6 +2,7 @@ package co.chainring.sequencer.core
 
 import co.chainring.sequencer.proto.BalanceChange
 import co.chainring.sequencer.proto.Order
+import co.chainring.sequencer.proto.OrderBatch
 import co.chainring.sequencer.proto.OrderChanged
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.TradeCreated
@@ -27,11 +28,31 @@ class Market(
         val balanceChanges: List<BalanceChange>,
     )
 
-    fun addOrders(ordersToAddList: List<Order>): AddOrdersResult {
+    fun applyOrderBatch(orderBatch: OrderBatch): AddOrdersResult {
         val ordersChanged = mutableListOf<OrderChanged>()
         val createdTrades = mutableListOf<TradeCreated>()
         val balanceChanges = mutableMapOf<Pair<WalletAddress, Asset>, BigInteger>()
-        ordersToAddList.forEach { order ->
+        orderBatch.ordersToCancelList.forEach { orderGuid ->
+            if (orderBook.removeOrder(orderGuid.toOrderGuid())) {
+                ordersChanged.add(
+                    orderChanged {
+                        this.guid = orderGuid
+                        this.disposition = OrderDisposition.Canceled
+                    },
+                )
+            }
+        }
+        orderBatch.ordersToChangeList.forEach { orderChange ->
+            orderBook.changeOrder(orderChange)?.let { orderDisposition ->
+                ordersChanged.add(
+                    orderChanged {
+                        this.guid = orderChange.guid
+                        this.disposition = orderDisposition
+                    },
+                )
+            }
+        }
+        orderBatch.ordersToAddList.forEach { order ->
             val orderResult = orderBook.addOrder(order)
             ordersChanged.add(
                 orderChanged {
@@ -44,9 +65,9 @@ class Market(
                     tradeCreated {
                         if (order.type == Order.Type.MarketBuy) {
                             buyGuid = order.guid
-                            sellGuid = execution.counterGuid.value
+                            sellGuid = execution.counterOrder.guid.value
                         } else {
-                            buyGuid = execution.counterGuid.value
+                            buyGuid = execution.counterOrder.guid.value
                             sellGuid = order.guid
                         }
                         amount = execution.amount.toIntegerValue()
@@ -55,7 +76,7 @@ class Market(
                 )
                 ordersChanged.add(
                     orderChanged {
-                        this.guid = execution.counterGuid.value
+                        this.guid = execution.counterOrder.guid.value
                         this.disposition = if (execution.counterOrderExhausted) OrderDisposition.Filled else OrderDisposition.PartiallyFilled
                     },
                 )
@@ -66,7 +87,7 @@ class Market(
                     ).toBigInteger()
                 val base = id.baseAsset()
                 val quote = id.quoteAsset()
-                val(buyer, seller) = if (order.type == Order.Type.MarketBuy) wallet to execution.counterWallet else execution.counterWallet to wallet
+                val(buyer, seller) = if (order.type == Order.Type.MarketBuy) wallet to execution.counterOrder.wallet else execution.counterOrder.wallet to wallet
                 balanceChanges.merge(Pair(buyer, quote), -notional, ::sumBigIntegers)
                 balanceChanges.merge(Pair(seller, base), -execution.amount, ::sumBigIntegers)
                 balanceChanges.merge(Pair(buyer, base), execution.amount, ::sumBigIntegers)

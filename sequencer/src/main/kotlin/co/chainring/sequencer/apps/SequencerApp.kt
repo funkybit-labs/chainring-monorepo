@@ -12,6 +12,7 @@ import co.chainring.sequencer.core.toAsset
 import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
 import co.chainring.sequencer.core.toIntegerValue
+import co.chainring.sequencer.core.toOrderGuid
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.BalanceChange
 import co.chainring.sequencer.proto.Order
@@ -82,7 +83,7 @@ class SequencerApp : BaseApp() {
                     error = SequencerError.UnknownMarket
                 } else {
                     if (withinBalanceLimit(market, orderBatch)) {
-                        val result = market.addOrders(orderBatch.ordersToAddList)
+                        val result = market.applyOrderBatch(orderBatch)
                         ordersChanged = result.ordersChanged
                         trades = result.createdTrades
                         balanceChanges = result.balanceChanges
@@ -189,7 +190,53 @@ class SequencerApp : BaseApp() {
                 else -> {}
             }
         }
-        // TODO CHAIN-81 - handle ordersToChangeList and ordersToCancelList
+        orderBatch.ordersToChangeList.forEach { orderChange ->
+            market.orderBook.ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
+                val (oldBaseAssets, oldQuoteAssets) = market.orderBook.assetsReservedForOrder(order)
+                if (oldBaseAssets > BigInteger.ZERO) { // LimitSell
+                    if (orderChange.price.toBigDecimal() > market.orderBook.marketPrice) {
+                        baseAssetsRequired.merge(
+                            order.wallet,
+                            orderChange.amount.toBigInteger() - order.quantity,
+                            ::sumBigIntegers,
+                        )
+                    }
+                }
+                if (oldQuoteAssets > BigInteger.ZERO) { // LimitBuy
+                    if (orderChange.price.toBigDecimal() < market.orderBook.marketPrice) {
+                        quoteAssetsRequired.merge(
+                            order.wallet,
+                            (
+                                notional(
+                                    orderChange.amount,
+                                    orderChange.price,
+                                    market.baseDecimals,
+                                    market.quoteDecimals,
+                                ) -
+                                    notional(
+                                        order.quantity,
+                                        market.orderBook.levels[order.levelIx].price,
+                                        market.baseDecimals,
+                                        market.quoteDecimals,
+                                    )
+                                ),
+                            ::sumBigIntegers,
+                        )
+                    }
+                }
+            }
+        }
+        orderBatch.ordersToCancelList.forEach { guid ->
+            market.orderBook.ordersByGuid[guid.toOrderGuid()]?.let { order ->
+                val (baseAssets, quoteAssets) = market.orderBook.assetsReservedForOrder(order)
+                if (baseAssets > BigInteger.ZERO) {
+                    baseAssetsRequired.merge(order.wallet, -baseAssets, ::sumBigIntegers)
+                }
+                if (quoteAssets > BigInteger.ZERO) {
+                    quoteAssetsRequired.merge(order.wallet, -quoteAssets, ::sumBigIntegers)
+                }
+            }
+        }
 
         baseAssetsRequired.forEach { (wallet, required) ->
             if (required + market.orderBook.baseAssetsRequired(wallet) > (
