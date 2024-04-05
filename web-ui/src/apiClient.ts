@@ -1,7 +1,7 @@
 import z from 'zod'
 import { Zodios } from '@zodios/core'
 import { pluginToken } from '@zodios/plugins'
-import { loadAuthToken } from 'Auth'
+import { loadAuthToken } from 'auth'
 
 export const apiBaseUrl = import.meta.env.ENV_API_URL
 

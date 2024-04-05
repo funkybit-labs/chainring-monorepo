@@ -2,7 +2,7 @@ import { useEffect, createContext, useRef, useContext } from 'react'
 import { ExponentialBackoff, Websocket, WebsocketBuilder } from 'websocket-ts'
 import { apiBaseUrl } from 'apiClient'
 import { UseAccountReturnType } from 'wagmi'
-import { loadAuthToken } from 'Auth'
+import { loadAuthToken } from 'auth'
 import {
   IncomingWSMessage,
   Publishable,

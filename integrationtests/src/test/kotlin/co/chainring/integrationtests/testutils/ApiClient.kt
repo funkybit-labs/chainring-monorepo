@@ -1,7 +1,6 @@
 package co.chainring.integrationtests.testutils
 
-import co.chainring.apps.api.middleware.TokenClaims
-import co.chainring.apps.api.middleware.TokenHeader
+import co.chainring.apps.api.middleware.SignInMessage
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ApiErrors
 import co.chainring.apps.api.model.ConfigurationApiResponse
@@ -12,10 +11,14 @@ import co.chainring.apps.api.model.OrdersApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.core.evm.ECHelper
+import co.chainring.core.evm.EIP712Helper
+import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.WithdrawalId
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.Headers
@@ -29,7 +32,6 @@ import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
 import java.net.HttpURLConnection
 import java.util.Base64
-import java.util.UUID
 
 val apiServerRootUrl = System.getenv("API_URL") ?: "http://localhost:9999"
 val httpClient = OkHttpClient.Builder().build()
@@ -75,37 +77,21 @@ class ApiClient(val ecKeyPair: ECKeyPair?) {
 
         fun issueAuthToken(
             ecKeyPair: ECKeyPair = Keys.createEcKeyPair(),
-            issuedAt: Long = Clock.System.now().epochSeconds,
-            expiresAt: Long = issuedAt + 30 * 60,
-            issuer: String = "did:ethr:0x${Keys.getAddress(ecKeyPair)}",
-            audience: String = "chainring",
+            address: Address = Address("0x${Keys.getAddress(ecKeyPair)}"),
+            chainId: ChainId = ChainId(1337U),
+            timestamp: Instant = Clock.System.now(),
         ): String {
-            val header = Json.encodeToString(
-                TokenHeader(
-                    alg = "ES256K",
-                    typ = "JWT",
-                ),
-            )
-            val claims = Json.encodeToString(
-                TokenClaims(
-                    iat = issuedAt,
-                    ext = expiresAt,
-                    iss = issuer,
-                    aud = audience,
-                    tid = UUID.randomUUID().toString(),
-                ),
+            val message = SignInMessage(
+                message = "[ChainRing Labs] Please sign this message to verify your ownership of this wallet address. This action will not cost any gas fees.",
+                address = address,
+                chainId = chainId,
+                timestamp = timestamp.toString(),
             )
 
-            val encodedHeader = base64UrlEncode(header)
-            val encodedClaims = base64UrlEncode(claims)
-            val body = "$encodedHeader.$encodedClaims"
+            val body: String = Json.encodeToString(message)
+            val signature: EvmSignature = ECHelper.signData(Credentials.create(ecKeyPair), EIP712Helper.computeHash(message))
 
-            val messagePrefix = "\u0019Ethereum Signed Message:\n${body.length}"
-            val messageHash = ECHelper.sha3(messagePrefix.toByteArray() + body.toByteArray())
-
-            val signature: EvmSignature = ECHelper.signData(Credentials.create(ecKeyPair), messageHash)
-            val didToken = "$body.${signature.value}"
-            return didToken
+            return "$body.${signature.value}"
         }
 
         private fun execute(request: Request): Response =
