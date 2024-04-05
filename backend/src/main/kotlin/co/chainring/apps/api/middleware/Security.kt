@@ -27,7 +27,7 @@ import java.util.Base64
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 
-val signedLoginRequestHeader = object : Security {
+val signedTokenSecurity = object : Security {
     override val filter = Filter { next -> wrapWithAuthentication(next) }
 
     private fun wrapWithAuthentication(httpHandler: HttpHandler): HttpHandler = { request ->

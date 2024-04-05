@@ -1,6 +1,6 @@
 package co.chainring.apps.api
 
-import co.chainring.apps.api.middleware.signedLoginRequestHeader
+import co.chainring.apps.api.middleware.signedTokenSecurity
 import co.chainring.apps.api.model.BalancesApiResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.ContractRoute
@@ -21,7 +21,7 @@ object BalanceRoutes {
         return "balances" meta {
             operationId = "get-balances"
             summary = "Get balances"
-            security = signedLoginRequestHeader
+            security = signedTokenSecurity
             returning(
                 Status.OK,
                 responseBody to BalancesApiResponse(
