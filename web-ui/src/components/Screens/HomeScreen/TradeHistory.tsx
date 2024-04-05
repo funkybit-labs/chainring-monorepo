@@ -1,32 +1,19 @@
-import { IncomingWSMessage, Trade, TradesSchema } from 'ApiClient'
-import { useEffect, useState } from 'react'
+import { Publishable, tradesTopic } from 'websocketMessages'
+import { useState } from 'react'
 import { Widget } from 'components/common/Widget'
-import { Websocket, WebsocketEvent } from 'websocket-ts'
 import { formatUnits } from 'viem'
 import { format } from 'date-fns'
+import { Trade } from 'ApiClient'
+import { useWebsocketSubscription } from 'components/WebsocketContext'
 
-export default function TradeHistory({ ws }: { ws: Websocket }) {
+export default function TradeHistory() {
   const [trades, setTrades] = useState<Trade[]>(() => [])
 
-  useEffect(() => {
-    const subscribe = () => {
-      ws.send(
-        JSON.stringify({
-          type: 'Subscribe',
-          topic: { type: 'Trades' }
-        })
-      )
-    }
-    ws.addEventListener(WebsocketEvent.reconnect, subscribe)
-    if (ws.readyState == WebSocket.OPEN) {
-      subscribe()
-    } else {
-      ws.addEventListener(WebsocketEvent.open, subscribe)
-    }
-    const handleMessage = (ws: Websocket, event: MessageEvent) => {
-      const message = JSON.parse(event.data) as IncomingWSMessage
-      if (message.type == 'Publish' && message.data.type == 'Trades') {
-        const incomingTrades = TradesSchema.parse(message.data).trades
+  useWebsocketSubscription({
+    topic: tradesTopic,
+    handler: (message: Publishable) => {
+      if (message.type === 'Trades') {
+        const incomingTrades = message.trades
         setTrades((currentTrades) => {
           const newTrades = incomingTrades.filter(
             (incomingTrade) =>
@@ -38,21 +25,7 @@ export default function TradeHistory({ ws }: { ws: Websocket }) {
         })
       }
     }
-    ws.addEventListener(WebsocketEvent.message, handleMessage)
-    return () => {
-      ws.removeEventListener(WebsocketEvent.message, handleMessage)
-      ws.removeEventListener(WebsocketEvent.reconnect, subscribe)
-      ws.removeEventListener(WebsocketEvent.open, subscribe)
-      if (ws.readyState == WebSocket.OPEN) {
-        ws.send(
-          JSON.stringify({
-            type: 'Unsubscribe',
-            topic: { type: 'Trades' }
-          })
-        )
-      }
-    }
-  }, [ws])
+  })
 
   return (
     <Widget

@@ -43,7 +43,13 @@ class OrderRoutesApiTest {
 
         var wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribe(SubscriptionTopic.Orders)
-        val initialOrdersOverWs = wsClient.waitForMessage<Orders>().orders
+        val initialOrdersOverWs = wsClient.waitForMessage().let { message ->
+            assertEquals(SubscriptionTopic.Orders, message.topic)
+            message.data.let { data ->
+                assertIs<Orders>(data)
+                data.orders
+            }
+        }
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
             nonce = UUID.randomUUID().toString(),
@@ -65,15 +71,28 @@ class OrderRoutesApiTest {
         assertEquals(limitOrder.id, apiClient.createOrder(limitOrderApiRequest).id)
 
         // client is notified over websocket
-        wsClient.waitForMessage<OrderCreated>().also { event ->
-            assertEquals(limitOrder, event.order)
+        wsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Orders, message.topic)
+            message.data.let { data ->
+                assertIs<OrderCreated>(data)
+                assertEquals(limitOrder, data.order)
+            }
         }
         wsClient.close()
 
         // check that order is included in the orders list sent via websocket
         wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribe(SubscriptionTopic.Orders)
-        assertEquals(listOf(limitOrder) + initialOrdersOverWs, wsClient.waitForMessage<Orders>().orders)
+        assertEquals(
+            listOf(limitOrder) + initialOrdersOverWs,
+            wsClient.waitForMessage().let { message ->
+                assertEquals(SubscriptionTopic.Orders, message.topic)
+                message.data.let { data ->
+                    assertIs<Orders>(data)
+                    data.orders
+                }
+            },
+        )
 
         // update order
         val updatedOrder = apiClient.updateOrder(
@@ -86,16 +105,24 @@ class OrderRoutesApiTest {
         assertIs<Order.Limit>(updatedOrder)
         assertEquals(BigDecimal("3").toFundamentalUnits(18), updatedOrder.amount)
         assertEquals(BigDecimal("4").toFundamentalUnits(18), updatedOrder.price)
-        wsClient.waitForMessage<OrderUpdated>().also { event ->
-            assertEquals(updatedOrder, event.order)
+        wsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Orders, message.topic)
+            message.data.let { data ->
+                assertIs<OrderUpdated>(data)
+                assertEquals(updatedOrder, data.order)
+            }
         }
 
         // cancel order is idempotent
         apiClient.cancelOrder(limitOrder.id)
         val cancelledOrder = apiClient.getOrder(limitOrder.id)
         assertEquals(OrderStatus.Cancelled, cancelledOrder.status)
-        wsClient.waitForMessage<OrderUpdated>().also { event ->
-            assertEquals(cancelledOrder, event.order)
+        wsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Orders, message.topic)
+            message.data.let { data ->
+                assertIs<OrderUpdated>(data)
+                assertEquals(cancelledOrder, data.order)
+            }
         }
 
         wsClient.close()
@@ -163,7 +190,13 @@ class OrderRoutesApiTest {
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribe(SubscriptionTopic.Orders)
-        val initialOrdersOverWs = wsClient.waitForMessage<Orders>().orders
+        val initialOrdersOverWs = wsClient.waitForMessage().let { message ->
+            assertEquals(SubscriptionTopic.Orders, message.topic)
+            message.data.let { data ->
+                assertIs<Orders>(data)
+                data.orders
+            }
+        }
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
             nonce = Clock.System.now().toEpochMilliseconds().toString(),
@@ -183,9 +216,13 @@ class OrderRoutesApiTest {
         apiClient.cancelOpenOrders()
         assertTrue(apiClient.listOrders().orders.all { it.status == OrderStatus.Cancelled })
 
-        wsClient.waitForMessage<Orders>().also { event ->
-            assertNotEquals(event.orders, initialOrdersOverWs)
-            assertTrue(event.orders.all { it.status == OrderStatus.Cancelled })
+        wsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Orders, message.topic)
+            message.data.let { data ->
+                assertIs<Orders>(data)
+                assertNotEquals(initialOrdersOverWs, data.orders)
+                assertTrue(data.orders.all { it.status == OrderStatus.Cancelled })
+            }
         }
         wsClient.close()
     }

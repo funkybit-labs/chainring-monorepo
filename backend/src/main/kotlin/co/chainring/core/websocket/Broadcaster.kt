@@ -86,8 +86,8 @@ class Broadcaster {
         }
 
         when (topic) {
-            is SubscriptionTopic.OrderBook -> sendOrderBook(topic.marketId, client)
-            is SubscriptionTopic.Prices -> sendPrices(topic.marketId, client)
+            is SubscriptionTopic.OrderBook -> sendOrderBook(topic, client)
+            is SubscriptionTopic.Prices -> sendPrices(topic, client)
             is SubscriptionTopic.Trades -> sendTrades(client)
             is SubscriptionTopic.Orders -> sendOrders(client)
         }
@@ -126,8 +126,8 @@ class Broadcaster {
     private fun publishData() {
         subscriptions.forEach { (topic, clients) ->
             when (topic) {
-                is SubscriptionTopic.OrderBook -> sendOrderBook(topic.marketId, clients)
-                is SubscriptionTopic.Prices -> sendPrices(topic.marketId, clients)
+                is SubscriptionTopic.OrderBook -> sendOrderBook(topic, clients)
+                is SubscriptionTopic.Prices -> sendPrices(topic, clients)
                 else -> {}
             }
         }
@@ -162,31 +162,31 @@ class Broadcaster {
         }
     }
 
-    private fun sendPrices(market: MarketId, clients: List<ConnectedClient>) {
-        clients.forEach { sendPrices(market, it) }
+    private fun sendPrices(topic: SubscriptionTopic.Prices, clients: List<ConnectedClient>) {
+        clients.forEach { sendPrices(topic, it) }
     }
 
-    private fun sendPrices(market: MarketId, client: ConnectedClient) {
-        val key = Pair(market, client)
+    private fun sendPrices(topic: SubscriptionTopic.Prices, client: ConnectedClient) {
+        val key = Pair(topic.marketId, client)
         val fullDump = !lastPricePublish.containsKey(key)
         val now = Clock.System.now()
         val prices = if (fullDump) {
             lastPricePublish[key] = now
             Prices(
-                market = market,
-                ohlc = mockOHLC(market, now.minus(7.days), 5.minutes, 12 * 24 * 7, true),
+                market = topic.marketId,
+                ohlc = mockOHLC(topic.marketId, now.minus(7.days), 5.minutes, 12 * 24 * 7, true),
                 full = true,
             )
         } else {
             Prices(
-                market = market,
-                ohlc = mockOHLC(market, lastPricePublish[key]!!, 1.seconds, (now - lastPricePublish[key]!!).inWholeSeconds, false),
+                market = topic.marketId,
+                ohlc = mockOHLC(topic.marketId, lastPricePublish[key]!!, 1.seconds, (now - lastPricePublish[key]!!).inWholeSeconds, false),
                 full = false,
             ).also {
                 lastPricePublish[key] = now
             }
         }
-        client.send(OutgoingWSMessage.Publish(prices))
+        client.send(OutgoingWSMessage.Publish(topic, prices))
     }
 
     private fun sendTrades(client: ConnectedClient) {
@@ -222,23 +222,24 @@ class Broadcaster {
 
         client.send(
             OutgoingWSMessage.Publish(
+                SubscriptionTopic.Trades,
                 Trades((1..100).map { i -> generateTrade(Clock.System.now().minus(i.minutes)) }),
             ),
         )
     }
 
-    private fun sendOrderBook(marketId: MarketId, clients: List<ConnectedClient>) {
-        clients.forEach { sendOrderBook(marketId, it) }
+    private fun sendOrderBook(topic: SubscriptionTopic.OrderBook, clients: List<ConnectedClient>) {
+        clients.forEach { sendOrderBook(topic, it) }
     }
 
-    private fun sendOrderBook(marketId: MarketId, client: ConnectedClient) {
-        when (marketId.value) {
+    private fun sendOrderBook(topic: SubscriptionTopic.OrderBook, client: ConnectedClient) {
+        when (topic.marketId.value) {
             "BTC/ETH" -> {
                 fun stutter() = rnd.nextDouble(-0.5, 0.5)
                 val lastStutter = stutter() / 3.0
 
                 OrderBook(
-                    marketId = marketId,
+                    marketId = topic.marketId,
                     last = LastTrade(
                         String.format("%.2f", (17.5 + lastStutter)),
                         if (lastStutter > 0) LastTradeDirection.Up else LastTradeDirection.Down,
@@ -273,7 +274,7 @@ class Broadcaster {
                 val lastStutter = stutter()
 
                 OrderBook(
-                    marketId = marketId,
+                    marketId = topic.marketId,
                     last = LastTrade(
                         String.format("%.2f", (1.03 + lastStutter)),
                         if (lastStutter > 0) LastTradeDirection.Up else LastTradeDirection.Down,
@@ -296,7 +297,7 @@ class Broadcaster {
             }
             else -> null
         }?.also { orderBook ->
-            client.send(OutgoingWSMessage.Publish(orderBook))
+            client.send(OutgoingWSMessage.Publish(topic, orderBook))
         }
     }
 
@@ -305,6 +306,7 @@ class Broadcaster {
             transaction {
                 client.send(
                     OutgoingWSMessage.Publish(
+                        SubscriptionTopic.Orders,
                         Orders(
                             OrderEntity.listOrders(client.principal)
                                 .map { it.toOrderResponse() },
@@ -329,7 +331,7 @@ class Broadcaster {
         }
 
         findClients(principal, topic)
-            .forEach { it.send(OutgoingWSMessage.Publish(message)) }
+            .forEach { it.send(OutgoingWSMessage.Publish(topic, message)) }
     }
 
     private fun findClients(principal: Principal, topic: SubscriptionTopic): List<ConnectedClient> =

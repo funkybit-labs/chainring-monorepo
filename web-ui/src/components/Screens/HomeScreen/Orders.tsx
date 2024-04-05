@@ -1,15 +1,6 @@
-import {
-  apiClient,
-  IncomingWSMessage,
-  Order,
-  OrderCreatedSchema,
-  OrdersSchema,
-  OrderUpdatedSchema,
-  UpdateOrderRequest
-} from 'ApiClient'
-import { useEffect, useState } from 'react'
+import { apiClient, Order, UpdateOrderRequest } from 'ApiClient'
+import { useState } from 'react'
 import { Widget } from 'components/common/Widget'
-import { Websocket, WebsocketEvent } from 'websocket-ts'
 import { TrashIcon } from '@heroicons/react/24/outline'
 import { formatUnits, parseUnits } from 'viem'
 import { format } from 'date-fns'
@@ -21,74 +12,38 @@ import { Modal } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
 import Markets from 'markets'
+import { useWebsocketSubscription } from 'components/WebsocketContext'
+import { ordersTopic, Publishable } from 'websocketMessages'
 
-export default function Orders({
-  ws,
-  markets
-}: {
-  ws: Websocket
-  markets: Markets
-}) {
+export default function Orders({ markets }: { markets: Markets }) {
   const [orders, setOrders] = useState<Order[]>(() => [])
   const [changedOrder, setChangedOrder] = useState<Order | null>(null)
   const [showChangeModal, setShowChangeModal] = useState<boolean>(false)
 
-  useEffect(() => {
-    const subscribe = () => {
-      ws.send(
-        JSON.stringify({
-          type: 'Subscribe',
-          topic: { type: 'Orders' }
-        })
-      )
-    }
-    ws.addEventListener(WebsocketEvent.reconnect, subscribe)
-    if (ws.readyState == WebSocket.OPEN) {
-      subscribe()
-    } else {
-      ws.addEventListener(WebsocketEvent.open, subscribe)
-    }
-
-    const handleMessage = (ws: Websocket, event: MessageEvent) => {
-      const message = JSON.parse(event.data) as IncomingWSMessage
-      if (message.type == 'Publish') {
-        if (message.data.type == 'Orders') {
-          setOrders(OrdersSchema.parse(message.data).orders)
-        } else if (message.data.type == 'OrderCreated') {
-          setOrders(
-            produce((draft) => {
-              draft.unshift(OrderCreatedSchema.parse(message.data).order)
-            })
-          )
-        } else if (message.data.type == 'OrderUpdated') {
-          setOrders(
-            produce((draft) => {
-              const updatedOrder = OrderUpdatedSchema.parse(message.data).order
-              const index = draft.findIndex(
-                (order) => order.id === updatedOrder.id
-              )
-              if (index !== -1) draft[index] = updatedOrder
-            })
-          )
-        }
-      }
-    }
-
-    ws.addEventListener(WebsocketEvent.message, handleMessage)
-    return () => {
-      ws.removeEventListener(WebsocketEvent.message, handleMessage)
-      ws.removeEventListener(WebsocketEvent.reconnect, subscribe)
-      ws.removeEventListener(WebsocketEvent.open, subscribe)
-      if (ws.readyState == WebSocket.OPEN) {
-        ws.send(
-          JSON.stringify({
-            type: 'Unsubscribe',
-            topic: { type: 'Orders' }
+  useWebsocketSubscription({
+    topic: ordersTopic,
+    handler: (message: Publishable) => {
+      if (message.type === 'Orders') {
+        setOrders(message.orders)
+      } else if (message.type === 'OrderCreated') {
+        setOrders(
+          produce((draft) => {
+            draft.unshift(message.order)
+          })
+        )
+      } else if (message.type === 'OrderUpdated') {
+        setOrders(
+          produce((draft) => {
+            const updatedOrder = message.order
+            const index = draft.findIndex(
+              (order) => order.id === updatedOrder.id
+            )
+            if (index !== -1) draft[index] = updatedOrder
           })
         )
       }
     }
-  }, [ws])
+  })
 
   function cancelOrder(id: string) {
     if (confirm('Are you sure you want to cancel your order?')) {

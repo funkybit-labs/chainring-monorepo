@@ -1,9 +1,9 @@
 import { Widget } from 'components/common/Widget'
 import { calculateTickSpacing } from 'utils/orderBookUtils'
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
-import { Websocket, WebsocketEvent } from 'websocket-ts'
-import { OrderBook, IncomingWSMessage, OrderBookSchema } from 'ApiClient'
+import { OrderBook, Publishable, orderBookTopic } from 'websocketMessages'
+import { useWebsocketSubscription } from 'components/WebsocketContext'
 
 type OrderBookParameters = {
   bookWidth: number
@@ -66,62 +66,19 @@ function calculateParameters(orderBook: OrderBook): OrderBookParameters {
   }
 }
 
-export function OrderBook({
-  ws,
-  marketId
-}: {
-  ws: Websocket
-  marketId: string
-}) {
+export function OrderBook({ marketId }: { marketId: string }) {
   const [orderBook, setOrderBook] = useState<OrderBook>()
   const [params, setParams] = useState<OrderBookParameters>()
 
-  useEffect(() => {
-    const subscribe = () => {
-      ws.send(
-        JSON.stringify({
-          type: 'Subscribe',
-          topic: {
-            type: 'OrderBook',
-            marketId
-          }
-        })
-      )
-    }
-    ws.addEventListener(WebsocketEvent.reconnect, subscribe)
-    if (ws.readyState == WebSocket.OPEN) {
-      subscribe()
-    } else {
-      ws.addEventListener(WebsocketEvent.open, subscribe)
-    }
-    const handleMessage = (ws: Websocket, event: MessageEvent) => {
-      const message = JSON.parse(event.data) as IncomingWSMessage
-      if (message.type == 'Publish' && message.data.type == 'OrderBook') {
-        // note that we don't try to parse IncomingWSMessage via predefined schema in order to support
-        // adding new message types on BE before supporting them on the client-side
-        const orderBook = OrderBookSchema.parse(message.data)
-        setParams(calculateParameters(orderBook))
-        setOrderBook(orderBook)
+  useWebsocketSubscription({
+    topic: useMemo(() => orderBookTopic(marketId), [marketId]),
+    handler: (message: Publishable) => {
+      if (message.type === 'OrderBook') {
+        setParams(calculateParameters(message))
+        setOrderBook(message)
       }
     }
-    ws.addEventListener(WebsocketEvent.message, handleMessage)
-    return () => {
-      ws.removeEventListener(WebsocketEvent.message, handleMessage)
-      ws.removeEventListener(WebsocketEvent.reconnect, subscribe)
-      ws.removeEventListener(WebsocketEvent.open, subscribe)
-      if (ws.readyState == WebSocket.OPEN) {
-        ws.send(
-          JSON.stringify({
-            type: 'Unsubscribe',
-            topic: {
-              type: 'OrderBook',
-              marketId
-            }
-          })
-        )
-      }
-    }
-  }, [ws, marketId])
+  })
 
   return (
     <Widget

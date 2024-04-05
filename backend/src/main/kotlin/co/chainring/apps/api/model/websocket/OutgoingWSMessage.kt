@@ -17,6 +17,7 @@ sealed class OutgoingWSMessage {
     @Serializable
     @SerialName("Publish")
     data class Publish(
+        val topic: SubscriptionTopic,
         val data: Publishable,
     ) : OutgoingWSMessage()
 }

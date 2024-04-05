@@ -1,10 +1,7 @@
-@file:Suppress("UNCHECKED_CAST")
-
 package co.chainring.integrationtests.testutils
 
 import co.chainring.apps.api.model.websocket.IncomingWSMessage
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
-import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -29,5 +26,6 @@ fun WsClient.receivedDecoded(): Sequence<OutgoingWSMessage> =
         Json.decodeFromString<OutgoingWSMessage>(it.bodyString())
     }
 
-fun <A : Publishable> WsClient.waitForMessage(): A =
-    (receivedDecoded().first() as OutgoingWSMessage.Publish).data as A
+fun WsClient.waitForMessage(): OutgoingWSMessage.Publish {
+    return receivedDecoded().first() as OutgoingWSMessage.Publish
+}
