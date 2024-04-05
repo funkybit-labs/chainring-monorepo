@@ -6,7 +6,7 @@ import { readContract } from 'wagmi/actions'
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import { apiClient, TradingSymbol } from 'ApiClient'
+import { apiClient, TradingSymbol } from 'apiClient'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import {
   getDomain,

@@ -1,40 +1,59 @@
 package co.chainring.sequencer.apps
 
+import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.core.Market
+import co.chainring.sequencer.core.MarketId
+import co.chainring.sequencer.core.WalletAddress
 import co.chainring.sequencer.core.inputQueue
+import co.chainring.sequencer.core.notional
 import co.chainring.sequencer.core.outputQueue
+import co.chainring.sequencer.core.sumBigIntegers
+import co.chainring.sequencer.core.toAsset
 import co.chainring.sequencer.core.toBigDecimal
-import co.chainring.sequencer.core.toMarketId
+import co.chainring.sequencer.core.toBigInteger
+import co.chainring.sequencer.core.toIntegerValue
+import co.chainring.sequencer.core.toWalletAddress
+import co.chainring.sequencer.proto.BalanceChange
+import co.chainring.sequencer.proto.Order
+import co.chainring.sequencer.proto.OrderBatch
 import co.chainring.sequencer.proto.OrderChanged
 import co.chainring.sequencer.proto.SequencerError
 import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.TradeCreated
+import co.chainring.sequencer.proto.balanceChange
 import co.chainring.sequencer.proto.marketCreated
 import co.chainring.sequencer.proto.sequencerResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.math.BigInteger
 import kotlin.concurrent.thread
+
+typealias BalanceByAsset = MutableMap<Asset, BigInteger>
 
 class SequencerApp : BaseApp() {
     override val logger = KotlinLogging.logger {}
     private var stop = false
     private lateinit var sequencerThread: Thread
-    private var markets = mutableMapOf<String, Market>()
+    private var markets = mutableMapOf<MarketId, Market>()
+    private var balances = mutableMapOf<WalletAddress, BalanceByAsset>()
 
     fun processRequest(request: SequencerRequest, sequence: Long = 0L, startTime: Long = 0L): SequencerResponse {
         return when (request.type) {
             SequencerRequest.Type.AddMarket -> {
                 val market = request.addMarket!!
+                val marketId = MarketId(market.marketId)
                 var error: SequencerError? = null
-                if (markets.containsKey(market.marketId)) {
+                if (markets.containsKey(marketId)) {
                     error = SequencerError.MarketExists
                 } else {
-                    markets[market.marketId] = Market(
-                        market.marketId.toMarketId(),
+                    markets[marketId] = Market(
+                        marketId,
                         market.tickSize.toBigDecimal(),
                         market.marketPrice.toBigDecimal(),
                         market.maxLevels,
                         market.maxOrdersPerLevel,
+                        market.baseDecimals,
+                        market.quoteDecimals,
                     )
                 }
                 sequencerResponse {
@@ -44,7 +63,7 @@ class SequencerApp : BaseApp() {
                     error?.let { this.error = it } ?: run {
                         this.marketsCreated.add(
                             marketCreated {
-                                this.marketId = market.marketId
+                                this.marketId = marketId.value
                                 this.tickSize = market.tickSize
                             },
                         )
@@ -54,14 +73,31 @@ class SequencerApp : BaseApp() {
             SequencerRequest.Type.ApplyOrderBatch -> {
                 var ordersChanged: List<OrderChanged> = emptyList()
                 var trades: List<TradeCreated> = emptyList()
+                var balanceChanges: List<BalanceChange> = emptyList()
                 val orderBatch = request.orderBatch!!
                 var error: SequencerError? = null
-                if (markets.containsKey(orderBatch.marketId)) {
-                    val result = markets[orderBatch.marketId]!!.addOrders(orderBatch.ordersToAddList)
-                    ordersChanged = result.ordersChanged
-                    trades = result.createdTrades
-                } else {
+                val marketId = MarketId(orderBatch.marketId)
+                val market = markets[marketId]
+                if (market == null) {
                     error = SequencerError.UnknownMarket
+                } else {
+                    if (withinBalanceLimit(market, orderBatch)) {
+                        val result = market.addOrders(orderBatch.ordersToAddList)
+                        ordersChanged = result.ordersChanged
+                        trades = result.createdTrades
+                        balanceChanges = result.balanceChanges
+                        // apply balance changes
+                        balanceChanges.forEach {
+                            balances.getOrPut(it.wallet.toWalletAddress()) {
+                                mutableMapOf()
+                            }.merge(
+                                it.asset.toAsset(),
+                                it.delta.toBigInteger(),
+                            ) { a, b -> BigInteger.ZERO.max(a + b) }
+                        }
+                    } else {
+                        error = SequencerError.ExceedsLimit
+                    }
                 }
                 sequencerResponse {
                     this.sequence = sequence
@@ -69,9 +105,56 @@ class SequencerApp : BaseApp() {
                     this.guid = orderBatch.guid
                     this.ordersChanged.addAll(ordersChanged)
                     this.tradesCreated.addAll(trades)
+                    this.balancesChanged.addAll(balanceChanges)
                     error?.let {
                         this.error = it
                     }
+                }
+            }
+
+            SequencerRequest.Type.ApplyBalanceBatch -> {
+                val balanceBatch = request.balanceBatch!!
+                val balancesChanged = mutableMapOf<Pair<WalletAddress, Asset>, BigInteger>()
+                balanceBatch.depositsList.forEach { deposit ->
+                    val wallet = deposit.wallet.toWalletAddress()
+                    val asset = deposit.asset.toAsset()
+                    val amount = deposit.amount.toBigInteger()
+                    balances.getOrPut(wallet) { mutableMapOf() }.merge(asset, amount, ::sumBigIntegers)
+                    balancesChanged.merge(Pair(wallet, asset), amount, ::sumBigIntegers)
+                }
+
+                balanceBatch.withdrawalsList.forEach { withdrawal ->
+                    balances[withdrawal.wallet.toWalletAddress()]?.let { balanceByAsset ->
+                        val asset = withdrawal.asset.toAsset()
+                        val withdrawalAmount = withdrawal.amount.toBigInteger().min(
+                            balanceByAsset[withdrawal.asset.toAsset()] ?: BigInteger.ZERO,
+                        )
+                        if (withdrawalAmount > BigInteger.ZERO) {
+                            val wallet = withdrawal.wallet.toWalletAddress()
+                            balanceByAsset.merge(asset, -withdrawalAmount, ::sumBigIntegers)
+                            balancesChanged.merge(Pair(wallet, asset), -withdrawalAmount, ::sumBigIntegers)
+                        }
+                    }
+                }
+
+                sequencerResponse {
+                    this.guid = balanceBatch.guid
+                    this.sequence = sequence
+                    this.processingTime = System.nanoTime() - startTime
+                    this.balancesChanged.addAll(
+                        balancesChanged.mapNotNull { (k, delta) ->
+                            val (wallet, asset) = k
+                            if (delta != BigInteger.ZERO) {
+                                balanceChange {
+                                    this.wallet = wallet.value
+                                    this.asset = asset.value
+                                    this.delta = delta.toIntegerValue()
+                                }
+                            } else {
+                                null
+                            }
+                        },
+                    )
                 }
             }
 
@@ -84,6 +167,51 @@ class SequencerApp : BaseApp() {
                 }
             }
         }
+    }
+
+    private fun withinBalanceLimit(market: Market, orderBatch: OrderBatch): Boolean {
+        // compute cumulative assets required change from applying all orders in order batch
+        val baseAssetsRequired = mutableMapOf<WalletAddress, BigInteger>()
+        val quoteAssetsRequired = mutableMapOf<WalletAddress, BigInteger>()
+        orderBatch.ordersToAddList.forEach { order ->
+            when (order.type) {
+                Order.Type.LimitSell, Order.Type.MarketSell -> {
+                    baseAssetsRequired.merge(order.wallet.toWalletAddress(), order.amount.toBigInteger(), ::sumBigIntegers)
+                }
+                Order.Type.LimitBuy -> {
+                    quoteAssetsRequired.merge(order.wallet.toWalletAddress(), notional(order.amount, order.price, market.baseDecimals, market.quoteDecimals), ::sumBigIntegers)
+                }
+                Order.Type.MarketBuy -> {
+                    // the quote assets required for a market buy depends on what the clearing price would be
+                    val(clearingPrice, availableQuantity) = market.orderBook.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger())
+                    quoteAssetsRequired.merge(order.wallet.toWalletAddress(), notional(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals), ::sumBigIntegers)
+                }
+                else -> {}
+            }
+        }
+        // TODO CHAIN-81 - handle ordersToChangeList and ordersToCancelList
+
+        baseAssetsRequired.forEach { (wallet, required) ->
+            if (required + market.orderBook.baseAssetsRequired(wallet) > (
+                    balances[wallet]?.get(market.id.baseAsset())
+                        ?: BigInteger.ZERO
+                    )
+            ) {
+                return false
+            }
+        }
+
+        quoteAssetsRequired.forEach { (wallet, required) ->
+            if (required + market.orderBook.quoteAssetsRequired(wallet) > (
+                    balances[wallet]?.get(market.id.quoteAsset())
+                        ?: BigInteger.ZERO
+                    )
+            ) {
+                return false
+            }
+        }
+
+        return true
     }
 
     override fun start() {

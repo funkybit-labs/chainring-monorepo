@@ -1,4 +1,4 @@
-import { TradingSymbol } from 'ApiClient'
+import { TradingSymbol } from 'apiClient'
 import btc from 'cryptocurrency-icons/svg/color/btc.svg'
 import eth from 'cryptocurrency-icons/svg/color/eth.svg'
 import usdc from 'cryptocurrency-icons/svg/color/usdc.svg'

@@ -1,4 +1,4 @@
-import { apiClient, OrderSide, TradingSymbol } from 'ApiClient'
+import { apiClient, OrderSide, TradingSymbol } from 'apiClient'
 import { classNames, cleanAndFormatNumberInput } from 'utils'
 import React, { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'

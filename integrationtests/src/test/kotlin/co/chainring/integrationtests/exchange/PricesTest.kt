@@ -12,6 +12,7 @@ import org.http4k.client.WebsocketClient
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
+import kotlin.test.assertIs
 
 @ExtendWith(AppUnderTestRunner::class)
 class PricesTest {
@@ -29,9 +30,14 @@ class PricesTest {
         val client = WebsocketClient.blocking(auth)
         client.subscribe(SubscriptionTopic.Prices(MarketId("BTC/ETH")))
 
-        val prices = client.waitForMessage<Prices>()
-        assertEquals("BTC/ETH", prices.market.value)
-        assertEquals(12 * 24 * 7, prices.ohlc.size)
+        client.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Prices(MarketId("BTC/ETH")), message.topic)
+            message.data.also { prices ->
+                assertIs<Prices>(prices)
+                assertEquals("BTC/ETH", prices.market.value)
+                assertEquals(12 * 24 * 7, prices.ohlc.size)
+            }
+        }
 
         client.close()
     }
