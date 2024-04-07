@@ -167,6 +167,13 @@ class OrderRoutesApiTest {
             assertIs<Orders>(message.data)
         }
 
+        val wsClient = WebsocketClient.blocking(apiClient.authToken)
+        wsClient.subscribe(SubscriptionTopic.Orders)
+        wsClient.waitForMessage().let { message ->
+            assertEquals(SubscriptionTopic.Orders, message.topic)
+            assertIs<Orders>(message.data)
+        }
+
         Faucet.fund(wallet.address)
         wallet.mintERC20("DAI", wallet.formatAmount("20", "DAI"))
         deposit(apiClient, wallet, "DAI", wallet.formatAmount("20", "DAI"))
