@@ -12,9 +12,9 @@ object EIP712Helper {
 
     fun computeHash(tx: EIP712Transaction, chainId: ChainId, verifyingContract: Address): ByteArray {
         //
-        // Structured data contains both the schema and the data, The type section holds the schema. The field ordering
-        // is important since that is the order in which the data in these fields is appended before being hashed
-        // for signing.
+        // Structured data contains both the schema and the data, the 'types' section holds the schema. The field ordering
+        // in type definitions is important since that is the order in which the data in these fields is appended
+        // before being hashed for signing.
         //
         val encoder = StructuredDataEncoder(
             StructuredData.EIP712Message(
