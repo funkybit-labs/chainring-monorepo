@@ -36,21 +36,3 @@ export function getNativeWithdrawMessage(
     nonce: nonce
   }
 }
-
-export function getOrderMessage(
-  walletAddress: Address,
-  baseTokenAddress: Address,
-  quoteTokenAddress: Address,
-  amount: bigint,
-  price: bigint,
-  nonce: bigint
-) {
-  return {
-    sender: walletAddress,
-    baseToken: baseTokenAddress,
-    quoteToken: quoteTokenAddress,
-    amount: amount,
-    price: price,
-    nonce: nonce
-  }
-}
