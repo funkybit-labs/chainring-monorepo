@@ -67,7 +67,7 @@ export default function TradeHistory({ markets }: { markets: Markets }) {
                       <td className="pl-4">{formatUnits(trade.amount, 18)}</td>
                       <td className="pl-4">{trade.marketId}</td>
                       <td className="pl-4">
-                        {trade.price.toFixed(market.getQuoteDecimalPlaces())}
+                        {trade.price.toFixed(market.quoteDecimalPlaces)}
                       </td>
                       <td className="pl-4">
                         {formatUnits(trade.feeAmount, 18)}

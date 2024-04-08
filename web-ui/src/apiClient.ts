@@ -11,14 +11,17 @@ const decimal = () =>
     .instanceof(Decimal)
     .or(z.string())
     .or(z.number())
-    .refine((value) => {
+    .transform((value, ctx) => {
       try {
         return new Decimal(value)
       } catch (error) {
-        return false
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${value} can't be parsed into Decimal`
+        })
+        return z.NEVER
       }
     })
-    .transform((value) => new Decimal(value))
 
 const AddressSchema = z.custom<`0x${string}`>((val: unknown) =>
   /^0x/.test(val as string)

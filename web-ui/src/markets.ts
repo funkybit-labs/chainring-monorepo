@@ -6,7 +6,8 @@ export class Market {
   id: string
   baseSymbol: TradingSymbol
   quoteSymbol: TradingSymbol
-  tickSize: Decimal
+  readonly tickSize: Decimal
+  readonly quoteDecimalPlaces: number
 
   constructor(
     id: string,
@@ -18,10 +19,7 @@ export class Market {
     this.baseSymbol = baseSymbol
     this.quoteSymbol = quoteSymbol
     this.tickSize = tickSize
-  }
-
-  getQuoteDecimalPlaces(): number {
-    return this.tickSize.decimalPlaces() + 1
+    this.quoteDecimalPlaces = this.tickSize.decimalPlaces() + 1
   }
 }
 

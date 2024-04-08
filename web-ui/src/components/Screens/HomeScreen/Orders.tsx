@@ -121,7 +121,7 @@ export default function Orders({ markets }: { markets: Markets }) {
                       <td className="pl-4">{order.marketId}</td>
                       <td className="pl-4">
                         {order.type == 'limit'
-                          ? order.price.toFixed(market.getQuoteDecimalPlaces())
+                          ? order.price.toFixed(market.quoteDecimalPlaces)
                           : 'MKT'}
                       </td>
                       <td className="pl-4">{order.status}</td>
@@ -251,7 +251,7 @@ function ChangeOrderModal({
                   setPrice(
                     cleanAndFormatNumberInput(
                       e.target.value,
-                      market.getQuoteDecimalPlaces()
+                      market.quoteDecimalPlaces
                     )
                   )
                 }

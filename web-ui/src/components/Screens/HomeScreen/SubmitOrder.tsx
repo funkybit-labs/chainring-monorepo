@@ -145,7 +145,7 @@ export default function SubmitOrder({
                         setPrice(
                           cleanAndFormatNumberInput(
                             e.target.value,
-                            market.getQuoteDecimalPlaces()
+                            market.quoteDecimalPlaces
                           )
                         )
                       }}
