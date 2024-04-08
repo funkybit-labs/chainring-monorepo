@@ -7,6 +7,7 @@ import org.jetbrains.exposed.dao.with
 import org.jetbrains.exposed.sql.SizedIterable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.selectAll
+import java.math.BigDecimal
 
 @Serializable
 @JvmInline
@@ -18,6 +19,7 @@ value class MarketId(override val value: String) : EntityId {
 object MarketTable : GUIDTable<MarketId>("market", ::MarketId) {
     val baseSymbolGuid = reference("base_symbol_guid", SymbolTable)
     val quoteSymbolGuid = reference("quote_symbol_guid", SymbolTable)
+    val tickSize = decimal("tick_size", 30, 18)
 }
 
 class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
@@ -25,9 +27,11 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
         fun create(
             baseSymbol: SymbolEntity,
             quoteSymbol: SymbolEntity,
+            tickSize: BigDecimal,
         ) = MarketEntity.new(MarketId(baseSymbol, quoteSymbol)) {
             this.baseSymbolGuid = baseSymbol.guid
             this.quoteSymbolGuid = quoteSymbol.guid
+            this.tickSize = tickSize
         }
 
         override fun all(): SizedIterable<MarketEntity> =
@@ -41,6 +45,7 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
 
     var baseSymbolGuid by MarketTable.baseSymbolGuid
     var quoteSymbolGuid by MarketTable.quoteSymbolGuid
+    var tickSize by MarketTable.tickSize
 
     var baseSymbol by SymbolEntity referencedOn MarketTable.baseSymbolGuid
     var quoteSymbol by SymbolEntity referencedOn MarketTable.quoteSymbolGuid

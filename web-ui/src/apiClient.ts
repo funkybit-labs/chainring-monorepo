@@ -2,8 +2,23 @@ import z from 'zod'
 import { Zodios } from '@zodios/core'
 import { pluginToken } from '@zodios/plugins'
 import { loadAuthToken } from 'auth'
+import Decimal from 'decimal.js'
 
 export const apiBaseUrl = import.meta.env.ENV_API_URL
+
+const decimal = () =>
+  z
+    .instanceof(Decimal)
+    .or(z.string())
+    .or(z.number())
+    .refine((value) => {
+      try {
+        return new Decimal(value)
+      } catch (error) {
+        return false
+      }
+    })
+    .transform((value) => new Decimal(value))
 
 const AddressSchema = z.custom<`0x${string}`>((val: unknown) =>
   /^0x/.test(val as string)
@@ -35,7 +50,8 @@ export type Chain = z.infer<typeof ChainSchema>
 const MarketSchema = z.object({
   id: z.string(),
   baseSymbol: z.string(),
-  quoteSymbol: z.string()
+  quoteSymbol: z.string(),
+  tickSize: decimal()
 })
 export type Market = z.infer<typeof MarketSchema>
 
@@ -66,7 +82,7 @@ const CreateLimitOrderSchema = z.object({
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.bigint(),
-  price: z.number(),
+  price: decimal(),
   signature: z.string()
 })
 export type CreateLimitOrder = z.infer<typeof CreateLimitOrderSchema>
@@ -88,7 +104,7 @@ const UpdateLimitOrderSchema = z.object({
   type: z.literal('limit'),
   id: z.string(),
   amount: z.coerce.bigint(),
-  price: z.number()
+  price: decimal()
 })
 export type UpdateLimitOrder = z.infer<typeof UpdateLimitOrderSchema>
 
@@ -104,7 +120,7 @@ export type ExecutionRole = z.infer<typeof ExecutionRoleSchema>
 const OrderExecutionSchema = z.object({
   timestamp: z.coerce.date(),
   amount: z.coerce.bigint(),
-  price: z.coerce.number(),
+  price: decimal(),
   role: ExecutionRoleSchema,
   feeAmount: z.coerce.bigint(),
   feeSymbol: z.string()
@@ -150,7 +166,7 @@ const LimitOrderSchema = z.object({
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
-  price: z.number(),
+  price: decimal(),
   originalAmount: z.coerce.bigint(),
   executions: z.array(OrderExecutionSchema),
   timing: OrderTimingSchema
@@ -183,7 +199,7 @@ export const TradeSchema = z.object({
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
-  price: z.number(),
+  price: decimal(),
   feeAmount: z.coerce.bigint(),
   feeSymbol: z.string()
 })

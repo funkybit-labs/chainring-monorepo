@@ -65,13 +65,13 @@ fun seedDatabase(fixtures: Fixtures, chainRpcUrl: String, privateKey: String) {
                  }
          }.associateBy { Fixtures.SymbolId(it.name, it.chainId.value) }
 
-        fixtures.markets.forEach { (baseSymbolId, quoteSymbolId) ->
+        fixtures.markets.forEach { (baseSymbolId, quoteSymbolId, tickSize) ->
             val baseSymbol = symbolEntities.getValue(baseSymbolId)
             val quoteSymbol = symbolEntities.getValue(quoteSymbolId)
 
             if (MarketEntity.findById(MarketId(baseSymbol, quoteSymbol)) == null) {
                 val marketEntity = MarketEntity
-                    .create(baseSymbol, quoteSymbol)
+                    .create(baseSymbol, quoteSymbol, tickSize)
                     .also {
                         it.flush()
                     }

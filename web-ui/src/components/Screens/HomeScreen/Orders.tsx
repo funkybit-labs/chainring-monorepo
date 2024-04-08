@@ -14,6 +14,7 @@ import SubmitButton from 'components/common/SubmitButton'
 import Markets from 'markets'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { ordersTopic, Publishable } from 'websocketMessages'
+import Decimal from 'decimal.js'
 
 export default function Orders({ markets }: { markets: Markets }) {
   const [orders, setOrders] = useState<Order[]>(() => [])
@@ -119,7 +120,9 @@ export default function Orders({ markets }: { markets: Markets }) {
                       </td>
                       <td className="pl-4">{order.marketId}</td>
                       <td className="pl-4">
-                        {order.type == 'limit' ? order.price : 'MKT'}
+                        {order.type == 'limit'
+                          ? order.price.toFixed(market.getQuoteDecimalPlaces())
+                          : 'MKT'}
                       </td>
                       <td className="pl-4">{order.status}</td>
                       <td className="py-1 pl-4">
@@ -207,7 +210,7 @@ function ChangeOrderModal({
             id: order.id,
             type: 'limit',
             amount: parseUnits(amount, baseSymbol.decimals),
-            price: Number(price)
+            price: new Decimal(price)
           }
     )
   }
@@ -248,7 +251,7 @@ function ChangeOrderModal({
                   setPrice(
                     cleanAndFormatNumberInput(
                       e.target.value,
-                      quoteSymbol.decimals
+                      market.getQuoteDecimalPlaces()
                     )
                   )
                 }

@@ -66,6 +66,7 @@ object ConfigRoutes {
                                 id = "USDC/DAI",
                                 baseSymbol = "USDC",
                                 quoteSymbol = "DAI",
+                                tickSize = "0.01".toBigDecimal(),
                             ),
                         ),
                     ),
@@ -99,6 +100,7 @@ object ConfigRoutes {
                                     id = market.id.value.toString(),
                                     baseSymbol = market.baseSymbol.name,
                                     quoteSymbol = market.quoteSymbol.name,
+                                    tickSize = market.tickSize,
                                 )
                             },
                         ),
