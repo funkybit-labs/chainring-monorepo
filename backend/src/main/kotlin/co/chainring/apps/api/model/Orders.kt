@@ -1,16 +1,22 @@
 package co.chainring.apps.api.model
 
+import co.chainring.core.evm.EIP712Transaction
+import co.chainring.core.model.Address
+import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
+import co.chainring.core.utils.toFundamentalUnits
+import co.chainring.core.utils.toHexBytes
 import kotlinx.datetime.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
+import java.math.BigInteger
 
 @Serializable
 @OptIn(ExperimentalSerializationApi::class)
@@ -20,6 +26,7 @@ sealed class CreateOrderApiRequest {
     abstract val marketId: MarketId
     abstract val side: OrderSide
     abstract val amount: BigIntegerJson
+    abstract val signature: EvmSignature
 
     @Serializable
     @SerialName("market")
@@ -28,7 +35,18 @@ sealed class CreateOrderApiRequest {
         override val marketId: MarketId,
         override val side: OrderSide,
         override val amount: BigIntegerJson,
-    ) : CreateOrderApiRequest()
+        override val signature: EvmSignature,
+    ) : CreateOrderApiRequest() {
+        fun toEip712Transaction(sender: Address, baseToken: Address?, quoteToken: Address?) = EIP712Transaction.Order(
+            sender,
+            baseToken ?: Address.zero,
+            quoteToken ?: Address.zero,
+            if (side == OrderSide.Buy) this.amount else this.amount.negate(),
+            BigInteger.ZERO,
+            BigInteger(1, nonce.toHexBytes()),
+            this.signature,
+        )
+    }
 
     @Serializable
     @SerialName("limit")
@@ -38,7 +56,18 @@ sealed class CreateOrderApiRequest {
         override val side: OrderSide,
         override val amount: BigIntegerJson,
         val price: BigDecimalJson,
-    ) : CreateOrderApiRequest()
+        override val signature: EvmSignature,
+    ) : CreateOrderApiRequest() {
+        fun toEip712Transaction(sender: Address, baseToken: Address?, quoteToken: Address?, quoteDecimals: Int) = EIP712Transaction.Order(
+            sender,
+            baseToken ?: Address.zero,
+            quoteToken ?: Address.zero,
+            if (side == OrderSide.Buy) this.amount else this.amount.negate(),
+            this.price.toFundamentalUnits(quoteDecimals),
+            BigInteger(1, nonce.toHexBytes()),
+            this.signature,
+        )
+    }
 }
 
 @Serializable

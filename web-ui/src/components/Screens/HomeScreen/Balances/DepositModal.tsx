@@ -11,9 +11,10 @@ import {
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import { TradingSymbol } from 'apiClient'
+import { apiClient, TradingSymbol } from 'apiClient'
 import { useQuery } from '@tanstack/react-query'
 import { cleanAndFormatNumberInput } from 'utils'
+import { useMutation } from '@tanstack/react-query'
 
 export default function DepositModal({
   exchangeContractAddress,
@@ -54,6 +55,7 @@ export default function DepositModal({
     | 'waitingForAllowanceReceipt'
     | 'waitingForDepositApproval'
     | 'waitingForDepositReceipt'
+    | 'submittingDeposit'
     | null
   >(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -74,6 +76,10 @@ export default function DepositModal({
       return false
     }
   })()
+
+  const mutation = useMutation({
+    mutationFn: apiClient.createSequencerDeposit
+  })
 
   async function onSubmit() {
     setSubmitError(null)
@@ -116,6 +122,12 @@ export default function DepositModal({
           setSubmitPhase('waitingForDepositReceipt')
           await waitForTransactionReceipt(config, { hash })
         }
+
+        setSubmitPhase('submittingDeposit')
+        await mutation.mutateAsync({
+          symbol: symbol.name,
+          amount: BigInt(parsedAmount)
+        })
 
         close()
       } catch (err) {
@@ -169,6 +181,8 @@ export default function DepositModal({
                         return 'Waiting for deposit approval'
                       case 'waitingForDepositReceipt':
                         return 'Waiting for deposit receipt'
+                      case 'submittingDeposit':
+                        return 'Submitting Deposit'
                       case null:
                         return 'Submit'
                     }

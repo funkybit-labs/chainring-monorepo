@@ -1,5 +1,6 @@
 package co.chainring.apps.api.model
 
+import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
@@ -18,6 +19,7 @@ class BatchOrderSerializerTest {
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
         amount = BigInteger("100000"),
+        signature = EvmSignature.emptySignature(),
     )
 
     private val updateLimitOrderRequest = UpdateOrderApiRequest.Limit(

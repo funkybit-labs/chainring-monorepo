@@ -3,7 +3,6 @@ package co.chainring.apps.api
 import co.chainring.apps.BaseApp
 import co.chainring.apps.api.middleware.HttpTransactionLogger
 import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
-import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.db.DbConfig
@@ -55,6 +54,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         ),
     )
 
+    private val enableTestRoutes = (System.getenv("ENABLE_TEST_ROUTES") ?: "true") == "true"
+
     private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
     private val withdrawalRoutes = WithdrawalRoutes(blockchainClient)
 
@@ -80,9 +81,9 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                 "/v1" bind
                     contract {
                         routes +=
-                            listOf(
+                            listOfNotNull(
                                 ConfigRoutes.getConfiguration(),
-                                OrderRoutes.createOrder(broadcaster),
+                                OrderRoutes.createOrder(broadcaster, blockchainClient),
                                 OrderRoutes.updateOrder(broadcaster),
                                 OrderRoutes.cancelOrder(broadcaster),
                                 OrderRoutes.getOrder(),
@@ -93,6 +94,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                                 BalanceRoutes.getBalances(),
                                 withdrawalRoutes.getWithdrawal(),
                                 withdrawalRoutes.createWithdrawal(),
+                                if (enableTestRoutes) TestRoutes.createSequencerDeposit() else null,
 
                                 // http api + websocket
                                 // GET /v1/market/market_id/order-book
@@ -136,7 +138,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         blockchainClient.updateContracts()
         blockchainClient.startTransactionSubmitter(
             transaction {
-                WithdrawalEntity.findPending().map { CreateWithdrawalApiRequest.fromEntity(it).toEip712Transaction() }
+                WithdrawalEntity.findPending().map { it.toEip712Transaction() }
             },
         )
     }

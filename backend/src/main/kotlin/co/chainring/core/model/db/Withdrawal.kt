@@ -1,5 +1,6 @@
 package co.chainring.core.model.db
 
+import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import de.fxlae.typeid.TypeId
@@ -101,6 +102,14 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
         this.status = status
         this.error = error
     }
+
+    fun toEip712Transaction() = EIP712Transaction.WithdrawTx(
+        this.walletAddress,
+        this.symbol.contractAddress,
+        this.amount,
+        this.nonce,
+        this.signature,
+    )
 
     var nonce by WithdrawalTable.nonce
     var walletAddress by WithdrawalTable.walletAddress.transform(

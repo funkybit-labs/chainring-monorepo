@@ -100,7 +100,7 @@ class ApiAuthenticationTest {
 
     @Test
     fun `test success`() {
-        val apiClient = ApiClient.initWallet()
+        val apiClient = ApiClient()
         assertDoesNotThrow {
             apiClient.listOrders()
         }

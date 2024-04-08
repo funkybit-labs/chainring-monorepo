@@ -78,7 +78,7 @@ class WithdrawalRoutes(private val blockchainClient: BlockchainClient) {
                             withdrawTx.signature,
                         )
                     }
-                    blockchainClient.queueTransaction(withdrawTx)
+                    blockchainClient.queueTransactions(listOf(withdrawTx))
                     Response(Status.CREATED).with(
                         responseBody of WithdrawalApiResponse(
                             transaction {

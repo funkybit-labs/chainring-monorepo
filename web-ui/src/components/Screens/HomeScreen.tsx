@@ -67,10 +67,14 @@ export default function HomeScreen() {
               <Prices marketId={selectedMarket.id} />
               {wallet.address && (
                 <>
-                  <SubmitOrder
-                    baseSymbol={selectedMarket.baseSymbol}
-                    quoteSymbol={selectedMarket.quoteSymbol}
-                  />
+                  {exchangeContract && (
+                    <SubmitOrder
+                      walletAddress={wallet.address}
+                      exchangeContractAddress={exchangeContract.address}
+                      baseSymbol={selectedMarket.baseSymbol}
+                      quoteSymbol={selectedMarket.quoteSymbol}
+                    />
+                  )}
                   <Orders markets={markets} />
                   <TradeHistory />
                   {symbols && exchangeContract && (

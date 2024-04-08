@@ -3,6 +3,9 @@ environment:
     DB_HOST: db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     EVM_NETWORK_URL: http://test-anvil.chainring.co:8545
     AUTH_TOKEN_VALIDITY_INTERVAL: P1D
+    SEQUENCER_HOST_NAME: test-sequencer.chainring.co
+    SEQUENCER_PORT: 5337
+    ENABLE_TEST_ROUTES: true
 services:
   api:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend

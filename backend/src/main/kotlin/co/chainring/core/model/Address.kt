@@ -18,5 +18,7 @@ value class Address(val value: String) {
 
     companion object {
         fun generate() = Address("0x${generateHexString(40)}")
+
+        val zero = Address("0x0000000000000000000000000000000000000000")
     }
 }

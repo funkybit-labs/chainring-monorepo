@@ -3,6 +3,7 @@ package co.chainring.sequencer.apps
 import co.chainring.sequencer.core.inputQueue
 import co.chainring.sequencer.core.outputQueue
 import co.chainring.sequencer.core.sequencedQueue
+import co.chainring.sequencer.proto.BalanceBatch
 import co.chainring.sequencer.proto.GatewayGrpcKt
 import co.chainring.sequencer.proto.GatewayResponse
 import co.chainring.sequencer.proto.Market
@@ -121,6 +122,13 @@ class GatewayApp(private val config: GatewayConfig = GatewayConfig()) : BaseApp(
             return toSequencer(request.guid) {
                 this.type = SequencerRequest.Type.ApplyOrderBatch
                 this.orderBatch = request
+            }
+        }
+
+        override suspend fun applyBalanceBatch(request: BalanceBatch): GatewayResponse {
+            return toSequencer(request.guid) {
+                this.type = SequencerRequest.Type.ApplyBalanceBatch
+                this.balanceBatch = request
             }
         }
     }

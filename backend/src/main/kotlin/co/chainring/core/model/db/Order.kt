@@ -1,7 +1,12 @@
 package co.chainring.core.model.db
 
 import co.chainring.apps.api.model.Order
+import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
+import co.chainring.core.model.EvmSignature
+import co.chainring.core.utils.toFundamentalUnits
+import co.chainring.core.utils.toHexBytes
+import co.chainring.sequencer.proto.OrderDisposition
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
@@ -43,10 +48,34 @@ enum class OrderStatus {
     Filled,
     Cancelled,
     Expired,
+    Rejected,
+    Failed,
+    CrossesMarket,
     ;
 
     fun isFinal(): Boolean {
-        return this in listOf(Filled, Cancelled, Expired)
+        return this in listOf(Filled, Cancelled, Expired, Failed, Rejected, CrossesMarket)
+    }
+
+    fun isError(): Boolean {
+        return this in listOf(Failed, Rejected, CrossesMarket)
+    }
+
+    companion object {
+        fun fromOrderDisposition(disposition: OrderDisposition): OrderStatus {
+            return when (disposition) {
+                OrderDisposition.Accepted -> Open
+                OrderDisposition.Filled -> Filled
+                OrderDisposition.PartiallyFilled -> Partial
+                OrderDisposition.Failed,
+                OrderDisposition.UNRECOGNIZED,
+                -> Failed
+                OrderDisposition.Canceled -> Cancelled
+                OrderDisposition.CrossesMarket -> CrossesMarket
+                OrderDisposition.Rejected -> Rejected
+                OrderDisposition.AutoReduced -> Open
+            }
+        }
     }
 }
 
@@ -81,6 +110,8 @@ object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
     val updatedBy = varchar("updated_by", 10485760).nullable()
     val closedAt = timestamp("closed_at").nullable()
     val closedBy = varchar("closed_by", 10485760).nullable()
+    val signature = varchar("signature", 10485760)
+    val sequencerOrderId = long("sequencer_order_id").uniqueIndex().nullable()
 }
 
 class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
@@ -137,6 +168,16 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         }
     }
 
+    fun toEip712Transaction(baseToken: Address, quoteToken: Address, quoteDecimals: Int) = EIP712Transaction.Order(
+        this.ownerAddress,
+        baseToken,
+        quoteToken,
+        this.amount,
+        this.price?.toFundamentalUnits(quoteDecimals) ?: BigInteger.ZERO,
+        BigInteger(1, this.nonce.toHexBytes()),
+        EvmSignature(this.signature),
+    )
+
     companion object : EntityClass<OrderId, OrderEntity>(OrderTable) {
         fun create(
             nonce: String,
@@ -146,6 +187,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             side: OrderSide,
             amount: BigInteger,
             price: BigDecimal?,
+            signature: EvmSignature,
         ) = OrderEntity.new(OrderId.generate()) {
             val now = Clock.System.now()
             this.nonce = nonce
@@ -159,11 +201,18 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             this.amount = amount
             this.originalAmount = amount
             this.price = price
+            this.signature = signature.value
         }
 
         fun findByNonce(nonce: String): OrderEntity? {
             return OrderEntity.find {
                 OrderTable.nonce.eq(nonce)
+            }.firstOrNull()
+        }
+
+        fun findBySequencerOrderId(sequencerOrderId: Long): OrderEntity? {
+            return OrderEntity.find {
+                OrderTable.sequencerOrderId.eq(sequencerOrderId)
             }.firstOrNull()
         }
 
@@ -198,6 +247,12 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         this.status = OrderStatus.Cancelled
     }
 
+    fun updateStatus(status: OrderStatus) {
+        val now = Clock.System.now()
+        this.updatedAt = now
+        this.status = status
+    }
+
     var nonce by OrderTable.nonce
     var createdAt by OrderTable.createdAt
     var createdBy by OrderTable.createdBy
@@ -223,4 +278,6 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
     var updatedBy by OrderTable.updatedBy
     var closedAt by OrderTable.closedAt
     var closedBy by OrderTable.closedBy
+    var signature by OrderTable.signature
+    var sequencerOrderId by OrderTable.sequencerOrderId
 }
