@@ -69,6 +69,7 @@ export default function HomeScreen() {
                 <>
                   {exchangeContract && (
                     <SubmitOrder
+                      market={selectedMarket}
                       walletAddress={wallet.address}
                       exchangeContractAddress={exchangeContract.address}
                       baseSymbol={selectedMarket.baseSymbol}
@@ -76,7 +77,7 @@ export default function HomeScreen() {
                     />
                   )}
                   <Orders markets={markets} />
-                  <TradeHistory />
+                  <TradeHistory markets={markets} />
                   {symbols && exchangeContract && (
                     <Balances
                       walletAddress={wallet.address}

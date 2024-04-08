@@ -28,7 +28,8 @@ data class Fixtures(
 
     data class Market(
         val baseSymbol: SymbolId,
-        val quoteSymbol: SymbolId
+        val quoteSymbol: SymbolId,
+        val tickSize: BigDecimal,
     )
 
     data class Wallet(
@@ -55,11 +56,13 @@ val localDevFixtures = Fixtures(
     markets = listOf(
         Fixtures.Market(
             baseSymbol = Fixtures.SymbolId("BTC", chainringDevChainId),
-            quoteSymbol = Fixtures.SymbolId("ETH", chainringDevChainId)
+            quoteSymbol = Fixtures.SymbolId("ETH", chainringDevChainId),
+            tickSize = "0.05".toBigDecimal(),
         ),
         Fixtures.Market(
             baseSymbol = Fixtures.SymbolId("USDC", chainringDevChainId),
-            quoteSymbol = Fixtures.SymbolId("DAI", chainringDevChainId)
+            quoteSymbol = Fixtures.SymbolId("DAI", chainringDevChainId),
+            tickSize = "0.01".toBigDecimal(),
         ),
     ),
     wallets = listOf(

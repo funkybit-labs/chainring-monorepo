@@ -1,10 +1,26 @@
 import { Market as ApiMarket, TradingSymbol } from 'apiClient'
 import TradingSymbols from 'tradingSymbols'
+import Decimal from 'decimal.js'
 
-export type Market = {
+export class Market {
   id: string
   baseSymbol: TradingSymbol
   quoteSymbol: TradingSymbol
+  readonly tickSize: Decimal
+  readonly quoteDecimalPlaces: number
+
+  constructor(
+    id: string,
+    baseSymbol: TradingSymbol,
+    quoteSymbol: TradingSymbol,
+    tickSize: Decimal
+  ) {
+    this.id = id
+    this.baseSymbol = baseSymbol
+    this.quoteSymbol = quoteSymbol
+    this.tickSize = tickSize
+    this.quoteDecimalPlaces = this.tickSize.decimalPlaces() + 1
+  }
 }
 
 export default class Markets {
@@ -13,11 +29,12 @@ export default class Markets {
 
   constructor(markets: ApiMarket[], symbols: TradingSymbols) {
     this.markets = markets.map((m) => {
-      return {
-        id: m.id,
-        baseSymbol: symbols.getByName(m.baseSymbol),
-        quoteSymbol: symbols.getByName(m.quoteSymbol)
-      }
+      return new Market(
+        m.id,
+        symbols.getByName(m.baseSymbol),
+        symbols.getByName(m.quoteSymbol),
+        m.tickSize
+      )
     })
     this.marketById = new Map(this.markets.map((m) => [m.id, m]))
   }

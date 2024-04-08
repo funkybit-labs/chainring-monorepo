@@ -8,13 +8,17 @@ import { Address, parseUnits } from 'viem'
 import { isErrorFromAlias } from '@zodios/core'
 import { useConfig, useSignTypedData } from 'wagmi'
 import { addressZero, getDomain } from 'utils/eip712'
+import { Market } from 'markets'
+import Decimal from 'decimal.js'
 
 export default function SubmitOrder({
+  market,
   exchangeContractAddress,
   walletAddress,
   baseSymbol,
   quoteSymbol
 }: {
+  market: Market
   exchangeContractAddress: Address
   walletAddress: Address
   baseSymbol: TradingSymbol
@@ -91,7 +95,7 @@ export default function SubmitOrder({
         type: 'limit',
         side: side,
         amount: parseUnits(amount, baseSymbol.decimals),
-        price: Number(price),
+        price: new Decimal(price),
         signature: signature
       })
     }
@@ -142,7 +146,7 @@ export default function SubmitOrder({
                         setPrice(
                           cleanAndFormatNumberInput(
                             e.target.value,
-                            quoteSymbol.decimals
+                            market.quoteDecimalPlaces
                           )
                         )
                       }}

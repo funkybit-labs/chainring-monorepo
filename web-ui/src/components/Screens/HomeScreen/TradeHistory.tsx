@@ -5,8 +5,9 @@ import { formatUnits } from 'viem'
 import { format } from 'date-fns'
 import { Trade } from 'apiClient'
 import { useWebsocketSubscription } from 'contexts/websocket'
+import Markets from 'markets'
 
-export default function TradeHistory() {
+export default function TradeHistory({ markets }: { markets: Markets }) {
   const [trades, setTrades] = useState<Trade[]>(() => [])
 
   useWebsocketSubscription({
@@ -54,6 +55,8 @@ export default function TradeHistory() {
               </thead>
               <tbody>
                 {trades.map((trade) => {
+                  const market = markets.getById(trade.marketId)
+
                   return (
                     <tr
                       key={trade.id}
@@ -63,7 +66,9 @@ export default function TradeHistory() {
                       <td className="pl-4">{trade.side}</td>
                       <td className="pl-4">{formatUnits(trade.amount, 18)}</td>
                       <td className="pl-4">{trade.marketId}</td>
-                      <td className="pl-4">{trade.price}</td>
+                      <td className="pl-4">
+                        {trade.price.toFixed(market.quoteDecimalPlaces)}
+                      </td>
                       <td className="pl-4">
                         {formatUnits(trade.feeAmount, 18)}
                       </td>
