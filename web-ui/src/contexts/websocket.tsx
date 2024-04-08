@@ -128,7 +128,7 @@ export function WebsocketProvider({
 
       const authQuery =
         wallet.address && wallet.status == 'connected'
-          ? `?auth=${await loadAuthToken(refreshAuth)}`
+          ? `?auth=${await loadAuthToken({ forceRefresh: refreshAuth })}`
           : ''
 
       ws.current?.close()

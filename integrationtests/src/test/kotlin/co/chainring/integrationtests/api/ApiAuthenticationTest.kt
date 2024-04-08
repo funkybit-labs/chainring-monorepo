@@ -88,6 +88,14 @@ class ApiAuthenticationTest {
                 ).toHeaders()
             }
         }
+
+        verifyFailure("Invalid signature") {
+            ApiClient.listOrders {
+                mapOf(
+                    "Authorization" to "Bearer ${ApiClient.issueAuthToken()}abcdef",
+                ).toHeaders()
+            }
+        }
     }
 
     @Test

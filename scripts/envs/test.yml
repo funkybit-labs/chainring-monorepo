@@ -2,6 +2,7 @@ environment:
   api:
     DB_HOST: db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     EVM_NETWORK_URL: http://test-anvil.chainring.co:8545
+    AUTH_TOKEN_VALIDITY_INTERVAL: P1D
 services:
   api:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend

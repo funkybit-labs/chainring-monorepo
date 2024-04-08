@@ -298,7 +298,7 @@ apiClient.use(
       return loadAuthToken()
     },
     renewToken: async () => {
-      return loadAuthToken(true)
+      return loadAuthToken({ forceRefresh: true })
     }
   })
 )

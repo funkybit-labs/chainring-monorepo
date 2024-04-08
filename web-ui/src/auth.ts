@@ -1,13 +1,17 @@
 import { getAccount, signTypedData } from '@wagmi/core'
 import { wagmiConfig } from 'wagmiConfig'
 
+export type LoadAuthTokenOptions = {
+  forceRefresh: boolean
+}
+
 export async function loadAuthToken(
-  forceRefresh: boolean = false
+  options: LoadAuthTokenOptions = { forceRefresh: false }
 ): Promise<string> {
   const account = getAccount(wagmiConfig)
   if (account.status === 'connected') {
     const existingToken = localStorage.getItem(`did-${account.address}`)
-    if (existingToken && !forceRefresh) return existingToken
+    if (existingToken && !options.forceRefresh) return existingToken
 
     const message = {
       message: `[ChainRing Labs] Please sign this message to verify your ownership of this wallet address. This action will not cost any gas fees.`,

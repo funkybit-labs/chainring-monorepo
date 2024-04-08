@@ -24,6 +24,7 @@ import org.http4k.core.Status
 import org.http4k.core.with
 import org.http4k.lens.RequestContextKey
 import java.util.Base64
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 
@@ -85,20 +86,22 @@ private fun validateExpiry(signInMessage: SignInMessage): Boolean {
     val messageTimestamp = Instant.parse(signInMessage.timestamp)
 
     val timestampIsInThePast = (messageTimestamp - currentTime) < 10.seconds
-    val acceptableValidityInterval = messageTimestamp + AUTHORIZATION_VALIDITY_INTERVAL > currentTime
+    val acceptableValidityInterval = messageTimestamp + AUTH_TOKEN_VALIDITY_INTERVAL > currentTime
 
     return timestampIsInThePast && acceptableValidityInterval
 }
 
 private fun endOfValidityInterval(signInMessage: SignInMessage): Instant =
-    Instant.parse(signInMessage.timestamp) + AUTHORIZATION_VALIDITY_INTERVAL
+    Instant.parse(signInMessage.timestamp) + AUTH_TOKEN_VALIDITY_INTERVAL
 
 private fun validateSignature(signInMessage: SignInMessage, signature: String): Boolean {
-    return ECHelper.isValidSignature(
-        messageHash = EIP712Helper.computeHash(signInMessage),
-        signature = EvmSignature(signature),
-        signerAddress = signInMessage.address,
-    )
+    return runCatching {
+        ECHelper.isValidSignature(
+            messageHash = EIP712Helper.computeHash(signInMessage),
+            signature = EvmSignature(signature),
+            signerAddress = signInMessage.address,
+        )
+    }.getOrElse { false }
 }
 
 private fun missingAuthorizationHeader(): AuthResult.Failure = authFailure("Authorization header is missing")
@@ -114,7 +117,7 @@ data class SignInMessage(
 
 private val logger = KotlinLogging.logger {}
 private const val AUTHORIZATION_SCHEME_PREFIX = "Bearer "
-private val AUTHORIZATION_VALIDITY_INTERVAL = 30.days
+private val AUTH_TOKEN_VALIDITY_INTERVAL = System.getenv("AUTH_TOKEN_VALIDITY_INTERVAL")?.let { Duration.parse(it) } ?: 30.days
 
 sealed class AuthResult {
     data class Success(val address: Address, val expiresAt: Instant) : AuthResult()
