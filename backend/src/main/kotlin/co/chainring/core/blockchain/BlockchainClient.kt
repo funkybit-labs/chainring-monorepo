@@ -296,9 +296,14 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
                         }
                     }
                 }
+            } catch (ie: InterruptedException) {
+                logger.warn { "existing blockchain handler" }
+                return@thread
+            } catch (e: Exception) {
+                logger.error(e) { "Unhandled exception submitting tx" }
             }
         }
-        pendingTransactions.forEach { txQueue.put(it) }
+        txQueue.put(pendingTransactions)
     }
 
     fun stopTransactionSubmitter() {
