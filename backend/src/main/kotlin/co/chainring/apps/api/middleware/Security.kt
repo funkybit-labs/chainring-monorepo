@@ -6,8 +6,10 @@ import co.chainring.apps.api.model.RequestProcessingError
 import co.chainring.apps.api.model.errorResponse
 import co.chainring.apps.api.requestContexts
 import co.chainring.core.evm.ECHelper
+import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.db.ChainId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -22,8 +24,11 @@ import org.http4k.core.Status
 import org.http4k.core.with
 import org.http4k.lens.RequestContextKey
 import java.util.Base64
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
 
-val signedDidTokenHeader = object : Security {
+val signedTokenSecurity = object : Security {
     override val filter = Filter { next -> wrapWithAuthentication(next) }
 
     private fun wrapWithAuthentication(httpHandler: HttpHandler): HttpHandler = { request ->
@@ -43,102 +48,77 @@ val signedDidTokenHeader = object : Security {
     }
 
     private fun authenticate(request: Request): AuthResult {
-        val authHeader = request.header("Authorization")?.trim()
-            ?: return missingHeader("Authorization")
+        val authHeader = request.header("Authorization")?.trim() ?: return missingAuthorizationHeader()
 
         if (!authHeader.startsWith(AUTHORIZATION_SCHEME_PREFIX, ignoreCase = true)) {
             return authFailure("Invalid authentication scheme")
         }
 
-        return validateDidToken(authHeader.removePrefix(AUTHORIZATION_SCHEME_PREFIX))
+        return validateAuthToken(authHeader.removePrefix(AUTHORIZATION_SCHEME_PREFIX))
     }
 }
 
-fun validateDidToken(didToken: String): AuthResult {
-    val message = didToken.substringBeforeLast('.')
-    val signature = didToken.substringAfterLast('.')
-    val claims = decodeJwtClaims(message) ?: return authFailure("Invalid token format")
+fun validateAuthToken(token: String): AuthResult {
+    val message = token.substringBefore('.')
+    val signature = token.substringAfter('.')
 
-    if (!validateTokenExpiry(claims)) {
+    val signInMessage = decodeSignInMessage(message) ?: return authFailure("Invalid token format")
+
+    if (!validateExpiry(signInMessage)) {
         return authFailure("Token is expired or not valid yet")
     }
 
-    if (!validateAudience(claims)) {
-        return authFailure("Invalid audience")
-    }
-
-    val issuerAddress = extractIssuerAddress(claims) ?: return authFailure("Invalid issuer")
-
-    if (validateSignature(message, signature, issuerAddress)) {
-        return AuthResult.Success(issuerAddress, expiryDate(claims))
+    if (validateSignature(signInMessage, signature)) {
+        return AuthResult.Success(signInMessage.address, endOfValidityInterval(signInMessage))
     }
 
     return authFailure("Invalid signature")
 }
 
-private fun decodeJwtClaims(message: String): TokenClaims? =
-    message.substringAfter('.').let { encodedClaims ->
-        runCatching {
-            Json.decodeFromString<TokenClaims>(String(Base64.getUrlDecoder().decode(encodedClaims)))
-        }.getOrNull()
-    }
-
-private fun validateTokenExpiry(claims: TokenClaims): Boolean {
-    val currentTime = Clock.System.now().epochSeconds
-
-    val notExpired = claims.ext - currentTime > -10
-    val issuedBeforeExpiry = claims.ext > claims.iat
-    val maximumDurationIsAcceptable = (claims.ext - claims.iat) < 30 * 24 * 60 * 60
-
-    return notExpired && issuedBeforeExpiry && maximumDurationIsAcceptable
+fun decodeSignInMessage(message: String): SignInMessage? {
+    return runCatching {
+        Json.decodeFromString<SignInMessage>(String(Base64.getUrlDecoder().decode(message)))
+    }.getOrNull()
 }
 
-private fun expiryDate(claims: TokenClaims): Instant = claims.ext.let { Instant.fromEpochSeconds(it) }
+private fun validateExpiry(signInMessage: SignInMessage): Boolean {
+    val currentTime = Clock.System.now()
+    val messageTimestamp = Instant.parse(signInMessage.timestamp)
 
-private fun validateAudience(claims: TokenClaims): Boolean =
-    claims.aud == "chainring"
+    val timestampIsInThePast = (messageTimestamp - currentTime) < 10.seconds
+    val acceptableValidityInterval = messageTimestamp + AUTH_TOKEN_VALIDITY_INTERVAL > currentTime
 
-private fun extractIssuerAddress(claims: TokenClaims): Address? =
-    claims.iss.substringAfterLast(":").let { addressString ->
-        runCatching {
-            Address(addressString)
-        }.getOrNull()
-    }
-
-private fun validateSignature(message: String, signature: String, issuerAddress: Address): Boolean {
-    val messagePrefix = "\u0019Ethereum Signed Message:\n${message.length}"
-    val messageHash = ECHelper.sha3(messagePrefix.toByteArray() + message.toByteArray())
-
-    return ECHelper.isValidSignature(
-        messageHash = messageHash,
-        signature = EvmSignature(signature),
-        signerAddress = issuerAddress,
-    )
+    return timestampIsInThePast && acceptableValidityInterval
 }
 
-private fun missingHeader(name: String): AuthResult.Failure =
-    authFailure("$name header is missing")
+private fun endOfValidityInterval(signInMessage: SignInMessage): Instant =
+    Instant.parse(signInMessage.timestamp) + AUTH_TOKEN_VALIDITY_INTERVAL
 
-private fun authFailure(error: String): AuthResult.Failure =
-    AuthResult.Failure(unauthorizedResponse(error))
+private fun validateSignature(signInMessage: SignInMessage, signature: String): Boolean {
+    return runCatching {
+        ECHelper.isValidSignature(
+            messageHash = EIP712Helper.computeHash(signInMessage),
+            signature = EvmSignature(signature),
+            signerAddress = signInMessage.address,
+        )
+    }.getOrElse { false }
+}
+
+private fun missingAuthorizationHeader(): AuthResult.Failure = authFailure("Authorization header is missing")
+private fun authFailure(error: String): AuthResult.Failure = AuthResult.Failure(unauthorizedResponse(error))
 
 @Serializable
-data class TokenHeader(
-    val alg: String,
-    val typ: String,
-)
-
-@Serializable
-data class TokenClaims(
-    val iat: Long,
-    val ext: Long,
-    val iss: String,
-    val aud: String,
-    val tid: String,
+data class SignInMessage(
+    val message: String,
+    val address: Address,
+    val chainId: ChainId,
+    val timestamp: String,
 )
 
 private val logger = KotlinLogging.logger {}
 private const val AUTHORIZATION_SCHEME_PREFIX = "Bearer "
+private val AUTH_TOKEN_VALIDITY_INTERVAL = System.getenv("AUTH_TOKEN_VALIDITY_INTERVAL")?.let { Duration.parse(it) } ?: 30.days
+
 sealed class AuthResult {
     data class Success(val address: Address, val expiresAt: Instant) : AuthResult()
     data class Failure(val response: Response) : AuthResult()

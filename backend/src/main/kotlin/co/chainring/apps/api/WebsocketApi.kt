@@ -1,7 +1,7 @@
 package co.chainring.apps.api
 
 import co.chainring.apps.api.middleware.AuthResult
-import co.chainring.apps.api.middleware.validateDidToken
+import co.chainring.apps.api.middleware.validateAuthToken
 import co.chainring.apps.api.model.websocket.IncomingWSMessage
 import co.chainring.core.websocket.Broadcaster
 import co.chainring.core.websocket.ConnectedClient
@@ -29,7 +29,7 @@ class WebsocketApi(private val broadcaster: Broadcaster) {
 
                 val connectedClient = when (val auth = request.query("auth")) {
                     null -> ConnectedClient(websocket, null, Instant.DISTANT_FUTURE)
-                    else -> when (val result = validateDidToken(auth)) {
+                    else -> when (val result = validateAuthToken(auth)) {
                         is AuthResult.Success -> ConnectedClient(websocket, result.address, result.expiresAt)
                         else -> {
                             websocket.close(wsUnauthorized)

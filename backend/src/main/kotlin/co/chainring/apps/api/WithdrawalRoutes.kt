@@ -1,6 +1,6 @@
 package co.chainring.apps.api
 
-import co.chainring.apps.api.middleware.signedDidTokenHeader
+import co.chainring.apps.api.middleware.signedTokenSecurity
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.Withdrawal
@@ -39,7 +39,7 @@ class WithdrawalRoutes(private val blockchainClient: BlockchainClient) {
         return "withdrawals" meta {
             operationId = "withdraw"
             summary = "Withdraw"
-            security = signedDidTokenHeader
+            security = signedTokenSecurity
             returning(
                 Status.CREATED,
                 responseBody to WithdrawalApiResponse(
@@ -97,7 +97,7 @@ class WithdrawalRoutes(private val blockchainClient: BlockchainClient) {
         return "withdrawals" / withdrawalIdPathParam meta {
             operationId = "get-withdrawal"
             summary = "Get withdrawal"
-            security = signedDidTokenHeader
+            security = signedTokenSecurity
             returning(
                 Status.OK,
                 responseBody to WithdrawalApiResponse(
