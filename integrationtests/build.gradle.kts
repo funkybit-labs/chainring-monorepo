@@ -58,6 +58,7 @@ dependencies {
     implementation("io.grpc:grpc-protobuf:$grpcProtobufVersion")
     implementation("com.google.protobuf:protobuf-kotlin:$protobufKotlinVersion")
     implementation("io.grpc:grpc-netty:$grpcProtobufVersion")
+    implementation("net.openhft:chronicle-queue:5.22.28")
 
     implementation(project(":backend"))
     implementation(project(":sequencer"))

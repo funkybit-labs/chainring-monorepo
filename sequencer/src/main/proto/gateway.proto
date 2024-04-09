@@ -16,7 +16,7 @@ message GatewayResponse {
 }
 
 service Gateway {
-  rpc ApplyOrderBatch (OrderBatch) returns (GatewayResponse);
   rpc AddMarket (Market) returns (GatewayResponse);
   rpc ApplyBalanceBatch (BalanceBatch) returns (GatewayResponse);
+  rpc ApplyOrderBatch (OrderBatch) returns (GatewayResponse);
 }

@@ -1,8 +1,5 @@
 package co.chainring.sequencer.apps
 
-import co.chainring.sequencer.core.inputQueue
-import co.chainring.sequencer.core.outputQueue
-import co.chainring.sequencer.core.sequencedQueue
 import co.chainring.sequencer.proto.BalanceBatch
 import co.chainring.sequencer.proto.GatewayGrpcKt
 import co.chainring.sequencer.proto.GatewayResponse
@@ -17,20 +14,29 @@ import co.chainring.sequencer.proto.sequencerRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.grpc.Server
 import io.grpc.ServerBuilder
+import net.openhft.chronicle.queue.ChronicleQueue
 import net.openhft.chronicle.queue.ExcerptTailer
 import java.util.UUID
 import kotlin.concurrent.getOrSet
 import kotlin.system.measureNanoTime
+import co.chainring.sequencer.core.inputQueue as defaultInputQueue
+import co.chainring.sequencer.core.outputQueue as defaultOutputQueue
+import co.chainring.sequencer.core.sequencedQueue as defaultSequencedQueue
 
 data class GatewayConfig(val port: Int = 5337)
 
-class GatewayApp(private val config: GatewayConfig = GatewayConfig()) : BaseApp() {
+class GatewayApp(
+    private val config: GatewayConfig = GatewayConfig(),
+    inputQueue: ChronicleQueue = defaultInputQueue,
+    outputQueue: ChronicleQueue = defaultOutputQueue,
+    sequencedQueue: ChronicleQueue = defaultSequencedQueue,
+) : BaseApp() {
     override val logger = KotlinLogging.logger {}
 
     private val server: Server =
         ServerBuilder
             .forPort(config.port)
-            .addService(GatewayService())
+            .addService(GatewayService(inputQueue, outputQueue, sequencedQueue))
             .build()
 
     override fun start() {
@@ -56,7 +62,11 @@ class GatewayApp(private val config: GatewayConfig = GatewayConfig()) : BaseApp(
         server.awaitTermination()
     }
 
-    internal class GatewayService() : GatewayGrpcKt.GatewayCoroutineImplBase() {
+    internal class GatewayService(
+        private val inputQueue: ChronicleQueue,
+        private val outputQueue: ChronicleQueue,
+        private val sequencedQueue: ChronicleQueue,
+    ) : GatewayGrpcKt.GatewayCoroutineImplBase() {
         private val outputTailer = ThreadLocal<ExcerptTailer>()
         private val logger = KotlinLogging.logger {}
 
