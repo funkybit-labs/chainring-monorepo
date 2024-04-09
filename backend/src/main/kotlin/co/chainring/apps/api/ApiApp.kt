@@ -7,6 +7,7 @@ import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.db.DbConfig
 import co.chainring.core.model.db.WithdrawalEntity
+import co.chainring.core.services.ExchangeService
 import co.chainring.core.websocket.Broadcaster
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.contract
@@ -57,9 +58,14 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val enableTestRoutes = (System.getenv("ENABLE_TEST_ROUTES") ?: "true") == "true"
 
     private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
-    private val withdrawalRoutes = WithdrawalRoutes(blockchainClient)
-
     private val broadcaster = Broadcaster()
+
+    private val exchangeService = ExchangeService(blockchainClient, broadcaster)
+
+    private val withdrawalRoutes = WithdrawalRoutes(exchangeService)
+    private val balanceRoutes = BalanceRoutes(blockchainClient)
+    private val testRoutes = TestRoutes(exchangeService)
+    private val orderRoutes = OrderRoutes(exchangeService)
 
     private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
         .then(ServerFilters.Cors(corsPolicy))
@@ -83,18 +89,18 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                         routes +=
                             listOfNotNull(
                                 ConfigRoutes.getConfiguration(),
-                                OrderRoutes.createOrder(broadcaster, blockchainClient),
-                                OrderRoutes.updateOrder(broadcaster),
-                                OrderRoutes.cancelOrder(broadcaster),
-                                OrderRoutes.getOrder(),
-                                OrderRoutes.listOrders(),
-                                OrderRoutes.cancelOpenOrders(broadcaster),
-                                OrderRoutes.batchOrders(broadcaster),
-                                OrderRoutes.listTrades(),
-                                BalanceRoutes.getBalances(),
+                                orderRoutes.createOrder(),
+                                orderRoutes.updateOrder(),
+                                orderRoutes.cancelOrder(),
+                                orderRoutes.getOrder(),
+                                orderRoutes.listOrders(),
+                                orderRoutes.cancelOpenOrders(),
+                                orderRoutes.batchOrders(),
+                                orderRoutes.listTrades(),
+                                balanceRoutes.getBalances(),
                                 withdrawalRoutes.getWithdrawal(),
                                 withdrawalRoutes.createWithdrawal(),
-                                if (enableTestRoutes) TestRoutes.createSequencerDeposit() else null,
+                                if (enableTestRoutes) testRoutes.createSequencerDeposit() else null,
 
                                 // http api + websocket
                                 // GET /v1/market/market_id/order-book
@@ -137,6 +143,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     fun updateContracts() {
         blockchainClient.updateContracts()
         blockchainClient.startTransactionSubmitter(
+            exchangeService,
             transaction {
                 WithdrawalEntity.findPending().map { it.toEip712Transaction() }
             },

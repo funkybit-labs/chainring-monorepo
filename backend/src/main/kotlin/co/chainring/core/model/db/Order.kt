@@ -4,6 +4,10 @@ import co.chainring.apps.api.model.Order
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.SequencerOrderId
+import co.chainring.core.model.db.WalletEntity.Companion.transform
+import co.chainring.core.model.db.migrations.V15_WalletTable.V15_WithdrawalTable.index
+import co.chainring.core.model.db.migrations.V15_WalletTable.V15_WithdrawalTable.nullable
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import co.chainring.sequencer.proto.OrderDisposition
@@ -84,7 +88,8 @@ object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
     val marketGuid = reference("market_guid", MarketTable).index()
-    val ownerAddress = varchar("owner_address", 10485760).index()
+    val walletGuid = reference("wallet_guid", WalletTable).index()
+
     val status = customEnumeration(
         "status",
         "OrderStatus",
@@ -169,7 +174,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
     }
 
     fun toEip712Transaction(baseToken: Address, quoteToken: Address, quoteDecimals: Int) = EIP712Transaction.Order(
-        this.ownerAddress,
+        this.wallet.address,
         baseToken,
         quoteToken,
         this.amount,
@@ -182,7 +187,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         fun create(
             nonce: String,
             market: MarketEntity,
-            ownerAddress: Address,
+            wallet: WalletEntity,
             type: OrderType,
             side: OrderSide,
             amount: BigInteger,
@@ -194,7 +199,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             this.createdAt = now
             this.createdBy = "system"
             this.market = market
-            this.ownerAddress = ownerAddress
+            this.walletGuid = wallet.guid
             this.status = OrderStatus.Open
             this.type = type
             this.side = side
@@ -216,17 +221,24 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             }.firstOrNull()
         }
 
-        fun listOrders(ownerAddress: Address): List<OrderEntity> {
+        fun listOrders(wallet: WalletEntity): List<OrderEntity> {
             return OrderEntity
-                .find { OrderTable.ownerAddress.eq(ownerAddress.value) }
+                .find { OrderTable.walletGuid.eq(wallet.guid) }
                 .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
                 .toList()
         }
 
-        fun cancelAll(ownerAddress: Address) {
+        fun listOpenOrders(wallet: WalletEntity): List<OrderEntity> {
+            return OrderEntity
+                .find { OrderTable.status.inList(listOf(OrderStatus.Open, OrderStatus.Partial)) and OrderTable.walletGuid.eq(wallet.guid) }
+                .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
+                .toList()
+        }
+
+        fun cancelAll(wallet: WalletEntity) {
             val now = Clock.System.now()
             OrderTable.update({
-                OrderTable.status.inList(listOf(OrderStatus.Open, OrderStatus.Partial)) and OrderTable.ownerAddress.eq(ownerAddress.value)
+                OrderTable.status.inList(listOf(OrderStatus.Open, OrderStatus.Partial)) and OrderTable.walletGuid.eq(wallet.guid)
             }) {
                 it[this.status] = OrderStatus.Cancelled
                 it[this.closedAt] = now
@@ -257,11 +269,9 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
     var createdAt by OrderTable.createdAt
     var createdBy by OrderTable.createdBy
     var marketGuid by OrderTable.marketGuid
-    var ownerAddress by OrderTable.ownerAddress.transform(
-        toReal = { Address(it) },
-        toColumn = { it.value },
-    )
     var market by MarketEntity referencedOn OrderTable.marketGuid
+    var walletGuid by OrderTable.walletGuid
+    var wallet by WalletEntity referencedOn OrderTable.walletGuid
     var status by OrderTable.status
     var type by OrderTable.type
     var side by OrderTable.side
@@ -279,5 +289,8 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
     var closedAt by OrderTable.closedAt
     var closedBy by OrderTable.closedBy
     var signature by OrderTable.signature
-    var sequencerOrderId by OrderTable.sequencerOrderId
+    var sequencerOrderId by OrderTable.sequencerOrderId.transform(
+        toReal = { it?.let { SequencerOrderId(it) } },
+        toColumn = { it?.value },
+    )
 }

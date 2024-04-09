@@ -8,7 +8,6 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import java.math.BigInteger
@@ -36,7 +35,7 @@ enum class WithdrawalStatus {
 }
 
 object WithdrawalTable : GUIDTable<WithdrawalId>("withdrawal", ::WithdrawalId) {
-    val walletAddress = varchar("wallet_address", 10485760).index()
+    val walletGuid = reference("wallet_guid", WalletTable).index()
     val nonce = long("nonce")
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
@@ -60,7 +59,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
         fun create(
             nonce: Long,
             chainId: ChainId,
-            walletAddress: Address,
+            wallet: WalletEntity,
             tokenAddress: Address?,
             amount: BigInteger,
             signature: EvmSignature,
@@ -69,24 +68,17 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
             this.nonce = nonce
             this.createdAt = now
             this.createdBy = "system"
-            this.walletAddress = walletAddress
+            this.walletGuid = wallet.guid
             this.symbolGuid = SymbolEntity.forChainAndContractAddress(chainId, tokenAddress).guid
             this.signature = signature
             this.status = WithdrawalStatus.Pending
             this.amount = amount
         }
 
-        fun findPendingByWalletAndNonce(walletAddress: Address, nonce: Long): WithdrawalEntity? {
+        fun findPendingByWalletAndNonce(wallet: WalletEntity, nonce: Long): WithdrawalEntity? {
             return WithdrawalEntity.find {
-                WithdrawalTable.walletAddress.eq(walletAddress.value) and WithdrawalTable.nonce.eq(nonce) and WithdrawalTable.status.eq(WithdrawalStatus.Pending)
+                WithdrawalTable.walletGuid.eq(wallet.guid) and WithdrawalTable.nonce.eq(nonce) and WithdrawalTable.status.eq(WithdrawalStatus.Pending)
             }.firstOrNull()
-        }
-
-        fun findAllByWallet(walletAddress: Address, limit: Int = 10): List<WithdrawalEntity> {
-            return WithdrawalEntity.find {
-                WithdrawalTable.walletAddress.eq(walletAddress.value)
-            }.orderBy(WithdrawalTable.createdAt to SortOrder.DESC)
-                .limit(limit).toList()
         }
 
         fun findPending(): List<WithdrawalEntity> {
@@ -104,7 +96,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
     }
 
     fun toEip712Transaction() = EIP712Transaction.WithdrawTx(
-        this.walletAddress,
+        this.wallet.address,
         this.symbol.contractAddress,
         this.amount,
         this.nonce,
@@ -112,10 +104,8 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
     )
 
     var nonce by WithdrawalTable.nonce
-    var walletAddress by WithdrawalTable.walletAddress.transform(
-        toColumn = { it.value },
-        toReal = { Address(it) },
-    )
+    var walletGuid by WithdrawalTable.walletGuid
+    var wallet by WalletEntity referencedOn WithdrawalTable.walletGuid
     var symbolGuid by WithdrawalTable.symbolGuid
     var symbol by SymbolEntity referencedOn WithdrawalTable.symbolGuid
 

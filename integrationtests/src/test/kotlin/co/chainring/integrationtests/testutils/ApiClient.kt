@@ -3,6 +3,7 @@ package co.chainring.integrationtests.testutils
 import co.chainring.apps.api.middleware.SignInMessage
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ApiErrors
+import co.chainring.apps.api.model.BalancesApiResponse
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateSequencerDeposit
@@ -238,6 +239,21 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
 
         when (httpResponse.code) {
             HttpURLConnection.HTTP_CREATED -> {}
+            else -> throw AbnormalApiResponseException(httpResponse)
+        }
+    }
+
+    fun getBalances(): BalancesApiResponse {
+        val httpResponse = execute(
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/balances")
+                .get()
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        )
+
+        return when (httpResponse.code) {
+            HttpURLConnection.HTTP_OK -> json.decodeFromString<BalancesApiResponse>(httpResponse.body?.string()!!)
             else -> throw AbnormalApiResponseException(httpResponse)
         }
     }

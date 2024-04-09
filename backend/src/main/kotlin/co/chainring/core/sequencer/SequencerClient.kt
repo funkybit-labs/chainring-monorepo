@@ -2,6 +2,8 @@ package co.chainring.core.sequencer
 
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.model.Address
+import co.chainring.core.model.SequencerOrderId
+import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.db.OrderId
 import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.core.toDecimalValue
@@ -20,16 +22,16 @@ import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.UUID
 
-fun OrderId.toSequencerId(): Long {
-    return this.value.toSequencerId()
+fun OrderId.toSequencerId(): SequencerOrderId {
+    return SequencerOrderId(this.value.toSequencerId())
 }
 
 fun String.toSequencerId(): Long {
     return BigInteger(1, ECHelper.sha3(this.toByteArray())).toLong()
 }
 
-fun Address.toSequencerId(): Long {
-    return BigInteger(1, ECHelper.sha3(this.value.toByteArray())).toLong()
+fun Address.toSequencerId(): SequencerWalletId {
+    return SequencerWalletId(BigInteger(1, ECHelper.sha3(this.value.toByteArray())).toLong())
 }
 
 object SequencerClient {
@@ -97,7 +99,7 @@ object SequencerClient {
         ).sequencerResponse
     }
 
-    suspend fun withdrawal(
+    suspend fun withdraw(
         wallet: Long,
         asset: Asset,
         amount: BigInteger,
@@ -112,6 +114,32 @@ object SequencerClient {
                         this.amount = amount.toIntegerValue()
                     },
                 )
+            },
+        ).sequencerResponse
+    }
+
+    suspend fun cancelOrder(
+        sequencerOrderId: Long,
+        marketId: String,
+    ): SequencerResponse {
+        return stub.applyOrderBatch(
+            orderBatch {
+                this.marketId = marketId
+                this.ordersToCancel.add(
+                    sequencerOrderId,
+                )
+            },
+        ).sequencerResponse
+    }
+
+    suspend fun cancelOrders(
+        sequencerOrderIds: List<Long>,
+        marketId: String,
+    ): SequencerResponse {
+        return stub.applyOrderBatch(
+            orderBatch {
+                this.marketId = marketId
+                this.ordersToCancel.addAll(sequencerOrderIds)
             },
         ).sequencerResponse
     }
