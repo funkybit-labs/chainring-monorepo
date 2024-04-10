@@ -14,6 +14,7 @@ import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.GatewayGrpcKt
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderDisposition
+import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.balanceBatch
 import co.chainring.sequencer.proto.deposit
 import co.chainring.sequencer.proto.market
@@ -172,6 +173,25 @@ class TestSequencerCheckpoints {
                 ).success,
             )
 
+            // limit sell 3
+            assertTrue(
+                gateway.applyOrderBatch(
+                    orderBatch {
+                        this.guid = UUID.randomUUID().toString()
+                        this.marketId = marketId.value
+                        this.ordersToAdd.add(
+                            order {
+                                this.guid = Random.nextLong()
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.570").toDecimalValue()
+                                this.wallet = maker.value
+                                this.type = Order.Type.LimitSell
+                            },
+                        )
+                    },
+                ).success,
+            )
+
             // restart sequencer, it should recover from checkpoint
             sequencerApp.stop()
             sequencerApp.start()
@@ -184,7 +204,7 @@ class TestSequencerCheckpoints {
                     this.ordersToAdd.add(
                         order {
                             this.guid = Random.nextLong()
-                            this.amount = BigDecimal("0.0006").inSats().toIntegerValue()
+                            this.amount = BigDecimal("0.0011").inSats().toIntegerValue()
                             this.price = BigDecimal.ZERO.toDecimalValue()
                             this.wallet = taker.value
                             this.type = Order.Type.MarketBuy
@@ -193,19 +213,28 @@ class TestSequencerCheckpoints {
                 },
             ).also {
                 assertTrue(it.success)
-                assertEquals(3, it.sequencerResponse.ordersChangedCount)
-                val takerOrder = it.sequencerResponse.ordersChangedList[0]
-                assertEquals(OrderDisposition.Filled, takerOrder.disposition)
-                val makerOrder1 = it.sequencerResponse.ordersChangedList[1]
-                assertEquals(OrderDisposition.Filled, makerOrder1.disposition)
+                assertEquals(4, it.sequencerResponse.ordersChangedCount)
 
-                val makerOrder2 = it.sequencerResponse.ordersChangedList[2]
-                assertEquals(OrderDisposition.PartiallyFilled, makerOrder2.disposition)
+                it.sequencerResponse.ordersChangedList[0].also { marketBuyOrder ->
+                    assertEquals(OrderDisposition.Filled, marketBuyOrder.disposition)
+                }
+
+                it.sequencerResponse.ordersChangedList[1].also { limitSellOrder1 ->
+                    assertEquals(OrderDisposition.Filled, limitSellOrder1.disposition)
+                }
+
+                it.sequencerResponse.ordersChangedList[2].also { limitSellOrder2 ->
+                    assertEquals(OrderDisposition.Filled, limitSellOrder2.disposition)
+                }
+
+                it.sequencerResponse.ordersChangedList[3].also { limitSellOrder3 ->
+                    assertEquals(OrderDisposition.PartiallyFilled, limitSellOrder3.disposition)
+                }
             }
 
-            // check that rollover has actually happened and checkpoint was saved
             assertQueueFilesCount(inputQueue, 2)
             assertCheckpointFilesCount(checkpointsPath, 1)
+            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 6)
         } finally {
             gatewayApp.stop()
             sequencerApp.stop()
@@ -227,6 +256,35 @@ class TestSequencerCheckpoints {
         Files.list(path).use { list ->
             assertEquals(expectedCount, list.count())
         }
+    }
+
+    private fun assertOutputQueueContainsNoDuplicates(outputQueue: ChronicleQueue, expectedMessagesCount: Int) {
+        val processedRequestGuids = mutableListOf<Long>()
+        val outputTailer = outputQueue.createTailer()
+        val lastIndex = outputTailer.toEnd().index()
+        outputTailer.toStart()
+        while (true) {
+            if (outputTailer.index() == lastIndex) {
+                break
+            }
+            outputTailer.readingDocument().use {
+                if (it.isPresent) {
+                    it.wire()?.read()?.bytes { bytes ->
+                        processedRequestGuids.add(
+                            SequencerResponse.parseFrom(bytes.toByteArray()).sequence,
+                        )
+                    }
+                }
+            }
+        }
+
+        assertEquals(
+            processedRequestGuids.distinct(),
+            processedRequestGuids,
+            "Output queue contains duplicate responses",
+        )
+
+        assertEquals(expectedMessagesCount, processedRequestGuids.size)
     }
 
     @Test

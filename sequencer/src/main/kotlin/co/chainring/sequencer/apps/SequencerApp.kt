@@ -272,35 +272,30 @@ class SequencerApp(
     }
 
     override fun start() {
-        stop = false
         logger.info { "Starting Sequencer App" }
+
+        stop = false
         sequencerThread = thread(start = true, name = "sequencer", isDaemon = false) {
             val inputTailer = inputQueue.createTailer("sequencer")
             val initialCycle = inputTailer.cycle()
 
-            // Move to the start of the cycle
+            // moveToCycle moves tailer to the start of the cycle
             if (inputTailer.moveToCycle(initialCycle)) {
                 // Restore from previous cycle's checkpoint unless we are in the first cycle
                 if (initialCycle != inputQueue.firstCycle()) {
                     val prevCycle = inputQueue.nextCycle(initialCycle, TailerDirection.BACKWARD)
-                    Path.of(checkpointsPath.toString(), "$prevCycle.ckpt")
-                        .also { checkpointPath ->
-                            logger.debug { "Restoring from checkpoint $checkpointPath" }
-                            state = SequencerState.load(checkpointPath)
-                            logger.debug { "Restored from checkpoint" }
-                        }
+                    restoreFromCheckpoint(prevCycle)
                 }
             }
+
+            val lastSequenceNumberProcessedBeforeRestart = getLastSequenceNumberInOutputQueue()
 
             val outputAppender = outputQueue.acquireAppender()
             var tailerPrevState = inputTailer.state()
             while (!stop) {
                 val tailerState = inputTailer.state()
                 if (tailerState == TailerState.END_OF_CYCLE && tailerState != tailerPrevState) {
-                    val checkpointPath = Path.of(checkpointsPath.toString(), "${inputTailer.cycle()}.ckpt")
-                    logger.debug { "Saving checkpoint to $checkpointPath" }
-                    state.persist(checkpointPath)
-                    logger.debug { "Saved checkpoint" }
+                    saveCheckpoint(inputTailer.cycle())
                 }
 
                 inputTailer.readingDocument().use { dc ->
@@ -308,10 +303,11 @@ class SequencerApp(
                         val startTime = System.nanoTime()
                         dc.wire()?.read()?.bytes { bytes ->
                             val request = SequencerRequest.parseFrom(bytes.toByteArray())
-                            outputAppender.writingDocument().use {
-                                it.wire()?.write()?.bytes(
-                                    processRequest(request, dc.index(), startTime).toByteArray(),
-                                )
+                            val response = processRequest(request, dc.index(), startTime)
+                            if (response.sequence > lastSequenceNumberProcessedBeforeRestart) {
+                                outputAppender.writingDocument().use {
+                                    it.wire()?.write()?.bytes(response.toByteArray())
+                                }
                             }
                         }
                     }
@@ -320,7 +316,36 @@ class SequencerApp(
                 tailerPrevState = tailerState
             }
         }
+
         logger.info { "Sequencer App started" }
+    }
+
+    private fun getLastSequenceNumberInOutputQueue(): Long =
+        outputQueue.createTailer().let { outputTailer ->
+            var result = -1L
+            outputTailer.moveToIndex(outputQueue.lastIndex())
+            outputTailer.readingDocument().use {
+                if (it.isPresent) {
+                    it.wire()?.read()?.bytes { bytes ->
+                        result = SequencerResponse.parseFrom(bytes.toByteArray()).sequence
+                    }
+                }
+            }
+            result
+        }
+
+    private fun saveCheckpoint(currentCycle: Int) {
+        val checkpointPath = Path.of(checkpointsPath.toString(), "$currentCycle.ckpt")
+        logger.debug { "Saving checkpoint to $checkpointPath" }
+        state.persist(checkpointPath)
+        logger.debug { "Saved checkpoint" }
+    }
+
+    private fun restoreFromCheckpoint(atCycle: Int) {
+        val checkpointPath = Path.of(checkpointsPath.toString(), "$atCycle.ckpt")
+        logger.debug { "Restoring from checkpoint $checkpointPath" }
+        state = SequencerState.load(checkpointPath)
+        logger.debug { "Restored from checkpoint" }
     }
 
     override fun stop() {
