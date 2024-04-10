@@ -28,6 +28,8 @@ import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.testutils.AbnormalApiResponseException
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
+import co.chainring.integrationtests.testutils.BalanceHelper
+import co.chainring.integrationtests.testutils.ExpectedBalance
 import co.chainring.integrationtests.testutils.Faucet
 import co.chainring.integrationtests.testutils.Wallet
 import co.chainring.integrationtests.testutils.apiError
@@ -52,7 +54,6 @@ import kotlin.test.assertNotEquals
 
 @ExtendWith(AppUnderTestRunner::class)
 class OrderRoutesApiTest {
-
     private val logger = KotlinLogging.logger {}
 
     @Test
@@ -72,7 +73,10 @@ class OrderRoutesApiTest {
 
         Faucet.fund(wallet.address)
         wallet.mintERC20("DAI", wallet.formatAmount("2", "DAI"))
-        deposit(apiClient, wallet, "DAI", wallet.formatAmount("2", "DAI"))
+        val amountToDeposit = wallet.formatAmount("2", "DAI")
+        BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit))) {
+            deposit(apiClient, wallet, "DAI", amountToDeposit)
+        }
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
             nonce = generateHexString(32),
@@ -143,14 +147,15 @@ class OrderRoutesApiTest {
         // cancel order is idempotent
         apiClient.cancelOrder(limitOrder.id)
         val cancelledOrder = apiClient.getOrder(limitOrder.id)
-        assertEquals(OrderStatus.Cancelled, cancelledOrder.status)
         wsClient.waitForMessage().also { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
                 assertIs<OrderUpdated>(data)
-                assertEquals(cancelledOrder, data.order)
+                assertEquals(cancelledOrder.id, data.order.id)
+                assertEquals(OrderStatus.Cancelled, data.order.status)
             }
         }
+        assertEquals(OrderStatus.Cancelled, apiClient.getOrder(limitOrder.id).status)
 
         wsClient.close()
     }
@@ -168,8 +173,11 @@ class OrderRoutesApiTest {
         }
 
         Faucet.fund(wallet.address)
-        wallet.mintERC20("DAI", wallet.formatAmount("20", "DAI"))
-        deposit(apiClient, wallet, "DAI", wallet.formatAmount("20", "DAI"))
+        val amountToDeposit = wallet.formatAmount("20", "DAI")
+        wallet.mintERC20("DAI", amountToDeposit)
+        BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit))) {
+            deposit(apiClient, wallet, "DAI", amountToDeposit)
+        }
 
         // operation on non-existent order
         listOf(
@@ -209,6 +217,7 @@ class OrderRoutesApiTest {
             },
         )
 
+        logger.debug { "Before wait for order created" }
         wsClient.waitForMessage().also { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
@@ -217,6 +226,7 @@ class OrderRoutesApiTest {
             }
         }
 
+        logger.debug { "Before wait for order updates" }
         wsClient.waitForMessage().also { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
@@ -273,8 +283,11 @@ class OrderRoutesApiTest {
         }
 
         Faucet.fund(wallet.address)
-        wallet.mintERC20("DAI", wallet.formatAmount("30", "DAI"))
-        deposit(apiClient, wallet, "DAI", wallet.formatAmount("30", "DAI"))
+        val amountToDeposit = wallet.formatAmount("30", "DAI")
+        wallet.mintERC20("DAI", amountToDeposit)
+        BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit))) {
+            deposit(apiClient, wallet, "DAI", amountToDeposit)
+        }
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
             nonce = generateHexString(32),
@@ -295,7 +308,6 @@ class OrderRoutesApiTest {
         }
 
         apiClient.cancelOpenOrders()
-        assertTrue(apiClient.listOrders().orders.all { it.status == OrderStatus.Cancelled })
 
         wsClient.waitForMessage().also { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
@@ -305,6 +317,9 @@ class OrderRoutesApiTest {
                 assertTrue(data.orders.all { it.status == OrderStatus.Cancelled })
             }
         }
+
+        assertTrue(apiClient.listOrders().orders.all { it.status == OrderStatus.Cancelled })
+
         wsClient.close()
     }
 
@@ -335,10 +350,21 @@ class OrderRoutesApiTest {
         takerWallet.mintERC20("ETH", takerWallet.formatAmount("2", "ETH"))
         makerWallet.mintERC20("ETH", takerWallet.formatAmount("2", "ETH"))
 
-        deposit(makerApiClient, makerWallet, "BTC", takerWallet.formatAmount("0.2", "BTC"))
-        deposit(makerApiClient, makerWallet, "ETH", takerWallet.formatAmount("1", "ETH"))
-        deposit(takerApiClient, takerWallet, "ETH", takerWallet.formatAmount("1", "ETH"))
-
+        val btcDepositAmount = takerWallet.formatAmount("0.2", "BTC")
+        val ethDepositAmount = takerWallet.formatAmount("1", "ETH")
+        BalanceHelper.waitForAndVerifyBalanceChange(
+            makerApiClient,
+            listOf(
+                ExpectedBalance("BTC", btcDepositAmount, btcDepositAmount),
+                ExpectedBalance("ETH", ethDepositAmount, ethDepositAmount),
+            ),
+        ) {
+            deposit(makerApiClient, makerWallet, "BTC", btcDepositAmount)
+            deposit(makerApiClient, makerWallet, "ETH", ethDepositAmount)
+        }
+        BalanceHelper.waitForAndVerifyBalanceChange(takerApiClient, listOf(ExpectedBalance("ETH", ethDepositAmount, ethDepositAmount))) {
+            deposit(takerApiClient, takerWallet, "ETH", ethDepositAmount)
+        }
         // starting onchain balances
         val makerStartingBTCBalance = makerWallet.getExchangeNativeBalance()
         val makerStartingETHBalance = makerWallet.getExchangeERC20Balance("ETH")
@@ -438,28 +464,29 @@ class OrderRoutesApiTest {
                 assertEquals(ExecutionRole.Maker, data.order.executions[0].role)
             }
         }
-        val trade = transaction {
-            OrderExecutionEntity.findForOrder(OrderEntity[marketBuyOrder.id]).first().trade
-        }
+        val trade = waitForTradeToExist(marketBuyOrder.id)
+
         assertEquals(trade.amount, takerWallet.formatAmount("0.00043210", "BTC"))
         assertEquals(0, trade.price.compareTo(BigDecimal("17.550")))
 
         waitForSettlementToFinish(trade.id.value)
-        transaction {
-            assertEquals(SettlementStatus.Completed, TradeEntity[trade.id].settlementStatus)
-        }
-
-        val makerBTCBalanceAfterTrade = makerWallet.getExchangeNativeBalance()
-        val makerETHBalanceAfterTrade = makerWallet.getExchangeERC20Balance("ETH")
-        val takerBTCBalanceAfterTrade = takerWallet.getExchangeNativeBalance()
-        val takerETHBalanceAfterTrade = takerWallet.getExchangeERC20Balance("ETH")
 
         val baseQuantity = takerWallet.formatAmount("0.00043210", "BTC")
         val notional = (trade.price * trade.amount.fromFundamentalUnits(takerWallet.decimals("BTC"))).toFundamentalUnits(takerWallet.decimals("ETH"))
-        assertEquals(takerBTCBalanceAfterTrade, takerStartingBTCBalance + baseQuantity)
-        assertEquals(makerBTCBalanceAfterTrade, makerStartingBTCBalance - baseQuantity)
-        assertEquals(takerETHBalanceAfterTrade, takerStartingETHBalance - notional)
-        assertEquals(makerETHBalanceAfterTrade, makerStartingETHBalance + notional)
+        BalanceHelper.verifyBalances(
+            makerApiClient,
+            listOf(
+                ExpectedBalance("BTC", makerStartingBTCBalance - baseQuantity, makerStartingBTCBalance - baseQuantity),
+                ExpectedBalance("ETH", makerStartingETHBalance + notional, makerStartingETHBalance + notional),
+            ),
+        )
+        BalanceHelper.verifyBalances(
+            takerApiClient,
+            listOf(
+                ExpectedBalance("BTC", takerStartingBTCBalance + baseQuantity, takerStartingBTCBalance + baseQuantity),
+                ExpectedBalance("ETH", takerStartingETHBalance - notional, takerStartingETHBalance - notional),
+            ),
+        )
 
         // place a sell order and see it gets executes
         val marketSellOrder = takerApiClient.createOrder(
@@ -509,28 +536,28 @@ class OrderRoutesApiTest {
                 assertEquals(ExecutionRole.Maker, data.order.executions[0].role)
             }
         }
-        val trade2 = transaction {
-            OrderExecutionEntity.findForOrder(OrderEntity[marketSellOrder.id]).first().trade
-        }
+        val trade2 = waitForTradeToExist(marketSellOrder.id)
         assertEquals(trade2.amount, takerWallet.formatAmount("0.00012345", "BTC"))
         assertEquals(0, trade2.price.compareTo(BigDecimal("17.500")))
 
         waitForSettlementToFinish(trade2.id.value)
-        transaction {
-            assertEquals(SettlementStatus.Completed, TradeEntity[trade2.id].settlementStatus)
-        }
-
-        val makerBTCBalanceAfterTrade2 = makerWallet.getExchangeNativeBalance()
-        val makerETHBalanceAfterTrade2 = makerWallet.getExchangeERC20Balance("ETH")
-        val takerBTCBalanceAfterTrade2 = takerWallet.getExchangeNativeBalance()
-        val takerETHBalanceAfterTrade2 = takerWallet.getExchangeERC20Balance("ETH")
 
         val baseQuantity2 = takerWallet.formatAmount("0.00012345", "BTC")
         val notional2 = (trade2.price * trade2.amount.fromFundamentalUnits(takerWallet.decimals("BTC"))).toFundamentalUnits(takerWallet.decimals("ETH"))
-        assertEquals(takerBTCBalanceAfterTrade2, takerBTCBalanceAfterTrade - baseQuantity2)
-        assertEquals(makerBTCBalanceAfterTrade2, makerBTCBalanceAfterTrade + baseQuantity2)
-        assertEquals(takerETHBalanceAfterTrade2, takerETHBalanceAfterTrade + notional2)
-        assertEquals(makerETHBalanceAfterTrade2, makerETHBalanceAfterTrade - notional2)
+        BalanceHelper.verifyBalances(
+            makerApiClient,
+            listOf(
+                ExpectedBalance("BTC", makerStartingBTCBalance - baseQuantity + baseQuantity2, makerStartingBTCBalance - baseQuantity + baseQuantity2),
+                ExpectedBalance("ETH", makerStartingETHBalance + notional - notional2, makerStartingETHBalance + notional - notional2),
+            ),
+        )
+        BalanceHelper.verifyBalances(
+            takerApiClient,
+            listOf(
+                ExpectedBalance("BTC", takerStartingBTCBalance + baseQuantity - baseQuantity2, takerStartingBTCBalance + baseQuantity - baseQuantity2),
+                ExpectedBalance("ETH", takerStartingETHBalance - notional + notional2, takerStartingETHBalance - notional + notional2),
+            ),
+        )
 
         makerWsClient.close()
         takerWsClient.close()
@@ -557,5 +584,24 @@ class OrderRoutesApiTest {
                     TradeEntity[id].settlementStatus.isFinal()
                 }
             }
+
+        transaction {
+            assertEquals(SettlementStatus.Completed, TradeEntity[id].settlementStatus)
+        }
+    }
+
+    private fun waitForTradeToExist(orderId: OrderId): TradeEntity {
+        await
+            .pollInSameThread()
+            .pollDelay(Duration.ofMillis(100))
+            .pollInterval(Duration.ofMillis(100))
+            .atMost(Duration.ofMillis(10000L))
+            .until {
+                transaction {
+                    OrderExecutionEntity.findForOrder(OrderEntity[orderId]).firstOrNull()?.trade != null
+                }
+            }
+
+        return transaction { OrderExecutionEntity.findForOrder(OrderEntity[orderId]).firstOrNull()?.trade!! }
     }
 }

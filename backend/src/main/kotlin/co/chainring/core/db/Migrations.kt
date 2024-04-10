@@ -5,6 +5,8 @@ import co.chainring.core.model.db.migrations.V11_NonNullableDeployedContractProx
 import co.chainring.core.model.db.migrations.V12_BigDecimalPrice
 import co.chainring.core.model.db.migrations.V13_AddSignatureToOrderTable
 import co.chainring.core.model.db.migrations.V14_MarketTickSize
+import co.chainring.core.model.db.migrations.V15_WalletTable
+import co.chainring.core.model.db.migrations.V16_BalanceAndLogTable
 import co.chainring.core.model.db.migrations.V1_DeployedSmartContract
 import co.chainring.core.model.db.migrations.V2_ERC20Token
 import co.chainring.core.model.db.migrations.V3_UpdateDeployedSmartContract
@@ -30,4 +32,6 @@ val migrations = listOf(
     V12_BigDecimalPrice(),
     V13_AddSignatureToOrderTable(),
     V14_MarketTickSize(),
+    V15_WalletTable(),
+    V16_BalanceAndLogTable(),
 )

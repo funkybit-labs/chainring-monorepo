@@ -1,25 +1,27 @@
 package co.chainring.integrationtests.exchange
 
 import co.chainring.apps.api.model.ApiError
+import co.chainring.apps.api.model.CreateSequencerDeposit
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
-import co.chainring.core.utils.toFundamentalUnits
-import co.chainring.core.utils.toHexBytes
 import co.chainring.integrationtests.testutils.AbnormalApiResponseException
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
+import co.chainring.integrationtests.testutils.BalanceHelper
+import co.chainring.integrationtests.testutils.ExpectedBalance
+import co.chainring.integrationtests.testutils.Faucet
 import co.chainring.integrationtests.testutils.Wallet
 import co.chainring.integrationtests.testutils.apiError
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.awaitility.kotlin.await
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
-import org.web3j.crypto.ECKeyPair
+import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.utils.Numeric
-import java.math.BigDecimal
 import java.math.BigInteger
 import java.time.Duration
 import kotlin.test.Test
@@ -27,81 +29,98 @@ import kotlin.test.Test
 @ExtendWith(AppUnderTestRunner::class)
 class EIP712WithdrawalTest {
 
-    private val walletPrivateKeyHex = "0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97"
+    private val logger = KotlinLogging.logger {}
 
     @Test
     fun testERC20EIP712Withdrawals() {
-        val apiClient = ApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
+        val apiClient = ApiClient()
         val wallet = Wallet(apiClient)
-        val decimals = wallet.symbols.first { it.name == "USDC" }.decimals.toInt()
+        Faucet.fund(wallet.address)
 
         // mint some USDC
-        val startingUsdcWalletBalance = wallet.getWalletERC20Balance("USDC")
-        val mintAmount = BigDecimal("20").toFundamentalUnits(decimals)
+        val mintAmount = wallet.formatAmount("20", "USDC")
         wallet.mintERC20("USDC", mintAmount)
-        assertEquals(wallet.getWalletERC20Balance("USDC"), startingUsdcWalletBalance + mintAmount)
+        assertEquals(wallet.getWalletERC20Balance("USDC"), mintAmount)
 
-        val startingUsdcExchangeBalance = wallet.getExchangeERC20Balance("USDC")
-        val depositAmount = BigDecimal("15").toFundamentalUnits(decimals)
+        val depositAmount = wallet.formatAmount("15", "USDC")
+        BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("USDC", depositAmount, depositAmount))) {
+            deposit(apiClient, wallet, "USDC", depositAmount)
+        }
+        assertEquals(wallet.getWalletERC20Balance("USDC"), mintAmount - depositAmount)
 
-        wallet.depositERC20("USDC", depositAmount)
-        assertEquals(wallet.getExchangeERC20Balance("USDC"), startingUsdcExchangeBalance + depositAmount)
-        assertEquals(wallet.getWalletERC20Balance("USDC"), startingUsdcWalletBalance + mintAmount - depositAmount)
-
-        val withdrawalAmount = BigDecimal("12").toFundamentalUnits(decimals)
-        val withdrawalApiRequest = wallet.signWithdraw("USDC", withdrawalAmount)
-        val response = apiClient.createWithdrawal(withdrawalApiRequest)
-        assertEquals(WithdrawalStatus.Pending, response.withdrawal.status)
-        waitForFinalizedWithdrawal(response.withdrawal.id)
-        assertEquals(WithdrawalStatus.Complete, apiClient.getWithdrawal(response.withdrawal.id).withdrawal.status)
-        assertEquals(wallet.getExchangeERC20Balance("USDC"), startingUsdcExchangeBalance + depositAmount - withdrawalAmount)
-        assertEquals(wallet.getWalletERC20Balance("USDC"), startingUsdcWalletBalance + mintAmount - depositAmount + withdrawalAmount)
+        val withdrawalAmount = wallet.formatAmount("15", "USDC")
+        BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("USDC", depositAmount - withdrawalAmount, depositAmount - withdrawalAmount))) {
+            val withdrawalApiRequest = wallet.signWithdraw("USDC", withdrawalAmount)
+            val response = apiClient.createWithdrawal(withdrawalApiRequest)
+            assertEquals(WithdrawalStatus.Pending, response.withdrawal.status)
+            waitForFinalizedWithdrawal(response.withdrawal.id)
+            assertEquals(WithdrawalStatus.Complete, apiClient.getWithdrawal(response.withdrawal.id).withdrawal.status)
+        }
+        assertEquals(wallet.getWalletERC20Balance("USDC"), mintAmount - depositAmount + withdrawalAmount)
     }
 
     @Test
     fun testNativeEIP712Withdrawals() {
-        val apiClient = ApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
+        val apiClient = ApiClient()
         val wallet = Wallet(apiClient)
-        val decimals = wallet.symbols.first { it.contractAddress == null }.decimals.toInt()
+        Faucet.fund(wallet.address)
 
         val startingWalletBalance = wallet.getWalletNativeBalance()
-        val startingExchangeBalance = wallet.getExchangeNativeBalance()
-        val depositAmount = BigDecimal("2").toFundamentalUnits(decimals)
 
-        val depositTxReceipt = wallet.depositNative(depositAmount)
+        val depositAmount = wallet.formatAmount("0.001", "BTC")
+        val depositTxReceipt = BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("BTC", depositAmount, depositAmount))) {
+            deposit(apiClient, wallet, "BTC", depositAmount)
+        }
         val depositGasCost = depositTxReceipt.gasUsed * Numeric.decodeQuantity(depositTxReceipt.effectiveGasPrice)
-        assertEquals(wallet.getExchangeNativeBalance(), startingExchangeBalance + depositAmount)
         assertEquals(wallet.getWalletNativeBalance(), startingWalletBalance - depositAmount - depositGasCost)
+        // do a second one
+        val depositTxReceipt2 = BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("BTC", depositAmount * BigInteger.TWO, depositAmount * BigInteger.TWO))) {
+            deposit(apiClient, wallet, "BTC", depositAmount)
+        }
+        val depositGasCost2 = depositTxReceipt2.gasUsed * Numeric.decodeQuantity(depositTxReceipt2.effectiveGasPrice)
+        assertEquals(wallet.getWalletNativeBalance(), startingWalletBalance - (depositAmount * BigInteger.TWO) - depositGasCost - depositGasCost2)
 
-        val withdrawalAmount = BigDecimal("2").toFundamentalUnits(decimals)
-        val withdrawalApiRequest = wallet.signWithdraw(null, withdrawalAmount)
-        val response = apiClient.createWithdrawal(withdrawalApiRequest)
-        assertEquals(WithdrawalStatus.Pending, response.withdrawal.status)
-        waitForFinalizedWithdrawal(response.withdrawal.id)
-        assertEquals(WithdrawalStatus.Complete, apiClient.getWithdrawal(response.withdrawal.id).withdrawal.status)
-        assertEquals(wallet.getExchangeNativeBalance(), startingExchangeBalance + depositAmount - withdrawalAmount)
-        assertEquals(wallet.getWalletNativeBalance(), startingWalletBalance - depositAmount + withdrawalAmount - depositGasCost)
+        val withdrawalAmount = wallet.formatAmount("0.001", "BTC")
+        BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("BTC", depositAmount * BigInteger.TWO - withdrawalAmount, depositAmount * BigInteger.TWO - withdrawalAmount))) {
+            val withdrawalApiRequest = wallet.signWithdraw(null, withdrawalAmount)
+            val response = apiClient.createWithdrawal(withdrawalApiRequest)
+            assertEquals(WithdrawalStatus.Pending, response.withdrawal.status)
+            waitForFinalizedWithdrawal(response.withdrawal.id)
+            assertEquals(WithdrawalStatus.Complete, apiClient.getWithdrawal(response.withdrawal.id).withdrawal.status)
+            assertEquals(
+                wallet.getWalletNativeBalance(),
+                startingWalletBalance - (depositAmount * BigInteger.TWO) + withdrawalAmount - depositGasCost - depositGasCost2,
+            )
+        }
     }
 
     @Test
     fun testERC20EIP712Errors() {
         val apiClient = ApiClient()
         val wallet = Wallet(apiClient)
+        Faucet.fund(wallet.address)
 
-        val startingUsdcExchangeBalance = wallet.getExchangeERC20Balance("USDC")
+        val amount = BigInteger("1000")
+        wallet.mintERC20("USDC", amount * BigInteger.TWO)
+        BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("USDC", amount, amount))) {
+            deposit(apiClient, wallet, "USDC", amount)
+        }
 
         // invalid amount
-        var withdrawalApiRequest = wallet.signWithdraw("USDC", startingUsdcExchangeBalance + BigInteger("1000"))
+        // TODO there is a mismatch between sequencer and contract here. Contract will fail if amount it too large,
+        // but sequencer withdraws whatever is remaining - created CHAIN-85.
+        var withdrawalApiRequest = wallet.signWithdraw("USDC", BigInteger("1001"))
         var response = apiClient.createWithdrawal(withdrawalApiRequest)
         assertEquals(WithdrawalStatus.Pending, response.withdrawal.status)
         waitForFinalizedWithdrawal(response.withdrawal.id)
         var withdrawal = apiClient.getWithdrawal(response.withdrawal.id).withdrawal
         assertEquals(WithdrawalStatus.Failed, withdrawal.status)
         assertEquals("execution reverted: revert: Insufficient Balance", withdrawal.error)
+        deposit(apiClient, wallet, "USDC", amount)
 
         // invalid nonce
         val invalidNonce = wallet.getNonce().plus(BigInteger.ONE)
-        withdrawalApiRequest = wallet.signWithdraw("USDC", startingUsdcExchangeBalance, invalidNonce)
+        withdrawalApiRequest = wallet.signWithdraw("USDC", BigInteger("5"), invalidNonce)
         response = apiClient.createWithdrawal(withdrawalApiRequest)
         assertEquals(WithdrawalStatus.Pending, response.withdrawal.status)
         waitForFinalizedWithdrawal(response.withdrawal.id)
@@ -110,16 +129,27 @@ class EIP712WithdrawalTest {
         assertEquals("execution reverted: revert: Invalid Nonce", withdrawal.error)
 
         // invalid signature
-        withdrawalApiRequest = wallet.signWithdraw("USDC", startingUsdcExchangeBalance)
+        withdrawalApiRequest = wallet.signWithdraw("USDC", amount)
         assertThrows<AbnormalApiResponseException> {
             // change the amount from what was signed
-            apiClient.createWithdrawal(withdrawalApiRequest.copy(tx = withdrawalApiRequest.tx.copy(amount = startingUsdcExchangeBalance + BigInteger("1000"))))
+            apiClient.createWithdrawal(withdrawalApiRequest.copy(tx = withdrawalApiRequest.tx.copy(amount = BigInteger.TWO)))
         }.also {
             assertEquals(
                 ApiError(ReasonCode.SignatureNotValid, "Signature not verified"),
                 it.response.apiError(),
             )
         }
+    }
+
+    private fun deposit(apiClient: ApiClient, wallet: Wallet, asset: String, amount: BigInteger): TransactionReceipt {
+        // deposit onchain and update sequencer
+        val txReceipt = if (asset == "BTC") {
+            wallet.depositNative(amount)
+        } else {
+            wallet.depositERC20(asset, amount)
+        }
+        apiClient.createSequencerDeposit(CreateSequencerDeposit(asset, amount))
+        return txReceipt
     }
 
     private fun waitForFinalizedWithdrawal(id: WithdrawalId) {

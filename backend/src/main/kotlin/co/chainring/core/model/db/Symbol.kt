@@ -64,6 +64,11 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
                 .orderBy(Pair(SymbolTable.name, SortOrder.ASC))
                 .toList()
 
+        fun forChainAndName(chainId: ChainId, name: String): SymbolEntity =
+            SymbolEntity
+                .find { SymbolTable.chainId.eq(chainId) and SymbolTable.name.eq(name) }
+                .single()
+
         fun forChainAndContractAddress(chainId: ChainId, contractAddress: Address?) =
             SymbolEntity
                 .find { SymbolTable.chainId.eq(chainId).and(contractAddress?.let { SymbolTable.contractAddress.eq(it.value) } ?: SymbolTable.contractAddress.isNull()) }

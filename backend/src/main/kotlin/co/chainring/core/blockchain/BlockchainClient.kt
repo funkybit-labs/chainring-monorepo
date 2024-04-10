@@ -8,10 +8,9 @@ import co.chainring.core.model.Address
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.SymbolEntity
-import co.chainring.core.model.db.TradeEntity
-import co.chainring.core.model.db.WithdrawalEntity
-import co.chainring.core.model.db.WithdrawalStatus
+import co.chainring.core.services.TxConfirmationCallback
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.future.await
 import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -105,6 +104,10 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
     )
     private val contractMap = mutableMapOf<ContractType, Address>()
 
+    private lateinit var exchangeContract: Exchange
+
+    private lateinit var txConfirmationCallback: TxConfirmationCallback
+
     companion object {
 
         val logger = KotlinLogging.logger {}
@@ -148,6 +151,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
                     contractMap[contractType] = deployedContract.proxyAddress
                 }
             }
+            exchangeContract = loadExchangeContract(contractMap[ContractType.Exchange]!!)
         }
     }
 
@@ -223,6 +227,24 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
         logger.debug { "Deployment complete for $contractType" }
     }
 
+    suspend fun getExchangeBalance(address: Address, tokenAddress: Address): BigInteger {
+        return if (tokenAddress == Address.zero) {
+            exchangeContract.nativeBalances(address.value).sendAsync().await()
+        } else {
+            exchangeContract.balances(address.value, tokenAddress.value).sendAsync().await()
+        }
+    }
+
+    suspend fun getExchangeBalances(walletAddress: Address, tokenAddresses: List<Address>): Map<Address, BigInteger> =
+        tokenAddresses.associateWith { tokenAddress ->
+            getExchangeBalance(walletAddress, tokenAddress)
+        }
+
+    suspend fun getExchangeBalances(walletAddresses: List<Address>, tokenAddresses: List<Address>): Map<Address, Map<Address, BigInteger>> =
+        walletAddresses.associateWith { walletAddress ->
+            getExchangeBalances(walletAddress, tokenAddresses)
+        }
+
     fun loadExchangeContract(address: Address): Exchange {
         return Exchange.load(address.value, web3j, transactionManager, gasProvider)
     }
@@ -235,7 +257,8 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
         }
     }
 
-    fun startTransactionSubmitter(pendingTransactions: List<EIP712Transaction>) {
+    fun startTransactionSubmitter(txConfirmationCallback: TxConfirmationCallback, pendingTransactions: List<EIP712Transaction>) {
+        this.txConfirmationCallback = txConfirmationCallback
         logger.debug { "Starting transaction submitter" }
         val exchange = Exchange.load(contractMap[ContractType.Exchange]!!.value, web3j, submitterTransactionManager, gasProvider)
         workerThread = thread(start = true, name = "transaction-processor", isDaemon = true) {
@@ -256,41 +279,11 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
                         logger.error(e) { "Unhandled exception submitting tx" }
                         "Unhandled error ${e.message}"
                     }
-                    // TODO when processing a batch need to determine which ones failed, remove it and retry
+
                     txs.forEach { tx ->
                         try {
                             logger.debug { "Finished processing tx - ${error?.let { "failed with $error" } ?: "success"}" }
-                            when (tx) {
-                                is EIP712Transaction.WithdrawTx -> {
-                                    transaction {
-                                        WithdrawalEntity.findPendingByWalletAndNonce(
-                                            tx.sender,
-                                            tx.nonce,
-                                        )
-                                            ?.update(
-                                                status = error?.let { WithdrawalStatus.Failed }
-                                                    ?: WithdrawalStatus.Complete,
-                                                error = error,
-                                            )
-                                    }
-                                }
-
-                                is EIP712Transaction.Order -> {}
-
-                                is EIP712Transaction.Trade -> {
-                                    transaction {
-                                        TradeEntity.findById(tx.tradeId)?.let { tradeEntity ->
-                                            if (error != null) {
-                                                logger.error { "settlement failed for ${tx.tradeId} - error is <$error>" }
-                                                tradeEntity.failSettlement()
-                                            } else {
-                                                logger.debug { "settlement completed for ${tx.tradeId}" }
-                                                tradeEntity.settle()
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            txConfirmationCallback.onTxConfirmation(tx, error)
                         } catch (e: Exception) {
                             logger.error(e) { "Unhandled exception updating tx" }
                         }

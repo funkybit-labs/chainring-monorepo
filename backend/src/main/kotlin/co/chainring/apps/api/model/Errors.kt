@@ -25,14 +25,14 @@ enum class ReasonCode {
 
     OrderNotFound,
     OrderIsClosed,
-    OrderSubmissionFailed,
 
     WithdrawalNotFound,
 
-    ContractUpdating,
     SignatureNotValid,
     UnexpectedError,
     AuthenticationError,
+
+    ProcessingError,
 }
 
 val jsonWithDefaults = Json { encodeDefaults = true }
@@ -49,6 +49,9 @@ fun errorResponse(
 
 fun notFoundError(reason: ReasonCode, message: String): Response = errorResponse(Status.NOT_FOUND, ApiError(reason, message))
 fun badRequestError(reason: ReasonCode, message: String): Response = errorResponse(Status.BAD_REQUEST, ApiError(reason, message))
+
+fun processingError(message: String): Response = errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.ProcessingError, message))
+fun unexpectedError(): Response = errorResponse(Status.INTERNAL_SERVER_ERROR, ApiError(ReasonCode.UnexpectedError, "Unexpected Error"))
 
 val marketNotSupportedError = badRequestError(ReasonCode.MarketNotSupported, "Market is not supported")
 val orderNotFoundError = notFoundError(ReasonCode.OrderNotFound, "Requested order does not exist")

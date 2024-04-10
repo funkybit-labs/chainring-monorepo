@@ -23,6 +23,7 @@ import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.TradeId
+import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.utils.Timer
 import co.chainring.core.utils.toFundamentalUnits
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -308,7 +309,7 @@ class Broadcaster {
                     OutgoingWSMessage.Publish(
                         SubscriptionTopic.Orders,
                         Orders(
-                            OrderEntity.listOrders(client.principal)
+                            OrderEntity.listOrders(WalletEntity.getOrCreate(client.principal))
                                 .map { it.toOrderResponse() },
                         ),
                     ),

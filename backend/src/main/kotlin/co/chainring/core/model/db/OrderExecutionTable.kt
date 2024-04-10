@@ -1,7 +1,6 @@
 package co.chainring.core.model.db
 
 import co.chainring.apps.api.model.Trade
-import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
@@ -91,13 +90,13 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             }.toList()
         }
 
-        fun listExecutions(ownerAddress: Address, beforeTimestamp: Instant, limit: Int): List<OrderExecutionEntity> {
+        fun listExecutions(wallet: WalletEntity, beforeTimestamp: Instant, limit: Int): List<OrderExecutionEntity> {
             return OrderExecutionTable
                 .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
                 .join(TradeTable, JoinType.INNER, TradeTable.guid, OrderExecutionTable.tradeGuid)
                 .select(OrderExecutionTable.columns)
                 .where {
-                    OrderTable.ownerAddress.eq(ownerAddress.value) and OrderExecutionTable.timestamp.less(beforeTimestamp)
+                    OrderTable.walletGuid.eq(wallet.guid) and OrderExecutionTable.timestamp.less(beforeTimestamp)
                 }
                 .limit(limit)
                 .map {

@@ -26,7 +26,7 @@ data class CreateWithdrawalApiRequest(
         fun fromEntity(entity: WithdrawalEntity): CreateWithdrawalApiRequest {
             return CreateWithdrawalApiRequest(
                 WithdrawTx(
-                    entity.walletAddress,
+                    entity.wallet.address,
                     entity.symbol.contractAddress,
                     entity.amount,
                     entity.nonce,
@@ -56,7 +56,7 @@ data class Withdrawal(
             return Withdrawal(
                 entity.id.value,
                 WithdrawTx(
-                    entity.walletAddress,
+                    entity.wallet.address,
                     entity.symbol.contractAddress,
                     entity.amount,
                     entity.nonce,
