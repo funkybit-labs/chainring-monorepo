@@ -45,7 +45,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
 
     private val corsPolicy = CorsPolicy(
         originPolicy = OriginPolicy.AllowAll(),
-        headers = listOf("Content-Type", "Authorization"),
+        headers = listOf("Content-Type", "Authorization", "X-IsAPI"),
         methods = listOf(
             Method.DELETE,
             Method.GET,

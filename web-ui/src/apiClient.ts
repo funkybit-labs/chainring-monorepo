@@ -1,8 +1,9 @@
 import z from 'zod'
 import { Zodios } from '@zodios/core'
-import { pluginToken } from '@zodios/plugins'
+import { pluginHeader, pluginToken } from '@zodios/plugins'
 import { loadAuthToken } from 'auth'
 import Decimal from 'decimal.js'
+import { useEffect, useState } from 'react'
 
 export const apiBaseUrl = import.meta.env.ENV_API_URL
 
@@ -351,3 +352,30 @@ apiClient.use(
     }
   })
 )
+
+apiClient.use(pluginHeader('X-IsApi', async () => 'true'))
+
+export function useMaintenance() {
+  const [maintenance, setMaintenance] = useState(false)
+
+  useEffect(() => {
+    const id = apiClient.axios.interceptors.response.use(
+      (response) => {
+        setMaintenance(false)
+        return response
+      },
+      (error) => {
+        if (error.response.status == 418) {
+          setMaintenance(true)
+        } else if (maintenance) {
+          setMaintenance(false)
+        }
+        return Promise.reject(error)
+      }
+    )
+    return () => {
+      apiClient.axios.interceptors.response.eject(id)
+    }
+  })
+  return maintenance
+}

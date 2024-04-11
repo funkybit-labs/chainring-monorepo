@@ -7,6 +7,7 @@ import { Button } from 'components/common/Button'
 import React, { useEffect, useState } from 'react'
 import { MarketSelector } from 'components/Screens/HomeScreen/MarketSelector'
 import Markets, { Market } from 'markets'
+import { useMaintenance } from 'apiClient'
 
 export function Header({
   markets,
@@ -21,6 +22,7 @@ export function Header({
   const account = useAccount()
   const [name, setName] = useState<string>()
   const [icon, setIcon] = useState<string>()
+  const maintenance = useMaintenance()
 
   useEffect(() => {
     if (account.isConnected && account.connector) {
@@ -30,55 +32,69 @@ export function Header({
   }, [account.isConnected, account.connector])
 
   return (
-    <div className="fixed z-50 flex h-20 w-full flex-row place-items-center justify-between bg-neutralGray p-0">
-      <span>
-        <img className="m-2 inline-block size-16" src={logo} alt="ChainRing" />
-        <img
-          className="m-2 inline-block aspect-auto h-max w-32 shrink-0 grow-0"
-          src={logoName}
-          alt="ChainRing"
-        />
-      </span>
-
-      <div className="flex">
-        {selectedMarket && (
-          <div className="flex items-center gap-4">
-            Market:{' '}
-            <MarketSelector
-              markets={markets}
-              selected={selectedMarket}
-              onChange={onMarketChange}
-            />
-          </div>
-        )}
-
-        <span className="m-2">
-          {account.isConnected ? (
-            <Button
-              caption={() => (
-                <span>
-                  {icon && (
-                    <img
-                      className="mr-2 inline-block size-8"
-                      src={icon}
-                      alt={name ?? ''}
-                    />
-                  )}
-                  {addressDisplay(account.address ?? '0x')}
-                </span>
-              )}
-              onClick={() => openWalletConnectModal({ view: 'Account' })}
-              disabled={false}
-            />
-          ) : (
-            <Button
-              caption={() => <>Connect Wallet</>}
-              onClick={() => openWalletConnectModal({ view: 'Networks' })}
-              disabled={false}
-            />
-          )}
+    <>
+      <div className="fixed z-50 flex h-20 w-full flex-row place-items-center justify-between bg-neutralGray p-0">
+        <span>
+          <img
+            className="m-2 inline-block size-16"
+            src={logo}
+            alt="ChainRing"
+          />
+          <img
+            className="m-2 inline-block aspect-auto h-max w-32 shrink-0 grow-0"
+            src={logoName}
+            alt="ChainRing"
+          />
         </span>
+
+        <div className="flex">
+          {selectedMarket && (
+            <div className="flex items-center gap-4">
+              Market:{' '}
+              <MarketSelector
+                markets={markets}
+                selected={selectedMarket}
+                onChange={onMarketChange}
+              />
+            </div>
+          )}
+
+          <span className="m-2">
+            {account.isConnected ? (
+              <Button
+                caption={() => (
+                  <span>
+                    {icon && (
+                      <img
+                        className="mr-2 inline-block size-8"
+                        src={icon}
+                        alt={name ?? ''}
+                      />
+                    )}
+                    {addressDisplay(account.address ?? '0x')}
+                  </span>
+                )}
+                onClick={() => openWalletConnectModal({ view: 'Account' })}
+                disabled={false}
+              />
+            ) : (
+              <Button
+                caption={() => <>Connect Wallet</>}
+                onClick={() => openWalletConnectModal({ view: 'Networks' })}
+                disabled={false}
+              />
+            )}
+          </span>
+        </div>
       </div>
-    </div>
+      {maintenance && (
+        <div className="fixed z-50 flex w-full flex-row place-items-center justify-center bg-red p-0 text-white opacity-80">
+          <span className="animate-bounce">
+            ChainRing is currently undergoing maintenance, we&apos;ll be back
+            soon.
+          </span>
+        </div>
+      )}
+    </>
   )
 }
