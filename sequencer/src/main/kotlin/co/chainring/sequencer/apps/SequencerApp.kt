@@ -3,10 +3,10 @@ package co.chainring.sequencer.apps
 import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
+import co.chainring.sequencer.core.SequencerState
 import co.chainring.sequencer.core.WalletAddress
-import co.chainring.sequencer.core.inputQueue
 import co.chainring.sequencer.core.notional
-import co.chainring.sequencer.core.outputQueue
+import co.chainring.sequencer.core.queueHome
 import co.chainring.sequencer.core.sumBigIntegers
 import co.chainring.sequencer.core.toAsset
 import co.chainring.sequencer.core.toBigDecimal
@@ -26,17 +26,24 @@ import co.chainring.sequencer.proto.balanceChange
 import co.chainring.sequencer.proto.marketCreated
 import co.chainring.sequencer.proto.sequencerResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
+import net.openhft.chronicle.queue.TailerDirection
+import net.openhft.chronicle.queue.TailerState
+import net.openhft.chronicle.queue.impl.RollingChronicleQueue
 import java.math.BigInteger
+import java.nio.file.Path
 import kotlin.concurrent.thread
+import co.chainring.sequencer.core.inputQueue as defaultInputQueue
+import co.chainring.sequencer.core.outputQueue as defaultOutputQueue
 
-typealias BalanceByAsset = MutableMap<Asset, BigInteger>
-
-class SequencerApp : BaseApp() {
+class SequencerApp(
+    val inputQueue: RollingChronicleQueue = defaultInputQueue,
+    val outputQueue: RollingChronicleQueue = defaultOutputQueue,
+    val checkpointsPath: Path = Path.of(queueHome, "checkpoints"),
+) : BaseApp() {
     override val logger = KotlinLogging.logger {}
     private var stop = false
     private lateinit var sequencerThread: Thread
-    private var markets = mutableMapOf<MarketId, Market>()
-    private var balances = mutableMapOf<WalletAddress, BalanceByAsset>()
+    private val state = SequencerState()
 
     fun processRequest(request: SequencerRequest, sequence: Long = 0L, startTime: Long = 0L): SequencerResponse {
         return when (request.type) {
@@ -44,10 +51,10 @@ class SequencerApp : BaseApp() {
                 val market = request.addMarket!!
                 val marketId = MarketId(market.marketId)
                 var error: SequencerError? = null
-                if (markets.containsKey(marketId)) {
+                if (state.markets.containsKey(marketId)) {
                     error = SequencerError.MarketExists
                 } else {
-                    markets[marketId] = Market(
+                    state.markets[marketId] = Market(
                         marketId,
                         market.tickSize.toBigDecimal(),
                         market.marketPrice.toBigDecimal(),
@@ -78,7 +85,7 @@ class SequencerApp : BaseApp() {
                 val orderBatch = request.orderBatch!!
                 var error: SequencerError? = null
                 val marketId = MarketId(orderBatch.marketId)
-                val market = markets[marketId]
+                val market = state.markets[marketId]
                 if (market == null) {
                     error = SequencerError.UnknownMarket
                 } else {
@@ -90,7 +97,7 @@ class SequencerApp : BaseApp() {
                         balanceChanges = result.balanceChanges
                         // apply balance changes
                         balanceChanges.forEach {
-                            balances.getOrPut(it.wallet.toWalletAddress()) {
+                            state.balances.getOrPut(it.wallet.toWalletAddress()) {
                                 mutableMapOf()
                             }.merge(
                                 it.asset.toAsset(),
@@ -119,12 +126,12 @@ class SequencerApp : BaseApp() {
                     val wallet = deposit.wallet.toWalletAddress()
                     val asset = deposit.asset.toAsset()
                     val amount = deposit.amount.toBigInteger()
-                    balances.getOrPut(wallet) { mutableMapOf() }.merge(asset, amount, ::sumBigIntegers)
+                    state.balances.getOrPut(wallet) { mutableMapOf() }.merge(asset, amount, ::sumBigIntegers)
                     balancesChanged.merge(Pair(wallet, asset), amount, ::sumBigIntegers)
                 }
 
                 balanceBatch.withdrawalsList.forEach { withdrawal ->
-                    balances[withdrawal.wallet.toWalletAddress()]?.let { balanceByAsset ->
+                    state.balances[withdrawal.wallet.toWalletAddress()]?.let { balanceByAsset ->
                         val asset = withdrawal.asset.toAsset()
                         val withdrawalAmount = withdrawal.amount.toBigInteger().min(
                             balanceByAsset[withdrawal.asset.toAsset()] ?: BigInteger.ZERO,
@@ -243,7 +250,7 @@ class SequencerApp : BaseApp() {
 
         baseAssetsRequired.forEach { (wallet, required) ->
             if (required + market.orderBook.baseAssetsRequired(wallet) > (
-                    balances[wallet]?.get(market.id.baseAsset())
+                    state.balances[wallet]?.get(market.id.baseAsset())
                         ?: BigInteger.ZERO
                     )
             ) {
@@ -253,7 +260,7 @@ class SequencerApp : BaseApp() {
 
         quoteAssetsRequired.forEach { (wallet, required) ->
             if (required + market.orderBook.quoteAssetsRequired(wallet) > (
-                    balances[wallet]?.get(market.id.quoteAsset())
+                    state.balances[wallet]?.get(market.id.quoteAsset())
                         ?: BigInteger.ZERO
                     )
             ) {
@@ -266,26 +273,79 @@ class SequencerApp : BaseApp() {
 
     override fun start() {
         logger.info { "Starting Sequencer App" }
+
+        stop = false
         sequencerThread = thread(start = true, name = "sequencer", isDaemon = false) {
             val inputTailer = inputQueue.createTailer("sequencer")
+            val initialCycle = inputTailer.cycle()
+
+            // moveToCycle moves tailer to the start of the cycle
+            if (inputTailer.moveToCycle(initialCycle)) {
+                // Restore from previous cycle's checkpoint unless we are in the first cycle
+                if (initialCycle != inputQueue.firstCycle()) {
+                    val prevCycle = inputQueue.nextCycle(initialCycle, TailerDirection.BACKWARD)
+                    restoreFromCheckpoint(prevCycle)
+                }
+            }
+
+            val lastSequenceNumberProcessedBeforeRestart = getLastSequenceNumberInOutputQueue()
+
             val outputAppender = outputQueue.acquireAppender()
+            var tailerPrevState = inputTailer.state()
             while (!stop) {
+                val tailerState = inputTailer.state()
+                if (tailerState == TailerState.END_OF_CYCLE && tailerState != tailerPrevState) {
+                    saveCheckpoint(inputTailer.cycle())
+                }
+
                 inputTailer.readingDocument().use { dc ->
                     if (dc.isPresent) {
                         val startTime = System.nanoTime()
                         dc.wire()?.read()?.bytes { bytes ->
                             val request = SequencerRequest.parseFrom(bytes.toByteArray())
-                            outputAppender.writingDocument().use {
-                                it.wire()?.write()?.bytes(
-                                    processRequest(request, dc.index(), startTime).toByteArray(),
-                                )
+                            val response = processRequest(request, dc.index(), startTime)
+                            if (response.sequence > lastSequenceNumberProcessedBeforeRestart) {
+                                outputAppender.writingDocument().use {
+                                    it.wire()?.write()?.bytes(response.toByteArray())
+                                }
                             }
                         }
                     }
                 }
+
+                tailerPrevState = tailerState
             }
         }
+
         logger.info { "Sequencer App started" }
+    }
+
+    private fun getLastSequenceNumberInOutputQueue(): Long =
+        outputQueue.createTailer().let { outputTailer ->
+            var result = -1L
+            outputTailer.moveToIndex(outputQueue.lastIndex())
+            outputTailer.readingDocument().use {
+                if (it.isPresent) {
+                    it.wire()?.read()?.bytes { bytes ->
+                        result = SequencerResponse.parseFrom(bytes.toByteArray()).sequence
+                    }
+                }
+            }
+            result
+        }
+
+    private fun saveCheckpoint(currentCycle: Int) {
+        val checkpointPath = Path.of(checkpointsPath.toString(), currentCycle.toString())
+        logger.debug { "Saving checkpoint to $checkpointPath" }
+        state.persist(checkpointPath)
+        logger.debug { "Saved checkpoint" }
+    }
+
+    private fun restoreFromCheckpoint(atCycle: Int) {
+        val checkpointPath = Path.of(checkpointsPath.toString(), atCycle.toString())
+        logger.debug { "Restoring from checkpoint $checkpointPath" }
+        state.load(checkpointPath)
+        logger.debug { "Restored from checkpoint" }
     }
 
     override fun stop() {

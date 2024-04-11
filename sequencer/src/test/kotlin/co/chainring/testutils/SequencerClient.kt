@@ -25,6 +25,7 @@ import kotlin.random.Random
 
 class SequencerClient {
     private val sequencer = SequencerApp()
+
     fun addOrder(
         marketId: MarketId,
         amount: Long,

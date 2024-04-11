@@ -1,26 +1,36 @@
 package co.chainring.sequencer.core
 
 import co.chainring.sequencer.proto.BalanceChange
+import co.chainring.sequencer.proto.MarketCheckpoint
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderBatch
 import co.chainring.sequencer.proto.OrderChanged
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.TradeCreated
 import co.chainring.sequencer.proto.balanceChange
+import co.chainring.sequencer.proto.marketCheckpoint
 import co.chainring.sequencer.proto.orderChanged
 import co.chainring.sequencer.proto.tradeCreated
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.math.pow
 
-class Market(
+data class Market(
     val id: MarketId,
-    tickSize: BigDecimal,
-    marketPrice: BigDecimal,
-    maxLevels: Int,
-    maxOrdersPerLevel: Int,
+    val tickSize: BigDecimal,
+    val marketPrice: BigDecimal,
+    val maxLevels: Int,
+    val maxOrdersPerLevel: Int,
     val baseDecimals: Int,
     val quoteDecimals: Int,
+    val orderBook: OrderBook = OrderBook(
+        maxLevels,
+        maxOrdersPerLevel,
+        tickSize,
+        marketPrice,
+        baseDecimals,
+        quoteDecimals,
+    ),
 ) {
     data class AddOrdersResult(
         val ordersChanged: List<OrderChanged>,
@@ -112,5 +122,27 @@ class Market(
         )
     }
 
-    val orderBook = OrderBook(maxLevels, maxOrdersPerLevel, tickSize, marketPrice, baseDecimals, quoteDecimals)
+    fun toCheckpoint(): MarketCheckpoint {
+        return marketCheckpoint {
+            this.id = this@Market.id.value
+            this.orderBook = this@Market.orderBook.toCheckpoint()
+        }
+    }
+
+    companion object {
+        fun fromCheckpoint(checkpoint: MarketCheckpoint): Market {
+            val orderBook = OrderBook.fromCheckpoint(checkpoint.orderBook)
+
+            return Market(
+                MarketId(checkpoint.id),
+                tickSize = orderBook.tickSize,
+                marketPrice = orderBook.marketPrice,
+                maxLevels = orderBook.maxLevels,
+                maxOrdersPerLevel = orderBook.maxOrdersPerLevel,
+                baseDecimals = orderBook.baseDecimals,
+                quoteDecimals = orderBook.quoteDecimals,
+                orderBook = orderBook,
+            )
+        }
+    }
 }

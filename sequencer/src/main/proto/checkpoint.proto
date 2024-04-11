@@ -1,0 +1,59 @@
+syntax = "proto3";
+package sequencer;
+
+import "bignum.proto";
+
+option java_multiple_files = true;
+option java_package = "co.chainring.sequencer.proto";
+option java_outer_classname = "CheckpointSchema";
+
+message BalancesCheckpoint {
+  repeated Balance balances = 1;
+
+  message Balance {
+    uint64 wallet = 1;
+    string asset = 2;
+    IntegerValue amount = 3;
+  }
+}
+
+
+message MarketCheckpoint {
+  string id = 1;
+  OrderBook orderBook = 2;
+
+  message OrderBook {
+    DecimalValue tickSize = 1;
+    DecimalValue marketPrice = 2;
+    uint32 maxLevels = 3;
+    uint32 maxOrdersPerLevel = 4;
+    uint32 baseDecimals = 5;
+    uint32 quoteDecimals = 6;
+    int32 maxOfferIx = 7;
+    int32 minBidIx = 8;
+    repeated OrderBookLevel levels = 9;
+  }
+
+  message OrderBookLevel {
+    int32 levelIx = 1;
+    BookSide side = 2;
+    DecimalValue price = 3;
+    uint32 maxOrderCount = 4;
+    IntegerValue totalQuantity = 5;
+    uint32 orderHead = 6;
+    uint32 orderTail = 7;
+    repeated LevelOrder orders = 8;
+  }
+
+  enum BookSide {
+    Buy = 0;
+    Sell = 1;
+  }
+
+  message LevelOrder {
+    uint64 guid = 1;
+    uint64 wallet = 2;
+    IntegerValue quantity = 3;
+    uint32 levelIx = 4;
+  }
+}
