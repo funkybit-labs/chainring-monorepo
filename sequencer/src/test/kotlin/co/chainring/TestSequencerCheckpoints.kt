@@ -372,7 +372,7 @@ class TestSequencerCheckpoints {
                                 this.type = Order.Type.LimitSell
                             },
                         ).forEach {
-                            market.orderBook.addOrder(it)
+                            market.addOrder(it)
                         }
                     },
                 ),
@@ -426,7 +426,7 @@ class TestSequencerCheckpoints {
                                 this.type = Order.Type.LimitBuy
                             },
                         ).forEach {
-                            market.orderBook.addOrder(it)
+                            market.addOrder(it)
                         }
                     },
                 ),
@@ -503,7 +503,7 @@ class TestSequencerCheckpoints {
                                 this.type = Order.Type.LimitSell
                             },
                         ).forEach {
-                            market.orderBook.addOrder(it)
+                            market.addOrder(it)
                         }
                     },
                     btcUsdcMarketId to Market(
@@ -559,7 +559,7 @@ class TestSequencerCheckpoints {
                                 this.type = Order.Type.LimitSell
                             },
                         ).forEach {
-                            market.orderBook.addOrder(it)
+                            market.addOrder(it)
                         }
                     },
                 ),
@@ -579,19 +579,19 @@ class TestSequencerCheckpoints {
         initialState.markets.values.forEach { initialStateMarket ->
             val restoredStateMarket = restoredState.markets.getValue(initialStateMarket.id)
 
-            initialStateMarket.orderBook.levels.forEach { initialStateLevel ->
+            initialStateMarket.levels.forEach { initialStateLevel ->
                 initialStateLevel.orders.forEachIndexed { i, initialStateOrder ->
                     assertEquals(
                         initialStateOrder,
-                        restoredStateMarket.orderBook.levels[initialStateLevel.levelIx].orders[i],
+                        restoredStateMarket.levels[initialStateLevel.levelIx].orders[i],
                         "Order mismatch at levelIx=${initialStateLevel.levelIx}, orderIx=$i",
                     )
                 }
             }
 
             assertContentEquals(
-                initialStateMarket.orderBook.levels,
-                restoredStateMarket.orderBook.levels,
+                initialStateMarket.levels,
+                restoredStateMarket.levels,
                 "Levels in market ${initialStateMarket.id} don't match",
             )
         }

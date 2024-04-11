@@ -12,6 +12,7 @@ option java_outer_classname = "SequencerSchema";
 message OrderChanged {
   uint64 guid = 1;
   OrderDisposition disposition = 2;
+  optional IntegerValue newQuantity = 3;
 }
 
 message TradeCreated {

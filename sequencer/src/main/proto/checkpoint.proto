@@ -14,25 +14,28 @@ message BalancesCheckpoint {
     uint64 wallet = 1;
     string asset = 2;
     IntegerValue amount = 3;
+    repeated Consumption consumed = 4;
+
+    message Consumption {
+      string marketId = 1;
+      IntegerValue consumed = 2;
+    }
   }
+
 }
 
 
 message MarketCheckpoint {
   string id = 1;
-  OrderBook orderBook = 2;
-
-  message OrderBook {
-    DecimalValue tickSize = 1;
-    DecimalValue marketPrice = 2;
-    uint32 maxLevels = 3;
-    uint32 maxOrdersPerLevel = 4;
-    uint32 baseDecimals = 5;
-    uint32 quoteDecimals = 6;
-    int32 maxOfferIx = 7;
-    int32 minBidIx = 8;
-    repeated OrderBookLevel levels = 9;
-  }
+  DecimalValue tickSize = 2;
+  DecimalValue marketPrice = 3;
+  uint32 maxLevels = 4;
+  uint32 maxOrdersPerLevel = 5;
+  uint32 baseDecimals = 6;
+  uint32 quoteDecimals = 7;
+  int32 maxOfferIx = 8;
+  int32 minBidIx = 9;
+  repeated OrderBookLevel levels = 10;
 
   message OrderBookLevel {
     int32 levelIx = 1;
@@ -55,5 +58,6 @@ message MarketCheckpoint {
     uint64 wallet = 2;
     IntegerValue quantity = 3;
     uint32 levelIx = 4;
+    IntegerValue originalQuantity = 5;
   }
 }

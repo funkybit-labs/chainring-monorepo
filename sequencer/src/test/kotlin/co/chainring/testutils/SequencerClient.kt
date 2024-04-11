@@ -12,6 +12,7 @@ import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.core.toMarketId
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.SequencerRequest
+import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.balanceBatch
 import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.order
@@ -28,7 +29,7 @@ class SequencerClient {
 
     fun addOrder(
         marketId: MarketId,
-        amount: Long,
+        amount: BigInteger,
         price: String?,
         wallet: WalletAddress,
         orderType: Order.Type,
@@ -42,7 +43,7 @@ class SequencerClient {
                     this.ordersToAdd.add(
                         order {
                             this.guid = Random.nextLong()
-                            this.amount = amount.toBigInteger().toIntegerValue()
+                            this.amount = amount.toIntegerValue()
                             this.price = price?.toBigDecimal()?.toDecimalValue() ?: BigDecimal.ZERO.toDecimalValue()
                             this.wallet = wallet.value
                             this.type = orderType
@@ -117,7 +118,7 @@ class SequencerClient {
     }
     private fun List<BigInteger>.sum() = this.reduce { a, b -> a + b }
 
-    fun depositsAndWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigInteger>, expectedAmount: BigInteger? = amounts.sum()) {
+    fun depositsAndWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigInteger>, expectedAmount: BigInteger? = amounts.sum()): SequencerResponse {
         val depositsAndWithdrawalsResponse = sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
@@ -158,6 +159,7 @@ class SequencerClient {
         } else {
             assertEquals(0, depositsAndWithdrawalsResponse.balancesChangedCount)
         }
+        return depositsAndWithdrawalsResponse
     }
 
     fun deposit(walletAddress: WalletAddress, asset: Asset, amount: BigInteger) = depositsAndWithdrawals(walletAddress, asset, listOf(amount))
