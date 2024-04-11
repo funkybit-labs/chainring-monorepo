@@ -7,12 +7,20 @@ option java_multiple_files = true;
 option java_package = "co.chainring.sequencer.proto";
 option java_outer_classname = "CheckpointSchema";
 
-message Checkpoint {
+message BalancesCheckpoint {
+  repeated Balance balances = 1;
+
   message Balance {
     uint64 wallet = 1;
     string asset = 2;
     IntegerValue amount = 3;
   }
+}
+
+
+message MarketCheckpoint {
+  string id = 1;
+  OrderBook orderBook = 2;
 
   message OrderBook {
     DecimalValue tickSize = 1;
@@ -26,11 +34,6 @@ message Checkpoint {
     repeated OrderBookLevel levels = 9;
   }
 
-  enum BookSide {
-    Buy = 0;
-    Sell = 1;
-  }
-
   message OrderBookLevel {
     int32 levelIx = 1;
     BookSide side = 2;
@@ -42,18 +45,15 @@ message Checkpoint {
     repeated LevelOrder orders = 8;
   }
 
+  enum BookSide {
+    Buy = 0;
+    Sell = 1;
+  }
+
   message LevelOrder {
     uint64 guid = 1;
     uint64 wallet = 2;
     IntegerValue quantity = 3;
     uint32 levelIx = 4;
   }
-
-  message Market {
-    string id = 1;
-    OrderBook orderBook = 2;
-  }
-
-  repeated Balance balances = 1;
-  repeated Market markets = 2;
 }

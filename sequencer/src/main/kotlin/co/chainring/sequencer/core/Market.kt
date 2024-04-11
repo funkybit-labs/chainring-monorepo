@@ -1,14 +1,14 @@
 package co.chainring.sequencer.core
 
 import co.chainring.sequencer.proto.BalanceChange
-import co.chainring.sequencer.proto.Checkpoint
-import co.chainring.sequencer.proto.CheckpointKt.market
+import co.chainring.sequencer.proto.MarketCheckpoint
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderBatch
 import co.chainring.sequencer.proto.OrderChanged
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.TradeCreated
 import co.chainring.sequencer.proto.balanceChange
+import co.chainring.sequencer.proto.marketCheckpoint
 import co.chainring.sequencer.proto.orderChanged
 import co.chainring.sequencer.proto.tradeCreated
 import java.math.BigDecimal
@@ -122,15 +122,15 @@ data class Market(
         )
     }
 
-    fun toCheckpoint(): Checkpoint.Market {
-        return market {
+    fun toCheckpoint(): MarketCheckpoint {
+        return marketCheckpoint {
             this.id = this@Market.id.value
             this.orderBook = this@Market.orderBook.toCheckpoint()
         }
     }
 
     companion object {
-        fun fromCheckpoint(checkpoint: Checkpoint.Market): Market {
+        fun fromCheckpoint(checkpoint: MarketCheckpoint): Market {
             val orderBook = OrderBook.fromCheckpoint(checkpoint.orderBook)
 
             return Market(

@@ -43,7 +43,7 @@ class SequencerApp(
     override val logger = KotlinLogging.logger {}
     private var stop = false
     private lateinit var sequencerThread: Thread
-    private var state = SequencerState()
+    private val state = SequencerState()
 
     fun processRequest(request: SequencerRequest, sequence: Long = 0L, startTime: Long = 0L): SequencerResponse {
         return when (request.type) {
@@ -335,16 +335,16 @@ class SequencerApp(
         }
 
     private fun saveCheckpoint(currentCycle: Int) {
-        val checkpointPath = Path.of(checkpointsPath.toString(), "$currentCycle.ckpt")
+        val checkpointPath = Path.of(checkpointsPath.toString(), currentCycle.toString())
         logger.debug { "Saving checkpoint to $checkpointPath" }
         state.persist(checkpointPath)
         logger.debug { "Saved checkpoint" }
     }
 
     private fun restoreFromCheckpoint(atCycle: Int) {
-        val checkpointPath = Path.of(checkpointsPath.toString(), "$atCycle.ckpt")
+        val checkpointPath = Path.of(checkpointsPath.toString(), atCycle.toString())
         logger.debug { "Restoring from checkpoint $checkpointPath" }
-        state = SequencerState.load(checkpointPath)
+        state.load(checkpointPath)
         logger.debug { "Restored from checkpoint" }
     }
 

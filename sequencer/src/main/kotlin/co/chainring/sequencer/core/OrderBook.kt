@@ -1,9 +1,9 @@
 package co.chainring.sequencer.core
 
-import co.chainring.sequencer.proto.Checkpoint
-import co.chainring.sequencer.proto.CheckpointKt.levelOrder
-import co.chainring.sequencer.proto.CheckpointKt.orderBook
-import co.chainring.sequencer.proto.CheckpointKt.orderBookLevel
+import co.chainring.sequencer.proto.MarketCheckpoint
+import co.chainring.sequencer.proto.MarketCheckpointKt.levelOrder
+import co.chainring.sequencer.proto.MarketCheckpointKt.orderBook
+import co.chainring.sequencer.proto.MarketCheckpointKt.orderBookLevel
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.order
@@ -43,7 +43,7 @@ data class LevelOrder(
         this.quantity = BigInteger.ZERO
     }
 
-    fun toCheckpoint(): Checkpoint.LevelOrder {
+    fun toCheckpoint(): MarketCheckpoint.LevelOrder {
         return levelOrder {
             this.guid = this@LevelOrder.guid.value
             this.wallet = this@LevelOrder.wallet.value
@@ -52,7 +52,7 @@ data class LevelOrder(
         }
     }
 
-    fun fromCheckpoint(checkpoint: Checkpoint.LevelOrder) {
+    fun fromCheckpoint(checkpoint: MarketCheckpoint.LevelOrder) {
         this.guid = OrderGuid(checkpoint.guid)
         this.wallet = WalletAddress(checkpoint.wallet)
         this.quantity = checkpoint.quantity.toBigInteger()
@@ -60,18 +60,18 @@ data class LevelOrder(
     }
 }
 
-data class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal, val maxOrderCount: Int) {
+class OrderBookLevel(val levelIx: Int, val side: BookSide, val price: BigDecimal, val maxOrderCount: Int) {
     val orders = Array(maxOrderCount) { _ -> LevelOrder(0L.toOrderGuid(), 0L.toWalletAddress(), BigInteger.ZERO, levelIx) }
     var totalQuantity = BigInteger.ZERO
     var orderHead = 0
     var orderTail = 0
 
-    fun toCheckpoint(): Checkpoint.OrderBookLevel {
+    fun toCheckpoint(): MarketCheckpoint.OrderBookLevel {
         return orderBookLevel {
             this.levelIx = this@OrderBookLevel.levelIx
             this.side = when (this@OrderBookLevel.side) {
-                BookSide.Buy -> Checkpoint.BookSide.Buy
-                BookSide.Sell -> Checkpoint.BookSide.Sell
+                BookSide.Buy -> MarketCheckpoint.BookSide.Buy
+                BookSide.Sell -> MarketCheckpoint.BookSide.Sell
             }
             this.price = this@OrderBookLevel.price.toDecimalValue()
             this.maxOrderCount = this@OrderBookLevel.maxOrderCount
@@ -85,7 +85,7 @@ data class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDe
         }
     }
 
-    fun fromCheckpoint(checkpoint: Checkpoint.OrderBookLevel) {
+    fun fromCheckpoint(checkpoint: MarketCheckpoint.OrderBookLevel) {
         orderHead = checkpoint.orderHead
         orderTail = checkpoint.orderTail
         val checkpointOrdersCount = checkpoint.ordersList.size
@@ -212,7 +212,7 @@ data class AddOrderResult(
 )
 
 // market price must be exactly halfway between two ticks
-data class OrderBook(
+class OrderBook(
     val maxLevels: Int,
     val maxOrdersPerLevel: Int,
     val tickSize: BigDecimal,
@@ -222,24 +222,28 @@ data class OrderBook(
     private var maxOfferIx: Int = -1,
     private var minBidIx: Int = -1,
 ) {
-
     private val halfTick = tickSize.setScale(tickSize.scale() + 1) / BigDecimal.valueOf(2)
-    private val marketIx = min(maxLevels / 2, (marketPrice - halfTick).divideToIntegralValue(tickSize).toInt())
-    val levels: Array<OrderBookLevel> = Array(maxLevels) { n ->
-        if (n < marketIx) {
-            OrderBookLevel(
-                n,
-                BookSide.Buy,
-                marketPrice.minus(tickSize.multiply((marketIx - n - 0.5).toBigDecimal())),
-                maxOrdersPerLevel,
-            )
-        } else {
-            OrderBookLevel(
-                n,
-                BookSide.Sell,
-                marketPrice.plus(tickSize.multiply((n - marketIx + 0.5).toBigDecimal())),
-                maxOrdersPerLevel,
-            )
+
+    private fun marketIx(): Int =
+        min(maxLevels / 2, (marketPrice - halfTick).divideToIntegralValue(tickSize).toInt())
+
+    val levels: Array<OrderBookLevel> = marketIx().let { marketIx ->
+        Array(maxLevels) { n ->
+            if (n < marketIx) {
+                OrderBookLevel(
+                    n,
+                    BookSide.Buy,
+                    marketPrice.minus(tickSize.multiply((marketIx - n - 0.5).toBigDecimal())),
+                    maxOrdersPerLevel,
+                )
+            } else {
+                OrderBookLevel(
+                    n,
+                    BookSide.Sell,
+                    marketPrice.plus(tickSize.multiply((n - marketIx + 0.5).toBigDecimal())),
+                    maxOrdersPerLevel,
+                )
+            }
         }
     }
 
@@ -248,7 +252,7 @@ data class OrderBook(
     private val sellOrdersByWallet = mutableMapOf<WalletAddress, CopyOnWriteArrayList<LevelOrder>>()
     val ordersByGuid = mutableMapOf<OrderGuid, LevelOrder>()
 
-    fun toCheckpoint(): Checkpoint.OrderBook {
+    fun toCheckpoint(): MarketCheckpoint.OrderBook {
         return orderBook {
             this.tickSize = this@OrderBook.tickSize.toDecimalValue()
             this.marketPrice = this@OrderBook.marketPrice.toDecimalValue()
@@ -258,14 +262,17 @@ data class OrderBook(
             this.quoteDecimals = this@OrderBook.quoteDecimals
             this.minBidIx = this@OrderBook.minBidIx
             this.maxOfferIx = this@OrderBook.maxOfferIx
-            this@OrderBook.levels.forEach { level ->
-                this.levels.add(level.toCheckpoint())
+            val marketIx = marketIx()
+            val firstLevelWithData = this.minBidIx.let { if (it == -1) marketIx else it }
+            val lastLevelWithData = this.maxOfferIx.let { if (it == -1) marketIx else it }
+            (firstLevelWithData..lastLevelWithData).forEach { i ->
+                this.levels.add(this@OrderBook.levels[i].toCheckpoint())
             }
         }
     }
 
     companion object {
-        fun fromCheckpoint(checkpoint: Checkpoint.OrderBook): OrderBook {
+        fun fromCheckpoint(checkpoint: MarketCheckpoint.OrderBook): OrderBook {
             return OrderBook(
                 tickSize = checkpoint.tickSize.toBigDecimal(),
                 marketPrice = checkpoint.marketPrice.toBigDecimal(),
@@ -276,9 +283,10 @@ data class OrderBook(
                 minBidIx = checkpoint.minBidIx,
                 maxOfferIx = checkpoint.maxOfferIx,
             ).apply {
-                checkpoint.levelsList.forEachIndexed { i, levelCheckpoint ->
-                    this.levels[i].fromCheckpoint(levelCheckpoint)
+                checkpoint.levelsList.forEach { levelCheckpoint ->
+                    this.levels[levelCheckpoint.levelIx].fromCheckpoint(levelCheckpoint)
                 }
+
                 levels.forEach { level ->
                     (level.orderHead.until(level.orderTail)).forEach { i ->
                         val order = level.orders[i]
@@ -405,7 +413,7 @@ data class OrderBook(
                 if (levelIx < 0) {
                     AddOrderResult(OrderDisposition.Rejected, noExecutions)
                 } else {
-                    if (levelIx < minBidIx) {
+                    if (levelIx < minBidIx || minBidIx == -1) {
                         minBidIx = levelIx
                     }
                     val(disposition, levelOrder) = levels[levelIx].addOrder(order)
@@ -505,7 +513,6 @@ data class OrderBook(
         if (maxOfferIx != other.maxOfferIx) return false
         if (minBidIx != other.minBidIx) return false
         if (halfTick != other.halfTick) return false
-        if (marketIx != other.marketIx) return false
         if (!levels.contentEquals(other.levels)) return false
         if (buyOrdersByWallet != other.buyOrdersByWallet) return false
         if (sellOrdersByWallet != other.sellOrdersByWallet) return false
@@ -522,7 +529,6 @@ data class OrderBook(
         result = 31 * result + maxOfferIx
         result = 31 * result + minBidIx
         result = 31 * result + halfTick.hashCode()
-        result = 31 * result + marketIx
         result = 31 * result + levels.contentHashCode()
         result = 31 * result + buyOrdersByWallet.hashCode()
         result = 31 * result + sellOrdersByWallet.hashCode()

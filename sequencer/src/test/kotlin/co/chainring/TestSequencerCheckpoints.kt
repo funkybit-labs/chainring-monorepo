@@ -46,6 +46,14 @@ class TestSequencerCheckpoints {
     private val testDirPath = Path.of(queueHome, "test")
     private val checkpointsPath = Path.of(testDirPath.toString(), "checkpoints")
 
+    private val wallet1 = 123456789L.toWalletAddress()
+    private val wallet2 = 555111555L.toWalletAddress()
+    private val btc = Asset("BTC")
+    private val eth = Asset("ETH")
+    private val usdc = Asset("USDC")
+    private val btcEthMarketId = MarketId("BTC/ETH")
+    private val btcUsdcMarketId = MarketId("BTC/USDC")
+
     @BeforeEach
     fun beforeEach() {
         testDirPath.toFile().deleteRecursively()
@@ -83,15 +91,11 @@ class TestSequencerCheckpoints {
                 ManagedChannelBuilder.forAddress("localhost", 5339).usePlaintext().build(),
             )
 
-            val marketId = MarketId("BTC/ETH")
-            val maker = 123456789L.toWalletAddress()
-            val taker = 555111555L.toWalletAddress()
-
             assertTrue(
                 gateway.addMarket(
                     market {
                         this.guid = UUID.randomUUID().toString()
-                        this.marketId = marketId.value
+                        this.marketId = btcEthMarketId.value
                         this.tickSize = "0.05".toBigDecimal().toDecimalValue()
                         this.maxLevels = 1000
                         this.maxOrdersPerLevel = 1000
@@ -110,18 +114,18 @@ class TestSequencerCheckpoints {
                         this.deposits.addAll(
                             listOf(
                                 deposit {
-                                    this.asset = marketId.baseAsset().value
-                                    this.wallet = maker.value
+                                    this.asset = btcEthMarketId.baseAsset().value
+                                    this.wallet = wallet1.value
                                     this.amount = BigDecimal("1").inSats().toIntegerValue()
                                 },
                                 deposit {
-                                    this.asset = marketId.quoteAsset().value
-                                    this.wallet = maker.value
+                                    this.asset = btcEthMarketId.quoteAsset().value
+                                    this.wallet = wallet1.value
                                     this.amount = BigDecimal("1").inWei().toIntegerValue()
                                 },
                                 deposit {
-                                    this.asset = marketId.quoteAsset().value
-                                    this.wallet = taker.value
+                                    this.asset = btcEthMarketId.quoteAsset().value
+                                    this.wallet = wallet2.value
                                     this.amount = BigDecimal("1").inWei().toIntegerValue()
                                 },
                             ),
@@ -137,13 +141,13 @@ class TestSequencerCheckpoints {
                 gateway.applyOrderBatch(
                     orderBatch {
                         this.guid = UUID.randomUUID().toString()
-                        this.marketId = marketId.value
+                        this.marketId = btcEthMarketId.value
                         this.ordersToAdd.add(
                             order {
                                 this.guid = Random.nextLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.550").toDecimalValue()
-                                this.wallet = maker.value
+                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                         )
@@ -159,13 +163,13 @@ class TestSequencerCheckpoints {
                 gateway.applyOrderBatch(
                     orderBatch {
                         this.guid = UUID.randomUUID().toString()
-                        this.marketId = marketId.value
+                        this.marketId = btcEthMarketId.value
                         this.ordersToAdd.add(
                             order {
                                 this.guid = Random.nextLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.560").toDecimalValue()
-                                this.wallet = maker.value
+                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                         )
@@ -178,13 +182,13 @@ class TestSequencerCheckpoints {
                 gateway.applyOrderBatch(
                     orderBatch {
                         this.guid = UUID.randomUUID().toString()
-                        this.marketId = marketId.value
+                        this.marketId = btcEthMarketId.value
                         this.ordersToAdd.add(
                             order {
                                 this.guid = Random.nextLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.570").toDecimalValue()
-                                this.wallet = maker.value
+                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                         )
@@ -200,13 +204,13 @@ class TestSequencerCheckpoints {
             gateway.applyOrderBatch(
                 orderBatch {
                     this.guid = UUID.randomUUID().toString()
-                    this.marketId = marketId.value
+                    this.marketId = btcEthMarketId.value
                     this.ordersToAdd.add(
                         order {
                             this.guid = Random.nextLong()
                             this.amount = BigDecimal("0.0011").inSats().toIntegerValue()
                             this.price = BigDecimal.ZERO.toDecimalValue()
-                            this.wallet = taker.value
+                            this.wallet = wallet2.value
                             this.type = Order.Type.MarketBuy
                         },
                     )
@@ -288,71 +292,310 @@ class TestSequencerCheckpoints {
     }
 
     @Test
-    fun `test state storing and loading`() {
-        val wallet1 = 123456789L.toWalletAddress()
-        val wallet2 = 555111555L.toWalletAddress()
-        val btc = Asset("BTC")
-        val eth = Asset("ETH")
-        val btcEthMarketId = MarketId("BTC/ETH")
+    fun `test state storing and loading - empty`() {
+        verifySerialization(
+            SequencerState(),
+        )
+    }
 
-        val initialState = SequencerState(
-            balances = mutableMapOf(
-                wallet1 to mutableMapOf(
-                    btc to BigDecimal("1").inSats(),
-                    eth to BigDecimal("2").inWei(),
+    @Test
+    fun `test state storing and loading - single empty market`() {
+        verifySerialization(
+            SequencerState(
+                balances = mutableMapOf(
+                    wallet1 to mutableMapOf(
+                        btc to BigDecimal("1").inSats(),
+                        eth to BigDecimal("2").inWei(),
+                    ),
+                    wallet2 to mutableMapOf(
+                        btc to BigDecimal("3").inSats(),
+                    ),
                 ),
-                wallet2 to mutableMapOf(
-                    btc to BigDecimal("3").inSats(),
+                markets = mutableMapOf(
+                    btcEthMarketId to Market(
+                        id = btcEthMarketId,
+                        tickSize = BigDecimal("0.05"),
+                        maxLevels = 1000,
+                        maxOrdersPerLevel = 1000,
+                        marketPrice = BigDecimal("17.525"),
+                        baseDecimals = 18,
+                        quoteDecimals = 18,
+                    ),
                 ),
-            ),
-            markets = mutableMapOf(
-                btcEthMarketId to Market(
-                    id = btcEthMarketId,
-                    tickSize = BigDecimal("0.05"),
-                    maxLevels = 1000,
-                    maxOrdersPerLevel = 1000,
-                    marketPrice = BigDecimal("17.525"),
-                    baseDecimals = 18,
-                    quoteDecimals = 18,
-                ).also {
-                    it.orderBook.addOrder(
-                        order {
-                            this.guid = Random.nextLong()
-                            this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                            this.price = BigDecimal("17.550").toDecimalValue()
-                            this.wallet = wallet1.value
-                            this.type = Order.Type.LimitSell
-                        },
-                    )
-                },
             ),
         )
+    }
 
-        // check that order book contains the order
-        initialState.markets.getValue(btcEthMarketId).also { market ->
-            assertEquals(1, market.orderBook.ordersByGuid.size)
-            market.orderBook.ordersByGuid.values.first().also {
-                assertEquals(wallet1, it.wallet)
-                assertEquals(BigDecimal("0.0005").inSats(), it.quantity)
-                assertEquals(350, it.levelIx)
-            }
+    @Test
+    fun `test state storing and loading - market with no buy orders`() {
+        verifySerialization(
+            SequencerState(
+                balances = mutableMapOf(
+                    wallet1 to mutableMapOf(
+                        btc to BigDecimal("1").inSats(),
+                        eth to BigDecimal("2").inWei(),
+                    ),
+                    wallet2 to mutableMapOf(
+                        btc to BigDecimal("3").inSats(),
+                    ),
+                ),
+                markets = mutableMapOf(
+                    btcEthMarketId to Market(
+                        id = btcEthMarketId,
+                        tickSize = BigDecimal("0.05"),
+                        maxLevels = 1000,
+                        maxOrdersPerLevel = 1000,
+                        marketPrice = BigDecimal("17.525"),
+                        baseDecimals = 18,
+                        quoteDecimals = 18,
+                    ).also { market ->
+                        listOf(
+                            order {
+                                this.guid = 1
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.550").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitSell
+                            },
+                            order {
+                                this.guid = 2
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.560").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitSell
+                            },
+                            order {
+                                this.guid = 3
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.600").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitSell
+                            },
+                        ).forEach {
+                            market.orderBook.addOrder(it)
+                        }
+                    },
+                ),
+            ),
+        )
+    }
 
-            market.orderBook.levels[350].also { level ->
-                assertEquals(BigDecimal("17.550"), level.price)
-                assertEquals(0, level.orderHead)
-                assertEquals(1, level.orderTail)
-            }
-        }
+    @Test
+    fun `test state storing and loading - market with no sell orders`() {
+        verifySerialization(
+            SequencerState(
+                balances = mutableMapOf(
+                    wallet1 to mutableMapOf(
+                        btc to BigDecimal("1").inSats(),
+                        eth to BigDecimal("2").inWei(),
+                    ),
+                    wallet2 to mutableMapOf(
+                        btc to BigDecimal("3").inSats(),
+                    ),
+                ),
+                markets = mutableMapOf(
+                    btcEthMarketId to Market(
+                        id = btcEthMarketId,
+                        tickSize = BigDecimal("0.05"),
+                        maxLevels = 1000,
+                        maxOrdersPerLevel = 1000,
+                        marketPrice = BigDecimal("17.525"),
+                        baseDecimals = 18,
+                        quoteDecimals = 18,
+                    ).also { market ->
+                        listOf(
+                            order {
+                                this.guid = 1
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.3").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitBuy
+                            },
+                            order {
+                                this.guid = 2
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.4").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitBuy
+                            },
+                            order {
+                                this.guid = 3
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.5").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitBuy
+                            },
+                        ).forEach {
+                            market.orderBook.addOrder(it)
+                        }
+                    },
+                ),
+            ),
+        )
+    }
 
-        val checkpointPath = Path.of(checkpointsPath.toString(), "1.ckpt")
+    @Test
+    fun `test state storing and loading - markets buy and sell orders`() {
+        verifySerialization(
+            SequencerState(
+                balances = mutableMapOf(
+                    wallet1 to mutableMapOf(
+                        btc to BigDecimal("1").inSats(),
+                        eth to BigDecimal("2").inWei(),
+                        usdc to BigDecimal("10000").inWei(),
+                    ),
+                    wallet2 to mutableMapOf(
+                        btc to BigDecimal("3").inSats(),
+                        usdc to BigDecimal("10000").inWei(),
+                    ),
+                ),
+                markets = mutableMapOf(
+                    btcEthMarketId to Market(
+                        id = btcEthMarketId,
+                        tickSize = BigDecimal("0.05"),
+                        maxLevels = 1000,
+                        maxOrdersPerLevel = 1000,
+                        marketPrice = BigDecimal("17.525"),
+                        baseDecimals = 18,
+                        quoteDecimals = 18,
+                    ).also { market ->
+                        listOf(
+                            order {
+                                this.guid = 1
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.3").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitBuy
+                            },
+                            order {
+                                this.guid = 2
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.4").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitBuy
+                            },
+                            order {
+                                this.guid = 3
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.5").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitBuy
+                            },
+                            order {
+                                this.guid = 4
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.550").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitSell
+                            },
+                            order {
+                                this.guid = 5
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.560").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitSell
+                            },
+                            order {
+                                this.guid = 6
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.600").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitSell
+                            },
+                        ).forEach {
+                            market.orderBook.addOrder(it)
+                        }
+                    },
+                    btcUsdcMarketId to Market(
+                        id = btcUsdcMarketId,
+                        tickSize = BigDecimal("1.00"),
+                        maxLevels = 1000,
+                        maxOrdersPerLevel = 1000,
+                        marketPrice = BigDecimal("70000"),
+                        baseDecimals = 18,
+                        quoteDecimals = 18,
+                    ).also { market ->
+                        listOf(
+                            order {
+                                this.guid = 1
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("69997").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitBuy
+                            },
+                            order {
+                                this.guid = 2
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("69998").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitBuy
+                            },
+                            order {
+                                this.guid = 3
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("69999").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitBuy
+                            },
+                            order {
+                                this.guid = 4
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("70001").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitSell
+                            },
+                            order {
+                                this.guid = 5
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("70002").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitSell
+                            },
+                            order {
+                                this.guid = 6
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("70003").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitSell
+                            },
+                        ).forEach {
+                            market.orderBook.addOrder(it)
+                        }
+                    },
+                ),
+            ),
+        )
+    }
+
+    private fun verifySerialization(initialState: SequencerState) {
+        checkpointsPath.toFile().deleteRecursively()
+        checkpointsPath.createDirectories()
+
+        val checkpointPath = Path.of(checkpointsPath.toString(), "1")
         initialState.persist(checkpointPath)
 
-        val restoredState = SequencerState.load(checkpointPath)
+        val restoredState = SequencerState().apply { load(checkpointPath) }
+
+        initialState.markets.values.forEach { initialStateMarket ->
+            val restoredStateMarket = restoredState.markets.getValue(initialStateMarket.id)
+
+            initialStateMarket.orderBook.levels.forEach { initialStateLevel ->
+                initialStateLevel.orders.forEachIndexed { i, initialStateOrder ->
+                    assertEquals(
+                        initialStateOrder,
+                        restoredStateMarket.orderBook.levels[initialStateLevel.levelIx].orders[i],
+                        "Order mismatch at levelIx=${initialStateLevel.levelIx}, orderIx=$i",
+                    )
+                }
+            }
+
+            assertContentEquals(
+                initialStateMarket.orderBook.levels,
+                restoredStateMarket.orderBook.levels,
+                "Levels in market ${initialStateMarket.id} don't match",
+            )
+        }
 
         assertEquals(initialState, restoredState)
-        assertContentEquals(
-            initialState.markets.getValue(btcEthMarketId).orderBook.levels,
-            restoredState.markets.getValue(btcEthMarketId).orderBook.levels,
-        )
     }
 }
