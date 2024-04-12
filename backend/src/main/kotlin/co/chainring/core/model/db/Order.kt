@@ -18,7 +18,10 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -82,6 +85,23 @@ enum class OrderStatus {
         }
     }
 }
+
+data class CreateOrderAssignment(
+    val orderId: OrderId,
+    val nonce: String,
+    val type: OrderType,
+    val side: OrderSide,
+    val amount: BigInteger,
+    val price: BigDecimal?,
+    val signature: EvmSignature,
+    val sequencerOrderId: SequencerOrderId,
+)
+
+data class UpdateOrderAssignment(
+    val orderId: OrderId,
+    val amount: BigInteger,
+    val price: BigDecimal?,
+)
 
 object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
     val nonce = varchar("nonce", 10485760).index()
@@ -184,6 +204,42 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
     )
 
     companion object : EntityClass<OrderId, OrderEntity>(OrderTable) {
+
+        fun batchUpdate(market: MarketEntity, wallet: WalletEntity, createAssignments: List<CreateOrderAssignment>, updateAssignments: List<UpdateOrderAssignment>) {
+            if (createAssignments.isEmpty() && updateAssignments.isEmpty()) {
+                return
+            }
+            val now = Clock.System.now()
+            OrderTable.batchInsert(createAssignments) { assignment ->
+                this[OrderTable.guid] = assignment.orderId
+                this[OrderTable.createdAt] = now
+                this[OrderTable.createdBy] = "system"
+                this[OrderTable.marketGuid] = market.guid
+                this[OrderTable.walletGuid] = wallet.guid
+                this[OrderTable.status] = OrderStatus.Open
+                this[OrderTable.side] = assignment.side
+                this[OrderTable.type] = assignment.type
+                this[OrderTable.amount] = assignment.amount.toBigDecimal()
+                this[OrderTable.originalAmount] = assignment.amount.toBigDecimal()
+                this[OrderTable.price] = assignment.price
+                this[OrderTable.nonce] = assignment.nonce
+                this[OrderTable.signature] = assignment.signature.value
+                this[OrderTable.sequencerOrderId] = assignment.sequencerOrderId.value
+            }
+            if (updateAssignments.isNotEmpty()) {
+                BatchUpdateStatement(OrderTable).apply {
+                    updateAssignments.forEach { assignment ->
+                        addBatch(EntityID(assignment.orderId, OrderTable))
+                        this[OrderTable.amount] = assignment.amount.toBigDecimal()
+                        this[OrderTable.price] = assignment.price
+                        this[BalanceTable.updatedAt] = now
+                        this[BalanceTable.updatedBy] = "system_batch"
+                    }
+                    execute(TransactionManager.current())
+                }
+            }
+        }
+
         fun create(
             nonce: String,
             market: MarketEntity,
@@ -193,6 +249,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             amount: BigInteger,
             price: BigDecimal?,
             signature: EvmSignature,
+            sequencerOrderId: SequencerOrderId,
         ) = OrderEntity.new(OrderId.generate()) {
             val now = Clock.System.now()
             this.nonce = nonce
@@ -207,6 +264,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             this.originalAmount = amount
             this.price = price
             this.signature = signature.value
+            this.sequencerOrderId = sequencerOrderId
         }
 
         fun findByNonce(nonce: String): OrderEntity? {
@@ -224,6 +282,13 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         fun listOrders(wallet: WalletEntity): List<OrderEntity> {
             return OrderEntity
                 .find { OrderTable.walletGuid.eq(wallet.guid) }
+                .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
+                .toList()
+        }
+
+        fun listOrders(orderIds: List<OrderId>): List<OrderEntity> {
+            return OrderEntity
+                .find { OrderTable.guid.inList(orderIds) }
                 .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
                 .toList()
         }

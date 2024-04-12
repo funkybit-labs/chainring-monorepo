@@ -4,6 +4,7 @@ import co.chainring.apps.api.middleware.SignInMessage
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ApiErrors
 import co.chainring.apps.api.model.BalancesApiResponse
+import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateSequencerDeposit
@@ -123,10 +124,25 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
         }
     }
 
+    fun batchOrders(apiRequest: BatchOrdersApiRequest): OrdersApiResponse {
+        val httpResponse = execute(
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/batch/orders")
+                .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        )
+
+        return when (httpResponse.code) {
+            HttpURLConnection.HTTP_OK -> json.decodeFromString<OrdersApiResponse>(httpResponse.body?.string()!!)
+            else -> throw AbnormalApiResponseException(httpResponse)
+        }
+    }
+
     fun updateOrder(apiRequest: UpdateOrderApiRequest): Order {
         val httpResponse = execute(
             Request.Builder()
-                .url("$apiServerRootUrl/v1/orders/${apiRequest.id}")
+                .url("$apiServerRootUrl/v1/orders/${apiRequest.orderId}")
                 .patch(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(ecKeyPair),

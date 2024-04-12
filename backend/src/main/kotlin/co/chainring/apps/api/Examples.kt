@@ -40,12 +40,12 @@ object Examples {
     )
 
     val updateMarketOrderRequest = UpdateOrderApiRequest.Market(
-        id = OrderId("123"),
+        orderId = OrderId("123"),
         amount = BigInteger("100"),
     )
 
     val updateLimitOrderRequest = UpdateOrderApiRequest.Limit(
-        id = OrderId("123"),
+        orderId = OrderId("123"),
         amount = BigInteger("100"),
         price = BigDecimal("100"),
     )

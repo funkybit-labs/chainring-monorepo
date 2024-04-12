@@ -57,7 +57,10 @@ class TestRoutes(private val exchangeService: ExchangeService) {
             transaction {
                 MarketEntity.all().forEach {
                     runBlocking {
-                        val marketPrice = if (it.guid.value.value == "BTC/ETH") "17.525" else "2.05"
+                        val marketPrice = when (it.guid.value.value) {
+                            "BTC/ETH", "BTC/USDC" -> "17.525"
+                            else -> "2.05"
+                        }
                         SequencerClient.createMarket(
                             it.guid.value.value,
                             tickSize = it.tickSize,

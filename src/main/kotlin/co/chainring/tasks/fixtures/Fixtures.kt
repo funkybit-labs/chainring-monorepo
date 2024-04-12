@@ -64,6 +64,11 @@ val localDevFixtures = Fixtures(
             quoteSymbol = Fixtures.SymbolId("DAI", chainringDevChainId),
             tickSize = "0.01".toBigDecimal(),
         ),
+        Fixtures.Market(
+            baseSymbol = Fixtures.SymbolId("BTC", chainringDevChainId),
+            quoteSymbol = Fixtures.SymbolId("USDC", chainringDevChainId),
+            tickSize = "0.05".toBigDecimal(),
+        ),
     ),
     wallets = listOf(
         Fixtures.Wallet(
