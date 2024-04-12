@@ -9,6 +9,7 @@ import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
+import co.chainring.core.model.db.OrderType
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import kotlinx.datetime.Instant
@@ -16,6 +17,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
+import java.math.BigDecimal
 import java.math.BigInteger
 
 @Serializable
@@ -68,33 +70,53 @@ sealed class CreateOrderApiRequest {
             this.signature,
         )
     }
+    fun getResolvedPrice(): BigDecimal? {
+        return when (this) {
+            is Limit -> price
+            is Market -> null
+        }
+    }
+
+    fun getOrderType(): OrderType {
+        return when (this) {
+            is Market -> OrderType.Market
+            is Limit -> OrderType.Limit
+        }
+    }
 }
 
 @Serializable
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("type")
 sealed class UpdateOrderApiRequest {
-    abstract val id: OrderId
+    abstract val orderId: OrderId
     abstract val amount: BigIntegerJson
 
     @Serializable
     @SerialName("market")
     data class Market(
-        override val id: OrderId,
+        override val orderId: OrderId,
         override val amount: BigIntegerJson,
     ) : UpdateOrderApiRequest()
 
     @Serializable
     @SerialName("limit")
     data class Limit(
-        override val id: OrderId,
+        override val orderId: OrderId,
         override val amount: BigIntegerJson,
         val price: BigDecimalJson,
     ) : UpdateOrderApiRequest()
+
+    fun getResolvedPrice(): BigDecimal? {
+        return when (this) {
+            is Limit -> price
+            is Market -> null
+        }
+    }
 }
 
 @Serializable
-data class DeleteUpdateOrderApiRequest(
+data class CancelUpdateOrderApiRequest(
     val orderId: OrderId,
 )
 
@@ -158,9 +180,10 @@ sealed class Order {
 
 @Serializable
 data class BatchOrdersApiRequest(
+    val marketId: MarketId,
     val createOrders: List<CreateOrderApiRequest>,
     val updateOrders: List<UpdateOrderApiRequest>,
-    val deleteOrders: List<DeleteUpdateOrderApiRequest>,
+    val cancelOrders: List<CancelUpdateOrderApiRequest>,
 )
 
 @Serializable

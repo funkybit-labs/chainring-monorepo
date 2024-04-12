@@ -84,6 +84,12 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             }.toList()
         }
 
+        fun findForOrders(orderIds: List<OrderId>): List<OrderExecutionEntity> {
+            return OrderExecutionEntity.find {
+                OrderExecutionTable.orderGuid.inList(orderIds)
+            }.toList()
+        }
+
         fun findForTrade(tradeEntity: TradeEntity): List<OrderExecutionEntity> {
             return OrderExecutionEntity.find {
                 OrderExecutionTable.tradeGuid.eq(tradeEntity.guid)

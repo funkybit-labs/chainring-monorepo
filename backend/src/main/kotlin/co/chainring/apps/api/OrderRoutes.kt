@@ -6,20 +6,10 @@ import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
-import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.TradesApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
-import co.chainring.apps.api.model.badRequestError
-import co.chainring.apps.api.model.marketNotSupportedError
 import co.chainring.apps.api.model.orderIsClosedError
 import co.chainring.apps.api.model.orderNotFoundError
-import co.chainring.apps.api.model.websocket.OrderUpdated
-import co.chainring.core.blockchain.BlockchainClient
-import co.chainring.core.blockchain.ContractType
-import co.chainring.core.evm.ECHelper
-import co.chainring.core.evm.EIP712Helper
-import co.chainring.core.model.Address
-import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
@@ -29,8 +19,6 @@ import co.chainring.core.services.ExchangeService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toInstant
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.div
 import org.http4k.contract.meta
@@ -76,24 +64,19 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
         } bindContract Method.POST to { request ->
             val apiRequest: CreateOrderApiRequest = requestBody(request)
 
-            val (wallet, market, isSignatureValid) = transaction {
-                val market = MarketEntity.findById(apiRequest.marketId)
-                Triple(
-                    WalletEntity.getOrCreate(request.principal),
-                    market,
-                    validateSignature(market, request.principal, apiRequest, exchangeService.blockchainClient),
-                )
+            val order = transaction {
+                OrderEntity.findByNonce(nonce = apiRequest.nonce)?.toOrderResponse()
             }
             when {
-                market == null -> marketNotSupportedError
-
-                !isSignatureValid -> badRequestError(ReasonCode.SignatureNotValid, "Signature not verified")
-
+                order != null -> {
+                    Response(Status.CREATED).with(
+                        responseBody of order,
+                    )
+                }
                 else -> {
                     ApiUtils.runCatchingValidation {
-                        val order = exchangeService.addOrder(wallet, market, apiRequest)
                         Response(Status.CREATED).with(
-                            responseBody of order,
+                            responseBody of exchangeService.addOrder(request.principal, apiRequest),
                         )
                     }
                 }
@@ -126,28 +109,15 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
         } bindContract Method.PATCH to { orderId ->
             fun handle(request: Request): Response {
                 val apiRequest: UpdateOrderApiRequest = requestBody(request)
-                return transaction {
-                    val orderEntity = OrderEntity.findById(orderId)
-                    when {
-                        orderEntity == null -> orderNotFoundError
-                        orderEntity.status.isFinal() -> orderIsClosedError
+                val orderEntity = transaction { OrderEntity.findById(orderId) }
+                return when {
+                    orderEntity == null -> orderNotFoundError
+                    orderEntity.status.isFinal() -> orderIsClosedError
 
-                        else -> {
-                            orderEntity.update(
-                                amount = apiRequest.amount,
-                                price = when (apiRequest) {
-                                    is UpdateOrderApiRequest.Market -> null
-                                    is UpdateOrderApiRequest.Limit -> apiRequest.price
-                                },
-                            )
-                            orderEntity.refresh(flush = true)
-
-                            val order = orderEntity.toOrderResponse().also {
-                                exchangeService.broadcaster.notify(request.principal, OrderUpdated(it))
-                            }
-
+                    else -> {
+                        ApiUtils.runCatchingValidation {
                             Response(Status.OK).with(
-                                responseBody of order,
+                                responseBody of exchangeService.updateOrder(request.principal, orderEntity, apiRequest),
                             )
                         }
                     }
@@ -176,7 +146,7 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
 
                         else -> {
                             ApiUtils.runCatchingValidation {
-                                exchangeService.cancelOrder(order)
+                                exchangeService.cancelOrder(request.principal, order)
                                 Response(Status.NO_CONTENT)
                             }
                         }
@@ -266,17 +236,13 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
         } bindContract Method.POST to { request ->
             val apiRequest: BatchOrdersApiRequest = requestBody(request)
 
-            logger.debug {
-                Json.encodeToString(apiRequest)
+            ApiUtils.runCatchingValidation {
+                Response(Status.OK).with(
+                    responseBody of OrdersApiResponse(
+                        exchangeService.orderBatch(request.principal, apiRequest),
+                    ),
+                )
             }
-
-            // TODO: broadcast affected orders
-
-            Response(Status.OK).with(
-                responseBody of OrdersApiResponse(
-                    emptyList(),
-                ),
-            )
         }
     }
 
@@ -305,27 +271,5 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
                 responseBody of TradesApiResponse(trades = trades),
             )
         }
-    }
-
-    private fun validateSignature(market: MarketEntity?, walletAddress: Address, apiRequest: CreateOrderApiRequest, blockchainClient: BlockchainClient): Boolean {
-        return market?.let {
-            val tx = when (apiRequest) {
-                is CreateOrderApiRequest.Market -> apiRequest.toEip712Transaction(walletAddress, it.baseSymbol.contractAddress, it.quoteSymbol.contractAddress)
-                is CreateOrderApiRequest.Limit -> apiRequest.toEip712Transaction(walletAddress, it.baseSymbol.contractAddress, it.quoteSymbol.contractAddress, it.quoteSymbol.decimals.toInt())
-            }
-
-            val contractAddress = blockchainClient.getContractAddress(ContractType.Exchange)
-            contractAddress?.let { verifyingContract ->
-                ECHelper.isValidSignature(
-                    EIP712Helper.computeHash(
-                        tx,
-                        blockchainClient.chainId,
-                        verifyingContract,
-                    ),
-                    tx.signature,
-                    walletAddress,
-                )
-            } ?: false
-        } ?: false
     }
 }

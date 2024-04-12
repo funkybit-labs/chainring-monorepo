@@ -1,6 +1,8 @@
 package co.chainring.integrationtests.api
 
 import co.chainring.apps.api.model.ApiError
+import co.chainring.apps.api.model.BatchOrdersApiRequest
+import co.chainring.apps.api.model.CancelUpdateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateSequencerDeposit
 import co.chainring.apps.api.model.Order
@@ -14,7 +16,6 @@ import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
-import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
@@ -22,6 +23,7 @@ import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.model.db.TradeEntity
 import co.chainring.core.model.db.TradeId
+import co.chainring.core.model.db.TradeTable
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.generateHexString
 import co.chainring.core.utils.toFundamentalUnits
@@ -40,6 +42,10 @@ import co.chainring.integrationtests.testutils.waitForMessage
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.awaitility.kotlin.await
 import org.http4k.client.WebsocketClient
+import org.http4k.websocket.WsClient
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -72,8 +78,8 @@ class OrderRoutesApiTest {
         }
 
         Faucet.fund(wallet.address)
-        wallet.mintERC20("DAI", wallet.formatAmount("2", "DAI"))
-        val amountToDeposit = wallet.formatAmount("2", "DAI")
+        wallet.mintERC20("DAI", wallet.formatAmount("14", "DAI"))
+        val amountToDeposit = wallet.formatAmount("14", "DAI")
         BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit))) {
             deposit(apiClient, wallet, "DAI", amountToDeposit)
         }
@@ -128,14 +134,14 @@ class OrderRoutesApiTest {
         // update order
         val updatedOrder = apiClient.updateOrder(
             apiRequest = UpdateOrderApiRequest.Limit(
-                id = limitOrder.id,
-                amount = BigDecimal("3").toFundamentalUnits(18),
-                price = BigDecimal("4"),
+                orderId = limitOrder.id,
+                amount = wallet.formatAmount("3", "USDC"),
+                price = BigDecimal("2.01"),
             ),
         )
         assertIs<Order.Limit>(updatedOrder)
-        assertEquals(BigDecimal("3").toFundamentalUnits(18), updatedOrder.amount)
-        assertEquals(0, BigDecimal("4").compareTo(updatedOrder.price))
+        assertEquals(wallet.formatAmount("3", "USDC"), updatedOrder.amount)
+        assertEquals(0, BigDecimal("2.01").compareTo(updatedOrder.price))
         wsClient.waitForMessage().also { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
@@ -185,7 +191,7 @@ class OrderRoutesApiTest {
             {
                 apiClient.updateOrder(
                     apiRequest = UpdateOrderApiRequest.Limit(
-                        id = OrderId.generate(),
+                        orderId = OrderId.generate(),
                         amount = BigDecimal("3").toFundamentalUnits(18),
                         price = BigDecimal("4"),
                     ),
@@ -217,7 +223,6 @@ class OrderRoutesApiTest {
             },
         )
 
-        logger.debug { "Before wait for order created" }
         wsClient.waitForMessage().also { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
@@ -226,7 +231,6 @@ class OrderRoutesApiTest {
             }
         }
 
-        logger.debug { "Before wait for order updates" }
         wsClient.waitForMessage().also { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
@@ -236,7 +240,27 @@ class OrderRoutesApiTest {
             }
         }
 
-        // try update cancelled order
+        // try creating a limit order not a multiple of tick size
+        assertThrows<AbnormalApiResponseException> {
+            apiClient.createOrder(
+                CreateOrderApiRequest.Limit(
+                    nonce = generateHexString(32),
+                    marketId = MarketId("USDC/DAI"),
+                    side = OrderSide.Buy,
+                    amount = wallet.formatAmount("1", "USDC"),
+                    price = BigDecimal("2.015"),
+                    signature = EvmSignature.emptySignature(),
+                ).let {
+                    wallet.signOrder(it)
+                },
+            )
+        }.also {
+            assertEquals(
+                ApiError(ReasonCode.ProcessingError, "Order price is not a multiple of tick size"),
+                it.response.apiError(),
+            )
+        }
+
         val limitOrder2 = apiClient.createOrder(
             CreateOrderApiRequest.Limit(
                 nonce = generateHexString(32),
@@ -249,11 +273,54 @@ class OrderRoutesApiTest {
                 wallet.signOrder(it)
             },
         )
+
+        // try updating the price to something not a tick size
+        assertThrows<AbnormalApiResponseException> {
+            apiClient.updateOrder(
+                apiRequest = UpdateOrderApiRequest.Limit(
+                    orderId = limitOrder2.id,
+                    amount = wallet.formatAmount("1", "USDC"),
+                    price = BigDecimal("2.015"),
+                ),
+            )
+        }.also {
+            assertEquals(
+                ApiError(ReasonCode.ProcessingError, "Order price is not a multiple of tick size"),
+                it.response.apiError(),
+            )
+        }
+
+        // try updating and cancelling an order not created by this wallet
+        val apiClient2 = ApiClient()
+        assertThrows<AbnormalApiResponseException> {
+            apiClient2.updateOrder(
+                apiRequest = UpdateOrderApiRequest.Limit(
+                    orderId = limitOrder2.id,
+                    amount = wallet.formatAmount("1", "USDC"),
+                    price = BigDecimal("2.01"),
+                ),
+            )
+        }.also {
+            assertEquals(
+                ApiError(ReasonCode.ProcessingError, "Order not created with this wallet"),
+                it.response.apiError(),
+            )
+        }
+        assertThrows<AbnormalApiResponseException> {
+            apiClient2.cancelOrder(limitOrder2.id)
+        }.also {
+            assertEquals(
+                ApiError(ReasonCode.ProcessingError, "Order not created with this wallet"),
+                it.response.apiError(),
+            )
+        }
+
+        // try update cancelled order
         apiClient.cancelOrder(limitOrder2.id)
         assertThrows<AbnormalApiResponseException> {
             apiClient.updateOrder(
                 apiRequest = UpdateOrderApiRequest.Limit(
-                    id = limitOrder2.id,
+                    orderId = limitOrder2.id,
                     amount = wallet.formatAmount("3", "USDC"),
                     price = BigDecimal("4"),
                 ),
@@ -325,46 +392,12 @@ class OrderRoutesApiTest {
 
     @Test
     fun `order execution`() {
-        val takerApiClient = ApiClient()
-        val takerWallet = Wallet(takerApiClient)
+        val (takerApiClient, takerWallet, takerWsClient) =
+            setupTrader("0.5", null, "ETH", "2")
 
-        val takerWsClient = WebsocketClient.blocking(takerApiClient.authToken)
-        takerWsClient.subscribe(SubscriptionTopic.Orders)
-        takerWsClient.waitForMessage().also { message ->
-            assertEquals(SubscriptionTopic.Orders, message.topic)
-            assertIs<Orders>(message.data)
-        }
+        val (makerApiClient, makerWallet, makerWsClient) =
+            setupTrader("0.5", "0.2", "ETH", "2")
 
-        val makerApiClient = ApiClient()
-        val makerWallet = Wallet(makerApiClient)
-
-        val makerWsClient = WebsocketClient.blocking(makerApiClient.authToken)
-        makerWsClient.subscribe(SubscriptionTopic.Orders)
-        makerWsClient.waitForMessage().also { message ->
-            assertEquals(SubscriptionTopic.Orders, message.topic)
-            assertIs<Orders>(message.data)
-        }
-
-        Faucet.fund(takerWallet.address, takerWallet.formatAmount("0.5", "BTC"))
-        Faucet.fund(makerWallet.address, takerWallet.formatAmount("0.5", "BTC"))
-        takerWallet.mintERC20("ETH", takerWallet.formatAmount("2", "ETH"))
-        makerWallet.mintERC20("ETH", takerWallet.formatAmount("2", "ETH"))
-
-        val btcDepositAmount = takerWallet.formatAmount("0.2", "BTC")
-        val ethDepositAmount = takerWallet.formatAmount("1", "ETH")
-        BalanceHelper.waitForAndVerifyBalanceChange(
-            makerApiClient,
-            listOf(
-                ExpectedBalance("BTC", btcDepositAmount, btcDepositAmount),
-                ExpectedBalance("ETH", ethDepositAmount, ethDepositAmount),
-            ),
-        ) {
-            deposit(makerApiClient, makerWallet, "BTC", btcDepositAmount)
-            deposit(makerApiClient, makerWallet, "ETH", ethDepositAmount)
-        }
-        BalanceHelper.waitForAndVerifyBalanceChange(takerApiClient, listOf(ExpectedBalance("ETH", ethDepositAmount, ethDepositAmount))) {
-            deposit(takerApiClient, takerWallet, "ETH", ethDepositAmount)
-        }
         // starting onchain balances
         val makerStartingBTCBalance = makerWallet.getExchangeNativeBalance()
         val makerStartingETHBalance = makerWallet.getExchangeERC20Balance("ETH")
@@ -377,8 +410,8 @@ class OrderRoutesApiTest {
                 nonce = generateHexString(32),
                 marketId = MarketId("BTC/ETH"),
                 side = OrderSide.Buy,
-                amount = makerWallet.formatAmount("0.00012345", "BTC"),
-                price = BigDecimal("17.5"),
+                amount = makerWallet.formatAmount("0.00013345", "BTC"),
+                price = BigDecimal("17.45"),
                 signature = EvmSignature.emptySignature(),
             ).let {
                 makerWallet.signOrder(it)
@@ -394,14 +427,30 @@ class OrderRoutesApiTest {
             }
         }
 
+        val updatedLimitBuyOrder = makerApiClient.updateOrder(
+            UpdateOrderApiRequest.Limit(
+                orderId = limitBuyOrder.id,
+                amount = makerWallet.formatAmount("0.00012345", "BTC"),
+                price = BigDecimal("17.50"),
+            ),
+        )
+
+        makerWsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Orders, message.topic)
+            message.data.let { data ->
+                assertIs<OrderUpdated>(data)
+                assertEquals(updatedLimitBuyOrder, data.order)
+            }
+        }
+
         // place a sell order
         val limitSellOrder = makerApiClient.createOrder(
             CreateOrderApiRequest.Limit(
                 nonce = generateHexString(32),
                 marketId = MarketId("BTC/ETH"),
                 side = OrderSide.Sell,
-                amount = makerWallet.formatAmount("0.00054321", "BTC"),
-                price = BigDecimal("17.550"),
+                amount = makerWallet.formatAmount("0.00154321", "BTC"),
+                price = BigDecimal("17.600"),
                 signature = EvmSignature.emptySignature(),
             ).let {
                 makerWallet.signOrder(it)
@@ -414,6 +463,23 @@ class OrderRoutesApiTest {
             message.data.let { data ->
                 assertIs<OrderCreated>(data)
                 assertEquals(limitSellOrder, data.order)
+            }
+        }
+
+        // update amount and price of the sell
+        val updatedLimitSellOrder = makerApiClient.updateOrder(
+            UpdateOrderApiRequest.Limit(
+                orderId = limitSellOrder.id,
+                amount = makerWallet.formatAmount("0.00054321", "BTC"),
+                price = BigDecimal("17.550"),
+            ),
+        )
+
+        makerWsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Orders, message.topic)
+            message.data.let { data ->
+                assertIs<OrderUpdated>(data)
+                assertEquals(updatedLimitSellOrder, data.order)
             }
         }
 
@@ -464,12 +530,12 @@ class OrderRoutesApiTest {
                 assertEquals(ExecutionRole.Maker, data.order.executions[0].role)
             }
         }
-        val trade = waitForTradeToExist(marketBuyOrder.id)
+        val trade = getTradesForOrders(listOf(marketBuyOrder.id)).first()
 
         assertEquals(trade.amount, takerWallet.formatAmount("0.00043210", "BTC"))
         assertEquals(0, trade.price.compareTo(BigDecimal("17.550")))
 
-        waitForSettlementToFinish(trade.id.value)
+        waitForSettlementToFinish(listOf(trade.id.value))
 
         val baseQuantity = takerWallet.formatAmount("0.00043210", "BTC")
         val notional = (trade.price * trade.amount.fromFundamentalUnits(takerWallet.decimals("BTC"))).toFundamentalUnits(takerWallet.decimals("ETH"))
@@ -536,11 +602,11 @@ class OrderRoutesApiTest {
                 assertEquals(ExecutionRole.Maker, data.order.executions[0].role)
             }
         }
-        val trade2 = waitForTradeToExist(marketSellOrder.id)
+        val trade2 = getTradesForOrders(listOf(marketSellOrder.id)).first()
         assertEquals(trade2.amount, takerWallet.formatAmount("0.00012345", "BTC"))
         assertEquals(0, trade2.price.compareTo(BigDecimal("17.500")))
 
-        waitForSettlementToFinish(trade2.id.value)
+        waitForSettlementToFinish(listOf(trade2.id.value))
 
         val baseQuantity2 = takerWallet.formatAmount("0.00012345", "BTC")
         val notional2 = (trade2.price * trade2.amount.fromFundamentalUnits(takerWallet.decimals("BTC"))).toFundamentalUnits(takerWallet.decimals("ETH"))
@@ -559,8 +625,204 @@ class OrderRoutesApiTest {
             ),
         )
 
+        takerApiClient.cancelOpenOrders()
+        makerApiClient.cancelOpenOrders()
+
         makerWsClient.close()
         takerWsClient.close()
+    }
+
+    @Test
+    fun `order batches`() {
+        val (makerApiClient, makerWallet, makerWsClient) =
+            setupTrader("0.5", "0.2", "USDC", "500")
+
+        val (takerApiClient, takerWallet, takerWsClient) =
+            setupTrader("0.5", null, "USDC", "500")
+
+        // starting onchain balances
+        val makerStartingBTCBalance = makerWallet.getExchangeNativeBalance()
+        val makerStartingUSDCBalance = makerWallet.getExchangeERC20Balance("USDC")
+        val takerStartingBTCBalance = takerWallet.getExchangeNativeBalance()
+        val takerStartingUSDCBalance = takerWallet.getExchangeERC20Balance("USDC")
+
+        // place 3 orders
+        val createBatchLimitOrders = makerApiClient.batchOrders(
+            BatchOrdersApiRequest(
+                marketId = MarketId("BTC/USDC"),
+                createOrders = listOf("0.00001", "0.00002", "0.0003").map {
+                    CreateOrderApiRequest.Limit(
+                        nonce = generateHexString(32),
+                        marketId = MarketId("BTC/USDC"),
+                        side = OrderSide.Sell,
+                        amount = makerWallet.formatAmount(it, "BTC"),
+                        price = BigDecimal("68400.000"),
+                        signature = EvmSignature.emptySignature(),
+                    ).let {
+                        makerWallet.signOrder(it)
+                    }
+                },
+                updateOrders = listOf(),
+                cancelOrders = listOf(),
+            ),
+        )
+
+        assertEquals(3, createBatchLimitOrders.orders.count { it.status == OrderStatus.Open })
+        makerWsClient.receivedDecoded().take(3).forEach {
+            assertIs<OrderCreated>((it as OutgoingWSMessage.Publish).data)
+        }
+
+        val batchOrderResponse = makerApiClient.batchOrders(
+            BatchOrdersApiRequest(
+                marketId = MarketId("BTC/USDC"),
+                createOrders = listOf("0.0004", "0.0005", "0.0006").map {
+                    CreateOrderApiRequest.Limit(
+                        nonce = generateHexString(32),
+                        marketId = MarketId("BTC/USDC"),
+                        side = OrderSide.Sell,
+                        amount = makerWallet.formatAmount(it, "BTC"),
+                        price = BigDecimal("68400.000"),
+                        signature = EvmSignature.emptySignature(),
+                    ).let {
+                        makerWallet.signOrder(it)
+                    }
+                },
+                updateOrders = listOf(
+                    UpdateOrderApiRequest.Limit(
+                        orderId = createBatchLimitOrders.orders[0].id,
+                        amount = makerWallet.formatAmount("0.0001", "BTC"),
+                        price = BigDecimal("68405.000"),
+                    ),
+                    UpdateOrderApiRequest.Limit(
+                        orderId = createBatchLimitOrders.orders[1].id,
+                        amount = makerWallet.formatAmount("0.0002", "BTC"),
+                        price = BigDecimal("68405.000"),
+                    ),
+                ),
+                cancelOrders = listOf(
+                    CancelUpdateOrderApiRequest(orderId = createBatchLimitOrders.orders[2].id),
+                ),
+            ),
+        )
+
+        assertEquals(6, batchOrderResponse.orders.count())
+        assertEquals(5, batchOrderResponse.orders.count { it.status == OrderStatus.Open })
+        assertEquals(1, batchOrderResponse.orders.count { it.status == OrderStatus.Cancelled })
+
+        makerWsClient.receivedDecoded().take(3).forEach {
+            assertIs<OrderCreated>((it as OutgoingWSMessage.Publish).data)
+        }
+
+        makerWsClient.receivedDecoded().take(3).forEach {
+            assertIs<OrderUpdated>((it as OutgoingWSMessage.Publish).data)
+        }
+
+        assertEquals(5, makerApiClient.listOrders().orders.count { it.status == OrderStatus.Open })
+
+        // total BTC available is 0.0001 + 0.0002 + 0.0004 + 0.0005 + 0.0006 = 0.0018
+        val takerOrderAmount = takerWallet.formatAmount("0.0018", "BTC")
+        // create a market orders that should match against the 5 limit orders
+        takerApiClient.createOrder(
+            CreateOrderApiRequest.Market(
+                nonce = generateHexString(32),
+                marketId = MarketId("BTC/USDC"),
+                side = OrderSide.Buy,
+                amount = takerOrderAmount,
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                takerWallet.signOrder(it)
+            },
+        )
+
+        takerWsClient.receivedDecoded().take(1).forEach {
+            assertIs<OrderCreated>((it as OutgoingWSMessage.Publish).data)
+        }
+
+        takerWsClient.receivedDecoded().take(1).forEach {
+            assertIs<OrderUpdated>((it as OutgoingWSMessage.Publish).data)
+        }
+
+        makerWsClient.receivedDecoded().take(5).forEach {
+            assertIs<OrderUpdated>((it as OutgoingWSMessage.Publish).data)
+        }
+        // should be 8 filled orders
+        val takerOrders = takerApiClient.listOrders().orders
+        assertEquals(1, takerOrders.count { it.status == OrderStatus.Filled })
+        assertEquals(5, makerApiClient.listOrders().orders.count { it.status == OrderStatus.Filled })
+
+        // now verify the trades
+
+        val expectedAmounts = listOf("0.0001", "0.0002", "0.0004", "0.0005", "0.0006").map { takerWallet.formatAmount(it, "BTC") }.toSet()
+        val trades = getTradesForOrders(takerOrders.map { it.id })
+        val prices = trades.map { it.price }.toSet()
+
+        assertEquals(5, trades.size)
+        assertEquals(expectedAmounts, trades.map { it.amount }.toSet())
+        assertEquals(prices.size, 2)
+
+        waitForSettlementToFinish(trades.map { it.id.value })
+
+        val notional = trades.map {
+            (it.price * it.amount.fromFundamentalUnits(makerWallet.decimals("BTC"))).toFundamentalUnits(takerWallet.decimals("USDC"))
+        }.reduce { acc, notionalForTrade -> acc + notionalForTrade }
+
+        // val notional = (prices.first() * BigDecimal("0.0018")).toFundamentalUnits(takerWallet.decimals("USDC"))
+        BalanceHelper.verifyBalances(
+            makerApiClient,
+            listOf(
+                ExpectedBalance("BTC", makerStartingBTCBalance - takerOrderAmount, makerStartingBTCBalance - takerOrderAmount),
+                ExpectedBalance("USDC", makerStartingUSDCBalance + notional, makerStartingUSDCBalance + notional),
+            ),
+        )
+        BalanceHelper.verifyBalances(
+            takerApiClient,
+            listOf(
+                ExpectedBalance("BTC", takerStartingBTCBalance + takerOrderAmount, takerStartingBTCBalance + takerOrderAmount),
+                ExpectedBalance("USDC", takerStartingUSDCBalance - notional, takerStartingUSDCBalance - notional),
+            ),
+        )
+
+        takerApiClient.cancelOpenOrders()
+        makerApiClient.cancelOpenOrders()
+
+        makerWsClient.close()
+        takerWsClient.close()
+    }
+
+    private fun setupTrader(
+        nativeAmount: String,
+        nativeDepositAmount: String?,
+        mintSymbol: String,
+        mintAmount: String,
+    ): Triple<ApiClient, Wallet, WsClient> {
+        val apiClient = ApiClient()
+        val wallet = Wallet(apiClient)
+
+        val wsClient = WebsocketClient.blocking(apiClient.authToken)
+        wsClient.subscribe(SubscriptionTopic.Orders)
+        wsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Orders, message.topic)
+            assertIs<Orders>(message.data)
+        }
+
+        Faucet.fund(wallet.address, wallet.formatAmount(nativeAmount, "BTC"))
+        val formattedMintAmount = wallet.formatAmount(mintAmount, mintSymbol)
+        wallet.mintERC20(mintSymbol, formattedMintAmount)
+
+        val formattedNativeAmount = nativeDepositAmount?.let { wallet.formatAmount(it, "BTC") }
+
+        BalanceHelper.waitForAndVerifyBalanceChange(
+            apiClient,
+            listOfNotNull(
+                ExpectedBalance(mintSymbol, formattedMintAmount, formattedMintAmount),
+                formattedNativeAmount?.let { ExpectedBalance("BTC", it, it) },
+            ),
+        ) {
+            deposit(apiClient, wallet, mintSymbol, formattedMintAmount)
+            formattedNativeAmount?.let { deposit(apiClient, wallet, "BTC", it) }
+        }
+
+        return Triple(apiClient, wallet, wsClient)
     }
 
     private fun deposit(apiClient: ApiClient, wallet: Wallet, asset: String, amount: BigInteger) {
@@ -573,7 +835,7 @@ class OrderRoutesApiTest {
         apiClient.createSequencerDeposit(CreateSequencerDeposit(asset, amount))
     }
 
-    private fun waitForSettlementToFinish(id: TradeId) {
+    private fun waitForSettlementToFinish(tradeIds: List<TradeId>) {
         await
             .pollInSameThread()
             .pollDelay(Duration.ofMillis(100))
@@ -581,27 +843,14 @@ class OrderRoutesApiTest {
             .atMost(Duration.ofMillis(30000L))
             .until {
                 transaction {
-                    TradeEntity[id].settlementStatus.isFinal()
-                }
+                    TradeEntity.count(TradeTable.guid.inList(tradeIds) and TradeTable.settlementStatus.eq(SettlementStatus.Completed))
+                } == tradeIds.size.toLong()
             }
-
-        transaction {
-            assertEquals(SettlementStatus.Completed, TradeEntity[id].settlementStatus)
-        }
     }
 
-    private fun waitForTradeToExist(orderId: OrderId): TradeEntity {
-        await
-            .pollInSameThread()
-            .pollDelay(Duration.ofMillis(100))
-            .pollInterval(Duration.ofMillis(100))
-            .atMost(Duration.ofMillis(10000L))
-            .until {
-                transaction {
-                    OrderExecutionEntity.findForOrder(OrderEntity[orderId]).firstOrNull()?.trade != null
-                }
-            }
-
-        return transaction { OrderExecutionEntity.findForOrder(OrderEntity[orderId]).firstOrNull()?.trade!! }
+    private fun getTradesForOrders(orderIds: List<OrderId>): List<TradeEntity> {
+        return transaction {
+            OrderExecutionEntity.findForOrders(orderIds).map { it.trade }
+        }
     }
 }

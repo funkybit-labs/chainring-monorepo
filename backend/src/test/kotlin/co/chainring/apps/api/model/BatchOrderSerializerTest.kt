@@ -23,7 +23,7 @@ class BatchOrderSerializerTest {
     )
 
     private val updateLimitOrderRequest = UpdateOrderApiRequest.Limit(
-        id = OrderId.generate(),
+        orderId = OrderId.generate(),
         amount = BigInteger("1000"),
         price = BigDecimal("101000"),
     )
@@ -35,9 +35,10 @@ class BatchOrderSerializerTest {
         assertEquals(createMarketOrderRequest, restoredOrder)
 
         val batchOrderApiRequest = BatchOrdersApiRequest(
+            marketId = MarketId("BTC/ETC"),
             createOrders = listOf(createMarketOrderRequest, createMarketOrderRequest),
             updateOrders = listOf(updateLimitOrderRequest),
-            deleteOrders = emptyList(),
+            cancelOrders = emptyList(),
         )
         val batchOrderString = Json.encodeToString(batchOrderApiRequest)
         val restoredBatchOrder = Json.decodeFromJsonElement<BatchOrdersApiRequest>(Json.parseToJsonElement(batchOrderString))

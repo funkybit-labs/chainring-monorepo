@@ -394,7 +394,7 @@ data class Market(
             }
         }
         val availableQuantity = amount - remainingAmount
-        return Pair(totalPriceUnits / availableQuantity.toBigDecimal(), availableQuantity)
+        return Pair(if (availableQuantity == BigInteger.ZERO) BigDecimal.ZERO else totalPriceUnits / availableQuantity.toBigDecimal(), availableQuantity)
     }
 
     // returns baseAsset and quoteAsset reserved by order
@@ -415,7 +415,7 @@ data class Market(
             val newPrice = orderChange.price.toBigDecimal()
             val newQuantity = orderChange.amount.toBigInteger()
             val quantityDelta = newQuantity - order.quantity
-            if (newPrice == level.price) {
+            if (newPrice.compareTo(level.price) == 0) {
                 val baseAssetDelta = if (level.side == BookSide.Buy) BigInteger.ZERO else quantityDelta
                 val quoteAssetDelta = if (level.side == BookSide.Buy) notional(quantityDelta, level.price, baseDecimals, quoteDecimals) else BigInteger.ZERO
                 level.totalQuantity += quantityDelta
