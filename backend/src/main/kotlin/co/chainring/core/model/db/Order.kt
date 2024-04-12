@@ -233,38 +233,11 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                         this[OrderTable.amount] = assignment.amount.toBigDecimal()
                         this[OrderTable.price] = assignment.price
                         this[BalanceTable.updatedAt] = now
-                        this[BalanceTable.updatedBy] = "system_batch"
+                        this[BalanceTable.updatedBy] = "system"
                     }
                     execute(TransactionManager.current())
                 }
             }
-        }
-
-        fun create(
-            nonce: String,
-            market: MarketEntity,
-            wallet: WalletEntity,
-            type: OrderType,
-            side: OrderSide,
-            amount: BigInteger,
-            price: BigDecimal?,
-            signature: EvmSignature,
-            sequencerOrderId: SequencerOrderId,
-        ) = OrderEntity.new(OrderId.generate()) {
-            val now = Clock.System.now()
-            this.nonce = nonce
-            this.createdAt = now
-            this.createdBy = "system"
-            this.market = market
-            this.walletGuid = wallet.guid
-            this.status = OrderStatus.Open
-            this.type = type
-            this.side = side
-            this.amount = amount
-            this.originalAmount = amount
-            this.price = price
-            this.signature = signature.value
-            this.sequencerOrderId = sequencerOrderId
         }
 
         fun findByNonce(nonce: String): OrderEntity? {
