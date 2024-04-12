@@ -6,7 +6,6 @@ import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.SequencerState
 import co.chainring.sequencer.core.WalletAddress
 import co.chainring.sequencer.core.notional
-import co.chainring.sequencer.core.queueHome
 import co.chainring.sequencer.core.sumBigIntegers
 import co.chainring.sequencer.core.toAsset
 import co.chainring.sequencer.core.toBigDecimal
@@ -38,7 +37,7 @@ import co.chainring.sequencer.core.outputQueue as defaultOutputQueue
 class SequencerApp(
     val inputQueue: RollingChronicleQueue = defaultInputQueue,
     val outputQueue: RollingChronicleQueue = defaultOutputQueue,
-    val checkpointsPath: Path = Path.of(queueHome, "checkpoints"),
+    val checkpointsPath: Path?,
 ) : BaseApp() {
     override val logger = KotlinLogging.logger {}
     private var stop = false
@@ -277,14 +276,17 @@ class SequencerApp(
         stop = false
         sequencerThread = thread(start = true, name = "sequencer", isDaemon = false) {
             val inputTailer = inputQueue.createTailer("sequencer")
-            val initialCycle = inputTailer.cycle()
 
-            // moveToCycle moves tailer to the start of the cycle
-            if (inputTailer.moveToCycle(initialCycle)) {
-                // Restore from previous cycle's checkpoint unless we are in the first cycle
-                if (initialCycle != inputQueue.firstCycle()) {
-                    val prevCycle = inputQueue.nextCycle(initialCycle, TailerDirection.BACKWARD)
-                    restoreFromCheckpoint(prevCycle)
+            if (checkpointsPath != null) {
+                val initialCycle = inputTailer.cycle()
+
+                // moveToCycle moves tailer to the start of the cycle
+                if (inputTailer.moveToCycle(initialCycle)) {
+                    // Restore from previous cycle's checkpoint unless we are in the first cycle
+                    if (initialCycle != inputQueue.firstCycle()) {
+                        val prevCycle = inputQueue.nextCycle(initialCycle, TailerDirection.BACKWARD)
+                        restoreFromCheckpoint(checkpointsPath, prevCycle)
+                    }
                 }
             }
 
@@ -295,7 +297,9 @@ class SequencerApp(
             while (!stop) {
                 val tailerState = inputTailer.state()
                 if (tailerState == TailerState.END_OF_CYCLE && tailerState != tailerPrevState) {
-                    saveCheckpoint(inputTailer.cycle())
+                    if (checkpointsPath != null) {
+                        saveCheckpoint(checkpointsPath, inputTailer.cycle())
+                    }
                 }
 
                 inputTailer.readingDocument().use { dc ->
@@ -334,14 +338,14 @@ class SequencerApp(
             result
         }
 
-    private fun saveCheckpoint(currentCycle: Int) {
+    private fun saveCheckpoint(checkpointsPath: Path, currentCycle: Int) {
         val checkpointPath = Path.of(checkpointsPath.toString(), currentCycle.toString())
         logger.debug { "Saving checkpoint to $checkpointPath" }
         state.persist(checkpointPath)
         logger.debug { "Saved checkpoint" }
     }
 
-    private fun restoreFromCheckpoint(atCycle: Int) {
+    private fun restoreFromCheckpoint(checkpointsPath: Path, atCycle: Int) {
         val checkpointPath = Path.of(checkpointsPath.toString(), atCycle.toString())
         logger.debug { "Restoring from checkpoint $checkpointPath" }
         state.load(checkpointPath)
