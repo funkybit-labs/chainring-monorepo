@@ -82,7 +82,7 @@ class SequencerApp(
                 var ordersChanged: List<OrderChanged> = emptyList()
                 var trades: List<TradeCreated> = emptyList()
                 var balanceChanges: List<BalanceChange> = emptyList()
-                val ordersChangedToConform = mutableListOf<OrderChanged>()
+                val walletsAndAssetsWithBalanceChanges: MutableSet<Pair<WalletAddress, Asset>> = mutableSetOf()
                 val orderBatch = request.orderBatch!!
                 val error: SequencerError?
                 val marketId = MarketId(orderBatch.marketId)
@@ -96,7 +96,6 @@ class SequencerApp(
                         ordersChanged = result.ordersChanged
                         trades = result.createdTrades
                         balanceChanges = result.balanceChanges
-                        val walletsAndAssetsWithBalanceChanges: MutableSet<Pair<WalletAddress, Asset>> = mutableSetOf()
                         // apply balance changes
                         balanceChanges.forEach {
                             state.balances.getOrPut(it.wallet.toWalletAddress()) {
@@ -117,16 +116,6 @@ class SequencerApp(
                                 }.merge(marketId, it.delta, ::sumBigIntegers)
                             }
                         }
-                        walletsAndAssetsWithBalanceChanges.forEach { (walletAddress, asset) ->
-                            state.consumed[walletAddress]?.get(asset)?.let { consumption ->
-                                val balance = state.balances[walletAddress]!![asset]!!
-                                consumption.forEach { (marketId, marketConsumption) ->
-                                    if (marketConsumption > balance) {
-                                        ordersChangedToConform.addAll(state.markets[marketId]!!.autoReduce(walletAddress, asset, balance))
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
                 sequencerResponse {
@@ -134,7 +123,7 @@ class SequencerApp(
                     this.processingTime = System.nanoTime() - startTime
                     this.guid = orderBatch.guid
                     this.ordersChanged.addAll(ordersChanged)
-                    this.ordersChanged.addAll(ordersChangedToConform)
+                    this.ordersChanged.addAll(autoReduce(walletsAndAssetsWithBalanceChanges))
                     this.tradesCreated.addAll(trades)
                     this.balancesChanged.addAll(balanceChanges)
                     error?.let {
@@ -168,17 +157,6 @@ class SequencerApp(
                     }
                 }
 
-                val orderChanges = balancesChanged.keys.flatMap { (walletAddress, asset) ->
-                    state.consumed[walletAddress]?.get(asset)?.flatMap { (marketId, amount) ->
-                        val balance = state.balances[walletAddress]?.get(asset) ?: BigInteger.ZERO
-                        if (amount > balance) {
-                            state.markets[marketId]?.autoReduce(walletAddress, asset, balance) ?: emptyList()
-                        } else {
-                            emptyList()
-                        }
-                    } ?: emptyList()
-                }
-
                 sequencerResponse {
                     this.guid = balanceBatch.guid
                     this.sequence = sequence
@@ -197,7 +175,7 @@ class SequencerApp(
                             }
                         },
                     )
-                    this.ordersChanged.addAll(orderChanges)
+                    this.ordersChanged.addAll(autoReduce(balancesChanged.keys))
                 }
             }
 
@@ -209,6 +187,19 @@ class SequencerApp(
                     this.error = SequencerError.UnknownRequest
                 }
             }
+        }
+    }
+
+    private fun autoReduce(walletsAndAssets: Collection<Pair<WalletAddress, Asset>>): List<OrderChanged> {
+        return walletsAndAssets.flatMap { (walletAddress, asset) ->
+            state.consumed[walletAddress]?.get(asset)?.flatMap { (marketId, amount) ->
+                val balance = state.balances[walletAddress]?.get(asset) ?: BigInteger.ZERO
+                if (amount > balance) {
+                    state.markets[marketId]?.autoReduce(walletAddress, asset, balance) ?: emptyList()
+                } else {
+                    emptyList()
+                }
+            } ?: emptyList()
         }
     }
 

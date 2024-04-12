@@ -203,7 +203,7 @@ data class Market(
         return if (asset == id.baseAsset()) {
             sellOrdersByWallet[walletAddress]?.let { sellOrders ->
                 sellOrders.sortedBy { it.levelIx }.mapNotNull { levelOrder ->
-                    if (levelOrder.quantity + total <= limit) {
+                    if (levelOrder.quantity <= limit - total) {
                         total += levelOrder.quantity
                         null
                     } else {
