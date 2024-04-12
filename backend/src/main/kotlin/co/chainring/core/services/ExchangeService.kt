@@ -202,7 +202,7 @@ class ExchangeService(
                     OrderEntity.listOrders(apiRequest.cancelOrders.map { it.orderId }).associateBy { it.guid.value }
                 updatedAndCancelsOrderIds.addAll(ordersToCancel.values.map { it.guid.value })
                 apiRequest.cancelOrders.map {
-                    val orderEntity = ordersToCancel[it.orderId]!!
+                    val orderEntity = ordersToCancel.getValue(it.orderId)
                     checkMarket(apiRequest.marketId, orderEntity.marketGuid.value)
                     checkIsOwner(orderEntity.wallet.address, walletAddress)
                     orderEntity.sequencerOrderId!!.value
@@ -378,7 +378,7 @@ class ExchangeService(
             BalanceUtils.updateBalances(
                 response.balancesChangedList.map { change ->
                     BalanceUtils.BalanceChange(
-                        walletId = walletMap[change.wallet]!!.guid.value,
+                        walletId = walletMap.getValue(change.wallet).guid.value,
                         symbolId = getSymbol(change.asset).guid.value,
                         delta = change.delta.toBigInteger(),
                     )
