@@ -196,6 +196,9 @@ export const OrderSchema = z
   })
 export type Order = z.infer<typeof OrderSchema>
 
+const TradeSettlementStatusSchema = z.enum(['Pending', 'Completed', 'Failed'])
+export type TradeSettlementStatus = z.infer<typeof TradeSettlementStatusSchema>
+
 export const TradeSchema = z.object({
   id: z.string(),
   timestamp: z.coerce.date(),
@@ -205,7 +208,8 @@ export const TradeSchema = z.object({
   amount: z.coerce.bigint(),
   price: decimal(),
   feeAmount: z.coerce.bigint(),
-  feeSymbol: z.string()
+  feeSymbol: z.string(),
+  settlementStatus: TradeSettlementStatusSchema
 })
 export type Trade = z.infer<typeof TradeSchema>
 

@@ -23,15 +23,22 @@ value class BalanceId(override val value: String) : EntityId {
     override fun toString(): String = value
 }
 
-data class BalanceUpdateAssignment(
-    val walletId: WalletId,
-    val symbolId: SymbolId,
-    val delta: BigInteger,
-    val balanceId: BalanceId,
-    val balanceBefore: BigInteger?,
-    val balanceAfter: BigInteger,
-    val balanceType: BalanceType,
-)
+sealed class BalanceChange {
+    abstract val walletId: WalletId
+    abstract val symbolId: SymbolId
+
+    data class Delta(
+        override val walletId: WalletId,
+        override val symbolId: SymbolId,
+        val amount: BigInteger,
+    ) : BalanceChange()
+
+    data class Replace(
+        override val walletId: WalletId,
+        override val symbolId: SymbolId,
+        val amount: BigInteger,
+    ) : BalanceChange()
+}
 
 enum class BalanceType {
     Exchange,
@@ -55,9 +62,47 @@ object BalanceTable : GUIDTable<BalanceId>("balance", ::BalanceId) {
 }
 
 class BalanceEntity(guid: EntityID<BalanceId>) : GUIDEntity<BalanceId>(guid) {
-
     companion object : EntityClass<BalanceId, BalanceEntity>(BalanceTable) {
-        fun updateBalances(assignments: List<BalanceUpdateAssignment>) {
+        fun updateBalances(changes: List<BalanceChange>, balanceType: BalanceType) {
+            val startingBalances = getBalances(
+                changes.map { it.walletId }.toSet().toList(),
+                changes.map { it.symbolId }.toSet().toList(),
+                balanceType,
+            )
+            updateBalances(
+                changes.map { change ->
+                    val startingBalanceEntity = startingBalances.firstOrNull { it.wallet.guid.value == change.walletId && it.symbol.guid.value == change.symbolId }
+                    val startingBalance = startingBalanceEntity?.balance
+                    BalanceUpdateAssignment(
+                        walletId = change.walletId,
+                        symbolId = change.symbolId,
+                        delta = when (change) {
+                            is BalanceChange.Delta -> change.amount
+                            is BalanceChange.Replace -> change.amount - (startingBalance ?: BigInteger.ZERO)
+                        },
+                        balanceId = startingBalanceEntity?.guid?.value ?: BalanceId.generate(),
+                        balanceBefore = startingBalance,
+                        balanceAfter = when (change) {
+                            is BalanceChange.Delta -> BigInteger.ZERO.max((startingBalance ?: BigInteger.ZERO) + change.amount)
+                            is BalanceChange.Replace -> change.amount
+                        },
+                        balanceType,
+                    )
+                },
+            )
+        }
+
+        private data class BalanceUpdateAssignment(
+            val walletId: WalletId,
+            val symbolId: SymbolId,
+            val delta: BigInteger,
+            val balanceId: BalanceId,
+            val balanceBefore: BigInteger?,
+            val balanceAfter: BigInteger,
+            val balanceType: BalanceType,
+        )
+
+        private fun updateBalances(assignments: List<BalanceUpdateAssignment>) {
             if (assignments.isEmpty()) {
                 return
             }

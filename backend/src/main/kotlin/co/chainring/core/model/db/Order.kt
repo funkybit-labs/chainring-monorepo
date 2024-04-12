@@ -5,9 +5,6 @@ import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.SequencerOrderId
-import co.chainring.core.model.db.WalletEntity.Companion.transform
-import co.chainring.core.model.db.migrations.V15_WalletTable.V15_WithdrawalTable.index
-import co.chainring.core.model.db.migrations.V15_WalletTable.V15_WithdrawalTable.nullable
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import co.chainring.sequencer.proto.OrderDisposition
@@ -252,7 +249,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             }.firstOrNull()
         }
 
-        fun listOrders(wallet: WalletEntity): List<OrderEntity> {
+        fun listForWallet(wallet: WalletEntity): List<OrderEntity> {
             return OrderEntity
                 .find { OrderTable.walletGuid.eq(wallet.guid) }
                 .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
@@ -266,7 +263,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 .toList()
         }
 
-        fun listOpenOrders(wallet: WalletEntity): List<OrderEntity> {
+        fun listOpenForWallet(wallet: WalletEntity): List<OrderEntity> {
             return OrderEntity
                 .find { OrderTable.status.inList(listOf(OrderStatus.Open, OrderStatus.Partial)) and OrderTable.walletGuid.eq(wallet.guid) }
                 .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))

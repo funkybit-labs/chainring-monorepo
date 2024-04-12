@@ -200,7 +200,7 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             )
         } bindContract Method.GET to { request: Request ->
             val orders = transaction {
-                OrderEntity.listOrders(WalletEntity.getOrCreate(request.principal)).map { it.toOrderResponse() }
+                OrderEntity.listForWallet(WalletEntity.getOrCreate(request.principal)).map { it.toOrderResponse() }
             }
             Response(Status.OK).with(
                 responseBody of OrdersApiResponse(
@@ -260,7 +260,7 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             val limit = request.query("limit")?.toInt() ?: 100
 
             val trades = transaction {
-                OrderExecutionEntity.listExecutions(
+                OrderExecutionEntity.listForWallet(
                     wallet = WalletEntity.getOrCreate(request.principal),
                     beforeTimestamp = timestamp,
                     limit = limit,

@@ -79,6 +79,18 @@ data class Trades(
 ) : Publishable()
 
 @Serializable
+@SerialName("TradeCreated")
+data class TradeCreated(
+    val trade: Trade,
+) : Publishable()
+
+@Serializable
+@SerialName("TradeUpdated")
+data class TradeUpdated(
+    val trade: Trade,
+) : Publishable()
+
+@Serializable
 @SerialName("Orders")
 data class Orders(
     val orders: List<Order>,

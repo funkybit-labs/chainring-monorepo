@@ -1,7 +1,6 @@
 package co.chainring.core.websocket
 
 import co.chainring.apps.api.model.BigDecimalJson
-import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.websocket.LastTrade
 import co.chainring.apps.api.model.websocket.LastTradeDirection
 import co.chainring.apps.api.model.websocket.OHLC
@@ -14,18 +13,16 @@ import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
+import co.chainring.apps.api.model.websocket.TradeCreated
+import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
 import co.chainring.apps.api.wsUnauthorized
 import co.chainring.core.model.Address
-import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
-import co.chainring.core.model.db.OrderId
-import co.chainring.core.model.db.OrderSide
-import co.chainring.core.model.db.TradeId
+import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.utils.Timer
-import co.chainring.core.utils.toFundamentalUnits
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -34,9 +31,6 @@ import kotlinx.serialization.json.Json
 import org.http4k.websocket.Websocket
 import org.http4k.websocket.WsMessage
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.math.BigDecimal
-import java.math.BigInteger
-import java.math.RoundingMode
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -191,42 +185,23 @@ class Broadcaster {
     }
 
     private fun sendTrades(client: ConnectedClient) {
-        fun generateTrade(timestamp: Instant): Trade {
-            val lastStutter = rnd.nextDouble(-0.5, 0.5) / 3.0
-            val marketId = setOf(MarketId("BTC/ETH"), MarketId("USDC/DAI")).random()
-            val (amount, price) = (
-                when (marketId.value) {
-                    "BTC/ETH" -> Pair(
-                        BigDecimal(rnd.nextDouble(0.00001, 0.5)).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
-                        BigDecimal(17.5 + lastStutter).setScale(5, RoundingMode.UP),
-                    )
-                    "USDC/DAI" -> Pair(
-                        BigDecimal(rnd.nextDouble(1000.00, 10000.00)).setScale(5, RoundingMode.UP).toFundamentalUnits(18),
-                        BigDecimal(1.00 + lastStutter / 10).setScale(5, RoundingMode.UP),
-                    )
-                    else -> null
-                }
-                )!!
-
-            return Trade(
-                id = TradeId.generate(),
-                timestamp = timestamp,
-                orderId = OrderId.generate(),
-                marketId = marketId,
-                side = if (lastStutter > 0) OrderSide.Buy else OrderSide.Sell,
-                amount = amount,
-                price = price,
-                feeAmount = BigInteger.ZERO,
-                feeSymbol = Symbol(marketId.value.split("/")[0]),
-            )
+        if (client.principal != null) {
+            transaction {
+                client.send(
+                    OutgoingWSMessage.Publish(
+                        SubscriptionTopic.Trades,
+                        Trades(
+                            OrderExecutionEntity
+                                .listForWallet(
+                                    WalletEntity.getOrCreate(client.principal),
+                                    beforeTimestamp = Clock.System.now(),
+                                    limit = 1000,
+                                ).map(OrderExecutionEntity::toTradeResponse),
+                        ),
+                    ),
+                )
+            }
         }
-
-        client.send(
-            OutgoingWSMessage.Publish(
-                SubscriptionTopic.Trades,
-                Trades((1..100).map { i -> generateTrade(Clock.System.now().minus(i.minutes)) }),
-            ),
-        )
     }
 
     private fun sendOrderBook(topic: SubscriptionTopic.OrderBook, clients: List<ConnectedClient>) {
@@ -309,8 +284,9 @@ class Broadcaster {
                     OutgoingWSMessage.Publish(
                         SubscriptionTopic.Orders,
                         Orders(
-                            OrderEntity.listOrders(WalletEntity.getOrCreate(client.principal))
-                                .map { it.toOrderResponse() },
+                            OrderEntity
+                                .listForWallet(WalletEntity.getOrCreate(client.principal))
+                                .map(OrderEntity::toOrderResponse),
                         ),
                     ),
                 )
@@ -328,7 +304,7 @@ class Broadcaster {
             is OrderBook -> SubscriptionTopic.OrderBook(message.marketId)
             is Orders, is OrderCreated, is OrderUpdated -> SubscriptionTopic.Orders
             is Prices -> SubscriptionTopic.Prices(message.market)
-            is Trades -> SubscriptionTopic.Trades
+            is Trades, is TradeCreated, is TradeUpdated -> SubscriptionTopic.Trades
         }
 
         findClients(principal, topic)

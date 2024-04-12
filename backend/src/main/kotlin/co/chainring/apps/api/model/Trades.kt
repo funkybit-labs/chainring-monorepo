@@ -4,6 +4,7 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
+import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.model.db.TradeId
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
@@ -19,6 +20,7 @@ data class Trade(
     val price: BigDecimalJson,
     val feeAmount: BigIntegerJson,
     val feeSymbol: Symbol,
+    val settlementStatus: SettlementStatus,
 )
 
 @Serializable
