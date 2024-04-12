@@ -29,6 +29,13 @@ resource "aws_iam_instance_profile" "baregate_node" {
 resource "aws_security_group" "baregate" {
   vpc_id = var.vpc.id
   name   = "${var.name_prefix}-baregate"
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = ["${var.bastion_ip}/32"]
+    ipv6_cidr_blocks = []
+  }
 
   egress {
     from_port        = 0
@@ -43,11 +50,17 @@ data "aws_ssm_parameter" "baregate_node_ami" {
   name = "/aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id"
 }
 
+resource "aws_key_pair" "baregate" {
+  key_name   = "baregate-key"
+  public_key = var.baregate_key
+}
+
 resource "aws_launch_template" "baregate_ec2" {
   name_prefix            = "${var.name_prefix}-baregate-ec2-"
   image_id               = data.aws_ssm_parameter.baregate_node_ami.value
   instance_type          = var.instance_type
   vpc_security_group_ids = [aws_security_group.baregate.id]
+  key_name               = "baregate-key"
 
   iam_instance_profile { arn = aws_iam_instance_profile.baregate_node.arn }
   monitoring { enabled = true }
@@ -55,8 +68,12 @@ resource "aws_launch_template" "baregate_ec2" {
   user_data = base64encode(<<-EOF
       #!/bin/bash
       echo ECS_CLUSTER=${var.ecs_cluster_name} >> /etc/ecs/ecs.config;
+      mkfs -t xfs /dev/nvme1n1;
+      mkdir -p /data/queues;
+      mount /dev/nvme1n1 /data/queues;
     EOF
   )
+  update_default_version = true
 }
 
 resource "aws_autoscaling_group" "ecs" {

@@ -5,3 +5,7 @@ output "security_group" {
 output "deployer_key_name" {
   value = aws_key_pair.deployer.key_name
 }
+
+output "private_ip" {
+  value = aws_instance.bastion.private_ip
+}
