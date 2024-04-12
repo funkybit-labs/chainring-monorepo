@@ -34,7 +34,10 @@ class AppUnderTestRunner : BeforeAllCallback {
                     private val dbConfig = DbConfig()
                     private val apiApp = ApiApp(ApiAppConfig(httpPort = 9999, dbConfig = dbConfig))
                     private val gatewayApp = GatewayApp(GatewayConfig(port = 5337))
-                    private val sequencerApp = SequencerApp()
+                    private val sequencerApp = SequencerApp(
+                        // we want sequencer to start from the clean-slate
+                        checkpointsPath = null,
+                    )
                     private val blockchainClient = TestBlockchainClient(BlockchainClientConfig())
 
                     private val isIntegrationRun = (getenv("INTEGRATION_RUN") ?: "0") == "1"

@@ -17,7 +17,7 @@ class AppUnderTestRunner : BeforeAllCallback {
             .getOrComputeIfAbsent("app under test") {
                 object : CloseableResource {
                     private val gatewayApp = GatewayApp(GatewayConfig(port = 5338))
-                    private val sequencerApp = SequencerApp()
+                    private val sequencerApp = SequencerApp(checkpointsPath = null)
 
                     private val isIntegrationRun = (getenv("INTEGRATION_RUN") ?: "0") == "1"
 

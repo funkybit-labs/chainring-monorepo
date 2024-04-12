@@ -8,6 +8,7 @@ environment:
     ENABLE_TEST_ROUTES: "true"
   sequencer:
     QUEUE_HOME: "/data/queues/test"
+    CHECKPOINTS_ENABLED: "false"
 services:
   api:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend

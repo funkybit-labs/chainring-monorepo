@@ -25,7 +25,7 @@ import java.util.UUID
 import kotlin.random.Random
 
 class SequencerClient {
-    private val sequencer = SequencerApp()
+    private val sequencer = SequencerApp(checkpointsPath = null)
 
     fun addOrder(
         marketId: MarketId,
