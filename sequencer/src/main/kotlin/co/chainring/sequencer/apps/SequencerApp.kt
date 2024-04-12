@@ -82,8 +82,9 @@ class SequencerApp(
                 var ordersChanged: List<OrderChanged> = emptyList()
                 var trades: List<TradeCreated> = emptyList()
                 var balanceChanges: List<BalanceChange> = emptyList()
+                val walletsAndAssetsWithBalanceChanges: MutableSet<Pair<WalletAddress, Asset>> = mutableSetOf()
                 val orderBatch = request.orderBatch!!
-                var error: SequencerError? = null
+                val error: SequencerError?
                 val marketId = MarketId(orderBatch.marketId)
                 val market = state.markets[marketId]
                 if (market == null) {
@@ -103,6 +104,17 @@ class SequencerApp(
                                 it.asset.toAsset(),
                                 it.delta.toBigInteger(),
                             ) { a, b -> BigInteger.ZERO.max(a + b) }
+                            walletsAndAssetsWithBalanceChanges.add(Pair(it.wallet.toWalletAddress(), it.asset.toAsset()))
+                        }
+                        // apply consumption changes
+                        result.consumptionChanges.forEach {
+                            if (it.delta != BigInteger.ZERO) {
+                                state.consumed.getOrPut(it.walletAddress) {
+                                    mutableMapOf()
+                                }.getOrPut(it.asset) {
+                                    mutableMapOf()
+                                }.merge(marketId, it.delta, ::sumBigIntegers)
+                            }
                         }
                     }
                 }
@@ -111,6 +123,7 @@ class SequencerApp(
                     this.processingTime = System.nanoTime() - startTime
                     this.guid = orderBatch.guid
                     this.ordersChanged.addAll(ordersChanged)
+                    this.ordersChanged.addAll(autoReduce(walletsAndAssetsWithBalanceChanges))
                     this.tradesCreated.addAll(trades)
                     this.balancesChanged.addAll(balanceChanges)
                     error?.let {
@@ -162,6 +175,7 @@ class SequencerApp(
                             }
                         },
                     )
+                    this.ordersChanged.addAll(autoReduce(balancesChanged.keys))
                 }
             }
 
@@ -173,6 +187,19 @@ class SequencerApp(
                     this.error = SequencerError.UnknownRequest
                 }
             }
+        }
+    }
+
+    private fun autoReduce(walletsAndAssets: Collection<Pair<WalletAddress, Asset>>): List<OrderChanged> {
+        return walletsAndAssets.flatMap { (walletAddress, asset) ->
+            state.consumed[walletAddress]?.get(asset)?.flatMap { (marketId, amount) ->
+                val balance = state.balances[walletAddress]?.get(asset) ?: BigInteger.ZERO
+                if (amount > balance) {
+                    state.markets[marketId]?.autoReduce(walletAddress, asset, balance) ?: emptyList()
+                } else {
+                    emptyList()
+                }
+            } ?: emptyList()
         }
     }
 
@@ -190,17 +217,17 @@ class SequencerApp(
                 }
                 Order.Type.MarketBuy -> {
                     // the quote assets required for a market buy depends on what the clearing price would be
-                    val(clearingPrice, availableQuantity) = market.orderBook.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger())
+                    val(clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger())
                     quoteAssetsRequired.merge(order.wallet.toWalletAddress(), notional(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals), ::sumBigIntegers)
                 }
                 else -> {}
             }
         }
         orderBatch.ordersToChangeList.forEach { orderChange ->
-            market.orderBook.ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
-                val (oldBaseAssets, oldQuoteAssets) = market.orderBook.assetsReservedForOrder(order)
+            market.ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
+                val (oldBaseAssets, oldQuoteAssets) = market.assetsReservedForOrder(order)
                 if (oldBaseAssets > BigInteger.ZERO) { // LimitSell
-                    if (orderChange.price.toBigDecimal() > market.orderBook.marketPrice) {
+                    if (orderChange.price.toBigDecimal() > market.marketPrice) {
                         baseAssetsRequired.merge(
                             order.wallet,
                             orderChange.amount.toBigInteger() - order.quantity,
@@ -211,7 +238,7 @@ class SequencerApp(
                     }
                 }
                 if (oldQuoteAssets > BigInteger.ZERO) { // LimitBuy
-                    if (orderChange.price.toBigDecimal() < market.orderBook.marketPrice) {
+                    if (orderChange.price.toBigDecimal() < market.marketPrice) {
                         quoteAssetsRequired.merge(
                             order.wallet,
                             (
@@ -223,7 +250,7 @@ class SequencerApp(
                                 ) -
                                     notional(
                                         order.quantity,
-                                        market.orderBook.levels[order.levelIx].price,
+                                        market.levels[order.levelIx].price,
                                         market.baseDecimals,
                                         market.quoteDecimals,
                                     )
@@ -237,8 +264,8 @@ class SequencerApp(
             }
         }
         orderBatch.ordersToCancelList.forEach { guid ->
-            market.orderBook.ordersByGuid[guid.toOrderGuid()]?.let { order ->
-                val (baseAssets, quoteAssets) = market.orderBook.assetsReservedForOrder(order)
+            market.ordersByGuid[guid.toOrderGuid()]?.let { order ->
+                val (baseAssets, quoteAssets) = market.assetsReservedForOrder(order)
                 if (baseAssets > BigInteger.ZERO) {
                     baseAssetsRequired.merge(order.wallet, -baseAssets, ::sumBigIntegers)
                 }
@@ -249,7 +276,7 @@ class SequencerApp(
         }
 
         baseAssetsRequired.forEach { (wallet, required) ->
-            if (required + market.orderBook.baseAssetsRequired(wallet) > (
+            if (required + market.baseAssetsRequired(wallet) > (
                     state.balances[wallet]?.get(market.id.baseAsset())
                         ?: BigInteger.ZERO
                     )
@@ -259,7 +286,7 @@ class SequencerApp(
         }
 
         quoteAssetsRequired.forEach { (wallet, required) ->
-            if (required + market.orderBook.quoteAssetsRequired(wallet) > (
+            if (required + market.quoteAssetsRequired(wallet) > (
                     state.balances[wallet]?.get(market.id.quoteAsset())
                         ?: BigInteger.ZERO
                     )
