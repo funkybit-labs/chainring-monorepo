@@ -27,6 +27,8 @@ jobs:
           make start_containers
       - name: Check with Gradle Wrapper
         run: ./gradlew check
+        env:
+          CI_RUN: 1
       - name: Test Report
         uses: dorny/test-reporter@v1.8.0
         if: success() || failure()

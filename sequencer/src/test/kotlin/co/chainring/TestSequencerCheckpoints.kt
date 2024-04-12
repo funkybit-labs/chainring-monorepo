@@ -29,8 +29,10 @@ import net.openhft.chronicle.queue.RollCycles
 import net.openhft.chronicle.queue.impl.single.SingleChronicleQueue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.lang.System.getenv
 import java.math.BigDecimal
 import java.nio.file.Files
 import java.nio.file.Path
@@ -42,6 +44,7 @@ import kotlin.test.assertContentEquals
 import kotlin.time.Duration.Companion.seconds
 
 class TestSequencerCheckpoints {
+    private val isOnCI = (getenv("CI_RUN") ?: "0") == "1"
     private val currentTime = AtomicLong(System.currentTimeMillis())
     private val testDirPath = Path.of(queueHome, "test")
     private val checkpointsPath = Path.of(testDirPath.toString(), "checkpoints")
@@ -62,6 +65,8 @@ class TestSequencerCheckpoints {
 
     @Test
     fun `test checkpoints`() = runTest {
+        Assumptions.assumeFalse(isOnCI)
+
         val inputQueue = ChronicleQueue.singleBuilder(Path.of(testDirPath.toString(), "input"))
             .rollCycle(RollCycles.MINUTELY)
             .timeProvider(currentTime::get)

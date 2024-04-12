@@ -41,6 +41,7 @@ jobs:
           EVM_NETWORK_URL: https://test-anvil.chainring.co
           INTEGRATION_RUN: 1
           API_URL: https://test-api.chainring.co
+          CI_RUN: 1
       - name: Test Report
         uses: dorny/test-reporter@v1.8.0
         if: success() || failure()
