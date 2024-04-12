@@ -656,7 +656,7 @@ class OrderRoutesApiTest {
                         marketId = MarketId("BTC/USDC"),
                         side = OrderSide.Sell,
                         amount = makerWallet.formatAmount(it, "BTC"),
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("68400.000"),
                         signature = EvmSignature.emptySignature(),
                     ).let {
                         makerWallet.signOrder(it)
@@ -681,7 +681,7 @@ class OrderRoutesApiTest {
                         marketId = MarketId("BTC/USDC"),
                         side = OrderSide.Sell,
                         amount = makerWallet.formatAmount(it, "BTC"),
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("68400.000"),
                         signature = EvmSignature.emptySignature(),
                     ).let {
                         makerWallet.signOrder(it)
@@ -691,12 +691,12 @@ class OrderRoutesApiTest {
                     UpdateOrderApiRequest.Limit(
                         orderId = createBatchLimitOrders.orders[0].id,
                         amount = makerWallet.formatAmount("0.0001", "BTC"),
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("68405.000"),
                     ),
                     UpdateOrderApiRequest.Limit(
                         orderId = createBatchLimitOrders.orders[1].id,
                         amount = makerWallet.formatAmount("0.0002", "BTC"),
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("68405.000"),
                     ),
                 ),
                 cancelOrders = listOf(
@@ -758,12 +758,15 @@ class OrderRoutesApiTest {
 
         assertEquals(5, trades.size)
         assertEquals(expectedAmounts, trades.map { it.amount }.toSet())
-        assertEquals(prices.size, 1)
-        assertEquals(0, BigDecimal("17.550").compareTo(prices.first()))
+        assertEquals(prices.size, 2)
 
         waitForSettlementToFinish(trades.map { it.id.value })
 
-        val notional = (prices.first() * BigDecimal("0.0018")).toFundamentalUnits(takerWallet.decimals("USDC"))
+        val notional = trades.map {
+            (it.price * it.amount.fromFundamentalUnits(makerWallet.decimals("BTC"))).toFundamentalUnits(takerWallet.decimals("USDC"))
+        }.reduce { acc, notionalForTrade -> acc + notionalForTrade }
+
+        // val notional = (prices.first() * BigDecimal("0.0018")).toFundamentalUnits(takerWallet.decimals("USDC"))
         BalanceHelper.verifyBalances(
             makerApiClient,
             listOf(

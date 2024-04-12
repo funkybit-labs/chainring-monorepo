@@ -394,7 +394,7 @@ data class Market(
             }
         }
         val availableQuantity = amount - remainingAmount
-        return Pair(totalPriceUnits / availableQuantity.toBigDecimal(), availableQuantity)
+        return Pair(if (availableQuantity == BigInteger.ZERO) BigDecimal.ZERO else totalPriceUnits / availableQuantity.toBigDecimal(), availableQuantity)
     }
 
     // returns baseAsset and quoteAsset reserved by order

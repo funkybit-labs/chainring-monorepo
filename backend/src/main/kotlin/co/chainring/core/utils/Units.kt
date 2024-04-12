@@ -4,13 +4,13 @@ import java.math.BigDecimal
 import java.math.BigInteger
 
 fun BigDecimal.toFundamentalUnits(decimals: Int): BigInteger {
-    return (this * BigDecimal("1e$decimals")).toBigInteger()
+    return this.movePointRight(decimals).toBigInteger()
 }
 
 fun BigDecimal.toFundamentalUnits(decimals: UByte): BigInteger {
-    return (this * BigDecimal("1e$decimals")).toBigInteger()
+    return this.toFundamentalUnits(decimals.toInt())
 }
 
 fun BigInteger.fromFundamentalUnits(decimals: Int): BigDecimal {
-    return (BigDecimal(this).setScale(decimals) / BigDecimal("1e$decimals"))
+    return BigDecimal(this).movePointLeft(decimals)
 }

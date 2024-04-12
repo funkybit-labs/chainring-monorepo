@@ -97,6 +97,7 @@ class OrderBookLevel(val levelIx: Int, val side: BookSide, val price: BigDecimal
     }
 
     fun addOrder(order: Order): Pair<OrderDisposition, LevelOrder?> {
+        println("$orderHead, $orderTail $maxOrderCount")
         val nextTail = (orderTail + 1) % maxOrderCount
         return if (nextTail == orderHead) {
             OrderDisposition.Rejected to null
@@ -154,15 +155,21 @@ class OrderBookLevel(val levelIx: Int, val side: BookSide, val price: BigDecimal
         val orderIx = orders.indexOf(levelOrder)
         totalQuantity -= levelOrder.quantity
         levelOrder.reset()
-        if (orderIx < orderHead) {
+        if (orderIx == (orderTail - 1) % maxOrderCount) {
+            orderTail = (orderTail - 1) % maxOrderCount
+        } else if (orderIx < orderHead) {
             // copy from after orderIx to orderTail, and decrement orderTail
             if (orderIx < orderTail) {
+                val orderIxRef = orders[orderIx]
                 System.arraycopy(orders, orderIx + 1, orders, orderIx, orderTail - orderIx)
+                orders[orderTail] = orderIxRef
             }
             orderTail = (orderTail - 1) % maxOrderCount
         } else {
             if (orderIx > orderHead) {
+                val orderIxRef = orders[orderIx]
                 System.arraycopy(orders, orderHead, orders, orderHead + 1, orderIx - orderHead)
+                orders[orderHead] = orderIxRef
             }
             orderHead = (orderHead + 1) % maxOrderCount
         }
