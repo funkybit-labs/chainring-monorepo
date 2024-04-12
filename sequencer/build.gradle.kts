@@ -138,5 +138,9 @@ jib {
         ) + chronicleJvmArgs
 
         creationTime.set("USE_CURRENT_TIMESTAMP")
+
+        volumes = listOf(
+            "/data/queues"
+        )
     }
 }

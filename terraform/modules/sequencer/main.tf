@@ -69,12 +69,7 @@ resource "aws_ecs_task_definition" "sequencer" {
       portMappings = local.port_mappings
       cpu          = 0
       volumesFrom  = []
-      environment  = [
-        {
-          name  = "QUEUE_HOME"
-          value = "/data/queues"
-        }
-      ]
+      environment  = []
       secrets          = []
       logConfiguration = {
         logDriver = "awslogs"

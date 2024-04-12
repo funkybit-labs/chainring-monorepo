@@ -104,6 +104,7 @@ module "baregate" {
   vpc               = module.vpc.vpc
   deployer_key_name = module.bastion.deployer_key_name
   ecs_cluster_name  = module.ecs.cluster.name
+  bastion_ip        = module.bastion.private_ip
 }
 
 module "sequencer" {

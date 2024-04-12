@@ -6,6 +6,8 @@ environment:
     SEQUENCER_HOST_NAME: test-sequencer.chainring.co
     SEQUENCER_PORT: "5337"
     ENABLE_TEST_ROUTES: "true"
+  sequencer:
+    QUEUE_HOME: "/data/queues/test"
 services:
   api:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
@@ -19,3 +21,4 @@ services:
   sequencer:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer
     count: 1
+    environment: sequencer
