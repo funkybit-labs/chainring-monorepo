@@ -25,9 +25,11 @@ import co.chainring.sequencer.proto.balanceChange
 import co.chainring.sequencer.proto.marketCreated
 import co.chainring.sequencer.proto.sequencerResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
+import net.openhft.chronicle.queue.ExcerptTailer
 import net.openhft.chronicle.queue.TailerDirection
 import net.openhft.chronicle.queue.TailerState
 import net.openhft.chronicle.queue.impl.RollingChronicleQueue
+import java.lang.Thread.UncaughtExceptionHandler
 import java.math.BigInteger
 import java.nio.file.Path
 import kotlin.concurrent.thread
@@ -301,20 +303,11 @@ class SequencerApp(
         logger.info { "Starting Sequencer App" }
 
         stop = false
-        sequencerThread = thread(start = true, name = "sequencer", isDaemon = false) {
+        sequencerThread = thread(start = false, name = "sequencer", isDaemon = false) {
             val inputTailer = inputQueue.createTailer("sequencer")
 
             if (checkpointsPath != null) {
-                val initialCycle = inputTailer.cycle()
-
-                // moveToCycle moves tailer to the start of the cycle
-                if (inputTailer.moveToCycle(initialCycle)) {
-                    // Restore from previous cycle's checkpoint unless we are in the first cycle
-                    if (initialCycle != inputQueue.firstCycle()) {
-                        val prevCycle = inputQueue.nextCycle(initialCycle, TailerDirection.BACKWARD)
-                        restoreFromCheckpoint(checkpointsPath, prevCycle)
-                    }
-                }
+                restoreFromLatestValidCheckpoint(inputTailer, checkpointsPath)
             }
 
             val lastSequenceNumberProcessedBeforeRestart = getLastSequenceNumberInOutputQueue()
@@ -347,6 +340,11 @@ class SequencerApp(
                 tailerPrevState = tailerState
             }
         }
+        sequencerThread.uncaughtExceptionHandler = UncaughtExceptionHandler { _, throwable ->
+            logger.error(throwable) { "Error in sequencer main thread" }
+            stop()
+        }
+        sequencerThread.start()
 
         logger.info { "Sequencer App started" }
     }
@@ -372,11 +370,34 @@ class SequencerApp(
         logger.debug { "Saved checkpoint" }
     }
 
-    private fun restoreFromCheckpoint(checkpointsPath: Path, atCycle: Int) {
-        val checkpointPath = Path.of(checkpointsPath.toString(), atCycle.toString())
-        logger.debug { "Restoring from checkpoint $checkpointPath" }
-        state.load(checkpointPath)
-        logger.debug { "Restored from checkpoint" }
+    private fun restoreFromLatestValidCheckpoint(inputTailer: ExcerptTailer, checkpointsPath: Path) {
+        var currentCycle = inputTailer.cycle()
+
+        while (true) {
+            // moveToCycle moves tailer to the start of the cycle
+            if (inputTailer.moveToCycle(currentCycle)) {
+                // restore from previous cycle's checkpoint unless we are in the first cycle
+                if (currentCycle == inputQueue.firstCycle()) {
+                    break
+                } else {
+                    val prevCycle = inputQueue.nextCycle(currentCycle, TailerDirection.BACKWARD)
+                    try {
+                        val checkpointPath = Path.of(checkpointsPath.toString(), prevCycle.toString())
+                        logger.debug { "Restoring from checkpoint $checkpointPath" }
+                        state.load(checkpointPath)
+                        logger.debug { "Restored from checkpoint" }
+                        break
+                    } catch (e: Throwable) {
+                        // go back one cycle and try again
+                        logger.warn(e) { "Failed to recover from checkpoint $prevCycle" }
+                        state.clear()
+                        currentCycle = prevCycle
+                    }
+                }
+            } else {
+                break
+            }
+        }
     }
 
     override fun stop() {
