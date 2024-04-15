@@ -10,6 +10,7 @@ import co.chainring.core.services.ExchangeService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import org.http4k.contract.ContractRoute
+import org.http4k.contract.Tag
 import org.http4k.contract.meta
 import org.http4k.core.Body
 import org.http4k.core.Method
@@ -32,6 +33,11 @@ class TestRoutes(private val exchangeService: ExchangeService) {
             operationId = "sequencer-deposits"
             summary = "Sequencer Deposit"
             security = signedTokenSecurity
+            tags += listOf(Tag("test"))
+            receiving(requestBody to CreateSequencerDeposit(
+                "BTC",
+                "12345".toBigInteger()
+            ))
             returning(
                 Status.CREATED,
                 responseBody to CreateSequencerDeposit("USDC", BigInteger("1234")),

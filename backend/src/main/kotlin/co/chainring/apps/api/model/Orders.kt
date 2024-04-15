@@ -14,6 +14,7 @@ import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import kotlinx.datetime.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialInfo
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator

@@ -11,6 +11,7 @@ import co.chainring.core.model.db.BalanceType
 import co.chainring.core.model.db.WalletEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.ContractRoute
+import org.http4k.contract.Tag
 import org.http4k.contract.meta
 import org.http4k.core.Body
 import org.http4k.core.Method
@@ -31,6 +32,7 @@ class BalanceRoutes(private val blockchainClient: BlockchainClient) {
             operationId = "get-balances"
             summary = "Get balances"
             security = signedTokenSecurity
+            tags += listOf(Tag("balances"))
             returning(
                 Status.OK,
                 responseBody to BalancesApiResponse(

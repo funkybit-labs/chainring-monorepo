@@ -3,6 +3,7 @@ package co.chainring.apps.api
 import co.chainring.apps.api.middleware.signedTokenSecurity
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.ReasonCode
+import co.chainring.apps.api.model.WithdrawTx
 import co.chainring.apps.api.model.Withdrawal
 import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.apps.api.model.badRequestError
@@ -12,11 +13,13 @@ import co.chainring.core.blockchain.ContractType
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
+import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.services.ExchangeService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.ContractRoute
+import org.http4k.contract.Tag
 import org.http4k.contract.div
 import org.http4k.contract.meta
 import org.http4k.core.Body
@@ -42,6 +45,11 @@ class WithdrawalRoutes(private val exchangeService: ExchangeService) {
             operationId = "withdraw"
             summary = "Withdraw"
             security = signedTokenSecurity
+            tags += listOf(Tag("withdrawal"))
+            receiving(requestBody to CreateWithdrawalApiRequest(
+                Examples.withdrawal.tx,
+                EvmSignature.emptySignature(),
+            ))
             returning(
                 Status.CREATED,
                 responseBody to WithdrawalApiResponse(
@@ -79,6 +87,7 @@ class WithdrawalRoutes(private val exchangeService: ExchangeService) {
             operationId = "get-withdrawal"
             summary = "Get withdrawal"
             security = signedTokenSecurity
+            tags += listOf(Tag("withdrawal"))
             returning(
                 Status.OK,
                 responseBody to WithdrawalApiResponse(
