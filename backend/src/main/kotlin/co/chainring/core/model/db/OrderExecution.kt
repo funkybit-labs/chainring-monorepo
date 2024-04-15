@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.JoinType
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import java.math.BigInteger
@@ -56,6 +57,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             price = this.trade.price,
             feeAmount = this.feeAmount,
             feeSymbol = this.feeSymbol,
+            settlementStatus = this.trade.settlementStatus,
         )
     }
 
@@ -96,7 +98,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             }.toList()
         }
 
-        fun listExecutions(wallet: WalletEntity, beforeTimestamp: Instant, limit: Int): List<OrderExecutionEntity> {
+        fun listForWallet(wallet: WalletEntity, beforeTimestamp: Instant, limit: Int): List<OrderExecutionEntity> {
             return OrderExecutionTable
                 .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
                 .join(TradeTable, JoinType.INNER, TradeTable.guid, OrderExecutionTable.tradeGuid)
@@ -104,6 +106,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
                 .where {
                     OrderTable.walletGuid.eq(wallet.guid) and OrderExecutionTable.timestamp.less(beforeTimestamp)
                 }
+                .orderBy(Pair(OrderExecutionTable.timestamp, SortOrder.DESC))
                 .limit(limit)
                 .map {
                     OrderExecutionEntity.wrapRow(it)

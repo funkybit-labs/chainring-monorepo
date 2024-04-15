@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { Trade } from 'apiClient'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import Markets from 'markets'
+import { produce } from 'immer'
 
 export default function TradeHistory({ markets }: { markets: Markets }) {
   const [trades, setTrades] = useState<Trade[]>(() => [])
@@ -14,16 +15,24 @@ export default function TradeHistory({ markets }: { markets: Markets }) {
     topic: tradesTopic,
     handler: (message: Publishable) => {
       if (message.type === 'Trades') {
-        const incomingTrades = message.trades
-        setTrades((currentTrades) => {
-          const newTrades = incomingTrades.filter(
-            (incomingTrade) =>
-              !currentTrades.some(
-                (currentTrade) => currentTrade.id === incomingTrade.id
-              )
-          )
-          return newTrades.concat(currentTrades)
-        })
+        setTrades(message.trades)
+      } else if (message.type === 'TradeCreated') {
+        setTrades(
+          produce((draft) => {
+            draft.unshift(message.trade)
+          })
+        )
+      } else if (message.type === 'TradeUpdated') {
+        setTrades(
+          produce((draft) => {
+            const updatedTrade = message.trade
+            const index = draft.findIndex(
+              (trade) =>
+                trade.id === updatedTrade.id && trade.side === updatedTrade.side
+            )
+            if (index !== -1) draft[index] = updatedTrade
+          })
+        )
       }
     }
   })
@@ -43,8 +52,10 @@ export default function TradeHistory({ markets }: { markets: Markets }) {
                   <th className="min-w-20 pl-4">Market</th>
                   <th className="min-w-20 pl-4">Price</th>
                   <th className="min-w-20 pl-4">Fee</th>
+                  <th className="min-w-20 pl-4">Settlement</th>
                 </tr>
                 <tr key="header-divider">
+                  <th className="h-px bg-lightBackground p-0"></th>
                   <th className="h-px bg-lightBackground p-0"></th>
                   <th className="h-px bg-lightBackground p-0"></th>
                   <th className="h-px bg-lightBackground p-0"></th>
@@ -59,7 +70,7 @@ export default function TradeHistory({ markets }: { markets: Markets }) {
 
                   return (
                     <tr
-                      key={trade.id}
+                      key={`${trade.id}-${trade.side}`}
                       className="duration-200 ease-in-out hover:cursor-default hover:bg-mutedGray"
                     >
                       <td>{format(trade.timestamp, 'MM/dd HH:mm:ss')}</td>
@@ -72,6 +83,7 @@ export default function TradeHistory({ markets }: { markets: Markets }) {
                       <td className="pl-4">
                         {formatUnits(trade.feeAmount, 18)}
                       </td>
+                      <td className="pl-4">{trade.settlementStatus}</td>
                     </tr>
                   )
                 })}

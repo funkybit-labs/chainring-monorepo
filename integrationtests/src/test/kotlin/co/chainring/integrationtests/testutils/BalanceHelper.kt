@@ -36,8 +36,8 @@ object BalanceHelper {
         val actualBalances = apiClient.getBalances().balances
         expectedBalances.forEach { expected ->
             val actual = actualBalances.first { it.symbol.value == expected.symbol }
-            assertEquals(expected.available, actual.available)
-            assertEquals(expected.total, actual.total)
+            assertEquals(expected.available, actual.available, "${expected.symbol} available balance does not match")
+            assertEquals(expected.total, actual.total, "${expected.symbol} total balance does not match")
         }
     }
 
