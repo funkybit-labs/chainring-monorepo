@@ -96,7 +96,7 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
                 Request.Builder()
                     .url("$apiServerRootUrl/v1/openapi.json")
                     .get()
-                    .build()
+                    .build(),
             )
             return if (httpResponse.code == HttpURLConnection.HTTP_OK) {
                 httpResponse.body?.string()!!

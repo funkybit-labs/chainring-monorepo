@@ -250,18 +250,20 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             summary = "Manage orders in batch"
             security = signedTokenSecurity
             tags += listOf(Tag("orders"))
-            receiving(requestBody to BatchOrdersApiRequest(
-                MarketId("BTC/ETH"),
-                listOf(
-                    Examples.createLimitOrderRequest
+            receiving(
+                requestBody to BatchOrdersApiRequest(
+                    MarketId("BTC/ETH"),
+                    listOf(
+                        Examples.createLimitOrderRequest,
+                    ),
+                    listOf(
+                        Examples.updateLimitOrderRequest,
+                    ),
+                    listOf(
+                        CancelUpdateOrderApiRequest(OrderId("123")),
+                    ),
                 ),
-                listOf(
-                    Examples.updateLimitOrderRequest
-                ),
-                listOf(
-                    CancelUpdateOrderApiRequest(OrderId("123"))
-                )
-            ))
+            )
             returning(Status.OK, responseBody to OrdersApiResponse(listOf(Examples.limitOrderResponse)))
         } bindContract Method.POST to { request ->
             val apiRequest: BatchOrdersApiRequest = requestBody(request)
@@ -286,20 +288,25 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             tags += listOf(Tag("trades"))
             queries += Query.string().optional("before-timestamp", "Return trades executed before provided timestamp")
             queries += Query.string().optional("limit", "Number of trades to return")
-            returning(Status.OK, responseBody to TradesApiResponse(
-                listOf(Trade(
-                    TradeId("trade_1234"),
-                    Clock.System.now(),
-                    OrderId("1234"),
-                    MarketId("BTC/ETH"),
-                    OrderSide.Buy,
-                    12345.toBigInteger(),
-                    17.61.toBigDecimal(),
-                    500.toBigInteger(),
-                    Symbol("ETH"),
-                    SettlementStatus.Pending
-                ))
-            ))
+            returning(
+                Status.OK,
+                responseBody to TradesApiResponse(
+                    listOf(
+                        Trade(
+                            TradeId("trade_1234"),
+                            Clock.System.now(),
+                            OrderId("1234"),
+                            MarketId("BTC/ETH"),
+                            OrderSide.Buy,
+                            12345.toBigInteger(),
+                            17.61.toBigDecimal(),
+                            500.toBigInteger(),
+                            Symbol("ETH"),
+                            SettlementStatus.Pending,
+                        ),
+                    ),
+                ),
+            )
         } bindContract Method.GET to { request ->
             val timestamp = request.query("before-timestamp")?.toInstant() ?: Instant.DISTANT_FUTURE
             val limit = request.query("limit")?.toInt() ?: 100

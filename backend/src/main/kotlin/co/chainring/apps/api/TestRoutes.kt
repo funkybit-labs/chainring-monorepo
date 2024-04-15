@@ -34,10 +34,12 @@ class TestRoutes(private val exchangeService: ExchangeService) {
             summary = "Sequencer Deposit"
             security = signedTokenSecurity
             tags += listOf(Tag("test"))
-            receiving(requestBody to CreateSequencerDeposit(
-                "BTC",
-                "12345".toBigInteger()
-            ))
+            receiving(
+                requestBody to CreateSequencerDeposit(
+                    "BTC",
+                    "12345".toBigInteger(),
+                ),
+            )
             returning(
                 Status.CREATED,
                 responseBody to CreateSequencerDeposit("USDC", BigInteger("1234")),

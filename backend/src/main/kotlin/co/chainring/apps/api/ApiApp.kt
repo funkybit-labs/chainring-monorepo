@@ -94,7 +94,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                         renderer = OpenApi3(
                             ApiInfo("ChainRing API", "0.1.0"),
                             Argo,
-                            servers = listOf(ApiServer(Uri.of("https://api.chainring.finance")))
+                            servers = listOf(ApiServer(Uri.of("https://api.chainring.finance"))),
                         )
                         descriptionPath = "/openapi.json"
                         routes +=

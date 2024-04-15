@@ -46,10 +46,12 @@ class WithdrawalRoutes(private val exchangeService: ExchangeService) {
             summary = "Withdraw"
             security = signedTokenSecurity
             tags += listOf(Tag("withdrawal"))
-            receiving(requestBody to CreateWithdrawalApiRequest(
-                Examples.withdrawal.tx,
-                EvmSignature.emptySignature(),
-            ))
+            receiving(
+                requestBody to CreateWithdrawalApiRequest(
+                    Examples.withdrawal.tx,
+                    EvmSignature.emptySignature(),
+                ),
+            )
             returning(
                 Status.CREATED,
                 responseBody to WithdrawalApiResponse(
