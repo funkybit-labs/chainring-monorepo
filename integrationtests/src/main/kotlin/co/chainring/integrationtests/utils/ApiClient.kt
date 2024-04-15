@@ -1,4 +1,4 @@
-package co.chainring.integrationtests.testutils
+package co.chainring.integrationtests.utils
 
 import arrow.core.Either
 import arrow.core.raise.either
@@ -36,13 +36,13 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.fail
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
 import java.net.HttpURLConnection
 import java.util.Base64
-import kotlin.test.assertNotNull
-import kotlin.test.fail
 
 val apiServerRootUrl = System.getenv("API_URL") ?: "http://localhost:9999"
 val httpClient = OkHttpClient.Builder().build()
@@ -332,7 +332,7 @@ inline fun <reified T> Response.toErrorOrPayload(expectedStatusCode: Int): Eithe
 
             assertNotNull(apiError, "API call failed with code: $code, body: $bodyString")
 
-            ApiCallFailure(code, apiError)
+            ApiCallFailure(code, apiError!!)
         }
 
         json.decodeFromString<T>(bodyString!!)
@@ -354,7 +354,7 @@ fun Response.toErrorOrUnit(expectedStatusCode: Int): Either<ApiCallFailure, Unit
 
             assertNotNull(apiError, "API call failed with code: $code, body: $bodyString")
 
-            ApiCallFailure(code, apiError)
+            ApiCallFailure(code, apiError!!)
         }
     }
 }
@@ -372,7 +372,7 @@ fun <T> Either<ApiCallFailure, T>.assertSuccess(): T {
 
 fun Either<ApiCallFailure, Any>.assertError(expectedHttpCode: Int, expectedError: ApiError) {
     if (this.isRight()) {
-        fail("Unexpected API error, but got a success response")
+        fail("Expected API error, but got a success response")
     }
     val failure = this.leftOrNull()!!
     assertEquals(expectedHttpCode, failure.httpCode)
@@ -381,7 +381,7 @@ fun Either<ApiCallFailure, Any>.assertError(expectedHttpCode: Int, expectedError
 
 fun Either<ApiCallFailure, Any>.assertError(expectedError: ApiError) {
     if (this.isRight()) {
-        fail("Unexpected API error, but got a success response")
+        fail("Expected API error, but got a success response")
     }
     val failure = this.leftOrNull()!!
     assertEquals(expectedError, failure.error)

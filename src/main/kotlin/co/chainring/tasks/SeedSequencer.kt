@@ -19,7 +19,7 @@ fun seedSequencer(fixtures: Fixtures, sequencerClient: SequencerClient) {
             )
 
             if (response.hasError()) {
-                throw RuntimeException("Failed to create market in sequencer")
+                throw RuntimeException("Failed to create market in sequencer: ${response.error}")
             }
         }
     }

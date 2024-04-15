@@ -1,4 +1,4 @@
-package co.chainring.testutils
+package co.chainring.core
 
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -7,5 +7,6 @@ fun BigDecimal.toFundamentalUnits(decimals: Int): BigInteger {
     return this.movePointRight(decimals).toBigInteger()
 }
 
-fun BigDecimal.inWei() = toFundamentalUnits(18)
-fun BigDecimal.inSats() = toFundamentalUnits(8)
+fun Int.toFundamentalUnits(decimals: Int): BigInteger {
+    return this.toBigInteger().toBigDecimal().toFundamentalUnits(decimals)
+}

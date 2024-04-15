@@ -372,7 +372,9 @@ export function PricesWidget({ marketId }: { marketId: string }) {
               <text x={params.chartEndX + 12} y={y + 5} fill={'white'}>
                 {
                   // dynamically adjust the number of decimals based on the grid spacing
-                  t.toFixed(-Math.floor(Math.log10(params.gridSpacing)))
+                  t.toFixed(
+                    Math.max(0, -Math.floor(Math.log10(params.gridSpacing)))
+                  )
                 }
               </text>
             </Fragment>
