@@ -9,10 +9,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.math.BigInteger
-import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
-import kotlin.io.path.name
 import kotlin.system.measureNanoTime
 
 typealias BalanceByAsset = MutableMap<Asset, BigInteger>
@@ -25,11 +23,13 @@ data class SequencerState(
 ) {
     private val logger = KotlinLogging.logger {}
 
-    fun load(sourceDir: Path) {
+    fun clear() {
         balances.clear()
         markets.clear()
         consumed.clear()
+    }
 
+    fun load(sourceDir: Path) {
         measureNanoTime {
             FileInputStream(Path.of(sourceDir.toString(), "balances").toFile()).use { inputStream ->
                 val balancesCheckpoint = BalancesCheckpoint.parseFrom(inputStream)
@@ -51,15 +51,24 @@ data class SequencerState(
         }
 
         measureNanoTime {
-            Files.list(sourceDir)
-                .filter { it.name.startsWith("market_") }
-                .forEach { marketCheckpointPath ->
-                    FileInputStream(marketCheckpointPath.toFile()).use { inputStream ->
-                        val marketCheckpoint = MarketCheckpoint.parseFrom(inputStream)
-                        val market = Market.fromCheckpoint(marketCheckpoint)
-                        markets[market.id] = market
+            val marketIds = FileInputStream(Path.of(sourceDir.toString(), "markets").toFile()).use { inputStream ->
+                String(inputStream.readAllBytes()).let {
+                    if (it.isEmpty()) {
+                        emptyList()
+                    } else {
+                        it.split(",").map(::MarketId)
                     }
                 }
+            }
+
+            marketIds.forEach { marketId ->
+                val marketCheckpointFileName = "market_${marketId.baseAsset()}_${marketId.quoteAsset()}"
+                FileInputStream(Path.of(sourceDir.toString(), marketCheckpointFileName).toFile()).use { inputStream ->
+                    val marketCheckpoint = MarketCheckpoint.parseFrom(inputStream)
+                    val market = Market.fromCheckpoint(marketCheckpoint)
+                    markets[market.id] = market
+                }
+            }
         }.let {
             logger.debug { "load of ${markets.size} markets took ${it / 1000}us" }
         }
@@ -67,6 +76,13 @@ data class SequencerState(
 
     fun persist(destinationDir: Path) {
         destinationDir.createDirectories()
+
+        // we are writing a list of markets into a separate file first so that
+        // when loading we could be sure that checkpoint files for all markets are present
+        FileOutputStream(Path.of(destinationDir.toString(), "markets").toFile()).use { outputStream ->
+            val marketIds = this.markets.keys.map { it.value }.sorted().joinToString(",")
+            outputStream.write(marketIds.toByteArray())
+        }
 
         measureNanoTime {
             FileOutputStream(Path.of(destinationDir.toString(), "balances").toFile()).use { outputStream ->

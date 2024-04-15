@@ -97,7 +97,6 @@ class OrderBookLevel(val levelIx: Int, val side: BookSide, val price: BigDecimal
     }
 
     fun addOrder(order: Order): Pair<OrderDisposition, LevelOrder?> {
-        println("$orderHead, $orderTail $maxOrderCount")
         val nextTail = (orderTail + 1) % maxOrderCount
         return if (nextTail == orderHead) {
             OrderDisposition.Rejected to null

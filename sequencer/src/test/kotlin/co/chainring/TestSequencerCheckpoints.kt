@@ -39,6 +39,7 @@ import java.nio.file.Path
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.io.path.createDirectories
+import kotlin.io.path.name
 import kotlin.random.Random
 import kotlin.test.assertContentEquals
 import kotlin.time.Duration.Companion.seconds
@@ -83,7 +84,7 @@ class TestSequencerCheckpoints {
             .build()
 
         assertQueueFilesCount(inputQueue, 0)
-        assertCheckpointFilesCount(checkpointsPath, 0)
+        assertCheckpointsCount(checkpointsPath, 0)
 
         val gatewayApp = GatewayApp(GatewayConfig(port = 5339), inputQueue, outputQueue, sequencedQueue)
         val sequencerApp = SequencerApp(inputQueue, outputQueue, checkpointsPath)
@@ -242,8 +243,58 @@ class TestSequencerCheckpoints {
             }
 
             assertQueueFilesCount(inputQueue, 2)
-            assertCheckpointFilesCount(checkpointsPath, 1)
+            assertCheckpointsCount(checkpointsPath, 1)
             assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 6)
+
+            currentTime.addAndGet(60.seconds.inWholeMilliseconds)
+
+            assertTrue(
+                gateway.applyOrderBatch(
+                    orderBatch {
+                        this.guid = UUID.randomUUID().toString()
+                        this.marketId = btcEthMarketId.value
+                        this.ordersToAdd.add(
+                            order {
+                                this.guid = Random.nextLong()
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = BigDecimal("17.550").toDecimalValue()
+                                this.wallet = wallet1.value
+                                this.type = Order.Type.LimitSell
+                            },
+                        )
+                    },
+                ).success,
+            )
+
+            assertCheckpointsCount(checkpointsPath, 2)
+
+            sequencerApp.stop()
+            corruptLatestCheckpoint()
+            sequencerApp.start()
+
+            currentTime.addAndGet(1.seconds.inWholeMilliseconds)
+
+            gateway.applyOrderBatch(
+                orderBatch {
+                    this.guid = UUID.randomUUID().toString()
+                    this.marketId = btcEthMarketId.value
+                    this.ordersToAdd.add(
+                        order {
+                            this.guid = Random.nextLong()
+                            this.amount = BigDecimal("0.0011").inSats().toIntegerValue()
+                            this.price = BigDecimal.ZERO.toDecimalValue()
+                            this.wallet = wallet2.value
+                            this.type = Order.Type.MarketBuy
+                        },
+                    )
+                },
+            ).also {
+                assertTrue(it.success)
+                assertEquals(3, it.sequencerResponse.ordersChangedCount)
+            }
+
+            assertCheckpointsCount(checkpointsPath, 2)
+            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 8)
         } finally {
             gatewayApp.stop()
             sequencerApp.stop()
@@ -261,7 +312,7 @@ class TestSequencerCheckpoints {
         }
     }
 
-    private fun assertCheckpointFilesCount(path: Path, expectedCount: Long) {
+    private fun assertCheckpointsCount(path: Path, expectedCount: Long) {
         Files.list(path).use { list ->
             assertEquals(expectedCount, list.count())
         }
@@ -295,6 +346,26 @@ class TestSequencerCheckpoints {
 
         assertEquals(expectedMessagesCount, processedRequestGuids.size)
     }
+
+    private fun corruptLatestCheckpoint() {
+        // delete checkpoint for one of the markets
+        Files
+            .list(latestCheckpointPath())
+            .filter { it.fileName.toString().startsWith("market_") }
+            .toList()
+            .first()
+            .toFile()
+            .delete()
+    }
+
+    private fun latestCheckpointPath(): Path =
+        Files.list(checkpointsPath).toList()
+            .map { it.fileName.name.toLong() }
+            .maxOf { it }
+            .toString()
+            .let {
+                Path.of(checkpointsPath.toString(), it)
+            }
 
     @Test
     fun `test state storing and loading - empty`() {
