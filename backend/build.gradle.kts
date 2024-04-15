@@ -52,6 +52,7 @@ dependencies {
     implementation("org.http4k:http4k-realtime-core:$http4kVersion")
     implementation("org.http4k:http4k-contract:$http4kVersion")
     implementation("org.http4k:http4k-format-kotlinx-serialization:$http4kVersion")
+    implementation("org.http4k:http4k-format-argo:$http4kVersion")
     implementation("org.http4k:http4k-server-netty:$http4kVersion")
     implementation("org.http4k:http4k-client-okhttp:$http4kVersion")
 

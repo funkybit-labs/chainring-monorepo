@@ -82,7 +82,16 @@ object Examples {
         amount = BigInteger("100"),
         price = BigDecimal("100"),
         originalAmount = BigInteger("100"),
-        executions = emptyList(),
+        executions = listOf(
+            Order.Execution(
+                timestamp = Clock.System.now(),
+                amount = BigInteger("50"),
+                price = BigDecimal("500"),
+                role = ExecutionRole.Maker,
+                feeAmount = BigInteger("0"),
+                feeSymbol = Symbol("ETH"),
+            ),
+        ),
         timing = Order.Timing(
             createdAt = Clock.System.now(),
             updatedAt = null,

@@ -91,6 +91,20 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
             return "${Base64.getUrlEncoder().encodeToString(body.toByteArray())}.${signature.value}"
         }
 
+        fun getOpenApiDocumentation(): String {
+            val httpResponse = execute(
+                Request.Builder()
+                    .url("$apiServerRootUrl/v1/openapi.json")
+                    .get()
+                    .build(),
+            )
+            return if (httpResponse.code == HttpURLConnection.HTTP_OK) {
+                httpResponse.body?.string()!!
+            } else {
+                throw AbnormalApiResponseException(httpResponse)
+            }
+        }
+
         private fun execute(request: Request): Response =
             httpClient.newCall(request).execute()
     }

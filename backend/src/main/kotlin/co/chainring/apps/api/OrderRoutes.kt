@@ -3,23 +3,32 @@ package co.chainring.apps.api
 import co.chainring.apps.api.middleware.principal
 import co.chainring.apps.api.middleware.signedTokenSecurity
 import co.chainring.apps.api.model.BatchOrdersApiRequest
+import co.chainring.apps.api.model.CancelUpdateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
+import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.TradesApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.orderIsClosedError
 import co.chainring.apps.api.model.orderNotFoundError
+import co.chainring.core.model.Symbol
+import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
+import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
+import co.chainring.core.model.db.SettlementStatus
+import co.chainring.core.model.db.TradeId
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.services.ExchangeService
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toInstant
 import org.http4k.contract.ContractRoute
+import org.http4k.contract.Tag
 import org.http4k.contract.div
 import org.http4k.contract.meta
 import org.http4k.core.Body
@@ -47,6 +56,7 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             operationId = "create-order"
             summary = "Create order"
             security = signedTokenSecurity
+            tags += listOf(Tag("orders"))
             receiving(
                 requestBody to Examples.createMarketOrderRequest,
             )
@@ -92,6 +102,7 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             operationId = "update-order"
             summary = "Update order"
             security = signedTokenSecurity
+            tags += listOf(Tag("orders"))
             receiving(
                 requestBody to Examples.updateMarketOrderRequest,
             )
@@ -132,6 +143,7 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             operationId = "cancel-order"
             summary = "Cancel order"
             security = signedTokenSecurity
+            tags += listOf(Tag("orders"))
             returning(
                 Status.NO_CONTENT,
             )
@@ -163,6 +175,7 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             operationId = "get-order"
             summary = "Get order"
             security = signedTokenSecurity
+            tags += listOf(Tag("orders"))
             returning(
                 Status.OK,
                 responseBody to Examples.marketOrderResponse,
@@ -192,6 +205,7 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             operationId = "list-orders"
             summary = "List orders"
             security = signedTokenSecurity
+            tags += listOf(Tag("orders"))
             returning(
                 Status.OK,
                 responseBody to OrdersApiResponse(
@@ -215,6 +229,8 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             operationId = "cancel-open-orders"
             summary = "Cancel open orders"
             security = signedTokenSecurity
+            tags += listOf(Tag("orders"))
+            returning(Status.NO_CONTENT)
         } bindContract Method.DELETE to { request ->
             ApiUtils.runCatchingValidation {
                 exchangeService.cancelOpenOrders(
@@ -233,6 +249,22 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             operationId = "batch-orders"
             summary = "Manage orders in batch"
             security = signedTokenSecurity
+            tags += listOf(Tag("orders"))
+            receiving(
+                requestBody to BatchOrdersApiRequest(
+                    MarketId("BTC/ETH"),
+                    listOf(
+                        Examples.createLimitOrderRequest,
+                    ),
+                    listOf(
+                        Examples.updateLimitOrderRequest,
+                    ),
+                    listOf(
+                        CancelUpdateOrderApiRequest(OrderId("123")),
+                    ),
+                ),
+            )
+            returning(Status.OK, responseBody to OrdersApiResponse(listOf(Examples.limitOrderResponse)))
         } bindContract Method.POST to { request ->
             val apiRequest: BatchOrdersApiRequest = requestBody(request)
 
@@ -253,8 +285,28 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             operationId = "list-trades"
             summary = "List trades"
             security = signedTokenSecurity
+            tags += listOf(Tag("trades"))
             queries += Query.string().optional("before-timestamp", "Return trades executed before provided timestamp")
             queries += Query.string().optional("limit", "Number of trades to return")
+            returning(
+                Status.OK,
+                responseBody to TradesApiResponse(
+                    listOf(
+                        Trade(
+                            TradeId("trade_1234"),
+                            Clock.System.now(),
+                            OrderId("1234"),
+                            MarketId("BTC/ETH"),
+                            OrderSide.Buy,
+                            12345.toBigInteger(),
+                            17.61.toBigDecimal(),
+                            500.toBigInteger(),
+                            Symbol("ETH"),
+                            SettlementStatus.Pending,
+                        ),
+                    ),
+                ),
+            )
         } bindContract Method.GET to { request ->
             val timestamp = request.query("before-timestamp")?.toInstant() ?: Instant.DISTANT_FUTURE
             val limit = request.query("limit")?.toInt() ?: 100

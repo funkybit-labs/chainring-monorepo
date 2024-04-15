@@ -11,16 +11,21 @@ import co.chainring.core.services.ExchangeService
 import co.chainring.core.websocket.Broadcaster
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.contract
+import org.http4k.contract.openapi.ApiInfo
+import org.http4k.contract.openapi.v3.ApiServer
+import org.http4k.contract.openapi.v3.OpenApi3
 import org.http4k.core.Method
 import org.http4k.core.RequestContexts
 import org.http4k.core.Response
 import org.http4k.core.Status
+import org.http4k.core.Uri
 import org.http4k.core.then
 import org.http4k.filter.AllowAll
 import org.http4k.filter.CorsPolicy
 import org.http4k.filter.OriginPolicy
 import org.http4k.filter.ServerFilters
 import org.http4k.filter.ZipkinTraces
+import org.http4k.format.Argo
 import org.http4k.routing.bind
 import org.http4k.routing.routes
 import org.http4k.routing.websockets
@@ -86,6 +91,12 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                 "/health" bind Method.GET to { Response(Status.OK) },
                 "/v1" bind
                     contract {
+                        renderer = OpenApi3(
+                            ApiInfo("ChainRing API", "0.1.0"),
+                            Argo,
+                            servers = listOf(ApiServer(Uri.of("https://api.chainring.finance"))),
+                        )
+                        descriptionPath = "/openapi.json"
                         routes +=
                             listOfNotNull(
                                 ConfigRoutes.getConfiguration(),

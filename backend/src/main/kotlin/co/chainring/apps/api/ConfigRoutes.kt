@@ -13,6 +13,7 @@ import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.SymbolEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.ContractRoute
+import org.http4k.contract.Tag
 import org.http4k.contract.meta
 import org.http4k.core.Body
 import org.http4k.core.Method
@@ -32,6 +33,7 @@ object ConfigRoutes {
         return "config" meta {
             operationId = "config"
             summary = "Get configuration"
+            tags += listOf(Tag("configuration"))
             returning(
                 Status.OK,
                 responseBody to
