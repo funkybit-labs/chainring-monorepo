@@ -10,6 +10,7 @@ import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.proto.GatewayGrpcKt
+import co.chainring.sequencer.proto.GetStateRequest
 import co.chainring.sequencer.proto.ResetRequest
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.balanceBatch
@@ -164,6 +165,10 @@ open class SequencerClient {
 
     suspend fun reset(): SequencerResponse {
         return stub.reset(ResetRequest.getDefaultInstance()).sequencerResponse
+    }
+
+    suspend fun getState(): SequencerResponse {
+        return stub.getState(GetStateRequest.getDefaultInstance()).sequencerResponse
     }
 
     private fun toOrderDSL(order: Order) = order {

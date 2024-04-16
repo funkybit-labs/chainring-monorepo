@@ -21,9 +21,7 @@ message BalancesCheckpoint {
       IntegerValue consumed = 2;
     }
   }
-
 }
-
 
 message MarketCheckpoint {
   string id = 1;

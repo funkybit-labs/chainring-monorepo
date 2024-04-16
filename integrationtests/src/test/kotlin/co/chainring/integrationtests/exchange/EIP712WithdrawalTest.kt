@@ -6,19 +6,18 @@ import co.chainring.apps.api.model.ReasonCode
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
-import co.chainring.integrationtests.testutils.AbnormalApiResponseException
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.BalanceHelper
 import co.chainring.integrationtests.testutils.ExpectedBalance
 import co.chainring.integrationtests.testutils.Faucet
 import co.chainring.integrationtests.testutils.Wallet
-import co.chainring.integrationtests.testutils.apiError
+import co.chainring.integrationtests.testutils.assertError
+import co.chainring.integrationtests.testutils.assertSuccess
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.awaitility.kotlin.await
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.utils.Numeric
@@ -51,7 +50,7 @@ class EIP712WithdrawalTest {
         val withdrawalAmount = wallet.formatAmount("15", "USDC")
         BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("USDC", depositAmount - withdrawalAmount, depositAmount - withdrawalAmount))) {
             val withdrawalApiRequest = wallet.signWithdraw("USDC", withdrawalAmount)
-            val response = apiClient.createWithdrawal(withdrawalApiRequest)
+            val response = apiClient.createWithdrawal(withdrawalApiRequest).assertSuccess()
             assertEquals(WithdrawalStatus.Pending, response.withdrawal.status)
             waitForFinalizedWithdrawal(response.withdrawal.id)
             assertEquals(WithdrawalStatus.Complete, apiClient.getWithdrawal(response.withdrawal.id).withdrawal.status)
@@ -83,7 +82,7 @@ class EIP712WithdrawalTest {
         val withdrawalAmount = wallet.formatAmount("0.001", "BTC")
         BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("BTC", depositAmount * BigInteger.TWO - withdrawalAmount, depositAmount * BigInteger.TWO - withdrawalAmount))) {
             val withdrawalApiRequest = wallet.signWithdraw(null, withdrawalAmount)
-            val response = apiClient.createWithdrawal(withdrawalApiRequest)
+            val response = apiClient.createWithdrawal(withdrawalApiRequest).assertSuccess()
             assertEquals(WithdrawalStatus.Pending, response.withdrawal.status)
             waitForFinalizedWithdrawal(response.withdrawal.id)
             assertEquals(WithdrawalStatus.Complete, apiClient.getWithdrawal(response.withdrawal.id).withdrawal.status)
@@ -110,7 +109,7 @@ class EIP712WithdrawalTest {
         // TODO there is a mismatch between sequencer and contract here. Contract will fail if amount it too large,
         // but sequencer withdraws whatever is remaining - created CHAIN-85.
         var withdrawalApiRequest = wallet.signWithdraw("USDC", BigInteger("1001"))
-        var response = apiClient.createWithdrawal(withdrawalApiRequest)
+        var response = apiClient.createWithdrawal(withdrawalApiRequest).assertSuccess()
         assertEquals(WithdrawalStatus.Pending, response.withdrawal.status)
         waitForFinalizedWithdrawal(response.withdrawal.id)
         var withdrawal = apiClient.getWithdrawal(response.withdrawal.id).withdrawal
@@ -121,7 +120,7 @@ class EIP712WithdrawalTest {
         // invalid nonce
         val invalidNonce = wallet.getNonce().plus(BigInteger.ONE)
         withdrawalApiRequest = wallet.signWithdraw("USDC", BigInteger("5"), invalidNonce)
-        response = apiClient.createWithdrawal(withdrawalApiRequest)
+        response = apiClient.createWithdrawal(withdrawalApiRequest).assertSuccess()
         assertEquals(WithdrawalStatus.Pending, response.withdrawal.status)
         waitForFinalizedWithdrawal(response.withdrawal.id)
         withdrawal = apiClient.getWithdrawal(response.withdrawal.id).withdrawal
@@ -130,15 +129,12 @@ class EIP712WithdrawalTest {
 
         // invalid signature
         withdrawalApiRequest = wallet.signWithdraw("USDC", amount)
-        assertThrows<AbnormalApiResponseException> {
-            // change the amount from what was signed
-            apiClient.createWithdrawal(withdrawalApiRequest.copy(tx = withdrawalApiRequest.tx.copy(amount = BigInteger.TWO)))
-        }.also {
-            assertEquals(
-                ApiError(ReasonCode.SignatureNotValid, "Signature not verified"),
-                it.response.apiError(),
-            )
-        }
+        // change the amount from what was signed
+        apiClient.createWithdrawal(
+            withdrawalApiRequest.copy(tx = withdrawalApiRequest.tx.copy(amount = BigInteger.TWO)),
+        ).assertError(
+            ApiError(ReasonCode.SignatureNotValid, "Signature not verified"),
+        )
     }
 
     private fun deposit(apiClient: ApiClient, wallet: Wallet, asset: String, amount: BigInteger): TransactionReceipt {

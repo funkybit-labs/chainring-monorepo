@@ -3,6 +3,7 @@ package co.chainring.sequencer.apps
 import co.chainring.sequencer.proto.BalanceBatch
 import co.chainring.sequencer.proto.GatewayGrpcKt
 import co.chainring.sequencer.proto.GatewayResponse
+import co.chainring.sequencer.proto.GetStateRequest
 import co.chainring.sequencer.proto.Market
 import co.chainring.sequencer.proto.OrderBatch
 import co.chainring.sequencer.proto.ResetRequest
@@ -146,6 +147,12 @@ class GatewayApp(
         override suspend fun reset(request: ResetRequest): GatewayResponse {
             return toSequencer(request.guid) {
                 this.type = SequencerRequest.Type.Reset
+            }
+        }
+
+        override suspend fun getState(request: GetStateRequest): GatewayResponse {
+            return toSequencer(request.guid) {
+                this.type = SequencerRequest.Type.GetState
             }
         }
     }

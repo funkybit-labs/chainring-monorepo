@@ -4,7 +4,9 @@ import co.chainring.sequencer.proto.BalancesCheckpoint
 import co.chainring.sequencer.proto.BalancesCheckpointKt.BalanceKt.consumption
 import co.chainring.sequencer.proto.BalancesCheckpointKt.balance
 import co.chainring.sequencer.proto.MarketCheckpoint
+import co.chainring.sequencer.proto.StateDump
 import co.chainring.sequencer.proto.balancesCheckpoint
+import co.chainring.sequencer.proto.stateDump
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -86,29 +88,7 @@ data class SequencerState(
 
         measureNanoTime {
             FileOutputStream(Path.of(destinationDir.toString(), "balances").toFile()).use { outputStream ->
-                val balancesMap = balances
-
-                balancesCheckpoint {
-                    balancesMap.forEach { (wallet, walletBalances) ->
-                        walletBalances.forEach { (asset, amount) ->
-                            this.balances.add(
-                                balance {
-                                    this.wallet = wallet.value
-                                    this.asset = asset.value
-                                    this.amount = amount.toIntegerValue()
-                                    this.consumed.addAll(
-                                        this@SequencerState.consumed.getOrDefault(wallet, mapOf()).getOrDefault(asset, mapOf()).map {
-                                            consumption {
-                                                this.marketId = it.key.value
-                                                this.consumed = it.value.toIntegerValue()
-                                            }
-                                        },
-                                    )
-                                },
-                            )
-                        }
-                    }
-                }.writeTo(outputStream)
+                getBalancesCheckpoint().writeTo(outputStream)
             }
         }.let {
             logger.debug { "persist of balances took ${it / 1000}us" }
@@ -124,6 +104,42 @@ data class SequencerState(
             }
         }.let {
             logger.debug { "persist of ${markets.size} markets took ${it / 1000}us" }
+        }
+    }
+
+    fun getDump(): StateDump {
+        val marketsMap = markets
+        return stateDump {
+            this.balances.addAll(getBalancesCheckpoint().balancesList)
+            marketsMap.forEach { (_, market) ->
+                this.markets.add(market.toCheckpoint())
+            }
+        }
+    }
+
+    private fun getBalancesCheckpoint(): BalancesCheckpoint {
+        val balancesMap = balances
+
+        return balancesCheckpoint {
+            balancesMap.forEach { (wallet, walletBalances) ->
+                walletBalances.forEach { (asset, amount) ->
+                    this.balances.add(
+                        balance {
+                            this.wallet = wallet.value
+                            this.asset = asset.value
+                            this.amount = amount.toIntegerValue()
+                            this.consumed.addAll(
+                                this@SequencerState.consumed.getOrDefault(wallet, mapOf()).getOrDefault(asset, mapOf()).map {
+                                    consumption {
+                                        this.marketId = it.key.value
+                                        this.consumed = it.value.toIntegerValue()
+                                    }
+                                },
+                            )
+                        },
+                    )
+                }
+            }
         }
     }
 }
