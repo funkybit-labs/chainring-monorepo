@@ -1,5 +1,6 @@
 package co.chainring.integrationtests.testutils
 
+import co.chainring.apps.api.TestRoutes
 import co.chainring.apps.api.middleware.SignInMessage
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ApiErrors
@@ -7,7 +8,6 @@ import co.chainring.apps.api.model.BalancesApiResponse
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
-import co.chainring.apps.api.model.CreateSequencerDeposit
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
@@ -258,18 +258,43 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
         }
     }
 
-    fun createSequencerDeposit(apiRequest: CreateSequencerDeposit) {
-        val httpResponse = execute(
+    fun resetSequencer() {
+        execute(
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/sequencer")
+                .delete()
+                .build(),
+        ).also { httpResponse ->
+            if (httpResponse.code != HttpURLConnection.HTTP_NO_CONTENT) {
+                throw AbnormalApiResponseException(httpResponse)
+            }
+        }
+    }
+
+    fun createMarketInSequencer(apiRequest: TestRoutes.Companion.CreateMarketInSequencer) {
+        execute(
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/sequencer-markets")
+                .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
+                .build(),
+        ).also { httpResponse ->
+            if (httpResponse.code != HttpURLConnection.HTTP_CREATED) {
+                throw AbnormalApiResponseException(httpResponse)
+            }
+        }
+    }
+
+    fun createSequencerDeposit(apiRequest: TestRoutes.Companion.CreateSequencerDeposit) {
+        execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/sequencer-deposits")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(ecKeyPair),
-        )
-
-        when (httpResponse.code) {
-            HttpURLConnection.HTTP_CREATED -> {}
-            else -> throw AbnormalApiResponseException(httpResponse)
+        ).also { httpResponse ->
+            if (httpResponse.code != HttpURLConnection.HTTP_CREATED) {
+                throw AbnormalApiResponseException(httpResponse)
+            }
         }
     }
 

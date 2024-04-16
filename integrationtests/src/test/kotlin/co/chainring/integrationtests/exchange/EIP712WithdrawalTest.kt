@@ -1,7 +1,7 @@
 package co.chainring.integrationtests.exchange
 
+import co.chainring.apps.api.TestRoutes
 import co.chainring.apps.api.model.ApiError
-import co.chainring.apps.api.model.CreateSequencerDeposit
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
@@ -148,7 +148,7 @@ class EIP712WithdrawalTest {
         } else {
             wallet.depositERC20(asset, amount)
         }
-        apiClient.createSequencerDeposit(CreateSequencerDeposit(asset, amount))
+        apiClient.createSequencerDeposit(TestRoutes.Companion.CreateSequencerDeposit(asset, amount))
         return txReceipt
     }
 
