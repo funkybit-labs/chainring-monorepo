@@ -1,5 +1,8 @@
 package co.chainring.core.model.db
 
+import co.chainring.apps.api.model.Balance
+import co.chainring.apps.api.model.BalancesApiResponse
+import co.chainring.core.model.Symbol
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
@@ -87,6 +90,24 @@ class BalanceEntity(guid: EntityID<BalanceId>) : GUIDEntity<BalanceId>(guid) {
                             is BalanceChange.Replace -> change.amount
                         },
                         balanceType,
+                    )
+                },
+            )
+        }
+
+        fun balancesAsApiResponse(walletEntity: WalletEntity): BalancesApiResponse {
+            val (availableBalances, exchangeBalances) = getBalancesForWallet(
+                walletEntity,
+            ).partition { it.type == BalanceType.Available }
+            val exchangeBalanceMap = exchangeBalances.associate { it.symbolGuid.value to it.balance }
+
+            return BalancesApiResponse(
+                availableBalances.map { availableBalance ->
+                    Balance(
+                        symbol = Symbol(availableBalance.symbol.name),
+                        total = exchangeBalanceMap.getOrDefault(availableBalance.symbol.guid.value, BigInteger.ZERO),
+                        available = availableBalance.balance,
+                        lastUpdated = availableBalance.updatedAt ?: availableBalance.createdAt,
                     )
                 },
             )

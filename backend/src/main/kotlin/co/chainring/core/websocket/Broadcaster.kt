@@ -1,6 +1,7 @@
 package co.chainring.core.websocket
 
 import co.chainring.apps.api.model.BigDecimalJson
+import co.chainring.apps.api.model.websocket.Balances
 import co.chainring.apps.api.model.websocket.LastTrade
 import co.chainring.apps.api.model.websocket.LastTradeDirection
 import co.chainring.apps.api.model.websocket.OHLC
@@ -18,6 +19,7 @@ import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
 import co.chainring.apps.api.wsUnauthorized
 import co.chainring.core.model.Address
+import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
@@ -85,6 +87,7 @@ class Broadcaster {
             is SubscriptionTopic.Prices -> sendPrices(topic, client)
             is SubscriptionTopic.Trades -> sendTrades(client)
             is SubscriptionTopic.Orders -> sendOrders(client)
+            is SubscriptionTopic.Balances -> sendBalances(client)
         }
     }
 
@@ -299,12 +302,33 @@ class Broadcaster {
             .forEach { sendOrders(it) }
     }
 
+    private fun sendBalances(client: ConnectedClient) {
+        if (client.principal != null) {
+            transaction {
+                client.send(
+                    OutgoingWSMessage.Publish(
+                        SubscriptionTopic.Balances,
+                        Balances(
+                            BalanceEntity.balancesAsApiResponse(WalletEntity.getOrCreate(client.principal)).balances,
+                        ),
+                    ),
+                )
+            }
+        }
+    }
+
+    fun sendBalances(principal: Principal) {
+        findClients(principal, SubscriptionTopic.Orders)
+            .forEach { sendBalances(it) }
+    }
+
     fun notify(principal: Principal, message: Publishable) {
         val topic = when (message) {
             is OrderBook -> SubscriptionTopic.OrderBook(message.marketId)
             is Orders, is OrderCreated, is OrderUpdated -> SubscriptionTopic.Orders
             is Prices -> SubscriptionTopic.Prices(message.market)
             is Trades, is TradeCreated, is TradeUpdated -> SubscriptionTopic.Trades
+            is Balances -> SubscriptionTopic.Balances
         }
 
         findClients(principal, topic)

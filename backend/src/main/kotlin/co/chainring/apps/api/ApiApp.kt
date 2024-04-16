@@ -61,8 +61,6 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         ),
     )
 
-    private val enableTestRoutes = (System.getenv("ENABLE_TEST_ROUTES") ?: "true") == "true"
-
     private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
     private val sequencerClient = SequencerClient()
     private val broadcaster = Broadcaster()
@@ -70,8 +68,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val exchangeService = ExchangeService(blockchainClient, sequencerClient, broadcaster)
 
     private val withdrawalRoutes = WithdrawalRoutes(exchangeService)
-    private val balanceRoutes = BalanceRoutes(blockchainClient)
-    private val testRoutes = TestRoutes(exchangeService)
+    private val balanceRoutes = BalanceRoutes()
+
     private val orderRoutes = OrderRoutes(exchangeService)
 
     private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
@@ -113,7 +111,6 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                                 balanceRoutes.getBalances(),
                                 withdrawalRoutes.getWithdrawal(),
                                 withdrawalRoutes.createWithdrawal(),
-                                if (enableTestRoutes) testRoutes.createSequencerDeposit() else null,
 
                                 // http api + websocket
                                 // GET /v1/market/market_id/order-book
@@ -161,5 +158,6 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                 WithdrawalEntity.findPending().map { it.toEip712Transaction() }
             },
         )
+        blockchainClient.startDepositEventsConsumer(exchangeService)
     }
 }

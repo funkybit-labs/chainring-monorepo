@@ -8,6 +8,7 @@ import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
+import co.chainring.contracts.generated.Exchange
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.evm.ECHelper
@@ -19,10 +20,13 @@ import co.chainring.core.model.ExchangeError
 import co.chainring.core.model.SequencerOrderId
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.Symbol
+import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.BalanceChange
 import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BalanceType
 import co.chainring.core.model.db.CreateOrderAssignment
+import co.chainring.core.model.db.DepositEntity
+import co.chainring.core.model.db.DepositStatus
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
@@ -62,11 +66,15 @@ interface TxConfirmationCallback {
     fun onTxConfirmation(tx: EIP712Transaction, error: String?)
 }
 
+interface DepositConfirmationCallback {
+    fun onDepositConfirmation(event: Exchange.DepositEventResponse)
+}
+
 class ExchangeService(
     val blockchainClient: BlockchainClient,
     val sequencerClient: SequencerClient,
     val broadcaster: Broadcaster,
-) : TxConfirmationCallback {
+) : TxConfirmationCallback, DepositConfirmationCallback {
 
     private val symbolMap = mutableMapOf<String, SymbolEntity>()
     private val marketMap = mutableMapOf<MarketId, MarketEntity>()
@@ -232,7 +240,7 @@ class ExchangeService(
             }
 
             if (response.error != SequencerError.None) {
-                throw ExchangeError("Unable to process request -  ${response.error}")
+                throw ExchangeError("Unable to process request - ${response.error}")
             }
 
             Pair(response, createdOrders)
@@ -245,21 +253,43 @@ class ExchangeService(
         }
     }
 
-    fun deposit(wallet: WalletEntity, symbol: String, amount: BigInteger) {
+    fun deposit(event: Exchange.DepositEventResponse) {
         transaction {
-            val response = runBlocking {
-                sequencerClient.deposit(wallet.sequencerId.value, Asset(symbol), amount)
+            val blockNumber = event.log.blockNumber
+            val txHash = TxHash(event.log.transactionHash)
+
+            if (DepositEntity.findByTxHash(txHash) != null) {
+                logger.debug { "Skipping already recorded deposit (tx hash: $txHash)" }
+                return@transaction
             }
-            val symbolId = getSymbol(symbol).guid.value
+
+            val walletAddress = Address(event.from)
+            val wallet = WalletEntity.getOrCreate(walletAddress)
+            val tokenAddress = Address(event.token).takeIf { it != Address.zero }
+            val amount = event.amount
+
+            val depositEntity = DepositEntity.create(
+                chainId = blockchainClient.chainId,
+                wallet = wallet,
+                tokenAddress = tokenAddress,
+                amount = amount,
+                blockNumber = blockNumber,
+                transactionHash = txHash,
+            )
+
+            val response = runBlocking {
+                sequencerClient.deposit(wallet.sequencerId.value, Asset(depositEntity.symbol.name), depositEntity.amount)
+            }
             BalanceEntity.updateBalances(
-                listOf(BalanceChange.Delta(wallet.id.value, symbolId, amount)),
+                listOf(BalanceChange.Delta(wallet.id.value, depositEntity.symbol.guid.value, depositEntity.amount)),
                 BalanceType.Exchange,
             )
             if (response.balancesChangedList.isEmpty()) {
-                // if this did not result in a balance change fail the withdrawal since sequencer rejected it for some reason
-                throw ExchangeError("Unable to update the balance")
+                // Should never happen. Mark deposit as failed and wait for manual
+                depositEntity.update(DepositStatus.Failed, "Rejected by sequencer")
             } else {
                 handleSequencerResponse(response)
+                depositEntity.update(DepositStatus.Complete)
             }
         }
     }
@@ -391,6 +421,9 @@ class ExchangeService(
                 },
                 BalanceType.Available,
             )
+            walletMap.values.forEach {
+                broadcaster.sendBalances(it.address)
+            }
         }
 
         // queue any blockchain txs for processing
@@ -560,5 +593,9 @@ class ExchangeService(
                 }
             }
         }
+    }
+
+    override fun onDepositConfirmation(event: Exchange.DepositEventResponse) {
+        deposit(event)
     }
 }

@@ -50,14 +50,14 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
 
                     init {
                         if (!isIntegrationRun) {
+                            sequencerApp.start()
+                            gatewayApp.start()
                             apiApp.startServer()
                             transaction {
                                 DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, blockchainClient.chainId)?.deprecated = true
                                 WithdrawalEntity.findPending().forEach { it.update(WithdrawalStatus.Failed, "restarting test") }
                             }
                             apiApp.updateContracts()
-                            sequencerApp.start()
-                            gatewayApp.start()
                         }
                         // wait for contracts to load
                         await

@@ -4,7 +4,6 @@ import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CancelUpdateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
-import co.chainring.apps.api.model.CreateSequencerDeposit
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.UpdateOrderApiRequest
@@ -986,7 +985,6 @@ class OrderRoutesApiTest {
         } else {
             wallet.depositERC20(asset, amount)
         }
-        apiClient.createSequencerDeposit(CreateSequencerDeposit(asset, amount))
     }
 
     private fun waitForSettlementToFinish(tradeIds: List<TradeId>) {

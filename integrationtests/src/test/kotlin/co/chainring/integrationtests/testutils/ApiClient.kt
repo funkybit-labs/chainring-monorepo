@@ -7,7 +7,6 @@ import co.chainring.apps.api.model.BalancesApiResponse
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
-import co.chainring.apps.api.model.CreateSequencerDeposit
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
@@ -254,21 +253,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
 
         return when (httpResponse.code) {
             HttpURLConnection.HTTP_OK -> json.decodeFromString<WithdrawalApiResponse>(httpResponse.body?.string()!!)
-            else -> throw AbnormalApiResponseException(httpResponse)
-        }
-    }
-
-    fun createSequencerDeposit(apiRequest: CreateSequencerDeposit) {
-        val httpResponse = execute(
-            Request.Builder()
-                .url("$apiServerRootUrl/v1/sequencer-deposits")
-                .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
-                .build()
-                .withAuthHeaders(ecKeyPair),
-        )
-
-        when (httpResponse.code) {
-            HttpURLConnection.HTTP_CREATED -> {}
             else -> throw AbnormalApiResponseException(httpResponse)
         }
     }

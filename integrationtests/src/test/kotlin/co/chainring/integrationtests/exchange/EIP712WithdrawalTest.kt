@@ -1,7 +1,6 @@
 package co.chainring.integrationtests.exchange
 
 import co.chainring.apps.api.model.ApiError
-import co.chainring.apps.api.model.CreateSequencerDeposit
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
@@ -44,7 +43,7 @@ class EIP712WithdrawalTest {
 
         val depositAmount = wallet.formatAmount("15", "USDC")
         BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("USDC", depositAmount, depositAmount))) {
-            deposit(apiClient, wallet, "USDC", depositAmount)
+            deposit(wallet, "USDC", depositAmount)
         }
         assertEquals(wallet.getWalletERC20Balance("USDC"), mintAmount - depositAmount)
 
@@ -69,13 +68,13 @@ class EIP712WithdrawalTest {
 
         val depositAmount = wallet.formatAmount("0.001", "BTC")
         val depositTxReceipt = BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("BTC", depositAmount, depositAmount))) {
-            deposit(apiClient, wallet, "BTC", depositAmount)
+            deposit(wallet, "BTC", depositAmount)
         }
         val depositGasCost = depositTxReceipt.gasUsed * Numeric.decodeQuantity(depositTxReceipt.effectiveGasPrice)
         assertEquals(wallet.getWalletNativeBalance(), startingWalletBalance - depositAmount - depositGasCost)
         // do a second one
         val depositTxReceipt2 = BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("BTC", depositAmount * BigInteger.TWO, depositAmount * BigInteger.TWO))) {
-            deposit(apiClient, wallet, "BTC", depositAmount)
+            deposit(wallet, "BTC", depositAmount)
         }
         val depositGasCost2 = depositTxReceipt2.gasUsed * Numeric.decodeQuantity(depositTxReceipt2.effectiveGasPrice)
         assertEquals(wallet.getWalletNativeBalance(), startingWalletBalance - (depositAmount * BigInteger.TWO) - depositGasCost - depositGasCost2)
@@ -102,8 +101,8 @@ class EIP712WithdrawalTest {
 
         val amount = BigInteger("1000")
         wallet.mintERC20("USDC", amount * BigInteger.TWO)
-        BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("USDC", amount, amount))) {
-            deposit(apiClient, wallet, "USDC", amount)
+        BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("USDC", total = amount, available = amount))) {
+            deposit(wallet, "USDC", amount)
         }
 
         // invalid amount
@@ -116,7 +115,12 @@ class EIP712WithdrawalTest {
         var withdrawal = apiClient.getWithdrawal(response.withdrawal.id).withdrawal
         assertEquals(WithdrawalStatus.Failed, withdrawal.status)
         assertEquals("execution reverted: revert: Insufficient Balance", withdrawal.error)
-        deposit(apiClient, wallet, "USDC", amount)
+        BalanceHelper.waitForAndVerifyBalanceChange(
+            apiClient,
+            listOf(ExpectedBalance("USDC", total = BigInteger("2000"), available = BigInteger("1000"))),
+        ) {
+            deposit(wallet, "USDC", amount)
+        }
 
         // invalid nonce
         val invalidNonce = wallet.getNonce().plus(BigInteger.ONE)
@@ -141,14 +145,13 @@ class EIP712WithdrawalTest {
         }
     }
 
-    private fun deposit(apiClient: ApiClient, wallet: Wallet, asset: String, amount: BigInteger): TransactionReceipt {
+    private fun deposit(wallet: Wallet, asset: String, amount: BigInteger): TransactionReceipt {
         // deposit onchain and update sequencer
         val txReceipt = if (asset == "BTC") {
             wallet.depositNative(amount)
         } else {
             wallet.depositERC20(asset, amount)
         }
-        apiClient.createSequencerDeposit(CreateSequencerDeposit(asset, amount))
         return txReceipt
     }
 
