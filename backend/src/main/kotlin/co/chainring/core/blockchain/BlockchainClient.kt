@@ -9,7 +9,6 @@ import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.SymbolEntity
-import co.chainring.core.services.DepositConfirmationCallback
 import co.chainring.core.services.TxConfirmationCallback
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.reactivex.Flowable
@@ -77,6 +76,10 @@ data class BlockchainClientConfig(
     }
 }
 
+interface DepositConfirmationCallback {
+    fun onExchangeContractDepositConfirmation(event: Exchange.DepositEventResponse)
+}
+
 open class BlockchainClient(private val config: BlockchainClientConfig = BlockchainClientConfig()) {
 
     protected val web3j = Web3j.build(httpService(config.url, config.enableWeb3jLogging))
@@ -102,8 +105,6 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
     )
     private var submitterWorkerThread: Thread? = null
     private val txQueue = LinkedBlockingQueue<List<EIP712Transaction>>(10)
-
-    private var listenerWorkerThread: Thread? = null
 
     protected val gasProvider = GasProvider(
         contractCreationLimit = config.contractCreationLimit,
@@ -317,7 +318,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
         }
     }
 
-    fun startDepositEventsConsumer(depositConfirmationCallback: DepositConfirmationCallback) {
+    fun registerDepositEventsConsumer(depositConfirmationCallback: DepositConfirmationCallback) {
         val exchangeContract = loadExchangeContract(contractMap[ContractType.Exchange]!!)
 
         val startFromBlock = maxSeenBlockNumber()
@@ -335,13 +336,13 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
                     if (Contract.staticExtractEventParameters(Exchange.DEPOSIT_EVENT, eventLog) != null) {
                         val depositEventResponse = Exchange.getDepositEventFromLog(eventLog)
                         logger.debug { "Received deposit event (from: ${depositEventResponse.from}, amount: ${depositEventResponse.amount}, token: ${depositEventResponse.token}, txHash: ${depositEventResponse.log.transactionHash})" }
-                        depositConfirmationCallback.onDepositConfirmation(depositEventResponse)
+                        depositConfirmationCallback.onExchangeContractDepositConfirmation(depositEventResponse)
                     }
                 },
                 { throwable: Throwable ->
                     logger.error(throwable) { "Unexpected error occurred while processing deposit events" }
 
-                    startDepositEventsConsumer(depositConfirmationCallback)
+                    registerDepositEventsConsumer(depositConfirmationCallback)
                 },
             )
     }

@@ -158,6 +158,6 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                 WithdrawalEntity.findPending().map { it.toEip712Transaction() }
             },
         )
-        blockchainClient.startDepositEventsConsumer(exchangeService)
+        blockchainClient.registerDepositEventsConsumer(exchangeService)
     }
 }
