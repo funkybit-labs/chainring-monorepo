@@ -15,6 +15,7 @@ import org.http4k.core.Method
 import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.format.KotlinxSerialization.auto
+import java.lang.RuntimeException
 
 class TestRoutes(
     private val exchangeService: ExchangeService,
@@ -50,7 +51,10 @@ class TestRoutes(
         } bindContract Method.DELETE to { _ ->
             ApiUtils.runCatchingValidation {
                 runBlocking {
-                    sequencerClient.reset()
+                    val sequencerResponse = sequencerClient.reset()
+                    if (sequencerResponse.hasError()) {
+                        throw RuntimeException("Failed to reset sequencer, error: ${sequencerResponse.error}")
+                    }
                 }
                 Response(Status.NO_CONTENT)
             }
@@ -79,13 +83,16 @@ class TestRoutes(
             ApiUtils.runCatchingValidation {
                 val payload = requestBody(request)
                 runBlocking {
-                    sequencerClient.createMarket(
+                    val sequencerResponse = sequencerClient.createMarket(
                         marketId = payload.id,
                         tickSize = payload.tickSize,
                         marketPrice = payload.marketPrice,
                         baseDecimals = payload.baseDecimals,
                         quoteDecimals = payload.quoteDecimals,
                     )
+                    if (sequencerResponse.hasError()) {
+                        throw RuntimeException("Failed to create market in sequencer, error: ${sequencerResponse.error}")
+                    }
                 }
                 Response(Status.CREATED)
             }
