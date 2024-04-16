@@ -64,6 +64,7 @@ interface TxConfirmationCallback {
 
 class ExchangeService(
     val blockchainClient: BlockchainClient,
+    val sequencerClient: SequencerClient,
     val broadcaster: Broadcaster,
 ) : TxConfirmationCallback {
 
@@ -215,7 +216,7 @@ class ExchangeService(
             }
 
             val response = runBlocking {
-                SequencerClient.orderBatch(market.id.value, ordersToAdd, ordersToUpdate, ordersToCancel)
+                sequencerClient.orderBatch(market.id.value, ordersToAdd, ordersToUpdate, ordersToCancel)
             }
 
             // apply db changes amd send the OrderCreated notification
@@ -247,7 +248,7 @@ class ExchangeService(
     fun deposit(wallet: WalletEntity, symbol: String, amount: BigInteger) {
         transaction {
             val response = runBlocking {
-                SequencerClient.deposit(wallet.sequencerId.value, Asset(symbol), amount)
+                sequencerClient.deposit(wallet.sequencerId.value, Asset(symbol), amount)
             }
             val symbolId = getSymbol(symbol).guid.value
             BalanceEntity.updateBalances(
@@ -275,7 +276,7 @@ class ExchangeService(
             )
 
             val response = runBlocking {
-                SequencerClient.withdraw(
+                sequencerClient.withdraw(
                     withdrawalEntity.wallet.sequencerId.value,
                     Asset(withdrawalEntity.symbol.name),
                     withdrawalEntity.amount,
@@ -295,7 +296,7 @@ class ExchangeService(
     fun cancelOrder(walletAddress: Address, orderEntity: OrderEntity) {
         val response = runBlocking {
             checkIsOwner(orderEntity.wallet.address, walletAddress)
-            SequencerClient.cancelOrder(
+            sequencerClient.cancelOrder(
                 sequencerOrderId = orderEntity.sequencerOrderId!!.value,
                 marketId = orderEntity.market.guid.value,
             )
@@ -310,7 +311,7 @@ class ExchangeService(
                 runBlocking {
                     openOrders.groupBy { it.marketGuid }.forEach { entry ->
                         val sequencerOrderIds = entry.value.mapNotNull { it.sequencerOrderId?.value }
-                        SequencerClient.cancelOrders(entry.key.value, sequencerOrderIds)
+                        sequencerClient.cancelOrders(entry.key.value, sequencerOrderIds)
                     }
                 }
                 OrderEntity.cancelAll(walletEntity)

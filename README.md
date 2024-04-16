@@ -26,7 +26,13 @@ Open http://localhost:3000 in your browser
 make anvil_logs
 ```
 
-Deploy mock ERC20 token contracts and mint coins to the default anvil wallets
+Run Sequencer
+
+```
+make run_sequencer
+```
+
+Seed database, Anvil and Sequencer (requires a running Sequencer)
 
 ```
 make local_init
@@ -36,6 +42,12 @@ Before running local_init make sure to update the submodules in the project
 
 ```
 git submodule update --init --recursive
+```
+
+Run backend
+
+```
+make run_backend
 ```
 
 ## Connecting a wallet

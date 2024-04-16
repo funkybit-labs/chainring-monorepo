@@ -9,6 +9,7 @@ environment:
   sequencer:
     QUEUE_HOME: "/data/queues/test"
     CHECKPOINTS_ENABLED: "false"
+    SANDBOX_MODE: "true"
 services:
   api:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend

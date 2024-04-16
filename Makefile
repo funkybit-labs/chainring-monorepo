@@ -42,7 +42,7 @@ run_backend:
 	./gradlew :run
 
 run_sequencer:
-	./gradlew :sequencer:run
+	SANDBOX_MODE=true ./gradlew :sequencer:run
 
 run_ui:
 	cd web-ui && pnpm install && pnpm run dev

@@ -7,6 +7,7 @@ import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.db.DbConfig
 import co.chainring.core.model.db.WithdrawalEntity
+import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.services.ExchangeService
 import co.chainring.core.websocket.Broadcaster
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -63,9 +64,10 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val enableTestRoutes = (System.getenv("ENABLE_TEST_ROUTES") ?: "true") == "true"
 
     private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
+    private val sequencerClient = SequencerClient()
     private val broadcaster = Broadcaster()
 
-    private val exchangeService = ExchangeService(blockchainClient, broadcaster)
+    private val exchangeService = ExchangeService(blockchainClient, sequencerClient, broadcaster)
 
     private val withdrawalRoutes = WithdrawalRoutes(exchangeService)
     private val balanceRoutes = BalanceRoutes(blockchainClient)

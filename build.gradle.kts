@@ -29,6 +29,9 @@ java {
 
 val log4j2Version = "2.23.1"
 val exposedVersion = "0.48.0"
+val grpcKotlinStubVersion = "1.4.1"
+val grpcProtobufVersion = "1.62.2"
+val protobufKotlinVersion = "4.26.0"
 
 dependencies {
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
@@ -51,7 +54,13 @@ dependencies {
     // Blockchain client
     implementation("org.web3j:core:4.10.3") // 4.11 introduces dependency (tech.pegasys:jc-kzg-4844) that is published to cloudsmith repository (https://github.com/web3j/web3j/issues/2013)
 
+    implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinStubVersion")
+    implementation("io.grpc:grpc-protobuf:$grpcProtobufVersion")
+    implementation("com.google.protobuf:protobuf-kotlin:$protobufKotlinVersion")
+    implementation("io.grpc:grpc-netty:$grpcProtobufVersion")
+
     implementation(project(":backend"))
+    implementation(project(":sequencer"))
 }
 
 allprojects {

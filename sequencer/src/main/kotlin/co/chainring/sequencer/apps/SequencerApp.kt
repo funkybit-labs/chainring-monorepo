@@ -40,6 +40,7 @@ class SequencerApp(
     val inputQueue: RollingChronicleQueue = defaultInputQueue,
     val outputQueue: RollingChronicleQueue = defaultOutputQueue,
     val checkpointsPath: Path?,
+    val inSandboxMode: Boolean = System.getenv("SANDBOX_MODE").toBoolean(),
 ) : BaseApp() {
     override val logger = KotlinLogging.logger {}
     private var stop = false
@@ -179,7 +180,23 @@ class SequencerApp(
                     this.ordersChanged.addAll(autoReduce(balancesChanged.keys))
                 }
             }
-
+            SequencerRequest.Type.Reset -> {
+                if (inSandboxMode) {
+                    state.clear()
+                    sequencerResponse {
+                        this.sequence = sequence
+                        this.processingTime = System.nanoTime() - startTime
+                        this.guid = request.guid
+                    }
+                } else {
+                    sequencerResponse {
+                        this.sequence = sequence
+                        this.processingTime = System.nanoTime() - startTime
+                        this.guid = request.guid
+                        this.error = SequencerError.UnknownRequest
+                    }
+                }
+            }
             null, SequencerRequest.Type.UNRECOGNIZED -> {
                 sequencerResponse {
                     this.sequence = sequence
@@ -300,7 +317,7 @@ class SequencerApp(
     }
 
     override fun start() {
-        logger.info { "Starting Sequencer App" }
+        logger.info { "Starting${if (inSandboxMode) " in sandbox mode" else ""}" }
 
         stop = false
         sequencerThread = thread(start = false, name = "sequencer", isDaemon = false) {
@@ -346,7 +363,7 @@ class SequencerApp(
         }
         sequencerThread.start()
 
-        logger.info { "Sequencer App started" }
+        logger.info { "Started" }
     }
 
     private fun getLastSequenceNumberInOutputQueue(): Long =
@@ -401,10 +418,10 @@ class SequencerApp(
     }
 
     override fun stop() {
-        logger.info { "Stopping Sequencer App" }
+        logger.info { "Stopping" }
         stop = true
         sequencerThread.join(100)
         sequencerThread.stop()
-        logger.info { "Sequencer App stopped" }
+        logger.info { "Stopped" }
     }
 }
