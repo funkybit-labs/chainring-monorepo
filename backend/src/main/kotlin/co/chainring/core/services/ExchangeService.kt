@@ -250,6 +250,11 @@ class ExchangeService(
             val response = runBlocking {
                 sequencerClient.deposit(wallet.sequencerId.value, Asset(symbol), amount)
             }
+
+            if (response.error != SequencerError.None) {
+                throw ExchangeError("Unable to process request - ${response.error}")
+            }
+
             val symbolId = getSymbol(symbol).guid.value
             BalanceEntity.updateBalances(
                 listOf(BalanceChange.Delta(wallet.id.value, symbolId, amount)),
