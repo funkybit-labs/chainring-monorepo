@@ -259,7 +259,7 @@ class OrderRoutesApiTest {
             )
         }.also {
             assertEquals(
-                ApiError(ReasonCode.ProcessingError, "Order price is not a multiple of tick size"),
+                ApiError(ReasonCode.ProcessingError, "Order price 2.015 is not a multiple of tick size 0.010000000000000000"),
                 it.response.apiError(),
             )
         }
@@ -288,7 +288,7 @@ class OrderRoutesApiTest {
             )
         }.also {
             assertEquals(
-                ApiError(ReasonCode.ProcessingError, "Order price is not a multiple of tick size"),
+                ApiError(ReasonCode.ProcessingError, "Order price 2.015 is not a multiple of tick size 0.010000000000000000"),
                 it.response.apiError(),
             )
         }
