@@ -1,7 +1,10 @@
 package co.chainring.integrationtests.testutils
 
 import co.chainring.core.model.db.BalanceTable
+import co.chainring.core.model.db.SymbolTable
+import kotlinx.datetime.Instant
 import org.awaitility.kotlin.await
+import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.max
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigInteger
@@ -17,7 +20,7 @@ data class ExpectedBalance(
 object BalanceHelper {
 
     fun <T> waitForAndVerifyBalanceChange(apiClient: ApiClient, expectedBalances: List<ExpectedBalance>, logic: () -> T): T {
-        val lastBalanceChange = getLastBalanceChange()
+        val lastBalanceChanges: List<Pair<String, Instant?>> = expectedBalances.map { it.symbol to getLastBalanceChange(it.symbol) }
 
         return logic().also {
             await
@@ -26,7 +29,9 @@ object BalanceHelper {
                 .pollInterval(Duration.ofMillis(100))
                 .atMost(Duration.ofMillis(20000L))
                 .until {
-                    lastBalanceChange != getLastBalanceChange()
+                    lastBalanceChanges.all { (symbol, lastBalanceChange) ->
+                        lastBalanceChange != getLastBalanceChange(symbol)
+                    }
                 }
             verifyBalances(apiClient, expectedBalances)
         }
@@ -41,10 +46,12 @@ object BalanceHelper {
         }
     }
 
-    private fun getLastBalanceChange() =
+    private fun getLastBalanceChange(symbol: String) =
         transaction {
             BalanceTable
+                .join(SymbolTable, JoinType.INNER, SymbolTable.guid, BalanceTable.symbolGuid)
                 .select(BalanceTable.updatedAt.max())
+                .where { SymbolTable.name.eq(symbol) }
                 .maxByOrNull { BalanceTable.updatedAt }?.let { it[BalanceTable.updatedAt.max()] }
         }
 }
