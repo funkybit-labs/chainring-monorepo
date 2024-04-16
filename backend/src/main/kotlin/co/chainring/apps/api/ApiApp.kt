@@ -61,6 +61,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         ),
     )
 
+    private val enableTestRoutes = (System.getenv("ENABLE_TEST_ROUTES") ?: "true") == "true"
+
     private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
     private val sequencerClient = SequencerClient()
     private val broadcaster = Broadcaster()
@@ -69,7 +71,6 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
 
     private val withdrawalRoutes = WithdrawalRoutes(exchangeService)
     private val balanceRoutes = BalanceRoutes()
-
     private val orderRoutes = OrderRoutes(exchangeService)
 
     private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
@@ -97,25 +98,24 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                             servers = listOf(ApiServer(Uri.of("https://api.chainring.finance"))),
                         )
                         descriptionPath = "/openapi.json"
-                        routes +=
-                            listOfNotNull(
-                                ConfigRoutes.getConfiguration(),
-                                orderRoutes.createOrder(),
-                                orderRoutes.updateOrder(),
-                                orderRoutes.cancelOrder(),
-                                orderRoutes.getOrder(),
-                                orderRoutes.listOrders(),
-                                orderRoutes.cancelOpenOrders(),
-                                orderRoutes.batchOrders(),
-                                orderRoutes.listTrades(),
-                                balanceRoutes.getBalances(),
-                                withdrawalRoutes.getWithdrawal(),
-                                withdrawalRoutes.createWithdrawal(),
+                        routes += listOf(
+                            ConfigRoutes.getConfiguration(),
+                            orderRoutes.createOrder(),
+                            orderRoutes.updateOrder(),
+                            orderRoutes.cancelOrder(),
+                            orderRoutes.getOrder(),
+                            orderRoutes.listOrders(),
+                            orderRoutes.cancelOpenOrders(),
+                            orderRoutes.batchOrders(),
+                            orderRoutes.listTrades(),
+                            balanceRoutes.getBalances(),
+                            withdrawalRoutes.getWithdrawal(),
+                            withdrawalRoutes.createWithdrawal(),
+                        )
 
-                                // http api + websocket
-                                // GET /v1/market/market_id/order-book
-                                // GET /v1/market/market_id/trades
-                            )
+                        if (enableTestRoutes) {
+                            routes += TestRoutes(exchangeService, sequencerClient).routes
+                        }
                     },
             ),
         )

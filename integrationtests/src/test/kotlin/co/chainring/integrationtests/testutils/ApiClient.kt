@@ -1,5 +1,6 @@
 package co.chainring.integrationtests.testutils
 
+import co.chainring.apps.api.TestRoutes
 import co.chainring.apps.api.middleware.SignInMessage
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ApiErrors
@@ -254,6 +255,32 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
         return when (httpResponse.code) {
             HttpURLConnection.HTTP_OK -> json.decodeFromString<WithdrawalApiResponse>(httpResponse.body?.string()!!)
             else -> throw AbnormalApiResponseException(httpResponse)
+        }
+    }
+
+    fun resetSequencer() {
+        execute(
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/sequencer")
+                .delete()
+                .build(),
+        ).also { httpResponse ->
+            if (httpResponse.code != HttpURLConnection.HTTP_NO_CONTENT) {
+                throw AbnormalApiResponseException(httpResponse)
+            }
+        }
+    }
+
+    fun createMarketInSequencer(apiRequest: TestRoutes.Companion.CreateMarketInSequencer) {
+        execute(
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/sequencer-markets")
+                .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
+                .build(),
+        ).also { httpResponse ->
+            if (httpResponse.code != HttpURLConnection.HTTP_CREATED) {
+                throw AbnormalApiResponseException(httpResponse)
+            }
         }
     }
 

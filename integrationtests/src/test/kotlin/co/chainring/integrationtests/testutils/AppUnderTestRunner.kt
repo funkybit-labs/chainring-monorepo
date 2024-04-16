@@ -2,6 +2,7 @@ package co.chainring.integrationtests.testutils
 
 import co.chainring.apps.api.ApiApp
 import co.chainring.apps.api.ApiAppConfig
+import co.chainring.apps.api.TestRoutes
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.db.DbConfig
@@ -14,12 +15,9 @@ import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.tasks.fixtures.localDevFixtures
 import co.chainring.tasks.seedBlockchain
 import co.chainring.tasks.seedDatabase
-import co.chainring.tasks.seedSequencer
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.runBlocking
 import org.awaitility.kotlin.await
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.BeforeEachCallback
 import org.junit.jupiter.api.extension.ExtensionContext
@@ -86,14 +84,23 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
     }
 
     override fun beforeEach(context: ExtensionContext) {
-        val sequencerClient = context
-            .root
-            .getStore(ExtensionContext.Namespace.GLOBAL)
-            .getOrComputeIfAbsent("SequencerClient", { TestSequencerClient() }, TestSequencerClient::class.java)
+        ApiClient().apply {
+            resetSequencer()
 
-        runBlocking {
-            assertFalse(sequencerClient.reset().hasError())
-            seedSequencer(localDevFixtures, sequencerClient)
+            localDevFixtures.markets.forEach { market ->
+                val baseSymbol = localDevFixtures.symbols.first { it.id == market.baseSymbol }
+                val quoteSymbol = localDevFixtures.symbols.first { it.id == market.quoteSymbol }
+
+                createMarketInSequencer(
+                    TestRoutes.Companion.CreateMarketInSequencer(
+                        id = "${baseSymbol.name}/${quoteSymbol.name}",
+                        tickSize = market.tickSize,
+                        marketPrice = market.marketPrice,
+                        quoteDecimals = quoteSymbol.decimals,
+                        baseDecimals = baseSymbol.decimals,
+                    ),
+                )
+            }
         }
     }
 }
