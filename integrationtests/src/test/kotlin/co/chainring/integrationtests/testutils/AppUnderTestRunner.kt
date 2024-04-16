@@ -12,18 +12,23 @@ import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.tasks.fixtures.localDevFixtures
+import co.chainring.tasks.seedBlockchain
 import co.chainring.tasks.seedDatabase
+import co.chainring.tasks.seedSequencer
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.runBlocking
 import org.awaitility.kotlin.await
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.extension.BeforeAllCallback
+import org.junit.jupiter.api.extension.BeforeEachCallback
 import org.junit.jupiter.api.extension.ExtensionContext
 import org.junit.jupiter.api.extension.ExtensionContext.Store.CloseableResource
 import java.lang.System.getenv
 import java.time.Duration
 
 // This extension allows us to start the app under test only once
-class AppUnderTestRunner : BeforeAllCallback {
+class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
     override fun beforeAll(context: ExtensionContext) {
         context
             .root
@@ -37,6 +42,7 @@ class AppUnderTestRunner : BeforeAllCallback {
                     private val sequencerApp = SequencerApp(
                         // we want sequencer to start from the clean-slate
                         checkpointsPath = null,
+                        inSandboxMode = true,
                     )
                     private val blockchainClient = TestBlockchainClient(BlockchainClientConfig())
 
@@ -63,7 +69,8 @@ class AppUnderTestRunner : BeforeAllCallback {
                                 transaction { DeployedSmartContractEntity.validContracts(blockchainClient.chainId).map { it.name } == listOf(ContractType.Exchange.name) }
                             }
 
-                        seedDatabase(localDevFixtures, blockchainClient.config.url, blockchainClient.config.privateKeyHex)
+                        val symbolContractAddresses = seedBlockchain(localDevFixtures, blockchainClient.config.url, blockchainClient.config.privateKeyHex)
+                        seedDatabase(localDevFixtures, symbolContractAddresses)
                     }
 
                     @Throws(Throwable::class)
@@ -76,5 +83,17 @@ class AppUnderTestRunner : BeforeAllCallback {
                     }
                 }
             }
+    }
+
+    override fun beforeEach(context: ExtensionContext) {
+        val sequencerClient = context
+            .root
+            .getStore(ExtensionContext.Namespace.GLOBAL)
+            .getOrComputeIfAbsent("SequencerClient", { TestSequencerClient() }, TestSequencerClient::class.java)
+
+        runBlocking {
+            assertFalse(sequencerClient.reset().hasError())
+            seedSequencer(localDevFixtures, sequencerClient)
+        }
     }
 }

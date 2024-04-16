@@ -38,6 +38,7 @@ message SequencerRequest {
     AddMarket = 0;
     ApplyOrderBatch = 1;
     ApplyBalanceBatch = 2;
+    Reset = 3;
   }
   string guid = 1;
   Type type = 2;

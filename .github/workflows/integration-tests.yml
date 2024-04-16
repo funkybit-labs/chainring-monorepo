@@ -42,6 +42,8 @@ jobs:
           INTEGRATION_RUN: 1
           API_URL: https://test-api.chainring.co
           CI_RUN: 1
+          SEQUENCER_HOST_NAME: test-sequencer.chainring.co
+          SEQUENCER_PORT: 5337
       - name: Test Report
         uses: dorny/test-reporter@v1.8.0
         if: success() || failure()

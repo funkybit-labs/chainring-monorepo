@@ -16,9 +16,9 @@ import co.chainring.sequencer.proto.deposit
 import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderBatch
-import co.chainring.sequencer.proto.sequencerResponse
 import co.chainring.sequencer.proto.withdrawal
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -40,8 +40,7 @@ fun Address.toSequencerId(): SequencerWalletId {
     return SequencerWalletId(BigInteger(1, ECHelper.sha3(this.value.toByteArray())).toLong())
 }
 
-object SequencerClient {
-
+open class SequencerClient {
     private val logger = KotlinLogging.logger {}
 
     data class Order(
@@ -52,11 +51,12 @@ object SequencerClient {
         val orderType: co.chainring.sequencer.proto.Order.Type,
     )
 
-    private val channel = ManagedChannelBuilder.forAddress(
+    protected val channel: ManagedChannel = ManagedChannelBuilder.forAddress(
         System.getenv("SEQUENCER_HOST_NAME") ?: "localhost",
         (System.getenv("SEQUENCER_PORT") ?: "5337").toInt(),
     ).usePlaintext().build()
-    private val stub = GatewayGrpcKt.GatewayCoroutineStub(channel)
+
+    protected val stub = GatewayGrpcKt.GatewayCoroutineStub(channel)
 
     suspend fun addOrder(
         marketId: MarketId,
@@ -94,8 +94,8 @@ object SequencerClient {
         }
     }
 
-    suspend fun createMarket(marketId: String, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal, baseDecimals: Int, quoteDecimals: Int) {
-        stub.addMarket(
+    suspend fun createMarket(marketId: String, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal, baseDecimals: Int, quoteDecimals: Int): SequencerResponse {
+        return stub.addMarket(
             market {
                 this.guid = UUID.randomUUID().toString()
                 this.marketId = marketId
@@ -106,7 +106,7 @@ object SequencerClient {
                 this.baseDecimals = baseDecimals
                 this.quoteDecimals = quoteDecimals
             },
-        )
+        ).sequencerResponse
     }
 
     suspend fun deposit(

@@ -3,12 +3,9 @@ package co.chainring.apps.api
 import co.chainring.apps.api.middleware.principal
 import co.chainring.apps.api.middleware.signedTokenSecurity
 import co.chainring.apps.api.model.CreateSequencerDeposit
-import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.WalletEntity
-import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.services.ExchangeService
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.runBlocking
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.Tag
 import org.http4k.contract.meta
@@ -23,7 +20,6 @@ import java.math.BigInteger
 
 class TestRoutes(private val exchangeService: ExchangeService) {
     private val logger = KotlinLogging.logger { }
-    private var needToSeedSequencerMarkets = true
 
     fun createSequencerDeposit(): ContractRoute {
         val requestBody = Body.auto<CreateSequencerDeposit>().toLens()
@@ -45,7 +41,6 @@ class TestRoutes(private val exchangeService: ExchangeService) {
                 responseBody to CreateSequencerDeposit("USDC", BigInteger("1234")),
             )
         } bindContract Method.POST to { request ->
-            seedSequencerMarkets()
             ApiUtils.runCatchingValidation {
                 val sequencerDeposit = requestBody(request)
                 exchangeService.deposit(
@@ -57,30 +52,6 @@ class TestRoutes(private val exchangeService: ExchangeService) {
                     responseBody of sequencerDeposit,
                 )
             }
-        }
-    }
-
-    private fun seedSequencerMarkets() {
-        if (needToSeedSequencerMarkets) {
-            transaction {
-                MarketEntity.all().forEach {
-                    runBlocking {
-                        val marketPrice = when (it.guid.value.value) {
-                            "BTC/ETH" -> "17.525"
-                            "BTC/USDC" -> "68390.000"
-                            else -> "2.05"
-                        }
-                        SequencerClient.createMarket(
-                            it.guid.value.value,
-                            tickSize = it.tickSize,
-                            marketPrice = marketPrice.toBigDecimal(),
-                            quoteDecimals = it.quoteSymbol.decimals.toInt(),
-                            baseDecimals = it.baseSymbol.decimals.toInt(),
-                        )
-                    }
-                }
-            }
-            needToSeedSequencerMarkets = false
         }
     }
 }

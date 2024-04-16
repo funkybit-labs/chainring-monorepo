@@ -51,6 +51,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
@@ -59,7 +60,6 @@ import java.math.BigInteger
 import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertIs
-import kotlin.test.assertNotEquals
 
 @ExtendWith(AppUnderTestRunner::class)
 class OrderRoutesApiTest {

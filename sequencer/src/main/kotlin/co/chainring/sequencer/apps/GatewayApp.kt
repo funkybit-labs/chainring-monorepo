@@ -5,6 +5,7 @@ import co.chainring.sequencer.proto.GatewayGrpcKt
 import co.chainring.sequencer.proto.GatewayResponse
 import co.chainring.sequencer.proto.Market
 import co.chainring.sequencer.proto.OrderBatch
+import co.chainring.sequencer.proto.ResetRequest
 import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerRequestKt
 import co.chainring.sequencer.proto.SequencerResponse
@@ -139,6 +140,12 @@ class GatewayApp(
             return toSequencer(request.guid) {
                 this.type = SequencerRequest.Type.ApplyBalanceBatch
                 this.balanceBatch = request
+            }
+        }
+
+        override suspend fun reset(request: ResetRequest): GatewayResponse {
+            return toSequencer(request.guid) {
+                this.type = SequencerRequest.Type.Reset
             }
         }
     }
