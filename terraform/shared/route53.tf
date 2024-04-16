@@ -58,3 +58,11 @@ resource "aws_route53_record" "labs-txt" {
   ]
 }
 
+resource "aws_route53_record" "docs-cname" {
+  name    = "docs"
+  type    = "CNAME"
+  ttl = "3600"
+  zone_id = aws_route53_zone.zone-finance.zone_id
+  records = ["9a4e771167-hosting.gitbook.io",]
+}
+
