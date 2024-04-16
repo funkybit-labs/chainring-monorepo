@@ -103,19 +103,19 @@ class EIP712WithdrawalTest {
             deposit(wallet, "USDC", amount)
         }
 
-        // invalid amount
-        // TODO there is a mismatch between sequencer and contract here. Contract will fail if amount it too large,
-        // but sequencer withdraws whatever is remaining - created CHAIN-85.
+        // amount > balance
+        // Sequencer withdraws whatever is remaining - contract should do the same.
         var withdrawalApiRequest = wallet.signWithdraw("USDC", BigInteger("1001"))
         var response = apiClient.createWithdrawal(withdrawalApiRequest)
         assertEquals(WithdrawalStatus.Pending, response.withdrawal.status)
         waitForFinalizedWithdrawal(response.withdrawal.id)
         var withdrawal = apiClient.getWithdrawal(response.withdrawal.id).withdrawal
-        assertEquals(WithdrawalStatus.Failed, withdrawal.status)
-        assertEquals("execution reverted: revert: Insufficient Balance", withdrawal.error)
+        assertEquals(WithdrawalStatus.Complete, withdrawal.status)
+        assertEquals(apiClient.getBalances().balances.first { it.symbol.value == "USDC" }.total, BigInteger.ZERO)
+        assertEquals(apiClient.getBalances().balances.first { it.symbol.value == "USDC" }.available, BigInteger.ZERO)
         BalanceHelper.waitForAndVerifyBalanceChange(
             apiClient,
-            listOf(ExpectedBalance("USDC", total = BigInteger("2000"), available = BigInteger("1000"))),
+            listOf(ExpectedBalance("USDC", total = BigInteger("1000"), available = BigInteger("1000"))),
         ) {
             deposit(wallet, "USDC", amount)
         }

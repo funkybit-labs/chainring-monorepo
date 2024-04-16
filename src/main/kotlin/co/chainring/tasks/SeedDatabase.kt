@@ -2,6 +2,7 @@ package co.chainring.tasks
 
 import co.chainring.core.db.DbConfig
 import co.chainring.core.db.connect
+import co.chainring.core.model.db.BlockchainNonceEntity
 import co.chainring.core.model.db.ChainEntity
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
@@ -21,6 +22,9 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
             if (ChainEntity.findById(chain.id) == null) {
                 ChainEntity.create(chain.id, chain.name).flush()
                 println("Created chain ${chain.name} with id=${chain.id}")
+            }
+            if (BlockchainNonceEntity.findByKeyAndChain(chain.submitterAddress.value, chain.id) == null) {
+                BlockchainNonceEntity.create(chain.submitterAddress.value, chain.id)
             }
         }
 
