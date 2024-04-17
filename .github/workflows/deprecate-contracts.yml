@@ -1,4 +1,4 @@
-name: Deploy Backend
+name: Deprecate Contracts
 
 on:
   # Manual trigger from the UI
@@ -7,7 +7,7 @@ on:
   # Call from another workflow (CI)
   workflow_call:
 
-# only one running pre deploy job
+# only one running job
 concurrency:
   group: deprecate-contracts
   cancel-in-progress: false
