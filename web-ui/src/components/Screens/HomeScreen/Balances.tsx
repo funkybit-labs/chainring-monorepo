@@ -75,7 +75,7 @@ function BalancesTable({
       <table>
         <tbody>
           {[symbols.native].concat(symbols.erc20).map((symbol) => {
-            const wsBalance = balances.find(
+            const balance = balances.find(
               (balance) => balance.symbol == symbol.name
             )
             return (
@@ -88,10 +88,10 @@ function BalancesTable({
                   {symbol.name}
                 </td>
                 <td className="min-w-12 px-4 text-left">
-                  {wsBalance
+                  {balance
                     ? formatUnits(
-                        wsBalance?.available,
-                        symbols.getByName(wsBalance!.symbol).decimals
+                        balance?.available,
+                        symbols.getByName(balance!.symbol).decimals
                       )
                     : '0'}
                 </td>
@@ -106,7 +106,7 @@ function BalancesTable({
                   <Button
                     caption={() => <>Withdraw</>}
                     onClick={() => openWithdrawModal(symbol)}
-                    disabled={wsBalance?.available === 0n}
+                    disabled={balance?.available === 0n}
                   />
                 </td>
               </tr>
