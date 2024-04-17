@@ -2,7 +2,7 @@ environment:
   api:
     DB_HOST: db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     EVM_NETWORK_URL: http://test-anvil.chainring.co:8545
-    EVM_NETWORK_EARLIEST_BLOCK: 1182700 # anvil's current block number on test
+    EVM_NETWORK_EARLIEST_BLOCK: "1182700" # anvil's current block number on test
     AUTH_TOKEN_VALIDITY_INTERVAL: P1D
     SEQUENCER_HOST_NAME: test-sequencer.chainring.co
     SEQUENCER_PORT: "5337"
