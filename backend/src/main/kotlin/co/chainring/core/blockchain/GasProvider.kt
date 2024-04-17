@@ -37,7 +37,7 @@ open class GasProvider(
         return baseFeePerGas.multiply(BigInteger.TWO).add(maxPriorityFeePerGas)
     }
 
-    // TODO : In the past we perioidically retrieved this value from alchemy and persisted it
+    // TODO : In the past we periodically retrieved this value from alchemy and persisted it
     override fun getMaxPriorityFeePerGas(contractFunc: String?): BigInteger = defaultMaxPriorityFeePerGas
 
     override fun getGasLimit(): BigInteger = contractCreationLimit

@@ -42,4 +42,8 @@ sealed class SubscriptionTopic {
     @Serializable
     @SerialName("Orders")
     data object Orders : SubscriptionTopic()
+
+    @Serializable
+    @SerialName("Balances")
+    data object Balances : SubscriptionTopic()
 }

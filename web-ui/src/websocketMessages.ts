@@ -1,11 +1,12 @@
 import z from 'zod'
-import { OrderSchema, TradeSchema } from 'apiClient'
+import { BalanceSchema, OrderSchema, TradeSchema } from 'apiClient'
 
 export type SubscriptionTopic =
   | { type: 'OrderBook'; marketId: string }
   | { type: 'Prices'; marketId: string }
   | { type: 'Trades' }
   | { type: 'Orders' }
+  | { type: 'Balances' }
 
 export function orderBookTopic(marketId: string): SubscriptionTopic {
   return { type: 'OrderBook', marketId }
@@ -17,6 +18,7 @@ export function pricesTopic(marketId: string): SubscriptionTopic {
 
 export const tradesTopic: SubscriptionTopic = { type: 'Trades' }
 export const ordersTopic: SubscriptionTopic = { type: 'Orders' }
+export const balancesTopic: SubscriptionTopic = { type: 'Balances' }
 
 export type Publish = {
   type: 'Publish'
@@ -88,6 +90,12 @@ export const OrdersSchema = z.object({
 })
 export type Orders = z.infer<typeof OrdersSchema>
 
+export const BalancesSchema = z.object({
+  type: z.literal('Balances'),
+  balances: z.array(BalanceSchema)
+})
+export type Balances = z.infer<typeof BalancesSchema>
+
 export const OrderCreatedSchema = z.object({
   type: z.literal('OrderCreated'),
   order: OrderSchema
@@ -107,6 +115,7 @@ export const PublishableSchema = z.discriminatedUnion('type', [
   TradeCreatedSchema,
   TradeUpdatedSchema,
   OrdersSchema,
+  BalancesSchema,
   OrderCreatedSchema,
   OrderUpdatedSchema
 ])

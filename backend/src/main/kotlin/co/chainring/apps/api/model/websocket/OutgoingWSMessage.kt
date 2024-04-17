@@ -1,5 +1,6 @@
 package co.chainring.apps.api.model.websocket
 
+import co.chainring.apps.api.model.Balance
 import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.Trade
@@ -94,6 +95,12 @@ data class TradeUpdated(
 @SerialName("Orders")
 data class Orders(
     val orders: List<Order>,
+) : Publishable()
+
+@Serializable
+@SerialName("Balances")
+data class Balances(
+    val balances: List<Balance>,
 ) : Publishable()
 
 @Serializable

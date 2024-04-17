@@ -11,10 +11,9 @@ import {
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import { apiClient, TradingSymbol } from 'apiClient'
+import { TradingSymbol } from 'apiClient'
 import { useQuery } from '@tanstack/react-query'
 import { cleanAndFormatNumberInput } from 'utils'
-import { useMutation } from '@tanstack/react-query'
 
 export default function DepositModal({
   exchangeContractAddress,
@@ -77,10 +76,6 @@ export default function DepositModal({
     }
   })()
 
-  const mutation = useMutation({
-    mutationFn: apiClient.createSequencerDeposit
-  })
-
   async function onSubmit() {
     setSubmitError(null)
     const parsedAmount = parseUnits(amount, symbol.decimals)
@@ -122,12 +117,6 @@ export default function DepositModal({
           setSubmitPhase('waitingForDepositReceipt')
           await waitForTransactionReceipt(config, { hash })
         }
-
-        setSubmitPhase('submittingDeposit')
-        await mutation.mutateAsync({
-          symbol: symbol.name,
-          amount: BigInt(parsedAmount)
-        })
 
         close()
       } catch (err) {

@@ -70,7 +70,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val exchangeService = ExchangeService(blockchainClient, sequencerClient, broadcaster)
 
     private val withdrawalRoutes = WithdrawalRoutes(exchangeService)
-    private val balanceRoutes = BalanceRoutes(blockchainClient)
+    private val balanceRoutes = BalanceRoutes()
     private val orderRoutes = OrderRoutes(exchangeService)
 
     private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
@@ -158,5 +158,6 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                 WithdrawalEntity.findPending().map { it.toEip712Transaction() }
             },
         )
+        blockchainClient.registerDepositEventsConsumer(exchangeService)
     }
 }

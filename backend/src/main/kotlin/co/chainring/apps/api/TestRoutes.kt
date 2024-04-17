@@ -1,7 +1,5 @@
 package co.chainring.apps.api
 
-import co.chainring.apps.api.middleware.principal
-import co.chainring.apps.api.middleware.signedTokenSecurity
 import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.core.model.SequencerWalletId
@@ -24,7 +22,6 @@ import org.http4k.core.with
 import org.http4k.format.KotlinxSerialization.auto
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.lang.RuntimeException
-import java.math.BigInteger
 
 class TestRoutes(
     private val exchangeService: ExchangeService,
@@ -294,43 +291,8 @@ class TestRoutes(
         }
     }
 
-    private val createSequencerDeposit: ContractRoute = run {
-        val requestBody = Body.auto<CreateSequencerDeposit>().toLens()
-        val responseBody = Body.auto<CreateSequencerDeposit>().toLens()
-
-        "sequencer-deposits" meta {
-            operationId = "sequencer-deposits"
-            summary = "Sequencer Deposit"
-            security = signedTokenSecurity
-            tags += listOf(Tag("test"))
-            receiving(
-                requestBody to CreateSequencerDeposit(
-                    "BTC",
-                    "12345".toBigInteger(),
-                ),
-            )
-            returning(
-                Status.CREATED,
-                responseBody to CreateSequencerDeposit("USDC", BigInteger("1234")),
-            )
-        } bindContract Method.POST to { request ->
-            ApiUtils.runCatchingValidation {
-                val sequencerDeposit = requestBody(request)
-                exchangeService.deposit(
-                    transaction { WalletEntity.getOrCreate(request.principal) },
-                    sequencerDeposit.symbol,
-                    sequencerDeposit.amount,
-                )
-                Response(Status.CREATED).with(
-                    responseBody of sequencerDeposit,
-                )
-            }
-        }
-    }
-
     val routes = listOf(
         createMarketInSequencer,
-        createSequencerDeposit,
         resetSequencer,
         getSequencerState,
     )

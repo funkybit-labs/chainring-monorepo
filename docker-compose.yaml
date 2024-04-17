@@ -9,6 +9,12 @@ services:
       - "8545:8545"
     volumes:
       - anvil-data:/root/.foundry
+  otterscan:
+    image: otterscan/otterscan
+    container_name: otterscan
+    restart: always
+    ports:
+      - "5100:80"
   db:
     image: postgres:15
     restart: always

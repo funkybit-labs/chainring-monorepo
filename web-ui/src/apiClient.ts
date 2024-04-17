@@ -213,6 +213,13 @@ export const TradeSchema = z.object({
 })
 export type Trade = z.infer<typeof TradeSchema>
 
+export const BalanceSchema = z.object({
+  symbol: z.string(),
+  total: z.coerce.bigint(),
+  available: z.coerce.bigint()
+})
+export type Balance = z.infer<typeof BalanceSchema>
+
 const WithdrawTxSchema = z.object({
   sender: AddressSchema,
   token: AddressSchema.nullable(),
@@ -233,11 +240,6 @@ const WithdrawalSchema = z.object({
 })
 const WithdrawalApiResponseSchema = z.object({
   withdrawal: WithdrawalSchema
-})
-
-const CreateSequencerDepositSchema = z.object({
-  symbol: z.string(),
-  amount: z.coerce.bigint()
 })
 
 const ApiErrorSchema = z.object({
@@ -330,19 +332,6 @@ export const apiClient = new Zodios(apiBaseUrl, [
     path: '/v1/withdrawals/:id',
     alias: 'getWithdrawal',
     response: WithdrawalApiResponseSchema
-  },
-  {
-    method: 'post',
-    path: '/v1/sequencer-deposits',
-    alias: 'createSequencerDeposit',
-    parameters: [
-      {
-        name: 'payload',
-        type: 'Body',
-        schema: CreateSequencerDepositSchema
-      }
-    ],
-    response: CreateSequencerDepositSchema
   }
 ])
 

@@ -274,18 +274,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
-    fun createSequencerDeposit(apiRequest: TestRoutes.Companion.CreateSequencerDeposit) =
-        tryCreateSequencerDeposit(apiRequest).assertSuccess()
-
-    fun tryCreateSequencerDeposit(apiRequest: TestRoutes.Companion.CreateSequencerDeposit): Either<ApiCallFailure, Unit> =
-        execute(
-            Request.Builder()
-                .url("$apiServerRootUrl/v1/sequencer-deposits")
-                .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
-                .build()
-                .withAuthHeaders(ecKeyPair),
-        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
-
     fun getBalances(): BalancesApiResponse =
         tryGetBalances().assertSuccess()
 

@@ -1,6 +1,5 @@
 package co.chainring.integrationtests.api
 
-import co.chainring.apps.api.TestRoutes
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CancelUpdateOrderApiRequest
@@ -8,6 +7,7 @@ import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.UpdateOrderApiRequest
+import co.chainring.apps.api.model.websocket.Balances
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.Orders
@@ -17,6 +17,7 @@ import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderExecutionEntity
@@ -82,7 +83,16 @@ class OrderRoutesApiTest {
         wallet.mintERC20("DAI", wallet.formatAmount("14", "DAI"))
         val amountToDeposit = wallet.formatAmount("14", "DAI")
         BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit))) {
-            deposit(apiClient, wallet, "DAI", amountToDeposit)
+            deposit(wallet, "DAI", amountToDeposit)
+        }
+        wsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Balances, message.topic)
+            message.data.let { data ->
+                assertIs<Balances>(data)
+                assertEquals(1, data.balances.size)
+                assertEquals(Symbol("DAI"), data.balances.first().symbol)
+                assertEquals(BigInteger("14000000000000000000"), data.balances.first().available)
+            }
         }
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
@@ -184,7 +194,16 @@ class OrderRoutesApiTest {
         val amountToDeposit = wallet.formatAmount("20", "DAI")
         wallet.mintERC20("DAI", amountToDeposit)
         BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit))) {
-            deposit(apiClient, wallet, "DAI", amountToDeposit)
+            deposit(wallet, "DAI", amountToDeposit)
+        }
+        wsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Balances, message.topic)
+            message.data.let { data ->
+                assertIs<Balances>(data)
+                assertEquals(1, data.balances.size)
+                assertEquals(Symbol("DAI"), data.balances.first().symbol)
+                assertEquals(BigInteger("20000000000000000000"), data.balances.first().available)
+            }
         }
 
         // operation on non-existent order
@@ -323,7 +342,16 @@ class OrderRoutesApiTest {
         val amountToDeposit = wallet.formatAmount("30", "DAI")
         wallet.mintERC20("DAI", amountToDeposit)
         BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit))) {
-            deposit(apiClient, wallet, "DAI", amountToDeposit)
+            deposit(wallet, "DAI", amountToDeposit)
+        }
+        wsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Balances, message.topic)
+            message.data.let { data ->
+                assertIs<Balances>(data)
+                assertEquals(1, data.balances.size)
+                assertEquals(Symbol("DAI"), data.balances.first().symbol)
+                assertEquals(BigInteger("30000000000000000000"), data.balances.first().available)
+            }
         }
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
@@ -501,6 +529,14 @@ class OrderRoutesApiTest {
                     assertEquals(data.order.executions[0].role, ExecutionRole.Taker)
                 }
             }
+            waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.Balances, message.topic)
+                message.data.let { data ->
+                    assertIs<Balances>(data)
+                    assertEquals(BigInteger("1992416645000000000"), data.balances.first { it.symbol.value == "ETH" }.available)
+                    assertEquals(BigInteger("432100000000000"), data.balances.first { it.symbol.value == "BTC" }.available)
+                }
+            }
         }
 
         makerWsClient.apply {
@@ -525,6 +561,14 @@ class OrderRoutesApiTest {
                     assertEquals(data.order.executions[0].amount, makerWallet.formatAmount("0.00043210", "BTC"))
                     assertEquals(0, data.order.executions[0].price.compareTo(BigDecimal("17.550")))
                     assertEquals(ExecutionRole.Maker, data.order.executions[0].role)
+                }
+            }
+            waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.Balances, message.topic)
+                message.data.let { data ->
+                    assertIs<Balances>(data)
+                    assertEquals(BigInteger("2007583355000000000"), data.balances.first { it.symbol.value == "ETH" }.available)
+                    assertEquals(BigInteger("199567900000000000"), data.balances.first { it.symbol.value == "BTC" }.available)
                 }
             }
         }
@@ -616,6 +660,14 @@ class OrderRoutesApiTest {
                     assertEquals(ExecutionRole.Taker, data.order.executions[0].role)
                 }
             }
+            waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.Balances, message.topic)
+                message.data.let { data ->
+                    assertIs<Balances>(data)
+                    assertEquals(BigInteger("1994577020000000000"), data.balances.first { it.symbol.value == "ETH" }.available)
+                    assertEquals(BigInteger("308650000000000"), data.balances.first { it.symbol.value == "BTC" }.available)
+                }
+            }
         }
 
         makerWsClient.apply {
@@ -640,6 +692,14 @@ class OrderRoutesApiTest {
                     assertEquals(data.order.executions[0].amount, takerWallet.formatAmount("0.00012345", "BTC"))
                     assertEquals(0, data.order.executions[0].price.compareTo(BigDecimal("17.500")))
                     assertEquals(ExecutionRole.Maker, data.order.executions[0].role)
+                }
+            }
+            waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.Balances, message.topic)
+                message.data.let { data ->
+                    assertIs<Balances>(data)
+                    assertEquals(BigInteger("2005422980000000000"), data.balances.first { it.symbol.value == "ETH" }.available)
+                    assertEquals(BigInteger("199691350000000000"), data.balances.first { it.symbol.value == "BTC" }.available)
                 }
             }
         }
@@ -924,6 +984,11 @@ class OrderRoutesApiTest {
                 assertEquals(SubscriptionTopic.Trades, message.topic)
                 assertIs<Trades>(message.data)
             }
+            subscribe(SubscriptionTopic.Balances)
+            waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.Balances, message.topic)
+                assertIs<Balances>(message.data)
+            }
         }
 
         Faucet.fund(wallet.address, wallet.formatAmount(nativeAmount, "BTC"))
@@ -932,28 +997,32 @@ class OrderRoutesApiTest {
 
         val formattedNativeAmount = nativeDepositAmount?.let { wallet.formatAmount(it, "BTC") }
 
+        val expectedBalances = listOfNotNull(
+            ExpectedBalance(mintSymbol, formattedMintAmount, formattedMintAmount),
+            formattedNativeAmount?.let { ExpectedBalance("BTC", it, it) },
+        )
+
         BalanceHelper.waitForAndVerifyBalanceChange(
             apiClient,
-            listOfNotNull(
-                ExpectedBalance(mintSymbol, formattedMintAmount, formattedMintAmount),
-                formattedNativeAmount?.let { ExpectedBalance("BTC", it, it) },
-            ),
+            expectedBalances,
         ) {
-            deposit(apiClient, wallet, mintSymbol, formattedMintAmount)
-            formattedNativeAmount?.let { deposit(apiClient, wallet, "BTC", it) }
+            deposit(wallet, mintSymbol, formattedMintAmount)
+            formattedNativeAmount?.let { deposit(wallet, "BTC", it) }
+        }
+        wsClient.receivedDecoded().take(expectedBalances.size).forEach {
+            assertIs<Balances>((it as OutgoingWSMessage.Publish).data)
         }
 
         return Triple(apiClient, wallet, wsClient)
     }
 
-    private fun deposit(apiClient: ApiClient, wallet: Wallet, asset: String, amount: BigInteger) {
+    private fun deposit(wallet: Wallet, asset: String, amount: BigInteger) {
         // deposit onchain and update sequencer
         if (asset == "BTC") {
             wallet.depositNative(amount)
         } else {
             wallet.depositERC20(asset, amount)
         }
-        apiClient.createSequencerDeposit(TestRoutes.Companion.CreateSequencerDeposit(asset, amount))
     }
 
     private fun waitForSettlementToFinish(tradeIds: List<TradeId>) {
