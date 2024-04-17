@@ -67,6 +67,29 @@ module "anvil" {
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
 }
 
+module "otterscan" {
+  source                = "../modules/ecs_task"
+  name_prefix           = local.name_prefix
+  task_name             = "otterscan"
+  image                 = "otterscan"
+  ecs_cluster_id        = module.ecs.cluster.id
+  app_ecs_task_role     = module.ecs.app_ecs_task_role
+  aws_region            = var.aws_region
+  subnet_id_1           = module.vpc.private_subnet_id_1
+  subnet_id_2           = module.vpc.private_subnet_id_2
+  vpc                   = module.vpc.vpc
+  allow_inbound         = true
+  hostnames             = ["${local.name_prefix}-otterscan.${data.terraform_remote_state.shared.outputs.zone.name}"]
+  lb_https_listener_arn = module.alb.https_listener_arn
+  lb_priority           = 102
+  lb_dns_name           = module.alb.dns_name
+  zone                  = data.terraform_remote_state.shared.outputs.zone
+  tcp_ports             = [80]
+  health_check          = "/"
+  health_check_status   = "200"
+  service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
+}
+
 module "bastion" {
   source      = "../modules/bastion"
   name_prefix = local.name_prefix
