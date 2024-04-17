@@ -48,25 +48,24 @@ val applicationJson = "application/json".toMediaType()
 
 class AbnormalApiResponseException(val response: Response) : Exception()
 
+data class ApiCallFailure(
+    val httpCode: Int,
+    val error: ApiError,
+)
+
 class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
     val authToken: String = issueAuthToken(ecKeyPair = ecKeyPair)
 
     companion object {
-        fun listOrders(authHeadersProvider: (Request) -> Headers): OrdersApiResponse {
-            val httpResponse = execute(
+        fun tryListOrders(authHeadersProvider: (Request) -> Headers): Either<ApiCallFailure, OrdersApiResponse> =
+            execute(
                 Request.Builder()
                     .url("$apiServerRootUrl/v1/orders")
                     .get()
                     .build().let {
                         it.addHeaders(authHeadersProvider(it))
                     },
-            )
-            return if (httpResponse.code == HttpURLConnection.HTTP_OK) {
-                json.decodeFromString<OrdersApiResponse>(httpResponse.body?.string()!!)
-            } else {
-                throw AbnormalApiResponseException(httpResponse)
-            }
-        }
+            ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
         internal fun authHeaders(ecKeyPair: ECKeyPair): Headers {
             val didToken = issueAuthToken(ecKeyPair)
@@ -155,153 +154,149 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
             httpClient.newCall(request).execute()
     }
 
-    fun getConfiguration(): ConfigurationApiResponse {
-        val httpResponse = execute(
+    fun getConfiguration(): ConfigurationApiResponse =
+        tryGetConfiguration().assertSuccess()
+
+    fun tryGetConfiguration(): Either<ApiCallFailure, ConfigurationApiResponse> =
+        execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/config")
                 .get()
                 .build(),
-        )
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
-        return when (httpResponse.code) {
-            HttpURLConnection.HTTP_OK -> json.decodeFromString<ConfigurationApiResponse>(httpResponse.body?.string()!!)
-            else -> throw AbnormalApiResponseException(httpResponse)
-        }
-    }
+    fun createOrder(apiRequest: CreateOrderApiRequest): Order =
+        tryCreateOrder(apiRequest).assertSuccess()
 
-    fun createOrder(apiRequest: CreateOrderApiRequest): Either<ApiError, Order> {
-        return execute(
+    fun tryCreateOrder(apiRequest: CreateOrderApiRequest): Either<ApiCallFailure, Order> =
+        execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
-    }
 
-    fun batchOrders(apiRequest: BatchOrdersApiRequest): Either<ApiError, OrdersApiResponse> {
-        return execute(
+    fun batchOrders(apiRequest: BatchOrdersApiRequest): OrdersApiResponse =
+        tryBatchOrders(apiRequest).assertSuccess()
+
+    fun tryBatchOrders(apiRequest: BatchOrdersApiRequest): Either<ApiCallFailure, OrdersApiResponse> =
+        execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/batch/orders")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
+    fun updateOrder(apiRequest: UpdateOrderApiRequest): Order {
+        return tryUpdateOrder(apiRequest).assertSuccess()
     }
 
-    fun updateOrder(apiRequest: UpdateOrderApiRequest): Either<ApiError, Order> {
-        return execute(
+    fun tryUpdateOrder(apiRequest: UpdateOrderApiRequest): Either<ApiCallFailure, Order> =
+        execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders/${apiRequest.orderId}")
                 .patch(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
-    }
 
-    fun cancelOrder(id: OrderId): Either<ApiError, Unit> {
-        return execute(
+    fun cancelOrder(id: OrderId) =
+        tryCancelOrder(id).assertSuccess()
+
+    fun tryCancelOrder(id: OrderId): Either<ApiCallFailure, Unit> =
+        execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders/$id")
                 .delete()
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
-    }
 
-    fun getOrder(id: OrderId): Order {
-        val httpResponse = execute(
+    fun getOrder(id: OrderId): Order =
+        tryGetOrder(id).assertSuccess()
+
+    fun tryGetOrder(id: OrderId): Either<ApiCallFailure, Order> =
+        execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders/$id")
                 .get()
                 .build()
                 .withAuthHeaders(ecKeyPair),
-        )
+        ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
-        return when (httpResponse.code) {
-            HttpURLConnection.HTTP_OK -> json.decodeFromString<Order>(httpResponse.body?.string()!!)
-            else -> throw AbnormalApiResponseException(httpResponse)
-        }
-    }
+    fun listOrders(): OrdersApiResponse =
+        tryListOrders().assertSuccess()
 
-    fun listOrders(): OrdersApiResponse {
-        val httpResponse = execute(
+    fun tryListOrders(): Either<ApiCallFailure, OrdersApiResponse> =
+        execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders")
                 .get()
                 .build()
                 .withAuthHeaders(ecKeyPair),
-        )
+        ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
-        return when (httpResponse.code) {
-            HttpURLConnection.HTTP_OK -> json.decodeFromString<OrdersApiResponse>(httpResponse.body?.string()!!)
-            else -> throw AbnormalApiResponseException(httpResponse)
-        }
-    }
+    fun cancelOpenOrders() =
+        tryCancelOpenOrders().assertSuccess()
 
-    fun cancelOpenOrders(): Either<ApiError, Unit> {
-        return execute(
+    fun tryCancelOpenOrders(): Either<ApiCallFailure, Unit> =
+        execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders")
                 .delete()
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
-    }
 
-    fun createWithdrawal(apiRequest: CreateWithdrawalApiRequest): Either<ApiError, WithdrawalApiResponse> {
-        return execute(
+    fun createWithdrawal(apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse =
+        tryCreateWithdrawal(apiRequest).assertSuccess()
+
+    fun tryCreateWithdrawal(apiRequest: CreateWithdrawalApiRequest): Either<ApiCallFailure, WithdrawalApiResponse> =
+        execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/withdrawals")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
-    }
 
-    fun getWithdrawal(id: WithdrawalId): WithdrawalApiResponse {
-        val httpResponse = execute(
+    fun getWithdrawal(id: WithdrawalId): WithdrawalApiResponse =
+        tryGetWithdrawal(id).assertSuccess()
+
+    fun tryGetWithdrawal(id: WithdrawalId): Either<ApiCallFailure, WithdrawalApiResponse> =
+        execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/withdrawals/$id")
                 .get()
                 .build()
                 .withAuthHeaders(ecKeyPair),
-        )
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
-        return when (httpResponse.code) {
-            HttpURLConnection.HTTP_OK -> json.decodeFromString<WithdrawalApiResponse>(httpResponse.body?.string()!!)
-            else -> throw AbnormalApiResponseException(httpResponse)
-        }
-    }
+    fun createSequencerDeposit(apiRequest: TestRoutes.Companion.CreateSequencerDeposit) =
+        tryCreateSequencerDeposit(apiRequest).assertSuccess()
 
-    fun createSequencerDeposit(apiRequest: TestRoutes.Companion.CreateSequencerDeposit) {
+    fun tryCreateSequencerDeposit(apiRequest: TestRoutes.Companion.CreateSequencerDeposit): Either<ApiCallFailure, Unit> =
         execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/sequencer-deposits")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(ecKeyPair),
-        ).also { httpResponse ->
-            if (httpResponse.code != HttpURLConnection.HTTP_CREATED) {
-                throw AbnormalApiResponseException(httpResponse)
-            }
-        }
-    }
+        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
-    fun getBalances(): BalancesApiResponse {
-        val httpResponse = execute(
+    fun getBalances(): BalancesApiResponse =
+        tryGetBalances().assertSuccess()
+
+    fun tryGetBalances(): Either<ApiCallFailure, BalancesApiResponse> =
+        execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/balances")
                 .get()
                 .build()
                 .withAuthHeaders(ecKeyPair),
-        )
-
-        return when (httpResponse.code) {
-            HttpURLConnection.HTTP_OK -> json.decodeFromString<BalancesApiResponse>(httpResponse.body?.string()!!)
-            else -> throw AbnormalApiResponseException(httpResponse)
-        }
-    }
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     private fun execute(request: Request): Response =
         httpClient.newCall(request).execute()
@@ -332,7 +327,7 @@ fun Response.apiError(): ApiError? {
     }
 }
 
-inline fun <reified T> Response.toErrorOrPayload(expectedStatusCode: Int): Either<ApiError, T> {
+inline fun <reified T> Response.toErrorOrPayload(expectedStatusCode: Int): Either<ApiCallFailure, T> {
     return either {
         val bodyString = body?.string()
 
@@ -347,14 +342,14 @@ inline fun <reified T> Response.toErrorOrPayload(expectedStatusCode: Int): Eithe
 
             assertNotNull(apiError, "API call failed with code: $code, body: $bodyString")
 
-            apiError
+            ApiCallFailure(code, apiError)
         }
 
         json.decodeFromString<T>(bodyString!!)
     }
 }
 
-fun Response.toErrorOrUnit(expectedStatusCode: Int): Either<ApiError, Unit> {
+fun Response.toErrorOrUnit(expectedStatusCode: Int): Either<ApiCallFailure, Unit> {
     return either {
         val bodyString = body?.string()
 
@@ -369,12 +364,12 @@ fun Response.toErrorOrUnit(expectedStatusCode: Int): Either<ApiError, Unit> {
 
             assertNotNull(apiError, "API call failed with code: $code, body: $bodyString")
 
-            apiError
+            ApiCallFailure(code, apiError)
         }
     }
 }
 
-fun <T> Either<ApiError, T>.assertSuccess(): T {
+fun <T> Either<ApiCallFailure, T>.assertSuccess(): T {
     if (this.isLeft()) {
         fail(
             "Unexpected API error: ${this.leftOrNull()}. ${
@@ -385,11 +380,21 @@ fun <T> Either<ApiError, T>.assertSuccess(): T {
     return this.getOrNull()!!
 }
 
-fun Either<ApiError, Any>.assertError(expectedError: ApiError) {
+fun Either<ApiCallFailure, Any>.assertError(expectedHttpCode: Int, expectedError: ApiError) {
     if (this.isRight()) {
         fail("Unexpected API error, but got a success response")
     }
-    assertEquals(expectedError, this.leftOrNull()!!)
+    val failure = this.leftOrNull()!!
+    assertEquals(expectedHttpCode, failure.httpCode)
+    assertEquals(expectedError, failure.error)
+}
+
+fun Either<ApiCallFailure, Any>.assertError(expectedError: ApiError) {
+    if (this.isRight()) {
+        fail("Unexpected API error, but got a success response")
+    }
+    val failure = this.leftOrNull()!!
+    assertEquals(expectedError, failure.error)
 }
 
 private fun Request.addHeaders(headers: Headers): Request =

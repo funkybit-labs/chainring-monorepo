@@ -30,16 +30,13 @@ import co.chainring.core.model.db.TradeTable
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.generateHexString
 import co.chainring.core.utils.toFundamentalUnits
-import co.chainring.integrationtests.testutils.AbnormalApiResponseException
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.BalanceHelper
 import co.chainring.integrationtests.testutils.ExpectedBalance
 import co.chainring.integrationtests.testutils.Faucet
 import co.chainring.integrationtests.testutils.Wallet
-import co.chainring.integrationtests.testutils.apiError
 import co.chainring.integrationtests.testutils.assertError
-import co.chainring.integrationtests.testutils.assertSuccess
 import co.chainring.integrationtests.testutils.blocking
 import co.chainring.integrationtests.testutils.receivedDecoded
 import co.chainring.integrationtests.testutils.subscribe
@@ -55,7 +52,6 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -100,7 +96,7 @@ class OrderRoutesApiTest {
             wallet.signOrder(it)
         }
 
-        val limitOrder = apiClient.createOrder(limitOrderApiRequest).assertSuccess()
+        val limitOrder = apiClient.createOrder(limitOrderApiRequest)
 
         // order created correctly
         assertIs<Order.Limit>(limitOrder)
@@ -111,7 +107,7 @@ class OrderRoutesApiTest {
         assertEquals(OrderStatus.Open, limitOrder.status)
 
         // order creation is idempotent
-        assertEquals(limitOrder.id, apiClient.createOrder(limitOrderApiRequest).assertSuccess().id)
+        assertEquals(limitOrder.id, apiClient.createOrder(limitOrderApiRequest).id)
 
         // client is notified over websocket
         wsClient.waitForMessage().also { message ->
@@ -144,7 +140,7 @@ class OrderRoutesApiTest {
                 amount = wallet.formatAmount("3", "USDC"),
                 price = BigDecimal("2.01"),
             ),
-        ).assertSuccess()
+        )
         assertIs<Order.Limit>(updatedOrder)
         assertEquals(wallet.formatAmount("3", "USDC"), updatedOrder.amount)
         assertEquals(0, BigDecimal("2.01").compareTo(updatedOrder.price))
@@ -157,7 +153,7 @@ class OrderRoutesApiTest {
         }
 
         // cancel order is idempotent
-        apiClient.cancelOrder(limitOrder.id).assertSuccess()
+        apiClient.cancelOrder(limitOrder.id)
         val cancelledOrder = apiClient.getOrder(limitOrder.id)
         wsClient.waitForMessage().also { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
@@ -193,16 +189,9 @@ class OrderRoutesApiTest {
 
         // operation on non-existent order
         ApiError(ReasonCode.OrderNotFound, "Requested order does not exist").also { expectedError ->
-            assertThrows<AbnormalApiResponseException> {
-                apiClient.getOrder(OrderId.generate())
-            }.also {
-                assertEquals(
-                    expectedError,
-                    it.response.apiError(),
-                )
-            }
+            apiClient.tryGetOrder(OrderId.generate()).assertError(expectedError)
 
-            apiClient.updateOrder(
+            apiClient.tryUpdateOrder(
                 apiRequest = UpdateOrderApiRequest.Limit(
                     orderId = OrderId.generate(),
                     amount = BigDecimal("3").toFundamentalUnits(18),
@@ -210,7 +199,7 @@ class OrderRoutesApiTest {
                 ),
             ).assertError(expectedError)
 
-            apiClient.cancelOrder(OrderId.generate()).assertError(expectedError)
+            apiClient.tryCancelOrder(OrderId.generate()).assertError(expectedError)
         }
 
         // try to submit an order that crosses the market
@@ -225,7 +214,7 @@ class OrderRoutesApiTest {
             ).let {
                 wallet.signOrder(it)
             },
-        ).assertSuccess()
+        )
 
         wsClient.waitForMessage().also { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
@@ -245,7 +234,7 @@ class OrderRoutesApiTest {
         }
 
         // try creating a limit order not a multiple of tick size
-        apiClient.createOrder(
+        apiClient.tryCreateOrder(
             CreateOrderApiRequest.Limit(
                 nonce = generateHexString(32),
                 marketId = MarketId("USDC/DAI"),
@@ -271,10 +260,10 @@ class OrderRoutesApiTest {
             ).let {
                 wallet.signOrder(it)
             },
-        ).assertSuccess()
+        )
 
         // try updating the price to something not a tick size
-        apiClient.updateOrder(
+        apiClient.tryUpdateOrder(
             apiRequest = UpdateOrderApiRequest.Limit(
                 orderId = limitOrder2.id,
                 amount = wallet.formatAmount("1", "USDC"),
@@ -286,7 +275,7 @@ class OrderRoutesApiTest {
 
         // try updating and cancelling an order not created by this wallet
         val apiClient2 = ApiClient()
-        apiClient2.updateOrder(
+        apiClient2.tryUpdateOrder(
             apiRequest = UpdateOrderApiRequest.Limit(
                 orderId = limitOrder2.id,
                 amount = wallet.formatAmount("1", "USDC"),
@@ -295,15 +284,15 @@ class OrderRoutesApiTest {
         ).assertError(
             ApiError(ReasonCode.ProcessingError, "Order not created with this wallet"),
         )
-        apiClient2.cancelOrder(
+        apiClient2.tryCancelOrder(
             limitOrder2.id,
         ).assertError(
             ApiError(ReasonCode.ProcessingError, "Order not created with this wallet"),
         )
 
         // try update cancelled order
-        apiClient.cancelOrder(limitOrder2.id).assertSuccess()
-        apiClient.updateOrder(
+        apiClient.cancelOrder(limitOrder2.id)
+        apiClient.tryUpdateOrder(
             apiRequest = UpdateOrderApiRequest.Limit(
                 orderId = limitOrder2.id,
                 amount = wallet.formatAmount("3", "USDC"),
@@ -318,7 +307,7 @@ class OrderRoutesApiTest {
     fun `list and cancel all open orders`() {
         val apiClient = ApiClient()
         val wallet = Wallet(apiClient)
-        apiClient.cancelOpenOrders().assertSuccess()
+        apiClient.cancelOpenOrders()
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribe(SubscriptionTopic.Orders)
@@ -348,14 +337,14 @@ class OrderRoutesApiTest {
             wallet.signOrder(it)
         }
         repeat(times = 10) {
-            apiClient.createOrder(wallet.signOrder(limitOrderApiRequest.copy(nonce = generateHexString(32)))).assertSuccess()
+            apiClient.createOrder(wallet.signOrder(limitOrderApiRequest.copy(nonce = generateHexString(32))))
         }
         assertEquals(10, apiClient.listOrders().orders.count { it.status != OrderStatus.Cancelled })
         wsClient.receivedDecoded().take(10).forEach {
             assertIs<OrderCreated>((it as OutgoingWSMessage.Publish).data)
         }
 
-        apiClient.cancelOpenOrders().assertSuccess()
+        apiClient.cancelOpenOrders()
 
         wsClient.waitForMessage().also { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
@@ -397,7 +386,7 @@ class OrderRoutesApiTest {
             ).let {
                 makerWallet.signOrder(it)
             },
-        ).assertSuccess()
+        )
         assertIs<Order.Limit>(limitBuyOrder)
         assertEquals(limitBuyOrder.status, OrderStatus.Open)
         makerWsClient.waitForMessage().also { message ->
@@ -414,7 +403,7 @@ class OrderRoutesApiTest {
                 amount = makerWallet.formatAmount("0.00012345", "BTC"),
                 price = BigDecimal("17.50"),
             ),
-        ).assertSuccess()
+        )
         assertIs<Order.Limit>(updatedLimitBuyOrder)
 
         makerWsClient.waitForMessage().also { message ->
@@ -437,7 +426,7 @@ class OrderRoutesApiTest {
             ).let {
                 makerWallet.signOrder(it)
             },
-        ).assertSuccess()
+        )
         assertIs<Order.Limit>(limitSellOrder)
         assertEquals(limitSellOrder.status, OrderStatus.Open)
         makerWsClient.waitForMessage().also { message ->
@@ -455,7 +444,7 @@ class OrderRoutesApiTest {
                 amount = makerWallet.formatAmount("0.00054321", "BTC"),
                 price = BigDecimal("17.550"),
             ),
-        ).assertSuccess()
+        )
         assertIs<Order.Limit>(updatedLimitSellOrder)
 
         makerWsClient.waitForMessage().also { message ->
@@ -477,7 +466,7 @@ class OrderRoutesApiTest {
             ).let {
                 takerWallet.signOrder(it)
             },
-        ).assertSuccess()
+        )
 
         assertIs<Order.Market>(marketBuyOrder)
         assertEquals(marketBuyOrder.status, OrderStatus.Open)
@@ -591,7 +580,7 @@ class OrderRoutesApiTest {
             ).let {
                 takerWallet.signOrder(it)
             },
-        ).assertSuccess()
+        )
 
         assertIs<Order.Market>(marketSellOrder)
         assertEquals(marketSellOrder.status, OrderStatus.Open)
@@ -694,8 +683,8 @@ class OrderRoutesApiTest {
             ),
         )
 
-        takerApiClient.cancelOpenOrders().assertSuccess()
-        makerApiClient.cancelOpenOrders().assertSuccess()
+        takerApiClient.cancelOpenOrders()
+        makerApiClient.cancelOpenOrders()
 
         // verify that client's websocket gets same orders and trades reconnect
         takerWsClient.close()
@@ -785,7 +774,7 @@ class OrderRoutesApiTest {
                 updateOrders = listOf(),
                 cancelOrders = listOf(),
             ),
-        ).assertSuccess()
+        )
 
         assertEquals(3, createBatchLimitOrders.orders.count { it.status == OrderStatus.Open })
         makerWsClient.receivedDecoded().take(3).forEach {
@@ -823,7 +812,7 @@ class OrderRoutesApiTest {
                     CancelUpdateOrderApiRequest(orderId = createBatchLimitOrders.orders[2].id),
                 ),
             ),
-        ).assertSuccess()
+        )
 
         assertEquals(6, batchOrderResponse.orders.count())
         assertEquals(5, batchOrderResponse.orders.count { it.status == OrderStatus.Open })
@@ -852,7 +841,7 @@ class OrderRoutesApiTest {
             ).let {
                 takerWallet.signOrder(it)
             },
-        ).assertSuccess()
+        )
 
         takerWsClient.receivedDecoded().take(1).forEach {
             assertIs<OrderCreated>((it as OutgoingWSMessage.Publish).data)
@@ -908,8 +897,8 @@ class OrderRoutesApiTest {
             ),
         )
 
-        takerApiClient.cancelOpenOrders().assertSuccess()
-        makerApiClient.cancelOpenOrders().assertSuccess()
+        takerApiClient.cancelOpenOrders()
+        makerApiClient.cancelOpenOrders()
 
         makerWsClient.close()
         takerWsClient.close()
