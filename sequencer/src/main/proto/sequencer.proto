@@ -4,6 +4,7 @@ import "bignum.proto";
 import "order.proto";
 import "market.proto";
 import "balance.proto";
+import "checkpoint.proto";
 
 option java_multiple_files = true;
 option java_package = "co.chainring.sequencer.proto";
@@ -39,6 +40,7 @@ message SequencerRequest {
     ApplyOrderBatch = 1;
     ApplyBalanceBatch = 2;
     Reset = 3;
+    GetState = 4;
   }
   string guid = 1;
   Type type = 2;
@@ -56,6 +58,11 @@ enum SequencerError {
   ChangeCrossesMarket = 5;
 }
 
+message StateDump {
+  repeated BalancesCheckpoint.Balance balances = 1;
+  repeated MarketCheckpoint markets = 2;
+}
+
 message SequencerResponse {
   uint64 sequence = 1;
   string guid = 2;
@@ -65,6 +72,7 @@ message SequencerResponse {
   repeated TradeCreated tradesCreated = 6;
   repeated BalanceChange balancesChanged = 7;
   repeated MarketCreated marketsCreated = 8;
+  optional StateDump stateDump = 9;
 }
 
 message Sequenced {

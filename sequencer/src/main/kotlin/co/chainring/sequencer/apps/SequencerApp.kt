@@ -197,6 +197,23 @@ class SequencerApp(
                     }
                 }
             }
+            SequencerRequest.Type.GetState -> {
+                if (inSandboxMode) {
+                    sequencerResponse {
+                        this.sequence = sequence
+                        this.processingTime = System.nanoTime() - startTime
+                        this.guid = request.guid
+                        this.stateDump = state.getDump()
+                    }
+                } else {
+                    sequencerResponse {
+                        this.sequence = sequence
+                        this.processingTime = System.nanoTime() - startTime
+                        this.guid = request.guid
+                        this.error = SequencerError.UnknownRequest
+                    }
+                }
+            }
             null, SequencerRequest.Type.UNRECOGNIZED -> {
                 sequencerResponse {
                     this.sequence = sequence
