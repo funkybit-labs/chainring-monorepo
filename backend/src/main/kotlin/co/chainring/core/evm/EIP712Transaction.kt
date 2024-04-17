@@ -4,6 +4,10 @@ import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.TradeId
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonClassDiscriminator
 import org.bouncycastle.util.encoders.Hex
 import org.web3j.abi.DefaultFunctionEncoder
 import org.web3j.abi.datatypes.DynamicStruct
@@ -20,8 +24,13 @@ enum class EIP712TransactionType {
     Trade,
 }
 
+@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@JsonClassDiscriminator("type")
 sealed class EIP712Transaction {
 
+    @Serializable
+    @SerialName("withdraw")
     data class WithdrawTx(
         val sender: Address,
         val token: Address?,
@@ -71,6 +80,8 @@ sealed class EIP712Transaction {
         }
     }
 
+    @Serializable
+    @SerialName("order")
     data class Order(
         val sender: Address,
         val baseToken: Address,
@@ -112,11 +123,13 @@ sealed class EIP712Transaction {
         }
     }
 
+    @Serializable
+    @SerialName("trade")
     data class Trade(
         val baseToken: Address,
         val quoteToken: Address,
-        val amount: BigInteger,
-        val price: BigInteger,
+        val amount: BigIntegerJson,
+        val price: BigIntegerJson,
         val takerOrder: Order,
         val makerOrder: Order,
         val tradeId: TradeId,

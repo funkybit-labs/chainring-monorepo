@@ -5,9 +5,11 @@ import co.chainring.contracts.generated.Exchange
 import co.chainring.contracts.generated.UUPSUpgradeable
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
+import co.chainring.core.model.db.BlockchainTransactionData
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.DepositEntity
+import co.chainring.core.model.db.ExchangeTransactionEntity
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.services.TxConfirmationCallback
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -23,6 +25,8 @@ import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.EthFilter
+import org.web3j.protocol.core.methods.request.Transaction
+import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.protocol.http.HttpService
 import org.web3j.tx.Contract
 import org.web3j.tx.RawTransactionManager
@@ -31,7 +35,6 @@ import org.web3j.utils.Async
 import java.math.BigInteger
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
-import kotlin.concurrent.thread
 
 enum class ContractType {
     Exchange,
@@ -54,14 +57,24 @@ data class BlockchainClientConfig(
     val deploymentPollingIntervalInMs: Long = longValue("DEPLOYMENT_POLLING_INTERVAL_MS", 1000L),
     val maxPollingAttempts: Long = longValue("MAX_POLLING_ATTEMPTS", 120L),
     val contractCreationLimit: BigInteger = bigIntegerValue("CONTRACT_CREATION_LIMIT", BigInteger.valueOf(5_000_000)),
-    val contractInvocationLimit: BigInteger = bigIntegerValue("CONTRACT_INVOCATION_LIMIT", BigInteger.valueOf(1_000_000)),
+    val contractInvocationLimit: BigInteger = bigIntegerValue("CONTRACT_INVOCATION_LIMIT", BigInteger.valueOf(3_000_000)),
     val defaultMaxPriorityFeePerGasInWei: BigInteger = bigIntegerValue("DEFAULT_MAX_PRIORITY_FEE_PER_GAS_WEI", BigInteger.valueOf(5_000_000_000)),
     val enableWeb3jLogging: Boolean = (System.getenv("ENABLE_WEB3J_LOGGING") ?: "true") == "true",
+    val pollingIntervalInMs: Long = longValue("POLLING_INTERVAL_MS", 500L),
+    val numConfirmations: Int = intValue("NUM_CONFIRMATIONS", 1),
 ) {
     companion object {
         fun longValue(name: String, defaultValue: Long): Long {
             return try {
                 System.getenv(name)?.toLong() ?: defaultValue
+            } catch (e: Exception) {
+                defaultValue
+            }
+        }
+
+        fun intValue(name: String, defaultValue: Int): Int {
+            return try {
+                System.getenv(name)?.toInt() ?: defaultValue
             } catch (e: Exception) {
                 defaultValue
             }
@@ -79,6 +92,45 @@ data class BlockchainClientConfig(
 
 interface DepositConfirmationCallback {
     fun onExchangeContractDepositConfirmation(event: Exchange.DepositEventResponse)
+}
+
+class BlockchainServerException(message: String) : Exception(message)
+class BlockchainClientException(message: String) : Exception(message)
+
+open class TransactionManagerWithNonceOverride(
+    web3j: Web3j,
+    val credentials: Credentials,
+    val nonceOverride: BigInteger?,
+) : RawTransactionManager(web3j, credentials) {
+    lateinit var currentNonce: BigInteger
+
+    override fun getNonce(): BigInteger {
+        currentNonce = nonceOverride ?: super.getNonce()
+        return currentNonce
+    }
+
+    open fun sendPendingTransaction(transactionData: BlockchainTransactionData, gasProvider: GasProvider): BlockchainTransactionData {
+        val response = try {
+            super.sendEIP1559Transaction(
+                gasProvider.chainId,
+                gasProvider.getMaxPriorityFeePerGas(""),
+                gasProvider.getMaxFeePerGas(""),
+                gasProvider.gasLimit,
+                transactionData.to,
+                transactionData.data,
+                transactionData.value,
+            )
+        } catch (e: Exception) {
+            throw BlockchainServerException(e.message ?: "unknown error")
+        }
+        return response.transactionHash?.let {
+            transactionData.copy(
+                nonce = currentNonce,
+                txHash = response.transactionHash,
+            )
+        } ?: response.error?.let { throw BlockchainClientException(it.message) }
+            ?: throw BlockchainServerException("unknown error")
+    }
 }
 
 open class BlockchainClient(private val config: BlockchainClientConfig = BlockchainClientConfig()) {
@@ -111,7 +163,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
     private var submitterWorkerThread: Thread? = null
     private val txQueue = LinkedBlockingQueue<List<EIP712Transaction>>(10)
 
-    protected val gasProvider = GasProvider(
+    val gasProvider = GasProvider(
         contractCreationLimit = config.contractCreationLimit,
         contractInvocationLimit = config.contractInvocationLimit,
         defaultMaxPriorityFeePerGas = config.defaultMaxPriorityFeePerGasInWei,
@@ -122,7 +174,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
 
     private lateinit var exchangeContract: Exchange
 
-    private lateinit var txConfirmationCallback: TxConfirmationCallback
+    private var blockchainTransactionHandler: BlockchainTransactionHandler? = null
 
     companion object {
 
@@ -268,59 +320,61 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
     fun getContractAddress(contractType: ContractType) = contractMap[contractType]
 
     fun queueTransactions(txs: List<EIP712Transaction>) {
-        if (txs.isNotEmpty()) {
-            txQueue.put(txs)
+        ExchangeTransactionEntity.createList(chainId, txs)
+    }
+
+    fun getTransactionReceipt(txHash: String): TransactionReceipt? {
+        val receipt = web3j.ethGetTransactionReceipt(txHash).send().transactionReceipt
+        return if (receipt.isPresent) {
+            return receipt.get()
+        } else {
+            null
         }
     }
 
-    fun startTransactionSubmitter(txConfirmationCallback: TxConfirmationCallback, pendingTransactions: List<EIP712Transaction>) {
-        this.txConfirmationCallback = txConfirmationCallback
-        logger.debug { "Starting transaction submitter" }
-        val exchange = Exchange.load(contractMap[ContractType.Exchange]!!.value, web3j, submitterTransactionManager, gasProvider)
-        submitterWorkerThread = thread(start = true, name = "transaction-processor", isDaemon = true) {
-            try {
-                logger.debug { "Transaction submitter thread starting" }
-                while (true) {
-                    val txs = txQueue.take()
-
-                    val error = try {
-                        logger.debug { "Submitting ${txs.size} transactions" }
-                        try {
-                            exchange.submitTransactions(txs.map { it.getTxData() }).send()
-                            null
-                        } catch (e: org.web3j.protocol.exceptions.TransactionException) {
-                            e.transactionReceipt.get().revertReason
-                        }
-                    } catch (e: Exception) {
-                        logger.error(e) { "Unhandled exception submitting tx" }
-                        "Unhandled error ${e.message}"
-                    }
-
-                    txs.forEach { tx ->
-                        try {
-                            logger.debug { "Finished processing tx - ${error?.let { "failed with $error" } ?: "success"}" }
-                            txConfirmationCallback.onTxConfirmation(tx, error)
-                        } catch (e: Exception) {
-                            logger.error(e) { "Unhandled exception updating tx" }
-                        }
-                    }
-                }
-            } catch (ie: InterruptedException) {
-                logger.warn { "existing blockchain handler" }
-                return@thread
-            } catch (e: Exception) {
-                logger.error(e) { "Unhandled exception submitting tx" }
-            }
-        }
-        txQueue.put(pendingTransactions)
+    open fun getBlockNumber(): BigInteger {
+        return web3j.ethBlockNumber().send().blockNumber
     }
 
-    fun stopTransactionSubmitter() {
-        txQueue.clear()
-        submitterWorkerThread?.let {
-            it.interrupt()
-            it.join(100)
+    fun getTxManager(nonceOverride: BigInteger): TransactionManagerWithNonceOverride {
+        return TransactionManagerWithNonceOverride(web3j, submitterCredentials, nonceOverride)
+    }
+
+    fun getNonce(address: String): BigInteger {
+        return web3j.ethGetTransactionCount(address, DefaultBlockParameterName.PENDING).send().transactionCount
+    }
+
+    fun extractRevertReasonFromSimulation(data: String, blockNumber: BigInteger): String? {
+        val response = web3j.ethCall(
+            Transaction.createEthCallTransaction(
+                submitterCredentials.address,
+                contractMap[ContractType.Exchange]!!.value,
+                data,
+                BigInteger.ZERO,
+            ),
+            DefaultBlockParameter.valueOf(blockNumber),
+        ).send()
+
+        return if (response.isReverted) {
+            response.revertReason ?: "Unknown Error"
+        } else {
+            null
         }
+    }
+
+    fun start(txConfirmationCallback: TxConfirmationCallback) {
+        blockchainTransactionHandler = BlockchainTransactionHandler(
+            blockchainClient = this,
+            submitterCredentials = submitterCredentials,
+            numConfirmations = config.numConfirmations,
+            pollingIntervalInMs = config.pollingIntervalInMs,
+        ).also {
+            it.start(txConfirmationCallback)
+        }
+    }
+
+    fun stop() {
+        blockchainTransactionHandler?.stop()
     }
 
     fun registerDepositEventsConsumer(depositConfirmationCallback: DepositConfirmationCallback) {

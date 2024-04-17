@@ -8,8 +8,10 @@ import co.chainring.core.blockchain.ContractType
 import co.chainring.core.db.DbConfig
 import co.chainring.core.model.db.BalanceLogTable
 import co.chainring.core.model.db.BalanceTable
+import co.chainring.core.model.db.BlockchainTransactionTable
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.DepositTable
+import co.chainring.core.model.db.ExchangeTransactionTable
 import co.chainring.core.model.db.OrderExecutionTable
 import co.chainring.core.model.db.OrderTable
 import co.chainring.core.model.db.TradeTable
@@ -119,6 +121,8 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             DepositTable.deleteAll()
             WithdrawalTable.deleteAll()
             WalletTable.deleteAll()
+            ExchangeTransactionTable.deleteAll()
+            BlockchainTransactionTable.deleteAll()
         }
     }
 }

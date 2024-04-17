@@ -6,7 +6,6 @@ import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.db.DbConfig
-import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.services.ExchangeService
 import co.chainring.core.websocket.Broadcaster
@@ -34,7 +33,6 @@ import org.http4k.server.Netty
 import org.http4k.server.PolyHandler
 import org.http4k.server.ServerConfig
 import org.http4k.server.asServer
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.MDC
 import java.time.Duration.ofSeconds
 
@@ -139,7 +137,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         super.stop()
         broadcaster.stop()
         server.stop()
-        blockchainClient.stopTransactionSubmitter()
+        blockchainClient.stop()
         logger.info { "Stopped" }
     }
 
@@ -152,11 +150,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
 
     fun updateContracts() {
         blockchainClient.updateContracts()
-        blockchainClient.startTransactionSubmitter(
+        blockchainClient.start(
             exchangeService,
-            transaction {
-                WithdrawalEntity.findPending().map { it.toEip712Transaction() }
-            },
         )
         blockchainClient.registerDepositEventsConsumer(exchangeService)
     }
