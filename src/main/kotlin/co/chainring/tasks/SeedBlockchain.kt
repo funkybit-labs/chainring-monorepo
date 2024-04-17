@@ -10,6 +10,7 @@ import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.SymbolId
 import co.chainring.tasks.fixtures.Fixtures
+import java.math.BigInteger
 import okhttp3.OkHttpClient
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.TransactionManager
@@ -22,8 +23,8 @@ import org.web3j.protocol.core.methods.response.VoidResponse
 import org.web3j.protocol.http.HttpService
 import org.web3j.tx.RawTransactionManager
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
+import org.web3j.utils.Async
 import org.web3j.utils.Numeric
-import java.math.BigInteger
 
 data class SymbolContractAddress(
     val symbolId: SymbolId,
@@ -86,11 +87,29 @@ fun seedBlockchain(fixtures: Fixtures, chainRpcUrl: String, privateKey: String):
 }
 
 private class BlockchainClient(config: BlockchainClientConfig = BlockchainClientConfig()) {
-    class AnvilRpc(web3jService: Web3jService) : JsonRpc2_0Web3j(web3jService) {
+    class AnvilRpc(web3jService: Web3jService) : JsonRpc2_0Web3j(
+        web3jService, System.getenv("EVM_NETWORK_POLLING_INTERVAL")?.toLong() ?: 1000L, Async.defaultExecutorService()
+    ) {
         fun setBalance(address: Address, amount: BigInteger): Request<String, VoidResponse?> =
             Request(
                 "anvil_setBalance",
                 listOf<String>(address.value, Numeric.encodeQuantity(amount)),
+                web3jService,
+                VoidResponse::class.java
+            )
+
+        fun setAutomine(value: Boolean): Request<Boolean, VoidResponse?> =
+            Request(
+                "evm_setAutomine",
+                listOf(value),
+                web3jService,
+                VoidResponse::class.java
+            )
+
+        fun mineBlock(): Request<String, VoidResponse?> =
+            Request(
+                "anvil_mine",
+                listOf<String>(),
                 web3jService,
                 VoidResponse::class.java
             )
@@ -171,5 +190,9 @@ private class BlockchainClient(config: BlockchainClientConfig = BlockchainClient
     ) {
         web3j.setBalance(address, amount).send()
     }
+
+    fun mineBlock() = web3j.mineBlock().send()
+    fun activateAutomine() = web3j.setAutomine(value = true).send()
+    fun deactivateAutomine() = web3j.setAutomine(value = false).send()
 }
 

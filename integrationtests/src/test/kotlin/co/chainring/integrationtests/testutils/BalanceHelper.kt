@@ -27,7 +27,7 @@ object BalanceHelper {
                 .pollInSameThread()
                 .pollDelay(Duration.ofMillis(100))
                 .pollInterval(Duration.ofMillis(100))
-                .atMost(Duration.ofMillis(20000L))
+                .atMost(Duration.ofMillis(10000L))
                 .until {
                     lastBalanceChanges.all { (symbol, lastBalanceChange) ->
                         lastBalanceChange != getLastBalanceChange(symbol)

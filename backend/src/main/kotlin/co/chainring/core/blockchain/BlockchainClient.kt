@@ -27,6 +27,7 @@ import org.web3j.protocol.http.HttpService
 import org.web3j.tx.Contract
 import org.web3j.tx.RawTransactionManager
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
+import org.web3j.utils.Async
 import java.math.BigInteger
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -82,7 +83,11 @@ interface DepositConfirmationCallback {
 
 open class BlockchainClient(private val config: BlockchainClientConfig = BlockchainClientConfig()) {
 
-    protected val web3j = Web3j.build(httpService(config.url, config.enableWeb3jLogging))
+    protected val web3j = Web3j.build(
+        httpService(config.url, config.enableWeb3jLogging),
+        System.getenv("EVM_NETWORK_POLLING_INTERVAL")?.toLong() ?: 1000L,
+        Async.defaultExecutorService(),
+    )
     protected val credentials = Credentials.create(config.privateKeyHex)
     val chainId = ChainId(web3j.ethChainId().send().chainId)
     private val receiptProcessor = PollingTransactionReceiptProcessor(
