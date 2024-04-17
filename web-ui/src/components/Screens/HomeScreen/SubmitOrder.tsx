@@ -128,49 +128,8 @@ export default function SubmitOrder({
               Sell {baseSymbol.name}
             </div>
           </div>
-          <table>
+          <table className="w-full">
             <tbody>
-              <tr>
-                <td className="pt-3">
-                  <label className="block text-sm">Price</label>
-                </td>
-              </tr>
-              <tr>
-                <td>
-                  <div className="relative">
-                    <input
-                      value={price}
-                      disabled={isMarketOrder || mutation.isPending}
-                      placeholder={'0.0'}
-                      onChange={(e) => {
-                        setPrice(
-                          cleanAndFormatNumberInput(
-                            e.target.value,
-                            market.quoteDecimalPlaces
-                          )
-                        )
-                      }}
-                      className="bg-black pr-12 text-white disabled:bg-mutedGray"
-                    />
-                    <span className="absolute right-2 top-2 text-white">
-                      {quoteSymbol.name}
-                    </span>
-                  </div>
-                </td>
-                <td className="pl-6">
-                  <label className="text-sm">
-                    <input
-                      type="checkbox"
-                      checked={isMarketOrder}
-                      disabled={mutation.isPending}
-                      onChange={(e) => {
-                        setIsMarketOrder(e.target.checked)
-                      }}
-                    />
-                    <span className="pl-2">Market Order</span>
-                  </label>
-                </td>
-              </tr>
               <tr>
                 <td className="pt-3">
                   <label className="block text-sm">Amount</label>
@@ -191,10 +150,49 @@ export default function SubmitOrder({
                           )
                         )
                       }}
-                      className="bg-black pr-12 text-white disabled:bg-mutedGray"
+                      className="w-full bg-black text-white disabled:bg-mutedGray"
                     />
                     <span className="absolute right-2 top-2 text-white">
                       {baseSymbol.name}
+                    </span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td className="relative pt-3">
+                  <label className="block text-sm">Price</label>
+                  <label className="absolute right-1 top-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={isMarketOrder}
+                      disabled={mutation.isPending}
+                      onChange={(e) => {
+                        setIsMarketOrder(e.target.checked)
+                      }}
+                    />
+                    <span className="pl-2">Market Order</span>
+                  </label>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div className="relative">
+                    <input
+                      value={price}
+                      disabled={isMarketOrder || mutation.isPending}
+                      placeholder={'0.0'}
+                      onChange={(e) => {
+                        setPrice(
+                          cleanAndFormatNumberInput(
+                            e.target.value,
+                            market.quoteDecimalPlaces
+                          )
+                        )
+                      }}
+                      className="w-full bg-black text-white disabled:bg-mutedGray"
+                    />
+                    <span className="absolute right-2 top-2 text-white">
+                      {quoteSymbol.name}
                     </span>
                   </div>
                 </td>

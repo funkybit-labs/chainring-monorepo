@@ -1,9 +1,10 @@
 import { Widget } from 'components/common/Widget'
 import { calculateTickSpacing } from 'utils/orderBookUtils'
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
 import { OrderBook, Publishable, orderBookTopic } from 'websocketMessages'
 import { useWebsocketSubscription } from 'contexts/websocket'
+import { useWindowDimensions, widgetSize, WindowDimensions } from 'utils/layout'
 
 type OrderBookParameters = {
   bookWidth: number
@@ -21,8 +22,11 @@ type OrderBookParameters = {
   ticks: number[]
 }
 
-function calculateParameters(orderBook: OrderBook): OrderBookParameters {
-  const bookWidth = 400
+function calculateParameters(
+  orderBook: OrderBook,
+  windowDimensions: WindowDimensions
+): OrderBookParameters {
+  const bookWidth = widgetSize(windowDimensions.width)
   const gridLines = 6
   const graphStartX = 60
   const graphEndX = bookWidth - 20
@@ -69,16 +73,22 @@ function calculateParameters(orderBook: OrderBook): OrderBookParameters {
 export function OrderBook({ marketId }: { marketId: string }) {
   const [orderBook, setOrderBook] = useState<OrderBook>()
   const [params, setParams] = useState<OrderBookParameters>()
+  const windowDimensions = useWindowDimensions()
 
   useWebsocketSubscription({
     topic: useMemo(() => orderBookTopic(marketId), [marketId]),
     handler: (message: Publishable) => {
       if (message.type === 'OrderBook') {
-        setParams(calculateParameters(message))
         setOrderBook(message)
       }
     }
   })
+
+  useEffect(() => {
+    if (orderBook) {
+      setParams(calculateParameters(orderBook, windowDimensions))
+    }
+  }, [orderBook, windowDimensions])
 
   return (
     <Widget
@@ -98,7 +108,10 @@ export function OrderBook({ marketId }: { marketId: string }) {
                 </text>
                 <rect
                   x={params.graphStartX}
-                  width={params.graphWidth * (l.size / params.maxSize)}
+                  width={Math.min(
+                    params.graphWidth,
+                    params.graphWidth * (l.size / params.maxSize)
+                  )}
                   y={params.graphStartY + 8 + i * params.barHeight}
                   height={params.barHeight}
                   fill="#10A327"
@@ -131,7 +144,10 @@ export function OrderBook({ marketId }: { marketId: string }) {
                 </text>
                 <rect
                   x={params.graphStartX}
-                  width={params.graphWidth * (l.size / params.maxSize)}
+                  width={Math.min(
+                    params.graphWidth,
+                    params.graphWidth * (l.size / params.maxSize)
+                  )}
                   y={params.sellStartY + i * params.barHeight}
                   height={params.barHeight}
                   fill="#7F1D1D"

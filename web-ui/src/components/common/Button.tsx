@@ -4,13 +4,16 @@ type Props = {
   caption: () => JSX.Element
   onClick: () => void
   disabled: boolean
+  narrow?: boolean
 }
-export function Button({ caption, onClick, disabled }: Props) {
+export function Button({ caption, onClick, disabled, narrow }: Props) {
   return (
     <button
       disabled={disabled}
       className={classNames(
-        'border-transparent rounded-lg bg-darkGray p-2 px-4 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray',
+        'overflow-ellipsis overflow-hidden border-transparent rounded-lg bg-darkGray',
+        narrow ? 'px-2 my-1 mx-1' : 'px-4 py-2',
+        'text-sm font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray',
         disabled ? 'text-neutralGray' : 'text-white hover:bg-mutedGray'
       )}
       onClick={onClick}

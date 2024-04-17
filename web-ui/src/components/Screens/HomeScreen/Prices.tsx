@@ -5,6 +5,7 @@ import Spinner from 'components/common/Spinner'
 import { Direction, OHLC, pricesTopic, Publishable } from 'websocketMessages'
 import { mergeOHLC } from 'utils/pricesUtils'
 import { useWebsocketSubscription } from 'contexts/websocket'
+import { useWindowDimensions, widgetSize, WindowDimensions } from 'utils/layout'
 
 type PriceParameters = {
   totalWidth: number
@@ -27,8 +28,11 @@ type PriceParameters = {
 
 type ZoomLevels = 'Week' | 'Day' | 'Hour'
 
-function calculateParameters(ohlc: OHLC[]): PriceParameters {
-  const totalWidth = 500
+function calculateParameters(
+  ohlc: OHLC[],
+  windowDimensions: WindowDimensions
+): PriceParameters {
+  const totalWidth = widgetSize(windowDimensions.width)
   const gridLines = 5
   const chartStartX = 20
   const chartEndX = totalWidth - 80
@@ -74,6 +78,7 @@ export function Prices({ marketId }: { marketId: string }) {
   const [latestStart, setLatestStart] = useState<Date | undefined>()
   const [ohlc, setOhlc] = useState<OHLC[]>([])
   const [params, setParams] = useState<PriceParameters>()
+  const windowDimensions = useWindowDimensions()
 
   useWebsocketSubscription({
     topic: useMemo(() => pricesTopic(marketId), [marketId]),
@@ -159,10 +164,10 @@ export function Prices({ marketId }: { marketId: string }) {
       ohlcDuration(zoom)
     )
     if (merged.length > 0) {
-      setParams(calculateParameters(merged))
+      setParams(calculateParameters(merged, windowDimensions))
     }
     return merged
-  }, [latestStart, ohlc, zoom])
+  }, [latestStart, ohlc, zoom, windowDimensions])
 
   // draw the body of a candlestick, with some special treatment if it is marked as "incomplete"
   function drawCandle(params: PriceParameters, l: OHLC, i: number) {

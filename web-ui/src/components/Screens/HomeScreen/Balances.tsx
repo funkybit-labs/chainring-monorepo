@@ -1,6 +1,6 @@
 import { Address, formatUnits } from 'viem'
 import { Balance, TradingSymbol } from 'apiClient'
-import React, { useState } from 'react'
+import React, { Fragment, useState } from 'react'
 import DepositModal from 'components/Screens/HomeScreen/Balances/DepositModal'
 import WithdrawalModal from 'components/Screens/HomeScreen/Balances/WithdrawalModal'
 import { Widget } from 'components/common/Widget'
@@ -72,48 +72,44 @@ function BalancesTable({
 
   return (
     <>
-      <table>
-        <tbody>
-          {[symbols.native].concat(symbols.erc20).map((symbol) => {
-            const balance = balances.find(
-              (balance) => balance.symbol == symbol.name
-            )
-            return (
-              <tr key={symbol.name}>
-                <td className="min-w-12 whitespace-nowrap pr-2">
-                  <SymbolIcon
-                    symbol={symbol}
-                    className="mr-2 inline-block size-6"
-                  />
-                  {symbol.name}
-                </td>
-                <td className="min-w-12 px-4 text-left">
-                  {balance
-                    ? formatUnits(
-                        balance?.available,
-                        symbols.getByName(balance!.symbol).decimals
-                      )
-                    : '0'}
-                </td>
-                <td className="px-2 py-1">
-                  <Button
-                    caption={() => <>Deposit</>}
-                    onClick={() => openDepositModal(symbol)}
-                    disabled={false}
-                  />
-                </td>
-                <td className="py-1 pl-2">
-                  <Button
-                    caption={() => <>Withdraw</>}
-                    onClick={() => openWithdrawModal(symbol)}
-                    disabled={balance?.available === 0n}
-                  />
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+      <div className="grid grid-cols-[min-content_max-content_1fr_1fr]">
+        {[symbols.native].concat(symbols.erc20).map((symbol) => {
+          const balance = balances.find(
+            (balance) => balance.symbol == symbol.name
+          )
+          return (
+            <Fragment key={symbol.name}>
+              <div className="my-2 mr-2 flex items-center whitespace-nowrap pr-2">
+                <SymbolIcon
+                  symbol={symbol}
+                  className="mr-2 inline-block size-6"
+                />
+                {symbol.name}
+              </div>
+              <div className="m-2 px-2 text-left">
+                {balance
+                  ? formatUnits(
+                      balance?.available,
+                      symbols.getByName(balance!.symbol).decimals
+                    )
+                  : '0'}
+              </div>
+              <Button
+                caption={() => <>Deposit</>}
+                onClick={() => openDepositModal(symbol)}
+                disabled={false}
+                narrow={true}
+              />
+              <Button
+                caption={() => <>Withdraw</>}
+                onClick={() => openWithdrawModal(symbol)}
+                disabled={balance?.available === 0n}
+                narrow={true}
+              />
+            </Fragment>
+          )
+        })}
+      </div>
 
       {depositSymbol && (
         <DepositModal

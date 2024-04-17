@@ -169,7 +169,7 @@ export function useWebsocketSubscription({
   topic,
   handler
 }: {
-  topic: SubscriptionTopic
+  topic: SubscriptionTopic | SubscriptionTopic[]
   handler: SubscriptionEventHandler
 }) {
   const handlerRef = useRef(handler)
@@ -184,10 +184,18 @@ export function useWebsocketSubscription({
 
   useEffect(() => {
     const handler = handlerRef.current
-    subscribe(topic, handler)
+    if (Array.isArray(topic)) {
+      topic.forEach((t) => subscribe(t, handler))
+    } else {
+      subscribe(topic, handler)
+    }
 
     return () => {
-      unsubscribe(topic, handler)
+      if (Array.isArray(topic)) {
+        topic.forEach((t) => unsubscribe(t, handler))
+      } else {
+        unsubscribe(topic, handler)
+      }
     }
   }, [topic, subscribe, unsubscribe])
 }
