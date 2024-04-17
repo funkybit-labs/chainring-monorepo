@@ -6,9 +6,17 @@ import co.chainring.apps.api.TestRoutes
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.db.DbConfig
+import co.chainring.core.model.db.BalanceLogTable
+import co.chainring.core.model.db.BalanceTable
 import co.chainring.core.model.db.DeployedSmartContractEntity
+import co.chainring.core.model.db.DepositTable
+import co.chainring.core.model.db.OrderExecutionTable
+import co.chainring.core.model.db.OrderTable
+import co.chainring.core.model.db.TradeTable
+import co.chainring.core.model.db.WalletTable
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
+import co.chainring.core.model.db.WithdrawalTable
 import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
 import co.chainring.sequencer.apps.SequencerApp
@@ -17,6 +25,7 @@ import co.chainring.tasks.seedBlockchain
 import co.chainring.tasks.seedDatabase
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.awaitility.kotlin.await
+import org.jetbrains.exposed.sql.deleteAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.BeforeEachCallback
@@ -99,6 +108,17 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                     baseDecimals = baseSymbol.decimals,
                 ),
             )
+        }
+
+        transaction {
+            OrderExecutionTable.deleteAll()
+            TradeTable.deleteAll()
+            OrderTable.deleteAll()
+            BalanceLogTable.deleteAll()
+            BalanceTable.deleteAll()
+            DepositTable.deleteAll()
+            WithdrawalTable.deleteAll()
+            WalletTable.deleteAll()
         }
     }
 }
