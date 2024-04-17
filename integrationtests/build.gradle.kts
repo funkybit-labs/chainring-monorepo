@@ -60,6 +60,8 @@ dependencies {
     implementation("io.grpc:grpc-netty:$grpcProtobufVersion")
     implementation("net.openhft:chronicle-queue:5.22.28")
 
+    implementation("io.arrow-kt:arrow-core:1.2.1")
+
     implementation(project(":backend"))
     implementation(project(":sequencer"))
     testImplementation(project(mapOf("path" to ":")))

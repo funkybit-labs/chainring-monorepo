@@ -6,19 +6,17 @@ import co.chainring.apps.api.model.ReasonCode
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
-import co.chainring.integrationtests.testutils.AbnormalApiResponseException
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.BalanceHelper
 import co.chainring.integrationtests.testutils.ExpectedBalance
 import co.chainring.integrationtests.testutils.Faucet
 import co.chainring.integrationtests.testutils.Wallet
-import co.chainring.integrationtests.testutils.apiError
+import co.chainring.integrationtests.testutils.assertError
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.awaitility.kotlin.await
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.utils.Numeric
@@ -130,15 +128,12 @@ class EIP712WithdrawalTest {
 
         // invalid signature
         withdrawalApiRequest = wallet.signWithdraw("USDC", amount)
-        assertThrows<AbnormalApiResponseException> {
-            // change the amount from what was signed
-            apiClient.createWithdrawal(withdrawalApiRequest.copy(tx = withdrawalApiRequest.tx.copy(amount = BigInteger.TWO)))
-        }.also {
-            assertEquals(
-                ApiError(ReasonCode.SignatureNotValid, "Signature not verified"),
-                it.response.apiError(),
-            )
-        }
+        // change the amount from what was signed
+        apiClient.tryCreateWithdrawal(
+            withdrawalApiRequest.copy(tx = withdrawalApiRequest.tx.copy(amount = BigInteger.TWO)),
+        ).assertError(
+            ApiError(ReasonCode.SignatureNotValid, "Signature not verified"),
+        )
     }
 
     private fun deposit(apiClient: ApiClient, wallet: Wallet, asset: String, amount: BigInteger): TransactionReceipt {

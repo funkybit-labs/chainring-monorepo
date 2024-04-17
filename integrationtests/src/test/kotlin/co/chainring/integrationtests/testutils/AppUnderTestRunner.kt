@@ -84,23 +84,21 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
     }
 
     override fun beforeEach(context: ExtensionContext) {
-        ApiClient().apply {
-            resetSequencer()
+        ApiClient.resetSequencer()
 
-            localDevFixtures.markets.forEach { market ->
-                val baseSymbol = localDevFixtures.symbols.first { it.id == market.baseSymbol }
-                val quoteSymbol = localDevFixtures.symbols.first { it.id == market.quoteSymbol }
+        localDevFixtures.markets.forEach { market ->
+            val baseSymbol = localDevFixtures.symbols.first { it.id == market.baseSymbol }
+            val quoteSymbol = localDevFixtures.symbols.first { it.id == market.quoteSymbol }
 
-                createMarketInSequencer(
-                    TestRoutes.Companion.CreateMarketInSequencer(
-                        id = "${baseSymbol.name}/${quoteSymbol.name}",
-                        tickSize = market.tickSize,
-                        marketPrice = market.marketPrice,
-                        quoteDecimals = quoteSymbol.decimals,
-                        baseDecimals = baseSymbol.decimals,
-                    ),
-                )
-            }
+            ApiClient.createMarketInSequencer(
+                TestRoutes.Companion.CreateMarketInSequencer(
+                    id = "${baseSymbol.name}/${quoteSymbol.name}",
+                    tickSize = market.tickSize,
+                    marketPrice = market.marketPrice,
+                    quoteDecimals = quoteSymbol.decimals,
+                    baseDecimals = baseSymbol.decimals,
+                ),
+            )
         }
     }
 }

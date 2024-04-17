@@ -30,14 +30,13 @@ import co.chainring.core.model.db.TradeTable
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.generateHexString
 import co.chainring.core.utils.toFundamentalUnits
-import co.chainring.integrationtests.testutils.AbnormalApiResponseException
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.BalanceHelper
 import co.chainring.integrationtests.testutils.ExpectedBalance
 import co.chainring.integrationtests.testutils.Faucet
 import co.chainring.integrationtests.testutils.Wallet
-import co.chainring.integrationtests.testutils.apiError
+import co.chainring.integrationtests.testutils.assertError
 import co.chainring.integrationtests.testutils.blocking
 import co.chainring.integrationtests.testutils.receivedDecoded
 import co.chainring.integrationtests.testutils.subscribe
@@ -53,7 +52,6 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -97,6 +95,7 @@ class OrderRoutesApiTest {
         ).let {
             wallet.signOrder(it)
         }
+
         val limitOrder = apiClient.createOrder(limitOrderApiRequest)
 
         // order created correctly
@@ -189,27 +188,18 @@ class OrderRoutesApiTest {
         }
 
         // operation on non-existent order
-        listOf(
-            { apiClient.getOrder(OrderId.generate()) },
-            {
-                apiClient.updateOrder(
-                    apiRequest = UpdateOrderApiRequest.Limit(
-                        orderId = OrderId.generate(),
-                        amount = BigDecimal("3").toFundamentalUnits(18),
-                        price = BigDecimal("4"),
-                    ),
-                )
-            },
-            { apiClient.cancelOrder(OrderId.generate()) },
-        ).forEach { op ->
-            assertThrows<AbnormalApiResponseException> {
-                op()
-            }.also {
-                assertEquals(
-                    ApiError(ReasonCode.OrderNotFound, "Requested order does not exist"),
-                    it.response.apiError(),
-                )
-            }
+        ApiError(ReasonCode.OrderNotFound, "Requested order does not exist").also { expectedError ->
+            apiClient.tryGetOrder(OrderId.generate()).assertError(expectedError)
+
+            apiClient.tryUpdateOrder(
+                apiRequest = UpdateOrderApiRequest.Limit(
+                    orderId = OrderId.generate(),
+                    amount = BigDecimal("3").toFundamentalUnits(18),
+                    price = BigDecimal("4"),
+                ),
+            ).assertError(expectedError)
+
+            apiClient.tryCancelOrder(OrderId.generate()).assertError(expectedError)
         }
 
         // try to submit an order that crosses the market
@@ -244,25 +234,20 @@ class OrderRoutesApiTest {
         }
 
         // try creating a limit order not a multiple of tick size
-        assertThrows<AbnormalApiResponseException> {
-            apiClient.createOrder(
-                CreateOrderApiRequest.Limit(
-                    nonce = generateHexString(32),
-                    marketId = MarketId("USDC/DAI"),
-                    side = OrderSide.Buy,
-                    amount = wallet.formatAmount("1", "USDC"),
-                    price = BigDecimal("2.015"),
-                    signature = EvmSignature.emptySignature(),
-                ).let {
-                    wallet.signOrder(it)
-                },
-            )
-        }.also {
-            assertEquals(
-                ApiError(ReasonCode.ProcessingError, "Order price is not a multiple of tick size"),
-                it.response.apiError(),
-            )
-        }
+        apiClient.tryCreateOrder(
+            CreateOrderApiRequest.Limit(
+                nonce = generateHexString(32),
+                marketId = MarketId("USDC/DAI"),
+                side = OrderSide.Buy,
+                amount = wallet.formatAmount("1", "USDC"),
+                price = BigDecimal("2.015"),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                wallet.signOrder(it)
+            },
+        ).assertError(
+            ApiError(ReasonCode.ProcessingError, "Order price is not a multiple of tick size"),
+        )
 
         val limitOrder2 = apiClient.createOrder(
             CreateOrderApiRequest.Limit(
@@ -278,62 +263,44 @@ class OrderRoutesApiTest {
         )
 
         // try updating the price to something not a tick size
-        assertThrows<AbnormalApiResponseException> {
-            apiClient.updateOrder(
-                apiRequest = UpdateOrderApiRequest.Limit(
-                    orderId = limitOrder2.id,
-                    amount = wallet.formatAmount("1", "USDC"),
-                    price = BigDecimal("2.015"),
-                ),
-            )
-        }.also {
-            assertEquals(
-                ApiError(ReasonCode.ProcessingError, "Order price is not a multiple of tick size"),
-                it.response.apiError(),
-            )
-        }
+        apiClient.tryUpdateOrder(
+            apiRequest = UpdateOrderApiRequest.Limit(
+                orderId = limitOrder2.id,
+                amount = wallet.formatAmount("1", "USDC"),
+                price = BigDecimal("2.015"),
+            ),
+        ).assertError(
+            ApiError(ReasonCode.ProcessingError, "Order price is not a multiple of tick size"),
+        )
 
         // try updating and cancelling an order not created by this wallet
         val apiClient2 = ApiClient()
-        assertThrows<AbnormalApiResponseException> {
-            apiClient2.updateOrder(
-                apiRequest = UpdateOrderApiRequest.Limit(
-                    orderId = limitOrder2.id,
-                    amount = wallet.formatAmount("1", "USDC"),
-                    price = BigDecimal("2.01"),
-                ),
-            )
-        }.also {
-            assertEquals(
-                ApiError(ReasonCode.ProcessingError, "Order not created with this wallet"),
-                it.response.apiError(),
-            )
-        }
-        assertThrows<AbnormalApiResponseException> {
-            apiClient2.cancelOrder(limitOrder2.id)
-        }.also {
-            assertEquals(
-                ApiError(ReasonCode.ProcessingError, "Order not created with this wallet"),
-                it.response.apiError(),
-            )
-        }
+        apiClient2.tryUpdateOrder(
+            apiRequest = UpdateOrderApiRequest.Limit(
+                orderId = limitOrder2.id,
+                amount = wallet.formatAmount("1", "USDC"),
+                price = BigDecimal("2.01"),
+            ),
+        ).assertError(
+            ApiError(ReasonCode.ProcessingError, "Order not created with this wallet"),
+        )
+        apiClient2.tryCancelOrder(
+            limitOrder2.id,
+        ).assertError(
+            ApiError(ReasonCode.ProcessingError, "Order not created with this wallet"),
+        )
 
         // try update cancelled order
         apiClient.cancelOrder(limitOrder2.id)
-        assertThrows<AbnormalApiResponseException> {
-            apiClient.updateOrder(
-                apiRequest = UpdateOrderApiRequest.Limit(
-                    orderId = limitOrder2.id,
-                    amount = wallet.formatAmount("3", "USDC"),
-                    price = BigDecimal("4"),
-                ),
-            )
-        }.also {
-            assertEquals(
-                ApiError(ReasonCode.OrderIsClosed, "Order is already finalized"),
-                it.response.apiError(),
-            )
-        }
+        apiClient.tryUpdateOrder(
+            apiRequest = UpdateOrderApiRequest.Limit(
+                orderId = limitOrder2.id,
+                amount = wallet.formatAmount("3", "USDC"),
+                price = BigDecimal("4"),
+            ),
+        ).assertError(
+            ApiError(ReasonCode.OrderIsClosed, "Order is already finalized"),
+        )
     }
 
     @Test

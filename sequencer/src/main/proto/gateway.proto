@@ -19,9 +19,14 @@ message ResetRequest {
   string guid = 1;
 }
 
+message GetStateRequest {
+  string guid = 1;
+}
+
 service Gateway {
   rpc AddMarket (Market) returns (GatewayResponse);
   rpc ApplyBalanceBatch (BalanceBatch) returns (GatewayResponse);
   rpc ApplyOrderBatch (OrderBatch) returns (GatewayResponse);
   rpc Reset (ResetRequest) returns (GatewayResponse);
+  rpc GetState (GetStateRequest) returns (GatewayResponse);
 }
