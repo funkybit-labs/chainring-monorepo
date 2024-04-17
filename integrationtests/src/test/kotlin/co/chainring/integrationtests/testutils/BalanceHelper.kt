@@ -1,17 +1,10 @@
 package co.chainring.integrationtests.testutils
 
-import co.chainring.core.model.db.BalanceTable
-import co.chainring.core.model.db.SymbolTable
-import kotlinx.datetime.Instant
 import org.awaitility.kotlin.await
-import org.jetbrains.exposed.sql.JoinType
-import org.jetbrains.exposed.sql.max
-import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigInteger
 import java.time.Duration
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 
 data class ExpectedBalance(
     val symbol: String,
