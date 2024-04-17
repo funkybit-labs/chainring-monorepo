@@ -97,7 +97,7 @@ export default function OrdersAndTrades({ markets }: { markets: Markets }) {
   function ordersContent() {
     return (
       <>
-        <div className="min-h-24 overflow-scroll">
+        <div className="max-h-96 min-h-24 overflow-scroll">
           <table className="relative w-full text-left text-sm">
             <thead className="sticky top-0 bg-black">
               <tr key="header">
@@ -185,7 +185,7 @@ export default function OrdersAndTrades({ markets }: { markets: Markets }) {
   function tradeHistoryContent() {
     return (
       <>
-        <div className="min-h-24 overflow-scroll">
+        <div className="max-h-96 min-h-24 overflow-scroll">
           <table className="relative w-full text-left text-sm">
             <thead className="sticky top-0 bg-black">
               <tr key="header">
