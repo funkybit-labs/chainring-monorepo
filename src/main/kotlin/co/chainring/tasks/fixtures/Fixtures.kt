@@ -94,6 +94,16 @@ val localDevFixtures = Fixtures(
                 SymbolId(chainringDevChainId, "USDC") to BigDecimal("100000").toFundamentalUnits(6),
                 SymbolId(chainringDevChainId, "DAI") to BigDecimal("100000").toFundamentalUnits(18),
             )
+        ),
+        Fixtures.Wallet(
+            privateKeyHex = "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba",
+            address = Address("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"),
+            balances = mapOf(
+                SymbolId(chainringDevChainId, "BTC") to BigDecimal("10").toFundamentalUnits(18),
+                SymbolId(chainringDevChainId, "ETH") to BigDecimal("100").toFundamentalUnits(18),
+                SymbolId(chainringDevChainId, "USDC") to BigDecimal("100000").toFundamentalUnits(6),
+                SymbolId(chainringDevChainId, "DAI") to BigDecimal("100000").toFundamentalUnits(18),
+            )
         )
     )
 )

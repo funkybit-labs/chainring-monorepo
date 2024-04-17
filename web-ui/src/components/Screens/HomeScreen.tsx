@@ -5,14 +5,15 @@ import Balances from 'components/Screens/HomeScreen/Balances'
 import { Header } from 'components/Screens/Header'
 import { OrderBook } from 'components/Screens/HomeScreen/OrderBook'
 import SubmitOrder from 'components/Screens/HomeScreen/SubmitOrder'
-import TradeHistory from 'components/Screens/HomeScreen/TradeHistory'
 import { Prices } from 'components/Screens/HomeScreen/Prices'
 import { useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
-import Orders from 'components/Screens/HomeScreen/Orders'
+import OrdersAndTrades from 'components/Screens/HomeScreen/OrdersAndTrades'
 import TradingSymbols from 'tradingSymbols'
 import Markets, { Market } from 'markets'
 import { WebsocketProvider } from 'contexts/websocket'
+import { gridClasses } from 'utils/layout'
+import { classNames } from 'utils'
 
 export default function HomeScreen() {
   const configQuery = useQuery({
@@ -54,40 +55,38 @@ export default function HomeScreen() {
   return (
     <WebsocketProvider wallet={wallet}>
       {markets && selectedMarket ? (
-        <div className="h-screen bg-gradient-to-b from-lightBackground to-darkBackground">
+        <div className="bg-gradient-to-b from-lightBackground to-darkBackground">
           <Header
             markets={markets}
             selectedMarket={selectedMarket}
             onMarketChange={setSelectedMarket}
           />
 
-          <div className="flex h-screen w-screen flex-col gap-4 overflow-y-scroll px-4 py-24">
-            <div className="flex flex-wrap gap-4">
-              <OrderBook marketId={selectedMarket.id} />
-              <Prices marketId={selectedMarket.id} />
-              {wallet.address && (
-                <>
-                  {exchangeContract && (
-                    <SubmitOrder
-                      market={selectedMarket}
-                      walletAddress={wallet.address}
-                      exchangeContractAddress={exchangeContract.address}
-                      baseSymbol={selectedMarket.baseSymbol}
-                      quoteSymbol={selectedMarket.quoteSymbol}
-                    />
-                  )}
-                  <Orders markets={markets} />
-                  <TradeHistory markets={markets} />
-                  {symbols && exchangeContract && (
-                    <Balances
-                      walletAddress={wallet.address}
-                      exchangeContractAddress={exchangeContract.address}
-                      symbols={symbols}
-                    />
-                  )}
-                </>
-              )}
-            </div>
+          <div
+            className={classNames(
+              'grid w-screen overflow-scroll gap-4 px-4 py-24',
+              ...gridClasses()
+            )}
+          >
+            {wallet.address && exchangeContract && (
+              <SubmitOrder
+                market={selectedMarket}
+                walletAddress={wallet.address}
+                exchangeContractAddress={exchangeContract.address}
+                baseSymbol={selectedMarket.baseSymbol}
+                quoteSymbol={selectedMarket.quoteSymbol}
+              />
+            )}
+            <OrderBook marketId={selectedMarket.id} />
+            <Prices marketId={selectedMarket.id} />
+            {wallet.address && symbols && exchangeContract && (
+              <Balances
+                walletAddress={wallet.address}
+                exchangeContractAddress={exchangeContract.address}
+                symbols={symbols}
+              />
+            )}
+            {wallet.address && <OrdersAndTrades markets={markets} />}
           </div>
         </div>
       ) : (
