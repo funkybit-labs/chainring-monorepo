@@ -38,15 +38,9 @@ class TestBlockchainClient(val config: BlockchainClientConfig = BlockchainClient
     }
 
     fun mine(numberOfBlocks: Int = config.numConfirmations) {
-        (1..numberOfBlocks).forEach { _ ->
-            mineSingle()
-        }
-    }
-
-    fun mineSingle() {
         Request(
             "anvil_mine",
-            listOf<String>(),
+            listOf(numberOfBlocks),
             web3jService,
             VoidResponse::class.java,
         ).send()
