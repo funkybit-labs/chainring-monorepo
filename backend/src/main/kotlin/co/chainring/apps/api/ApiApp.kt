@@ -63,9 +63,9 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
 
     private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
     private val sequencerClient = SequencerClient()
-    private val broadcaster = Broadcaster()
+    private val broadcaster = Broadcaster(db)
 
-    private val exchangeService = ExchangeService(blockchainClient, sequencerClient, broadcaster)
+    private val exchangeService = ExchangeService(blockchainClient, sequencerClient)
 
     private val withdrawalRoutes = WithdrawalRoutes(exchangeService)
     private val balanceRoutes = BalanceRoutes()
@@ -128,7 +128,6 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
 
     override fun start() {
         startServer()
-        broadcaster.start()
         updateContracts()
     }
 
@@ -145,6 +144,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         logger.info { "Starting" }
         super.start()
         server.start()
+        broadcaster.start()
         logger.info { "Started" }
     }
 
