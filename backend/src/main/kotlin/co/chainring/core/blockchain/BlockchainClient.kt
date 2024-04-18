@@ -135,8 +135,9 @@ open class TransactionManagerWithNonceOverride(
 
 open class BlockchainClient(private val config: BlockchainClientConfig = BlockchainClientConfig()) {
 
-    protected val web3j = Web3j.build(
-        httpService(config.url, config.enableWeb3jLogging),
+    protected val web3jService: HttpService = httpService(config.url, config.enableWeb3jLogging)
+    protected val web3j: Web3j = Web3j.build(
+        web3jService,
         System.getenv("EVM_NETWORK_POLLING_INTERVAL")?.toLong() ?: 1000L,
         Async.defaultExecutorService(),
     )

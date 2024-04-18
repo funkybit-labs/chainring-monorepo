@@ -58,6 +58,9 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                     private val isIntegrationRun = (getenv("INTEGRATION_RUN") ?: "0") == "1"
 
                     init {
+                        // activate auto mining to speeding up blockchain seeding
+                        blockchainClient.setAutoMining(true)
+
                         if (!isIntegrationRun) {
                             sequencerApp.start()
                             gatewayApp.start()
@@ -80,6 +83,9 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
 
                         val symbolContractAddresses = seedBlockchain(localDevFixtures, blockchainClient.config.url, blockchainClient.config.privateKeyHex)
                         seedDatabase(localDevFixtures, symbolContractAddresses)
+
+                        // during tests block will be mined manually
+                        blockchainClient.setAutoMining(false)
                     }
 
                     @Throws(Throwable::class)
@@ -89,6 +95,9 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                             sequencerApp.stop()
                             gatewayApp.stop()
                         }
+
+                        // revert back to interval mining for `test` env to work normally
+                        blockchainClient.setIntervalMining()
                     }
                 }
             }

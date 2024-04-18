@@ -78,7 +78,7 @@ class BlockchainTransactionHandler(
                                         pendingTx.markAsSeen(blockNumber = blockNumber)
                                     }
                                 }
-                                if (numConfirmations >= confirmationsReceived) {
+                                if (confirmationsReceived >= numConfirmations) {
                                     transaction {
                                         pendingTx.markAsConfirmed(
                                             gasAccountFee(receipt),

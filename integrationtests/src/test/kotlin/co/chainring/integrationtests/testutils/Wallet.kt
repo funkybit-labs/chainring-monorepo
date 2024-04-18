@@ -44,7 +44,9 @@ class Wallet(
     }
 
     fun mintERC20(symbol: String, amount: BigInteger) {
-        loadErc20Contract(symbol).mint(address.value, amount).send()
+        confirmedBlock {
+            loadErc20Contract(symbol).mint(address.value, amount)
+        }
     }
 
     fun getWalletNativeBalance(): BigInteger {
@@ -52,20 +54,30 @@ class Wallet(
     }
 
     fun getExchangeERC20Balance(symbol: String): BigInteger {
-        return exchangeContract.balances(address.value, erc20TokenAddress(symbol)).send()
+        return confirmedBlock {
+            exchangeContract.balances(address.value, erc20TokenAddress(symbol))
+        }
     }
 
     fun getExchangeNativeBalance(): BigInteger {
-        return exchangeContract.nativeBalances(address.value).send()
+        return confirmedBlock {
+            exchangeContract.nativeBalances(address.value)
+        }
     }
 
     fun depositERC20(symbol: String, amount: BigInteger): TransactionReceipt {
-        loadErc20Contract(symbol).approve(exchangeContractAddress.value, amount).send()
-        return exchangeContract.deposit(erc20TokenAddress(symbol), amount).send()
+        confirmedBlock {
+            loadErc20Contract(symbol).approve(exchangeContractAddress.value, amount)
+        }
+        return confirmedBlock {
+            exchangeContract.deposit(erc20TokenAddress(symbol), amount)
+        }
     }
 
     fun withdrawERC20(symbol: String, amount: BigInteger): TransactionReceipt {
-        return exchangeContract.withdraw(erc20TokenAddress(symbol), amount).send()
+        return confirmedBlock {
+            exchangeContract.withdraw(erc20TokenAddress(symbol), amount)
+        }
     }
 
     fun signWithdraw(symbol: String?, amount: BigInteger, nonceOverride: BigInteger? = null): CreateWithdrawalApiRequest {
@@ -97,11 +109,15 @@ class Wallet(
     }
 
     fun getNonce(): BigInteger {
-        return exchangeContract.nonces(address.value).send()
+        return confirmedBlock {
+            exchangeContract.nonces(address.value)
+        }
     }
 
     fun withdrawNative(amount: BigInteger): TransactionReceipt {
-        return exchangeContract.withdraw(amount).send()
+        return confirmedBlock {
+            exchangeContract.withdraw(amount)
+        }
     }
 
     fun depositNative(amount: BigInteger): TransactionReceipt {

@@ -157,6 +157,7 @@ class EIP712WithdrawalTest {
             .pollInterval(Duration.ofMillis(100))
             .atMost(Duration.ofMillis(30000L))
             .until {
+                Faucet.mine()
                 transaction {
                     WithdrawalEntity[id].status.isFinal()
                 }

@@ -1034,6 +1034,7 @@ class OrderRoutesApiTest {
             .pollInterval(Duration.ofMillis(100))
             .atMost(Duration.ofMillis(30000L))
             .until {
+                Faucet.mine()
                 transaction {
                     TradeEntity.count(TradeTable.guid.inList(tradeIds) and TradeTable.settlementStatus.eq(SettlementStatus.Completed))
                 } == tradeIds.size.toLong()
