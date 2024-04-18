@@ -12,18 +12,22 @@ import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
-import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
 import co.chainring.apps.api.wsUnauthorized
 import co.chainring.core.model.Address
+import co.chainring.core.model.BroadcasterNotification
+import co.chainring.core.model.PrincipalNotifications
 import co.chainring.core.model.db.BalanceEntity
+import co.chainring.core.model.db.ExecutionId
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
+import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.WalletEntity
+import co.chainring.core.utils.PgListener
 import co.chainring.core.utils.Timer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
@@ -32,6 +36,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.http4k.websocket.Websocket
 import org.http4k.websocket.WsMessage
+import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
@@ -63,11 +68,15 @@ data class ConnectedClient(
 typealias Subscriptions = CopyOnWriteArrayList<ConnectedClient>
 typealias TopicSubscriptions = ConcurrentHashMap<SubscriptionTopic, Subscriptions>
 
-class Broadcaster {
+class Broadcaster(val db: Database) {
     private val subscriptions = TopicSubscriptions()
     private val subscriptionsByPrincipal = ConcurrentHashMap<Principal, TopicSubscriptions>()
     private val lastPricePublish = mutableMapOf<Pair<MarketId, ConnectedClient>, Instant>()
     private val rnd = Random(0)
+
+    private val pgListener = PgListener(db, "broadcaster-listener", "broadcaster_ctl") { notification ->
+        handleDbNotification(notification.parameter)
+    }
 
     fun subscribe(topic: SubscriptionTopic, client: ConnectedClient) {
         subscriptions.getOrPut(topic) {
@@ -115,10 +124,12 @@ class Broadcaster {
     fun start() {
         timer = Timer(logger)
         timer?.scheduleAtFixedRate(Duration.ofSeconds(1), stopOnError = true, this::publishData)
+        pgListener.start()
     }
 
     fun stop() {
         timer?.cancel()
+        pgListener.stop()
     }
 
     private fun publishData() {
@@ -302,6 +313,94 @@ class Broadcaster {
             .forEach { sendOrders(it) }
     }
 
+    private fun sendOrdersCreated(client: ConnectedClient, orderIds: List<OrderId>) {
+        if (client.principal != null) {
+            transaction {
+                OrderEntity.listOrders(orderIds).forEach {
+                    client.send(
+                        OutgoingWSMessage.Publish(
+                            SubscriptionTopic.Orders,
+                            OrderCreated(
+                                it.toOrderResponse(),
+                            ),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun sendOrdersCreated(principal: Principal, orderIds: List<OrderId>) {
+        findClients(principal, SubscriptionTopic.Orders)
+            .forEach { sendOrdersCreated(it, orderIds) }
+    }
+
+    private fun sendOrdersUpdated(client: ConnectedClient, orderIds: List<OrderId>) {
+        if (client.principal != null) {
+            transaction {
+                OrderEntity.listOrders(orderIds).forEach {
+                    client.send(
+                        OutgoingWSMessage.Publish(
+                            SubscriptionTopic.Orders,
+                            OrderUpdated(
+                                it.toOrderResponse(),
+                            ),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun sendOrdersUpdated(principal: Principal, orderIds: List<OrderId>) {
+        findClients(principal, SubscriptionTopic.Orders)
+            .forEach { sendOrdersUpdated(it, orderIds) }
+    }
+
+    private fun sendTradesCreated(client: ConnectedClient, executionIds: List<ExecutionId>) {
+        if (client.principal != null) {
+            transaction {
+                OrderExecutionEntity.findByIds(executionIds).forEach {
+                    client.send(
+                        OutgoingWSMessage.Publish(
+                            SubscriptionTopic.Trades,
+                            TradeCreated(
+                                it.toTradeResponse(),
+                            ),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun sendTradesCreated(principal: Principal, executionIds: List<ExecutionId>) {
+        findClients(principal, SubscriptionTopic.Trades)
+            .forEach { sendTradesCreated(it, executionIds) }
+    }
+
+    private fun sendTradesUpdated(client: ConnectedClient, executionIds: List<ExecutionId>) {
+        if (client.principal != null) {
+            transaction {
+                OrderExecutionEntity.findByIds(executionIds).forEach {
+                    client.send(
+                        OutgoingWSMessage.Publish(
+                            SubscriptionTopic.Trades,
+                            TradeUpdated(
+                                it.toTradeResponse(),
+                            ),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun sendTradesUpdated(principal: Principal, executionIds: List<ExecutionId>) {
+        findClients(principal, SubscriptionTopic.Trades)
+            .forEach { sendTradesUpdated(it, executionIds) }
+    }
+
     private fun sendBalances(client: ConnectedClient) {
         if (client.principal != null) {
             transaction {
@@ -317,22 +416,35 @@ class Broadcaster {
         }
     }
 
-    fun sendBalances(principal: Principal) {
+    private fun sendBalances(principal: Principal) {
         findClients(principal, SubscriptionTopic.Orders)
             .forEach { sendBalances(it) }
     }
 
-    fun notify(principal: Principal, message: Publishable) {
-        val topic = when (message) {
-            is OrderBook -> SubscriptionTopic.OrderBook(message.marketId)
-            is Orders, is OrderCreated, is OrderUpdated -> SubscriptionTopic.Orders
-            is Prices -> SubscriptionTopic.Prices(message.market)
-            is Trades, is TradeCreated, is TradeUpdated -> SubscriptionTopic.Trades
-            is Balances -> SubscriptionTopic.Balances
+    private fun handleDbNotification(payload: String) {
+        logger.debug { "received db notification with payload $payload" }
+        try {
+            val notifications = Json.decodeFromString<List<PrincipalNotifications>>(payload)
+            notifications.forEach { principalNotifications ->
+                principalNotifications.notifications.forEach { notification ->
+                    when (notification) {
+                        BroadcasterNotification.Balances -> sendBalances(principalNotifications.principal)
+                        is BroadcasterNotification.OrdersCreated ->
+                            sendOrdersCreated(principalNotifications.principal, notification.ids)
+                        is BroadcasterNotification.OrdersUpdated ->
+                            sendOrdersUpdated(principalNotifications.principal, notification.ids)
+                        is BroadcasterNotification.TradesCreated ->
+                            sendTradesCreated(principalNotifications.principal, notification.ids)
+                        is BroadcasterNotification.TradesUpdated ->
+                            sendTradesUpdated(principalNotifications.principal, notification.ids)
+                        is BroadcasterNotification.Orders ->
+                            sendOrders(principalNotifications.principal)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            logger.error(e) { "Broadcaster: Unhandled exception " }
         }
-
-        findClients(principal, topic)
-            .forEach { it.send(OutgoingWSMessage.Publish(topic, message)) }
     }
 
     private fun findClients(principal: Principal, topic: SubscriptionTopic): List<ConnectedClient> =

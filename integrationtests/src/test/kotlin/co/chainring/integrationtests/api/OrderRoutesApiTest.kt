@@ -60,6 +60,7 @@ import java.math.BigInteger
 import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 
 @ExtendWith(AppUnderTestRunner::class)
 class OrderRoutesApiTest {
@@ -125,7 +126,8 @@ class OrderRoutesApiTest {
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
                 assertIs<OrderCreated>(data)
-                assertEquals(limitOrder, data.order)
+                assertIs<Order.Limit>(data.order)
+                validateLimitOrders(limitOrder, data.order as Order.Limit, false)
             }
         }
         wsClient.close()
@@ -159,7 +161,8 @@ class OrderRoutesApiTest {
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
                 assertIs<OrderUpdated>(data)
-                assertEquals(updatedOrder, data.order)
+                assertIs<Order.Limit>(data.order)
+                validateLimitOrders(updatedOrder, data.order as Order.Limit, true)
             }
         }
 
@@ -236,11 +239,12 @@ class OrderRoutesApiTest {
             },
         )
 
+        assertIs<Order.Limit>(limitOrder)
         wsClient.waitForMessage().also { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
                 assertIs<OrderCreated>(data)
-                assertEquals(limitOrder, data.order)
+                validateLimitOrders(limitOrder, data.order as Order.Limit, false)
             }
         }
 
@@ -422,7 +426,7 @@ class OrderRoutesApiTest {
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
                 assertIs<OrderCreated>(data)
-                assertEquals(limitBuyOrder, data.order)
+                validateLimitOrders(limitBuyOrder, data.order as Order.Limit, false)
             }
         }
 
@@ -439,7 +443,7 @@ class OrderRoutesApiTest {
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
                 assertIs<OrderUpdated>(data)
-                assertEquals(updatedLimitBuyOrder, data.order)
+                validateLimitOrders(updatedLimitBuyOrder, data.order as Order.Limit, true)
             }
         }
 
@@ -462,7 +466,7 @@ class OrderRoutesApiTest {
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
                 assertIs<OrderCreated>(data)
-                assertEquals(limitSellOrder, data.order)
+                validateLimitOrders(limitSellOrder, data.order as Order.Limit, false)
             }
         }
 
@@ -480,7 +484,8 @@ class OrderRoutesApiTest {
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
                 assertIs<OrderUpdated>(data)
-                assertEquals(updatedLimitSellOrder, data.order)
+                assertIs<Order.Limit>(data.order)
+                validateLimitOrders(updatedLimitSellOrder, data.order as Order.Limit, true)
             }
         }
 
@@ -505,7 +510,11 @@ class OrderRoutesApiTest {
                 assertEquals(SubscriptionTopic.Orders, message.topic)
                 message.data.let { data ->
                     assertIs<OrderCreated>(data)
-                    assertEquals(marketBuyOrder, data.order)
+                    assertEquals(marketBuyOrder.id, data.order.id)
+                    assertEquals(marketBuyOrder.amount, data.order.amount)
+                    assertEquals(marketBuyOrder.side, data.order.side)
+                    assertEquals(marketBuyOrder.marketId, data.order.marketId)
+                    assertEquals(marketBuyOrder.timing.createdAt, data.order.timing.createdAt)
                 }
             }
             waitForMessage().also { message ->
@@ -635,7 +644,11 @@ class OrderRoutesApiTest {
                 assertEquals(SubscriptionTopic.Orders, message.topic)
                 message.data.let { data ->
                     assertIs<OrderCreated>(data)
-                    assertEquals(marketSellOrder, data.order)
+                    assertEquals(marketSellOrder.id, data.order.id)
+                    assertEquals(marketSellOrder.amount, data.order.amount)
+                    assertEquals(marketSellOrder.side, data.order.side)
+                    assertEquals(marketSellOrder.marketId, data.order.marketId)
+                    assertEquals(marketSellOrder.timing.createdAt, data.order.timing.createdAt)
                 }
             }
             waitForMessage().also { message ->
@@ -963,6 +976,19 @@ class OrderRoutesApiTest {
 
         makerWsClient.close()
         takerWsClient.close()
+    }
+
+    private fun validateLimitOrders(left: Order.Limit, right: Order.Limit, updated: Boolean) {
+        assertEquals(left.id, right.id)
+        assertEquals(left.amount, right.amount)
+        assertEquals(left.side, right.side)
+        assertEquals(left.marketId, right.marketId)
+        assertEquals(left.price, right.price)
+        assertEquals(left.timing.createdAt, right.timing.createdAt)
+        if (updated) {
+            assertNotNull(left.timing.updatedAt)
+            assertNotNull(right.timing.updatedAt)
+        }
     }
 
     private fun setupTrader(
