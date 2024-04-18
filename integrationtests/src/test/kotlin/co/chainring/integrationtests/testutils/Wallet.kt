@@ -44,7 +44,7 @@ class Wallet(
     }
 
     fun mintERC20(symbol: String, amount: BigInteger) {
-        loadErc20Contract(symbol).mint(address.value, amount).send()
+        loadErc20Contract(symbol).mint(address.value, amount).sendAndWaitForConfirmation()
     }
 
     fun getWalletNativeBalance(): BigInteger {
@@ -52,20 +52,20 @@ class Wallet(
     }
 
     fun getExchangeERC20Balance(symbol: String): BigInteger {
-        return exchangeContract.balances(address.value, erc20TokenAddress(symbol)).send()
+        return exchangeContract.balances(address.value, erc20TokenAddress(symbol)).sendAndWaitForConfirmation()
     }
 
     fun getExchangeNativeBalance(): BigInteger {
-        return exchangeContract.nativeBalances(address.value).send()
+        return exchangeContract.nativeBalances(address.value).sendAndWaitForConfirmation()
     }
 
     fun depositERC20(symbol: String, amount: BigInteger): TransactionReceipt {
-        loadErc20Contract(symbol).approve(exchangeContractAddress.value, amount).send()
-        return exchangeContract.deposit(erc20TokenAddress(symbol), amount).send()
+        loadErc20Contract(symbol).approve(exchangeContractAddress.value, amount).sendAndWaitForConfirmation()
+        return exchangeContract.deposit(erc20TokenAddress(symbol), amount).sendAndWaitForConfirmation()
     }
 
     fun withdrawERC20(symbol: String, amount: BigInteger): TransactionReceipt {
-        return exchangeContract.withdraw(erc20TokenAddress(symbol), amount).send()
+        return exchangeContract.withdraw(erc20TokenAddress(symbol), amount).sendAndWaitForConfirmation()
     }
 
     fun signWithdraw(symbol: String?, amount: BigInteger, nonceOverride: BigInteger? = null): CreateWithdrawalApiRequest {
@@ -97,11 +97,11 @@ class Wallet(
     }
 
     fun getNonce(): BigInteger {
-        return exchangeContract.nonces(address.value).send()
+        return exchangeContract.nonces(address.value).sendAndWaitForConfirmation()
     }
 
     fun withdrawNative(amount: BigInteger): TransactionReceipt {
-        return exchangeContract.withdraw(amount).send()
+        return exchangeContract.withdraw(amount).sendAndWaitForConfirmation()
     }
 
     fun depositNative(amount: BigInteger): TransactionReceipt {

@@ -135,8 +135,9 @@ open class TransactionManagerWithNonceOverride(
 
 open class BlockchainClient(private val config: BlockchainClientConfig = BlockchainClientConfig()) {
 
-    protected val web3j = Web3j.build(
-        httpService(config.url, config.enableWeb3jLogging),
+    protected val web3jService: HttpService = httpService(config.url, config.enableWeb3jLogging)
+    protected val web3j: Web3j = Web3j.build(
+        web3jService,
         System.getenv("EVM_NETWORK_POLLING_INTERVAL")?.toLong() ?: 1000L,
         Async.defaultExecutorService(),
     )
@@ -384,7 +385,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
             ?: System.getenv("EVM_NETWORK_EARLIEST_BLOCK")?.let { DefaultBlockParameter.valueOf(it.toBigInteger()) }
             ?: DefaultBlockParameterName.EARLIEST
 
-        val filter = EthFilter(startFromBlock, DefaultBlockParameterName.LATEST, exchangeContract.contractAddress)
+        val filter = EthFilter(startFromBlock, DefaultBlockParameterName.SAFE, exchangeContract.contractAddress)
 
         web3j.ethLogFlowable(filter)
             .retryWhen { f: Flowable<Throwable> -> f.take(5).delay(300, TimeUnit.MILLISECONDS) }

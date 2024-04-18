@@ -8,7 +8,9 @@ import co.chainring.core.model.EvmSignature
 import co.chainring.core.utils.toHex
 import org.web3j.crypto.Sign
 import org.web3j.protocol.core.DefaultBlockParameter
+import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.methods.response.TransactionReceipt
+import org.web3j.protocol.core.methods.response.VoidResponse
 import org.web3j.tx.Transfer
 import org.web3j.utils.Convert
 import java.math.BigInteger
@@ -25,11 +27,34 @@ class TestBlockchainClient(val config: BlockchainClientConfig = BlockchainClient
             Convert.Unit.WEI,
             web3j.ethGasPrice().send().gasPrice,
             config.contractCreationLimit,
-        ).send()
+        ).sendAndWaitForConfirmation()
     }
 
     fun signData(hash: ByteArray): EvmSignature {
         val signature = Sign.signMessage(hash, credentials.ecKeyPair, false)
         return EvmSignature((signature.r + signature.s + signature.v).toHex())
     }
+
+    fun mine(numberOfBlocks: Int = config.numConfirmations) {
+        Request(
+            "anvil_mine",
+            listOf(numberOfBlocks),
+            web3jService,
+            VoidResponse::class.java,
+        ).send()
+    }
+
+    fun setIntervalMining(interval: Int = 1): VoidResponse = Request(
+        "evm_setIntervalMining",
+        listOf(interval),
+        web3jService,
+        VoidResponse::class.java,
+    ).send()
+
+    fun setAutoMining(value: Boolean): VoidResponse = Request(
+        "evm_setAutomine",
+        listOf(value),
+        web3jService,
+        VoidResponse::class.java,
+    ).send()
 }
