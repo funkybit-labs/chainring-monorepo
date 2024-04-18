@@ -35,8 +35,6 @@ class OrderBookTest {
             message.data.also { orderBook ->
                 assertIs<OrderBook>(orderBook)
                 assertEquals("BTC/ETH", orderBook.marketId.value)
-                assertEquals(9, orderBook.buy.size)
-                assertEquals(10, orderBook.sell.size)
             }
         }
 

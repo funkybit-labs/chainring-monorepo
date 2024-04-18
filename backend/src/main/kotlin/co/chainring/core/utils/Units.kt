@@ -14,3 +14,7 @@ fun BigDecimal.toFundamentalUnits(decimals: UByte): BigInteger {
 fun BigInteger.fromFundamentalUnits(decimals: Int): BigDecimal {
     return BigDecimal(this).movePointLeft(decimals)
 }
+
+fun BigInteger.fromFundamentalUnits(decimals: UByte): BigDecimal {
+    return BigDecimal(this).movePointLeft(decimals.toInt())
+}

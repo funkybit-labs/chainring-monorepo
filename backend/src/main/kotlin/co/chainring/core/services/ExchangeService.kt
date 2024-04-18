@@ -22,6 +22,9 @@ import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.ExchangeError
+import co.chainring.core.model.GlobalNotification
+import co.chainring.core.model.NotificationsBatch
+import co.chainring.core.model.PrincipalNotifications
 import co.chainring.core.model.SequencerOrderId
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.Symbol
@@ -311,6 +314,7 @@ class ExchangeService(
                         sequencerClient.cancelOrders(entry.key.value, sequencerOrderIds)
                     }
                 }
+
                 OrderEntity.cancelAll(walletEntity)
                 listOf(
                     PrincipalNotifications(
@@ -324,6 +328,20 @@ class ExchangeService(
                         ),
                     ),
                 ).send()
+
+                NotificationsBatch(
+                    principalNotifications = listOf(
+                        PrincipalNotifications(
+                            walletEntity.address,
+                            listOf(BroadcasterNotification.AllOpenOrdersCancelled),
+                        ),
+                    ),
+                    globalNotifications = openOrders
+                        .map { it.marketGuid.value }
+                        .toSet()
+                        .map { GlobalNotification.OrderBookUpdated(it) }
+                        .sortedBy { it.marketId },
+                ).send()
             }
         }
     }
@@ -334,38 +352,35 @@ class ExchangeService(
         // handle trades
         val blockchainTxs = response.tradesCreatedList.mapNotNull {
             logger.debug { "Trade Created ${it.buyGuid}, ${it.sellGuid}, ${it.amount.toBigInteger()} ${it.price.toBigDecimal()} " }
-            val buyOrder = OrderEntity.findBySequencerOrderId(it.buyGuid)
-            val sellOrder = OrderEntity.findBySequencerOrderId(it.sellGuid)
 
-            if (buyOrder != null && sellOrder != null) {
-                val tradeEntity = TradeEntity.create(
+            val buyOrder = OrderEntity.findBySequencerOrderId(it.buyGuid) ?: return@mapNotNull null
+            val sellOrder = OrderEntity.findBySequencerOrderId(it.sellGuid) ?: return@mapNotNull null
+
+            val tradeEntity = TradeEntity.create(
+                timestamp = timestamp,
+                market = buyOrder.market,
+                amount = it.amount.toBigInteger(),
+                price = it.price.toBigDecimal(),
+            )
+
+            // create executions for both
+            listOf(buyOrder, sellOrder).forEach { order ->
+                val execution = OrderExecutionEntity.create(
                     timestamp = timestamp,
-                    market = buyOrder.market,
-                    amount = it.amount.toBigInteger(),
-                    price = it.price.toBigDecimal(),
+                    orderEntity = order,
+                    tradeEntity = tradeEntity,
+                    role = if (order.type == OrderType.Market) ExecutionRole.Taker else ExecutionRole.Maker,
+                    feeAmount = BigInteger.ZERO,
+                    feeSymbol = Symbol(order.market.quoteSymbol.name),
                 )
-
-                // create executions for both
-                listOf(buyOrder, sellOrder).forEach { order ->
-                    val execution = OrderExecutionEntity.create(
-                        timestamp = timestamp,
-                        orderEntity = order,
-                        tradeEntity = tradeEntity,
-                        role = if (order.type == OrderType.Market) ExecutionRole.Taker else ExecutionRole.Maker,
-                        feeAmount = BigInteger.ZERO,
-                        feeSymbol = Symbol(order.market.quoteSymbol.name),
-                    )
 
                     execution.refresh(flush = true)
                     logger.debug { "Sending TradeCreated for order ${order.guid}" }
                     broadcasterNotifications.add(order.wallet.address, TradeCreated(execution.toTradeResponse()))
                 }
 
-                // build the transaction to settle
-                tradeEntity.toEip712Transaction()
-            } else {
-                null
-            }
+            // build the transaction to settle
+            tradeEntity.toEip712Transaction()
         }
 
         // update all orders that have changed
@@ -410,7 +425,13 @@ class ExchangeService(
 
         // queue any blockchain txs for processing
         blockchainClient.queueTransactions(blockchainTxs)
-        broadcasterNotifications.map { PrincipalNotifications(it.key, it.value) }.send()
+        NotificationsBatch(
+            principalNotifications = broadcasterNotifications.map { PrincipalNotifications(it.key, it.value) },
+            globalNotifications = OrderEntity
+                .getOrdersMarkets(response.ordersChangedList.map { it.guid })
+                .map { GlobalNotification.OrderBookUpdated(it) }
+                .sortedBy { it.marketId },
+        ).send()
     }
 
     private fun getSymbol(asset: String): SymbolEntity {
@@ -574,7 +595,11 @@ class ExchangeService(
                     }
                 }
             }
-            broadcasterNotifications.map { PrincipalNotifications(it.key, it.value) }.send()
+
+            NotificationsBatch(
+                principalNotifications = broadcasterNotifications.map { PrincipalNotifications(it.key, it.value) },
+                globalNotifications = emptyList(),
+            ).send()
         }
     }
 

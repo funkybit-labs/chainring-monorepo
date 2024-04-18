@@ -8,6 +8,10 @@ import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.websocket.Balances
+import co.chainring.apps.api.model.websocket.LastTrade
+import co.chainring.apps.api.model.websocket.LastTradeDirection
+import co.chainring.apps.api.model.websocket.OrderBook
+import co.chainring.apps.api.model.websocket.OrderBookEntry
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.Orders
@@ -65,6 +69,8 @@ import kotlin.test.assertNotNull
 @ExtendWith(AppUnderTestRunner::class)
 class OrderRoutesApiTest {
     private val logger = KotlinLogging.logger {}
+    private val btcEthMarketId = MarketId("BTC/ETH")
+    private val usdcDaiMarketId = MarketId("USDC/DAI")
 
     @Test
     fun `CRUD order`() {
@@ -105,7 +111,7 @@ class OrderRoutesApiTest {
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
             nonce = generateHexString(32),
-            marketId = MarketId("USDC/DAI"),
+            marketId = usdcDaiMarketId,
             side = OrderSide.Buy,
             amount = wallet.formatAmount("1", "USDC"),
             price = BigDecimal("2"),
@@ -241,7 +247,7 @@ class OrderRoutesApiTest {
         val limitOrder = apiClient.createOrder(
             CreateOrderApiRequest.Limit(
                 nonce = generateHexString(32),
-                marketId = MarketId("USDC/DAI"),
+                marketId = usdcDaiMarketId,
                 side = OrderSide.Buy,
                 amount = wallet.formatAmount("1", "USDC"),
                 price = BigDecimal("3"),
@@ -273,7 +279,7 @@ class OrderRoutesApiTest {
         apiClient.tryCreateOrder(
             CreateOrderApiRequest.Limit(
                 nonce = generateHexString(32),
-                marketId = MarketId("USDC/DAI"),
+                marketId = usdcDaiMarketId,
                 side = OrderSide.Buy,
                 amount = wallet.formatAmount("1", "USDC"),
                 price = BigDecimal("2.015"),
@@ -288,7 +294,7 @@ class OrderRoutesApiTest {
         val limitOrder2 = apiClient.createOrder(
             CreateOrderApiRequest.Limit(
                 nonce = generateHexString(32),
-                marketId = MarketId("USDC/DAI"),
+                marketId = usdcDaiMarketId,
                 side = OrderSide.Buy,
                 amount = wallet.formatAmount("1", "USDC"),
                 price = BigDecimal("2"),
@@ -379,7 +385,7 @@ class OrderRoutesApiTest {
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
             nonce = generateHexString(32),
-            marketId = MarketId("USDC/DAI"),
+            marketId = usdcDaiMarketId,
             side = OrderSide.Buy,
             amount = wallet.formatAmount("1", "USDC"),
             price = BigDecimal("2"),
@@ -414,10 +420,10 @@ class OrderRoutesApiTest {
     @Test
     fun `order execution`() {
         val (takerApiClient, takerWallet, takerWsClient) =
-            setupTrader("0.5", null, "ETH", "2")
+            setupTrader(btcEthMarketId, "0.5", null, "ETH", "2")
 
         val (makerApiClient, makerWallet, makerWsClient) =
-            setupTrader("0.5", "0.2", "ETH", "2")
+            setupTrader(btcEthMarketId, "0.5", "0.2", "ETH", "2")
 
         // starting onchain balances
         val makerStartingBTCBalance = makerWallet.getExchangeNativeBalance()
@@ -429,7 +435,7 @@ class OrderRoutesApiTest {
         val limitBuyOrder = makerApiClient.createOrder(
             CreateOrderApiRequest.Limit(
                 nonce = generateHexString(32),
-                marketId = MarketId("BTC/ETH"),
+                marketId = btcEthMarketId,
                 side = OrderSide.Buy,
                 amount = makerWallet.formatAmount("0.00013345", "BTC"),
                 price = BigDecimal("17.45"),
@@ -444,7 +450,30 @@ class OrderRoutesApiTest {
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
                 assertIs<OrderCreated>(data)
-                validateLimitOrders(limitBuyOrder, data.order as Order.Limit, false)
+                validateLimitOrders(
+                    limitBuyOrder,
+                    data.order as Order.Limit,
+                    false,
+                )
+            }
+        }
+        listOf(makerWsClient, takerWsClient).forEach { wsClient ->
+            wsClient.waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.OrderBook(btcEthMarketId), message.topic)
+                message.data.let { data ->
+                    assertIs<OrderBook>(data)
+                    assertEquals(
+                        OrderBook(
+                            marketId = btcEthMarketId,
+                            buy = listOf(
+                                OrderBookEntry(price = "17.45", size = "0.00013345".toBigDecimal()),
+                            ),
+                            sell = emptyList(),
+                            last = LastTrade("0.00", LastTradeDirection.Up),
+                        ),
+                        data,
+                    )
+                }
             }
         }
 
@@ -461,7 +490,30 @@ class OrderRoutesApiTest {
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
                 assertIs<OrderUpdated>(data)
-                validateLimitOrders(updatedLimitBuyOrder, data.order as Order.Limit, true)
+                validateLimitOrders(
+                    updatedLimitBuyOrder,
+                    data.order as Order.Limit,
+                    true,
+                )
+            }
+        }
+        listOf(makerWsClient, takerWsClient).forEach { wsClient ->
+            wsClient.waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.OrderBook(btcEthMarketId), message.topic)
+                message.data.let { data ->
+                    assertIs<OrderBook>(data)
+                    assertEquals(
+                        OrderBook(
+                            marketId = btcEthMarketId,
+                            buy = listOf(
+                                OrderBookEntry(price = "17.50", size = "0.00012345".toBigDecimal()),
+                            ),
+                            sell = emptyList(),
+                            last = LastTrade("0.00", LastTradeDirection.Up),
+                        ),
+                        data,
+                    )
+                }
             }
         }
 
@@ -469,7 +521,7 @@ class OrderRoutesApiTest {
         val limitSellOrder = makerApiClient.createOrder(
             CreateOrderApiRequest.Limit(
                 nonce = generateHexString(32),
-                marketId = MarketId("BTC/ETH"),
+                marketId = btcEthMarketId,
                 side = OrderSide.Sell,
                 amount = makerWallet.formatAmount("0.00154321", "BTC"),
                 price = BigDecimal("17.600"),
@@ -480,11 +532,33 @@ class OrderRoutesApiTest {
         )
         assertIs<Order.Limit>(limitSellOrder)
         assertEquals(limitSellOrder.status, OrderStatus.Open)
+
         makerWsClient.waitForMessage().also { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
             message.data.let { data ->
                 assertIs<OrderCreated>(data)
                 validateLimitOrders(limitSellOrder, data.order as Order.Limit, false)
+            }
+        }
+        listOf(makerWsClient, takerWsClient).forEach { wsClient ->
+            wsClient.waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.OrderBook(btcEthMarketId), message.topic)
+                message.data.let { data ->
+                    assertIs<OrderBook>(data)
+                    assertEquals(
+                        OrderBook(
+                            marketId = btcEthMarketId,
+                            buy = listOf(
+                                OrderBookEntry(price = "17.50", size = "0.00012345".toBigDecimal()),
+                            ),
+                            sell = listOf(
+                                OrderBookEntry(price = "17.60", size = "0.00154321".toBigDecimal()),
+                            ),
+                            last = LastTrade("0.00", LastTradeDirection.Up),
+                        ),
+                        data,
+                    )
+                }
             }
         }
 
@@ -506,12 +580,33 @@ class OrderRoutesApiTest {
                 validateLimitOrders(updatedLimitSellOrder, data.order as Order.Limit, true)
             }
         }
+        listOf(makerWsClient, takerWsClient).forEach { wsClient ->
+            wsClient.waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.OrderBook(btcEthMarketId), message.topic)
+                message.data.let { data ->
+                    assertIs<OrderBook>(data)
+                    assertEquals(
+                        OrderBook(
+                            marketId = btcEthMarketId,
+                            buy = listOf(
+                                OrderBookEntry(price = "17.50", size = "0.00012345".toBigDecimal()),
+                            ),
+                            sell = listOf(
+                                OrderBookEntry(price = "17.55", size = "0.00054321".toBigDecimal()),
+                            ),
+                            last = LastTrade("0.00", LastTradeDirection.Up),
+                        ),
+                        data,
+                    )
+                }
+            }
+        }
 
         // place a buy order and see it gets executed
         val marketBuyOrder = takerApiClient.createOrder(
             CreateOrderApiRequest.Market(
                 nonce = generateHexString(32),
-                marketId = MarketId("BTC/ETH"),
+                marketId = btcEthMarketId,
                 side = OrderSide.Buy,
                 amount = takerWallet.formatAmount("0.00043210", "BTC"),
                 signature = EvmSignature.emptySignature(),
@@ -551,6 +646,7 @@ class OrderRoutesApiTest {
                 assertEquals(SubscriptionTopic.Orders, message.topic)
                 message.data.let { data ->
                     assertIs<OrderUpdated>(data)
+                    assertEquals(OrderStatus.Filled, data.order.status)
                     assertEquals(1, data.order.executions.size)
                     assertEquals(data.order.executions[0].amount, takerWallet.formatAmount("0.00043210", "BTC"))
                     assertEquals(0, data.order.executions[0].price.compareTo(BigDecimal("17.550")))
@@ -601,6 +697,29 @@ class OrderRoutesApiTest {
             }
         }
 
+        listOf(makerWsClient, takerWsClient).forEach { wsClient ->
+            wsClient.waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.OrderBook(btcEthMarketId), message.topic)
+                message.data.let { data ->
+                    assertIs<OrderBook>(data)
+                    assertEquals(
+                        OrderBook(
+                            marketId = btcEthMarketId,
+                            buy = listOf(
+                                OrderBookEntry(price = "17.50", size = "0.00012345".toBigDecimal()),
+                            ),
+                            sell = listOf(
+                                // TODO: amount should be reduced since MM order was partially filled
+                                OrderBookEntry(price = "17.55", size = "0.00054321".toBigDecimal()),
+                            ),
+                            last = LastTrade("17.55", LastTradeDirection.Up),
+                        ),
+                        data,
+                    )
+                }
+            }
+        }
+
         val trade = getTradesForOrders(listOf(marketBuyOrder.id)).first()
 
         assertEquals(trade.amount, takerWallet.formatAmount("0.00043210", "BTC"))
@@ -645,7 +764,7 @@ class OrderRoutesApiTest {
         val marketSellOrder = takerApiClient.createOrder(
             CreateOrderApiRequest.Market(
                 nonce = generateHexString(32),
-                marketId = MarketId("BTC/ETH"),
+                marketId = btcEthMarketId,
                 side = OrderSide.Sell,
                 amount = takerWallet.formatAmount("0.00012346", "BTC"),
                 signature = EvmSignature.emptySignature(),
@@ -736,6 +855,26 @@ class OrderRoutesApiTest {
             }
         }
 
+        listOf(makerWsClient, takerWsClient).forEach { wsClient ->
+            wsClient.waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.OrderBook(btcEthMarketId), message.topic)
+                message.data.let { data ->
+                    assertIs<OrderBook>(data)
+                    assertEquals(
+                        OrderBook(
+                            marketId = btcEthMarketId,
+                            buy = emptyList(),
+                            sell = listOf(
+                                OrderBookEntry(price = "17.55", size = "0.00054321".toBigDecimal()),
+                            ),
+                            last = LastTrade("17.50", LastTradeDirection.Down),
+                        ),
+                        data,
+                    )
+                }
+            }
+        }
+
         val trade2 = getTradesForOrders(listOf(marketSellOrder.id)).first()
         assertEquals(trade2.amount, takerWallet.formatAmount("0.00012345", "BTC"))
         assertEquals(0, trade2.price.compareTo(BigDecimal("17.500")))
@@ -776,9 +915,54 @@ class OrderRoutesApiTest {
         )
 
         takerApiClient.cancelOpenOrders()
-        makerApiClient.cancelOpenOrders()
+        takerWsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Orders, message.topic)
+            assertIs<Orders>(message.data)
+        }
+        listOf(makerWsClient, takerWsClient).forEach { wsClient ->
+            wsClient.waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.OrderBook(btcEthMarketId), message.topic)
+                message.data.let { data ->
+                    assertIs<OrderBook>(data)
+                    assertEquals(
+                        OrderBook(
+                            marketId = btcEthMarketId,
+                            buy = emptyList(),
+                            sell = listOf(
+                                OrderBookEntry(price = "17.55", size = "0.00054321".toBigDecimal()),
+                            ),
+                            last = LastTrade("17.50", LastTradeDirection.Down),
+                        ),
+                        data,
+                    )
+                }
+            }
+        }
 
-        // verify that client's websocket gets same orders and trades reconnect
+        makerApiClient.cancelOpenOrders()
+        makerWsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Orders, message.topic)
+            assertIs<Orders>(message.data)
+        }
+        listOf(makerWsClient, takerWsClient).forEach { wsClient ->
+            wsClient.waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.OrderBook(btcEthMarketId), message.topic)
+                message.data.let { data ->
+                    assertIs<OrderBook>(data)
+                    assertEquals(
+                        OrderBook(
+                            marketId = btcEthMarketId,
+                            buy = emptyList(),
+                            sell = emptyList(),
+                            last = LastTrade("17.50", LastTradeDirection.Down),
+                        ),
+                        data,
+                    )
+                }
+            }
+        }
+
+        // verify that client's websocket gets same orders, trades and order book on reconnect
         takerWsClient.close()
         WebsocketClient.blocking(takerApiClient.authToken).apply {
             subscribe(SubscriptionTopic.Orders)
@@ -828,6 +1012,23 @@ class OrderRoutesApiTest {
                     assertEquals(SettlementStatus.Completed, settlementStatus)
                 }
             }
+
+            subscribe(SubscriptionTopic.OrderBook(btcEthMarketId))
+            waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.OrderBook(btcEthMarketId), message.topic)
+                message.data.let { data ->
+                    assertIs<OrderBook>(data)
+                    assertEquals(
+                        OrderBook(
+                            marketId = btcEthMarketId,
+                            buy = emptyList(),
+                            sell = emptyList(),
+                            last = LastTrade("17.50", LastTradeDirection.Down),
+                        ),
+                        data,
+                    )
+                }
+            }
         }.close()
 
         makerWsClient.close()
@@ -836,10 +1037,10 @@ class OrderRoutesApiTest {
     @Test
     fun `order batches`() {
         val (makerApiClient, makerWallet, makerWsClient) =
-            setupTrader("0.5", "0.2", "USDC", "500")
+            setupTrader(usdcDaiMarketId, "0.5", "0.2", "USDC", "500")
 
         val (takerApiClient, takerWallet, takerWsClient) =
-            setupTrader("0.5", null, "USDC", "500")
+            setupTrader(usdcDaiMarketId, "0.5", null, "USDC", "500")
 
         // starting onchain balances
         val makerStartingBTCBalance = makerWallet.getExchangeNativeBalance()
@@ -1010,6 +1211,7 @@ class OrderRoutesApiTest {
     }
 
     private fun setupTrader(
+        marketId: MarketId,
         nativeAmount: String,
         nativeDepositAmount: String?,
         mintSymbol: String,
@@ -1019,6 +1221,12 @@ class OrderRoutesApiTest {
         val wallet = Wallet(apiClient)
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken).apply {
+            subscribe(SubscriptionTopic.OrderBook(marketId))
+            waitForMessage().also { message ->
+                assertEquals(SubscriptionTopic.OrderBook(marketId), message.topic)
+                assertIs<OrderBook>(message.data)
+            }
+
             subscribe(SubscriptionTopic.Orders)
             waitForMessage().also { message ->
                 assertEquals(SubscriptionTopic.Orders, message.topic)
