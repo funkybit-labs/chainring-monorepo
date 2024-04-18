@@ -6,8 +6,8 @@ import org.awaitility.kotlin.withAlias
 import org.web3j.protocol.core.RemoteCall
 import java.time.Duration
 
-fun <T> confirmedBlock(logic: () -> RemoteCall<T>): T {
-    val async = logic().sendAsync()
+fun <T> RemoteCall<T>.sendAndWaitForConfirmation(): T {
+    val async = this.sendAsync()
 
     await
         .withAlias("Waiting for block confirmation")

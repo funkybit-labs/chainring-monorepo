@@ -21,15 +21,13 @@ class TestBlockchainClient(val config: BlockchainClientConfig = BlockchainClient
     fun getNativeBalance(address: Address) = web3j.ethGetBalance(address.value, DefaultBlockParameter.valueOf("latest")).send().balance
 
     fun depositNative(address: Address, amount: BigInteger): TransactionReceipt {
-        return confirmedBlock {
-            Transfer(web3j, transactionManager).sendFunds(
-                address.value,
-                Convert.toWei(amount.toString(10), Convert.Unit.WEI),
-                Convert.Unit.WEI,
-                web3j.ethGasPrice().send().gasPrice,
-                config.contractCreationLimit,
-            )
-        }
+        return Transfer(web3j, transactionManager).sendFunds(
+            address.value,
+            Convert.toWei(amount.toString(10), Convert.Unit.WEI),
+            Convert.Unit.WEI,
+            web3j.ethGasPrice().send().gasPrice,
+            config.contractCreationLimit,
+        ).sendAndWaitForConfirmation()
     }
 
     fun signData(hash: ByteArray): EvmSignature {
