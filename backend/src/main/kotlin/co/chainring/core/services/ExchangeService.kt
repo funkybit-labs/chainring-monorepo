@@ -4,6 +4,14 @@ import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.UpdateOrderApiRequest
+import co.chainring.apps.api.model.websocket.Balances
+import co.chainring.apps.api.model.websocket.OrderCreated
+import co.chainring.apps.api.model.websocket.OrderUpdated
+import co.chainring.apps.api.model.websocket.Orders
+import co.chainring.apps.api.model.websocket.Publishable
+import co.chainring.apps.api.model.websocket.TradeCreated
+import co.chainring.apps.api.model.websocket.TradeUpdated
+import co.chainring.contracts.generated.Exchange
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.blockchain.DepositConfirmationCallback
@@ -12,20 +20,18 @@ import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
-import co.chainring.core.model.BroadcasterNotification
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.ExchangeError
-import co.chainring.core.model.PrincipalNotifications
 import co.chainring.core.model.SequencerOrderId
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.BalanceChange
 import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BalanceType
+import co.chainring.core.model.db.BroadcasterJobEntity
 import co.chainring.core.model.db.CreateOrderAssignment
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
-import co.chainring.core.model.db.ExecutionId
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
@@ -35,6 +41,7 @@ import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.OrderType
+import co.chainring.core.model.db.PrincipalNotifications
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.TradeEntity
 import co.chainring.core.model.db.UpdateOrderAssignment
@@ -56,26 +63,14 @@ import co.chainring.sequencer.proto.SequencerResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigDecimal
 import java.math.BigInteger
 
-typealias BroadcasterNotifications = MutableMap<Address, MutableList<BroadcasterNotification>>
-fun BroadcasterNotifications.add(address: Address, notification: BroadcasterNotification) {
-    this.getOrPut(address) { mutableListOf() }.add(notification)
-}
-
-typealias WalletOrders = MutableMap<Address, MutableList<OrderId>>
-fun WalletOrders.add(address: Address, orderId: OrderId) {
-    this.getOrPut(address) { mutableListOf() }.add(orderId)
-}
-
-typealias WalletExecutions = MutableMap<Address, MutableList<ExecutionId>>
-fun WalletExecutions.add(address: Address, executionId: ExecutionId) {
-    this.getOrPut(address) { mutableListOf() }.add(executionId)
+typealias BroadcasterNotifications = MutableMap<Address, MutableList<Publishable>>
+fun BroadcasterNotifications.add(address: Address, publishable: Publishable) {
+    this.getOrPut(address) { mutableListOf() }.add(publishable)
 }
 
 interface TxConfirmationCallback {
@@ -244,7 +239,9 @@ class ExchangeService(
             OrderEntity.batchUpdate(market, wallet, createAssignments, updateAssignments)
             val createdOrders = if (createAssignments.isNotEmpty()) {
                 val orders = OrderEntity.listOrders(createAssignments.map { it.orderId }).map { it.toOrderResponse() }
-                broadcasterNotifications.add(wallet.address, BroadcasterNotification.OrdersCreated(orders.map { it.id }))
+                orders.forEach {
+                    broadcasterNotifications.add(wallet.address, OrderCreated(it))
+                }
                 orders
             } else {
                 emptyList()
@@ -315,7 +312,18 @@ class ExchangeService(
                     }
                 }
                 OrderEntity.cancelAll(walletEntity)
-                listOf(PrincipalNotifications(walletEntity.address, listOf(BroadcasterNotification.Orders))).send()
+                listOf(
+                    PrincipalNotifications(
+                        walletEntity.address,
+                        listOf(
+                            Orders(
+                                OrderEntity
+                                    .listForWallet(walletEntity)
+                                    .map(OrderEntity::toOrderResponse),
+                            ),
+                        ),
+                    ),
+                ).send()
             }
         }
     }
@@ -324,7 +332,6 @@ class ExchangeService(
         val timestamp = Clock.System.now()
 
         // handle trades
-        val walletExecutionIds: WalletExecutions = mutableMapOf()
         val blockchainTxs = response.tradesCreatedList.mapNotNull {
             logger.debug { "Trade Created ${it.buyGuid}, ${it.sellGuid}, ${it.amount.toBigInteger()} ${it.price.toBigDecimal()} " }
             val buyOrder = OrderEntity.findBySequencerOrderId(it.buyGuid)
@@ -351,7 +358,7 @@ class ExchangeService(
 
                     execution.refresh(flush = true)
                     logger.debug { "Sending TradeCreated for order ${order.guid}" }
-                    walletExecutionIds.add(order.wallet.address, execution.id.value)
+                    broadcasterNotifications.add(order.wallet.address, TradeCreated(execution.toTradeResponse()))
                 }
 
                 // build the transaction to settle
@@ -360,23 +367,16 @@ class ExchangeService(
                 null
             }
         }
-        walletExecutionIds.forEach { (address, executionIds) ->
-            broadcasterNotifications.add(address, BroadcasterNotification.TradesCreated(executionIds))
-        }
 
         // update all orders that have changed
-        val walletOrderIds: WalletOrders = mutableMapOf()
         response.ordersChangedList.forEach {
             if (ordersBeingUpdated.contains(it.guid.sequencerOrderId()) || it.disposition != OrderDisposition.Accepted) {
                 logger.debug { "order updated for ${it.guid}, disposition ${it.disposition}" }
                 OrderEntity.findBySequencerOrderId(it.guid)?.let { orderToUpdate ->
                     orderToUpdate.updateStatus(OrderStatus.fromOrderDisposition(it.disposition))
-                    walletOrderIds.add(orderToUpdate.wallet.address, orderToUpdate.id.value)
+                    broadcasterNotifications.add(orderToUpdate.wallet.address, OrderUpdated(orderToUpdate.toOrderResponse()))
                 }
             }
-        }
-        walletOrderIds.forEach { (address, orderIds) ->
-            broadcasterNotifications.add(address, BroadcasterNotification.OrdersUpdated(orderIds))
         }
 
         // update balance changes
@@ -399,7 +399,12 @@ class ExchangeService(
                 BalanceType.Available,
             )
             walletMap.values.forEach {
-                broadcasterNotifications.add(it.address, BroadcasterNotification.Balances)
+                broadcasterNotifications.add(
+                    it.address,
+                    Balances(
+                        BalanceEntity.balancesAsApiResponse(it).balances,
+                    ),
+                )
             }
         }
 
@@ -564,7 +569,7 @@ class ExchangeService(
                         )
 
                         executions.forEach { execution ->
-                            broadcasterNotifications.add(execution.order.wallet.address, BroadcasterNotification.TradesUpdated(listOf(execution.id.value)))
+                            broadcasterNotifications.add(execution.order.wallet.address, TradeUpdated(execution.toTradeResponse()))
                         }
                     }
                 }
@@ -574,10 +579,11 @@ class ExchangeService(
     }
 
     fun List<PrincipalNotifications>.send() {
-        val payload = Json.encodeToString(this).also {
-            logger.debug { "sending payload (${it.length} bytes) (value=$it) with notify" }
-        }
-        TransactionManager.current().notifyDbListener("broadcaster_ctl", payload)
+        logger.debug { "sending broadcaster notification for $this" }
+        TransactionManager.current().notifyDbListener(
+            "broadcaster_ctl",
+            BroadcasterJobEntity.create(this).value,
+        )
     }
 
     override fun onExchangeContractDepositConfirmation(deposit: DepositEntity) {

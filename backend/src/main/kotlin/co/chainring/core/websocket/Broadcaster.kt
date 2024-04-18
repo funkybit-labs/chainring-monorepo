@@ -12,20 +12,19 @@ import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
+import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
 import co.chainring.apps.api.wsUnauthorized
 import co.chainring.core.model.Address
-import co.chainring.core.model.BroadcasterNotification
-import co.chainring.core.model.PrincipalNotifications
 import co.chainring.core.model.db.BalanceEntity
-import co.chainring.core.model.db.ExecutionId
+import co.chainring.core.model.db.BroadcasterJobEntity
+import co.chainring.core.model.db.BroadcasterJobId
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
-import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.utils.PgListener
 import co.chainring.core.utils.Timer
@@ -149,7 +148,13 @@ class Broadcaster(val db: Database) {
         ),
     )
 
-    private fun mockOHLC(marketId: MarketId, startTime: Instant, duration: kotlin.time.Duration, count: Long, full: Boolean): List<OHLC> {
+    private fun mockOHLC(
+        marketId: MarketId,
+        startTime: Instant,
+        duration: kotlin.time.Duration,
+        count: Long,
+        full: Boolean,
+    ): List<OHLC> {
         fun priceAdjust(range: Double, direction: Int) =
             1 + (rnd.nextDouble() * range) + when (direction) {
                 0 -> -(range / 2)
@@ -189,7 +194,13 @@ class Broadcaster(val db: Database) {
         } else {
             Prices(
                 market = topic.marketId,
-                ohlc = mockOHLC(topic.marketId, lastPricePublish[key]!!, 1.seconds, (now - lastPricePublish[key]!!).inWholeSeconds, false),
+                ohlc = mockOHLC(
+                    topic.marketId,
+                    lastPricePublish[key]!!,
+                    1.seconds,
+                    (now - lastPricePublish[key]!!).inWholeSeconds,
+                    false,
+                ),
                 full = false,
             ).also {
                 lastPricePublish[key] = now
@@ -308,97 +319,9 @@ class Broadcaster(val db: Database) {
         }
     }
 
-    fun sendOrders(principal: Principal) {
+    private fun sendOrders(principal: Principal) {
         findClients(principal, SubscriptionTopic.Orders)
             .forEach { sendOrders(it) }
-    }
-
-    private fun sendOrdersCreated(client: ConnectedClient, orderIds: List<OrderId>) {
-        if (client.principal != null) {
-            transaction {
-                OrderEntity.listOrders(orderIds).forEach {
-                    client.send(
-                        OutgoingWSMessage.Publish(
-                            SubscriptionTopic.Orders,
-                            OrderCreated(
-                                it.toOrderResponse(),
-                            ),
-                        ),
-                    )
-                }
-            }
-        }
-    }
-
-    private fun sendOrdersCreated(principal: Principal, orderIds: List<OrderId>) {
-        findClients(principal, SubscriptionTopic.Orders)
-            .forEach { sendOrdersCreated(it, orderIds) }
-    }
-
-    private fun sendOrdersUpdated(client: ConnectedClient, orderIds: List<OrderId>) {
-        if (client.principal != null) {
-            transaction {
-                OrderEntity.listOrders(orderIds).forEach {
-                    client.send(
-                        OutgoingWSMessage.Publish(
-                            SubscriptionTopic.Orders,
-                            OrderUpdated(
-                                it.toOrderResponse(),
-                            ),
-                        ),
-                    )
-                }
-            }
-        }
-    }
-
-    private fun sendOrdersUpdated(principal: Principal, orderIds: List<OrderId>) {
-        findClients(principal, SubscriptionTopic.Orders)
-            .forEach { sendOrdersUpdated(it, orderIds) }
-    }
-
-    private fun sendTradesCreated(client: ConnectedClient, executionIds: List<ExecutionId>) {
-        if (client.principal != null) {
-            transaction {
-                OrderExecutionEntity.findByIds(executionIds).forEach {
-                    client.send(
-                        OutgoingWSMessage.Publish(
-                            SubscriptionTopic.Trades,
-                            TradeCreated(
-                                it.toTradeResponse(),
-                            ),
-                        ),
-                    )
-                }
-            }
-        }
-    }
-
-    private fun sendTradesCreated(principal: Principal, executionIds: List<ExecutionId>) {
-        findClients(principal, SubscriptionTopic.Trades)
-            .forEach { sendTradesCreated(it, executionIds) }
-    }
-
-    private fun sendTradesUpdated(client: ConnectedClient, executionIds: List<ExecutionId>) {
-        if (client.principal != null) {
-            transaction {
-                OrderExecutionEntity.findByIds(executionIds).forEach {
-                    client.send(
-                        OutgoingWSMessage.Publish(
-                            SubscriptionTopic.Trades,
-                            TradeUpdated(
-                                it.toTradeResponse(),
-                            ),
-                        ),
-                    )
-                }
-            }
-        }
-    }
-
-    private fun sendTradesUpdated(principal: Principal, executionIds: List<ExecutionId>) {
-        findClients(principal, SubscriptionTopic.Trades)
-            .forEach { sendTradesUpdated(it, executionIds) }
     }
 
     private fun sendBalances(client: ConnectedClient) {
@@ -417,34 +340,43 @@ class Broadcaster(val db: Database) {
     }
 
     private fun sendBalances(principal: Principal) {
-        findClients(principal, SubscriptionTopic.Orders)
+        findClients(principal, SubscriptionTopic.Balances)
             .forEach { sendBalances(it) }
     }
 
     private fun handleDbNotification(payload: String) {
         logger.debug { "received db notification with payload $payload" }
         try {
-            val notifications = Json.decodeFromString<List<PrincipalNotifications>>(payload)
-            notifications.forEach { principalNotifications ->
+            val notificationData = transaction {
+                BroadcasterJobEntity.findById(BroadcasterJobId(payload))?.notificationData
+            }
+            notificationData?.forEach { principalNotifications ->
                 principalNotifications.notifications.forEach { notification ->
-                    when (notification) {
-                        BroadcasterNotification.Balances -> sendBalances(principalNotifications.principal)
-                        is BroadcasterNotification.OrdersCreated ->
-                            sendOrdersCreated(principalNotifications.principal, notification.ids)
-                        is BroadcasterNotification.OrdersUpdated ->
-                            sendOrdersUpdated(principalNotifications.principal, notification.ids)
-                        is BroadcasterNotification.TradesCreated ->
-                            sendTradesCreated(principalNotifications.principal, notification.ids)
-                        is BroadcasterNotification.TradesUpdated ->
-                            sendTradesUpdated(principalNotifications.principal, notification.ids)
-                        is BroadcasterNotification.Orders ->
-                            sendOrders(principalNotifications.principal)
-                    }
+                    notify(principalNotifications.principal, notification)
                 }
             }
         } catch (e: Exception) {
             logger.error(e) { "Broadcaster: Unhandled exception " }
         }
+    }
+
+    private fun notify(principal: Principal, message: Publishable) {
+        val topic = when (message) {
+            is OrderBook -> SubscriptionTopic.OrderBook(message.marketId)
+            is Orders, is OrderCreated, is OrderUpdated -> SubscriptionTopic.Orders
+            is Prices -> SubscriptionTopic.Prices(message.market)
+            is Trades, is TradeCreated, is TradeUpdated -> SubscriptionTopic.Trades
+            is Balances -> SubscriptionTopic.Balances
+        }
+
+        findClients(principal, topic)
+            .forEach {
+                try {
+                    it.send(OutgoingWSMessage.Publish(topic, message))
+                } catch (e: Exception) {
+                    logger.warn(e) { "error sending message $principal $topic $message " }
+                }
+            }
     }
 
     private fun findClients(principal: Principal, topic: SubscriptionTopic): List<ConnectedClient> =
