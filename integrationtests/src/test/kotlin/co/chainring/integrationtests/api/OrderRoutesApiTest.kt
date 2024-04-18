@@ -44,6 +44,7 @@ import co.chainring.integrationtests.testutils.subscribe
 import co.chainring.integrationtests.testutils.waitForMessage
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.awaitility.kotlin.await
+import org.awaitility.kotlin.withAlias
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.WsClient
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -1027,6 +1028,7 @@ class OrderRoutesApiTest {
 
     private fun waitForSettlementToFinish(tradeIds: List<TradeId>) {
         await
+            .withAlias("Waiting for trade settlement to finish. TradeIds: ${tradeIds.joinToString { it.value }}")
             .pollInSameThread()
             .pollDelay(Duration.ofMillis(100))
             .pollInterval(Duration.ofMillis(100))

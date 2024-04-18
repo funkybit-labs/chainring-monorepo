@@ -12,6 +12,9 @@ stop_containers:
 start_containers: stop_containers
 	docker-compose down --remove-orphans && docker-compose up -d
 
+start_ci_containers: stop_containers
+	docker-compose -f ./docker-compose-ci.yaml down --remove-orphans && docker-compose -f ./docker-compose-ci.yaml up -d
+
 anvil_logs:
 	docker compose logs anvil -f
 

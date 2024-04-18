@@ -24,7 +24,7 @@ jobs:
       - name: Start Anvil and Postgres containers
         run: |
           make anvil_image
-          make start_containers
+          make start_ci_containers
       - name: Check with Gradle Wrapper
         run: ./gradlew check
         env:
