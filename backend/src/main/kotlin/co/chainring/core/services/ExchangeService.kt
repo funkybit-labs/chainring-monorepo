@@ -4,7 +4,6 @@ import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.UpdateOrderApiRequest
-import co.chainring.contracts.generated.Exchange
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.blockchain.DepositConfirmationCallback
@@ -20,7 +19,6 @@ import co.chainring.core.model.PrincipalNotifications
 import co.chainring.core.model.SequencerOrderId
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.Symbol
-import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.BalanceChange
 import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BalanceType
@@ -582,43 +580,21 @@ class ExchangeService(
         TransactionManager.current().notifyDbListener("broadcaster_ctl", payload)
     }
 
-    override fun onExchangeContractDepositConfirmation(event: Exchange.DepositEventResponse) {
+    override fun onExchangeContractDepositConfirmation(deposit: DepositEntity) {
         transaction {
-            val blockNumber = event.log.blockNumber
-            val txHash = TxHash(event.log.transactionHash)
-
-            if (DepositEntity.findByTxHash(txHash) != null) {
-                logger.debug { "Skipping already recorded deposit (tx hash: $txHash)" }
-                return@transaction
-            }
-
-            val walletAddress = Address(event.from)
-            val wallet = WalletEntity.getOrCreate(walletAddress)
-            val tokenAddress = Address(event.token).takeIf { it != Address.zero }
-            val amount = event.amount
-
-            val depositEntity = DepositEntity.create(
-                chainId = blockchainClient.chainId,
-                wallet = wallet,
-                tokenAddress = tokenAddress,
-                amount = amount,
-                blockNumber = blockNumber,
-                transactionHash = txHash,
-            )
-
             val response = runBlocking {
-                sequencerClient.deposit(wallet.sequencerId.value, Asset(depositEntity.symbol.name), depositEntity.amount)
+                sequencerClient.deposit(deposit.wallet.sequencerId.value, Asset(deposit.symbol.name), deposit.amount)
             }
             BalanceEntity.updateBalances(
-                listOf(BalanceChange.Delta(wallet.id.value, depositEntity.symbol.guid.value, depositEntity.amount)),
+                listOf(BalanceChange.Delta(deposit.wallet.id.value, deposit.symbol.guid.value, deposit.amount)),
                 BalanceType.Exchange,
             )
             if (response.balancesChangedList.isEmpty()) {
                 // Should never happen. Mark deposit as failed and wait for manual
-                depositEntity.update(DepositStatus.Failed, "Rejected by sequencer")
+                deposit.update(DepositStatus.Failed, "Rejected by sequencer")
             } else {
                 handleSequencerResponse(response, mutableMapOf())
-                depositEntity.update(DepositStatus.Complete)
+                deposit.update(DepositStatus.Complete)
             }
         }
     }

@@ -5,12 +5,14 @@ import co.chainring.contracts.generated.Exchange
 import co.chainring.contracts.generated.UUPSUpgradeable
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
+import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.BlockchainTransactionData
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.ExchangeTransactionEntity
 import co.chainring.core.model.db.SymbolEntity
+import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.services.TxConfirmationCallback
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.reactivex.Flowable
@@ -33,7 +35,6 @@ import org.web3j.tx.RawTransactionManager
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import org.web3j.utils.Async
 import java.math.BigInteger
-import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 enum class ContractType {
@@ -91,7 +92,7 @@ data class BlockchainClientConfig(
 }
 
 interface DepositConfirmationCallback {
-    fun onExchangeContractDepositConfirmation(event: Exchange.DepositEventResponse)
+    fun onExchangeContractDepositConfirmation(deposit: DepositEntity)
 }
 
 class BlockchainServerException(message: String) : Exception(message)
@@ -155,14 +156,6 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
         receiptProcessor,
     )
     protected val submitterCredentials = Credentials.create(config.submitterPrivateKeyHex)
-    protected val submitterTransactionManager = RawTransactionManager(
-        web3j,
-        submitterCredentials,
-        chainId.value.toLong(),
-        receiptProcessor,
-    )
-    private var submitterWorkerThread: Thread? = null
-    private val txQueue = LinkedBlockingQueue<List<EIP712Transaction>>(10)
 
     val gasProvider = GasProvider(
         contractCreationLimit = config.contractCreationLimit,
@@ -176,6 +169,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
     private lateinit var exchangeContract: Exchange
 
     private var blockchainTransactionHandler: BlockchainTransactionHandler? = null
+    private var blockchainDepositHandler: BlockchainDepositHandler? = null
 
     companion object {
 
@@ -363,7 +357,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
         }
     }
 
-    fun start(txConfirmationCallback: TxConfirmationCallback) {
+    fun start(txConfirmationCallback: TxConfirmationCallback, depositConfirmationCallback: DepositConfirmationCallback) {
         blockchainTransactionHandler = BlockchainTransactionHandler(
             blockchainClient = this,
             submitterCredentials = submitterCredentials,
@@ -372,20 +366,31 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
         ).also {
             it.start(txConfirmationCallback)
         }
+
+        blockchainDepositHandler = BlockchainDepositHandler(
+            blockchainClient = this,
+            numConfirmations = config.numConfirmations,
+            pollingIntervalInMs = config.pollingIntervalInMs,
+        ).also {
+            it.start(depositConfirmationCallback)
+        }
+
+        registerDepositEventsConsumer()
     }
 
     fun stop() {
         blockchainTransactionHandler?.stop()
+        blockchainDepositHandler?.stop()
     }
 
-    fun registerDepositEventsConsumer(depositConfirmationCallback: DepositConfirmationCallback) {
+    private fun registerDepositEventsConsumer() {
         val exchangeContract = loadExchangeContract(contractMap[ContractType.Exchange]!!)
 
         val startFromBlock = maxSeenBlockNumber()
             ?: System.getenv("EVM_NETWORK_EARLIEST_BLOCK")?.let { DefaultBlockParameter.valueOf(it.toBigInteger()) }
             ?: DefaultBlockParameterName.EARLIEST
 
-        val filter = EthFilter(startFromBlock, DefaultBlockParameterName.SAFE, exchangeContract.contractAddress)
+        val filter = EthFilter(startFromBlock, DefaultBlockParameterName.LATEST, exchangeContract.contractAddress)
 
         web3j.ethLogFlowable(filter)
             .retryWhen { f: Flowable<Throwable> -> f.take(5).delay(300, TimeUnit.MILLISECONDS) }
@@ -396,13 +401,34 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
                     if (Contract.staticExtractEventParameters(Exchange.DEPOSIT_EVENT, eventLog) != null) {
                         val depositEventResponse = Exchange.getDepositEventFromLog(eventLog)
                         logger.debug { "Received deposit event (from: ${depositEventResponse.from}, amount: ${depositEventResponse.amount}, token: ${depositEventResponse.token}, txHash: ${depositEventResponse.log.transactionHash})" }
-                        depositConfirmationCallback.onExchangeContractDepositConfirmation(depositEventResponse)
+
+                        val blockNumber = depositEventResponse.log.blockNumber
+                        val txHash = TxHash(depositEventResponse.log.transactionHash)
+
+                        transaction {
+                            if (DepositEntity.findByTxHash(txHash) != null) {
+                                logger.debug { "Skipping already recorded deposit (tx hash: $txHash)" }
+                            } else {
+                                val walletAddress = Address(depositEventResponse.from)
+                                val wallet = WalletEntity.getOrCreate(walletAddress)
+                                val tokenAddress = Address(depositEventResponse.token).takeIf { it != Address.zero }
+                                val amount = depositEventResponse.amount
+
+                                DepositEntity.create(
+                                    chainId = chainId,
+                                    wallet = wallet,
+                                    tokenAddress = tokenAddress,
+                                    amount = amount,
+                                    blockNumber = blockNumber,
+                                    transactionHash = txHash,
+                                )
+                            }
+                        }
                     }
                 },
                 { throwable: Throwable ->
                     logger.error(throwable) { "Unexpected error occurred while processing deposit events" }
-
-                    registerDepositEventsConsumer(depositConfirmationCallback)
+                    registerDepositEventsConsumer()
                 },
             )
     }

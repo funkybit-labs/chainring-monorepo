@@ -12,6 +12,7 @@ import co.chainring.core.model.db.migrations.V18_BlockchainNonce
 import co.chainring.core.model.db.migrations.V19_BlockchainTransaction
 import co.chainring.core.model.db.migrations.V1_DeployedSmartContract
 import co.chainring.core.model.db.migrations.V20_ExchangeTransaction
+import co.chainring.core.model.db.migrations.V21_UpdateDepositStatus
 import co.chainring.core.model.db.migrations.V2_ERC20Token
 import co.chainring.core.model.db.migrations.V3_UpdateDeployedSmartContract
 import co.chainring.core.model.db.migrations.V4_AddDecimalsToERC20Token
@@ -42,4 +43,5 @@ val migrations = listOf(
     V18_BlockchainNonce(),
     V19_BlockchainTransaction(),
     V20_ExchangeTransaction(),
+    V21_UpdateDepositStatus(),
 )
