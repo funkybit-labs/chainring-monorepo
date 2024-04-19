@@ -11,27 +11,22 @@ import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
-import co.chainring.contracts.generated.Exchange
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.blockchain.DepositConfirmationCallback
-import co.chainring.core.db.notifyDbListener
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.ExchangeError
-import co.chainring.core.model.GlobalNotification
-import co.chainring.core.model.NotificationsBatch
-import co.chainring.core.model.PrincipalNotifications
 import co.chainring.core.model.SequencerOrderId
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.BalanceChange
 import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BalanceType
-import co.chainring.core.model.db.BroadcasterJobEntity
+import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.CreateOrderAssignment
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
@@ -44,7 +39,6 @@ import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.OrderType
-import co.chainring.core.model.db.PrincipalNotifications
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.TradeEntity
 import co.chainring.core.model.db.UpdateOrderAssignment
@@ -52,6 +46,7 @@ import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
+import co.chainring.core.model.db.publishBroadcasterNotifications
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.sequencer.sequencerOrderId
 import co.chainring.core.sequencer.toSequencerId
@@ -66,7 +61,6 @@ import co.chainring.sequencer.proto.SequencerResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
-import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -316,32 +310,24 @@ class ExchangeService(
                 }
 
                 OrderEntity.cancelAll(walletEntity)
-                listOf(
-                    PrincipalNotifications(
-                        walletEntity.address,
-                        listOf(
+
+                publishBroadcasterNotifications(
+                    listOf(
+                        BroadcasterNotification(
                             Orders(
                                 OrderEntity
                                     .listForWallet(walletEntity)
                                     .map(OrderEntity::toOrderResponse),
                             ),
-                        ),
-                    ),
-                ).send()
-
-                NotificationsBatch(
-                    principalNotifications = listOf(
-                        PrincipalNotifications(
                             walletEntity.address,
-                            listOf(BroadcasterNotification.AllOpenOrdersCancelled),
                         ),
+                    ) + BroadcasterNotification.orderBooksForMarkets(
+                        openOrders
+                            .map { it.market }
+                            .toSet()
+                            .sortedBy { it.guid },
                     ),
-                    globalNotifications = openOrders
-                        .map { it.marketGuid.value }
-                        .toSet()
-                        .map { GlobalNotification.OrderBookUpdated(it) }
-                        .sortedBy { it.marketId },
-                ).send()
+                )
             }
         }
     }
@@ -374,10 +360,9 @@ class ExchangeService(
                     feeSymbol = Symbol(order.market.quoteSymbol.name),
                 )
 
-                    execution.refresh(flush = true)
-                    logger.debug { "Sending TradeCreated for order ${order.guid}" }
-                    broadcasterNotifications.add(order.wallet.address, TradeCreated(execution.toTradeResponse()))
-                }
+                execution.refresh(flush = true)
+                broadcasterNotifications.add(order.wallet.address, TradeCreated(execution.toTradeResponse()))
+            }
 
             // build the transaction to settle
             tradeEntity.toEip712Transaction()
@@ -425,13 +410,16 @@ class ExchangeService(
 
         // queue any blockchain txs for processing
         blockchainClient.queueTransactions(blockchainTxs)
-        NotificationsBatch(
-            principalNotifications = broadcasterNotifications.map { PrincipalNotifications(it.key, it.value) },
-            globalNotifications = OrderEntity
-                .getOrdersMarkets(response.ordersChangedList.map { it.guid })
-                .map { GlobalNotification.OrderBookUpdated(it) }
-                .sortedBy { it.marketId },
-        ).send()
+
+        publishBroadcasterNotifications(
+            broadcasterNotifications.flatMap { (address, notifications) ->
+                notifications.map { BroadcasterNotification(it, address) }
+            } + BroadcasterNotification.orderBooksForMarkets(
+                OrderEntity
+                    .getOrdersMarkets(response.ordersChangedList.map { it.guid })
+                    .sortedBy { it.guid },
+            ),
+        )
     }
 
     private fun getSymbol(asset: String): SymbolEntity {
@@ -596,19 +584,12 @@ class ExchangeService(
                 }
             }
 
-            NotificationsBatch(
-                principalNotifications = broadcasterNotifications.map { PrincipalNotifications(it.key, it.value) },
-                globalNotifications = emptyList(),
-            ).send()
+            publishBroadcasterNotifications(
+                broadcasterNotifications.flatMap { (address, notifications) ->
+                    notifications.map { BroadcasterNotification(it, address) }
+                },
+            )
         }
-    }
-
-    fun List<PrincipalNotifications>.send() {
-        logger.debug { "sending broadcaster notification for $this" }
-        TransactionManager.current().notifyDbListener(
-            "broadcaster_ctl",
-            BroadcasterJobEntity.create(this).value,
-        )
     }
 
     override fun onExchangeContractDepositConfirmation(deposit: DepositEntity) {

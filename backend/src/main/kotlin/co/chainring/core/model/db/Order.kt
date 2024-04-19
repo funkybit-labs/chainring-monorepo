@@ -32,6 +32,7 @@ import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
 import java.math.BigInteger
+import java.math.RoundingMode
 
 @Serializable
 @JvmInline
@@ -258,16 +259,18 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             }.firstOrNull()
         }
 
-        fun getOrdersMarkets(sequencerOrderIds: List<Long>): Set<MarketId> {
+        fun getOrdersMarkets(sequencerOrderIds: List<Long>): Set<MarketEntity> {
             return if (sequencerOrderIds.isEmpty()) {
                 emptySet()
             } else {
-                OrderTable
+                val marketIds = OrderTable
                     .select(OrderTable.marketGuid)
                     .where { OrderTable.sequencerOrderId.inList(sequencerOrderIds) }
                     .distinct()
                     .map { it[OrderTable.marketGuid].value }
                     .toSet()
+
+                MarketEntity.find { MarketTable.guid.inList(marketIds) }.toSet()
             }
         }
 
@@ -302,8 +305,11 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             }
         }
 
+        fun getOrderBooks(markets: List<MarketEntity>): List<OrderBook> =
+            markets.map { getOrderBook(it) }
+
         fun getOrderBook(market: MarketEntity): OrderBook {
-            val priceScale = market.tickSize.stripTrailingZeros().scale()
+            val priceScale = market.tickSize.stripTrailingZeros().scale() + 1
 
             fun getOrderBookEntries(side: OrderSide): List<OrderBookEntry> {
                 val sizeCol = OrderTable.amount.sum().alias("size")
@@ -363,7 +369,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 buy = getOrderBookEntries(OrderSide.Buy),
                 sell = getOrderBookEntries(OrderSide.Sell),
                 last = LastTrade(
-                    price = lastTradePrice.setScale(priceScale).toString(),
+                    price = lastTradePrice.setScale(priceScale, RoundingMode.HALF_EVEN).toString(),
                     direction = when {
                         lastTradePrice >= prevTradePrice -> LastTradeDirection.Up
                         else -> LastTradeDirection.Down

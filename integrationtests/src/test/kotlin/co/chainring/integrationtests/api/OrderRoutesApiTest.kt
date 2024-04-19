@@ -81,11 +81,8 @@ class OrderRoutesApiTest {
         wsClient.subscribeToOrders()
         val initialOrdersOverWs = wsClient.assertOrdersMessageReceived().orders
 
-        wsClient.subscribe(SubscriptionTopic.Balances)
-        wsClient.waitForMessage().also { message ->
-            assertEquals(SubscriptionTopic.Balances, message.topic)
-            assertIs<Balances>(message.data)
-        }
+        wsClient.subscribeToBalances()
+        wsClient.assertBalancesMessageReceived()
 
         Faucet.fund(wallet.address)
         wallet.mintERC20("DAI", wallet.formatAmount("14", "DAI"))
@@ -175,11 +172,8 @@ class OrderRoutesApiTest {
         wsClient.subscribeToOrders()
         wsClient.assertOrdersMessageReceived()
 
-        wsClient.subscribe(SubscriptionTopic.Balances)
-        wsClient.waitForMessage().also { message ->
-            assertEquals(SubscriptionTopic.Balances, message.topic)
-            assertIs<Balances>(message.data)
-        }
+        wsClient.subscribeToBalances()
+        wsClient.assertBalancesMessageReceived()
 
         Faucet.fund(wallet.address)
         val amountToDeposit = wallet.formatAmount("20", "DAI")
@@ -314,11 +308,8 @@ class OrderRoutesApiTest {
         wsClient.subscribeToOrders()
         val initialOrdersOverWs = wsClient.assertOrdersMessageReceived().orders
 
-        wsClient.subscribe(SubscriptionTopic.Balances)
-        wsClient.waitForMessage().also { message ->
-            assertEquals(SubscriptionTopic.Balances, message.topic)
-            assertIs<Balances>(message.data)
-        }
+        wsClient.subscribeToBalances()
+        wsClient.assertBalancesMessageReceived()
 
         Faucet.fund(wallet.address)
         val amountToDeposit = wallet.formatAmount("30", "DAI")
@@ -399,10 +390,10 @@ class OrderRoutesApiTest {
                 OrderBook(
                     marketId = btcEthMarketId,
                     buy = listOf(
-                        OrderBookEntry(price = "17.45", size = "0.00013345".toBigDecimal()),
+                        OrderBookEntry(price = "17.450", size = "0.00013345".toBigDecimal()),
                     ),
                     sell = emptyList(),
-                    last = LastTrade("0.00", LastTradeDirection.Up),
+                    last = LastTrade("0.000", LastTradeDirection.Up),
                 ),
             )
         }
@@ -425,10 +416,10 @@ class OrderRoutesApiTest {
                 OrderBook(
                     marketId = btcEthMarketId,
                     buy = listOf(
-                        OrderBookEntry(price = "17.50", size = "0.00012345".toBigDecimal()),
+                        OrderBookEntry(price = "17.500", size = "0.00012345".toBigDecimal()),
                     ),
                     sell = emptyList(),
-                    last = LastTrade("0.00", LastTradeDirection.Up),
+                    last = LastTrade("0.000", LastTradeDirection.Up),
                 ),
             )
         }
@@ -458,12 +449,12 @@ class OrderRoutesApiTest {
                 OrderBook(
                     marketId = btcEthMarketId,
                     buy = listOf(
-                        OrderBookEntry(price = "17.50", size = "0.00012345".toBigDecimal()),
+                        OrderBookEntry(price = "17.500", size = "0.00012345".toBigDecimal()),
                     ),
                     sell = listOf(
-                        OrderBookEntry(price = "17.60", size = "0.00154321".toBigDecimal()),
+                        OrderBookEntry(price = "17.600", size = "0.00154321".toBigDecimal()),
                     ),
-                    last = LastTrade("0.00", LastTradeDirection.Up),
+                    last = LastTrade("0.000", LastTradeDirection.Up),
                 ),
             )
         }
@@ -488,12 +479,12 @@ class OrderRoutesApiTest {
                 OrderBook(
                     marketId = btcEthMarketId,
                     buy = listOf(
-                        OrderBookEntry(price = "17.50", size = "0.00012345".toBigDecimal()),
+                        OrderBookEntry(price = "17.500", size = "0.00012345".toBigDecimal()),
                     ),
                     sell = listOf(
-                        OrderBookEntry(price = "17.55", size = "0.00054321".toBigDecimal()),
+                        OrderBookEntry(price = "17.550", size = "0.00054321".toBigDecimal()),
                     ),
-                    last = LastTrade("0.00", LastTradeDirection.Up),
+                    last = LastTrade("0.000", LastTradeDirection.Up),
                 ),
             )
         }
@@ -571,13 +562,13 @@ class OrderRoutesApiTest {
                 OrderBook(
                     marketId = btcEthMarketId,
                     buy = listOf(
-                        OrderBookEntry(price = "17.50", size = "0.00012345".toBigDecimal()),
+                        OrderBookEntry(price = "17.500", size = "0.00012345".toBigDecimal()),
                     ),
                     sell = listOf(
                         // TODO: amount should be reduced since MM order was partially filled
-                        OrderBookEntry(price = "17.55", size = "0.00054321".toBigDecimal()),
+                        OrderBookEntry(price = "17.550", size = "0.00054321".toBigDecimal()),
                     ),
-                    last = LastTrade("17.55", LastTradeDirection.Up),
+                    last = LastTrade("17.550", LastTradeDirection.Up),
                 ),
             )
         }
@@ -688,9 +679,9 @@ class OrderRoutesApiTest {
                     marketId = btcEthMarketId,
                     buy = emptyList(),
                     sell = listOf(
-                        OrderBookEntry(price = "17.55", size = "0.00054321".toBigDecimal()),
+                        OrderBookEntry(price = "17.550", size = "0.00054321".toBigDecimal()),
                     ),
-                    last = LastTrade("17.50", LastTradeDirection.Down),
+                    last = LastTrade("17.500", LastTradeDirection.Down),
                 ),
             )
         }
@@ -735,9 +726,9 @@ class OrderRoutesApiTest {
                     marketId = btcEthMarketId,
                     buy = emptyList(),
                     sell = listOf(
-                        OrderBookEntry(price = "17.55", size = "0.00054321".toBigDecimal()),
+                        OrderBookEntry(price = "17.550", size = "0.00054321".toBigDecimal()),
                     ),
-                    last = LastTrade("17.50", LastTradeDirection.Down),
+                    last = LastTrade("17.500", LastTradeDirection.Down),
                 ),
             )
         }
@@ -751,7 +742,7 @@ class OrderRoutesApiTest {
                     marketId = btcEthMarketId,
                     buy = emptyList(),
                     sell = emptyList(),
-                    last = LastTrade("17.50", LastTradeDirection.Down),
+                    last = LastTrade("17.500", LastTradeDirection.Down),
                 ),
             )
         }
@@ -808,7 +799,7 @@ class OrderRoutesApiTest {
                     marketId = btcEthMarketId,
                     buy = emptyList(),
                     sell = emptyList(),
-                    last = LastTrade("17.50", LastTradeDirection.Down),
+                    last = LastTrade("17.500", LastTradeDirection.Down),
                 ),
             )
         }.close()

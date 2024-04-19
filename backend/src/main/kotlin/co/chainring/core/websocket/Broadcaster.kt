@@ -8,21 +8,17 @@ import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
-import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
 import co.chainring.apps.api.wsUnauthorized
 import co.chainring.core.model.Address
-import co.chainring.core.model.BroadcasterNotification
-import co.chainring.core.model.GlobalNotification
-import co.chainring.core.model.NotificationsBatch
 import co.chainring.core.model.db.BalanceEntity
-import co.chainring.core.model.db.ExecutionId
-import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.BroadcasterJobEntity
 import co.chainring.core.model.db.BroadcasterJobId
+import co.chainring.core.model.db.BroadcasterNotification
+import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
@@ -231,10 +227,9 @@ class Broadcaster(val db: Database) {
     }
 
     private fun sendOrderBook(topic: SubscriptionTopic.OrderBook) {
-        val clients = subscriptions
-            .getOrPut(topic) { Subscriptions() }
-
-        clients.forEach { sendOrderBook(topic, it) }
+        subscriptions.getOrPut(topic) { Subscriptions() }.forEach { client ->
+            sendOrderBook(topic, client)
+        }
     }
 
     private fun sendOrderBook(topic: SubscriptionTopic.OrderBook, client: ConnectedClient) {
@@ -262,11 +257,6 @@ class Broadcaster(val db: Database) {
         }
     }
 
-    private fun sendOrders(principal: Principal) {
-        findClients(principal, SubscriptionTopic.Orders)
-            .forEach { sendOrders(it) }
-    }
-
     private fun sendBalances(client: ConnectedClient) {
         if (client.principal != null) {
             transaction {
@@ -282,52 +272,42 @@ class Broadcaster(val db: Database) {
         }
     }
 
-    private fun sendBalances(principal: Principal) {
-        findClients(principal, SubscriptionTopic.Balances)
-            .forEach { sendBalances(it) }
-    }
-
     private fun handleDbNotification(payload: String) {
         logger.debug { "received db notification with payload $payload" }
         try {
-            val notificationData = transaction {
+            transaction {
                 BroadcasterJobEntity.findById(BroadcasterJobId(payload))?.notificationData
-            }
-            notificationData?.forEach { principalNotifications ->
-                principalNotifications.notifications.forEach { notification ->
-                    notify(principalNotifications.principal, notification)
-                }
-            }
-            notificationsBatch.globalNotifications.forEach { notification ->
-                when (notification) {
-                    is GlobalNotification.OrderBookUpdated -> {
-                        orderBooksByMarket.remove(notification.marketId) // invalidate cache
-                        sendOrderBook(SubscriptionTopic.OrderBook(notification.marketId))
-                    }
-                }
-            }
+            }?.forEach(::notify)
         } catch (e: Exception) {
             logger.error(e) { "Broadcaster: Unhandled exception" }
         }
     }
 
-    private fun notify(principal: Principal, message: Publishable) {
-        val topic = when (message) {
-            is OrderBook -> SubscriptionTopic.OrderBook(message.marketId)
+    private fun notify(notification: BroadcasterNotification) {
+        val topic = when (notification.message) {
+            is OrderBook -> {
+                orderBooksByMarket.replace(notification.message.marketId, notification.message) // update cached value
+                SubscriptionTopic.OrderBook(notification.message.marketId)
+            }
             is Orders, is OrderCreated, is OrderUpdated -> SubscriptionTopic.Orders
-            is Prices -> SubscriptionTopic.Prices(message.market)
+            is Prices -> SubscriptionTopic.Prices(notification.message.market)
             is Trades, is TradeCreated, is TradeUpdated -> SubscriptionTopic.Trades
             is Balances -> SubscriptionTopic.Balances
         }
 
-        findClients(principal, topic)
-            .forEach {
-                try {
-                    it.send(OutgoingWSMessage.Publish(topic, message))
-                } catch (e: Exception) {
-                    logger.warn(e) { "error sending message $principal $topic $message " }
-                }
+        val clients = if (notification.recipient == null) {
+            subscriptions.getOrPut(topic) { Subscriptions() }
+        } else {
+            findClients(notification.recipient, topic)
+        }
+
+        clients.forEach { client ->
+            try {
+                client.send(OutgoingWSMessage.Publish(topic, notification.message))
+            } catch (e: Exception) {
+                logger.warn(e) { "Error sending message. Recipient=${client.principal}, topic=$topic, message=${notification.message}" }
             }
+        }
     }
 
     private fun findClients(principal: Principal, topic: SubscriptionTopic): List<ConnectedClient> =
