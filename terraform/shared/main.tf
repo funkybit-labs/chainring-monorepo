@@ -40,7 +40,8 @@ resource "aws_iam_role_policy" "auth" {
             "Effect": "Allow",
             "Action": [
                 "cloudfront:ListDistributions",
-                "cloudfront:ListTagsForResource"
+                "cloudfront:ListTagsForResource",
+                "cloudfront:CreateInvalidation"
             ],
             "Resource": "*"
         }
