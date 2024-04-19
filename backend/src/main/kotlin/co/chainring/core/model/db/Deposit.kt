@@ -7,6 +7,8 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.JoinType
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.max
 import java.math.BigInteger
@@ -24,6 +26,7 @@ value class DepositId(override val value: String) : EntityId {
 @Serializable
 enum class DepositStatus {
     Pending,
+    Confirmed,
     Complete,
     Failed,
     ;
@@ -84,6 +87,17 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
                 .select(DepositTable.blockNumber.max())
                 .maxByOrNull { DepositTable.blockNumber }
                 ?.let { it[DepositTable.blockNumber.max()]?.toBigInteger() }
+        }
+
+        fun getPending(chainId: ChainId): List<DepositEntity> {
+            return DepositTable
+                .join(SymbolTable, JoinType.INNER, SymbolTable.guid, DepositTable.symbolGuid)
+                .select(DepositTable.columns)
+                .where {
+                    SymbolTable.chainId.eq(chainId) and DepositTable.status.inList(listOf(DepositStatus.Pending))
+                }
+                .let { DepositEntity.wrapRows(it) }
+                .toList()
         }
     }
 

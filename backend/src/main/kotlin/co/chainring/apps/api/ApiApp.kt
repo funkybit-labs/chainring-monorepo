@@ -152,7 +152,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         blockchainClient.updateContracts()
         blockchainClient.start(
             exchangeService,
+            exchangeService,
         )
-        blockchainClient.registerDepositEventsConsumer(exchangeService)
     }
 }

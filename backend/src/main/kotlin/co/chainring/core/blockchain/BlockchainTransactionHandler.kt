@@ -39,7 +39,7 @@ class BlockchainTransactionHandler(
         val exchange = blockchainClient.loadExchangeContract(contractAddress)
         workerThread = thread(start = true, name = "batch-transaction-handler", isDaemon = true) {
             try {
-                BlockchainClient.logger.debug { "Batch Transaction handler thread starting" }
+                logger.debug { "Batch Transaction handler thread starting" }
                 transaction {
                     BlockchainNonceEntity.clearNonce(submitterCredentials.address, chainId)
                 }
@@ -49,10 +49,10 @@ class BlockchainTransactionHandler(
                     handle(exchange, txConfirmationCallback)
                 }
             } catch (ie: InterruptedException) {
-                BlockchainClient.logger.warn { "exiting blockchain handler" }
+                logger.warn { "exiting blockchain handler" }
                 return@thread
             } catch (e: Exception) {
-                BlockchainClient.logger.error(e) { "Unhandled exception submitting tx" }
+                logger.error(e) { "Unhandled exception submitting tx" }
             }
         }
     }
@@ -68,7 +68,7 @@ class BlockchainTransactionHandler(
         pendingTxs.filter { it.status == BlockchainTransactionStatus.Submitted }.forEach { pendingTx ->
             pendingTx.transactionData.txHash?.let { txHash ->
                 blockchainClient.getTransactionReceipt(txHash)?.let { receipt ->
-                    BlockchainClient.logger.debug { "receipt is $receipt" }
+                    logger.debug { "receipt is $receipt" }
                     receipt.blockNumber?.let { blockNumber ->
                         when (receipt.status) {
                             "0x1" -> {
@@ -101,7 +101,7 @@ class BlockchainTransactionHandler(
                                 val error = receipt.revertReason
                                     ?: blockchainClient.extractRevertReasonFromSimulation(pendingTx.transactionData.data, receipt.blockNumber)
                                     ?: "Unknown Error"
-                                BlockchainClient.logger.error { "transaction batch failed with revert reason $error" }
+                                logger.error { "transaction batch failed with revert reason $error" }
 
                                 invokeTxCallbacks(pendingTx, txConfirmationCallback, error)
 
@@ -151,7 +151,7 @@ class BlockchainTransactionHandler(
                 tx.markAsFailed(ce.message ?: "Unknown error")
             }
         } catch (se: BlockchainServerException) {
-            logger.warn { "failed to send, will retry, ${se.message}" }
+            logger.warn(se) { "failed to send, will retry, ${se.message}" }
         }
     }
 
@@ -167,7 +167,7 @@ class BlockchainTransactionHandler(
             try {
                 txConfirmationCallback.onTxConfirmation(tx, error)
             } catch (e: Exception) {
-                BlockchainClient.logger.error { "Callback exception for $tx" }
+                logger.error(e) { "Callback exception for $tx" }
             }
         }
     }
@@ -187,7 +187,7 @@ class BlockchainTransactionHandler(
             candidateNonce = blockchainClient.getNonce(address)
             isConsistent = (1..2).map { blockchainClient.getNonce(address) }.all { it == candidateNonce }
             if (!isConsistent) {
-                BlockchainClient.logger.error { "Got inconsistent nonces, retrying" }
+                logger.error { "Got inconsistent nonces, retrying" }
                 Thread.sleep(100)
             }
         }

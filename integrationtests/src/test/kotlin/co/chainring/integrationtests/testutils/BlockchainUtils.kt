@@ -1,6 +1,5 @@
 package co.chainring.integrationtests.testutils
 
-import co.chainring.integrationtests.testutils.Faucet.blockchainClient
 import org.awaitility.kotlin.await
 import org.awaitility.kotlin.withAlias
 import org.web3j.protocol.core.RemoteCall
@@ -16,8 +15,9 @@ fun <T> RemoteCall<T>.sendAndWaitForConfirmation(): T {
         .pollInterval(Duration.ofMillis(100))
         .atMost(Duration.ofMillis(10000L))
         .until {
-            blockchainClient.mine()
-            async.isDone
+            async.isDone.also { done ->
+                if (!done) Faucet.mine()
+            }
         }
 
     return async.get()
