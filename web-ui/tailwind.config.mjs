@@ -25,5 +25,14 @@ export default {
   },
   plugins: [
     require('@tailwindcss/forms')
+  ],
+  safelist: [
+    {
+      pattern: /grid-cols-/,
+      variants: ['sm', 'md', 'lg', 'xl', '2xl']
+    },
+    {
+      pattern: /col-span-/,
+    }
   ]
 }
