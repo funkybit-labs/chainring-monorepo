@@ -54,10 +54,13 @@ jobs:
       - name: Deploy to ${{ inputs.environment }} environment
         working-directory: ./web-ui
         run: aws s3 sync dist/ s3://${{ inputs.environment }}-chainring-web/
+      - name: Install jq
+        uses: dcarbone/install-jq-action@v2
       - name: invalidate cloudfront cache
+        shell: bash
         run: |
-          aws cloudfront list-distributions --query DistributionList.Items[].ARN | jq -c -r '.[]' | while read arn; do
-            if [[ $(aws cloudfront list-tags-for-resource --resource $arn --query 'Tags.Items[?Key=="environment"][].Value|[0]') == "${{ inputs.environment }}" ]]; then
+          aws cloudfront list-distributions --query DistributionList.Items[].ARN | jq -c -r '.[]' | while IFS= read -r arn; do
+            if [[ $(aws cloudfront list-tags-for-resource --resource $arn | jq -c -r '.Tags.Items[] | select(.Key == "environment") | .Value') == "${{ inputs.environment }}" ]]; then
               aws cloudfront create-invalidation --distribution-id $(echo $arn | sed 's/.*\///') --paths "/*";
             fi
           done
