@@ -98,7 +98,10 @@ class BalanceEntity(guid: EntityID<BalanceId>) : GUIDEntity<BalanceId>(guid) {
         fun balancesAsApiResponse(walletEntity: WalletEntity): BalancesApiResponse {
             val (availableBalances, exchangeBalances) = getBalancesForWallet(
                 walletEntity,
-            ).partition { it.type == BalanceType.Available }
+            ).map {
+                it.refresh(flush = true)
+                it
+            }.partition { it.type == BalanceType.Available }
             val exchangeBalanceMap = exchangeBalances.associate { it.symbolGuid.value to it.balance }
 
             return BalancesApiResponse(

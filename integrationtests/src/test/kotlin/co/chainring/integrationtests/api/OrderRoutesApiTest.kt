@@ -81,6 +81,12 @@ class OrderRoutesApiTest {
             }
         }
 
+        wsClient.subscribe(SubscriptionTopic.Balances)
+        wsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Balances, message.topic)
+            assertIs<Balances>(message.data)
+        }
+
         Faucet.fund(wallet.address)
         wallet.mintERC20("DAI", wallet.formatAmount("14", "DAI"))
         val amountToDeposit = wallet.formatAmount("14", "DAI")
@@ -192,6 +198,12 @@ class OrderRoutesApiTest {
         wsClient.waitForMessage().let { message ->
             assertEquals(SubscriptionTopic.Orders, message.topic)
             assertIs<Orders>(message.data)
+        }
+
+        wsClient.subscribe(SubscriptionTopic.Balances)
+        wsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Balances, message.topic)
+            assertIs<Balances>(message.data)
         }
 
         Faucet.fund(wallet.address)
@@ -341,6 +353,12 @@ class OrderRoutesApiTest {
                 assertIs<Orders>(data)
                 data.orders
             }
+        }
+
+        wsClient.subscribe(SubscriptionTopic.Balances)
+        wsClient.waitForMessage().also { message ->
+            assertEquals(SubscriptionTopic.Balances, message.topic)
+            assertIs<Balances>(message.data)
         }
 
         Faucet.fund(wallet.address)
