@@ -156,12 +156,12 @@ class TestSequencerCheckpoints {
                     orderBatch {
                         this.guid = UUID.randomUUID().toString()
                         this.marketId = btcEthMarketId.value
+                        this.wallet = wallet1.value
                         this.ordersToAdd.add(
                             order {
                                 this.guid = Random.nextLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.550").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                         )
@@ -178,12 +178,12 @@ class TestSequencerCheckpoints {
                     orderBatch {
                         this.guid = UUID.randomUUID().toString()
                         this.marketId = btcEthMarketId.value
+                        this.wallet = wallet1.value
                         this.ordersToAdd.add(
                             order {
                                 this.guid = Random.nextLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.560").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                         )
@@ -197,12 +197,12 @@ class TestSequencerCheckpoints {
                     orderBatch {
                         this.guid = UUID.randomUUID().toString()
                         this.marketId = btcEthMarketId.value
+                        this.wallet = wallet1.value
                         this.ordersToAdd.add(
                             order {
                                 this.guid = Random.nextLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.570").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                         )
@@ -219,12 +219,12 @@ class TestSequencerCheckpoints {
                 orderBatch {
                     this.guid = UUID.randomUUID().toString()
                     this.marketId = btcEthMarketId.value
+                    this.wallet = wallet2.value
                     this.ordersToAdd.add(
                         order {
                             this.guid = Random.nextLong()
                             this.amount = BigDecimal("0.0011").inSats().toIntegerValue()
                             this.price = BigDecimal.ZERO.toDecimalValue()
-                            this.wallet = wallet2.value
                             this.type = Order.Type.MarketBuy
                         },
                     )
@@ -261,12 +261,12 @@ class TestSequencerCheckpoints {
                     orderBatch {
                         this.guid = UUID.randomUUID().toString()
                         this.marketId = btcEthMarketId.value
+                        this.wallet = wallet1.value
                         this.ordersToAdd.add(
                             order {
                                 this.guid = Random.nextLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.550").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                         )
@@ -286,12 +286,12 @@ class TestSequencerCheckpoints {
                 orderBatch {
                     this.guid = UUID.randomUUID().toString()
                     this.marketId = btcEthMarketId.value
+                    this.wallet = wallet2.value
                     this.ordersToAdd.add(
                         order {
                             this.guid = Random.nextLong()
                             this.amount = BigDecimal("0.0011").inSats().toIntegerValue()
                             this.price = BigDecimal.ZERO.toDecimalValue()
-                            this.wallet = wallet2.value
                             this.type = Order.Type.MarketBuy
                         },
                     )
@@ -438,25 +438,22 @@ class TestSequencerCheckpoints {
                                 this.guid = 1
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.550").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                             order {
                                 this.guid = 2
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.560").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                             order {
                                 this.guid = 3
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.600").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                         ).forEach {
-                            market.addOrder(it)
+                            market.addOrder(wallet1.value, it)
                         }
                     },
                 ),
@@ -492,25 +489,22 @@ class TestSequencerCheckpoints {
                                 this.guid = 1
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.3").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 2
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.4").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 3
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.5").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitBuy
                             },
                         ).forEach {
-                            market.addOrder(it)
+                            market.addOrder(wallet1.value, it)
                         }
                     },
                 ),
@@ -548,46 +542,40 @@ class TestSequencerCheckpoints {
                                 this.guid = 1
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.3").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 2
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.4").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 3
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.5").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 4
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.550").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                             order {
                                 this.guid = 5
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.560").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                             order {
                                 this.guid = 6
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("17.600").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                         ).forEach {
-                            market.addOrder(it)
+                            market.addOrder(wallet1.value, it)
                         }
                     },
                     btcUsdcMarketId to Market(
@@ -604,46 +592,40 @@ class TestSequencerCheckpoints {
                                 this.guid = 1
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("69997").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 2
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("69998").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 3
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("69999").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 4
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("70001").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                             order {
                                 this.guid = 5
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("70002").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                             order {
                                 this.guid = 6
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
                                 this.price = BigDecimal("70003").toDecimalValue()
-                                this.wallet = wallet1.value
                                 this.type = Order.Type.LimitSell
                             },
                         ).forEach {
-                            market.addOrder(it)
+                            market.addOrder(wallet1.value, it)
                         }
                     },
                 ),

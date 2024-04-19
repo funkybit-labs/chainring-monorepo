@@ -40,12 +40,12 @@ class SequencerClient {
                 this.type = SequencerRequest.Type.ApplyOrderBatch
                 this.orderBatch = orderBatch {
                     this.marketId = marketId.value
+                    this.wallet = wallet.value
                     this.ordersToAdd.add(
                         order {
                             this.guid = Random.nextLong()
                             this.amount = amount.toIntegerValue()
                             this.price = price?.toBigDecimal()?.toDecimalValue() ?: BigDecimal.ZERO.toDecimalValue()
-                            this.wallet = wallet.value
                             this.type = orderType
                         },
                     )
@@ -58,12 +58,14 @@ class SequencerClient {
         guid: OrderGuid,
         amount: Long,
         price: String,
+        wallet: WalletAddress,
     ) = sequencer.processRequest(
         sequencerRequest {
             this.guid = UUID.randomUUID().toString()
             this.type = SequencerRequest.Type.ApplyOrderBatch
             this.orderBatch = orderBatch {
                 this.marketId = marketId.value
+                this.wallet = wallet.value
                 this.ordersToChange.add(
                     order {
                         this.guid = guid.value
@@ -75,24 +77,23 @@ class SequencerClient {
         },
     )
 
-    fun cancelOrder(marketId: MarketId, guid: Long) =
+    fun cancelOrder(marketId: MarketId, guid: Long, wallet: WalletAddress) =
         sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
                 this.type = SequencerRequest.Type.ApplyOrderBatch
                 this.orderBatch = orderBatch {
                     this.marketId = marketId.value
+                    this.wallet = wallet.value
                     this.ordersToCancel.add(
-                        guid,
+                        co.chainring.sequencer.proto.cancelOrder {
+                            this.guid = guid
+                            this.externalGuid = ""
+                        },
                     )
                 }
             },
         )
-
-    fun cancelOrder(
-        marketId: MarketId,
-        guid: OrderGuid,
-    ) = cancelOrder(marketId, guid.value)
 
     fun createMarket(marketId: MarketId, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal = "17.525".toBigDecimal(), baseDecimals: Int = 8, quoteDecimals: Int = 18) {
         val createMarketResponse = sequencer.processRequest(

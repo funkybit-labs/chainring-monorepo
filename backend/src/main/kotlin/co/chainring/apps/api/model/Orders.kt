@@ -86,16 +86,28 @@ sealed class CreateOrderApiRequest {
 }
 
 @Serializable
+data class CreateOrderApiResponse(
+    val orderId: OrderId,
+    val requestStatus: RequestStatus,
+    val error: ApiError?,
+    val order: CreateOrderApiRequest,
+)
+
+@Serializable
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("type")
 sealed class UpdateOrderApiRequest {
     abstract val orderId: OrderId
+    abstract val marketId: MarketId
+    abstract val side: OrderSide
     abstract val amount: BigIntegerJson
 
     @Serializable
     @SerialName("market")
     data class Market(
         override val orderId: OrderId,
+        override val marketId: MarketId,
+        override val side: OrderSide,
         override val amount: BigIntegerJson,
     ) : UpdateOrderApiRequest()
 
@@ -103,6 +115,8 @@ sealed class UpdateOrderApiRequest {
     @SerialName("limit")
     data class Limit(
         override val orderId: OrderId,
+        override val marketId: MarketId,
+        override val side: OrderSide,
         override val amount: BigIntegerJson,
         val price: BigDecimalJson,
     ) : UpdateOrderApiRequest()
@@ -116,8 +130,28 @@ sealed class UpdateOrderApiRequest {
 }
 
 @Serializable
-data class CancelUpdateOrderApiRequest(
+data class UpdateOrderApiResponse(
+    val requestStatus: RequestStatus,
+    val error: ApiError?,
+    val order: UpdateOrderApiRequest,
+)
+
+@Serializable
+enum class RequestStatus {
+    Accepted,
+    Rejected,
+}
+
+@Serializable
+data class CancelOrderApiRequest(
     val orderId: OrderId,
+)
+
+@Serializable
+data class CancelOrderApiResponse(
+    val orderId: OrderId,
+    val requestStatus: RequestStatus,
+    val error: ApiError?,
 )
 
 @Serializable
@@ -183,10 +217,17 @@ data class BatchOrdersApiRequest(
     val marketId: MarketId,
     val createOrders: List<CreateOrderApiRequest>,
     val updateOrders: List<UpdateOrderApiRequest>,
-    val cancelOrders: List<CancelUpdateOrderApiRequest>,
+    val cancelOrders: List<CancelOrderApiRequest>,
 )
 
 @Serializable
 data class OrdersApiResponse(
     val orders: List<Order>,
+)
+
+@Serializable
+data class BatchOrdersApiResponse(
+    val createdOrders: List<CreateOrderApiResponse>,
+    val updatedOrders: List<UpdateOrderApiResponse>,
+    val canceledOrders: List<CancelOrderApiResponse>,
 )

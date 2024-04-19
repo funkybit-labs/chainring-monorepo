@@ -1,15 +1,31 @@
 package co.chainring.core.blockchain
 
+import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.contracts.generated.Exchange
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
+import co.chainring.core.model.db.BalanceChange
+import co.chainring.core.model.db.BalanceEntity
+import co.chainring.core.model.db.BalanceType
 import co.chainring.core.model.db.BlockchainNonceEntity
 import co.chainring.core.model.db.BlockchainTransactionData
 import co.chainring.core.model.db.BlockchainTransactionEntity
 import co.chainring.core.model.db.BlockchainTransactionStatus
+import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.ExchangeTransactionEntity
+import co.chainring.core.model.db.OrderExecutionEntity
+import co.chainring.core.model.db.SymbolEntity
+import co.chainring.core.model.db.TradeEntity
 import co.chainring.core.model.db.TxHash
+import co.chainring.core.model.db.WalletEntity
+import co.chainring.core.model.db.WithdrawalEntity
+import co.chainring.core.model.db.WithdrawalStatus
+import co.chainring.core.model.db.publishBroadcasterNotifications
+import co.chainring.core.utils.BroadcasterNotifications
+import co.chainring.core.utils.add
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.runBlocking
+import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.utils.Numeric
 import java.math.BigInteger
@@ -22,11 +38,11 @@ interface TxConfirmationHandler {
 
 class BlockchainTransactionHandler(
     private val blockchainClient: BlockchainClient,
-    private val txConfirmationHandler: TxConfirmationHandler,
     private val numConfirmations: Int = System.getenv("BLOCKCHAIN_TX_HANDLER_NUM_CONFIRMATIONS")?.toIntOrNull() ?: 1,
     private val pollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_TX_HANDLER_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
 ) {
     private val chainId = blockchainClient.chainId
+    private val symbolMap = mutableMapOf<String, SymbolEntity>()
     private var workerThread: Thread? = null
     val logger = KotlinLogging.logger {}
 
@@ -102,7 +118,7 @@ class BlockchainTransactionHandler(
                     tx.markAsConfirmed(gasAccountFee(receipt), receipt.gasUsed)
 
                     // invoke callbacks for transactions in this confirmed batch
-                    invokeTxCallbacks(tx, txConfirmationHandler)
+                    invokeTxCallbacks(tx)
 
                     // mark batch as complete
                     tx.markAsCompleted()
@@ -120,7 +136,7 @@ class BlockchainTransactionHandler(
 
                 logger.error { "transaction batch failed with revert reason $error" }
 
-                invokeTxCallbacks(tx, txConfirmationHandler, error)
+                invokeTxCallbacks(tx, error)
 
                 val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
                 submitterNonce.nonce = null
@@ -138,7 +154,7 @@ class BlockchainTransactionHandler(
             tx.markAsSubmitted(txHash)
         } catch (ce: BlockchainClientException) {
             logger.error(ce) { "Failed with client exception, ${ce.message}" }
-            invokeTxCallbacks(tx, txConfirmationHandler, ce.message ?: "Unknown error")
+            invokeTxCallbacks(tx, ce.message ?: "Unknown error")
             tx.markAsFailed(ce.message ?: "Unknown error")
         } catch (se: BlockchainServerException) {
             logger.warn(se) { "Failed to send, will retry, ${se.message}" }
@@ -179,12 +195,12 @@ class BlockchainTransactionHandler(
         return (currentBlock - startingBlock).toLong().toInt() + 1
     }
 
-    private fun invokeTxCallbacks(tx: BlockchainTransactionEntity, txConfirmationHandler: TxConfirmationHandler, error: String? = null) {
+    private fun invokeTxCallbacks(tx: BlockchainTransactionEntity, error: String? = null) {
         ExchangeTransactionEntity
             .findExchangeTransactionsForBlockchainTransaction(tx.guid.value)
             .forEach { exchangeTx ->
                 try {
-                    txConfirmationHandler.onTxConfirmation(exchangeTx.transactionData, error)
+                    onTxConfirmation(exchangeTx.transactionData, error)
                 } catch (e: Exception) {
                     logger.error(e) { "Callback exception for transaction ${tx.guid.value}" }
                 }
@@ -229,6 +245,107 @@ class BlockchainTransactionHandler(
             )
         } else {
             null
+        }
+    }
+
+    private fun getSymbol(asset: String): SymbolEntity {
+        return symbolMap.getOrPut(asset) {
+            transaction { SymbolEntity.forChainAndName(blockchainClient.chainId, asset) }
+        }
+    }
+
+    private fun getContractAddress(asset: String): Address {
+        return getSymbol(asset).contractAddress ?: Address.zero
+    }
+
+    private fun onTxConfirmation(tx: EIP712Transaction, error: String?) {
+        transaction {
+            val broadcasterNotifications: BroadcasterNotifications = mutableMapOf()
+            when (tx) {
+                is EIP712Transaction.WithdrawTx -> {
+                    WithdrawalEntity.findPendingByWalletAndNonce(
+                        WalletEntity.getByAddress(tx.sender)!!,
+                        tx.nonce,
+                    )?.let {
+                        it.update(
+                            status = error?.let { WithdrawalStatus.Failed }
+                                ?: WithdrawalStatus.Complete,
+                            error = error,
+                        )
+                        val finalBalance = runBlocking {
+                            blockchainClient.getExchangeBalance(
+                                it.wallet.address,
+                                it.symbol.contractAddress ?: Address.zero,
+                            )
+                        }
+                        BalanceEntity.updateBalances(
+                            listOf(
+                                BalanceChange.Replace(
+                                    it.wallet.id.value,
+                                    it.symbol.id.value,
+                                    finalBalance,
+                                ),
+                            ),
+                            BalanceType.Exchange,
+                        )
+                    }
+                }
+
+                is EIP712Transaction.Order -> {}
+
+                is EIP712Transaction.Trade -> {
+                    TradeEntity.findById(tx.tradeId)?.let { tradeEntity ->
+                        if (error != null) {
+                            BlockchainClient.logger.error { "settlement failed for ${tx.tradeId} - error is <$error>" }
+                            tradeEntity.failSettlement()
+                        } else {
+                            BlockchainClient.logger.debug { "settlement completed for ${tx.tradeId}" }
+                            tradeEntity.settle()
+                        }
+
+                        val executions = OrderExecutionEntity.findForTrade(tradeEntity)
+                        // update the onchain balances
+                        val wallets = executions.map { it.order.wallet }
+                        val symbols = listOf(
+                            executions.first().order.market.baseSymbol,
+                            executions.first().order.market.quoteSymbol,
+                        )
+                        val finalExchangeBalances = runBlocking {
+                            blockchainClient.getExchangeBalances(
+                                wallets.map { it.address },
+                                symbols.map { getContractAddress(it.name) },
+                            )
+                        }
+
+                        BalanceEntity.updateBalances(
+                            wallets.map { wallet ->
+                                symbols.map { symbol ->
+                                    BalanceChange.Replace(
+                                        walletId = wallet.guid.value,
+                                        symbolId = symbol.guid.value,
+                                        amount = finalExchangeBalances.getValue(wallet.address).getValue(
+                                            getContractAddress(
+                                                symbol.name,
+                                            ),
+                                        ),
+                                    )
+                                }
+                            }.flatten(),
+                            BalanceType.Exchange,
+                        )
+
+                        executions.forEach { execution ->
+                            broadcasterNotifications.add(execution.order.wallet.address, TradeUpdated(execution.toTradeResponse()))
+                        }
+                    }
+                }
+            }
+
+            publishBroadcasterNotifications(
+                broadcasterNotifications.flatMap { (address, notifications) ->
+                    notifications.map { BroadcasterNotification(it, address) }
+                },
+            )
         }
     }
 }

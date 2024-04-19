@@ -9,9 +9,12 @@ import co.chainring.core.db.DbConfig
 import co.chainring.core.model.db.BalanceLogTable
 import co.chainring.core.model.db.BalanceTable
 import co.chainring.core.model.db.BlockchainTransactionTable
+import co.chainring.core.model.db.BroadcasterJobTable
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.DepositTable
 import co.chainring.core.model.db.ExchangeTransactionTable
+import co.chainring.core.model.db.KeyValueStore
+import co.chainring.core.model.db.OHLCTable
 import co.chainring.core.model.db.OrderExecutionTable
 import co.chainring.core.model.db.OrderTable
 import co.chainring.core.model.db.TradeTable
@@ -21,6 +24,7 @@ import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.model.db.WithdrawalTable
 import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
+import co.chainring.sequencer.apps.QueueProcessorApp
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.tasks.fixtures.localDevFixtures
 import co.chainring.tasks.migrateDatabase
@@ -54,6 +58,10 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                         checkpointsPath = null,
                         inSandboxMode = true,
                     )
+                    private val queueProcessorApp = QueueProcessorApp(
+                        sequencerApp.inputQueue,
+                        sequencerApp.outputQueue,
+                    )
                     private val blockchainClient = TestBlockchainClient(BlockchainClientConfig())
 
                     private val isIntegrationRun = (getenv("INTEGRATION_RUN") ?: "0") == "1"
@@ -66,6 +74,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
 
                         if (!isIntegrationRun) {
                             sequencerApp.start()
+                            queueProcessorApp.start()
                             gatewayApp.start()
                             transaction {
                                 DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, blockchainClient.chainId)?.deprecated = true
@@ -124,9 +133,12 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
         }
 
         transaction {
+            KeyValueStore.deleteAll()
+            BroadcasterJobTable.deleteAll()
             ExchangeTransactionTable.deleteAll()
             BlockchainTransactionTable.deleteAll()
             OrderExecutionTable.deleteAll()
+            OHLCTable.deleteAll()
             TradeTable.deleteAll()
             OrderTable.deleteAll()
             DepositTable.deleteAll()

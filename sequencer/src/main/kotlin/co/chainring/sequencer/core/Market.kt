@@ -79,30 +79,42 @@ data class Market(
         val createdTrades = mutableListOf<TradeCreated>()
         val balanceChanges = mutableMapOf<Pair<WalletAddress, Asset>, BigInteger>()
         val consumptionChanges = mutableMapOf<WalletAddress, Pair<BigInteger, BigInteger>>()
-        orderBatch.ordersToCancelList.forEach { orderGuid ->
-            removeOrder(orderGuid.toOrderGuid())?.let { result ->
-                ordersChanged.add(
-                    orderChanged {
-                        this.guid = orderGuid
-                        this.disposition = OrderDisposition.Canceled
-                    },
-                )
-                consumptionChanges.merge(result.wallet, Pair(-result.baseAssetAmount, -result.quoteAssetAmount), ::sumBigIntegerPair)
+        orderBatch.ordersToCancelList.forEach { cancelOrder ->
+            if (isOrderForWallet(orderBatch.wallet, cancelOrder.guid)) {
+                removeOrder(cancelOrder.guid.toOrderGuid())?.let { result ->
+                    ordersChanged.add(
+                        orderChanged {
+                            this.guid = cancelOrder.guid
+                            this.disposition = OrderDisposition.Canceled
+                        },
+                    )
+                    consumptionChanges.merge(
+                        result.wallet,
+                        Pair(-result.baseAssetAmount, -result.quoteAssetAmount),
+                        ::sumBigIntegerPair,
+                    )
+                }
             }
         }
         orderBatch.ordersToChangeList.forEach { orderChange ->
-            changeOrder(orderChange)?.let { changeOrderResult ->
-                ordersChanged.add(
-                    orderChanged {
-                        this.guid = orderChange.guid
-                        this.disposition = changeOrderResult.disposition
-                    },
-                )
-                consumptionChanges.merge(changeOrderResult.wallet, Pair(changeOrderResult.baseAssetDelta, changeOrderResult.quoteAssetDelta), ::sumBigIntegerPair)
+            if (isOrderForWallet(orderBatch.wallet, orderChange.guid)) {
+                changeOrder(orderChange)?.let { changeOrderResult ->
+                    ordersChanged.add(
+                        orderChanged {
+                            this.guid = orderChange.guid
+                            this.disposition = changeOrderResult.disposition
+                        },
+                    )
+                    consumptionChanges.merge(
+                        changeOrderResult.wallet,
+                        Pair(changeOrderResult.baseAssetDelta, changeOrderResult.quoteAssetDelta),
+                        ::sumBigIntegerPair,
+                    )
+                }
             }
         }
         orderBatch.ordersToAddList.forEach { order ->
-            val orderResult = addOrder(order)
+            val orderResult = addOrder(orderBatch.wallet, order)
             ordersChanged.add(
                 orderChanged {
                     this.guid = order.guid
@@ -112,7 +124,7 @@ data class Market(
             if (orderResult.disposition == OrderDisposition.Accepted) {
                 when (order.type) {
                     Order.Type.LimitBuy -> consumptionChanges.merge(
-                        order.wallet.toWalletAddress(),
+                        orderBatch.wallet.toWalletAddress(),
                         Pair(
                             BigInteger.ZERO,
                             notional(order.amount, order.price, baseDecimals, quoteDecimals),
@@ -121,7 +133,7 @@ data class Market(
                     )
 
                     Order.Type.LimitSell -> consumptionChanges.merge(
-                        order.wallet.toWalletAddress(),
+                        orderBatch.wallet.toWalletAddress(),
                         Pair(order.amount.toBigInteger(), BigInteger.ZERO),
                         ::sumBigIntegerPair,
                     )
@@ -154,7 +166,7 @@ data class Market(
                         }
                     },
                 )
-                val wallet = order.wallet.toWalletAddress()
+                val wallet = orderBatch.wallet.toWalletAddress()
                 val notional = notional(execution.amount, execution.price, baseDecimals, quoteDecimals)
                 val base = id.baseAsset()
                 val quote = id.quoteAsset()
@@ -326,7 +338,7 @@ data class Market(
         return ret
     }
 
-    fun addOrder(order: Order): AddOrderResult {
+    fun addOrder(wallet: Long, order: Order): AddOrderResult {
         return if (order.type == Order.Type.LimitSell) {
             val orderPrice = order.price.toBigDecimal()
 
@@ -340,7 +352,7 @@ data class Market(
                     if (levelIx > maxOfferIx) {
                         maxOfferIx = levelIx
                     }
-                    val(disposition, levelOrder) = levels[levelIx].addOrder(order)
+                    val(disposition, levelOrder) = levels[levelIx].addOrder(wallet, order)
                     if (disposition == OrderDisposition.Accepted) {
                         sellOrdersByWallet.getOrPut(levelOrder!!.wallet) { CopyOnWriteArrayList() }.add(levelOrder)
                         ordersByGuid[levelOrder.guid] = levelOrder
@@ -361,7 +373,7 @@ data class Market(
                     if (levelIx < minBidIx || minBidIx == -1) {
                         minBidIx = levelIx
                     }
-                    val(disposition, levelOrder) = levels[levelIx].addOrder(order)
+                    val(disposition, levelOrder) = levels[levelIx].addOrder(wallet, order)
                     if (disposition == OrderDisposition.Accepted) {
                         buyOrdersByWallet.getOrPut(levelOrder!!.wallet) { CopyOnWriteArrayList() }.add(levelOrder)
                         ordersByGuid[levelOrder.guid] = levelOrder
@@ -440,10 +452,10 @@ data class Market(
                 }
                 removeOrder(order.guid)
                 addOrder(
+                    wallet,
                     co.chainring.sequencer.proto.order {
                         this.guid = orderChange.guid
                         this.type = if (level.side == BookSide.Buy) Order.Type.LimitBuy else Order.Type.LimitSell
-                        this.wallet = wallet
                         this.amount = orderChange.amount
                         this.price = orderChange.price
                     },
@@ -453,6 +465,11 @@ data class Market(
                 null
             }
         }
+    }
+    fun isOrderForWallet(wallet: Long, orderGuid: Long): Boolean {
+        return ordersByGuid[orderGuid.toOrderGuid()]?.let { order ->
+            wallet == order.wallet.value
+        } ?: false
     }
 
     // equals and hashCode are overridden because of levels are stored in array

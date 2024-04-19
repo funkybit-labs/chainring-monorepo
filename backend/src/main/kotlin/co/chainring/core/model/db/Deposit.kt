@@ -77,6 +77,7 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
             this.blockNumber = blockNumber
             this.transactionHash = transactionHash
         }
+
         fun findByTxHash(txHash: TxHash): DepositEntity? {
             return DepositEntity.find {
                 DepositTable.transactionHash.eq(txHash.value)

@@ -17,17 +17,26 @@ message Order {
   }
 
   Type type = 3;
-  uint64 wallet = 4;
-  IntegerValue amount = 5;
-  optional DecimalValue price = 6; // required for limit orders
+  IntegerValue amount = 4;
+  optional DecimalValue price = 5; // required for limit orders
+  optional IntegerValue nonce = 6; // required for add order
+  optional string signature = 7; // required for add order (created CHAIN-123 as order updates should require a new signature)
+  string externalGuid = 8;
 }
+message CancelOrder {
+  uint64 guid  = 1;
+  string externalGuid = 2;
+}
+
 
 message OrderBatch {
   string guid = 1;
   string marketId = 2;
-  repeated Order ordersToAdd = 3;
-  repeated Order ordersToChange = 4;
-  repeated uint64 ordersToCancel = 5; // order guids
+  uint64 wallet = 3;
+  repeated Order ordersToAdd = 4;
+  repeated Order ordersToChange = 5;
+  repeated CancelOrder ordersToCancel = 6; // order guids
+  bool cancelAll = 7;
 }
 
 enum OrderDisposition {

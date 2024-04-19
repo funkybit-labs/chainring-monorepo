@@ -10,12 +10,16 @@ message Deposit {
   string asset = 1;
   uint64 wallet = 2;
   IntegerValue amount = 3;
+  string externalGuid = 4;
 }
 
 message Withdrawal {
   string asset = 1;
   uint64 wallet = 2;
   IntegerValue amount = 3;
+  IntegerValue nonce = 4;
+  string signature = 5;
+  string externalGuid = 6;
 }
 
 message BalanceBatch {

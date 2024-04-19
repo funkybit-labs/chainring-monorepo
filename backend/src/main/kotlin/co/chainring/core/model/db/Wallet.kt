@@ -2,12 +2,14 @@ package co.chainring.core.model.db
 
 import co.chainring.core.model.Address
 import co.chainring.core.model.SequencerWalletId
+import co.chainring.core.model.toChecksumAddress
 import co.chainring.core.sequencer.toSequencerId
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.web3j.crypto.Keys
 
 @Serializable
 @JvmInline
@@ -41,7 +43,7 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
         }
         fun getByAddress(address: Address): WalletEntity? {
             return WalletEntity.find {
-                WalletTable.address.eq(address.value)
+                WalletTable.address.eq(address.toChecksumAddress().value)
             }.firstOrNull()
         }
 
@@ -50,12 +52,18 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
                 WalletTable.sequencerId.inList(sequencerIds.map { it.value })
             }.toList()
         }
+
+        fun getBySequencerId(sequencerId: SequencerWalletId): WalletEntity? {
+            return WalletEntity.find {
+                WalletTable.sequencerId.eq(sequencerId.value)
+            }.firstOrNull()
+        }
     }
 
     var createdAt by WalletTable.createdAt
     var createdBy by WalletTable.createdBy
     var address by WalletTable.address.transform(
-        toReal = { Address(it) },
+        toReal = { Address(Keys.toChecksumAddress(it)) },
         toColumn = { it.value },
     )
     var sequencerId by WalletTable.sequencerId.transform(

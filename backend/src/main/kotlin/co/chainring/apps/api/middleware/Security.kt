@@ -10,6 +10,7 @@ import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.toChecksumAddress
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -23,6 +24,7 @@ import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.core.with
 import org.http4k.lens.RequestContextKey
+import org.web3j.crypto.Keys
 import java.util.Base64
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -36,7 +38,7 @@ val signedTokenSecurity = object : Security {
             is AuthResult.Success -> {
                 val requestWithPrincipal =
                     request.with(
-                        principalRequestContextKey of authResult.address,
+                        principalRequestContextKey of authResult.address.toChecksumAddress(),
                     )
                 httpHandler(requestWithPrincipal)
             }
@@ -69,7 +71,7 @@ fun validateAuthToken(token: String): AuthResult {
     }
 
     if (validateSignature(signInMessage, signature)) {
-        return AuthResult.Success(signInMessage.address, endOfValidityInterval(signInMessage))
+        return AuthResult.Success(Address(Keys.toChecksumAddress(signInMessage.address)), endOfValidityInterval(signInMessage))
     }
 
     return authFailure("Invalid signature")
@@ -99,7 +101,7 @@ private fun validateSignature(signInMessage: SignInMessage, signature: String): 
         ECHelper.isValidSignature(
             messageHash = EIP712Helper.computeHash(signInMessage),
             signature = EvmSignature(signature),
-            signerAddress = signInMessage.address,
+            signerAddress = Address(Keys.toChecksumAddress(signInMessage.address)),
         )
     }.getOrElse { false }
 }
@@ -110,7 +112,7 @@ private fun authFailure(error: String): AuthResult.Failure = AuthResult.Failure(
 @Serializable
 data class SignInMessage(
     val message: String,
-    val address: Address,
+    val address: String,
     val chainId: ChainId,
     val timestamp: String,
 )

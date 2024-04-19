@@ -10,6 +10,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.web3j.crypto.Keys
 
 @Serializable
 @JvmInline
@@ -79,7 +80,7 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
     var chainId by SymbolTable.chainId
     var contractAddress by SymbolTable.contractAddress.transform(
         toColumn = { it?.value },
-        toReal = { it?.let { Address(it) } },
+        toReal = { it?.let { Address(Keys.toChecksumAddress(it)) } },
     )
     var decimals by SymbolTable.decimals
     var description by SymbolTable.description

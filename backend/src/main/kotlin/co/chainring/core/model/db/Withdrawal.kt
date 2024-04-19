@@ -57,13 +57,14 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
 
     companion object : EntityClass<WithdrawalId, WithdrawalEntity>(WithdrawalTable) {
         fun create(
+            withdrawalId: WithdrawalId,
             nonce: Long,
             chainId: ChainId,
             wallet: WalletEntity,
             tokenAddress: Address?,
             amount: BigInteger,
             signature: EvmSignature,
-        ) = WithdrawalEntity.new(WithdrawalId.generate()) {
+        ) = WithdrawalEntity.new(withdrawalId) {
             val now = Clock.System.now()
             this.nonce = nonce
             this.createdAt = now

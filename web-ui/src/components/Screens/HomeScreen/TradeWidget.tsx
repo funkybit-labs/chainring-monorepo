@@ -74,7 +74,7 @@ export default function TradeWidget({
         amount: side == 'Buy' ? bigIntAmount : -bigIntAmount,
         price: isMarketOrder
           ? BigInt(0)
-          : parseUnits(price, baseSymbol.decimals),
+          : parseUnits(price, quoteSymbol.decimals),
         nonce: BigInt('0x' + nonce)
       }
     })

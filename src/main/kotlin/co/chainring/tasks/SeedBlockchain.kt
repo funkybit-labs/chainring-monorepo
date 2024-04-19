@@ -16,6 +16,7 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.crypto.Credentials
+import org.web3j.crypto.Keys
 import org.web3j.protocol.Web3jService
 import org.web3j.protocol.core.JsonRpc2_0Web3j
 import org.web3j.protocol.core.Request
@@ -146,7 +147,7 @@ private class BlockchainClient(config: BlockchainClientConfig = BlockchainClient
             tokenName,
             decimals
         ).send()
-        return Address(contract.contractAddress)
+        return Address(Keys.toChecksumAddress(contract.contractAddress))
     }
 
     fun getERC20Balance(tokenContractAddress: Address, holder: Address): BigInteger {

@@ -33,6 +33,8 @@ enum class ReasonCode {
     AuthenticationError,
 
     ProcessingError,
+
+    RejectedBySequencer,
 }
 
 val jsonWithDefaults = Json { encodeDefaults = true }

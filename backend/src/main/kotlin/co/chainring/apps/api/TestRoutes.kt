@@ -5,7 +5,6 @@ import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.sequencer.SequencerClient
-import co.chainring.core.services.ExchangeService
 import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -24,7 +23,6 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import java.lang.RuntimeException
 
 class TestRoutes(
-    private val exchangeService: ExchangeService,
     private val sequencerClient: SequencerClient,
 ) {
     private val logger = KotlinLogging.logger { }
@@ -37,12 +35,6 @@ class TestRoutes(
             val marketPrice: BigDecimalJson,
             val baseDecimals: Int,
             val quoteDecimals: Int,
-        )
-
-        @Serializable
-        data class CreateSequencerDeposit(
-            val symbol: String,
-            val amount: BigIntegerJson,
         )
 
         @Serializable

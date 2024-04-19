@@ -34,7 +34,7 @@ class Wallet(
     }
 
     val blockchainClient = TestBlockchainClient(BlockchainClientConfig().copy(privateKeyHex = walletKeypair.privateKey.toByteArray().toHex()))
-    val address = Address("0x" + Keys.getAddress(walletKeypair))
+    val address = Address(Keys.toChecksumAddress("0x" + Keys.getAddress(walletKeypair)))
 
     private val exchangeContractAddress = contracts.first { it.name == ContractType.Exchange.name }.address
     private val exchangeContract: Exchange = blockchainClient.loadExchangeContract(exchangeContractAddress)

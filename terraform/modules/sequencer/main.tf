@@ -33,6 +33,15 @@ resource "aws_iam_role_policy" "sequencer_execution_role_policy" {
         "logs:PutLogEvents"
       ],
       "Resource": "*"
+    },
+   {
+      "Effect": "Allow",
+      "Action": [
+          "secretsmanager:GetSecretValue"
+      ],
+      "Resource": [
+        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*"
+      ]
     }
   ]
 }
