@@ -24,7 +24,7 @@ resource "aws_lightsail_static_ip_attachment" "lightsail" {
 }
 
 resource "aws_lightsail_key_pair" "default_key_pair" {
-  name       = var.publickey-name
+  name = var.publickey-name
 
   public_key = var.publickey
 }
@@ -64,15 +64,15 @@ data "aws_route53_zone" "primary_hosted_zone" {
 }
 
 resource "aws_route53_record" "domain_root" {
-  zone_id = "${data.aws_route53_zone.primary_hosted_zone.zone_id}"
-  name    = "${data.aws_route53_zone.primary_hosted_zone.name}"
+  zone_id = data.aws_route53_zone.primary_hosted_zone.zone_id
+  name    = data.aws_route53_zone.primary_hosted_zone.name
   type    = "A"
   ttl     = "300"
   records = ["${aws_lightsail_static_ip.lightsail.ip_address}"]
 }
 
 resource "aws_route53_record" "primary_web" {
-  zone_id = "${data.aws_route53_zone.primary_hosted_zone.zone_id}"
+  zone_id = data.aws_route53_zone.primary_hosted_zone.zone_id
   name    = var.primary_web
   type    = "CNAME"
   ttl     = "300"
@@ -80,7 +80,7 @@ resource "aws_route53_record" "primary_web" {
 }
 
 resource "aws_route53_record" "development_web" {
-  zone_id = "${data.aws_route53_zone.primary_hosted_zone.zone_id}"
+  zone_id = data.aws_route53_zone.primary_hosted_zone.zone_id
   name    = var.development_web
   type    = "CNAME"
   ttl     = "300"

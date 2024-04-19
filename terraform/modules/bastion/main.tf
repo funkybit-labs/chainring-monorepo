@@ -1,8 +1,3 @@
-resource "aws_key_pair" "deployer" {
-  key_name   = "deployer-key"
-  public_key = var.deployer_key
-}
-
 resource "aws_security_group" "bastion" {
   vpc_id = var.vpc.id
   name   = "${var.name_prefix}-bastion"
@@ -30,7 +25,7 @@ resource "aws_instance" "bastion" {
   ami                         = var.ami
   associate_public_ip_address = true
   subnet_id                   = var.subnet_id
-  key_name                    = aws_key_pair.deployer.key_name
+  key_name                    = "deployer-key"
   user_data_base64            = base64encode(templatefile("${path.module}/user_data.sh.tftpl", { ssh_authorized_keys = base64encode(join("\n", var.user_keys)) }))
   user_data_replace_on_change = true
   vpc_security_group_ids      = [aws_security_group.bastion.id]

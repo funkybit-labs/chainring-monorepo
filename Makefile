@@ -36,7 +36,7 @@ lint:
 	./gradlew lintKotlin && cd web-ui && pnpm run lint
 
 format:
-	./gradlew formatKotlin && cd web-ui && pnpm run lint --fix
+	./gradlew formatKotlin && (cd web-ui && pnpm run lint --fix) && (cd terraform && terraform fmt -recursive)
 
 test:
 	./gradlew test

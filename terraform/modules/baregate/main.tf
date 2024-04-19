@@ -30,10 +30,10 @@ resource "aws_security_group" "baregate" {
   vpc_id = var.vpc.id
   name   = "${var.name_prefix}-baregate"
   ingress {
-    from_port = 22
-    to_port = 22
-    protocol = "tcp"
-    cidr_blocks = ["${var.bastion_ip}/32"]
+    from_port        = 22
+    to_port          = 22
+    protocol         = "tcp"
+    cidr_blocks      = ["${var.bastion_ip}/32"]
     ipv6_cidr_blocks = []
   }
 
@@ -48,11 +48,6 @@ resource "aws_security_group" "baregate" {
 
 data "aws_ssm_parameter" "baregate_node_ami" {
   name = "/aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id"
-}
-
-resource "aws_key_pair" "baregate" {
-  key_name   = "baregate-key"
-  public_key = var.baregate_key
 }
 
 resource "aws_launch_template" "baregate_ec2" {
@@ -77,8 +72,8 @@ resource "aws_launch_template" "baregate_ec2" {
 }
 
 resource "aws_autoscaling_group" "ecs" {
-  name_prefix           = "${var.name_prefix}-baregate-asg-"
-  vpc_zone_identifier   = [var.subnet_id]
+  name_prefix         = "${var.name_prefix}-baregate-asg-"
+  vpc_zone_identifier = [var.subnet_id]
   // to use an EC2 instance from ECS, it needs to be created by an autoscaling group
   // we only want one instance though
   min_size              = 1

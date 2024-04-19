@@ -6,11 +6,9 @@ variable "ami" {
 variable "instance_type" {
   default = "t2.micro"
 }
-variable "deployer_key" {
-  default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE7/1w7LSANgOrUQ1gSpwk+vJfc2vDAkOQHCFdHpg0uR deployer-key@chainring"
-}
+
 variable "user_keys" {
-  type    = list(string)
+  type = list(string)
   default = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM4OCE/lPa8hta76kcy6b5+qUtXsH9R5rbI6CfIjCWO6 bholzman@bhmbp16-2023",
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIECo8JAWZ7LP0U1xYRodpNbRO3zxkU6rU1BE6PD0A5Uh bflood@bfmbp16-2023",

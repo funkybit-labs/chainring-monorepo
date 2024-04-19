@@ -1,11 +1,11 @@
 variable "github_org" {
   description = "Name of GitHub organization/user (case sensitive)"
-  default = "Chainring-Inc"
+  default     = "Chainring-Inc"
 }
 
 variable "repository_name" {
   description = "Name of GitHub repository (case sensitive)"
-  default = "chainring-monorepo"
+  default     = "chainring-monorepo"
 }
 
 variable "oidc_provider_arn" {
