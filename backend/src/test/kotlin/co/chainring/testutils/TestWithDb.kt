@@ -39,18 +39,22 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.deleteAll
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
+import java.lang.System.getenv
 import java.math.BigDecimal
 import java.util.UUID
 
 open class TestWithDb {
     companion object {
         private val logger = KotlinLogging.logger {}
+        private val isIntegrationRun = (getenv("INTEGRATION_RUN") ?: "0") == "1"
 
         @JvmStatic
         @BeforeAll
         fun beforeAll() {
+            Assumptions.assumeFalse(isIntegrationRun)
             val db = Database.connect(DbConfig(port = 5433))
             db.upgrade(migrations, logger)
             TransactionManager.defaultDatabase = db
