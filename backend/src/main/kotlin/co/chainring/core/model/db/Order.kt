@@ -1,10 +1,15 @@
 package co.chainring.core.model.db
 
 import co.chainring.apps.api.model.Order
+import co.chainring.apps.api.model.websocket.LastTrade
+import co.chainring.apps.api.model.websocket.LastTradeDirection
+import co.chainring.apps.api.model.websocket.OrderBook
+import co.chainring.apps.api.model.websocket.OrderBookEntry
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.SequencerOrderId
+import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import co.chainring.sequencer.proto.OrderDisposition
@@ -14,14 +19,20 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.div
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.times
+import org.jetbrains.exposed.sql.alias
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
+import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
 import java.math.BigInteger
+import java.math.RoundingMode
 
 @Serializable
 @JvmInline
@@ -201,7 +212,6 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
     )
 
     companion object : EntityClass<OrderId, OrderEntity>(OrderTable) {
-
         fun batchUpdate(market: MarketEntity, wallet: WalletEntity, createAssignments: List<CreateOrderAssignment>, updateAssignments: List<UpdateOrderAssignment>) {
             if (createAssignments.isEmpty() && updateAssignments.isEmpty()) {
                 return
@@ -249,6 +259,21 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             }.firstOrNull()
         }
 
+        fun getOrdersMarkets(sequencerOrderIds: List<Long>): Set<MarketEntity> {
+            return if (sequencerOrderIds.isEmpty()) {
+                emptySet()
+            } else {
+                val marketIds = OrderTable
+                    .select(OrderTable.marketGuid)
+                    .where { OrderTable.sequencerOrderId.inList(sequencerOrderIds) }
+                    .distinct()
+                    .map { it[OrderTable.marketGuid].value }
+                    .toSet()
+
+                MarketEntity.find { MarketTable.guid.inList(marketIds) }.toSet()
+            }
+        }
+
         fun listForWallet(wallet: WalletEntity): List<OrderEntity> {
             return OrderEntity
                 .find { OrderTable.walletGuid.eq(wallet.guid) }
@@ -278,6 +303,79 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 it[this.status] = OrderStatus.Cancelled
                 it[this.closedAt] = now
             }
+        }
+
+        fun getOrderBooks(markets: List<MarketEntity>): List<OrderBook> =
+            markets.map { getOrderBook(it) }
+
+        fun getOrderBook(market: MarketEntity): OrderBook {
+            val priceScale = market.tickSize.stripTrailingZeros().scale() + 1
+
+            fun getOrderBookEntries(side: OrderSide): List<OrderBookEntry> {
+                val sizeCol = OrderTable.amount.sum().alias("size")
+
+                return OrderTable
+                    .select(OrderTable.price, sizeCol)
+                    .where { OrderTable.marketGuid.eq(market.guid) }
+                    .andWhere { OrderTable.type.eq(OrderType.Limit) }
+                    .andWhere { OrderTable.side.eq(side) }
+                    .andWhere { OrderTable.status.inList(listOf(OrderStatus.Open, OrderStatus.Partial)) }
+                    .andWhere { OrderTable.price.isNotNull() }
+                    .groupBy(OrderTable.price)
+                    .orderBy(
+                        OrderTable.price,
+                        when (side) {
+                            OrderSide.Buy -> SortOrder.ASC
+                            OrderSide.Sell -> SortOrder.DESC
+                        },
+                    )
+                    .toList()
+                    .mapNotNull {
+                        val price = it[OrderTable.price] ?: return@mapNotNull null
+                        val size = it[sizeCol] ?: return@mapNotNull null
+                        OrderBookEntry(
+                            price = price.setScale(priceScale).toString(),
+                            size = size.toBigInteger().fromFundamentalUnits(market.baseSymbol.decimals).stripTrailingZeros(),
+                        )
+                    }
+            }
+
+            // We calculate last trade's price as a size-weighted average
+            // of all execution prices from the last match
+            val weightedAveragePriceCol = TradeTable.price.times(TradeTable.amount).sum().div(TradeTable.amount.sum())
+
+            val (lastTradePrice, prevTradePrice) = OrderExecutionTable
+                .leftJoin(OrderTable)
+                .leftJoin(TradeTable)
+                .select(weightedAveragePriceCol)
+                .where { OrderTable.marketGuid.eq(market.guid) }
+                .andWhere { OrderTable.type.eq(OrderType.Market) }
+                .groupBy(
+                    OrderExecutionTable.orderGuid,
+                    OrderExecutionTable.timestamp,
+                )
+                .orderBy(OrderExecutionTable.timestamp, SortOrder.DESC)
+                .limit(2)
+                .mapNotNull { it[weightedAveragePriceCol] }
+                .let {
+                    Pair(
+                        it.getOrElse(0) { BigDecimal.ZERO },
+                        it.getOrElse(1) { BigDecimal.ZERO },
+                    )
+                }
+
+            return OrderBook(
+                marketId = market.id.value,
+                buy = getOrderBookEntries(OrderSide.Buy),
+                sell = getOrderBookEntries(OrderSide.Sell),
+                last = LastTrade(
+                    price = lastTradePrice.setScale(priceScale, RoundingMode.HALF_EVEN).toString(),
+                    direction = when {
+                        lastTradePrice >= prevTradePrice -> LastTradeDirection.Up
+                        else -> LastTradeDirection.Down
+                    },
+                ),
+            )
         }
     }
 

@@ -9,7 +9,6 @@ import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -52,9 +51,7 @@ object TradeTable : GUIDTable<TradeId>("trade", ::TradeId) {
 }
 
 class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
-
     companion object : EntityClass<TradeId, TradeEntity>(TradeTable) {
-
         fun create(
             timestamp: Instant,
             market: MarketEntity,
@@ -68,14 +65,6 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
             this.amount = amount
             this.price = price
             this.settlementStatus = SettlementStatus.Pending
-        }
-
-        fun listTrades(beforeTimestamp: Instant, limit: Int): List<TradeEntity> {
-            return TradeEntity
-                .find { OrderExecutionTable.createdAt.lessEq(beforeTimestamp) }
-                .orderBy(OrderExecutionTable.createdAt to SortOrder.DESC)
-                .limit(limit)
-                .toList()
         }
     }
 

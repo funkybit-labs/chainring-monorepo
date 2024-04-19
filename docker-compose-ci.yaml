@@ -19,6 +19,16 @@ services:
       PGUSER: chainring # is used by psql inside container
     ports:
       - "5432:5432"
+  ut_db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: chainring
+      POSTGRES_PASSWORD: chainring
+      POSTGRES_DB: chainring
+      PGUSER: chainring # is used by psql inside container
+    ports:
+      - "5433:5432"
 
 volumes:
   anvil-data:

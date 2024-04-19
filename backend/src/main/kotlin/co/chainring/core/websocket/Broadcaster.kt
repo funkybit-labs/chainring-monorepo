@@ -1,18 +1,13 @@
 package co.chainring.core.websocket
 
-import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.apps.api.model.websocket.Balances
-import co.chainring.apps.api.model.websocket.LastTrade
-import co.chainring.apps.api.model.websocket.LastTradeDirection
 import co.chainring.apps.api.model.websocket.OHLC
 import co.chainring.apps.api.model.websocket.OrderBook
-import co.chainring.apps.api.model.websocket.OrderBookEntry
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
-import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
@@ -22,6 +17,8 @@ import co.chainring.core.model.Address
 import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BroadcasterJobEntity
 import co.chainring.core.model.db.BroadcasterJobId
+import co.chainring.core.model.db.BroadcasterNotification
+import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
@@ -72,6 +69,7 @@ class Broadcaster(val db: Database) {
     private val subscriptionsByPrincipal = ConcurrentHashMap<Principal, TopicSubscriptions>()
     private val lastPricePublish = mutableMapOf<Pair<MarketId, ConnectedClient>, Instant>()
     private val rnd = Random(0)
+    private val orderBooksByMarket = ConcurrentHashMap<MarketId, OrderBook>()
 
     private val pgListener = PgListener(db, "broadcaster-listener", "broadcaster_ctl") { notification ->
         handleDbNotification(notification.parameter)
@@ -134,7 +132,6 @@ class Broadcaster(val db: Database) {
     private fun publishData() {
         subscriptions.forEach { (topic, clients) ->
             when (topic) {
-                is SubscriptionTopic.OrderBook -> sendOrderBook(topic, clients)
                 is SubscriptionTopic.Prices -> sendPrices(topic, clients)
                 else -> {}
             }
@@ -229,75 +226,16 @@ class Broadcaster(val db: Database) {
         }
     }
 
-    private fun sendOrderBook(topic: SubscriptionTopic.OrderBook, clients: List<ConnectedClient>) {
-        clients.forEach { sendOrderBook(topic, it) }
+    private fun sendOrderBook(topic: SubscriptionTopic.OrderBook) {
+        subscriptions.getOrPut(topic) { Subscriptions() }.forEach { client ->
+            sendOrderBook(topic, client)
+        }
     }
 
     private fun sendOrderBook(topic: SubscriptionTopic.OrderBook, client: ConnectedClient) {
-        when (topic.marketId.value) {
-            "BTC/ETH" -> {
-                fun stutter() = rnd.nextDouble(-0.5, 0.5)
-                val lastStutter = stutter() / 3.0
-
-                OrderBook(
-                    marketId = topic.marketId,
-                    last = LastTrade(
-                        String.format("%.2f", (17.5 + lastStutter)),
-                        if (lastStutter > 0) LastTradeDirection.Up else LastTradeDirection.Down,
-                    ),
-                    buy = listOf(
-                        OrderBookEntry("17.75", BigDecimalJson(2.3 + stutter())),
-                        OrderBookEntry("18.00", BigDecimalJson(2.8 + stutter())),
-                        OrderBookEntry("18.25", BigDecimalJson(5 + stutter())),
-                        OrderBookEntry("18.50", BigDecimalJson(10.1 + stutter())),
-                        OrderBookEntry("18.75", BigDecimalJson(9.5 + stutter())),
-                        OrderBookEntry("19.00", BigDecimalJson(12.4 + stutter())),
-                        OrderBookEntry("19.50", BigDecimalJson(14.2 + stutter())),
-                        OrderBookEntry("20.00", BigDecimalJson(15.3 + stutter())),
-                        OrderBookEntry("20.50", BigDecimalJson(19 + stutter())),
-                    ),
-                    sell = listOf(
-                        OrderBookEntry("17.25", BigDecimalJson(2.1 + stutter())),
-                        OrderBookEntry("17.00", BigDecimalJson(5 + stutter())),
-                        OrderBookEntry("16.75", BigDecimalJson(5.4 + stutter())),
-                        OrderBookEntry("16.50", BigDecimalJson(7.5 + stutter())),
-                        OrderBookEntry("16.25", BigDecimalJson(10.1 + stutter())),
-                        OrderBookEntry("16.00", BigDecimalJson(7.5 + stutter())),
-                        OrderBookEntry("15.50", BigDecimalJson(12.4 + stutter())),
-                        OrderBookEntry("15.00", BigDecimalJson(11.3 + stutter())),
-                        OrderBookEntry("14.50", BigDecimalJson(14 + stutter())),
-                        OrderBookEntry("14.00", BigDecimalJson(19.5 + stutter())),
-                    ),
-                )
-            }
-            "USDC/DAI" -> {
-                fun stutter() = rnd.nextDouble(-0.01, 0.01)
-                val lastStutter = stutter()
-
-                OrderBook(
-                    marketId = topic.marketId,
-                    last = LastTrade(
-                        String.format("%.2f", (1.03 + lastStutter)),
-                        if (lastStutter > 0) LastTradeDirection.Up else LastTradeDirection.Down,
-                    ),
-                    buy = listOf(
-                        OrderBookEntry("1.05", BigDecimalJson(100 + stutter())),
-                        OrderBookEntry("1.06", BigDecimalJson(200 + stutter())),
-                        OrderBookEntry("1.07", BigDecimalJson(10 + stutter())),
-                        OrderBookEntry("1.08", BigDecimalJson(150 + stutter())),
-                        OrderBookEntry("1.09", BigDecimalJson(20 + stutter())),
-                    ),
-                    sell = listOf(
-                        OrderBookEntry("1.04", BigDecimalJson(120 + stutter())),
-                        OrderBookEntry("1.03", BigDecimalJson(300 + stutter())),
-                        OrderBookEntry("1.02", BigDecimalJson(100 + stutter())),
-                        OrderBookEntry("1.01", BigDecimalJson(50 + stutter())),
-                        OrderBookEntry("1.00", BigDecimalJson(30 + stutter())),
-                    ),
-                )
-            }
-            else -> null
-        }?.also { orderBook ->
+        orderBooksByMarket.getOrPut(topic.marketId) {
+            transaction { OrderEntity.getOrderBook(MarketEntity[topic.marketId]) }
+        }.also { orderBook ->
             client.send(OutgoingWSMessage.Publish(topic, orderBook))
         }
     }
@@ -319,11 +257,6 @@ class Broadcaster(val db: Database) {
         }
     }
 
-    private fun sendOrders(principal: Principal) {
-        findClients(principal, SubscriptionTopic.Orders)
-            .forEach { sendOrders(it) }
-    }
-
     private fun sendBalances(client: ConnectedClient) {
         if (client.principal != null) {
             transaction {
@@ -339,44 +272,42 @@ class Broadcaster(val db: Database) {
         }
     }
 
-    private fun sendBalances(principal: Principal) {
-        findClients(principal, SubscriptionTopic.Balances)
-            .forEach { sendBalances(it) }
-    }
-
     private fun handleDbNotification(payload: String) {
         logger.debug { "received db notification with payload $payload" }
         try {
-            val notificationData = transaction {
+            transaction {
                 BroadcasterJobEntity.findById(BroadcasterJobId(payload))?.notificationData
-            }
-            notificationData?.forEach { principalNotifications ->
-                principalNotifications.notifications.forEach { notification ->
-                    notify(principalNotifications.principal, notification)
-                }
-            }
+            }?.forEach(::notify)
         } catch (e: Exception) {
-            logger.error(e) { "Broadcaster: Unhandled exception " }
+            logger.error(e) { "Broadcaster: Unhandled exception" }
         }
     }
 
-    private fun notify(principal: Principal, message: Publishable) {
-        val topic = when (message) {
-            is OrderBook -> SubscriptionTopic.OrderBook(message.marketId)
+    private fun notify(notification: BroadcasterNotification) {
+        val topic = when (notification.message) {
+            is OrderBook -> {
+                orderBooksByMarket.replace(notification.message.marketId, notification.message) // update cached value
+                SubscriptionTopic.OrderBook(notification.message.marketId)
+            }
             is Orders, is OrderCreated, is OrderUpdated -> SubscriptionTopic.Orders
-            is Prices -> SubscriptionTopic.Prices(message.market)
+            is Prices -> SubscriptionTopic.Prices(notification.message.market)
             is Trades, is TradeCreated, is TradeUpdated -> SubscriptionTopic.Trades
             is Balances -> SubscriptionTopic.Balances
         }
 
-        findClients(principal, topic)
-            .forEach {
-                try {
-                    it.send(OutgoingWSMessage.Publish(topic, message))
-                } catch (e: Exception) {
-                    logger.warn(e) { "error sending message $principal $topic $message " }
-                }
+        val clients = if (notification.recipient == null) {
+            subscriptions.getOrPut(topic) { Subscriptions() }
+        } else {
+            findClients(notification.recipient, topic)
+        }
+
+        clients.forEach { client ->
+            try {
+                client.send(OutgoingWSMessage.Publish(topic, notification.message))
+            } catch (e: Exception) {
+                logger.warn(e) { "Error sending message. Recipient=${client.principal}, topic=$topic, message=${notification.message}" }
             }
+        }
     }
 
     private fun findClients(principal: Principal, topic: SubscriptionTopic): List<ConnectedClient> =

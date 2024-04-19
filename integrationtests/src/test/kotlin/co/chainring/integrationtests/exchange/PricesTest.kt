@@ -1,18 +1,15 @@
 package co.chainring.integrationtests.exchange
 
-import co.chainring.apps.api.model.websocket.Prices
-import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.core.model.db.MarketId
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
+import co.chainring.integrationtests.testutils.assertPricesMessageReceived
 import co.chainring.integrationtests.testutils.blocking
-import co.chainring.integrationtests.testutils.subscribe
-import co.chainring.integrationtests.testutils.waitForMessage
+import co.chainring.integrationtests.testutils.subscribeToPrices
 import org.http4k.client.WebsocketClient
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import kotlin.test.assertIs
 
 @ExtendWith(AppUnderTestRunner::class)
 class PricesTest {
@@ -28,15 +25,11 @@ class PricesTest {
 
     private fun `test authenticated prices over websocket`(auth: String?) {
         val client = WebsocketClient.blocking(auth)
-        client.subscribe(SubscriptionTopic.Prices(MarketId("BTC/ETH")))
+        client.subscribeToPrices(MarketId("BTC/ETH"))
 
-        client.waitForMessage().also { message ->
-            assertEquals(SubscriptionTopic.Prices(MarketId("BTC/ETH")), message.topic)
-            message.data.also { prices ->
-                assertIs<Prices>(prices)
-                assertEquals("BTC/ETH", prices.market.value)
-                assertEquals(12 * 24 * 7, prices.ohlc.size)
-            }
+        client.assertPricesMessageReceived(MarketId("BTC/ETH")) { msg ->
+            assertEquals("BTC/ETH", msg.market.value)
+            assertEquals(12 * 24 * 7, msg.ohlc.size)
         }
 
         client.close()

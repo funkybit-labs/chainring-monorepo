@@ -1,8 +1,10 @@
 package co.chainring.core.model.db
 
 import co.chainring.apps.api.model.websocket.Publishable
+import co.chainring.core.db.notifyDbListener
 import co.chainring.core.model.Address
 import de.fxlae.typeid.TypeId
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.http4k.format.KotlinxSerialization
@@ -10,12 +12,32 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.transactions.TransactionManager
+
+private val logger = KotlinLogging.logger {}
 
 @Serializable
-data class PrincipalNotifications(
-    val principal: Address,
-    val notifications: List<Publishable>,
-)
+data class BroadcasterNotification(
+    val message: Publishable,
+    val recipient: Address?,
+) {
+    companion object {
+        fun orderBooksForMarkets(markets: List<MarketEntity>): List<BroadcasterNotification> =
+            OrderEntity
+                .getOrderBooks(markets)
+                .map { orderBook ->
+                    BroadcasterNotification(orderBook, recipient = null)
+                }
+    }
+}
+
+fun publishBroadcasterNotifications(notifications: List<BroadcasterNotification>) {
+    logger.debug { "Scheduling broadcaster notifications: $notifications" }
+    TransactionManager.current().notifyDbListener(
+        "broadcaster_ctl",
+        BroadcasterJobEntity.create(notifications).value,
+    )
+}
 
 @JvmInline
 value class BroadcasterJobId(override val value: String) : EntityId {
@@ -28,18 +50,16 @@ value class BroadcasterJobId(override val value: String) : EntityId {
 object BroadcasterJobTable : GUIDTable<BroadcasterJobId>("broadcaster_job", ::BroadcasterJobId) {
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
-    val notificationData = jsonb<List<PrincipalNotifications>>("notification_data", KotlinxSerialization.json)
+    val notificationData = jsonb<List<BroadcasterNotification>>("notification_data", KotlinxSerialization.json)
 }
 
 class BroadcasterJobEntity(guid: EntityID<BroadcasterJobId>) : GUIDEntity<BroadcasterJobId>(guid) {
-
     companion object : EntityClass<BroadcasterJobId, BroadcasterJobEntity>(BroadcasterJobTable) {
-
-        fun create(notificationData: List<PrincipalNotifications>): BroadcasterJobId {
+        fun create(notifications: List<BroadcasterNotification>): BroadcasterJobId {
             return BroadcasterJobEntity.new(BroadcasterJobId.generate()) {
                 this.createdAt = Clock.System.now()
                 this.createdBy = "system"
-                this.notificationData = notificationData
+                this.notificationData = notifications
             }.guid.value
         }
     }

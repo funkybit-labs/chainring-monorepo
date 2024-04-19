@@ -1,18 +1,15 @@
 package co.chainring.integrationtests.exchange
 
-import co.chainring.apps.api.model.websocket.OrderBook
-import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.core.model.db.MarketId
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
+import co.chainring.integrationtests.testutils.assertOrderBookMessageReceived
 import co.chainring.integrationtests.testutils.blocking
-import co.chainring.integrationtests.testutils.subscribe
-import co.chainring.integrationtests.testutils.waitForMessage
+import co.chainring.integrationtests.testutils.subscribeToOrderBook
 import org.http4k.client.WebsocketClient
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import kotlin.test.assertIs
 
 @ExtendWith(AppUnderTestRunner::class)
 class OrderBookTest {
@@ -28,16 +25,10 @@ class OrderBookTest {
 
     private fun `test order book over websocket`(auth: String?) {
         val client = WebsocketClient.blocking(auth)
-        client.subscribe(SubscriptionTopic.OrderBook(MarketId("BTC/ETH")))
+        client.subscribeToOrderBook(MarketId("BTC/ETH"))
 
-        client.waitForMessage().also { message ->
-            assertEquals(SubscriptionTopic.OrderBook(MarketId("BTC/ETH")), message.topic)
-            message.data.also { orderBook ->
-                assertIs<OrderBook>(orderBook)
-                assertEquals("BTC/ETH", orderBook.marketId.value)
-                assertEquals(9, orderBook.buy.size)
-                assertEquals(10, orderBook.sell.size)
-            }
+        client.assertOrderBookMessageReceived(MarketId("BTC/ETH")) { msg ->
+            assertEquals("BTC/ETH", msg.marketId.value)
         }
 
         client.close()

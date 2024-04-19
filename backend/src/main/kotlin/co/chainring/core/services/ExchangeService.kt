@@ -11,11 +11,9 @@ import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
-import co.chainring.contracts.generated.Exchange
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.blockchain.DepositConfirmationCallback
-import co.chainring.core.db.notifyDbListener
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
@@ -28,7 +26,7 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.BalanceChange
 import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BalanceType
-import co.chainring.core.model.db.BroadcasterJobEntity
+import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.CreateOrderAssignment
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
@@ -41,7 +39,6 @@ import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.OrderType
-import co.chainring.core.model.db.PrincipalNotifications
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.TradeEntity
 import co.chainring.core.model.db.UpdateOrderAssignment
@@ -49,6 +46,7 @@ import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
+import co.chainring.core.model.db.publishBroadcasterNotifications
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.sequencer.sequencerOrderId
 import co.chainring.core.sequencer.toSequencerId
@@ -63,7 +61,6 @@ import co.chainring.sequencer.proto.SequencerResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
-import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -311,19 +308,26 @@ class ExchangeService(
                         sequencerClient.cancelOrders(entry.key.value, sequencerOrderIds)
                     }
                 }
+
                 OrderEntity.cancelAll(walletEntity)
-                listOf(
-                    PrincipalNotifications(
-                        walletEntity.address,
-                        listOf(
+
+                publishBroadcasterNotifications(
+                    listOf(
+                        BroadcasterNotification(
                             Orders(
                                 OrderEntity
                                     .listForWallet(walletEntity)
                                     .map(OrderEntity::toOrderResponse),
                             ),
+                            walletEntity.address,
                         ),
+                    ) + BroadcasterNotification.orderBooksForMarkets(
+                        openOrders
+                            .map { it.market }
+                            .toSet()
+                            .sortedBy { it.guid },
                     ),
-                ).send()
+                )
             }
         }
     }
@@ -334,38 +338,34 @@ class ExchangeService(
         // handle trades
         val blockchainTxs = response.tradesCreatedList.mapNotNull {
             logger.debug { "Trade Created ${it.buyGuid}, ${it.sellGuid}, ${it.amount.toBigInteger()} ${it.price.toBigDecimal()} " }
-            val buyOrder = OrderEntity.findBySequencerOrderId(it.buyGuid)
-            val sellOrder = OrderEntity.findBySequencerOrderId(it.sellGuid)
 
-            if (buyOrder != null && sellOrder != null) {
-                val tradeEntity = TradeEntity.create(
+            val buyOrder = OrderEntity.findBySequencerOrderId(it.buyGuid) ?: return@mapNotNull null
+            val sellOrder = OrderEntity.findBySequencerOrderId(it.sellGuid) ?: return@mapNotNull null
+
+            val tradeEntity = TradeEntity.create(
+                timestamp = timestamp,
+                market = buyOrder.market,
+                amount = it.amount.toBigInteger(),
+                price = it.price.toBigDecimal(),
+            )
+
+            // create executions for both
+            listOf(buyOrder, sellOrder).forEach { order ->
+                val execution = OrderExecutionEntity.create(
                     timestamp = timestamp,
-                    market = buyOrder.market,
-                    amount = it.amount.toBigInteger(),
-                    price = it.price.toBigDecimal(),
+                    orderEntity = order,
+                    tradeEntity = tradeEntity,
+                    role = if (order.type == OrderType.Market) ExecutionRole.Taker else ExecutionRole.Maker,
+                    feeAmount = BigInteger.ZERO,
+                    feeSymbol = Symbol(order.market.quoteSymbol.name),
                 )
 
-                // create executions for both
-                listOf(buyOrder, sellOrder).forEach { order ->
-                    val execution = OrderExecutionEntity.create(
-                        timestamp = timestamp,
-                        orderEntity = order,
-                        tradeEntity = tradeEntity,
-                        role = if (order.type == OrderType.Market) ExecutionRole.Taker else ExecutionRole.Maker,
-                        feeAmount = BigInteger.ZERO,
-                        feeSymbol = Symbol(order.market.quoteSymbol.name),
-                    )
-
-                    execution.refresh(flush = true)
-                    logger.debug { "Sending TradeCreated for order ${order.guid}" }
-                    broadcasterNotifications.add(order.wallet.address, TradeCreated(execution.toTradeResponse()))
-                }
-
-                // build the transaction to settle
-                tradeEntity.toEip712Transaction()
-            } else {
-                null
+                execution.refresh(flush = true)
+                broadcasterNotifications.add(order.wallet.address, TradeCreated(execution.toTradeResponse()))
             }
+
+            // build the transaction to settle
+            tradeEntity.toEip712Transaction()
         }
 
         // update all orders that have changed
@@ -410,7 +410,16 @@ class ExchangeService(
 
         // queue any blockchain txs for processing
         blockchainClient.queueTransactions(blockchainTxs)
-        broadcasterNotifications.map { PrincipalNotifications(it.key, it.value) }.send()
+
+        publishBroadcasterNotifications(
+            broadcasterNotifications.flatMap { (address, notifications) ->
+                notifications.map { BroadcasterNotification(it, address) }
+            } + BroadcasterNotification.orderBooksForMarkets(
+                OrderEntity
+                    .getOrdersMarkets(response.ordersChangedList.map { it.guid })
+                    .sortedBy { it.guid },
+            ),
+        )
     }
 
     private fun getSymbol(asset: String): SymbolEntity {
@@ -574,16 +583,13 @@ class ExchangeService(
                     }
                 }
             }
-            broadcasterNotifications.map { PrincipalNotifications(it.key, it.value) }.send()
-        }
-    }
 
-    fun List<PrincipalNotifications>.send() {
-        logger.debug { "sending broadcaster notification for $this" }
-        TransactionManager.current().notifyDbListener(
-            "broadcaster_ctl",
-            BroadcasterJobEntity.create(this).value,
-        )
+            publishBroadcasterNotifications(
+                broadcasterNotifications.flatMap { (address, notifications) ->
+                    notifications.map { BroadcasterNotification(it, address) }
+                },
+            )
+        }
     }
 
     override fun onExchangeContractDepositConfirmation(deposit: DepositEntity) {
