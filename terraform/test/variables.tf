@@ -14,7 +14,8 @@ provider "aws" {
 variable "cidr_prefix" {
   default = "10.10"
 }
-
+# this is a test comment just to test signed commits
+#
 data "terraform_remote_state" "shared" {
   backend = "s3"
   config = {
