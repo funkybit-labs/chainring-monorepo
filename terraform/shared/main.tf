@@ -180,3 +180,13 @@ resource "aws_route53_zone" "zone-finance" {
 resource "aws_route53_zone" "zone-labs" {
   name = "chainringlabs.com"
 }
+
+resource "aws_key_pair" "baregate" {
+  key_name   = "baregate-key"
+  public_key = var.baregate_key
+}
+
+resource "aws_key_pair" "deployer" {
+  key_name   = "deployer-key"
+  public_key = var.deployer_key
+}

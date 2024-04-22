@@ -12,7 +12,7 @@ provider "aws" {
 }
 
 variable "cidr_prefix" {
-  default = "10.10"
+  default = "10.40"
 }
 
 data "terraform_remote_state" "shared" {
@@ -24,8 +24,8 @@ data "terraform_remote_state" "shared" {
   }
 }
 
-data "aws_acm_certificate" "chainring" {
-  domain    = "*.chainring.co"
+data "aws_acm_certificate" "chainring_finance" {
+  domain    = "*.chainring.finance"
   key_types = ["EC_prime256v1"]
   provider  = aws.us_east_1
 }
@@ -35,7 +35,7 @@ terraform {
 
   backend "s3" {
     bucket = "chainring-terraform-state"
-    key    = "test/main.tfstate"
+    key    = "testnet/main.tfstate"
     region = "us-east-2"
   }
 }

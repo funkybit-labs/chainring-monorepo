@@ -15,19 +15,19 @@ variable "instance_name" {
 variable "ip_address_type" {
   type        = string
   description = "The IP address type of the Lightsail Instance. Valid Values: dualstack | ipv4"
-  default = "ipv4"
+  default     = "ipv4"
 }
 
 variable "blueprint" {
   type        = string
   description = "One of the blueprints listed by the AWS cli - aws lightsail get-blueprints"
-  default = "ubuntu_22_04"
+  default     = "ubuntu_22_04"
 }
 
 variable "bundle_id" {
   type        = string
   description = "The bundle id of the instance. Use AWS cli - aws lightsail get-bundles"
-  default = "small_3_0"
+  default     = "small_3_0"
 }
 
 variable "static_ip_name" {
@@ -36,15 +36,15 @@ variable "static_ip_name" {
 }
 
 variable "publickey" {
-  type        = string
- }
+  type = string
+}
 
 variable "publickey-name" {
-  type        = string
+  type = string
 }
 
 variable "dns_zone" {
-  type = string
+  type        = string
   description = "primary existing dns zone to attach to this instance"
 }
 
@@ -54,7 +54,7 @@ variable "primary_web" {
 }
 
 variable "development_web" {
-  type = string
+  type        = string
   description = "CNAME hostname for development web address"
 }
 

@@ -1,6 +1,6 @@
 environment:
   api:
-    DB_HOST: db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
+    DB_HOST: test-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     EVM_NETWORK_URL: http://test-anvil.chainring.co:8545
     EVM_NETWORK_EARLIEST_BLOCK: "1182700" # anvil's current block number on test
     AUTH_TOKEN_VALIDITY_INTERVAL: P1D
@@ -18,7 +18,7 @@ services:
     count: 1
     environment: api
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-cd1262a5-40ca-4997-9abd-0a2f1855d691-HEAMok
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
   anvil:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
     count: 1

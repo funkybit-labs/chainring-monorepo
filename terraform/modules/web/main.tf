@@ -9,7 +9,7 @@ resource "aws_s3_bucket" "web" {
 }
 
 resource "aws_cloudfront_origin_access_control" "web" {
-  name                              = "web"
+  name                              = "${var.name_prefix}-web"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"
@@ -60,7 +60,7 @@ resource "aws_cloudfront_distribution" "web" {
   viewer_certificate {
     ssl_support_method             = "sni-only"
     minimum_protocol_version       = "TLSv1.2_2021"
-    acm_certificate_arn            = data.aws_acm_certificate.chainring.arn
+    acm_certificate_arn            = var.certificate_arn
     cloudfront_default_certificate = false
   }
 
@@ -80,28 +80,28 @@ resource "aws_s3_bucket_policy" "web" {
       Principal = {
         "Service" : "cloudfront.amazonaws.com"
       },
-      Action = "s3:GetObject",
+      Action   = "s3:GetObject",
       Resource = "arn:aws:s3:::${aws_s3_bucket.web.id}/*",
       Condition = {
         "StringEquals" : {
           "AWS:SourceArn" : "arn:aws:cloudfront::${local.account_id}:distribution/${aws_cloudfront_distribution.web.id}"
         }
       }
-    },
+      },
       {
-        Sid = "AllowCIList",
-        Effect =  "Allow",
+        Sid    = "AllowCIList",
+        Effect = "Allow",
         Principal = {
-          "AWS": var.ci_role_arn
+          "AWS" : var.ci_role_arn
         },
-        Action = ["s3:ListBucket", "s3:GetBucketLocation"],
+        Action   = ["s3:ListBucket", "s3:GetBucketLocation"],
         Resource = "arn:aws:s3:::${aws_s3_bucket.web.id}"
       },
       {
-        Sid = "AllowCIWrite",
+        Sid    = "AllowCIWrite",
         Effect = "Allow",
         Principal = {
-          "AWS": var.ci_role_arn
+          "AWS" : var.ci_role_arn
         },
         Action = [
           "s3:PutObject",
@@ -112,7 +112,7 @@ resource "aws_s3_bucket_policy" "web" {
         Resource = [
           "arn:aws:s3:::${aws_s3_bucket.web.id}/*"
         ]
-      }]
+    }]
   })
 }
 

@@ -70,10 +70,10 @@ resource "aws_ecs_task_definition" "sequencer" {
       cpu          = 0
       volumesFrom  = []
       environment  = []
-      secrets          = []
+      secrets      = []
       logConfiguration = {
         logDriver = "awslogs"
-        options   = {
+        options = {
           "awslogs-group" : aws_cloudwatch_log_group.sequencer.name
           "awslogs-region" : var.aws_region,
           "awslogs-stream-prefix" : "${var.name_prefix}-sequencer",
@@ -135,10 +135,10 @@ resource "aws_service_discovery_service" "sequencer" {
 }
 
 resource "aws_ecs_service" "sequencer" {
-  name                    = "${var.name_prefix}-sequencer"
-  cluster                 = var.ecs_cluster_name
-  task_definition         = aws_ecs_task_definition.sequencer.arn
-  desired_count           = 1
+  name            = "${var.name_prefix}-sequencer"
+  cluster         = var.ecs_cluster_name
+  task_definition = aws_ecs_task_definition.sequencer.arn
+  desired_count   = 1
 
   network_configuration {
     security_groups = [aws_security_group.security_group.id]

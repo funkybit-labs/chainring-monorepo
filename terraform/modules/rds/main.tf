@@ -24,7 +24,7 @@ resource "aws_security_group" "db_security_group" {
 }
 
 resource "aws_rds_cluster" "db_cluster" {
-  cluster_identifier          = "db-cluster"
+  cluster_identifier          = "${var.name_prefix}-db-cluster"
   engine                      = "aurora-postgresql"
   engine_version              = "16.1"
   manage_master_user_password = true
@@ -44,7 +44,7 @@ resource "aws_rds_cluster" "db_cluster" {
 
 resource "aws_rds_cluster_instance" "db_instance" {
   count                = 2
-  identifier           = "db-instance-${count.index + 1}"
+  identifier           = "${var.name_prefix}-db-instance-${count.index + 1}"
   instance_class       = var.instance_class
   cluster_identifier   = aws_rds_cluster.db_cluster.id
   engine               = "aurora-postgresql"
@@ -58,8 +58,8 @@ locals {
 }
 
 resource "aws_secretsmanager_secret_policy" "ci_db_password_access" {
-  for_each = toset([for s in aws_rds_cluster.db_cluster.master_user_secret: s.secret_arn])
-  secret_arn = each.value
+  depends_on = [aws_rds_cluster.db_cluster]
+  secret_arn = aws_rds_cluster.db_cluster.master_user_secret.0.secret_arn
   policy     = <<EOF
 {
   "Version": "2012-10-17",
@@ -73,7 +73,7 @@ resource "aws_secretsmanager_secret_policy" "ci_db_password_access" {
         "AWS": "${var.ci_role_arn}"
       },
       "Resource": [
-        "${each.value}"
+        "${aws_rds_cluster.db_cluster.master_user_secret.0.secret_arn}"
       ]
     }
   ]
