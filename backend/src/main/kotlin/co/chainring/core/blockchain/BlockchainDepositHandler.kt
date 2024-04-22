@@ -1,18 +1,32 @@
 package co.chainring.core.blockchain
 
+import co.chainring.contracts.generated.Exchange
+import co.chainring.core.model.Address
+import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
+import co.chainring.core.model.db.WalletEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.reactivex.Flowable
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.web3j.protocol.core.DefaultBlockParameter
+import org.web3j.protocol.core.DefaultBlockParameterName
+import org.web3j.protocol.core.methods.request.EthFilter
+import org.web3j.tx.Contract
 import java.math.BigInteger
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
+
+interface DepositConfirmationHandler {
+    fun onExchangeContractDepositConfirmation(deposit: DepositEntity)
+}
 
 class BlockchainDepositHandler(
     private val blockchainClient: BlockchainClient,
-    private val numConfirmations: Int,
-    private val pollingIntervalInMs: Long,
+    private val depositConfirmationHandler: DepositConfirmationHandler,
+    private val numConfirmations: Int = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toIntOrNull() ?: 1,
+    private val pollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
 ) {
-
     private val chainId = blockchainClient.chainId
     private var workerThread: Thread? = null
     val logger = KotlinLogging.logger {}
@@ -24,8 +38,10 @@ class BlockchainDepositHandler(
         }
     }
 
-    fun start(depositConfirmationCallback: DepositConfirmationCallback) {
+    fun start() {
         logger.debug { "Starting deposit confirmation handler" }
+
+        registerDepositEventsConsumer()
 
         workerThread = thread(start = true, name = "deposit-confirmation-handler", isDaemon = true) {
             try {
@@ -33,7 +49,7 @@ class BlockchainDepositHandler(
 
                 while (true) {
                     Thread.sleep(pollingIntervalInMs)
-                    handle(depositConfirmationCallback)
+                    handle(depositConfirmationHandler)
                 }
             } catch (ie: InterruptedException) {
                 logger.warn { "Exiting deposit confirmation handler thread" }
@@ -44,7 +60,57 @@ class BlockchainDepositHandler(
         }
     }
 
-    private fun handle(depositConfirmationCallback: DepositConfirmationCallback) {
+    private fun registerDepositEventsConsumer() {
+        val exchangeContract = blockchainClient.loadExchangeContract()
+
+        val startFromBlock = maxSeenBlockNumber()
+            ?: System.getenv("EVM_NETWORK_EARLIEST_BLOCK")?.let { DefaultBlockParameter.valueOf(it.toBigInteger()) }
+            ?: DefaultBlockParameterName.EARLIEST
+
+        val filter = EthFilter(startFromBlock, DefaultBlockParameterName.LATEST, exchangeContract.contractAddress)
+
+        blockchainClient.ethLogFlowable(filter)
+            .retryWhen { f: Flowable<Throwable> -> f.take(5).delay(300, TimeUnit.MILLISECONDS) }
+            .subscribe(
+                { eventLog ->
+                    // listen to all events of the exchange contract and manually check for DEPOSIT_EVENT
+                    // exchangeContract.depositEventFlowable(filter) fails with null pointer on any other event form the contract
+                    if (Contract.staticExtractEventParameters(Exchange.DEPOSIT_EVENT, eventLog) != null) {
+                        val depositEventResponse = Exchange.getDepositEventFromLog(eventLog)
+                        logger.debug { "Received deposit event (from: ${depositEventResponse.from}, amount: ${depositEventResponse.amount}, token: ${depositEventResponse.token}, txHash: ${depositEventResponse.log.transactionHash})" }
+
+                        val blockNumber = depositEventResponse.log.blockNumber
+                        val txHash = TxHash(depositEventResponse.log.transactionHash)
+
+                        transaction {
+                            if (DepositEntity.findByTxHash(txHash) != null) {
+                                logger.debug { "Skipping already recorded deposit (tx hash: $txHash)" }
+                            } else {
+                                val walletAddress = Address(depositEventResponse.from)
+                                val wallet = WalletEntity.getOrCreate(walletAddress)
+                                val tokenAddress = Address(depositEventResponse.token).takeIf { it != Address.zero }
+                                val amount = depositEventResponse.amount
+
+                                DepositEntity.create(
+                                    chainId = chainId,
+                                    wallet = wallet,
+                                    tokenAddress = tokenAddress,
+                                    amount = amount,
+                                    blockNumber = blockNumber,
+                                    transactionHash = txHash,
+                                )
+                            }
+                        }
+                    }
+                },
+                { throwable: Throwable ->
+                    logger.error(throwable) { "Unexpected error occurred while processing deposit events" }
+                    registerDepositEventsConsumer()
+                },
+            )
+    }
+
+    private fun handle(depositConfirmationHandler: DepositConfirmationHandler) {
         val currentBlock = blockchainClient.getBlockNumber()
 
         val pendingDeposits = transaction {
@@ -64,7 +130,7 @@ class BlockchainDepositHandler(
                                 }
 
                                 try {
-                                    depositConfirmationCallback.onExchangeContractDepositConfirmation(pendingDeposit)
+                                    depositConfirmationHandler.onExchangeContractDepositConfirmation(pendingDeposit)
                                 } catch (e: Exception) {
                                     logger.error(e) { "DepositConfirmationCallback failed for $pendingDeposit" }
                                 }
@@ -90,6 +156,10 @@ class BlockchainDepositHandler(
                 }
             }
         }
+    }
+
+    private fun maxSeenBlockNumber() = transaction {
+        DepositEntity.maxBlockNumber()?.let { DefaultBlockParameter.valueOf(it) }
     }
 
     private fun confirmations(currentBlock: BigInteger, startingBlock: BigInteger): Int {

@@ -23,6 +23,7 @@ import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.tasks.fixtures.localDevFixtures
+import co.chainring.tasks.migrateDatabase
 import co.chainring.tasks.seedBlockchain
 import co.chainring.tasks.seedDatabase
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -58,18 +59,19 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                     private val isIntegrationRun = (getenv("INTEGRATION_RUN") ?: "0") == "1"
 
                     init {
+                        migrateDatabase()
+
                         // activate auto mining to speeding up blockchain seeding
                         blockchainClient.setAutoMining(true)
 
                         if (!isIntegrationRun) {
                             sequencerApp.start()
                             gatewayApp.start()
-                            apiApp.startServer()
                             transaction {
                                 DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, blockchainClient.chainId)?.deprecated = true
                                 WithdrawalEntity.findPending().forEach { it.update(WithdrawalStatus.Failed, "restarting test") }
                             }
-                            apiApp.updateContracts()
+                            apiApp.start()
                         }
                         // wait for contracts to load
                         await

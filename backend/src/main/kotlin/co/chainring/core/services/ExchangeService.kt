@@ -13,7 +13,8 @@ import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.ContractType
-import co.chainring.core.blockchain.DepositConfirmationCallback
+import co.chainring.core.blockchain.DepositConfirmationHandler
+import co.chainring.core.blockchain.TxConfirmationHandler
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
@@ -70,15 +71,10 @@ fun BroadcasterNotifications.add(address: Address, publishable: Publishable) {
     this.getOrPut(address) { mutableListOf() }.add(publishable)
 }
 
-interface TxConfirmationCallback {
-    fun onTxConfirmation(tx: EIP712Transaction, error: String?)
-}
-
 class ExchangeService(
     val blockchainClient: BlockchainClient,
     val sequencerClient: SequencerClient,
-) : TxConfirmationCallback, DepositConfirmationCallback {
-
+) : TxConfirmationHandler, DepositConfirmationHandler {
     private val symbolMap = mutableMapOf<String, SymbolEntity>()
     private val marketMap = mutableMapOf<MarketId, MarketEntity>()
     private val logger = KotlinLogging.logger {}

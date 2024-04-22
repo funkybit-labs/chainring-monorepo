@@ -1,5 +1,6 @@
 package co.chainring.core.model.db
 
+import co.chainring.core.model.Address
 import org.jetbrains.exposed.dao.IntEntity
 import org.jetbrains.exposed.dao.IntEntityClass
 import org.jetbrains.exposed.dao.id.EntityID
@@ -21,33 +22,32 @@ object BlockchainNonceTable : IntIdTable("blockchain_nonce") {
 
 class BlockchainNonceEntity(id: EntityID<Int>) : IntEntity(id) {
     companion object : IntEntityClass<BlockchainNonceEntity>(BlockchainNonceTable) {
-
-        fun findByKeyAndChain(key: String, chainId: ChainId): BlockchainNonceEntity? {
+        fun findByKeyAndChain(address: Address, chainId: ChainId): BlockchainNonceEntity? {
             return BlockchainNonceEntity.find {
-                BlockchainNonceTable.key eq Keys.toChecksumAddress(key) and
+                BlockchainNonceTable.key eq Keys.toChecksumAddress(address.value) and
                     BlockchainNonceTable.chainId.eq(chainId)
             }.firstOrNull()
         }
 
-        fun create(key: String, chainId: ChainId) {
+        fun create(address: Address, chainId: ChainId) {
             BlockchainNonceTable.insert {
-                it[BlockchainNonceTable.key] = Keys.toChecksumAddress(key)
+                it[BlockchainNonceTable.key] = Keys.toChecksumAddress(address.value)
                 it[BlockchainNonceTable.chainId] = chainId
             }
         }
 
-        fun lockForUpdate(key: String, chainId: ChainId): BlockchainNonceEntity {
+        fun lockForUpdate(address: Address, chainId: ChainId): BlockchainNonceEntity {
             return BlockchainNonceTable.selectAll().where {
-                BlockchainNonceTable.key eq Keys.toChecksumAddress(key) and
+                BlockchainNonceTable.key eq Keys.toChecksumAddress(address.value) and
                     BlockchainNonceTable.chainId.eq(chainId)
             }.forUpdate().map {
                 BlockchainNonceEntity.wrapRow(it)
             }.single()
         }
 
-        fun clearNonce(key: String, chainId: ChainId) {
+        fun clearNonce(address: Address, chainId: ChainId) {
             BlockchainNonceTable.update({
-                BlockchainNonceTable.key eq Keys.toChecksumAddress(key) and
+                BlockchainNonceTable.key eq Keys.toChecksumAddress(address.value) and
                     BlockchainNonceTable.chainId.eq(chainId)
             }) {
                 it[this.nonce] = null

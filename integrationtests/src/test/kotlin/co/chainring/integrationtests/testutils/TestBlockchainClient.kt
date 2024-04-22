@@ -35,7 +35,7 @@ class TestBlockchainClient(val config: BlockchainClientConfig = BlockchainClient
         return EvmSignature((signature.r + signature.s + signature.v).toHex())
     }
 
-    fun mine(numberOfBlocks: Int = config.numConfirmations) {
+    fun mine(numberOfBlocks: Int = 1) {
         Request(
             "anvil_mine",
             listOf(numberOfBlocks),
