@@ -23,8 +23,8 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                 ChainEntity.create(chain.id, chain.name).flush()
                 println("Created chain ${chain.name} with id=${chain.id}")
             }
-            if (BlockchainNonceEntity.findByKeyAndChain(chain.submitterAddress.value, chain.id) == null) {
-                BlockchainNonceEntity.create(chain.submitterAddress.value, chain.id)
+            if (BlockchainNonceEntity.findByKeyAndChain(chain.submitterAddress, chain.id) == null) {
+                BlockchainNonceEntity.create(chain.submitterAddress, chain.id)
             }
         }
 

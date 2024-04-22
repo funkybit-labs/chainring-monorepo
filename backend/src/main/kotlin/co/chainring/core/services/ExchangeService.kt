@@ -13,7 +13,8 @@ import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.ContractType
-import co.chainring.core.blockchain.DepositConfirmationCallback
+import co.chainring.core.blockchain.DepositConfirmationHandler
+import co.chainring.core.blockchain.TxConfirmationHandler
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
@@ -30,6 +31,7 @@ import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.CreateOrderAssignment
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
+import co.chainring.core.model.db.ExchangeTransactionEntity
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
@@ -70,15 +72,10 @@ fun BroadcasterNotifications.add(address: Address, publishable: Publishable) {
     this.getOrPut(address) { mutableListOf() }.add(publishable)
 }
 
-interface TxConfirmationCallback {
-    fun onTxConfirmation(tx: EIP712Transaction, error: String?)
-}
-
 class ExchangeService(
     val blockchainClient: BlockchainClient,
     val sequencerClient: SequencerClient,
-) : TxConfirmationCallback, DepositConfirmationCallback {
-
+) : TxConfirmationHandler, DepositConfirmationHandler {
     private val symbolMap = mutableMapOf<String, SymbolEntity>()
     private val marketMap = mutableMapOf<MarketId, MarketEntity>()
     private val logger = KotlinLogging.logger {}
@@ -281,7 +278,7 @@ class ExchangeService(
                 withdrawalEntity.update(WithdrawalStatus.Failed, "Rejected by sequencer")
             } else {
                 handleSequencerResponse(response, mutableMapOf())
-                blockchainClient.queueTransactions(listOf(withdrawalEntity.toEip712Transaction()))
+                queueBlockchainExchangeTransactions(listOf(withdrawalEntity.toEip712Transaction()))
             }
             withdrawalEntity.guid.value
         }
@@ -409,7 +406,7 @@ class ExchangeService(
         }
 
         // queue any blockchain txs for processing
-        blockchainClient.queueTransactions(blockchainTxs)
+        queueBlockchainExchangeTransactions(blockchainTxs)
 
         publishBroadcasterNotifications(
             broadcasterNotifications.flatMap { (address, notifications) ->
@@ -609,5 +606,9 @@ class ExchangeService(
                 deposit.update(DepositStatus.Complete)
             }
         }
+    }
+
+    private fun queueBlockchainExchangeTransactions(txs: List<EIP712Transaction>) {
+        ExchangeTransactionEntity.createList(blockchainClient.chainId, txs)
     }
 }

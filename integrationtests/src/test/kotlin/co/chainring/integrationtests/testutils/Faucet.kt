@@ -16,7 +16,7 @@ object Faucet {
         return blockchainClient.depositNative(address, amount ?: BigDecimal("0.05").toFundamentalUnits(18))
     }
 
-    fun mine(numberOfBlocks: Int = blockchainClient.config.numConfirmations) {
+    fun mine(numberOfBlocks: Int = 1) {
         blockchainClient.mine(numberOfBlocks)
     }
 }

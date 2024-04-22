@@ -5,6 +5,9 @@ import co.chainring.apps.api.middleware.HttpTransactionLogger
 import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
+import co.chainring.core.blockchain.BlockchainDepositHandler
+import co.chainring.core.blockchain.BlockchainTransactionHandler
+import co.chainring.core.blockchain.ContractsPublisher
 import co.chainring.core.db.DbConfig
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.services.ExchangeService
@@ -62,10 +65,14 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val enableTestRoutes = (System.getenv("ENABLE_TEST_ROUTES") ?: "true") == "true"
 
     private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
+    private val contractsPublisher = ContractsPublisher(blockchainClient)
+
     private val sequencerClient = SequencerClient()
     private val broadcaster = Broadcaster(db)
 
     private val exchangeService = ExchangeService(blockchainClient, sequencerClient)
+    private val blockchainTransactionHandler = BlockchainTransactionHandler(blockchainClient, exchangeService)
+    private val blockchainDepositHandler = BlockchainDepositHandler(blockchainClient, exchangeService)
 
     private val withdrawalRoutes = WithdrawalRoutes(exchangeService)
     private val balanceRoutes = BalanceRoutes()
@@ -123,12 +130,17 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val server = PolyHandler(
         httpHandler,
         websockets(websocketApi.connect()),
-    )
-        .asServer(Netty(config.httpPort, ServerConfig.StopMode.Graceful(ofSeconds(1))))
+    ).asServer(Netty(config.httpPort, ServerConfig.StopMode.Graceful(ofSeconds(1))))
 
     override fun start() {
-        startServer()
-        updateContracts()
+        logger.info { "Starting" }
+        super.start()
+        server.start()
+        broadcaster.start()
+        contractsPublisher.updateContracts()
+        blockchainTransactionHandler.start()
+        blockchainDepositHandler.start()
+        logger.info { "Started" }
     }
 
     override fun stop() {
@@ -136,23 +148,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         super.stop()
         broadcaster.stop()
         server.stop()
-        blockchainClient.stop()
+        blockchainTransactionHandler.stop()
+        blockchainDepositHandler.stop()
         logger.info { "Stopped" }
-    }
-
-    fun startServer() {
-        logger.info { "Starting" }
-        super.start()
-        server.start()
-        broadcaster.start()
-        logger.info { "Started" }
-    }
-
-    fun updateContracts() {
-        blockchainClient.updateContracts()
-        blockchainClient.start(
-            exchangeService,
-            exchangeService,
-        )
     }
 }
