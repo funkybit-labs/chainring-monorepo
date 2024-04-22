@@ -31,6 +31,7 @@ import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.CreateOrderAssignment
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
+import co.chainring.core.model.db.ExchangeTransactionEntity
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
@@ -277,7 +278,7 @@ class ExchangeService(
                 withdrawalEntity.update(WithdrawalStatus.Failed, "Rejected by sequencer")
             } else {
                 handleSequencerResponse(response, mutableMapOf())
-                blockchainClient.queueTransactions(listOf(withdrawalEntity.toEip712Transaction()))
+                queueBlockchainExchangeTransactions(listOf(withdrawalEntity.toEip712Transaction()))
             }
             withdrawalEntity.guid.value
         }
@@ -405,7 +406,7 @@ class ExchangeService(
         }
 
         // queue any blockchain txs for processing
-        blockchainClient.queueTransactions(blockchainTxs)
+        queueBlockchainExchangeTransactions(blockchainTxs)
 
         publishBroadcasterNotifications(
             broadcasterNotifications.flatMap { (address, notifications) ->
@@ -605,5 +606,9 @@ class ExchangeService(
                 deposit.update(DepositStatus.Complete)
             }
         }
+    }
+
+    private fun queueBlockchainExchangeTransactions(txs: List<EIP712Transaction>) {
+        ExchangeTransactionEntity.createList(blockchainClient.chainId, txs)
     }
 }

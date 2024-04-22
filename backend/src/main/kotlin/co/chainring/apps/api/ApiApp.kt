@@ -7,6 +7,7 @@ import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.BlockchainDepositHandler
 import co.chainring.core.blockchain.BlockchainTransactionHandler
+import co.chainring.core.blockchain.ContractsPublisher
 import co.chainring.core.db.DbConfig
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.services.ExchangeService
@@ -64,6 +65,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val enableTestRoutes = (System.getenv("ENABLE_TEST_ROUTES") ?: "true") == "true"
 
     private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
+    private val contractsPublisher = ContractsPublisher(blockchainClient)
 
     private val sequencerClient = SequencerClient()
     private val broadcaster = Broadcaster(db)
@@ -135,7 +137,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         super.start()
         server.start()
         broadcaster.start()
-        blockchainClient.updateContracts()
+        contractsPublisher.updateContracts()
         blockchainTransactionHandler.start()
         blockchainDepositHandler.start()
         logger.info { "Started" }

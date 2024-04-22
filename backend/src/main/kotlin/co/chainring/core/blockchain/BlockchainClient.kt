@@ -3,12 +3,8 @@ package co.chainring.core.blockchain
 import co.chainring.contracts.generated.ERC1967Proxy
 import co.chainring.contracts.generated.Exchange
 import co.chainring.contracts.generated.UUPSUpgradeable
-import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
 import co.chainring.core.model.db.ChainId
-import co.chainring.core.model.db.DeployedSmartContractEntity
-import co.chainring.core.model.db.ExchangeTransactionEntity
-import co.chainring.core.model.db.SymbolEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.reactivex.Flowable
 import kotlinx.coroutines.future.await
@@ -16,7 +12,6 @@ import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.crypto.Credentials
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameter
@@ -130,96 +125,82 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
         }
     }
 
-    fun updateContracts() {
-        transaction {
-            ContractType.entries.forEach { contractType ->
-                val deployedContract = DeployedSmartContractEntity
-                    .findLastDeployedContractByNameAndChain(contractType.name, chainId)
+    sealed class DeployContractParams {
+        abstract val contractType: ContractType
 
-                if (deployedContract == null) {
-                    logger.info { "Deploying contract: $contractType" }
-                    deployOrUpgradeWithProxy(contractType, null)
-                } else if (deployedContract.deprecated) {
-                    logger.info { "Upgrading contract: $contractType" }
-                    deployOrUpgradeWithProxy(contractType, deployedContract.proxyAddress)
-                } else {
-                    contractMap[contractType] = deployedContract.proxyAddress
-                }
-            }
-            exchangeContract = loadExchangeContract(contractMap[ContractType.Exchange]!!)
+        data class Exchange(
+            val nativePrecision: BigInteger,
+        ) : DeployContractParams() {
+            override val contractType: ContractType = ContractType.Exchange
         }
     }
 
-    private fun deployOrUpgradeWithProxy(
-        contractType: ContractType,
-        existingProxyAddress: Address?,
-    ) {
-        logger.debug { "Starting deployment for $contractType" }
-        val (implementationContractAddress, version) =
-            when (contractType) {
-                ContractType.Exchange -> {
-                    val implementationContract = Exchange.deploy(web3j, transactionManager, gasProvider).send()
-                    Pair(
-                        Address(implementationContract.contractAddress),
-                        implementationContract.version.send().toInt(),
-                    )
-                }
+    data class DeployedContract(
+        val proxyAddress: Address,
+        val implementationAddress: Address,
+        val version: Int,
+    )
+
+    fun deployOrUpgradeWithProxy(params: DeployContractParams, existingProxyAddress: Address?): DeployedContract {
+        logger.debug { "Starting deployment for ${params.contractType}" }
+
+        val (implementationContractAddress, version) = when (params) {
+            is DeployContractParams.Exchange -> {
+                val implementationContract = Exchange.deploy(web3j, transactionManager, gasProvider).send()
+                Pair(
+                    Address(implementationContract.contractAddress),
+                    implementationContract.version.send().toInt(),
+                )
             }
-        val proxyAddress =
-            if (existingProxyAddress != null) {
-                // for now call upgradeTo here
-                logger.debug { "Calling upgradeTo for $contractType" }
-                UUPSUpgradeable.load(
-                    existingProxyAddress.value,
-                    web3j,
-                    transactionManager,
-                    gasProvider,
-                ).upgradeToAndCall(implementationContractAddress.value, ByteArray(0), BigInteger.ZERO).send()
-                existingProxyAddress
-            } else {
-                // deploy the proxy and call the initialize method in contract - this can only be called once
-                logger.debug { "Deploying proxy for $contractType" }
-                val proxyContract =
-                    ERC1967Proxy.deploy(
+        }
+
+        val proxyAddress = if (existingProxyAddress != null) {
+            // for now call upgradeTo here
+            logger.debug { "Calling upgradeTo for ${params.contractType}" }
+            UUPSUpgradeable.load(
+                existingProxyAddress.value,
+                web3j,
+                transactionManager,
+                gasProvider,
+            ).upgradeToAndCall(implementationContractAddress.value, ByteArray(0), BigInteger.ZERO).send()
+            existingProxyAddress
+        } else {
+            // deploy the proxy and call the initialize method in contract - this can only be called once
+            logger.debug { "Deploying proxy for ${params.contractType}" }
+            val proxyContract = ERC1967Proxy.deploy(
+                web3j,
+                transactionManager,
+                gasProvider,
+                BigInteger.ZERO,
+                implementationContractAddress.value,
+                ByteArray(0),
+            ).send()
+            logger.debug { "Deploying initialize for ${params.contractType}" }
+            when (params) {
+                is DeployContractParams.Exchange -> {
+                    Exchange.load(
+                        proxyContract.contractAddress,
                         web3j,
                         transactionManager,
                         gasProvider,
-                        BigInteger.ZERO,
-                        implementationContractAddress.value,
-                        ByteArray(0),
+                    ).initialize(
+                        submitterCredentials.address,
+                        config.feeAccountAddress,
+                        params.nativePrecision,
                     ).send()
-                logger.debug { "Deploying initialize for $contractType" }
-                when (contractType) {
-                    ContractType.Exchange -> {
-                        Exchange.load(
-                            proxyContract.contractAddress,
-                            web3j,
-                            transactionManager,
-                            gasProvider,
-                        ).initialize(
-                            submitterCredentials.address,
-                            config.feeAccountAddress,
-                            transaction {
-                                SymbolEntity.forChain(chainId)
-                                    .firstOrNull { it.contractAddress == null }?.decimals?.toInt()?.toBigInteger()
-                                    ?: BigInteger("18")
-                            },
-                        ).send()
-                    }
                 }
-                Address(proxyContract.contractAddress)
             }
+            Address(proxyContract.contractAddress)
+        }
 
-        logger.debug { "Creating db entry for $contractType" }
-        contractMap[contractType] = proxyAddress
-        DeployedSmartContractEntity.create(
-            name = contractType.name,
-            chainId = chainId,
-            implementationAddress = implementationContractAddress,
+        logger.debug { "Deployment complete for ${params.contractType}" }
+        setContractAddress(params.contractType, proxyAddress)
+
+        return DeployedContract(
             proxyAddress = proxyAddress,
+            implementationAddress = implementationContractAddress,
             version = version,
         )
-        logger.debug { "Deployment complete for $contractType" }
     }
 
     suspend fun getExchangeBalance(address: Address, tokenAddress: Address): BigInteger {
@@ -240,18 +221,19 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
             getExchangeBalances(walletAddress, tokenAddresses)
         }
 
-    fun loadExchangeContract(): Exchange =
-        loadExchangeContract(contractMap.getValue(ContractType.Exchange))
-
     fun loadExchangeContract(address: Address): Exchange {
         return Exchange.load(address.value, web3j, transactionManager, gasProvider)
     }
 
-    fun getContractAddress(contractType: ContractType) = contractMap[contractType]
-
-    fun queueTransactions(txs: List<EIP712Transaction>) {
-        ExchangeTransactionEntity.createList(chainId, txs)
+    fun setContractAddress(contractType: ContractType, address: Address) {
+        contractMap[contractType] = address
+        if (contractType == ContractType.Exchange) {
+            exchangeContract = loadExchangeContract(address)
+        }
     }
+
+    fun getContractAddress(contractType: ContractType): Address? =
+        contractMap[contractType]
 
     fun getTransactionReceipt(txHash: String): TransactionReceipt? {
         val receipt = web3j.ethGetTransactionReceipt(txHash).send().transactionReceipt

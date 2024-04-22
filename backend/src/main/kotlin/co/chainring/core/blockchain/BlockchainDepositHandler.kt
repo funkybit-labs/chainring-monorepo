@@ -61,13 +61,13 @@ class BlockchainDepositHandler(
     }
 
     private fun registerDepositEventsConsumer() {
-        val exchangeContract = blockchainClient.loadExchangeContract()
+        val exchangeContractAddress = blockchainClient.getContractAddress(ContractType.Exchange)!!.value
 
         val startFromBlock = maxSeenBlockNumber()
             ?: System.getenv("EVM_NETWORK_EARLIEST_BLOCK")?.let { DefaultBlockParameter.valueOf(it.toBigInteger()) }
             ?: DefaultBlockParameterName.EARLIEST
 
-        val filter = EthFilter(startFromBlock, DefaultBlockParameterName.LATEST, exchangeContract.contractAddress)
+        val filter = EthFilter(startFromBlock, DefaultBlockParameterName.LATEST, exchangeContractAddress)
 
         blockchainClient.ethLogFlowable(filter)
             .retryWhen { f: Flowable<Throwable> -> f.take(5).delay(300, TimeUnit.MILLISECONDS) }
