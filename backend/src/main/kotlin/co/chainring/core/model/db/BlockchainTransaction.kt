@@ -63,7 +63,6 @@ object BlockchainTransactionTable : GUIDTable<BlockchainTransactionId>("blockcha
 }
 
 class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUIDEntity<BlockchainTransactionId>(guid) {
-
     companion object : EntityClass<BlockchainTransactionId, BlockchainTransactionEntity>(BlockchainTransactionTable) {
         fun create(
             chainId: ChainId,
@@ -83,7 +82,7 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
             return entity
         }
 
-        fun getPending(chainId: ChainId): List<BlockchainTransactionEntity> {
+        fun getUncompleted(chainId: ChainId): List<BlockchainTransactionEntity> {
             return BlockchainTransactionEntity.find {
                 BlockchainTransactionTable.chainId.eq(chainId) and
                     BlockchainTransactionTable.status.inList(

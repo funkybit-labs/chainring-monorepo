@@ -8,6 +8,11 @@ import co.chainring.core.model.db.ChainId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.reactivex.Flowable
 import kotlinx.coroutines.future.await
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -103,22 +108,40 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
         val logger = KotlinLogging.logger {}
         fun httpService(url: String, logging: Boolean): HttpService {
             val builder = OkHttpClient.Builder()
+
+            fun shouldLogRpcInvocation(requestBody: String, responseBody: String): Boolean =
+                runCatching {
+                    val rpcMethod = Json.parseToJsonElement(requestBody).jsonObject["method"]?.jsonPrimitive?.contentOrNull
+                    val rpcResult = Json.parseToJsonElement(responseBody).jsonObject["result"]
+                    // filter out periodic calls for event logs unless they contain any results
+                    if (rpcMethod == "eth_getFilterChanges" && rpcResult?.jsonArray?.isEmpty() == true) {
+                        return false
+                    } else {
+                        return true
+                    }
+                }.getOrDefault(true)
+
             if (logging) {
                 builder.addInterceptor {
                     val request = it.request()
-                    val requestCopy = request.newBuilder().build()
-                    val requestBuffer = Buffer()
-                    requestCopy.body?.writeTo(requestBuffer)
-                    logger.debug {
-                        ">> ${request.method} ${request.url} | ${requestBuffer.readUtf8()}"
-                    }
+
+                    // making a copy of request body since it can be consumed only once
+                    val requestBodyCopy = request.newBuilder().build().body?.let { body ->
+                        val requestBuffer = Buffer()
+                        body.writeTo(requestBuffer)
+                        requestBuffer.readUtf8()
+                    } ?: ""
+
                     val response = it.proceed(request)
-                    val contentType: MediaType? = response.body!!.contentType()
-                    val content = response.body!!.string()
-                    logger.debug {
-                        "<< ${response.code} | $content"
+                    val contentType: MediaType? = response.body?.contentType()
+                    val responseBody = response.body?.string()
+
+                    if (shouldLogRpcInvocation(requestBodyCopy, responseBody ?: "")) {
+                        logger.debug { "RPC call: url=${request.url}, request=$requestBodyCopy, response code=${response.code}, response body=$responseBody" }
                     }
-                    response.newBuilder().body(content.toResponseBody(contentType)).build()
+
+                    // making a copy of response body since it can be consumed only once
+                    response.newBuilder().body(responseBody?.toResponseBody(contentType)).build()
                 }
             }
             return HttpService(url, builder.build())

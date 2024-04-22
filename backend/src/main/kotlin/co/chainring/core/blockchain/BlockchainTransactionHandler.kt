@@ -41,7 +41,9 @@ class BlockchainTransactionHandler(
 
                 while (true) {
                     Thread.sleep(pollingIntervalInMs)
-                    handle(exchange, txConfirmationHandler)
+                    processUncompletedTransactions()
+                    createNextBatch(exchange)
+                        ?.also(::submitToBlockchain)
                 }
             } catch (ie: InterruptedException) {
                 logger.warn { "exiting blockchain handler" }
@@ -59,88 +61,86 @@ class BlockchainTransactionHandler(
         }
     }
 
-    private fun handle(exchange: Exchange, txConfirmationHandler: TxConfirmationHandler) {
-        val currentBlock = blockchainClient.getBlockNumber()
-
-        val pendingTxs = transaction {
-            BlockchainTransactionEntity.getPending(chainId)
+    private fun processUncompletedTransactions() {
+        val uncompletedTransactions = transaction {
+            BlockchainTransactionEntity.getUncompleted(chainId)
         }
 
-        // handle submitted - if we hit required confirmations, invoke callbacks
-        pendingTxs.filter { it.status == BlockchainTransactionStatus.Submitted }.forEach { pendingTx ->
-            pendingTx.transactionData.txHash?.let { txHash ->
-                blockchainClient.getTransactionReceipt(txHash)?.let { receipt ->
-                    logger.debug { "receipt is $receipt" }
-                    receipt.blockNumber?.let { blockNumber ->
-                        when (receipt.status) {
-                            "0x1" -> {
-                                val confirmationsReceived = confirmations(currentBlock, blockNumber)
-                                if (pendingTx.blockNumber == null) {
-                                    transaction {
-                                        pendingTx.markAsSeen(blockNumber = blockNumber)
-                                    }
-                                }
-                                if (confirmationsReceived >= numConfirmations) {
-                                    transaction {
-                                        pendingTx.markAsConfirmed(
-                                            gasAccountFee(receipt),
-                                            receipt.gasUsed,
-                                        )
-                                    }
+        if (uncompletedTransactions.isNotEmpty()) {
+            val currentBlock = blockchainClient.getBlockNumber()
 
-                                    // invoke callbacks for transactions in this confirmed batch
-                                    invokeTxCallbacks(pendingTx, txConfirmationHandler)
+            // Refresh submitted - if we hit required confirmations, invoke callbacks
+            uncompletedTransactions
+                .filter { it.status == BlockchainTransactionStatus.Submitted }
+                .forEach { tx -> refreshSubmittedTransaction(tx, currentBlock) }
 
-                                    // mark batch as complete and remove
-                                    transaction {
-                                        pendingTx.markAsCompleted()
-                                    }
-                                }
-                            }
-
-                            else -> {
-                                // update in DB as failed, log an error and remove
-                                val error = receipt.revertReason
-                                    ?: blockchainClient.extractRevertReasonFromSimulation(pendingTx.transactionData.data, receipt.blockNumber)
-                                    ?: "Unknown Error"
-                                logger.error { "transaction batch failed with revert reason $error" }
-
-                                invokeTxCallbacks(pendingTx, txConfirmationHandler, error)
-
-                                transaction {
-                                    val lockAddress = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
-                                    lockAddress.nonce = null
-                                    pendingTx.markAsFailed(
-                                        error,
-                                        gasAccountFee(receipt),
-                                        receipt.gasUsed,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Send any pending batches not submitted yet
-        pendingTxs.filter { it.status == BlockchainTransactionStatus.Pending }.forEach { tx ->
-            submitToBlockchain(tx, txConfirmationHandler)
-        }
-
-        // create the next batch
-        createNextBatch(exchange)?.let { tx ->
-            submitToBlockchain(tx, txConfirmationHandler)
+            // Send any pending batches not submitted yet
+            uncompletedTransactions
+                .filter { it.status == BlockchainTransactionStatus.Pending }
+                .forEach { tx -> submitToBlockchain(tx) }
         }
     }
 
-    private fun submitToBlockchain(tx: BlockchainTransactionEntity, txConfirmationHandler: TxConfirmationHandler) {
+    private fun refreshSubmittedTransaction(tx: BlockchainTransactionEntity, currentBlock: BigInteger) {
+        val txHash = tx.transactionData.txHash ?: return
+        val receipt = blockchainClient.getTransactionReceipt(txHash) ?: return
+
+        logger.debug { "receipt is $receipt" }
+
+        val receiptBlockNumber = receipt.blockNumber ?: return
+
+        when (receipt.status) {
+            "0x1" -> {
+                val confirmationsReceived = confirmations(currentBlock, receiptBlockNumber)
+                if (tx.blockNumber == null) {
+                    transaction {
+                        tx.markAsSeen(blockNumber = receiptBlockNumber)
+                    }
+                }
+                if (confirmationsReceived >= numConfirmations) {
+                    transaction {
+                        tx.markAsConfirmed(gasAccountFee(receipt), receipt.gasUsed)
+                    }
+
+                    // invoke callbacks for transactions in this confirmed batch
+                    invokeTxCallbacks(tx, txConfirmationHandler)
+
+                    // mark batch as complete
+                    transaction {
+                        tx.markAsCompleted()
+                    }
+                }
+            }
+
+            else -> {
+                // update in DB as failed and log an error
+                val error = receipt.revertReason
+                    ?: blockchainClient.extractRevertReasonFromSimulation(
+                        tx.transactionData.data,
+                        receipt.blockNumber,
+                    )
+                    ?: "Unknown Error"
+
+                logger.error { "transaction batch failed with revert reason $error" }
+
+                invokeTxCallbacks(tx, txConfirmationHandler, error)
+
+                transaction {
+                    val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
+                    submitterNonce.nonce = null
+                    tx.markAsFailed(error, gasAccountFee(receipt), receipt.gasUsed)
+                }
+            }
+        }
+    }
+
+    private fun submitToBlockchain(tx: BlockchainTransactionEntity) {
         try {
             transaction {
-                val lockAddress = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
-                val nonce = lockAddress.nonce?.let { it + BigInteger.ONE } ?: getConsistentNonce(lockAddress.key)
+                val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
+                val nonce = submitterNonce.nonce?.let { it + BigInteger.ONE } ?: getConsistentNonce(submitterNonce.key)
                 val transactionData = sendPendingTransaction(tx.transactionData, nonce)
-                lockAddress.nonce = transactionData.nonce!!
+                submitterNonce.nonce = transactionData.nonce!!
                 tx.markAsSubmitted(transactionData)
             }
         } catch (ce: BlockchainClientException) {
