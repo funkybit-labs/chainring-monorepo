@@ -33,4 +33,4 @@ jobs:
           ssh -o StrictHostKeyChecking=no -L 5434:test-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com:5432 ec2-user@test-bastion.chainring.co -N &
           sleep 2  # to give the SSH tunnel time to be set up
           PGPASSWORD=$(aws --region us-east-2 secretsmanager get-secret-value --secret-id 'arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2' | jq -r '.SecretString' | jq -r '.password') \
-            psql --port=5434 --host=localhost --user=chainring -c "update deployed_smart_contract set deprecated='t' where deprecated='f'"
+            psql --port=5434 --host=localhost --user=chainring -c "DO \$\$ BEGIN if exists (select 1 from pg_class where relname = 'deployed_smart_contract') then update deployed_smart_contract set deprecated='t' where deprecated='f'; end if; END \$\$"
