@@ -1,5 +1,5 @@
 import { apiClient, Order, Trade, UpdateOrderRequest } from 'apiClient'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import { TrashIcon } from '@heroicons/react/24/outline'
 import { formatUnits, parseUnits } from 'viem'
@@ -17,7 +17,11 @@ import { ordersTopic, Publishable, tradesTopic } from 'websocketMessages'
 import Decimal from 'decimal.js'
 import { getColumnsForWidth, useWindowDimensions } from 'utils/layout'
 
-export default function OrdersAndTrades({ markets }: { markets: Markets }) {
+export default function OrdersAndTradesWidget({
+  markets
+}: {
+  markets: Markets
+}) {
   const [orders, setOrders] = useState<Order[]>(() => [])
   const [changedOrder, setChangedOrder] = useState<Order | null>(null)
   const [showChangeModal, setShowChangeModal] = useState<boolean>(false)
@@ -25,7 +29,7 @@ export default function OrdersAndTrades({ markets }: { markets: Markets }) {
   const windowDimensions = useWindowDimensions()
 
   useWebsocketSubscription({
-    topic: [ordersTopic, tradesTopic],
+    topics: useMemo(() => [ordersTopic, tradesTopic], []),
     handler: (message: Publishable) => {
       if (message.type === 'Orders') {
         setOrders(message.orders)

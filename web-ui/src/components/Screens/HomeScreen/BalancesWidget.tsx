@@ -1,8 +1,8 @@
 import { Address, formatUnits } from 'viem'
 import { Balance, TradingSymbol } from 'apiClient'
-import React, { Fragment, useState } from 'react'
-import DepositModal from 'components/Screens/HomeScreen/Balances/DepositModal'
-import WithdrawalModal from 'components/Screens/HomeScreen/Balances/WithdrawalModal'
+import React, { Fragment, useMemo, useState } from 'react'
+import DepositModal from 'components/Screens/HomeScreen/DepositModal'
+import WithdrawalModal from 'components/Screens/HomeScreen/WithdrawalModal'
 import { Widget } from 'components/common/Widget'
 import { Button } from 'components/common/Button'
 import SymbolIcon from 'components/common/SymbolIcon'
@@ -10,7 +10,7 @@ import TradingSymbols from 'tradingSymbols'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { balancesTopic, Publishable } from 'websocketMessages'
 
-export default function Balances({
+export default function BalancesWidget({
   walletAddress,
   exchangeContractAddress,
   symbols
@@ -52,7 +52,7 @@ function BalancesTable({
 
   const [balances, setBalances] = useState<Balance[]>(() => [])
   useWebsocketSubscription({
-    topic: balancesTopic,
+    topics: useMemo(() => [balancesTopic], []),
     handler: (message: Publishable) => {
       if (message.type === 'Balances') {
         setBalances(message.balances)

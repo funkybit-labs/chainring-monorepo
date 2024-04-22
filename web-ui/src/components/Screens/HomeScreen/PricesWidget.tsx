@@ -73,7 +73,7 @@ function calculateParameters(
   }
 }
 
-export function Prices({ marketId }: { marketId: string }) {
+export function PricesWidget({ marketId }: { marketId: string }) {
   const [zoom, setZoom] = useState<ZoomLevels>('Week')
   const [latestStart, setLatestStart] = useState<Date | undefined>()
   const [ohlc, setOhlc] = useState<OHLC[]>([])
@@ -81,7 +81,7 @@ export function Prices({ marketId }: { marketId: string }) {
   const windowDimensions = useWindowDimensions()
 
   useWebsocketSubscription({
-    topic: useMemo(() => pricesTopic(marketId), [marketId]),
+    topics: useMemo(() => [pricesTopic(marketId)], [marketId]),
     handler: (message: Publishable) => {
       if (message.type === 'Prices') {
         if (message.full) {

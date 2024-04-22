@@ -1,14 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from 'apiClient'
 import { useAccount } from 'wagmi'
-import Balances from 'components/Screens/HomeScreen/Balances'
+import BalancesWidget from 'components/Screens/HomeScreen/BalancesWidget'
 import { Header } from 'components/Screens/Header'
-import { OrderBook } from 'components/Screens/HomeScreen/OrderBook'
-import SubmitOrder from 'components/Screens/HomeScreen/SubmitOrder'
-import { Prices } from 'components/Screens/HomeScreen/Prices'
+import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
+import TradeWidget from 'components/Screens/HomeScreen/TradeWidget'
+import { PricesWidget } from 'components/Screens/HomeScreen/PricesWidget'
 import { useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
-import OrdersAndTrades from 'components/Screens/HomeScreen/OrdersAndTrades'
+import OrdersAndTradesWidget from 'components/Screens/HomeScreen/OrdersAndTradesWidget'
 import TradingSymbols from 'tradingSymbols'
 import Markets, { Market } from 'markets'
 import { WebsocketProvider } from 'contexts/websocket'
@@ -69,7 +69,7 @@ export default function HomeScreen() {
             )}
           >
             {wallet.address && exchangeContract && (
-              <SubmitOrder
+              <TradeWidget
                 market={selectedMarket}
                 walletAddress={wallet.address}
                 exchangeContractAddress={exchangeContract.address}
@@ -77,16 +77,16 @@ export default function HomeScreen() {
                 quoteSymbol={selectedMarket.quoteSymbol}
               />
             )}
-            <OrderBook marketId={selectedMarket.id} />
-            <Prices marketId={selectedMarket.id} />
+            <OrderBookWidget marketId={selectedMarket.id} />
+            <PricesWidget marketId={selectedMarket.id} />
             {wallet.address && symbols && exchangeContract && (
-              <Balances
+              <BalancesWidget
                 walletAddress={wallet.address}
                 exchangeContractAddress={exchangeContract.address}
                 symbols={symbols}
               />
             )}
-            {wallet.address && <OrdersAndTrades markets={markets} />}
+            {wallet.address && <OrdersAndTradesWidget markets={markets} />}
           </div>
         </div>
       ) : (

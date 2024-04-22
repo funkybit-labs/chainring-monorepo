@@ -11,7 +11,7 @@ import { addressZero, getDomain } from 'utils/eip712'
 import { Market } from 'markets'
 import Decimal from 'decimal.js'
 
-export default function SubmitOrder({
+export default function TradeWidget({
   market,
   exchangeContractAddress,
   walletAddress,
