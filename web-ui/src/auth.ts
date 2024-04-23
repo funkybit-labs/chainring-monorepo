@@ -1,5 +1,5 @@
 import { getAccount, signTypedData } from '@wagmi/core'
-import { wagmiConfig } from 'wagmiConfig'
+import { chain, wagmiConfig } from 'wagmiConfig'
 
 export type LoadAuthTokenOptions = {
   forceRefresh: boolean
@@ -23,7 +23,7 @@ export async function loadAuthToken(
     const signature = await signTypedData(wagmiConfig, {
       domain: {
         name: 'ChainRing Labs',
-        chainId: 1337
+        chainId: chain.id
       },
       types: {
         EIP712Domain: [
