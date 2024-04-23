@@ -14,7 +14,7 @@ import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
 import co.chainring.core.model.db.MarketId
-import co.chainring.core.model.db.OHLCPeriod
+import co.chainring.core.model.db.OHLCDuration
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.http4k.client.WebsocketClient
@@ -35,8 +35,8 @@ fun WsClient.subscribeToOrderBook(marketId: MarketId) {
     send(IncomingWSMessage.Subscribe(SubscriptionTopic.OrderBook(marketId)))
 }
 
-fun WsClient.subscribeToPrices(marketId: MarketId, period: OHLCPeriod = OHLCPeriod.P5M) {
-    send(IncomingWSMessage.Subscribe(SubscriptionTopic.Prices(marketId, period)))
+fun WsClient.subscribeToPrices(marketId: MarketId, duration: OHLCDuration = OHLCDuration.P5M) {
+    send(IncomingWSMessage.Subscribe(SubscriptionTopic.Prices(marketId, duration)))
 }
 
 fun WsClient.subscribeToOrders() {
@@ -88,8 +88,8 @@ fun WsClient.assertTradeUpdatedMessageReceived(assertions: (TradeUpdated) -> Uni
 fun WsClient.assertBalancesMessageReceived(assertions: (Balances) -> Unit = {}): Balances =
     assertMessageReceived<Balances>(SubscriptionTopic.Balances, assertions)
 
-fun WsClient.assertPricesMessageReceived(marketId: MarketId, period: OHLCPeriod = OHLCPeriod.P5M, assertions: (Prices) -> Unit = {}): Prices =
-    assertMessageReceived<Prices>(SubscriptionTopic.Prices(marketId, period), assertions)
+fun WsClient.assertPricesMessageReceived(marketId: MarketId, duration: OHLCDuration = OHLCDuration.P5M, assertions: (Prices) -> Unit = {}): Prices =
+    assertMessageReceived<Prices>(SubscriptionTopic.Prices(marketId, duration), assertions)
 
 fun WsClient.assertOrderBookMessageReceived(marketId: MarketId, assertions: (OrderBook) -> Unit = {}): OrderBook =
     assertMessageReceived<OrderBook>(SubscriptionTopic.OrderBook(marketId), assertions)

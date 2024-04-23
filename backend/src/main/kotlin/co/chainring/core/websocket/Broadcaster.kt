@@ -20,8 +20,8 @@ import co.chainring.core.model.db.BroadcasterJobId
 import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OHLCEntity
-import co.chainring.core.model.db.OHLCPeriod
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.WalletEntity
@@ -40,7 +40,6 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
-import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -127,8 +126,11 @@ class Broadcaster(val db: Database) {
         transaction {
             // load historical prices once, later only updates will be delivered via notify
             MarketEntity.all().map { it.guid.value }.forEach { market ->
-                OHLCPeriod.entries.forEach { p ->
-                    val ohlcEntities = OHLCEntity.findFrom(market, p, startTime = Clock.System.now() - 7.days)
+                OHLCDuration.entries.forEach { p ->
+                    // equivalent to 7 days of 5 minutes intervals
+                    val startTime = Clock.System.now() - (p.durationMs() * 20 * 24 * 7).milliseconds
+
+                    val ohlcEntities = OHLCEntity.findFrom(market, p, startTime = startTime)
                     pricesByMarket[SubscriptionTopic.Prices(market, p)] = ohlcEntities.map { it.toWSResponse() }.toMutableList()
                 }
             }
@@ -181,13 +183,13 @@ class Broadcaster(val db: Database) {
         val prices = when (val lastTimestamp = lastPricePublish[key]) {
             null -> Prices(
                 market = topic.marketId,
-                period = topic.period,
+                duration = topic.duration,
                 ohlc = pricesByMarket[topic] ?: listOf(),
                 full = true,
             )
             else -> Prices(
                 market = topic.marketId,
-                period = topic.period,
+                duration = topic.duration,
                 ohlc = pricesByMarket[topic]?.takeLastWhile { (it.start + it.durationMs.milliseconds) > lastTimestamp } ?: listOf(),
                 full = false,
             )
@@ -219,7 +221,7 @@ class Broadcaster(val db: Database) {
     }
 
     private fun updatePrices(message: Prices) {
-        val key = SubscriptionTopic.Prices(message.market, message.period)
+        val key = SubscriptionTopic.Prices(message.market, message.duration)
         pricesByMarket[key]?.let { existingEntries ->
             message.ohlc.sortedBy { it.start }.forEach { incoming ->
                 val index = existingEntries.indexOfLast { it.start == incoming.start }
@@ -292,7 +294,7 @@ class Broadcaster(val db: Database) {
             is Orders, is OrderCreated, is OrderUpdated -> SubscriptionTopic.Orders
             is Prices -> {
                 updatePrices(notification.message)
-                SubscriptionTopic.Prices(notification.message.market, notification.message.period)
+                SubscriptionTopic.Prices(notification.message.market, notification.message.duration)
             }
             is Trades, is TradeCreated, is TradeUpdated -> SubscriptionTopic.Trades
             is Balances -> SubscriptionTopic.Balances

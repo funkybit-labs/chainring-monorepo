@@ -27,7 +27,7 @@ type PriceParameters = {
   ticks: number[]
 }
 
-enum OHLCPeriod {
+enum OHLCDuration {
   P1M = 'P1M',
   P5M = 'P5M',
   P15M = 'P15M',
@@ -36,13 +36,13 @@ enum OHLCPeriod {
   P1D = 'P1D'
 }
 
-const periodDurations: Record<OHLCPeriod, number> = {
-  [OHLCPeriod.P1M]: 60 * 1000,
-  [OHLCPeriod.P5M]: 5 * 60 * 1000,
-  [OHLCPeriod.P15M]: 15 * 60 * 1000,
-  [OHLCPeriod.P1H]: 60 * 60 * 1000,
-  [OHLCPeriod.P4H]: 4 * 60 * 60 * 1000,
-  [OHLCPeriod.P1D]: 24 * 60 * 60 * 1000
+const durations: Record<OHLCDuration, number> = {
+  [OHLCDuration.P1M]: 60 * 1000,
+  [OHLCDuration.P5M]: 5 * 60 * 1000,
+  [OHLCDuration.P15M]: 15 * 60 * 1000,
+  [OHLCDuration.P1H]: 60 * 60 * 1000,
+  [OHLCDuration.P4H]: 4 * 60 * 60 * 1000,
+  [OHLCDuration.P1D]: 24 * 60 * 60 * 1000
 }
 
 type ViewPort = {
@@ -59,7 +59,7 @@ function calculateParameters(
   const chartStartX = 20
   const chartEndX = totalWidth - 80
   const chartWidth = chartEndX - chartStartX
-  const barWidth = Math.ceil(chartWidth / ohlc.length) - 1
+  const barWidth = Math.floor(chartWidth / ohlc.length)
   const minPrice = Math.min(...ohlc.map((o) => o.low))
   const maxPrice = Math.max(...ohlc.map((o) => o.high))
   const priceRange = maxPrice - minPrice
@@ -99,7 +99,7 @@ function calculateParameters(
 }
 
 export function PricesWidget({ marketId }: { marketId: string }) {
-  const [period, setPeriod] = useState<OHLCPeriod>(OHLCPeriod.P5M)
+  const [period, setPeriod] = useState<OHLCDuration>(OHLCDuration.P5M)
   const [viewPort, setViewPort] = useState<ViewPort>({
     earliestStart: undefined,
     latestStart: undefined
@@ -114,13 +114,11 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     handler: (message: Publishable) => {
       if (message.type === 'Prices') {
         if (message.full) {
-          console.log('replacing OHLC')
-          setOhlc(mergeOHLC([], message.ohlc, periodDurations[period]))
+          setOhlc(mergeOHLC([], message.ohlc, durations[period]))
         } else {
-          console.log('updating OHLC')
           setOhlc(
             produce((draft) => {
-              mergeOHLC(draft, message.ohlc, periodDurations[period])
+              mergeOHLC(draft, message.ohlc, durations[period])
             })
           )
         }
@@ -280,12 +278,12 @@ export function PricesWidget({ marketId }: { marketId: string }) {
   // x-axis label, based on zoom level
   // the last label used is passed in to allow for special handling of day-crossings when zoomed in
   function calculateLabel(
-    ohlcPeriod: OHLCPeriod,
+    ohlcDuration: OHLCDuration,
     ohlc: OHLC,
     lastLabel?: string
   ): string {
     const date = ohlc.start
-    if (ohlcPeriod === OHLCPeriod.P1D) {
+    if (ohlcDuration === OHLCDuration.P1D) {
       return weeklyLabel(date)
     } else {
       const hours = date.getHours()
@@ -293,7 +291,10 @@ export function PricesWidget({ marketId }: { marketId: string }) {
       if (hours < lastHours) {
         return weeklyLabel(date)
       } else {
-        if (ohlcPeriod === OHLCPeriod.P1H || ohlcPeriod === OHLCPeriod.P4H) {
+        if (
+          ohlcDuration === OHLCDuration.P1H ||
+          ohlcDuration === OHLCDuration.P4H
+        ) {
           return (hours < 10 ? '0' + hours : hours) + ':00'
         } else {
           const minutes = date.getMinutes()
@@ -430,7 +431,7 @@ export function PricesWidget({ marketId }: { marketId: string }) {
   }
 
   function zoomIn() {
-    const values = Object.values(OHLCPeriod)
+    const values = Object.values(OHLCDuration)
     const idx = values.indexOf(period)
     const inner = idx > 0 ? values[idx - 1] : period
     setOhlc([])
@@ -442,7 +443,7 @@ export function PricesWidget({ marketId }: { marketId: string }) {
   }
 
   function zoomOut() {
-    const values = Object.values(OHLCPeriod)
+    const values = Object.values(OHLCDuration)
     const idx = values.indexOf(period)
     const outer = idx < values.length - 1 ? values[idx + 1] : period
     setOhlc([])
@@ -453,15 +454,15 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     })
   }
 
-  function canZoomOut(period: OHLCPeriod): boolean {
-    const values = Object.values(OHLCPeriod)
-    const idx = values.indexOf(period)
+  function canZoomOut(duration: OHLCDuration): boolean {
+    const values = Object.values(OHLCDuration)
+    const idx = values.indexOf(duration)
     return idx < values.length - 1
   }
 
-  function canZoomIn(period: OHLCPeriod): boolean {
-    const values = Object.values(OHLCPeriod)
-    const idx = values.indexOf(period)
+  function canZoomIn(duration: OHLCDuration): boolean {
+    const values = Object.values(OHLCDuration)
+    const idx = values.indexOf(duration)
     return idx > 0
   }
 

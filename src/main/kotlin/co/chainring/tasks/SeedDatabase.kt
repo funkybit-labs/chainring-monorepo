@@ -74,8 +74,8 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                     tradeAmount = BigInteger("0"),
                 ).map {
                     BroadcasterNotification.pricesForMarketPeriods(
-                        MarketId("BTC/ETH"),
-                        it.period,
+                        MarketId("${baseSymbol}/${quoteSymbol}"),
+                        it.duration,
                         listOf(it),
                         full = false,
                     )

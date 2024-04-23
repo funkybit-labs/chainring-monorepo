@@ -16,7 +16,7 @@ import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
-import co.chainring.core.model.db.OHLCPeriod
+import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
@@ -586,7 +586,7 @@ class OrderRoutesApiTest {
         takerWsClient.assertPricesMessageReceived(btcEthMarketId) { msg ->
             assertEquals(
                 OHLC(
-                    start = OHLCPeriod.P5M.periodStart(trade.timestamp),
+                    start = OHLCDuration.P5M.durationStart(trade.timestamp),
                     // db seed value
                     open = 17.525,
                     // trade price
@@ -603,7 +603,7 @@ class OrderRoutesApiTest {
         makerWsClient.assertPricesMessageReceived(btcEthMarketId) { msg ->
             assertEquals(
                 OHLC(
-                    start = OHLCPeriod.P5M.periodStart(trade.timestamp),
+                    start = OHLCDuration.P5M.durationStart(trade.timestamp),
                     // db seed value
                     open = 17.525,
                     // trade price
@@ -732,7 +732,7 @@ class OrderRoutesApiTest {
         takerWsClient.assertPricesMessageReceived(btcEthMarketId) { msg ->
             assertEquals(
                 OHLC(
-                    start = OHLCPeriod.P5M.periodStart(trade.timestamp),
+                    start = OHLCDuration.P5M.durationStart(trade.timestamp),
                     // db seed value
                     open = 17.525,
                     // previous trade price
@@ -749,7 +749,7 @@ class OrderRoutesApiTest {
         makerWsClient.assertPricesMessageReceived(btcEthMarketId) { msg ->
             assertEquals(
                 OHLC(
-                    start = OHLCPeriod.P5M.periodStart(trade.timestamp),
+                    start = OHLCDuration.P5M.durationStart(trade.timestamp),
                     // db seed value
                     open = 17.525,
                     // previous trade price

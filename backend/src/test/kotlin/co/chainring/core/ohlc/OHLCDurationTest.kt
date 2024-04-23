@@ -3,8 +3,8 @@ package co.chainring.core.ohlc
 import co.chainring.apps.api.model.websocket.OHLC
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketEntity
+import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OHLCEntity
-import co.chainring.core.model.db.OHLCPeriod
 import co.chainring.testutils.TestWithDb
 import kotlinx.datetime.Instant
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -14,7 +14,7 @@ import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.test.assertEquals
 
-class OHLCPeriodTest : TestWithDb() {
+class OHLCDurationTest : TestWithDb() {
 
     @BeforeEach
     fun setup() {
@@ -32,12 +32,12 @@ class OHLCPeriodTest : TestWithDb() {
     fun `OHLC period start is calculated correctly`() {
         val instant = Instant.parse("2024-04-20T07:58:55.789155Z")
 
-        assertEquals(Instant.parse("2024-04-20T07:58:00Z"), OHLCPeriod.P1M.periodStart(instant))
-        assertEquals(Instant.parse("2024-04-20T07:55:00Z"), OHLCPeriod.P5M.periodStart(instant))
-        assertEquals(Instant.parse("2024-04-20T07:45:00Z"), OHLCPeriod.P15M.periodStart(instant))
-        assertEquals(Instant.parse("2024-04-20T07:00:00Z"), OHLCPeriod.P1H.periodStart(instant))
-        assertEquals(Instant.parse("2024-04-20T04:00:00Z"), OHLCPeriod.P4H.periodStart(instant))
-        assertEquals(Instant.parse("2024-04-20T00:00:00Z"), OHLCPeriod.P1D.periodStart(instant))
+        assertEquals(Instant.parse("2024-04-20T07:58:00Z"), OHLCDuration.P1M.durationStart(instant))
+        assertEquals(Instant.parse("2024-04-20T07:55:00Z"), OHLCDuration.P5M.durationStart(instant))
+        assertEquals(Instant.parse("2024-04-20T07:45:00Z"), OHLCDuration.P15M.durationStart(instant))
+        assertEquals(Instant.parse("2024-04-20T07:00:00Z"), OHLCDuration.P1H.durationStart(instant))
+        assertEquals(Instant.parse("2024-04-20T04:00:00Z"), OHLCDuration.P4H.durationStart(instant))
+        assertEquals(Instant.parse("2024-04-20T00:00:00Z"), OHLCDuration.P1D.durationStart(instant))
     }
 
     @Test
@@ -70,9 +70,9 @@ class OHLCPeriodTest : TestWithDb() {
             )
 
             assertEquals(
-                expected = OHLCPeriod.entries.map {
+                expected = OHLCDuration.entries.map {
                     OHLC(
-                        start = it.periodStart(now),
+                        start = it.durationStart(now),
                         open = tradePrice.toDouble(),
                         high = tradePrice.toDouble(),
                         low = tradePrice.toDouble(),
@@ -92,9 +92,9 @@ class OHLCPeriodTest : TestWithDb() {
             )
 
             assertEquals(
-                expected = OHLCPeriod.entries.map {
+                expected = OHLCDuration.entries.map {
                     OHLC(
-                        start = it.periodStart(now),
+                        start = it.durationStart(now),
                         open = tradePrice.toDouble(),
                         high = higherTradePrice.toDouble(),
                         low = tradePrice.toDouble(),
@@ -117,9 +117,9 @@ class OHLCPeriodTest : TestWithDb() {
             )
 
             assertEquals(
-                expected = OHLCPeriod.entries.map {
+                expected = OHLCDuration.entries.map {
                     OHLC(
-                        start = it.periodStart(now),
+                        start = it.durationStart(now),
                         open = tradePrice.toDouble(),
                         high = higherTradePrice.toDouble(),
                         low = lowerTradePrice.toDouble(),
@@ -141,11 +141,11 @@ class OHLCPeriodTest : TestWithDb() {
                 tradeAmount = tradeAmount,
             )
             assertEquals(
-                expected = OHLCPeriod.entries.map {
+                expected = OHLCDuration.entries.map {
                     when (it) {
-                        OHLCPeriod.P1M -> setOf(
+                        OHLCDuration.P1M -> setOf(
                             OHLC(
-                                start = it.periodStart(now),
+                                start = it.durationStart(now),
                                 open = tradePrice.toDouble(),
                                 high = higherTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),
@@ -153,7 +153,7 @@ class OHLCPeriodTest : TestWithDb() {
                                 durationMs = it.durationMs(),
                             ),
                             OHLC(
-                                start = it.periodStart(nextMinute),
+                                start = it.durationStart(nextMinute),
                                 open = lowerTradePrice.toDouble(),
                                 high = lowerTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),
@@ -164,7 +164,7 @@ class OHLCPeriodTest : TestWithDb() {
 
                         else -> setOf(
                             OHLC(
-                                start = it.periodStart(now),
+                                start = it.durationStart(now),
                                 open = tradePrice.toDouble(),
                                 high = higherTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),
@@ -185,11 +185,11 @@ class OHLCPeriodTest : TestWithDb() {
                 tradeAmount = tradeAmount,
             )
             assertEquals(
-                expected = OHLCPeriod.entries.map {
+                expected = OHLCDuration.entries.map {
                     when (it) {
-                        OHLCPeriod.P1M -> setOf(
+                        OHLCDuration.P1M -> setOf(
                             OHLC(
-                                start = it.periodStart(now),
+                                start = it.durationStart(now),
                                 open = tradePrice.toDouble(),
                                 high = higherTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),
@@ -197,7 +197,7 @@ class OHLCPeriodTest : TestWithDb() {
                                 durationMs = it.durationMs(),
                             ),
                             OHLC(
-                                start = it.periodStart(nextMinute),
+                                start = it.durationStart(nextMinute),
                                 open = lowerTradePrice.toDouble(),
                                 high = lowerTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),
@@ -205,7 +205,7 @@ class OHLCPeriodTest : TestWithDb() {
                                 durationMs = it.durationMs(),
                             ),
                             OHLC(
-                                start = it.periodStart(nextFiveMinutes),
+                                start = it.durationStart(nextFiveMinutes),
                                 open = higherTradePrice.toDouble(),
                                 high = higherTradePrice.toDouble(),
                                 low = higherTradePrice.toDouble(),
@@ -214,9 +214,9 @@ class OHLCPeriodTest : TestWithDb() {
                             ),
                         )
 
-                        OHLCPeriod.P5M -> setOf(
+                        OHLCDuration.P5M -> setOf(
                             OHLC(
-                                start = it.periodStart(nextMinute),
+                                start = it.durationStart(nextMinute),
                                 open = tradePrice.toDouble(),
                                 high = higherTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),
@@ -224,7 +224,7 @@ class OHLCPeriodTest : TestWithDb() {
                                 durationMs = it.durationMs(),
                             ),
                             OHLC(
-                                start = it.periodStart(nextFiveMinutes),
+                                start = it.durationStart(nextFiveMinutes),
                                 open = higherTradePrice.toDouble(),
                                 high = higherTradePrice.toDouble(),
                                 low = higherTradePrice.toDouble(),
@@ -235,7 +235,7 @@ class OHLCPeriodTest : TestWithDb() {
 
                         else -> setOf(
                             OHLC(
-                                start = it.periodStart(now),
+                                start = it.durationStart(now),
                                 open = tradePrice.toDouble(),
                                 high = higherTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),

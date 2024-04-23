@@ -1,7 +1,7 @@
 package co.chainring.apps.api.model.websocket
 
 import co.chainring.core.model.db.MarketId
-import co.chainring.core.model.db.OHLCPeriod
+import co.chainring.core.model.db.OHLCDuration
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -34,7 +34,7 @@ sealed class SubscriptionTopic {
 
     @Serializable
     @SerialName("Prices")
-    data class Prices(val marketId: MarketId, val period: OHLCPeriod) : SubscriptionTopic()
+    data class Prices(val marketId: MarketId, val duration: OHLCDuration) : SubscriptionTopic()
 
     @Serializable
     @SerialName("Trades")

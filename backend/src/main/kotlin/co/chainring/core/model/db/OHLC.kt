@@ -2,13 +2,13 @@ package co.chainring.core.model.db
 
 import co.chainring.apps.api.model.websocket.OHLC
 import co.chainring.core.model.db.OHLCTable.close
+import co.chainring.core.model.db.OHLCTable.duration
 import co.chainring.core.model.db.OHLCTable.firstTrade
 import co.chainring.core.model.db.OHLCTable.high
 import co.chainring.core.model.db.OHLCTable.lastTrade
 import co.chainring.core.model.db.OHLCTable.low
 import co.chainring.core.model.db.OHLCTable.marketGuid
 import co.chainring.core.model.db.OHLCTable.open
-import co.chainring.core.model.db.OHLCTable.period
 import co.chainring.core.model.db.OHLCTable.start
 import co.chainring.core.model.db.OHLCTable.updatedAt
 import co.chainring.core.model.db.OHLCTable.volume
@@ -48,7 +48,7 @@ value class OHLCId(override val value: String) : EntityId {
     override fun toString(): String = value
 }
 
-enum class OHLCPeriod {
+enum class OHLCDuration {
     P1M,
     P5M,
     P15M,
@@ -57,7 +57,7 @@ enum class OHLCPeriod {
     P1D,
     ;
 
-    fun periodStart(instant: Instant): Instant {
+    fun durationStart(instant: Instant): Instant {
         return when (this) {
             P1M -> instant.truncateTo(DateTimeUnit.MINUTE)
             P5M -> instant.truncateTo(DateTimeUnit.MINUTE * 5)
@@ -83,10 +83,10 @@ enum class OHLCPeriod {
 object OHLCTable : GUIDTable<OHLCId>("ohlc", ::OHLCId) {
     val marketGuid = reference("market_guid", MarketTable).index()
     val start = timestamp("start")
-    val period = customEnumeration(
+    val duration = customEnumeration(
         "duration",
         "OHLCDuration",
-        { value -> OHLCPeriod.valueOf(value as String) },
+        { value -> OHLCDuration.valueOf(value as String) },
         { PGEnum("OHLCDuration", it) },
     )
     val firstTrade = timestamp("first_trade")
@@ -103,7 +103,7 @@ object OHLCTable : GUIDTable<OHLCId>("ohlc", ::OHLCId) {
     init {
         uniqueIndex(
             customIndexName = "Unique_OHLC",
-            columns = arrayOf(marketGuid, period, start),
+            columns = arrayOf(marketGuid, duration, start),
         )
     }
 }
@@ -116,17 +116,17 @@ class OHLCEntity(guid: EntityID<OHLCId>) : GUIDEntity<OHLCId>(guid) {
             high = this.high.toDouble(),
             low = this.low.toDouble(),
             close = this.close.toDouble(),
-            durationMs = this.period.durationMs(),
+            durationMs = this.duration.durationMs(),
         )
     }
 
     companion object : EntityClass<OHLCId, OHLCEntity>(OHLCTable) {
         fun updateWith(market: MarketId, tradeTimestamp: Instant, tradePrice: BigDecimal, tradeAmount: BigInteger): List<OHLCEntity> {
-            return OHLCPeriod.entries.map { ohlcPeriod ->
-                ohlcPeriod to ohlcPeriod.periodStart(tradeTimestamp)
-            }.map { (ohlcPeriod, ohlcStart) ->
+            return OHLCDuration.entries.map { ohlcDuration ->
+                ohlcDuration to ohlcDuration.durationStart(tradeTimestamp)
+            }.map { (ohlcDuration, ohlcStart) ->
                 OHLCTable.upsert(
-                    keys = arrayOf(marketGuid, start, period),
+                    keys = arrayOf(marketGuid, start, duration),
                     onUpdate = mutableListOf(
                         open to Case().When(firstTrade.greater(tradeTimestamp), decimalLiteral(tradePrice)).Else(open),
                         high to Case().When(high.less(tradePrice), decimalLiteral(tradePrice)).Else(high),
@@ -141,7 +141,7 @@ class OHLCEntity(guid: EntityID<OHLCId>) : GUIDEntity<OHLCId>(guid) {
                         it[id] = OHLCId.generate()
                         it[marketGuid] = market
                         it[start] = ohlcStart
-                        it[period] = ohlcPeriod
+                        it[duration] = ohlcDuration
                         it[open] = tradePrice
                         it[high] = tradePrice
                         it[low] = tradePrice
@@ -152,21 +152,21 @@ class OHLCEntity(guid: EntityID<OHLCId>) : GUIDEntity<OHLCId>(guid) {
                         it[createdAt] = Clock.System.now()
                     },
                 )
-                (ohlcPeriod to ohlcStart)
-            }.mapNotNull { (ohlcPeriod, ohlcStart) ->
-                findSingle(market, ohlcPeriod, ohlcStart)
+                (ohlcDuration to ohlcStart)
+            }.mapNotNull { (ohlcDuration, ohlcStart) ->
+                findSingle(market, ohlcDuration, ohlcStart)
             }
         }
 
-        fun findFrom(market: MarketId, period: OHLCPeriod, startTime: Instant): List<OHLCEntity> {
+        fun findFrom(market: MarketId, duration: OHLCDuration, startTime: Instant): List<OHLCEntity> {
             return OHLCEntity.find {
-                OHLCTable.marketGuid.eq(market) and OHLCTable.period.eq(period) and OHLCTable.start.greaterEq(startTime)
+                OHLCTable.marketGuid.eq(market) and OHLCTable.duration.eq(duration) and OHLCTable.start.greaterEq(startTime)
             }.orderBy(OHLCTable.start to SortOrder.ASC).toList()
         }
 
-        fun findSingle(market: MarketId, period: OHLCPeriod, startTime: Instant): OHLCEntity? {
+        fun findSingle(market: MarketId, duration: OHLCDuration, startTime: Instant): OHLCEntity? {
             return OHLCEntity.find {
-                OHLCTable.marketGuid.eq(market) and OHLCTable.period.eq(period) and OHLCTable.start.eq(startTime)
+                OHLCTable.marketGuid.eq(market) and OHLCTable.duration.eq(duration) and OHLCTable.start.eq(startTime)
             }.orderBy(OHLCTable.start to SortOrder.ASC).singleOrNull()
         }
     }
@@ -174,7 +174,7 @@ class OHLCEntity(guid: EntityID<OHLCId>) : GUIDEntity<OHLCId>(guid) {
     var marketGuid by OHLCTable.marketGuid
     var market by MarketEntity referencedOn OHLCTable.marketGuid
     var start by OHLCTable.start
-    var period by OHLCTable.period
+    var duration by OHLCTable.duration
 
     var firstTrade by OHLCTable.lastTrade
     var lastTrade by OHLCTable.lastTrade

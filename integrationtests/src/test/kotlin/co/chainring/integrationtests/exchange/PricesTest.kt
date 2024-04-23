@@ -1,7 +1,7 @@
 package co.chainring.integrationtests.exchange
 
 import co.chainring.core.model.db.MarketId
-import co.chainring.core.model.db.OHLCPeriod
+import co.chainring.core.model.db.OHLCDuration
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.assertPricesMessageReceived
@@ -26,9 +26,9 @@ class PricesTest {
 
     private fun `test authenticated prices over websocket`(auth: String?) {
         val client = WebsocketClient.blocking(auth)
-        client.subscribeToPrices(MarketId("BTC/ETH"), period = OHLCPeriod.P15M)
+        client.subscribeToPrices(MarketId("BTC/ETH"), duration = OHLCDuration.P15M)
 
-        client.assertPricesMessageReceived(MarketId("BTC/ETH"), period = OHLCPeriod.P15M) { msg ->
+        client.assertPricesMessageReceived(MarketId("BTC/ETH"), duration = OHLCDuration.P15M) { msg ->
             assertEquals("BTC/ETH", msg.market.value)
         }
 

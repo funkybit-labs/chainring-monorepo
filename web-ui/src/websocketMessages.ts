@@ -3,7 +3,7 @@ import { BalanceSchema, OrderSchema, TradeSchema } from 'apiClient'
 
 export type SubscriptionTopic =
   | { type: 'OrderBook'; marketId: string }
-  | { type: 'Prices'; marketId: string; period: string }
+  | { type: 'Prices'; marketId: string; duration: string }
   | { type: 'Trades' }
   | { type: 'Orders' }
   | { type: 'Balances' }
@@ -14,9 +14,9 @@ export function orderBookTopic(marketId: string): SubscriptionTopic {
 
 export function pricesTopic(
   marketId: string,
-  period: string
+  duration: string
 ): SubscriptionTopic {
-  return { type: 'Prices', marketId, period }
+  return { type: 'Prices', marketId, duration }
 }
 
 export const tradesTopic: SubscriptionTopic = { type: 'Trades' }

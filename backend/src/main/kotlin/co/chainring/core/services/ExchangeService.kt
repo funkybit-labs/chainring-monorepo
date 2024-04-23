@@ -417,7 +417,7 @@ class ExchangeService(
             ).map {
                 BroadcasterNotification.pricesForMarketPeriods(
                     trade.marketGuid.value,
-                    it.period,
+                    it.duration,
                     listOf(it),
                     full = false,
                 )

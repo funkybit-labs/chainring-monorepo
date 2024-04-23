@@ -30,8 +30,8 @@ data class BroadcasterNotification(
                     BroadcasterNotification(orderBook, recipient = null)
                 }
 
-        fun pricesForMarketPeriods(marketId: MarketId, period: OHLCPeriod, ohlc: List<OHLCEntity>, full: Boolean): BroadcasterNotification =
-            BroadcasterNotification(Prices(marketId, period, ohlc.map { it.toWSResponse() }, full), null)
+        fun pricesForMarketPeriods(marketId: MarketId, duration: OHLCDuration, ohlc: List<OHLCEntity>, full: Boolean): BroadcasterNotification =
+            BroadcasterNotification(Prices(marketId, duration, ohlc.map { it.toWSResponse() }, full), null)
     }
 }
 
