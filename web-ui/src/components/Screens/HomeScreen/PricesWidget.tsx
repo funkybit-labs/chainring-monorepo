@@ -6,6 +6,7 @@ import { Direction, OHLC, pricesTopic, Publishable } from 'websocketMessages'
 import { mergeOHLC } from 'utils/pricesUtils'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { useWindowDimensions, widgetSize, WindowDimensions } from 'utils/layout'
+import { produce } from 'immer'
 
 type PriceParameters = {
   totalWidth: number
@@ -26,7 +27,19 @@ type PriceParameters = {
   ticks: number[]
 }
 
-type ZoomLevels = 'Week' | 'Day' | 'Hour'
+enum OHLCPeriod {
+  P1M = 'P1M',
+  P5M = 'P5M',
+  P15M = 'P15M',
+  P1H = 'P1H',
+  P4H = 'P4H',
+  P1D = 'P1D'
+}
+
+type ViewPort = {
+  earliestStart: Date | undefined
+  latestStart: Date | undefined
+}
 
 function calculateParameters(
   ohlc: OHLC[],
@@ -37,11 +50,14 @@ function calculateParameters(
   const chartStartX = 20
   const chartEndX = totalWidth - 80
   const chartWidth = chartEndX - chartStartX
-  const barWidth = Math.ceil(chartWidth / ohlc.length)
+  const barWidth = Math.ceil(chartWidth / ohlc.length) - 1
   const minPrice = Math.min(...ohlc.map((o) => o.low))
   const maxPrice = Math.max(...ohlc.map((o) => o.high))
   const priceRange = maxPrice - minPrice
-  const gridSpacing = calculateTickSpacing(minPrice, maxPrice, gridLines)
+  const gridSpacing = Math.max(
+    calculateTickSpacing(minPrice, maxPrice, gridLines),
+    0.05
+  )
   const totalHeight = 385
   const chartStartY = 20
   const chartEndY = totalHeight - 60
@@ -74,20 +90,30 @@ function calculateParameters(
 }
 
 export function PricesWidget({ marketId }: { marketId: string }) {
-  const [zoom, setZoom] = useState<ZoomLevels>('Week')
-  const [latestStart, setLatestStart] = useState<Date | undefined>()
+  const [period, setPeriod] = useState<OHLCPeriod>(OHLCPeriod.P5M)
+  const [viewPort, setViewPort] = useState<ViewPort>({
+    earliestStart: undefined,
+    latestStart: undefined
+  })
   const [ohlc, setOhlc] = useState<OHLC[]>([])
   const [params, setParams] = useState<PriceParameters>()
   const windowDimensions = useWindowDimensions()
+  const maxCandles = 20
 
   useWebsocketSubscription({
-    topics: useMemo(() => [pricesTopic(marketId)], [marketId]),
+    topics: useMemo(() => [pricesTopic(marketId, period)], [marketId, period]),
     handler: (message: Publishable) => {
       if (message.type === 'Prices') {
         if (message.full) {
-          setOhlc(message.ohlc)
+          console.log('replacing OHLC')
+          setOhlc(mergeOHLC([], message.ohlc))
         } else {
-          setOhlc((o) => o.concat([...message.ohlc]))
+          console.log('updating OHLC')
+          setOhlc(
+            produce((draft) => {
+              mergeOHLC(draft, message.ohlc)
+            })
+          )
         }
       }
     }
@@ -113,79 +139,59 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     }
   })
 
-  // the duration each candlestick should cover, based on the zoom level
-  function ohlcDuration(zoom: ZoomLevels): number {
-    if (zoom == 'Week') {
-      return 1000 * 60 * 60 * 12
-    } else if (zoom == 'Day') {
-      return 1000 * 60 * 60 * 2
-    } else {
-      // Hour
-      return 1000 * 60 * 5
-    }
-  }
-
-  // the total time, in ms, that should be shown at once, based on the zoom level
-  function visibleDurationMs(zoom: ZoomLevels): number {
-    if (zoom == 'Week') {
-      return 1000 * 60 * 60 * 24 * 7
-    } else if (zoom == 'Day') {
-      return 1000 * 60 * 60 * 24
-    } else {
-      // Hour
-      return 1000 * 60 * 60
-    }
-  }
-
-  const mergedOhlc = useMemo(() => {
+  const viewportOhlc = useMemo(() => {
     // filter to candlesticks which are in the visible range
-    function visibleOhlc(
-      latestStart: Date | undefined,
-      zoom: ZoomLevels,
-      ohlc: OHLC[]
-    ): OHLC[] {
+    function filterVisibleOhlc(viewPort: ViewPort, ohlc: OHLC[]): OHLC[] {
       if (ohlc.length > 0) {
-        if (latestStart === undefined) {
-          latestStart = ohlc[ohlc.length - 1].start
+        if (viewPort.earliestStart === undefined) {
+          setViewPort({
+            earliestStart:
+              ohlc[Math.max(ohlc.length - 1 - maxCandles, 0)].start,
+            latestStart: viewPort.latestStart
+          })
+          return []
         }
-        const earliestStart = new Date(
-          latestStart.getTime() - visibleDurationMs(zoom)
-        )
+
+        const latestStart = viewPort.latestStart
+          ? viewPort.latestStart
+          : ohlc[ohlc.length - 1].start
+
         return ohlc.filter((l) => {
-          return l.start >= earliestStart && l.start < latestStart!
+          return l.start >= viewPort.earliestStart! && l.start <= latestStart!
         })
       } else {
         return []
       }
     }
 
-    const merged = mergeOHLC(
-      visibleOhlc(latestStart, zoom, ohlc),
-      ohlcDuration(zoom)
-    )
-    if (merged.length > 0) {
-      setParams(calculateParameters(merged, windowDimensions))
+    const visibleOhlc = filterVisibleOhlc(viewPort, ohlc)
+
+    if (visibleOhlc.length > 0) {
+      setParams(calculateParameters(visibleOhlc, windowDimensions))
     }
-    return merged
-  }, [latestStart, ohlc, zoom, windowDimensions])
+
+    return visibleOhlc
+  }, [ohlc, viewPort, windowDimensions])
 
   // draw the body of a candlestick, with some special treatment if it is marked as "incomplete"
   function drawCandle(params: PriceParameters, l: OHLC, i: number) {
     if (params) {
       return (
         <rect
-          x={i * params.barWidth + params.chartStartX + 1}
+          x={i * params.barWidth + params.chartStartX + 5}
           width={params.barWidth - 3}
           y={priceToY(params, Math.max(l.open, l.close))}
           height={
-            (params.chartHeight * Math.abs(l.open - l.close)) / params.tickRange
+            (params.chartHeight *
+              Math.max(Math.abs(l.open - l.close), 0.0001)) /
+            params.tickRange
           }
-          fill={l.close > l.open ? '#10A327' : '#7F1D1D'}
+          fill={l.close < l.open ? '#7F1D1D' : '#10A327'}
           stroke={
             l.incomplete
-              ? l.close > l.open
-                ? '#10A327'
-                : '#7F1D1D'
+              ? l.close < l.open
+                ? '#7F1D1D'
+                : '#10A327'
               : undefined
           }
           strokeDasharray={l.incomplete ? 2 : 0}
@@ -207,17 +213,23 @@ export function PricesWidget({ marketId }: { marketId: string }) {
       return (
         <line
           x1={
-            i * params.barWidth + params.chartStartX + (params.barWidth - 4) / 2
+            i * params.barWidth +
+            5 +
+            params.chartStartX +
+            (params.barWidth - 4) / 2
           }
           x2={
-            i * params.barWidth + params.chartStartX + (params.barWidth - 4) / 2
+            i * params.barWidth +
+            5 +
+            params.chartStartX +
+            (params.barWidth - 4) / 2
           }
           y1={priceToY(
             params,
             (direction == 'Up' ? Math.max : Math.min)(l.open, l.close)
           )}
           y2={priceToY(params, direction == 'Up' ? l.high : l.low)}
-          stroke={l.close > l.open ? '#10A327' : '#7F1D1D'}
+          stroke={l.close < l.open ? '#7F1D1D' : '#10A327'}
         />
       )
     }
@@ -256,12 +268,12 @@ export function PricesWidget({ marketId }: { marketId: string }) {
   // x-axis label, based on zoom level
   // the last label used is passed in to allow for special handling of day-crossings when zoomed in
   function calculateLabel(
-    zoom: ZoomLevels,
+    ohlcPeriod: OHLCPeriod,
     ohlc: OHLC,
     lastLabel?: string
   ): string {
     const date = ohlc.start
-    if (zoom === 'Week') {
+    if (ohlcPeriod === OHLCPeriod.P1D) {
       return weeklyLabel(date)
     } else {
       const hours = date.getHours()
@@ -269,7 +281,7 @@ export function PricesWidget({ marketId }: { marketId: string }) {
       if (hours < lastHours) {
         return weeklyLabel(date)
       } else {
-        if (zoom === 'Day') {
+        if (ohlcPeriod === OHLCPeriod.P1H || ohlcPeriod === OHLCPeriod.P4H) {
           return (hours < 10 ? '0' + hours : hours) + ':00'
         } else {
           const minutes = date.getMinutes()
@@ -281,26 +293,13 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     }
   }
 
-  // how far to pan left or right, based on zoom level
-  function panDistance(zoom: ZoomLevels) {
-    if (zoom === 'Day') {
-      return 1000 * 60 * 60 * 2
-    } else if (zoom === 'Hour') {
-      return 1000 * 60 * 5 * 2
-    } else if (zoom === 'Week') {
-      return 1000 * 60 * 60 * 24 * 7
-    } else {
-      return 0
-    }
-  }
-
   // draw the grid columns and x-axis labels
   function drawGridX(params: PriceParameters, ohlc: OHLC[]) {
     let lastLabel: string | undefined
     return (
       <>
         {ohlc.map((l, i) => {
-          const label = calculateLabel(zoom, l, lastLabel)
+          const label = calculateLabel(period, l, lastLabel)
           const oldLastLabel = lastLabel
           lastLabel = label
           const x = params.chartStartX + i * params.barWidth
@@ -374,78 +373,100 @@ export function PricesWidget({ marketId }: { marketId: string }) {
 
   // prevent panning left in weekly zoom or if there are fewer than 10 panDistances left
   function panLeftAllowed() {
-    if (zoom === 'Week') {
-      return false
-    }
-    return (
-      !latestStart ||
-      latestStart >=
-        new Date(ohlc[0]?.start?.getTime() + panDistance(zoom) * 10)
-    )
+    return !viewPort.earliestStart || viewPort.earliestStart > ohlc[0]?.start
   }
 
   // prevent panning right in weekly zoom or if there's no more data
   function panRightAllowed() {
-    if (zoom === 'Week') {
-      return false
-    }
     return (
-      latestStart &&
-      latestStart <
-        new Date(ohlc[ohlc.length - 1]?.start?.getTime() - panDistance(zoom))
+      viewPort.latestStart &&
+      viewPort.latestStart < ohlc[ohlc.length - 1]?.start
     )
   }
 
   function panLeft() {
     if (panLeftAllowed()) {
-      setLatestStart(
-        new Date(
-          (latestStart ? latestStart : ohlc[ohlc.length - 1]!.start).getTime() -
-            panDistance(zoom)
-        )
+      const earliestIndex = ohlc.findIndex(
+        (ohlc) => ohlc.start === viewPort.earliestStart
       )
+      const newEarliestIndex = Math.max(earliestIndex - maxCandles, 0)
+      const newLatestIndex = Math.min(
+        newEarliestIndex + maxCandles,
+        ohlc.length - 1
+      )
+
+      setViewPort({
+        earliestStart: ohlc[newEarliestIndex].start,
+        latestStart: ohlc[newLatestIndex].start
+      })
     }
   }
 
   function panRight() {
     if (panRightAllowed()) {
-      setLatestStart(
-        new Date(
-          (latestStart ? latestStart : ohlc[ohlc.length - 1]!.start).getTime() +
-            panDistance(zoom)
-        )
+      const latestIndex = ohlc.findIndex(
+        (ohlc) => ohlc.start === viewPort.latestStart
       )
+      const newLatestIndex = Math.min(latestIndex + maxCandles, ohlc.length - 1)
+      const newEarliestIndex = Math.max(newLatestIndex - maxCandles, 0)
+
+      setViewPort({
+        earliestStart: ohlc[newEarliestIndex].start,
+        latestStart: ohlc[newLatestIndex].start
+      })
     }
   }
 
   function zoomIn() {
-    setZoom(zoom === 'Day' ? 'Hour' : zoom === 'Week' ? 'Day' : 'Hour')
+    const values = Object.values(OHLCPeriod)
+    const idx = values.indexOf(period)
+    const inner = idx > 0 ? values[idx - 1] : period
+    setOhlc([])
+    setPeriod(inner)
+    setViewPort({
+      earliestStart: undefined,
+      latestStart: undefined
+    })
   }
 
   function zoomOut() {
-    setZoom(zoom == 'Day' ? 'Week' : zoom === 'Hour' ? 'Day' : 'Week')
-    if (zoom === 'Week') {
-      setLatestStart(undefined)
-    }
+    const values = Object.values(OHLCPeriod)
+    const idx = values.indexOf(period)
+    const outer = idx < values.length - 1 ? values[idx + 1] : period
+    setOhlc([])
+    setPeriod(outer)
+    setViewPort({
+      earliestStart: undefined,
+      latestStart: undefined
+    })
+  }
+
+  function canZoomOut(period: OHLCPeriod): boolean {
+    const values = Object.values(OHLCPeriod)
+    const idx = values.indexOf(period)
+    return idx < values.length - 1
+  }
+
+  function canZoomIn(period: OHLCPeriod): boolean {
+    const values = Object.values(OHLCPeriod)
+    const idx = values.indexOf(period)
+    return idx > 0
   }
 
   // compute the title showing the date range being displayed
   function title(): string {
-    const firstDate = mergedOhlc[0]?.start
-    const lastDate = mergedOhlc[mergedOhlc.length - 1]?.start
+    const firstDate = viewportOhlc[0]?.start
+    const lastDate = viewportOhlc[viewportOhlc.length - 1]?.start
     let startDate = firstDate
-    if (latestStart) {
+    if (viewPort.earliestStart) {
       startDate = new Date(
-        Math.max(
-          firstDate.getTime(),
-          latestStart.getTime() - visibleDurationMs(zoom)
-        )
+        Math.max(firstDate.getTime(), viewPort.earliestStart.getTime())
       )
     }
     const endDate = new Date(
-      latestStart
-        ? latestStart.getTime() + ohlcDuration(zoom)
-        : lastDate.getTime() + mergedOhlc[mergedOhlc.length - 1].durationMs
+      viewPort.latestStart
+        ? viewPort.latestStart.getTime()
+        : lastDate.getTime() + viewportOhlc[viewportOhlc.length - 1].durationMs
     )
     if (endDate.getDate() == startDate.getDate()) {
       return `${startDate.toLocaleDateString()}, ${startDate.toLocaleTimeString()} to ${endDate.toLocaleTimeString()}`
@@ -463,14 +484,15 @@ export function PricesWidget({ marketId }: { marketId: string }) {
             <div className="shrink-0">
               <button
                 className="px-1 text-xl disabled:opacity-50"
-                disabled={zoom == 'Hour'}
+                disabled={!canZoomIn(period)}
                 onClick={zoomIn}
               >
                 +
               </button>
+              <span>{period}</span>
               <button
                 className="px-1 text-xl disabled:opacity-50"
-                disabled={zoom == 'Week'}
+                disabled={!canZoomOut(period)}
                 onClick={zoomOut}
               >
                 -
@@ -490,15 +512,17 @@ export function PricesWidget({ marketId }: { marketId: string }) {
                 →
               </button>
             </div>
-            <div className="flex w-full justify-around align-middle">
-              {mergedOhlc.length > 0 && params && title()}
-            </div>
+            {
+              <div className="flex w-full justify-around align-middle">
+                {viewportOhlc.length > 0 && params && title()}
+              </div>
+            }
           </div>
-          {mergedOhlc.length > 0 && params ? (
+          {viewportOhlc.length > 0 && params ? (
             <svg width={params.totalWidth} height={params.totalHeight}>
               {drawGridY(params)}
-              {drawGridX(params, mergedOhlc)}
-              {mergedOhlc.map((l, i) => (
+              {drawGridX(params, viewportOhlc)}
+              {viewportOhlc.map((l, i) => (
                 <Fragment key={`${l.start}`}>
                   {drawCandle(params, l, i)}
                   {drawWick(params, l, i, 'Up')}

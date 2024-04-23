@@ -18,6 +18,7 @@ import co.chainring.core.model.db.DepositTable
 import co.chainring.core.model.db.ExchangeTransactionTable
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketTable
+import co.chainring.core.model.db.OHLCTable
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionTable
 import co.chainring.core.model.db.OrderId
@@ -75,6 +76,7 @@ open class TestWithDb {
             ExchangeTransactionTable.deleteAll()
             BlockchainTransactionTable.deleteAll()
             BlockchainNonceTable.deleteAll()
+            OHLCTable.deleteAll()
             MarketTable.deleteAll()
             SymbolTable.deleteAll()
             DeployedSmartContractTable.deleteAll()

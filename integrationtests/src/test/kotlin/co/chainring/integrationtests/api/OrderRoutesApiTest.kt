@@ -9,12 +9,14 @@ import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.websocket.LastTrade
 import co.chainring.apps.api.model.websocket.LastTradeDirection
+import co.chainring.apps.api.model.websocket.OHLC
 import co.chainring.apps.api.model.websocket.OrderBook
 import co.chainring.apps.api.model.websocket.OrderBookEntry
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OHLCPeriod
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
@@ -38,6 +40,7 @@ import co.chainring.integrationtests.testutils.assertOrderBookMessageReceived
 import co.chainring.integrationtests.testutils.assertOrderCreatedMessageReceived
 import co.chainring.integrationtests.testutils.assertOrderUpdatedMessageReceived
 import co.chainring.integrationtests.testutils.assertOrdersMessageReceived
+import co.chainring.integrationtests.testutils.assertPricesMessageReceived
 import co.chainring.integrationtests.testutils.assertTradeCreatedMessageReceived
 import co.chainring.integrationtests.testutils.assertTradeUpdatedMessageReceived
 import co.chainring.integrationtests.testutils.assertTradesMessageReceived
@@ -45,6 +48,7 @@ import co.chainring.integrationtests.testutils.blocking
 import co.chainring.integrationtests.testutils.subscribeToBalances
 import co.chainring.integrationtests.testutils.subscribeToOrderBook
 import co.chainring.integrationtests.testutils.subscribeToOrders
+import co.chainring.integrationtests.testutils.subscribeToPrices
 import co.chainring.integrationtests.testutils.subscribeToTrades
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.awaitility.kotlin.await
@@ -579,6 +583,40 @@ class OrderRoutesApiTest {
         assertEquals(0, trade.price.compareTo(BigDecimal("17.550")))
 
         waitForSettlementToFinish(listOf(trade.id.value))
+        takerWsClient.assertPricesMessageReceived(btcEthMarketId) { msg ->
+            assertEquals(
+                OHLC(
+                    start = OHLCPeriod.P5M.periodStart(trade.timestamp),
+                    // db seed value
+                    open = 17.525,
+                    // trade price
+                    high = 17.55,
+                    // db seed value
+                    low = 17.525,
+                    // trade price
+                    close = 17.55,
+                    durationMs = 300000,
+                ),
+                msg.ohlc.last(),
+            )
+        }
+        makerWsClient.assertPricesMessageReceived(btcEthMarketId) { msg ->
+            assertEquals(
+                OHLC(
+                    start = OHLCPeriod.P5M.periodStart(trade.timestamp),
+                    // db seed value
+                    open = 17.525,
+                    // trade price
+                    high = 17.55,
+                    // db seed value
+                    low = 17.525,
+                    // trade price
+                    close = 17.55,
+                    durationMs = 300000,
+                ),
+                msg.ohlc.last(),
+            )
+        }
         takerWsClient.assertTradeUpdatedMessageReceived { msg ->
             assertEquals(marketBuyOrder.id, msg.trade.orderId)
             assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
@@ -691,6 +729,40 @@ class OrderRoutesApiTest {
         assertEquals(0, trade2.price.compareTo(BigDecimal("17.500")))
 
         waitForSettlementToFinish(listOf(trade2.id.value))
+        takerWsClient.assertPricesMessageReceived(btcEthMarketId) { msg ->
+            assertEquals(
+                OHLC(
+                    start = OHLCPeriod.P5M.periodStart(trade.timestamp),
+                    // db seed value
+                    open = 17.525,
+                    // previous trade price
+                    high = 17.55,
+                    // this trade price
+                    low = 17.5,
+                    // this trade price
+                    close = 17.5,
+                    durationMs = 300000,
+                ),
+                msg.ohlc.last(),
+            )
+        }
+        makerWsClient.assertPricesMessageReceived(btcEthMarketId) { msg ->
+            assertEquals(
+                OHLC(
+                    start = OHLCPeriod.P5M.periodStart(trade.timestamp),
+                    // db seed value
+                    open = 17.525,
+                    // previous trade price
+                    high = 17.55,
+                    // this trade price
+                    low = 17.5,
+                    // this trade price
+                    close = 17.5,
+                    durationMs = 300000,
+                ),
+                msg.ohlc.last(),
+            )
+        }
         takerWsClient.assertTradeUpdatedMessageReceived { msg ->
             assertEquals(marketSellOrder.id, msg.trade.orderId)
             assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
@@ -983,6 +1055,9 @@ class OrderRoutesApiTest {
         val wsClient = WebsocketClient.blocking(apiClient.authToken).apply {
             subscribeToOrderBook(marketId)
             assertOrderBookMessageReceived(marketId)
+
+            subscribeToPrices(marketId)
+            assertPricesMessageReceived(marketId)
 
             subscribeToOrders()
             assertOrdersMessageReceived()

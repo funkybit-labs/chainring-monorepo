@@ -5,6 +5,7 @@ import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.Trade
 import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OHLCPeriod
 import kotlinx.datetime.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -59,6 +60,7 @@ data class LastTrade(
 @SerialName("Prices")
 data class Prices(
     val market: MarketId,
+    val period: OHLCPeriod,
     val ohlc: List<OHLC>,
     val full: Boolean,
 ) : Publishable()
