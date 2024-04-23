@@ -35,6 +35,7 @@ import co.chainring.core.model.db.ExchangeTransactionEntity
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OHLCEntity
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
@@ -334,7 +335,7 @@ class ExchangeService(
         val timestamp = Clock.System.now()
 
         // handle trades
-        val blockchainTxs = response.tradesCreatedList.mapNotNull {
+        val tradeEntities = response.tradesCreatedList.mapNotNull {
             logger.debug { "Trade Created ${it.buyGuid}, ${it.sellGuid}, ${it.amount.toBigInteger()} ${it.price.toBigDecimal()} " }
 
             val buyOrder = OrderEntity.findBySequencerOrderId(it.buyGuid) ?: return@mapNotNull null
@@ -362,8 +363,7 @@ class ExchangeService(
                 broadcasterNotifications.add(order.wallet.address, TradeCreated(execution.toTradeResponse()))
             }
 
-            // build the transaction to settle
-            tradeEntity.toEip712Transaction()
+            tradeEntity
         }
 
         // update all orders that have changed
@@ -410,7 +410,18 @@ class ExchangeService(
         }
 
         // queue any blockchain txs for processing
-        queueBlockchainExchangeTransactions(blockchainTxs)
+        queueBlockchainExchangeTransactions(tradeEntities.map { it.toEip712Transaction() })
+
+        val ohlcNotifications = tradeEntities.map { trade ->
+            OHLCEntity.updateWith(trade).map {
+                BroadcasterNotification.pricesForMarketPeriods(
+                    trade.marketGuid.value,
+                    it.duration,
+                    listOf(it),
+                    full = false,
+                )
+            }
+        }.flatten().distinct()
 
         publishBroadcasterNotifications(
             broadcasterNotifications.flatMap { (address, notifications) ->
@@ -419,7 +430,7 @@ class ExchangeService(
                 OrderEntity
                     .getOrdersMarkets(response.ordersChangedList.map { it.guid })
                     .sortedBy { it.guid },
-            ),
+            ) + ohlcNotifications,
         )
     }
 

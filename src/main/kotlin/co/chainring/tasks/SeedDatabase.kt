@@ -2,13 +2,20 @@ package co.chainring.tasks
 
 import co.chainring.core.db.DbConfig
 import co.chainring.core.db.connect
+import co.chainring.core.db.notifyDbListener
 import co.chainring.core.model.db.BlockchainNonceEntity
+import co.chainring.core.model.db.BroadcasterJobEntity
+import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.ChainEntity
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OHLCEntity
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.SymbolId
 import co.chainring.tasks.fixtures.Fixtures
+import java.math.BigInteger
+import kotlin.time.Duration.Companion.hours
+import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -48,7 +55,7 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                  }
          }.associateBy { it.id.value }
 
-        fixtures.markets.forEach { (baseSymbolId, quoteSymbolId, tickSize) ->
+        fixtures.markets.forEach { (baseSymbolId, quoteSymbolId, tickSize, marketPrice) ->
             val baseSymbol = symbolEntities.getValue(baseSymbolId)
             val quoteSymbol = symbolEntities.getValue(quoteSymbolId)
 
@@ -60,6 +67,13 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                     }
 
                 println("Created market ${marketEntity.guid.value}")
+
+                OHLCEntity.updateWith(
+                    market = marketEntity.guid.value,
+                    tradeTimestamp = Clock.System.now() - 1.hours,
+                    tradePrice = marketPrice,
+                    tradeAmount = BigInteger("0"),
+                )
             }
         }
     }

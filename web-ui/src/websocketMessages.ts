@@ -3,7 +3,7 @@ import { BalanceSchema, OrderSchema, TradeSchema } from 'apiClient'
 
 export type SubscriptionTopic =
   | { type: 'OrderBook'; marketId: string }
-  | { type: 'Prices'; marketId: string }
+  | { type: 'Prices'; marketId: string; duration: string }
   | { type: 'Trades' }
   | { type: 'Orders' }
   | { type: 'Balances' }
@@ -12,8 +12,11 @@ export function orderBookTopic(marketId: string): SubscriptionTopic {
   return { type: 'OrderBook', marketId }
 }
 
-export function pricesTopic(marketId: string): SubscriptionTopic {
-  return { type: 'Prices', marketId }
+export function pricesTopic(
+  marketId: string,
+  duration: string
+): SubscriptionTopic {
+  return { type: 'Prices', marketId, duration }
 }
 
 export const tradesTopic: SubscriptionTopic = { type: 'Trades' }

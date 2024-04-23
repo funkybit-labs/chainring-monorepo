@@ -28,7 +28,8 @@ describe('PricesUtils', () => {
     open: number,
     high: number,
     low: number,
-    close: number
+    close: number,
+    incomplete: boolean = false
   ) {
     return {
       start: new Date(startMs),
@@ -36,42 +37,55 @@ describe('PricesUtils', () => {
       high,
       low,
       close,
-      durationMs
+      durationMs,
+      incomplete
     }
   }
 
   it('should work as a no-op', () => {
-    expect(mergeOHLC([ohlc(1000, 1000, 2, 4, 1, 3)], 1000)).toStrictEqual([
-      ohlc(1000, 1000, 2, 4, 1, 3)
-    ])
-  })
-  it('should adjust start to beginning of duration boundary', () => {
-    expect(mergeOHLC([ohlc(1001, 1000, 2, 4, 1, 3)], 1000)).toStrictEqual([
-      ohlc(1000, 1000, 2, 4, 1, 3)
-    ])
-  })
-  it('should adjust end to end of duration boundary', () => {
-    expect(mergeOHLC([ohlc(1234, 1743, 2, 4, 1, 3)], 1000)).toStrictEqual([
-      ohlc(1000, 1000, 2, 4, 1, 3)
-    ])
-  })
-  it('should merge two together', () => {
     expect(
       mergeOHLC(
-        [ohlc(1000, 500, 2, 4, 1, 3), ohlc(1500, 500, 3, 5, 0, 4)],
+        [ohlc(1000, 1000, 2, 4, 1, 3)],
+        [ohlc(1000, 1000, 2, 4, 1, 3)],
         1000
       )
-    ).toStrictEqual([ohlc(1000, 1000, 2, 5, 0, 4)])
+    ).toStrictEqual([ohlc(1000, 1000, 2, 4, 1, 3)])
+  })
+  it('should replace ohlc matched by start', () => {
+    expect(
+      mergeOHLC(
+        [ohlc(1000, 1000, 2, 4, 1, 3)],
+        [ohlc(1000, 1000, 2, 5, 1, 5)],
+        1000
+      )
+    ).toStrictEqual([ohlc(1000, 1000, 2, 5, 1, 5)])
+  })
+  it('should replace and add ohlc matched by start', () => {
+    expect(
+      mergeOHLC(
+        [ohlc(2000, 1000, 2, 4, 1, 3), ohlc(3000, 1000, 2, 4, 1, 3)],
+        [ohlc(3000, 1000, 2, 5, 1, 5), ohlc(4000, 1000, 3, 3, 3, 3)],
+        1000
+      )
+    ).toStrictEqual([
+      ohlc(2000, 1000, 2, 4, 1, 3),
+      ohlc(3000, 1000, 2, 5, 1, 5),
+      ohlc(4000, 1000, 3, 3, 3, 3)
+    ])
   })
   it('should fill-in any gaps', () => {
     expect(
       mergeOHLC(
-        [ohlc(1000, 500, 2, 4, 1, 3), ohlc(2500, 500, 3, 5, 0, 4)],
-        1000
+        [ohlc(1000, 500, 2, 4, 1, 3), ohlc(1500, 500, 3, 5, 0, 4)],
+        [ohlc(3000, 500, 2, 5, 1, 5)],
+        500
       )
     ).toStrictEqual([
-      ohlc(1000, 1000, 2, 4, 1, 3),
-      ohlc(2000, 1000, 3, 5, 0, 4)
+      ohlc(1000, 500, 2, 4, 1, 3),
+      ohlc(1500, 500, 3, 5, 0, 4),
+      ohlc(2000, 500, 4, 4, 4, 4),
+      ohlc(2500, 500, 4, 4, 4, 4),
+      ohlc(3000, 500, 2, 5, 1, 5)
     ])
   })
 })

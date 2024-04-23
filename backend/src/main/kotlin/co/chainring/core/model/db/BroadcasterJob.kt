@@ -1,5 +1,6 @@
 package co.chainring.core.model.db
 
+import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.core.db.notifyDbListener
 import co.chainring.core.model.Address
@@ -28,6 +29,9 @@ data class BroadcasterNotification(
                 .map { orderBook ->
                     BroadcasterNotification(orderBook, recipient = null)
                 }
+
+        fun pricesForMarketPeriods(marketId: MarketId, duration: OHLCDuration, ohlc: List<OHLCEntity>, full: Boolean): BroadcasterNotification =
+            BroadcasterNotification(Prices(marketId, duration, ohlc.map { it.toWSResponse() }, full), null)
     }
 }
 

@@ -20,11 +20,12 @@ import co.chainring.core.model.db.BroadcasterJobId
 import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OHLCDuration
+import co.chainring.core.model.db.OHLCEntity
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.utils.PgListener
-import co.chainring.core.utils.Timer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -34,14 +35,12 @@ import org.http4k.websocket.Websocket
 import org.http4k.websocket.WsMessage
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
-import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger {}
@@ -51,13 +50,14 @@ typealias Principal = Address
 data class ConnectedClient(
     val websocket: Websocket,
     val principal: Principal?,
-    val validUntil: Instant,
+    val authorizedUntil: Instant,
 ) : Websocket by websocket {
     fun send(message: OutgoingWSMessage) {
-        if (validUntil < Clock.System.now()) {
+        if (authorizedUntil >= Clock.System.now()) {
+            websocket.send(WsMessage(Json.encodeToString(message)))
+        } else {
             websocket.close(wsUnauthorized)
         }
-        websocket.send(WsMessage(Json.encodeToString(message)))
     }
 }
 
@@ -70,6 +70,7 @@ class Broadcaster(val db: Database) {
     private val lastPricePublish = mutableMapOf<Pair<MarketId, ConnectedClient>, Instant>()
     private val rnd = Random(0)
     private val orderBooksByMarket = ConcurrentHashMap<MarketId, OrderBook>()
+    private val pricesByMarketAndPeriod = ConcurrentHashMap<SubscriptionTopic.Prices, MutableList<OHLC>>()
 
     private val pgListener = PgListener(db, "broadcaster-listener", "broadcaster_ctl") { notification ->
         handleDbNotification(notification.parameter)
@@ -116,26 +117,28 @@ class Broadcaster(val db: Database) {
         }
     }
 
-    private var timer: Timer? = null
-
     fun start() {
-        timer = Timer(logger)
-        timer?.scheduleAtFixedRate(Duration.ofSeconds(1), stopOnError = true, this::publishData)
         pgListener.start()
+        initializePrices()
+    }
+
+    private fun initializePrices() {
+        transaction {
+            // load historical prices once, later only updates will be delivered via notify
+            MarketEntity.all().map { it.guid.value }.forEach { market ->
+                OHLCDuration.entries.forEach { p ->
+                    // equivalent to 7 days of 5 minutes intervals
+                    val startTime = Clock.System.now() - (p.durationMs() * 20 * 24 * 7).milliseconds
+
+                    val ohlcEntities = OHLCEntity.findFrom(market, p, startTime = startTime)
+                    pricesByMarketAndPeriod[SubscriptionTopic.Prices(market, p)] = ohlcEntities.map { it.toWSResponse() }.toMutableList()
+                }
+            }
+        }
     }
 
     fun stop() {
-        timer?.cancel()
         pgListener.stop()
-    }
-
-    private fun publishData() {
-        subscriptions.forEach { (topic, clients) ->
-            when (topic) {
-                is SubscriptionTopic.Prices -> sendPrices(topic, clients)
-                else -> {}
-            }
-        }
     }
 
     private val mockPrices = ConcurrentHashMap(
@@ -173,37 +176,28 @@ class Broadcaster(val db: Database) {
         }
     }
 
-    private fun sendPrices(topic: SubscriptionTopic.Prices, clients: List<ConnectedClient>) {
-        clients.forEach { sendPrices(topic, it) }
-    }
-
     private fun sendPrices(topic: SubscriptionTopic.Prices, client: ConnectedClient) {
         val key = Pair(topic.marketId, client)
-        val fullDump = !lastPricePublish.containsKey(key)
         val now = Clock.System.now()
-        val prices = if (fullDump) {
-            lastPricePublish[key] = now
-            Prices(
+
+        val prices = when (val lastTimestamp = lastPricePublish[key]) {
+            null -> Prices(
                 market = topic.marketId,
-                ohlc = mockOHLC(topic.marketId, now.minus(7.days), 5.minutes, 12 * 24 * 7, true),
+                duration = topic.duration,
+                ohlc = pricesByMarketAndPeriod[topic] ?: listOf(),
                 full = true,
             )
-        } else {
-            Prices(
+            else -> Prices(
                 market = topic.marketId,
-                ohlc = mockOHLC(
-                    topic.marketId,
-                    lastPricePublish[key]!!,
-                    1.seconds,
-                    (now - lastPricePublish[key]!!).inWholeSeconds,
-                    false,
-                ),
+                duration = topic.duration,
+                ohlc = pricesByMarketAndPeriod[topic]?.takeLastWhile { (it.start + it.durationMs.milliseconds) > lastTimestamp } ?: listOf(),
                 full = false,
-            ).also {
-                lastPricePublish[key] = now
-            }
+            )
         }
-        client.send(OutgoingWSMessage.Publish(topic, prices))
+
+        client.send(OutgoingWSMessage.Publish(topic, prices)).also {
+            lastPricePublish[key] = now
+        }
     }
 
     private fun sendTrades(client: ConnectedClient) {
@@ -226,9 +220,17 @@ class Broadcaster(val db: Database) {
         }
     }
 
-    private fun sendOrderBook(topic: SubscriptionTopic.OrderBook) {
-        subscriptions.getOrPut(topic) { Subscriptions() }.forEach { client ->
-            sendOrderBook(topic, client)
+    private fun updatePrices(message: Prices) {
+        val key = SubscriptionTopic.Prices(message.market, message.duration)
+        pricesByMarketAndPeriod[key]?.let { existingEntries ->
+            message.ohlc.sortedBy { it.start }.forEach { incoming ->
+                val index = existingEntries.indexOfLast { it.start == incoming.start }
+                if (index != -1) {
+                    existingEntries[index] = incoming
+                } else {
+                    existingEntries.add(incoming)
+                }
+            }
         }
     }
 
@@ -290,7 +292,10 @@ class Broadcaster(val db: Database) {
                 SubscriptionTopic.OrderBook(notification.message.marketId)
             }
             is Orders, is OrderCreated, is OrderUpdated -> SubscriptionTopic.Orders
-            is Prices -> SubscriptionTopic.Prices(notification.message.market)
+            is Prices -> {
+                updatePrices(notification.message)
+                SubscriptionTopic.Prices(notification.message.market, notification.message.duration)
+            }
             is Trades, is TradeCreated, is TradeUpdated -> SubscriptionTopic.Trades
             is Balances -> SubscriptionTopic.Balances
         }
