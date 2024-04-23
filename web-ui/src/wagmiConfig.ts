@@ -17,8 +17,8 @@ export const chain = defineChain({
   name: import.meta.env.ENV_CHAIN_NAME,
   nativeCurrency: {
     decimals: 18,
-    name: 'Ether',
-    symbol: 'ETH'
+    name: import.meta.env.ENV_NATIVE_SYMBOL_NAME,
+    symbol: import.meta.env.ENV_NATIVE_SYMBOL
   },
   rpcUrls: {
     default: { http: [import.meta.env.ENV_CHAIN_JSON_RPC_URL] }

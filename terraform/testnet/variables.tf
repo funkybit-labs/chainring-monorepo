@@ -24,10 +24,15 @@ data "terraform_remote_state" "shared" {
   }
 }
 
-data "aws_acm_certificate" "chainring_finance" {
+data "aws_acm_certificate" "chainring_finance_us_east_1" {
   domain    = "*.chainring.finance"
   key_types = ["EC_prime256v1"]
   provider  = aws.us_east_1
+}
+
+data "aws_acm_certificate" "chainring_finance" {
+  domain    = "*.chainring.finance"
+  key_types = ["EC_prime256v1"]
 }
 
 terraform {

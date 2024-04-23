@@ -10,11 +10,12 @@ module "vpc" {
 }
 
 module "alb" {
-  source      = "../modules/alb"
-  name_prefix = local.name_prefix
-  subnet_id_1 = module.vpc.public_subnet_id_1
-  subnet_id_2 = module.vpc.public_subnet_id_2
-  vpc         = module.vpc.vpc
+  source          = "../modules/alb"
+  name_prefix     = local.name_prefix
+  subnet_id_1     = module.vpc.public_subnet_id_1
+  subnet_id_2     = module.vpc.public_subnet_id_2
+  vpc             = module.vpc.vpc
+  certificate_arn = data.aws_acm_certificate.chainring.arn
 }
 
 module "ecs" {
@@ -35,7 +36,9 @@ module "api" {
   subnet_id_2                             = module.vpc.private_subnet_id_2
   vpc                                     = module.vpc.vpc
   allow_inbound                           = true
-  hostnames                               = ["${local.name_prefix}-api.${data.terraform_remote_state.shared.outputs.zone.name}"]
+  hostnames                               = [
+    "${local.name_prefix}-api.${data.terraform_remote_state.shared.outputs.zone.name}"
+  ]
   lb_https_listener_arn                   = module.alb.https_listener_arn
   lb_dns_name                             = module.alb.dns_name
   zone                                    = data.terraform_remote_state.shared.outputs.zone
@@ -55,7 +58,9 @@ module "anvil" {
   subnet_id_2                             = module.vpc.private_subnet_id_2
   vpc                                     = module.vpc.vpc
   allow_inbound                           = true
-  hostnames                               = ["${local.name_prefix}-anvil.${data.terraform_remote_state.shared.outputs.zone.name}"]
+  hostnames                               = [
+    "${local.name_prefix}-anvil.${data.terraform_remote_state.shared.outputs.zone.name}"
+  ]
   lb_https_listener_arn                   = module.alb.https_listener_arn
   lb_priority                             = 101
   lb_dns_name                             = module.alb.dns_name
@@ -79,7 +84,9 @@ module "otterscan" {
   subnet_id_2                             = module.vpc.private_subnet_id_2
   vpc                                     = module.vpc.vpc
   allow_inbound                           = true
-  hostnames                               = ["${local.name_prefix}-otterscan.${data.terraform_remote_state.shared.outputs.zone.name}"]
+  hostnames                               = [
+    "${local.name_prefix}-otterscan.${data.terraform_remote_state.shared.outputs.zone.name}"
+  ]
   lb_https_listener_arn                   = module.alb.https_listener_arn
   lb_priority                             = 102
   lb_dns_name                             = module.alb.dns_name
@@ -114,11 +121,11 @@ module "web" {
   source      = "../modules/web"
   name_prefix = local.name_prefix
   zone        = data.terraform_remote_state.shared.outputs.zone
-  providers = {
+  providers   = {
     aws.us_east_1 = aws.us_east_1
   }
   ci_role_arn     = data.terraform_remote_state.shared.outputs.ci_role_arn
-  certificate_arn = data.aws_acm_certificate.chainring.arn
+  certificate_arn = data.aws_acm_certificate.chainring_us_east_1.arn
 }
 
 module "baregate" {
