@@ -12,6 +12,7 @@ import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.SequencerError
 import co.chainring.sequencer.proto.SequencerResponse
+import co.chainring.sequencer.proto.newQuantityOrNull
 import co.chainring.testutils.SequencerClient
 import co.chainring.testutils.inSats
 import co.chainring.testutils.inWei
@@ -133,7 +134,10 @@ class TestSequencer {
         assertEquals(OrderDisposition.Filled, response.ordersChangedList[1].disposition)
         assertEquals(OrderDisposition.Filled, response.ordersChangedList[2].disposition)
         assertEquals(OrderDisposition.Filled, response.ordersChangedList[3].disposition)
-        assertEquals(OrderDisposition.PartiallyFilled, response.ordersChangedList[4].disposition)
+        response.ordersChangedList[4].apply {
+            assertEquals(OrderDisposition.PartiallyFilled, disposition)
+            assertEquals(BigInteger.valueOf(5000), this.newQuantityOrNull?.toBigInteger())
+        }
         assertEquals(
             listOf(sell1.orderGuid(), sell2.orderGuid(), sell3.orderGuid(), sell4.orderGuid()),
             response.tradesCreatedList.map { it.sellGuid },

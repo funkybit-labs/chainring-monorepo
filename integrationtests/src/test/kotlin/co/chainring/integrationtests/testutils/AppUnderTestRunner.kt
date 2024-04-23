@@ -124,16 +124,16 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
         }
 
         transaction {
+            ExchangeTransactionTable.deleteAll()
+            BlockchainTransactionTable.deleteAll()
             OrderExecutionTable.deleteAll()
             TradeTable.deleteAll()
             OrderTable.deleteAll()
-            BalanceLogTable.deleteAll()
-            BalanceTable.deleteAll()
             DepositTable.deleteAll()
             WithdrawalTable.deleteAll()
+            BalanceLogTable.deleteAll()
+            BalanceTable.deleteAll()
             WalletTable.deleteAll()
-            ExchangeTransactionTable.deleteAll()
-            BlockchainTransactionTable.deleteAll()
         }
     }
 }

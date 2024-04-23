@@ -49,7 +49,9 @@ class BlockchainDepositHandler(
 
                 while (true) {
                     Thread.sleep(pollingIntervalInMs)
-                    refreshPendingDeposits()
+                    transaction {
+                        refreshPendingDeposits()
+                    }
                 }
             } catch (ie: InterruptedException) {
                 logger.warn { "Exiting deposit confirmation handler thread" }
@@ -111,9 +113,7 @@ class BlockchainDepositHandler(
     }
 
     private fun refreshPendingDeposits() {
-        val pendingDeposits = transaction {
-            DepositEntity.getPending(chainId)
-        }
+        val pendingDeposits = DepositEntity.getPendingForUpdate(chainId)
 
         if (pendingDeposits.isNotEmpty()) {
             val currentBlock = blockchainClient.getBlockNumber()
@@ -132,9 +132,7 @@ class BlockchainDepositHandler(
                     "0x1" -> {
                         val confirmationsReceived = confirmations(currentBlock, blockNumber)
                         if (confirmationsReceived >= numConfirmations) {
-                            transaction {
-                                pendingDeposit.update(status = DepositStatus.Confirmed)
-                            }
+                            pendingDeposit.update(DepositStatus.Confirmed)
 
                             try {
                                 depositConfirmationHandler.onExchangeContractDepositConfirmation(pendingDeposit)
@@ -142,9 +140,7 @@ class BlockchainDepositHandler(
                                 logger.error(e) { "DepositConfirmationCallback failed for $pendingDeposit" }
                             }
 
-                            transaction {
-                                pendingDeposit.update(status = DepositStatus.Complete)
-                            }
+                            pendingDeposit.update(DepositStatus.Complete)
                         }
                     }
 
@@ -152,12 +148,7 @@ class BlockchainDepositHandler(
                         val error = receipt.revertReason ?: "Unknown Error"
                         logger.error { "Deposit failed with revert reason $error" }
 
-                        transaction {
-                            pendingDeposit.update(
-                                status = DepositStatus.Failed,
-                                error = error,
-                            )
-                        }
+                        pendingDeposit.update(DepositStatus.Failed, error)
                     }
                 }
             }

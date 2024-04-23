@@ -146,8 +146,12 @@ data class Market(
                 ordersChanged.add(
                     orderChanged {
                         this.guid = execution.counterOrder.guid.value
-                        this.disposition =
-                            if (execution.counterOrderExhausted) OrderDisposition.Filled else OrderDisposition.PartiallyFilled
+                        if (execution.counterOrderExhausted) {
+                            this.disposition = OrderDisposition.Filled
+                        } else {
+                            this.disposition = OrderDisposition.PartiallyFilled
+                            this.newQuantity = execution.counterOrder.quantity.toIntegerValue()
+                        }
                     },
                 )
                 val wallet = order.wallet.toWalletAddress()

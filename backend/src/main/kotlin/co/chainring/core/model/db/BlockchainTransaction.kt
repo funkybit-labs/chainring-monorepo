@@ -82,18 +82,20 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
             return entity
         }
 
-        fun getUncompleted(chainId: ChainId): List<BlockchainTransactionEntity> {
-            return BlockchainTransactionEntity.find {
-                BlockchainTransactionTable.chainId.eq(chainId) and
-                    BlockchainTransactionTable.status.inList(
-                        listOf(
-                            BlockchainTransactionStatus.Pending,
-                            BlockchainTransactionStatus.Submitted,
-                            BlockchainTransactionStatus.Confirmed,
-                        ),
-                    )
-            }
+        fun getUncompletedForUpdate(chainId: ChainId): List<BlockchainTransactionEntity> {
+            return BlockchainTransactionEntity
+                .find {
+                    BlockchainTransactionTable.chainId.eq(chainId) and
+                        BlockchainTransactionTable.status.inList(
+                            listOf(
+                                BlockchainTransactionStatus.Pending,
+                                BlockchainTransactionStatus.Submitted,
+                                BlockchainTransactionStatus.Confirmed,
+                            ),
+                        )
+                }
                 .orderBy(BlockchainTransactionTable.sequenceId to SortOrder.ASC)
+                .forUpdate()
                 .toList()
         }
     }
