@@ -1,5 +1,5 @@
 import { getAccount, signTypedData } from '@wagmi/core'
-import {chain, wagmiConfig} from 'wagmiConfig'
+import { chain, wagmiConfig } from 'wagmiConfig'
 
 export type LoadAuthTokenOptions = {
   forceRefresh: boolean

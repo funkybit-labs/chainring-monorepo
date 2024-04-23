@@ -70,7 +70,7 @@ module "web" {
   source      = "../modules/web"
   name_prefix = local.name_prefix
   zone        = local.zone
-  providers   = {
+  providers = {
     aws.us_east_1 = aws.us_east_1
   }
   ci_role_arn     = data.terraform_remote_state.shared.outputs.ci_role_arn
