@@ -36,6 +36,15 @@ enum OHLCPeriod {
   P1D = 'P1D'
 }
 
+const periodDurations: Record<OHLCPeriod, number> = {
+  [OHLCPeriod.P1M]: 60 * 1000,
+  [OHLCPeriod.P5M]: 5 * 60 * 1000,
+  [OHLCPeriod.P15M]: 15 * 60 * 1000,
+  [OHLCPeriod.P1H]: 60 * 60 * 1000,
+  [OHLCPeriod.P4H]: 4 * 60 * 60 * 1000,
+  [OHLCPeriod.P1D]: 24 * 60 * 60 * 1000
+}
+
 type ViewPort = {
   earliestStart: Date | undefined
   latestStart: Date | undefined
@@ -106,12 +115,12 @@ export function PricesWidget({ marketId }: { marketId: string }) {
       if (message.type === 'Prices') {
         if (message.full) {
           console.log('replacing OHLC')
-          setOhlc(mergeOHLC([], message.ohlc))
+          setOhlc(mergeOHLC([], message.ohlc, periodDurations[period]))
         } else {
           console.log('updating OHLC')
           setOhlc(
             produce((draft) => {
-              mergeOHLC(draft, message.ohlc)
+              mergeOHLC(draft, message.ohlc, periodDurations[period])
             })
           )
         }
@@ -183,7 +192,10 @@ export function PricesWidget({ marketId }: { marketId: string }) {
           y={priceToY(params, Math.max(l.open, l.close))}
           height={
             (params.chartHeight *
-              Math.max(Math.abs(l.open - l.close), 0.0001)) /
+              Math.max(
+                Math.abs(l.open - l.close),
+                params.gridSpacing * 0.005
+              )) /
             params.tickRange
           }
           fill={l.close < l.open ? '#7F1D1D' : '#10A327'}

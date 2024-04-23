@@ -44,19 +44,28 @@ describe('PricesUtils', () => {
 
   it('should work as a no-op', () => {
     expect(
-      mergeOHLC([ohlc(1000, 1000, 2, 4, 1, 3)], [ohlc(1000, 1000, 2, 4, 1, 3)])
+      mergeOHLC(
+        [ohlc(1000, 1000, 2, 4, 1, 3)],
+        [ohlc(1000, 1000, 2, 4, 1, 3)],
+        1000
+      )
     ).toStrictEqual([ohlc(1000, 1000, 2, 4, 1, 3)])
   })
   it('should replace ohlc matched by start', () => {
     expect(
-      mergeOHLC([ohlc(1000, 1000, 2, 4, 1, 3)], [ohlc(1000, 1000, 2, 5, 1, 5)])
+      mergeOHLC(
+        [ohlc(1000, 1000, 2, 4, 1, 3)],
+        [ohlc(1000, 1000, 2, 5, 1, 5)],
+        1000
+      )
     ).toStrictEqual([ohlc(1000, 1000, 2, 5, 1, 5)])
   })
   it('should replace and add ohlc matched by start', () => {
     expect(
       mergeOHLC(
         [ohlc(2000, 1000, 2, 4, 1, 3), ohlc(3000, 1000, 2, 4, 1, 3)],
-        [ohlc(3000, 1000, 2, 5, 1, 5), ohlc(4000, 1000, 3, 3, 3, 3)]
+        [ohlc(3000, 1000, 2, 5, 1, 5), ohlc(4000, 1000, 3, 3, 3, 3)],
+        1000
       )
     ).toStrictEqual([
       ohlc(2000, 1000, 2, 4, 1, 3),
@@ -64,15 +73,19 @@ describe('PricesUtils', () => {
       ohlc(4000, 1000, 3, 3, 3, 3)
     ])
   })
-  /*it('should fill-in any gaps', () => {
+  it('should fill-in any gaps', () => {
     expect(
       mergeOHLC(
-        [ohlc(1000, 500, 2, 4, 1, 3), ohlc(2500, 500, 3, 5, 0, 4)],
-        1000
+        [ohlc(1000, 500, 2, 4, 1, 3), ohlc(1500, 500, 3, 5, 0, 4)],
+        [ohlc(3000, 500, 2, 5, 1, 5)],
+        500
       )
     ).toStrictEqual([
-      ohlc(1000, 1000, 2, 4, 1, 3),
-      ohlc(2000, 1000, 3, 5, 0, 4)
+      ohlc(1000, 500, 2, 4, 1, 3),
+      ohlc(1500, 500, 3, 5, 0, 4),
+      ohlc(2000, 500, 4, 4, 4, 4),
+      ohlc(2500, 500, 4, 4, 4, 4),
+      ohlc(3000, 500, 2, 5, 1, 5)
     ])
-  })*/
+  })
 })
