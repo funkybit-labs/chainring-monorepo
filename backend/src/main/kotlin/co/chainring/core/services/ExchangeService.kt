@@ -409,12 +409,7 @@ class ExchangeService(
         queueBlockchainExchangeTransactions(tradeEntities.map { it.toEip712Transaction() })
 
         val ohlcNotifications = tradeEntities.map { trade ->
-            OHLCEntity.updateWith(
-                market = trade.marketGuid.value,
-                tradeTimestamp = trade.timestamp,
-                tradeAmount = trade.amount,
-                tradePrice = trade.price,
-            ).map {
+            OHLCEntity.updateWith(trade).map {
                 BroadcasterNotification.pricesForMarketPeriods(
                     trade.marketGuid.value,
                     it.duration,

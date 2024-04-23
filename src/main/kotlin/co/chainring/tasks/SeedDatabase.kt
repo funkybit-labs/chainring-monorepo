@@ -14,6 +14,7 @@ import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.SymbolId
 import co.chainring.tasks.fixtures.Fixtures
 import java.math.BigInteger
+import kotlin.time.Duration.Companion.hours
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.TransactionManager
@@ -69,22 +70,10 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
 
                 OHLCEntity.updateWith(
                     market = marketEntity.guid.value,
-                    tradeTimestamp = Clock.System.now(),
+                    tradeTimestamp = Clock.System.now() - 1.hours,
                     tradePrice = marketPrice,
                     tradeAmount = BigInteger("0"),
-                ).map {
-                    BroadcasterNotification.pricesForMarketPeriods(
-                        MarketId("${baseSymbol}/${quoteSymbol}"),
-                        it.duration,
-                        listOf(it),
-                        full = false,
-                    )
-                }.let {
-                    TransactionManager.current().notifyDbListener(
-                        "broadcaster_ctl",
-                        BroadcasterJobEntity.create(it).value,
-                    )
-                }
+                )
             }
         }
     }

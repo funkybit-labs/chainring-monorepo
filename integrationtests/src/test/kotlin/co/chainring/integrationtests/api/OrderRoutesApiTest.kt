@@ -587,13 +587,9 @@ class OrderRoutesApiTest {
             assertEquals(
                 OHLC(
                     start = OHLCDuration.P5M.durationStart(trade.timestamp),
-                    // db seed value
-                    open = 17.525,
-                    // trade price
+                    open = 17.55,
                     high = 17.55,
-                    // db seed value
-                    low = 17.525,
-                    // trade price
+                    low = 17.55,
                     close = 17.55,
                     durationMs = 300000,
                 ),
@@ -604,13 +600,9 @@ class OrderRoutesApiTest {
             assertEquals(
                 OHLC(
                     start = OHLCDuration.P5M.durationStart(trade.timestamp),
-                    // db seed value
-                    open = 17.525,
-                    // trade price
+                    open = 17.55,
                     high = 17.55,
-                    // db seed value
-                    low = 17.525,
-                    // trade price
+                    low = 17.55,
                     close = 17.55,
                     durationMs = 300000,
                 ),
@@ -733,13 +725,9 @@ class OrderRoutesApiTest {
             assertEquals(
                 OHLC(
                     start = OHLCDuration.P5M.durationStart(trade.timestamp),
-                    // db seed value
-                    open = 17.525,
-                    // previous trade price
+                    open = 17.55,
                     high = 17.55,
-                    // this trade price
                     low = 17.5,
-                    // this trade price
                     close = 17.5,
                     durationMs = 300000,
                 ),
@@ -750,13 +738,9 @@ class OrderRoutesApiTest {
             assertEquals(
                 OHLC(
                     start = OHLCDuration.P5M.durationStart(trade.timestamp),
-                    // db seed value
-                    open = 17.525,
-                    // previous trade price
+                    open = 17.55,
                     high = 17.55,
-                    // this trade price
                     low = 17.5,
-                    // this trade price
                     close = 17.5,
                     durationMs = 300000,
                 ),

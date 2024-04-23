@@ -70,7 +70,7 @@ class Broadcaster(val db: Database) {
     private val lastPricePublish = mutableMapOf<Pair<MarketId, ConnectedClient>, Instant>()
     private val rnd = Random(0)
     private val orderBooksByMarket = ConcurrentHashMap<MarketId, OrderBook>()
-    private val pricesByMarket = ConcurrentHashMap<SubscriptionTopic.Prices, MutableList<OHLC>>()
+    private val pricesByMarketAndPeriod = ConcurrentHashMap<SubscriptionTopic.Prices, MutableList<OHLC>>()
 
     private val pgListener = PgListener(db, "broadcaster-listener", "broadcaster_ctl") { notification ->
         handleDbNotification(notification.parameter)
@@ -131,7 +131,7 @@ class Broadcaster(val db: Database) {
                     val startTime = Clock.System.now() - (p.durationMs() * 20 * 24 * 7).milliseconds
 
                     val ohlcEntities = OHLCEntity.findFrom(market, p, startTime = startTime)
-                    pricesByMarket[SubscriptionTopic.Prices(market, p)] = ohlcEntities.map { it.toWSResponse() }.toMutableList()
+                    pricesByMarketAndPeriod[SubscriptionTopic.Prices(market, p)] = ohlcEntities.map { it.toWSResponse() }.toMutableList()
                 }
             }
         }
@@ -184,13 +184,13 @@ class Broadcaster(val db: Database) {
             null -> Prices(
                 market = topic.marketId,
                 duration = topic.duration,
-                ohlc = pricesByMarket[topic] ?: listOf(),
+                ohlc = pricesByMarketAndPeriod[topic] ?: listOf(),
                 full = true,
             )
             else -> Prices(
                 market = topic.marketId,
                 duration = topic.duration,
-                ohlc = pricesByMarket[topic]?.takeLastWhile { (it.start + it.durationMs.milliseconds) > lastTimestamp } ?: listOf(),
+                ohlc = pricesByMarketAndPeriod[topic]?.takeLastWhile { (it.start + it.durationMs.milliseconds) > lastTimestamp } ?: listOf(),
                 full = false,
             )
         }
@@ -222,7 +222,7 @@ class Broadcaster(val db: Database) {
 
     private fun updatePrices(message: Prices) {
         val key = SubscriptionTopic.Prices(message.market, message.duration)
-        pricesByMarket[key]?.let { existingEntries ->
+        pricesByMarketAndPeriod[key]?.let { existingEntries ->
             message.ohlc.sortedBy { it.start }.forEach { incoming ->
                 val index = existingEntries.indexOfLast { it.start == incoming.start }
                 if (index != -1) {
