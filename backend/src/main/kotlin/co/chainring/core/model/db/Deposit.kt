@@ -11,6 +11,7 @@ import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.max
+import org.jetbrains.exposed.sql.vendors.ForUpdateOption
 import java.math.BigInteger
 
 @Serializable
@@ -89,13 +90,14 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
                 ?.let { it[DepositTable.blockNumber.max()]?.toBigInteger() }
         }
 
-        fun getPending(chainId: ChainId): List<DepositEntity> {
+        fun getPendingForUpdate(chainId: ChainId): List<DepositEntity> {
             return DepositTable
                 .join(SymbolTable, JoinType.INNER, SymbolTable.guid, DepositTable.symbolGuid)
                 .select(DepositTable.columns)
                 .where {
                     SymbolTable.chainId.eq(chainId) and DepositTable.status.inList(listOf(DepositStatus.Pending))
                 }
+                .forUpdate(ForUpdateOption.PostgreSQL.ForUpdate(mode = null, DepositTable))
                 .let { DepositEntity.wrapRows(it) }
                 .toList()
         }

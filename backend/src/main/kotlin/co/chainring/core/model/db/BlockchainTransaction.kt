@@ -1,6 +1,7 @@
 package co.chainring.core.model.db
 
 import co.chainring.apps.api.model.BigIntegerJson
+import co.chainring.core.model.Address
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
@@ -31,14 +32,14 @@ enum class BlockchainTransactionStatus {
 }
 
 @Serializable
+@JvmInline
+value class TxHash(val value: String)
+
+@Serializable
 data class BlockchainTransactionData(
     val data: String,
-    val to: String,
+    val to: Address,
     val value: BigIntegerJson = BigInteger.ZERO,
-    val nonce: BigIntegerJson? = null,
-    val txHash: String? = null,
-    val maxPriorityFeePerGas: BigIntegerJson? = null,
-    val gasLimit: BigIntegerJson? = null,
 )
 
 object BlockchainTransactionTable : GUIDTable<BlockchainTransactionId>("blockchain_transaction", ::BlockchainTransactionId) {
@@ -82,18 +83,20 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
             return entity
         }
 
-        fun getUncompleted(chainId: ChainId): List<BlockchainTransactionEntity> {
-            return BlockchainTransactionEntity.find {
-                BlockchainTransactionTable.chainId.eq(chainId) and
-                    BlockchainTransactionTable.status.inList(
-                        listOf(
-                            BlockchainTransactionStatus.Pending,
-                            BlockchainTransactionStatus.Submitted,
-                            BlockchainTransactionStatus.Confirmed,
-                        ),
-                    )
-            }
+        fun getUncompletedForUpdate(chainId: ChainId): List<BlockchainTransactionEntity> {
+            return BlockchainTransactionEntity
+                .find {
+                    BlockchainTransactionTable.chainId.eq(chainId) and
+                        BlockchainTransactionTable.status.inList(
+                            listOf(
+                                BlockchainTransactionStatus.Pending,
+                                BlockchainTransactionStatus.Submitted,
+                                BlockchainTransactionStatus.Confirmed,
+                            ),
+                        )
+                }
                 .orderBy(BlockchainTransactionTable.sequenceId to SortOrder.ASC)
+                .forUpdate()
                 .toList()
         }
     }
@@ -104,9 +107,8 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
         this.updatedBy = "system"
     }
 
-    fun markAsSubmitted(transactionData: BlockchainTransactionData) {
-        this.txHash = transactionData.txHash
-        this.transactionData = transactionData
+    fun markAsSubmitted(txHash: TxHash) {
+        this.txHash = txHash
         this.status = BlockchainTransactionStatus.Submitted
         this.updatedAt = Clock.System.now()
         this.updatedBy = "system"
@@ -142,7 +144,10 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
     var status by BlockchainTransactionTable.status
     var error by BlockchainTransactionTable.error
     var sequenceId by BlockchainTransactionTable.sequenceId
-    var txHash by BlockchainTransactionTable.txHash
+    var txHash by BlockchainTransactionTable.txHash.transform(
+        toReal = { it?.let(::TxHash) },
+        toColumn = { it?.value },
+    )
     var transactionData by BlockchainTransactionTable.transactionData
     var blockNumber by BlockchainTransactionTable.blockNumber.transform(
         toReal = { it?.toBigInteger() },

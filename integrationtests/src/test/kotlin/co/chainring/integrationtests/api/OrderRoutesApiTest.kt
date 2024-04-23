@@ -565,8 +565,7 @@ class OrderRoutesApiTest {
                         OrderBookEntry(price = "17.500", size = "0.00012345".toBigDecimal()),
                     ),
                     sell = listOf(
-                        // TODO: amount should be reduced since MM order was partially filled
-                        OrderBookEntry(price = "17.550", size = "0.00054321".toBigDecimal()),
+                        OrderBookEntry(price = "17.550", size = "0.00011111".toBigDecimal()),
                     ),
                     last = LastTrade("17.550", LastTradeDirection.Up),
                 ),
@@ -679,7 +678,7 @@ class OrderRoutesApiTest {
                     marketId = btcEthMarketId,
                     buy = emptyList(),
                     sell = listOf(
-                        OrderBookEntry(price = "17.550", size = "0.00054321".toBigDecimal()),
+                        OrderBookEntry(price = "17.550", size = "0.00011111".toBigDecimal()),
                     ),
                     last = LastTrade("17.500", LastTradeDirection.Down),
                 ),
@@ -726,7 +725,7 @@ class OrderRoutesApiTest {
                     marketId = btcEthMarketId,
                     buy = emptyList(),
                     sell = listOf(
-                        OrderBookEntry(price = "17.550", size = "0.00054321".toBigDecimal()),
+                        OrderBookEntry(price = "17.550", size = "0.00011111".toBigDecimal()),
                     ),
                     last = LastTrade("17.500", LastTradeDirection.Down),
                 ),

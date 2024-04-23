@@ -60,6 +60,7 @@ import co.chainring.sequencer.core.toBigInteger
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.SequencerError
 import co.chainring.sequencer.proto.SequencerResponse
+import co.chainring.sequencer.proto.newQuantityOrNull
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
@@ -366,11 +367,14 @@ class ExchangeService(
         }
 
         // update all orders that have changed
-        response.ordersChangedList.forEach {
-            if (ordersBeingUpdated.contains(it.guid.sequencerOrderId()) || it.disposition != OrderDisposition.Accepted) {
-                logger.debug { "order updated for ${it.guid}, disposition ${it.disposition}" }
-                OrderEntity.findBySequencerOrderId(it.guid)?.let { orderToUpdate ->
-                    orderToUpdate.updateStatus(OrderStatus.fromOrderDisposition(it.disposition))
+        response.ordersChangedList.forEach { orderChanged ->
+            if (ordersBeingUpdated.contains(orderChanged.guid.sequencerOrderId()) || orderChanged.disposition != OrderDisposition.Accepted) {
+                logger.debug { "order updated for ${orderChanged.guid}, disposition ${orderChanged.disposition}" }
+                OrderEntity.findBySequencerOrderId(orderChanged.guid)?.let { orderToUpdate ->
+                    orderToUpdate.updateStatus(OrderStatus.fromOrderDisposition(orderChanged.disposition))
+                    orderChanged.newQuantityOrNull?.also { newQuantity ->
+                        orderToUpdate.amount = newQuantity.toBigInteger()
+                    }
                     broadcasterNotifications.add(orderToUpdate.wallet.address, OrderUpdated(orderToUpdate.toOrderResponse()))
                 }
             }

@@ -2,17 +2,19 @@ package co.chainring.core.blockchain
 
 import co.chainring.contracts.generated.Exchange
 import co.chainring.core.evm.EIP712Transaction
+import co.chainring.core.model.Address
 import co.chainring.core.model.db.BlockchainNonceEntity
 import co.chainring.core.model.db.BlockchainTransactionData
 import co.chainring.core.model.db.BlockchainTransactionEntity
 import co.chainring.core.model.db.BlockchainTransactionStatus
 import co.chainring.core.model.db.ExchangeTransactionEntity
+import co.chainring.core.model.db.TxHash
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.utils.Numeric
 import java.math.BigInteger
 import kotlin.concurrent.thread
+import org.jetbrains.exposed.sql.transactions.transaction as dbTransaction
 
 interface TxConfirmationHandler {
     fun onTxConfirmation(tx: EIP712Transaction, error: String?)
@@ -35,18 +37,21 @@ class BlockchainTransactionHandler(
         workerThread = thread(start = true, name = "batch-transaction-handler", isDaemon = true) {
             try {
                 logger.debug { "Batch Transaction handler thread starting" }
-                transaction {
+                dbTransaction {
                     BlockchainNonceEntity.clearNonce(blockchainClient.submitterAddress, chainId)
                 }
 
                 while (true) {
                     Thread.sleep(pollingIntervalInMs)
-                    processUncompletedTransactions()
-                    createNextBatch(exchange)
-                        ?.also(::submitToBlockchain)
+
+                    dbTransaction {
+                        processUncompletedTransactions()
+                        createNextPendingTransaction(exchange)
+                            ?.also(::submitToBlockchain)
+                    }
                 }
             } catch (ie: InterruptedException) {
-                logger.warn { "exiting blockchain handler" }
+                logger.warn { "Exiting blockchain handler" }
                 return@thread
             } catch (e: Exception) {
                 logger.error(e) { "Unhandled exception submitting tx" }
@@ -62,9 +67,7 @@ class BlockchainTransactionHandler(
     }
 
     private fun processUncompletedTransactions() {
-        val uncompletedTransactions = transaction {
-            BlockchainTransactionEntity.getUncompleted(chainId)
-        }
+        val uncompletedTransactions = BlockchainTransactionEntity.getUncompletedForUpdate(chainId)
 
         if (uncompletedTransactions.isNotEmpty()) {
             val currentBlock = blockchainClient.getBlockNumber()
@@ -77,13 +80,13 @@ class BlockchainTransactionHandler(
             // Send any pending batches not submitted yet
             uncompletedTransactions
                 .filter { it.status == BlockchainTransactionStatus.Pending }
-                .forEach { tx -> submitToBlockchain(tx) }
+                .forEach(::submitToBlockchain)
         }
     }
 
     private fun refreshSubmittedTransaction(tx: BlockchainTransactionEntity, currentBlock: BigInteger) {
-        val txHash = tx.transactionData.txHash ?: return
-        val receipt = blockchainClient.getTransactionReceipt(txHash) ?: return
+        val txHash = tx.txHash ?: return
+        val receipt = blockchainClient.getTransactionReceipt(txHash.value) ?: return
 
         logger.debug { "receipt is $receipt" }
 
@@ -93,22 +96,16 @@ class BlockchainTransactionHandler(
             "0x1" -> {
                 val confirmationsReceived = confirmations(currentBlock, receiptBlockNumber)
                 if (tx.blockNumber == null) {
-                    transaction {
-                        tx.markAsSeen(blockNumber = receiptBlockNumber)
-                    }
+                    tx.markAsSeen(blockNumber = receiptBlockNumber)
                 }
                 if (confirmationsReceived >= numConfirmations) {
-                    transaction {
-                        tx.markAsConfirmed(gasAccountFee(receipt), receipt.gasUsed)
-                    }
+                    tx.markAsConfirmed(gasAccountFee(receipt), receipt.gasUsed)
 
                     // invoke callbacks for transactions in this confirmed batch
                     invokeTxCallbacks(tx, txConfirmationHandler)
 
                     // mark batch as complete
-                    transaction {
-                        tx.markAsCompleted()
-                    }
+                    tx.markAsCompleted()
                 }
             }
 
@@ -125,36 +122,30 @@ class BlockchainTransactionHandler(
 
                 invokeTxCallbacks(tx, txConfirmationHandler, error)
 
-                transaction {
-                    val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
-                    submitterNonce.nonce = null
-                    tx.markAsFailed(error, gasAccountFee(receipt), receipt.gasUsed)
-                }
+                val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
+                submitterNonce.nonce = null
+                tx.markAsFailed(error, gasAccountFee(receipt), receipt.gasUsed)
             }
         }
     }
 
     private fun submitToBlockchain(tx: BlockchainTransactionEntity) {
         try {
-            transaction {
-                val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
-                val nonce = submitterNonce.nonce?.let { it + BigInteger.ONE } ?: getConsistentNonce(submitterNonce.key)
-                val transactionData = sendPendingTransaction(tx.transactionData, nonce)
-                submitterNonce.nonce = transactionData.nonce!!
-                tx.markAsSubmitted(transactionData)
-            }
+            val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
+            val nonce = submitterNonce.nonce?.let { it + BigInteger.ONE } ?: getConsistentNonce(submitterNonce.key)
+            val txHash = sendPendingTransaction(tx.transactionData, nonce)
+            submitterNonce.nonce = nonce
+            tx.markAsSubmitted(txHash)
         } catch (ce: BlockchainClientException) {
             logger.error(ce) { "Failed with client exception, ${ce.message}" }
             invokeTxCallbacks(tx, txConfirmationHandler, ce.message ?: "Unknown error")
-            transaction {
-                tx.markAsFailed(ce.message ?: "Unknown error")
-            }
+            tx.markAsFailed(ce.message ?: "Unknown error")
         } catch (se: BlockchainServerException) {
             logger.warn(se) { "Failed to send, will retry, ${se.message}" }
         }
     }
 
-    private fun sendPendingTransaction(transactionData: BlockchainTransactionData, nonce: BigInteger): BlockchainTransactionData {
+    private fun sendPendingTransaction(transactionData: BlockchainTransactionData, nonce: BigInteger): TxHash {
         val txManager = blockchainClient.getTxManager(nonce)
         val gasProvider = blockchainClient.gasProvider
 
@@ -164,7 +155,7 @@ class BlockchainTransactionHandler(
                 gasProvider.getMaxPriorityFeePerGas(""),
                 gasProvider.getMaxFeePerGas(""),
                 gasProvider.gasLimit,
-                transactionData.to,
+                transactionData.to.value,
                 transactionData.data,
                 transactionData.value,
             )
@@ -180,7 +171,7 @@ class BlockchainTransactionHandler(
                 ?.let { BlockchainClientException(error.message) }
                 ?: BlockchainServerException("Unknown error")
         } else {
-            return transactionData.copy(nonce = nonce, txHash = txHash)
+            return TxHash(txHash)
         }
     }
 
@@ -189,15 +180,15 @@ class BlockchainTransactionHandler(
     }
 
     private fun invokeTxCallbacks(tx: BlockchainTransactionEntity, txConfirmationHandler: TxConfirmationHandler, error: String? = null) {
-        transaction {
-            ExchangeTransactionEntity.findExchangeTransactionsForBlockchainTransaction(tx.guid.value)
-        }.forEach { exchangeTx ->
-            try {
-                txConfirmationHandler.onTxConfirmation(exchangeTx.transactionData, error)
-            } catch (e: Exception) {
-                logger.error(e) { "Callback exception for $tx" }
+        ExchangeTransactionEntity
+            .findExchangeTransactionsForBlockchainTransaction(tx.guid.value)
+            .forEach { exchangeTx ->
+                try {
+                    txConfirmationHandler.onTxConfirmation(exchangeTx.transactionData, error)
+                } catch (e: Exception) {
+                    logger.error(e) { "Callback exception for transaction ${tx.guid.value}" }
+                }
             }
-        }
     }
 
     private fun gasAccountFee(receipt: TransactionReceipt): BigInteger? {
@@ -222,23 +213,22 @@ class BlockchainTransactionHandler(
         return candidateNonce!!
     }
 
-    private fun createNextBatch(exchange: Exchange): BlockchainTransactionEntity? {
-        return transaction {
-            val unassignedTxs = ExchangeTransactionEntity.findUnassignedExchangeTransactions(blockchainClient.chainId, 50)
-            if (unassignedTxs.isNotEmpty()) {
-                BlockchainTransactionEntity.create(
-                    chainId = chainId,
-                    transactionData = BlockchainTransactionData(
-                        data = exchange.submitTransactions(unassignedTxs.map { it.transactionData.getTxData() })
-                            .encodeFunctionCall(),
-                        to = exchange.contractAddress,
-                        value = BigInteger.ZERO,
-                    ),
-                    transactions = unassignedTxs,
-                )
-            } else {
-                null
-            }
+    private fun createNextPendingTransaction(exchange: Exchange): BlockchainTransactionEntity? {
+        val unassignedTxs = ExchangeTransactionEntity.findUnassignedExchangeTransactions(blockchainClient.chainId, 50)
+        return if (unassignedTxs.isNotEmpty()) {
+            BlockchainTransactionEntity.create(
+                chainId = chainId,
+                transactionData = BlockchainTransactionData(
+                    data = exchange
+                        .submitTransactions(unassignedTxs.map { it.transactionData.getTxData() })
+                        .encodeFunctionCall(),
+                    to = Address(exchange.contractAddress),
+                    value = BigInteger.ZERO,
+                ),
+                transactions = unassignedTxs,
+            )
+        } else {
+            null
         }
     }
 }
