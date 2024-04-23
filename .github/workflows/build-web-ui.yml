@@ -30,4 +30,4 @@ jobs:
       #        run: pnpm run test --run
       - name: build
         working-directory: ./web-ui
-        run: pnpm run build --mode staging
+        run: pnpm run build --mode test

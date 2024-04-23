@@ -49,7 +49,7 @@ jobs:
         run: pnpm run typecheck
       - name: build
         working-directory: ./web-ui
-        run: pnpm run build --mode staging
+        run: pnpm run build --mode ${{ inputs.environment }}
       - name: Setup AWS
         uses: ./.github/actions/setup-aws
       - name: Deploy to ${{ inputs.environment }} environment
