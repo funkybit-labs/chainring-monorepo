@@ -15,17 +15,8 @@ concurrency:
   cancel-in-progress: ${{ github.ref_name != 'main' }}
 
 jobs:
-  build_push_backend:
-    name: Build Backend and push to ECR
-    permissions:
-      id-token: write # needed for aws credentials
-      contents: write
-      checks: write # for writing test reports
-    uses: ./.github/workflows/build-push-backend.yml
-
   deploy_backend:
     name: Deploy Backend
-    needs: [ build_push_backend ]
     permissions:
       id-token: write # needed for aws credentials
       contents: read
@@ -33,11 +24,11 @@ jobs:
     with:
       action: upgrade
       environment: testnet
-      tag: ${{ needs.build_push_backend.outputs.docker_image_tag }}
+      tag: ${{ inputs.tag }}
 
   deploy_web_ui:
     name: Deploy Web UI
-    needs: [ build_push_backend, deploy_backend ]
+    needs: [ deploy_backend ]
     permissions:
       id-token: write # needed for aws credentials
       contents: read
