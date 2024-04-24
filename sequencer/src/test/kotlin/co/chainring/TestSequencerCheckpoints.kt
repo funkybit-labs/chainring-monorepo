@@ -4,14 +4,21 @@ import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.Asset
+import co.chainring.sequencer.core.LevelOrder
 import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
+import co.chainring.sequencer.core.OrderGuid
 import co.chainring.sequencer.core.SequencerState
+import co.chainring.sequencer.core.WalletAddress
 import co.chainring.sequencer.core.queueHome
+import co.chainring.sequencer.core.toBigDecimal
+import co.chainring.sequencer.core.toBigInteger
 import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
+import co.chainring.sequencer.core.toMarketId
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.GatewayGrpcKt
+import co.chainring.sequencer.proto.MarketCheckpoint
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.SequencerResponse
@@ -32,6 +39,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.io.FileInputStream
 import java.lang.System.getenv
 import java.math.BigDecimal
 import java.nio.file.Files
@@ -650,6 +658,8 @@ class TestSequencerCheckpoints {
         val checkpointPath = Path.of(checkpointsPath.toString(), "1")
         initialState.persist(checkpointPath)
 
+        verifySerializedOrdersContent(initialState, checkpointPath)
+
         val restoredState = SequencerState().apply { load(checkpointPath) }
 
         initialState.markets.values.forEach { initialStateMarket ->
@@ -673,5 +683,49 @@ class TestSequencerCheckpoints {
         }
 
         assertEquals(initialState, restoredState)
+    }
+
+    private fun verifySerializedOrdersContent(initialState: SequencerState, checkpointPath: Path) {
+        val marketIds = FileInputStream(Path.of(checkpointPath.toString(), "markets").toFile()).use { inputStream ->
+            String(inputStream.readAllBytes()).let {
+                if (it.isEmpty()) {
+                    emptyList()
+                } else {
+                    it.split(",").map(::MarketId)
+                }
+            }
+        }
+        assertEquals(initialState.markets.keys, marketIds.toSet())
+
+        marketIds.forEach { marketId ->
+            val marketCheckpointFileName = "market_${marketId.baseAsset()}_${marketId.quoteAsset()}"
+            FileInputStream(Path.of(checkpointPath.toString(), marketCheckpointFileName).toFile()).use { inputStream ->
+                val marketCheckpoint = MarketCheckpoint.parseFrom(inputStream)
+
+                initialState.markets[marketId]!!.let { initialMarket ->
+                    assertEquals(initialMarket.id, marketCheckpoint.id.toMarketId())
+                    assertEquals(initialMarket.tickSize, marketCheckpoint.tickSize.toBigDecimal())
+                    assertEquals(initialMarket.marketPrice, marketCheckpoint.marketPrice.toBigDecimal())
+                    assertEquals(initialMarket.maxLevels, marketCheckpoint.maxLevels)
+                    assertEquals(initialMarket.maxOrdersPerLevel, marketCheckpoint.maxOrdersPerLevel)
+                    assertEquals(initialMarket.baseDecimals, marketCheckpoint.baseDecimals)
+                    assertEquals(initialMarket.quoteDecimals, marketCheckpoint.quoteDecimals)
+
+                    // verify checkpoint contains exact number of orders
+                    assertEquals(
+                        initialMarket.ordersByGuid.map { (_, v) -> v }.toSet(),
+                        marketCheckpoint.levelsList.flatMap { it.ordersList }.map {
+                            LevelOrder(
+                                OrderGuid(it.guid),
+                                WalletAddress(it.wallet),
+                                it.quantity.toBigInteger(),
+                                it.levelIx,
+                                it.originalQuantity.toBigInteger(),
+                            )
+                        }.toSet(),
+                    )
+                }
+            }
+        }
     }
 }

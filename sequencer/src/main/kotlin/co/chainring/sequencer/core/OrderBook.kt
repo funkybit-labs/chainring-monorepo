@@ -78,7 +78,8 @@ class OrderBookLevel(val levelIx: Int, val side: BookSide, val price: BigDecimal
             this.totalQuantity = this@OrderBookLevel.totalQuantity.toIntegerValue()
             this.orderHead = this@OrderBookLevel.orderHead
             this.orderTail = this@OrderBookLevel.orderTail
-            (this@OrderBookLevel.orderHead..this@OrderBookLevel.orderTail).forEach { i ->
+            // tail points to the next free slot. When level is empty (0..-1) range results in no action.
+            (this@OrderBookLevel.orderHead..this@OrderBookLevel.orderTail - 1).forEach { i ->
                 val order = this@OrderBookLevel.orders[i]
                 this.orders.add(order.toCheckpoint())
             }
