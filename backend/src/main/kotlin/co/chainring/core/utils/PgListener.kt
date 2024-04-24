@@ -11,6 +11,7 @@ class PgListener(
     private val database: Database,
     private val threadName: String,
     private val channel: String,
+    onReconnect: () -> Unit,
     onNotifyLogic: (PGNotification) -> Unit,
 ) {
     private var reconnectDebounceMs = 1000L
@@ -55,6 +56,7 @@ class PgListener(
             } catch (t: Throwable) {
                 logger.error(t) { "Caught an exception" }
                 Thread.sleep(reconnectDebounceMs)
+                onReconnect()
             }
         }
     }

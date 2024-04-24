@@ -1,5 +1,5 @@
 import { apiClient, Order, Trade, UpdateOrderRequest } from 'apiClient'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import { TrashIcon } from '@heroicons/react/24/outline'
 import { formatUnits, parseUnits } from 'viem'
@@ -30,7 +30,7 @@ export default function OrdersAndTradesWidget({
 
   useWebsocketSubscription({
     topics: useMemo(() => [ordersTopic, tradesTopic], []),
-    handler: (message: Publishable) => {
+    handler: useCallback((message: Publishable) => {
       if (message.type === 'Orders') {
         setOrders(message.orders)
       } else if (message.type === 'OrderCreated') {
@@ -69,7 +69,7 @@ export default function OrdersAndTradesWidget({
           })
         )
       }
-    }
+    }, [])
   })
 
   function cancelOrder(id: string) {

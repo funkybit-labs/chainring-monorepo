@@ -77,7 +77,7 @@ class OHLCDurationTest : TestWithDb() {
                         high = tradePrice.toDouble(),
                         low = tradePrice.toDouble(),
                         close = tradePrice.toDouble(),
-                        durationMs = it.durationMs(),
+                        duration = it,
                     )
                 }.toSet(),
                 actual = OHLCEntity.all().toSet().map { it.toWSResponse() }.toSet(),
@@ -99,7 +99,7 @@ class OHLCDurationTest : TestWithDb() {
                         high = higherTradePrice.toDouble(),
                         low = tradePrice.toDouble(),
                         close = higherTradePrice.toDouble(),
-                        durationMs = it.durationMs(),
+                        duration = it,
                     )
                 }.toSet(),
                 actual = OHLCEntity.all().map { it.toWSResponse() }.toSet(),
@@ -124,7 +124,7 @@ class OHLCDurationTest : TestWithDb() {
                         high = higherTradePrice.toDouble(),
                         low = lowerTradePrice.toDouble(),
                         close = lowerTradePrice.toDouble(),
-                        durationMs = it.durationMs(),
+                        duration = it,
                     )
                 }.toSet(),
                 actual = OHLCEntity.all().map { it.toWSResponse() }.toSet(),
@@ -150,7 +150,7 @@ class OHLCDurationTest : TestWithDb() {
                                 high = higherTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),
                                 close = lowerTradePrice.toDouble(),
-                                durationMs = it.durationMs(),
+                                duration = it,
                             ),
                             OHLC(
                                 start = it.durationStart(nextMinute),
@@ -158,7 +158,7 @@ class OHLCDurationTest : TestWithDb() {
                                 high = lowerTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),
                                 close = lowerTradePrice.toDouble(),
-                                durationMs = it.durationMs(),
+                                duration = it,
                             ),
                         )
 
@@ -169,7 +169,7 @@ class OHLCDurationTest : TestWithDb() {
                                 high = higherTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),
                                 close = lowerTradePrice.toDouble(),
-                                durationMs = it.durationMs(),
+                                duration = it,
                             ),
                         )
                     }
@@ -194,7 +194,7 @@ class OHLCDurationTest : TestWithDb() {
                                 high = higherTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),
                                 close = lowerTradePrice.toDouble(),
-                                durationMs = it.durationMs(),
+                                duration = it,
                             ),
                             OHLC(
                                 start = it.durationStart(nextMinute),
@@ -202,7 +202,7 @@ class OHLCDurationTest : TestWithDb() {
                                 high = lowerTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),
                                 close = lowerTradePrice.toDouble(),
-                                durationMs = it.durationMs(),
+                                duration = it,
                             ),
                             OHLC(
                                 start = it.durationStart(nextFiveMinutes),
@@ -210,7 +210,7 @@ class OHLCDurationTest : TestWithDb() {
                                 high = higherTradePrice.toDouble(),
                                 low = higherTradePrice.toDouble(),
                                 close = higherTradePrice.toDouble(),
-                                durationMs = it.durationMs(),
+                                duration = it,
                             ),
                         )
 
@@ -221,7 +221,7 @@ class OHLCDurationTest : TestWithDb() {
                                 high = higherTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),
                                 close = lowerTradePrice.toDouble(),
-                                durationMs = it.durationMs(),
+                                duration = it,
                             ),
                             OHLC(
                                 start = it.durationStart(nextFiveMinutes),
@@ -229,7 +229,7 @@ class OHLCDurationTest : TestWithDb() {
                                 high = higherTradePrice.toDouble(),
                                 low = higherTradePrice.toDouble(),
                                 close = higherTradePrice.toDouble(),
-                                durationMs = it.durationMs(),
+                                duration = it,
                             ),
                         )
 
@@ -240,7 +240,7 @@ class OHLCDurationTest : TestWithDb() {
                                 high = higherTradePrice.toDouble(),
                                 low = lowerTradePrice.toDouble(),
                                 close = higherTradePrice.toDouble(),
-                                durationMs = it.durationMs(),
+                                duration = it,
                             ),
                         )
                     }

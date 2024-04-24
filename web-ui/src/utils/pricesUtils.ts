@@ -1,12 +1,21 @@
-import { OHLC } from 'websocketMessages'
+import { OHLC, OHLCDuration } from 'websocketMessages'
+
+export const olhcDurationsMs: Record<OHLCDuration, number> = {
+  ['P1M']: 60 * 1000,
+  ['P5M']: 5 * 60 * 1000,
+  ['P15M']: 15 * 60 * 1000,
+  ['P1H']: 60 * 60 * 1000,
+  ['P4H']: 4 * 60 * 60 * 1000,
+  ['P1D']: 24 * 60 * 60 * 1000
+}
 
 export function mergeOHLC(
   draft: OHLC[],
   incoming: OHLC[],
-  duration: number
+  duration: OHLCDuration
 ): OHLC[] {
   // update completes of last item before merge
-  updateLastItemCompleteness(draft)
+  updateLastItemCompleteness(draft, olhcDurationsMs[duration])
 
   // merge new data
   incoming.forEach((newItem) => {
@@ -16,7 +25,7 @@ export function mergeOHLC(
     )
     if (index == -1) {
       // fill gaps before pushing new ohlc
-      fillGaps(draft, newItem, duration)
+      fillGaps(draft, newItem, olhcDurationsMs[duration])
 
       draft.push(newItem)
     } else {
@@ -24,15 +33,15 @@ export function mergeOHLC(
     }
   })
   // update completes of last item after merge
-  updateLastItemCompleteness(draft)
+  updateLastItemCompleteness(draft, olhcDurationsMs[duration])
   return draft
 }
 
-function updateLastItemCompleteness(ohlc: OHLC[]): OHLC[] {
+function updateLastItemCompleteness(ohlc: OHLC[], duration: number): OHLC[] {
   if (ohlc.length > 0) {
     const mostRecentItem = ohlc[ohlc.length - 1]
-    ohlc[ohlc.length - 1].incomplete =
-      mostRecentItem.start.getTime() + mostRecentItem.durationMs > Date.now()
+    mostRecentItem.incomplete =
+      mostRecentItem.start.getTime() + duration > Date.now()
   }
   return ohlc
 }
@@ -47,7 +56,7 @@ function fillGaps(draft: OHLC[], newItem: OHLC, duration: number) {
 
     draft.push({
       start: new Date(lastItem.start.getTime() + duration),
-      durationMs: lastItem.durationMs,
+      duration: lastItem.duration,
       open: lastItem.close,
       high: lastItem.close,
       low: lastItem.close,

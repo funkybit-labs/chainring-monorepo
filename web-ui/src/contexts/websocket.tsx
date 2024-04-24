@@ -172,8 +172,6 @@ export function useWebsocketSubscription({
   topics: SubscriptionTopic[]
   handler: SubscriptionEventHandler
 }) {
-  const handlerRef = useRef(handler)
-
   const context = useContext(WebsocketContext)
   if (!context) {
     throw Error(
@@ -183,11 +181,10 @@ export function useWebsocketSubscription({
   const { subscribe, unsubscribe } = context
 
   useEffect(() => {
-    const handler = handlerRef.current
     topics.forEach((t) => subscribe(t, handler))
 
     return () => {
       topics.forEach((t) => unsubscribe(t, handler))
     }
-  }, [topics, subscribe, unsubscribe])
+  }, [topics, subscribe, unsubscribe, handler])
 }

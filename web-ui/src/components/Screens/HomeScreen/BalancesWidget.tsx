@@ -1,6 +1,6 @@
 import { Address, formatUnits } from 'viem'
 import { Balance, TradingSymbol } from 'apiClient'
-import React, { Fragment, useMemo, useState } from 'react'
+import React, { Fragment, useCallback, useMemo, useState } from 'react'
 import DepositModal from 'components/Screens/HomeScreen/DepositModal'
 import WithdrawalModal from 'components/Screens/HomeScreen/WithdrawalModal'
 import { Widget } from 'components/common/Widget'
@@ -53,11 +53,11 @@ function BalancesTable({
   const [balances, setBalances] = useState<Balance[]>(() => [])
   useWebsocketSubscription({
     topics: useMemo(() => [balancesTopic], []),
-    handler: (message: Publishable) => {
+    handler: useCallback((message: Publishable) => {
       if (message.type === 'Balances') {
         setBalances(message.balances)
       }
-    }
+    }, [])
   })
 
   function openDepositModal(symbol: TradingSymbol) {

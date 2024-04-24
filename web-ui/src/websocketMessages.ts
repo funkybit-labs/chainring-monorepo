@@ -51,9 +51,19 @@ export const OrderBookSchema = z.object({
 })
 export type OrderBook = z.infer<typeof OrderBookSchema>
 
+export const OHLCDurationSchema = z.enum([
+  'P1M',
+  'P5M',
+  'P15M',
+  'P1H',
+  'P4H',
+  'P1D'
+])
+export type OHLCDuration = z.infer<typeof OHLCDurationSchema>
+
 const OHLCSchema = z.object({
   start: z.coerce.date(),
-  durationMs: z.number(),
+  duration: OHLCDurationSchema,
   open: z.number(),
   high: z.number(),
   low: z.number(),

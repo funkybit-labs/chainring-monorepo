@@ -37,11 +37,6 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.random.Random
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger {}
 
@@ -68,13 +63,20 @@ class Broadcaster(val db: Database) {
     private val subscriptions = TopicSubscriptions()
     private val subscriptionsByPrincipal = ConcurrentHashMap<Principal, TopicSubscriptions>()
     private val lastPricePublish = mutableMapOf<Pair<MarketId, ConnectedClient>, Instant>()
-    private val rnd = Random(0)
     private val orderBooksByMarket = ConcurrentHashMap<MarketId, OrderBook>()
     private val pricesByMarketAndPeriod = ConcurrentHashMap<SubscriptionTopic.Prices, MutableList<OHLC>>()
 
-    private val pgListener = PgListener(db, "broadcaster-listener", "broadcaster_ctl") { notification ->
-        handleDbNotification(notification.parameter)
-    }
+    private val pgListener = PgListener(
+        db,
+        threadName = "broadcaster-listener",
+        channel = "broadcaster_ctl",
+        onReconnect = {
+            reloadPrices()
+        },
+        onNotifyLogic = { notification ->
+            handleDbNotification(notification.parameter)
+        },
+    )
 
     fun subscribe(topic: SubscriptionTopic, client: ConnectedClient) {
         subscriptions.getOrPut(topic) {
@@ -119,19 +121,19 @@ class Broadcaster(val db: Database) {
 
     fun start() {
         pgListener.start()
-        initializePrices()
+        reloadPrices()
     }
 
-    private fun initializePrices() {
+    private fun reloadPrices() {
         transaction {
             // load historical prices once, later only updates will be delivered via notify
             MarketEntity.all().map { it.guid.value }.forEach { market ->
-                OHLCDuration.entries.forEach { p ->
+                OHLCDuration.entries.forEach { duration ->
                     // equivalent to 7 days of 5 minutes intervals
-                    val startTime = Clock.System.now() - (p.durationMs() * 20 * 24 * 7).milliseconds
+                    val startTime = Clock.System.now() - duration.interval() * 20 * 24 * 7
 
-                    val ohlcEntities = OHLCEntity.findFrom(market, p, startTime = startTime)
-                    pricesByMarketAndPeriod[SubscriptionTopic.Prices(market, p)] = ohlcEntities.map { it.toWSResponse() }.toMutableList()
+                    val ohlcEntities = OHLCEntity.findFrom(market, duration, startTime = startTime)
+                    pricesByMarketAndPeriod[SubscriptionTopic.Prices(market, duration)] = ohlcEntities.map { it.toWSResponse() }.toMutableList()
                 }
             }
         }
@@ -148,34 +150,6 @@ class Broadcaster(val db: Database) {
         ),
     )
 
-    private fun mockOHLC(
-        marketId: MarketId,
-        startTime: Instant,
-        duration: kotlin.time.Duration,
-        count: Long,
-        full: Boolean,
-    ): List<OHLC> {
-        fun priceAdjust(range: Double, direction: Int) =
-            1 + (rnd.nextDouble() * range) + when (direction) {
-                0 -> -(range / 2)
-                -1 -> -(2 * range)
-                else -> 0.0
-            }
-        return (0 until count).map { i ->
-            val curPrice = mockPrices[marketId]!!
-            val nextPrice = curPrice * priceAdjust(if (full) 0.001 else 0.0001, 0)
-            mockPrices[marketId] = nextPrice
-            OHLC(
-                start = startTime.plus((duration.inWholeSeconds * i).seconds),
-                open = curPrice,
-                high = max(curPrice, nextPrice) * priceAdjust(0.0001, 1),
-                low = min(curPrice, nextPrice) * priceAdjust(0.0001, -1),
-                close = nextPrice,
-                durationMs = duration.inWholeMilliseconds,
-            )
-        }
-    }
-
     private fun sendPrices(topic: SubscriptionTopic.Prices, client: ConnectedClient) {
         val key = Pair(topic.marketId, client)
         val now = Clock.System.now()
@@ -190,7 +164,7 @@ class Broadcaster(val db: Database) {
             else -> Prices(
                 market = topic.marketId,
                 duration = topic.duration,
-                ohlc = pricesByMarketAndPeriod[topic]?.takeLastWhile { (it.start + it.durationMs.milliseconds) > lastTimestamp } ?: listOf(),
+                ohlc = pricesByMarketAndPeriod[topic]?.takeLastWhile { it.start + it.duration.interval() > lastTimestamp } ?: listOf(),
                 full = false,
             )
         }

@@ -72,7 +72,7 @@ data class OHLC(
     val high: Double,
     val low: Double,
     val close: Double,
-    val durationMs: Long,
+    val duration: OHLCDuration,
 )
 
 @Serializable

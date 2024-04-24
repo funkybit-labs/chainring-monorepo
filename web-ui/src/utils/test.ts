@@ -1,5 +1,6 @@
 import { calculateTickSpacing } from 'utils/orderBookUtils'
 import { mergeOHLC } from 'utils/pricesUtils'
+import { OHLCDuration } from 'websocketMessages'
 
 describe('OrderBookUtils', () => {
   it('should work for different values', () => {
@@ -24,7 +25,7 @@ describe('OrderBookUtils', () => {
 describe('PricesUtils', () => {
   function ohlc(
     startMs: number,
-    durationMs: number,
+    duration: OHLCDuration,
     open: number,
     high: number,
     low: number,
@@ -37,7 +38,7 @@ describe('PricesUtils', () => {
       high,
       low,
       close,
-      durationMs,
+      duration,
       incomplete
     }
   }
@@ -45,47 +46,47 @@ describe('PricesUtils', () => {
   it('should work as a no-op', () => {
     expect(
       mergeOHLC(
-        [ohlc(1000, 1000, 2, 4, 1, 3)],
-        [ohlc(1000, 1000, 2, 4, 1, 3)],
-        1000
+        [ohlc(60000, 'P1M', 2, 4, 1, 3)],
+        [ohlc(12000, 'P1M', 2, 4, 1, 3)],
+        'P1M'
       )
-    ).toStrictEqual([ohlc(1000, 1000, 2, 4, 1, 3)])
+    ).toStrictEqual([ohlc(1000, 'P1M', 2, 4, 1, 3)])
   })
   it('should replace ohlc matched by start', () => {
     expect(
       mergeOHLC(
-        [ohlc(1000, 1000, 2, 4, 1, 3)],
-        [ohlc(1000, 1000, 2, 5, 1, 5)],
-        1000
+        [ohlc(60000, 'P1M', 2, 4, 1, 3)],
+        [ohlc(60000, 'P1M', 2, 5, 1, 5)],
+        'P1M'
       )
-    ).toStrictEqual([ohlc(1000, 1000, 2, 5, 1, 5)])
+    ).toStrictEqual([ohlc(60000, 'P1M', 2, 5, 1, 5)])
   })
   it('should replace and add ohlc matched by start', () => {
     expect(
       mergeOHLC(
-        [ohlc(2000, 1000, 2, 4, 1, 3), ohlc(3000, 1000, 2, 4, 1, 3)],
-        [ohlc(3000, 1000, 2, 5, 1, 5), ohlc(4000, 1000, 3, 3, 3, 3)],
-        1000
+        [ohlc(60000, 'P1M', 2, 4, 1, 3), ohlc(120000, 'P1M', 2, 4, 1, 3)],
+        [ohlc(120000, 'P1M', 2, 5, 1, 5), ohlc(180000, 'P1M', 3, 3, 3, 3)],
+        'P1M'
       )
     ).toStrictEqual([
-      ohlc(2000, 1000, 2, 4, 1, 3),
-      ohlc(3000, 1000, 2, 5, 1, 5),
-      ohlc(4000, 1000, 3, 3, 3, 3)
+      ohlc(60000, 'P1M', 2, 4, 1, 3),
+      ohlc(120000, 'P1M', 2, 5, 1, 5),
+      ohlc(180000, 'P1M', 3, 3, 3, 3)
     ])
   })
   it('should fill-in any gaps', () => {
     expect(
       mergeOHLC(
-        [ohlc(1000, 500, 2, 4, 1, 3), ohlc(1500, 500, 3, 5, 0, 4)],
-        [ohlc(3000, 500, 2, 5, 1, 5)],
-        500
+        [ohlc(60000, 'P1M', 2, 4, 1, 3), ohlc(120000, 'P1M', 3, 5, 0, 4)],
+        [ohlc(300000, 'P1M', 2, 5, 1, 5)],
+        'P1M'
       )
     ).toStrictEqual([
-      ohlc(1000, 500, 2, 4, 1, 3),
-      ohlc(1500, 500, 3, 5, 0, 4),
-      ohlc(2000, 500, 4, 4, 4, 4),
-      ohlc(2500, 500, 4, 4, 4, 4),
-      ohlc(3000, 500, 2, 5, 1, 5)
+      ohlc(60000, 'P1M', 2, 4, 1, 3),
+      ohlc(120000, 'P1M', 3, 5, 0, 4),
+      ohlc(180000, 'P1M', 4, 4, 4, 4),
+      ohlc(240000, 'P1M', 4, 4, 4, 4),
+      ohlc(300000, 'P1M', 2, 5, 1, 5)
     ])
   })
 })

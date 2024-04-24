@@ -1,6 +1,6 @@
 import { Widget } from 'components/common/Widget'
 import { calculateTickSpacing } from 'utils/orderBookUtils'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
 import { OrderBook, Publishable, orderBookTopic } from 'websocketMessages'
 import { useWebsocketSubscription } from 'contexts/websocket'
@@ -77,11 +77,11 @@ export function OrderBookWidget({ marketId }: { marketId: string }) {
 
   useWebsocketSubscription({
     topics: useMemo(() => [orderBookTopic(marketId)], [marketId]),
-    handler: (message: Publishable) => {
+    handler: useCallback((message: Publishable) => {
       if (message.type === 'OrderBook') {
         setOrderBook(message)
       }
-    }
+    }, [])
   })
 
   useEffect(() => {
