@@ -97,18 +97,28 @@ const CreateOrderRequestSchema = z.discriminatedUnion('type', [
 ])
 export type CreateOrderRequest = z.infer<typeof CreateOrderRequestSchema>
 
+const RequestStatusSchema = z.enum(['Accepted', 'Rejected'])
+const CreateOrderApiResponseSchema = z.object({
+  orderId: z.string(),
+  requestStatus: RequestStatusSchema
+})
+
 const UpdateMarketOrderSchema = z.object({
   type: z.literal('market'),
-  id: z.string(),
-  amount: z.coerce.bigint()
+  orderId: z.string(),
+  amount: z.coerce.bigint(),
+  marketId: z.string(),
+  side: OrderSideSchema
 })
 export type UpdateMarketOrder = z.infer<typeof UpdateMarketOrderSchema>
 
 const UpdateLimitOrderSchema = z.object({
   type: z.literal('limit'),
-  id: z.string(),
+  orderId: z.string(),
   amount: z.coerce.bigint(),
-  price: decimal()
+  price: decimal(),
+  marketId: z.string(),
+  side: OrderSideSchema
 })
 export type UpdateLimitOrder = z.infer<typeof UpdateLimitOrderSchema>
 
@@ -117,6 +127,10 @@ const UpdateOrderRequestSchema = z.discriminatedUnion('type', [
   UpdateLimitOrderSchema
 ])
 export type UpdateOrderRequest = z.infer<typeof UpdateOrderRequestSchema>
+
+const UpdateOrderApiResponseSchema = z.object({
+  requestStatus: RequestStatusSchema
+})
 
 const ExecutionRoleSchema = z.enum(['Maker', 'Taker'])
 export type ExecutionRole = z.infer<typeof ExecutionRoleSchema>
@@ -270,7 +284,7 @@ export const apiClient = new Zodios(apiBaseUrl, [
         schema: CreateOrderRequestSchema
       }
     ],
-    response: OrderSchema,
+    response: CreateOrderApiResponseSchema,
     errors: [
       {
         status: 'default',
@@ -294,7 +308,7 @@ export const apiClient = new Zodios(apiBaseUrl, [
         schema: UpdateOrderRequestSchema
       }
     ],
-    response: OrderSchema,
+    response: UpdateOrderApiResponseSchema,
     errors: [
       {
         status: 'default',

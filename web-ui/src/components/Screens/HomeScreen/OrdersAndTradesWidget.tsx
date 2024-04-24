@@ -282,7 +282,7 @@ function ChangeOrderModal({
 
   const mutation = useMutation({
     mutationFn: (payload: UpdateOrderRequest) =>
-      apiClient.updateOrder(payload, { params: { id: payload.id } }),
+      apiClient.updateOrder(payload, { params: { id: payload.orderId } }),
     onSuccess: () => {
       close()
     }
@@ -292,15 +292,19 @@ function ChangeOrderModal({
     mutation.mutate(
       order.type === 'market'
         ? {
-            id: order.id,
+            orderId: order.id,
             type: 'market',
-            amount: parseUnits(amount, baseSymbol.decimals)
+            amount: parseUnits(amount, baseSymbol.decimals),
+            marketId: order.marketId,
+            side: order.side
           }
         : {
-            id: order.id,
+            orderId: order.id,
             type: 'limit',
             amount: parseUnits(amount, baseSymbol.decimals),
-            price: new Decimal(price)
+            price: new Decimal(price),
+            marketId: order.marketId,
+            side: order.side
           }
     )
   }

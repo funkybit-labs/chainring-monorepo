@@ -26,6 +26,8 @@ class BatchOrderSerializerTest {
         orderId = OrderId.generate(),
         amount = BigInteger("1000"),
         price = BigDecimal("101000"),
+        marketId = MarketId("BTC/ETH"),
+        side = OrderSide.Buy,
     )
 
     @Test

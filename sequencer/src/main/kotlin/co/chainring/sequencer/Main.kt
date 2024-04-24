@@ -1,6 +1,7 @@
 package co.chainring.sequencer
 
 import co.chainring.sequencer.apps.GatewayApp
+import co.chainring.sequencer.apps.QueueProcessorApp
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.queueHome
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -21,6 +22,11 @@ fun main(args: Array<String>) {
             },
         )
         sequencer.start()
+        val queueProcessorApp = QueueProcessorApp(
+            sequencer.inputQueue,
+            sequencer.outputQueue,
+        )
+        queueProcessorApp.start()
         try {
             val gateway = GatewayApp()
             gateway.start()
@@ -30,6 +36,7 @@ fun main(args: Array<String>) {
             logger.error(e) { "Failed, stopping sequencer and exiting" }
         } finally {
             sequencer.stop()
+            queueProcessorApp.stop()
         }
     } catch (e: Throwable) {
         logger.error(e) { "Failed to start" }

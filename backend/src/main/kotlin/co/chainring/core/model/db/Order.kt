@@ -10,7 +10,9 @@ import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.SequencerOrderId
 import co.chainring.core.utils.fromFundamentalUnits
+import co.chainring.core.utils.toByteArrayNoSign
 import co.chainring.core.utils.toFundamentalUnits
+import co.chainring.core.utils.toHex
 import co.chainring.core.utils.toHexBytes
 import co.chainring.sequencer.proto.OrderDisposition
 import de.fxlae.typeid.TypeId
@@ -26,10 +28,10 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
 import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.transactions.TransactionManager
-import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.RoundingMode
@@ -96,7 +98,7 @@ enum class OrderStatus {
 
 data class CreateOrderAssignment(
     val orderId: OrderId,
-    val nonce: String,
+    val nonce: BigInteger,
     val type: OrderType,
     val side: OrderSide,
     val amount: BigInteger,
@@ -229,7 +231,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 this[OrderTable.amount] = assignment.amount.toBigDecimal()
                 this[OrderTable.originalAmount] = assignment.amount.toBigDecimal()
                 this[OrderTable.price] = assignment.price
-                this[OrderTable.nonce] = assignment.nonce
+                this[OrderTable.nonce] = assignment.nonce.toByteArrayNoSign().toHex(false)
                 this[OrderTable.signature] = assignment.signature.value
                 this[OrderTable.sequencerOrderId] = assignment.sequencerOrderId.value
             }
@@ -290,19 +292,15 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
 
         fun listOpenForWallet(wallet: WalletEntity): List<OrderEntity> {
             return OrderEntity
-                .find { OrderTable.status.inList(listOf(OrderStatus.Open, OrderStatus.Partial)) and OrderTable.walletGuid.eq(wallet.guid) }
+                .find {
+                    (
+                        OrderTable.status.eq(OrderStatus.Open).or(
+                            OrderTable.status.eq(OrderStatus.Partial) and OrderTable.type.eq(OrderType.Limit),
+                        )
+                        ) and OrderTable.walletGuid.eq(wallet.guid)
+                }
                 .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
                 .toList()
-        }
-
-        fun cancelAll(wallet: WalletEntity) {
-            val now = Clock.System.now()
-            OrderTable.update({
-                OrderTable.status.inList(listOf(OrderStatus.Open, OrderStatus.Partial)) and OrderTable.walletGuid.eq(wallet.guid)
-            }) {
-                it[this.status] = OrderStatus.Cancelled
-                it[this.closedAt] = now
-            }
         }
 
         fun getOrderBooks(markets: List<MarketEntity>): List<OrderBook> =

@@ -3,7 +3,6 @@ package co.chainring.integrationtests.api
 import arrow.core.Either
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ReasonCode
-import co.chainring.core.model.Address
 import co.chainring.integrationtests.testutils.ApiCallFailure
 import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
@@ -81,7 +80,7 @@ class ApiAuthenticationTest {
                     "Authorization" to "Bearer ${
                         ApiClient.issueAuthToken(
                             ecKeyPair = Keys.createEcKeyPair(),
-                            address = Address("0x${Keys.getAddress(Keys.createEcKeyPair())}"),
+                            address = "0x${Keys.getAddress(Keys.createEcKeyPair())}",
                         )
                     }",
                 ).toHeaders()

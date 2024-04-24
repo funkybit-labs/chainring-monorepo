@@ -16,6 +16,7 @@ repositories {
     mavenCentral()
 }
 
+val exposedVersion = "0.48.0"
 val log4j2Version = "2.23.1"
 val grpcKotlinStubVersion = "1.4.1"
 val grpcProtobufVersion = "1.62.2"
@@ -36,6 +37,20 @@ val chronicleJvmArgs = listOf(
 dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+
+    // Database
+    implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-dao:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-kotlin-datetime:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-json:$exposedVersion")
+    implementation("org.postgresql:postgresql:42.3.9")
+    implementation("org.apache.commons:commons-compress:1.26.1")
+    implementation("org.apache.commons:commons-dbcp2:2.12.0")
+
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
     implementation("org.apache.logging.log4j:log4j-api:$log4j2Version")
     implementation("org.apache.logging.log4j:log4j-core:$log4j2Version")
@@ -46,6 +61,9 @@ dependencies {
     implementation("com.google.protobuf:protobuf-kotlin:$protobufKotlinVersion")
     implementation("io.grpc:grpc-netty:$grpcProtobufVersion")
     implementation("net.openhft:chronicle-queue:5.22.28")
+    implementation(project(":sequencercommon"))
+
+    implementation(project(":backend"))
 }
 
 tasks.test {
@@ -77,35 +95,8 @@ application {
 
 sourceSets {
     main {
-        proto {
-            // In addition to the default 'src/main/proto'
-        }
         kotlin {
             srcDir("src/main/kotlin")
-        }
-    }
-}
-protobuf {
-    protoc {
-        artifact = "com.google.protobuf:protoc:$protobufKotlinVersion"
-    }
-    plugins {
-        create("grpc") {
-            artifact = "io.grpc:protoc-gen-grpc-java:$grpcProtobufVersion"
-        }
-        create("grpckt") {
-            artifact = "io.grpc:protoc-gen-grpc-kotlin:$grpcKotlinStubVersion:jdk8@jar"
-        }
-    }
-    generateProtoTasks {
-        all().forEach {
-            it.plugins {
-                create("grpc")
-                create("grpckt")
-            }
-            it.builtins {
-                create("kotlin")
-            }
         }
     }
 }

@@ -10,6 +10,7 @@ environment:
   sequencer:
     QUEUE_HOME: "/data/queues/testnet"
     CHECKPOINTS_ENABLED: "true"
+    DB_HOST: testnet-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
 services:
   api:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
@@ -23,3 +24,5 @@ services:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer
     count: 1
     environment: sequencer
+    secrets:
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-45c44b9b-ac53-47ab-8997-6d5d799ce4bc-OY4iRs

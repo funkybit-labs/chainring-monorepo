@@ -2,10 +2,14 @@ package co.chainring.core.sequencer
 
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.model.Address
+import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.SequencerOrderId
 import co.chainring.core.model.SequencerWalletId
+import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
+import co.chainring.core.model.db.WithdrawalId
+import co.chainring.core.utils.toHexBytes
 import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
@@ -14,6 +18,7 @@ import co.chainring.sequencer.proto.GetStateRequest
 import co.chainring.sequencer.proto.ResetRequest
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.balanceBatch
+import co.chainring.sequencer.proto.cancelOrder
 import co.chainring.sequencer.proto.deposit
 import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.order
@@ -27,11 +32,22 @@ import java.math.BigInteger
 import java.util.UUID
 
 fun OrderId.toSequencerId(): SequencerOrderId {
-    return SequencerOrderId(this.value.toSequencerId())
+    return this.value.hashToLong().sequencerOrderId()
 }
 
-fun String.toSequencerId(): Long {
+fun String.hashToLong(): Long {
     return BigInteger(1, ECHelper.sha3(this.toByteArray())).toLong()
+}
+fun String.orderId(): OrderId {
+    return OrderId(this)
+}
+
+fun String.withdrawalId(): WithdrawalId {
+    return WithdrawalId(this)
+}
+
+fun String.depositId(): DepositId {
+    return DepositId(this)
 }
 
 fun Long.sequencerOrderId(): SequencerOrderId {
@@ -39,7 +55,11 @@ fun Long.sequencerOrderId(): SequencerOrderId {
 }
 
 fun Address.toSequencerId(): SequencerWalletId {
-    return SequencerWalletId(BigInteger(1, ECHelper.sha3(this.value.toByteArray())).toLong())
+    return SequencerWalletId(BigInteger(1, ECHelper.sha3(this.value.toHexBytes())).toLong())
+}
+
+fun Long.sequencerWalletId(): SequencerWalletId {
+    return SequencerWalletId(this)
 }
 
 open class SequencerClient {
@@ -51,6 +71,9 @@ open class SequencerClient {
         val price: String?,
         val wallet: Long,
         val orderType: co.chainring.sequencer.proto.Order.Type,
+        val nonce: BigInteger?,
+        val signature: EvmSignature?,
+        val orderId: OrderId,
     )
 
     protected val channel: ManagedChannel = ManagedChannelBuilder.forAddress(
@@ -60,40 +83,30 @@ open class SequencerClient {
 
     protected val stub = GatewayGrpcKt.GatewayCoroutineStub(channel)
 
-    suspend fun addOrder(
-        marketId: MarketId,
-        addOrder: Order,
-    ): SequencerResponse {
-        return orderBatch(marketId, listOf(addOrder), emptyList(), emptyList())
-    }
-
-    suspend fun changeOrder(
-        marketId: MarketId,
-        changeOrder: Order,
-    ): SequencerResponse {
-        return orderBatch(marketId, emptyList(), listOf(changeOrder), emptyList())
-    }
-
     suspend fun orderBatch(
         marketId: MarketId,
+        wallet: Long,
         ordersToAdd: List<Order>,
         ordersToChange: List<Order>,
-        ordersToCancel: List<Long>,
+        ordersToCancel: List<OrderId>,
+        cancelAll: Boolean = false,
     ): SequencerResponse {
         return stub.applyOrderBatch(
             orderBatch {
                 this.marketId = marketId.value
+                this.wallet = wallet
                 this.ordersToAdd.addAll(
                     ordersToAdd.map { toOrderDSL(it) },
                 )
                 this.ordersToChange.addAll(
                     ordersToChange.map { toOrderDSL(it) },
                 )
-                this.ordersToCancel.addAll(ordersToCancel)
+                this.ordersToCancel.addAll(
+                    ordersToCancel.map { toCancelOrderDSL(it) },
+                )
+                this.cancelAll = cancelAll
             },
-        ).sequencerResponse.also {
-            logger.debug { it }
-        }
+        ).sequencerResponse
     }
 
     suspend fun createMarket(marketId: String, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal, baseDecimals: Int, quoteDecimals: Int): SequencerResponse {
@@ -115,6 +128,7 @@ open class SequencerClient {
         wallet: Long,
         asset: Asset,
         amount: BigInteger,
+        depositId: DepositId,
     ): SequencerResponse {
         return stub.applyBalanceBatch(
             balanceBatch {
@@ -124,6 +138,7 @@ open class SequencerClient {
                         this.asset = asset.value
                         this.wallet = wallet
                         this.amount = amount.toIntegerValue()
+                        this.externalGuid = depositId.value
                     },
                 )
             },
@@ -134,6 +149,9 @@ open class SequencerClient {
         wallet: Long,
         asset: Asset,
         amount: BigInteger,
+        nonce: BigInteger,
+        evmSignature: EvmSignature,
+        withdrawalId: WithdrawalId,
     ): SequencerResponse {
         return stub.applyBalanceBatch(
             balanceBatch {
@@ -143,6 +161,9 @@ open class SequencerClient {
                         this.asset = asset.value
                         this.wallet = wallet
                         this.amount = amount.toIntegerValue()
+                        this.nonce = nonce.toIntegerValue()
+                        this.signature = evmSignature.value
+                        this.externalGuid = withdrawalId.value
                     },
                 )
             },
@@ -151,16 +172,19 @@ open class SequencerClient {
 
     suspend fun cancelOrder(
         marketId: MarketId,
-        sequencerOrderId: Long,
+        wallet: Long,
+        orderId: OrderId,
     ): SequencerResponse {
-        return orderBatch(marketId, emptyList(), emptyList(), listOf(sequencerOrderId))
+        return orderBatch(marketId, wallet, emptyList(), emptyList(), listOf(orderId))
     }
 
     suspend fun cancelOrders(
         marketId: MarketId,
-        sequencerOrderIds: List<Long>,
+        wallet: Long,
+        orderIds: List<OrderId>,
+        cancelAll: Boolean = false,
     ): SequencerResponse {
-        return orderBatch(marketId, emptyList(), emptyList(), sequencerOrderIds)
+        return orderBatch(marketId, wallet, emptyList(), emptyList(), orderIds, cancelAll = cancelAll)
     }
 
     suspend fun reset(): SequencerResponse {
@@ -175,7 +199,14 @@ open class SequencerClient {
         this.guid = order.sequencerOrderId
         this.amount = order.amount.toIntegerValue()
         this.price = order.price?.toBigDecimal()?.toDecimalValue() ?: BigDecimal.ZERO.toDecimalValue()
-        this.wallet = order.wallet
         this.type = order.orderType
+        this.nonce = order.nonce?.toIntegerValue() ?: BigInteger.ZERO.toIntegerValue()
+        this.signature = order.signature?.value ?: EvmSignature.emptySignature().value
+        this.externalGuid = order.orderId.value
+    }
+
+    private fun toCancelOrderDSL(orderId: OrderId) = cancelOrder {
+        this.guid = orderId.toSequencerId().value
+        this.externalGuid = orderId.value
     }
 }

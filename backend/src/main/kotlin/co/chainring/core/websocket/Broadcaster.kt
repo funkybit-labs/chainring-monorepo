@@ -25,6 +25,7 @@ import co.chainring.core.model.db.OHLCEntity
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.WalletEntity
+import co.chainring.core.model.toChecksumAddress
 import co.chainring.core.utils.PgListener
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
@@ -84,7 +85,7 @@ class Broadcaster(val db: Database) {
         }.addIfAbsent(client)
 
         client.principal?.also { principal ->
-            subscriptionsByPrincipal.getOrPut(principal) {
+            subscriptionsByPrincipal.getOrPut(principal.toChecksumAddress()) {
                 TopicSubscriptions()
             }.getOrPut(topic) {
                 Subscriptions()

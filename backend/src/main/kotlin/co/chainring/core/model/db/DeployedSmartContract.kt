@@ -9,6 +9,7 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.web3j.crypto.Keys
 
 @Serializable
 @JvmInline
@@ -84,12 +85,12 @@ class DeployedSmartContractEntity(guid: EntityID<ContractId>) : GUIDEntity<Contr
     var name by DeployedSmartContractTable.name
     var chainId by DeployedSmartContractTable.chainId
     var proxyAddress by DeployedSmartContractTable.proxyAddress.transform(
-        toColumn = { it.value },
-        toReal = { Address(it) },
+        toColumn = { Keys.toChecksumAddress(it.value) },
+        toReal = { Address(Keys.toChecksumAddress(it)) },
     )
     var implementationAddress by DeployedSmartContractTable.implementationAddress.transform(
-        toColumn = { it.value },
-        toReal = { Address(it) },
+        toColumn = { Keys.toChecksumAddress(it.value) },
+        toReal = { Address(Keys.toChecksumAddress(it)) },
     )
     var version by DeployedSmartContractTable.version
     var deprecated by DeployedSmartContractTable.deprecated

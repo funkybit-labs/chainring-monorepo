@@ -1,9 +1,13 @@
 package co.chainring.apps.api
 
 import co.chainring.apps.api.model.Balance
+import co.chainring.apps.api.model.CancelOrderApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
+import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.Order
+import co.chainring.apps.api.model.RequestStatus
 import co.chainring.apps.api.model.UpdateOrderApiRequest
+import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.WithdrawTx
 import co.chainring.apps.api.model.Withdrawal
 import co.chainring.core.model.Address
@@ -42,12 +46,48 @@ object Examples {
     val updateMarketOrderRequest = UpdateOrderApiRequest.Market(
         orderId = OrderId("123"),
         amount = BigInteger("100"),
+        marketId = MarketId("BTC/ETH"),
+        side = OrderSide.Buy,
     )
 
     val updateLimitOrderRequest = UpdateOrderApiRequest.Limit(
         orderId = OrderId("123"),
         amount = BigInteger("100"),
         price = BigDecimal("100"),
+        marketId = MarketId("BTC/ETH"),
+        side = OrderSide.Buy,
+    )
+
+    val createMarketOrderResponse = CreateOrderApiResponse(
+        orderId = OrderId.generate(),
+        requestStatus = RequestStatus.Accepted,
+        error = null,
+        order = createMarketOrderRequest,
+    )
+
+    val createLimitOrderResponse = CreateOrderApiResponse(
+        orderId = OrderId.generate(),
+        requestStatus = RequestStatus.Accepted,
+        error = null,
+        order = createLimitOrderRequest,
+    )
+
+    val updateMarketOrderResponse = UpdateOrderApiResponse(
+        requestStatus = RequestStatus.Accepted,
+        error = null,
+        order = updateMarketOrderRequest,
+    )
+
+    val updateLimitOrderResponse = UpdateOrderApiResponse(
+        requestStatus = RequestStatus.Accepted,
+        error = null,
+        order = updateLimitOrderRequest,
+    )
+
+    val cancelOrderResponse = CancelOrderApiResponse(
+        orderId = OrderId.generate(),
+        requestStatus = RequestStatus.Accepted,
+        error = null,
     )
 
     val marketOrderResponse = Order.Market(

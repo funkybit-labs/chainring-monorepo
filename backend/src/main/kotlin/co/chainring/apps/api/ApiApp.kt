@@ -3,6 +3,7 @@ package co.chainring.apps.api
 import co.chainring.apps.BaseApp
 import co.chainring.apps.api.middleware.HttpTransactionLogger
 import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
+import co.chainring.apps.api.services.ExchangeApiService
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.BlockchainDepositHandler
@@ -10,7 +11,6 @@ import co.chainring.core.blockchain.BlockchainTransactionHandler
 import co.chainring.core.blockchain.ContractsPublisher
 import co.chainring.core.db.DbConfig
 import co.chainring.core.sequencer.SequencerClient
-import co.chainring.core.services.ExchangeService
 import co.chainring.core.websocket.Broadcaster
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.contract
@@ -70,13 +70,13 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val sequencerClient = SequencerClient()
     private val broadcaster = Broadcaster(db)
 
-    private val exchangeService = ExchangeService(blockchainClient, sequencerClient)
-    private val blockchainTransactionHandler = BlockchainTransactionHandler(blockchainClient, exchangeService)
-    private val blockchainDepositHandler = BlockchainDepositHandler(blockchainClient, exchangeService)
+    private val exchangeApiService = ExchangeApiService(blockchainClient, sequencerClient)
+    private val blockchainTransactionHandler = BlockchainTransactionHandler(blockchainClient)
+    private val blockchainDepositHandler = BlockchainDepositHandler(blockchainClient, sequencerClient)
 
-    private val withdrawalRoutes = WithdrawalRoutes(exchangeService)
+    private val withdrawalRoutes = WithdrawalRoutes(exchangeApiService)
     private val balanceRoutes = BalanceRoutes()
-    private val orderRoutes = OrderRoutes(exchangeService)
+    private val orderRoutes = OrderRoutes(exchangeApiService)
 
     private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
         .then(ServerFilters.Cors(corsPolicy))
@@ -119,7 +119,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                         )
 
                         if (enableTestRoutes) {
-                            routes += TestRoutes(exchangeService, sequencerClient).routes
+                            routes += TestRoutes(sequencerClient).routes
                         }
                     },
             ),

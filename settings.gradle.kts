@@ -11,4 +11,5 @@ plugins {
 rootProject.name = "chainring"
 include("backend")
 include("integrationtests")
+include("sequencercommon")
 include("sequencer")

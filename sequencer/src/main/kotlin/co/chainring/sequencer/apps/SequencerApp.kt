@@ -245,15 +245,15 @@ class SequencerApp(
         orderBatch.ordersToAddList.forEach { order ->
             when (order.type) {
                 Order.Type.LimitSell, Order.Type.MarketSell -> {
-                    baseAssetsRequired.merge(order.wallet.toWalletAddress(), order.amount.toBigInteger(), ::sumBigIntegers)
+                    baseAssetsRequired.merge(orderBatch.wallet.toWalletAddress(), order.amount.toBigInteger(), ::sumBigIntegers)
                 }
                 Order.Type.LimitBuy -> {
-                    quoteAssetsRequired.merge(order.wallet.toWalletAddress(), notional(order.amount, order.price, market.baseDecimals, market.quoteDecimals), ::sumBigIntegers)
+                    quoteAssetsRequired.merge(orderBatch.wallet.toWalletAddress(), notional(order.amount, order.price, market.baseDecimals, market.quoteDecimals), ::sumBigIntegers)
                 }
                 Order.Type.MarketBuy -> {
                     // the quote assets required for a market buy depends on what the clearing price would be
                     val(clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger())
-                    quoteAssetsRequired.merge(order.wallet.toWalletAddress(), notional(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals), ::sumBigIntegers)
+                    quoteAssetsRequired.merge(orderBatch.wallet.toWalletAddress(), notional(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals), ::sumBigIntegers)
                 }
                 else -> {}
             }
@@ -298,8 +298,8 @@ class SequencerApp(
                 }
             }
         }
-        orderBatch.ordersToCancelList.forEach { guid ->
-            market.ordersByGuid[guid.toOrderGuid()]?.let { order ->
+        orderBatch.ordersToCancelList.forEach { cancelOrder ->
+            market.ordersByGuid[cancelOrder.guid.toOrderGuid()]?.let { order ->
                 val (baseAssets, quoteAssets) = market.assetsReservedForOrder(order)
                 if (baseAssets > BigInteger.ZERO) {
                     baseAssetsRequired.merge(order.wallet, -baseAssets, ::sumBigIntegers)

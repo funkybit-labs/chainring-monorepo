@@ -9,16 +9,18 @@ import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ApiErrors
 import co.chainring.apps.api.model.BalancesApiResponse
 import co.chainring.apps.api.model.BatchOrdersApiRequest
+import co.chainring.apps.api.model.BatchOrdersApiResponse
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
+import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
+import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
-import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.OrderId
@@ -79,7 +81,7 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
 
         fun issueAuthToken(
             ecKeyPair: ECKeyPair = Keys.createEcKeyPair(),
-            address: Address = Address("0x${Keys.getAddress(ecKeyPair)}"),
+            address: String = "0x${Keys.getAddress(ecKeyPair)}",
             chainId: ChainId = ChainId(1337U),
             timestamp: Instant = Clock.System.now(),
         ): String {
@@ -165,10 +167,10 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
                 .build(),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
-    fun createOrder(apiRequest: CreateOrderApiRequest): Order =
+    fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
         tryCreateOrder(apiRequest).assertSuccess()
 
-    fun tryCreateOrder(apiRequest: CreateOrderApiRequest): Either<ApiCallFailure, Order> =
+    fun tryCreateOrder(apiRequest: CreateOrderApiRequest): Either<ApiCallFailure, CreateOrderApiResponse> =
         execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders")
@@ -177,10 +179,10 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
-    fun batchOrders(apiRequest: BatchOrdersApiRequest): OrdersApiResponse =
+    fun batchOrders(apiRequest: BatchOrdersApiRequest): BatchOrdersApiResponse =
         tryBatchOrders(apiRequest).assertSuccess()
 
-    fun tryBatchOrders(apiRequest: BatchOrdersApiRequest): Either<ApiCallFailure, OrdersApiResponse> =
+    fun tryBatchOrders(apiRequest: BatchOrdersApiRequest): Either<ApiCallFailure, BatchOrdersApiResponse> =
         execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/batch/orders")
@@ -189,11 +191,11 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
-    fun updateOrder(apiRequest: UpdateOrderApiRequest): Order {
+    fun updateOrder(apiRequest: UpdateOrderApiRequest): UpdateOrderApiResponse {
         return tryUpdateOrder(apiRequest).assertSuccess()
     }
 
-    fun tryUpdateOrder(apiRequest: UpdateOrderApiRequest): Either<ApiCallFailure, Order> =
+    fun tryUpdateOrder(apiRequest: UpdateOrderApiRequest): Either<ApiCallFailure, UpdateOrderApiResponse> =
         execute(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders/${apiRequest.orderId}")

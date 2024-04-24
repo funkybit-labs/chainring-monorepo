@@ -257,7 +257,7 @@ class TestSequencer {
         sequencer.deposit(maker, marketId.baseAsset(), BigInteger.valueOf(1000))
         val response = sequencer.addOrder(marketId, BigInteger.valueOf(1000), "17.55", maker, Order.Type.LimitSell)
         assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
-        val response2 = sequencer.cancelOrder(marketId, response.orderGuid())
+        val response2 = sequencer.cancelOrder(marketId, response.orderGuid(), maker)
         assertEquals(OrderDisposition.Canceled, response2.ordersChangedList.first().disposition)
         // try canceling an order which has been partially filled
         val response3 = sequencer.addOrder(marketId, BigInteger.valueOf(1000), "17.55", maker, Order.Type.LimitSell)
@@ -267,8 +267,11 @@ class TestSequencer {
         sequencer.deposit(taker, marketId.quoteAsset(), BigDecimal.ONE.inWei())
         val response4 = sequencer.addOrder(marketId, BigInteger.valueOf(500), null, taker, Order.Type.MarketBuy)
         assertEquals(OrderDisposition.Filled, response4.ordersChangedList.first().disposition)
-        val response5 = sequencer.cancelOrder(marketId, response3.orderGuid())
-        assertEquals(OrderDisposition.Canceled, response5.ordersChangedList.first().disposition)
+        // have taker try to cancel maker order
+        val response5 = sequencer.cancelOrder(marketId, response3.orderGuid(), taker)
+        assertEquals(0, response5.ordersChangedList.size)
+        val response6 = sequencer.cancelOrder(marketId, response3.orderGuid(), maker)
+        assertEquals(OrderDisposition.Canceled, response6.ordersChangedList.first().disposition)
     }
 
     @Test
@@ -283,14 +286,14 @@ class TestSequencer {
         assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
 
         // reduce amount
-        val response2 = sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 999L, "17.55")
+        val response2 = sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 999L, "17.55", maker)
         assertEquals(OrderDisposition.Accepted, response2.ordersChangedList.first().disposition)
 
         // cannot increase amount beyond 1000L since there is not enough collateral
-        assertEquals(SequencerError.ExceedsLimit, sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 1001L, "17.55").error)
+        assertEquals(SequencerError.ExceedsLimit, sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 1001L, "17.55", maker).error)
 
         // but can change price
-        val response3 = sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 999L, "17.60")
+        val response3 = sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 999L, "17.60", maker)
         assertEquals(OrderDisposition.Accepted, response3.ordersChangedList.first().disposition)
 
         // can also add a new order for 1
@@ -298,7 +301,7 @@ class TestSequencer {
         assertEquals(OrderDisposition.Accepted, response4.ordersChangedList.first().disposition)
 
         // cannot change the price to cross the book
-        assertEquals(SequencerError.ChangeCrossesMarket, sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 999L, "17.50").error)
+        assertEquals(SequencerError.ChangeCrossesMarket, sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 999L, "17.50", maker).error)
 
         // check for a limit buy
         sequencer.deposit(maker, marketId.quoteAsset(), BigDecimal.TEN.inWei())
@@ -313,6 +316,7 @@ class TestSequencer {
                 response5.orderGuid().toOrderGuid(),
                 BigDecimal.ONE.inSats().toLong() + 1,
                 "10.00",
+                maker,
             ).error,
         )
 
@@ -324,14 +328,15 @@ class TestSequencer {
                 response5.orderGuid().toOrderGuid(),
                 BigDecimal.ONE.inSats().toLong(),
                 "10.05",
+                maker,
             ).error,
         )
 
         // but can decrease amount or decrease price
-        val response6 = sequencer.changeOrder(marketId, response5.orderGuid().toOrderGuid(), BigDecimal.ONE.inSats().toLong() - 1, "10.00")
+        val response6 = sequencer.changeOrder(marketId, response5.orderGuid().toOrderGuid(), BigDecimal.ONE.inSats().toLong() - 1, "10.00", maker)
         assertEquals(OrderDisposition.Accepted, response6.ordersChangedList.first().disposition)
 
-        val response7 = sequencer.changeOrder(marketId, response5.orderGuid().toOrderGuid(), BigDecimal.ONE.inSats().toLong(), "9.95")
+        val response7 = sequencer.changeOrder(marketId, response5.orderGuid().toOrderGuid(), BigDecimal.ONE.inSats().toLong(), "9.95", maker)
         assertEquals(OrderDisposition.Accepted, response7.ordersChangedList.first().disposition)
     }
 

@@ -70,7 +70,7 @@ object EIP712Helper {
                 /* message = */
                 mapOf(
                     "message" to signInMessage.message,
-                    "address" to signInMessage.address.value,
+                    "address" to signInMessage.address,
                     "chainId" to signInMessage.chainId.value,
                     "timestamp" to signInMessage.timestamp,
                 ),

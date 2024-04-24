@@ -60,6 +60,7 @@ dependencies {
     implementation("io.grpc:grpc-netty:$grpcProtobufVersion")
 
     implementation(project(":backend"))
+    implementation(project(":sequencercommon"))
     implementation(project(":sequencer"))
 }
 

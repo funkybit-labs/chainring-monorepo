@@ -71,8 +71,7 @@ dependencies {
     implementation("io.grpc:grpc-protobuf:$grpcProtobufVersion")
     implementation("com.google.protobuf:protobuf-kotlin:$protobufKotlinVersion")
     implementation("io.grpc:grpc-netty:$grpcProtobufVersion")
-
-    implementation(project(":sequencer"))
+    implementation(project(":sequencercommon"))
 }
 
 tasks.test {

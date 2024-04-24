@@ -18,6 +18,7 @@ import okhttp3.OkHttpClient
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
 import org.web3j.crypto.Credentials
+import org.web3j.crypto.Keys
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.DefaultBlockParameterName
@@ -69,6 +70,10 @@ open class TransactionManagerWithNonceOverride(
         nonceOverride
 }
 
+fun Credentials.checksumAddress(): Address {
+    return Address(Keys.toChecksumAddress(this.address))
+}
+
 open class BlockchainClient(private val config: BlockchainClientConfig = BlockchainClientConfig()) {
     protected val web3jService: HttpService = httpService(config.url, config.enableWeb3jLogging)
     protected val web3j: Web3j = Web3j.build(
@@ -91,7 +96,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
     )
 
     protected val submitterCredentials = Credentials.create(config.submitterPrivateKeyHex)
-    val submitterAddress: Address = Address(submitterCredentials.address)
+    val submitterAddress: Address = submitterCredentials.checksumAddress()
 
     val gasProvider = GasProvider(
         contractCreationLimit = config.contractCreationLimit,
@@ -171,7 +176,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
             is DeployContractParams.Exchange -> {
                 val implementationContract = Exchange.deploy(web3j, transactionManager, gasProvider).send()
                 Pair(
-                    Address(implementationContract.contractAddress),
+                    Address(Keys.toChecksumAddress(implementationContract.contractAddress)),
                     implementationContract.version.send().toInt(),
                 )
             }
@@ -213,7 +218,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
                     ).send()
                 }
             }
-            Address(proxyContract.contractAddress)
+            Address(Keys.toChecksumAddress(proxyContract.contractAddress))
         }
 
         logger.debug { "Deployment complete for ${params.contractType}" }

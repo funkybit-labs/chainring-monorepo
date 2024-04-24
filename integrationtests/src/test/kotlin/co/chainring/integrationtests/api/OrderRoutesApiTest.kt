@@ -2,10 +2,12 @@ package co.chainring.integrationtests.api
 
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.BatchOrdersApiRequest
-import co.chainring.apps.api.model.CancelUpdateOrderApiRequest
+import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
+import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.ReasonCode
+import co.chainring.apps.api.model.RequestStatus
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.websocket.LastTrade
 import co.chainring.apps.api.model.websocket.LastTradeDirection
@@ -111,23 +113,19 @@ class OrderRoutesApiTest {
             wallet.signOrder(it)
         }
 
-        val limitOrder = apiClient.createOrder(limitOrderApiRequest)
+        val createLimitOrderResponse = apiClient.createOrder(limitOrderApiRequest)
 
         // order created correctly
-        assertIs<Order.Limit>(limitOrder)
-        assertEquals(limitOrder.marketId, limitOrderApiRequest.marketId)
-        assertEquals(limitOrder.side, limitOrderApiRequest.side)
-        assertEquals(limitOrder.amount, limitOrderApiRequest.amount)
-        assertEquals(0, limitOrder.price.compareTo(limitOrderApiRequest.price))
-        assertEquals(OrderStatus.Open, limitOrder.status)
-
-        // order creation is idempotent
-        assertEquals(limitOrder.id, apiClient.createOrder(limitOrderApiRequest).id)
+        assertIs<CreateOrderApiRequest.Limit>(createLimitOrderResponse.order)
+        assertEquals(createLimitOrderResponse.order.marketId, limitOrderApiRequest.marketId)
+        assertEquals(createLimitOrderResponse.order.side, limitOrderApiRequest.side)
+        assertEquals(createLimitOrderResponse.order.amount, limitOrderApiRequest.amount)
+        assertEquals(0, (createLimitOrderResponse.order as CreateOrderApiRequest.Limit).price.compareTo(limitOrderApiRequest.price))
 
         // client is notified over websocket
         wsClient.assertOrderCreatedMessageReceived { msg ->
             assertIs<Order.Limit>(msg.order)
-            validateLimitOrders(limitOrder, msg.order as Order.Limit, false)
+            validateLimitOrders(createLimitOrderResponse, msg.order as Order.Limit, false)
         }
         wsClient.close()
 
@@ -135,34 +133,37 @@ class OrderRoutesApiTest {
         wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribeToOrders()
         assertEquals(
-            listOf(limitOrder) + initialOrdersOverWs,
-            wsClient.assertOrdersMessageReceived().orders,
+            listOf(createLimitOrderResponse.orderId) + initialOrdersOverWs.map { it.id },
+            wsClient.assertOrdersMessageReceived().orders.map { it.id },
         )
 
         // update order
-        val updatedOrder = apiClient.updateOrder(
+        val updatedOrderApiResponse = apiClient.updateOrder(
             apiRequest = UpdateOrderApiRequest.Limit(
-                orderId = limitOrder.id,
+                orderId = createLimitOrderResponse.orderId,
+                marketId = createLimitOrderResponse.order.marketId,
+                side = createLimitOrderResponse.order.side,
                 amount = wallet.formatAmount("3", "USDC"),
                 price = BigDecimal("2.01"),
             ),
         )
-        assertIs<Order.Limit>(updatedOrder)
-        assertEquals(wallet.formatAmount("3", "USDC"), updatedOrder.amount)
-        assertEquals(0, BigDecimal("2.01").compareTo(updatedOrder.price))
+        assertEquals(updatedOrderApiResponse.requestStatus, RequestStatus.Accepted)
+        assertIs<UpdateOrderApiRequest.Limit>(updatedOrderApiResponse.order)
+        assertEquals(wallet.formatAmount("3", "USDC"), updatedOrderApiResponse.order.amount)
+        assertEquals(0, BigDecimal("2.01").compareTo((updatedOrderApiResponse.order as UpdateOrderApiRequest.Limit).price))
         wsClient.assertOrderUpdatedMessageReceived { msg ->
             assertIs<Order.Limit>(msg.order)
-            validateLimitOrders(updatedOrder, msg.order as Order.Limit, true)
+            validateLimitOrders(updatedOrderApiResponse.order, msg.order as Order.Limit, true)
         }
 
         // cancel order is idempotent
-        apiClient.cancelOrder(limitOrder.id)
-        val cancelledOrder = apiClient.getOrder(limitOrder.id)
+        apiClient.cancelOrder(createLimitOrderResponse.orderId)
         wsClient.assertOrderUpdatedMessageReceived { msg ->
-            assertEquals(cancelledOrder.id, msg.order.id)
+            assertEquals(createLimitOrderResponse.orderId, msg.order.id)
             assertEquals(OrderStatus.Cancelled, msg.order.status)
         }
-        assertEquals(OrderStatus.Cancelled, apiClient.getOrder(limitOrder.id).status)
+        val cancelledOrder = apiClient.getOrder(createLimitOrderResponse.orderId)
+        assertEquals(OrderStatus.Cancelled, cancelledOrder.status)
 
         wsClient.close()
     }
@@ -198,16 +199,18 @@ class OrderRoutesApiTest {
             apiClient.tryUpdateOrder(
                 apiRequest = UpdateOrderApiRequest.Limit(
                     orderId = OrderId.generate(),
+                    marketId = usdcDaiMarketId,
+                    side = OrderSide.Buy,
                     amount = BigDecimal("3").toFundamentalUnits(18),
                     price = BigDecimal("4"),
                 ),
-            ).assertError(expectedError)
+            ).assertError(ApiError(ReasonCode.RejectedBySequencer, "Rejected By Sequencer"))
 
-            apiClient.tryCancelOrder(OrderId.generate()).assertError(expectedError)
+            apiClient.tryCancelOrder(OrderId.generate()).assertError(ApiError(ReasonCode.ProcessingError, expectedError.message))
         }
 
         // try to submit an order that crosses the market
-        val limitOrder = apiClient.createOrder(
+        val createLimitOrderResponse = apiClient.createOrder(
             CreateOrderApiRequest.Limit(
                 nonce = generateHexString(32),
                 marketId = usdcDaiMarketId,
@@ -220,14 +223,14 @@ class OrderRoutesApiTest {
             },
         )
 
-        assertIs<Order.Limit>(limitOrder)
+        assertIs<CreateOrderApiRequest.Limit>(createLimitOrderResponse.order)
 
         wsClient.apply {
             assertOrderCreatedMessageReceived { msg ->
-                validateLimitOrders(limitOrder, msg.order as Order.Limit, false)
+                validateLimitOrders(createLimitOrderResponse, msg.order as Order.Limit, false)
             }
             assertOrderUpdatedMessageReceived { msg ->
-                assertEquals(limitOrder.id, msg.order.id)
+                assertEquals(createLimitOrderResponse.orderId, msg.order.id)
                 assertEquals(OrderStatus.CrossesMarket, msg.order.status)
             }
         }
@@ -248,7 +251,7 @@ class OrderRoutesApiTest {
             ApiError(ReasonCode.ProcessingError, "Order price is not a multiple of tick size"),
         )
 
-        val limitOrder2 = apiClient.createOrder(
+        val createLimitOrderResponse2 = apiClient.createOrder(
             CreateOrderApiRequest.Limit(
                 nonce = generateHexString(32),
                 marketId = usdcDaiMarketId,
@@ -261,11 +264,19 @@ class OrderRoutesApiTest {
             },
         )
 
+        wsClient.apply {
+            assertOrderCreatedMessageReceived { msg ->
+                validateLimitOrders(createLimitOrderResponse2, msg.order as Order.Limit, false)
+            }
+        }
+
         // try updating the price to something not a tick size
         apiClient.tryUpdateOrder(
             apiRequest = UpdateOrderApiRequest.Limit(
-                orderId = limitOrder2.id,
+                orderId = createLimitOrderResponse2.orderId,
                 amount = wallet.formatAmount("1", "USDC"),
+                marketId = createLimitOrderResponse2.order.marketId,
+                side = createLimitOrderResponse2.order.side,
                 price = BigDecimal("2.015"),
             ),
         ).assertError(
@@ -276,29 +287,39 @@ class OrderRoutesApiTest {
         val apiClient2 = ApiClient()
         apiClient2.tryUpdateOrder(
             apiRequest = UpdateOrderApiRequest.Limit(
-                orderId = limitOrder2.id,
+                orderId = createLimitOrderResponse2.orderId,
                 amount = wallet.formatAmount("1", "USDC"),
+                marketId = createLimitOrderResponse2.order.marketId,
+                side = createLimitOrderResponse2.order.side,
                 price = BigDecimal("2.01"),
             ),
         ).assertError(
-            ApiError(ReasonCode.ProcessingError, "Order not created with this wallet"),
+            ApiError(ReasonCode.RejectedBySequencer, "Rejected By Sequencer"),
         )
         apiClient2.tryCancelOrder(
-            limitOrder2.id,
+            createLimitOrderResponse2.orderId,
         ).assertError(
-            ApiError(ReasonCode.ProcessingError, "Order not created with this wallet"),
+            ApiError(ReasonCode.RejectedBySequencer, "Rejected By Sequencer"),
         )
 
         // try update cancelled order
-        apiClient.cancelOrder(limitOrder2.id)
+        apiClient.cancelOrder(createLimitOrderResponse2.orderId)
+        wsClient.apply {
+            assertOrderUpdatedMessageReceived { msg ->
+                assertEquals(createLimitOrderResponse2.orderId, msg.order.id)
+                assertEquals(OrderStatus.Cancelled, msg.order.status)
+            }
+        }
         apiClient.tryUpdateOrder(
             apiRequest = UpdateOrderApiRequest.Limit(
-                orderId = limitOrder2.id,
+                orderId = createLimitOrderResponse2.orderId,
                 amount = wallet.formatAmount("3", "USDC"),
-                price = BigDecimal("4"),
+                marketId = createLimitOrderResponse2.order.marketId,
+                side = createLimitOrderResponse2.order.side,
+                price = BigDecimal("2.01"),
             ),
         ).assertError(
-            ApiError(ReasonCode.OrderIsClosed, "Order is already finalized"),
+            ApiError(ReasonCode.RejectedBySequencer, "Rejected By Sequencer"),
         )
     }
 
@@ -340,8 +361,8 @@ class OrderRoutesApiTest {
         repeat(times = 10) {
             apiClient.createOrder(wallet.signOrder(limitOrderApiRequest.copy(nonce = generateHexString(32))))
         }
-        assertEquals(10, apiClient.listOrders().orders.count { it.status != OrderStatus.Cancelled })
         repeat(10) { wsClient.assertOrderCreatedMessageReceived() }
+        assertEquals(10, apiClient.listOrders().orders.count { it.status != OrderStatus.Cancelled })
 
         apiClient.cancelOpenOrders()
 
@@ -370,7 +391,7 @@ class OrderRoutesApiTest {
         val takerStartingETHBalance = takerWallet.getExchangeERC20Balance("ETH")
 
         // place an order and see that it gets accepted
-        val limitBuyOrder = makerApiClient.createOrder(
+        val limitBuyOrderApiResponse = makerApiClient.createOrder(
             CreateOrderApiRequest.Limit(
                 nonce = generateHexString(32),
                 marketId = btcEthMarketId,
@@ -382,10 +403,9 @@ class OrderRoutesApiTest {
                 makerWallet.signOrder(it)
             },
         )
-        assertIs<Order.Limit>(limitBuyOrder)
-        assertEquals(limitBuyOrder.status, OrderStatus.Open)
+        assertIs<CreateOrderApiRequest.Limit>(limitBuyOrderApiResponse.order)
         makerWsClient.assertOrderCreatedMessageReceived { msg ->
-            validateLimitOrders(limitBuyOrder, msg.order as Order.Limit, false)
+            validateLimitOrders(limitBuyOrderApiResponse, msg.order as Order.Limit, false)
         }
 
         listOf(makerWsClient, takerWsClient).forEach { wsClient ->
@@ -402,17 +422,20 @@ class OrderRoutesApiTest {
             )
         }
 
-        val updatedLimitBuyOrder = makerApiClient.updateOrder(
+        val updatedLimitBuyOrderApiResponse = makerApiClient.updateOrder(
             UpdateOrderApiRequest.Limit(
-                orderId = limitBuyOrder.id,
+                orderId = limitBuyOrderApiResponse.orderId,
                 amount = makerWallet.formatAmount("0.00012345", "BTC"),
+                marketId = limitBuyOrderApiResponse.order.marketId,
+                side = limitBuyOrderApiResponse.order.side,
                 price = BigDecimal("17.50"),
             ),
         )
-        assertIs<Order.Limit>(updatedLimitBuyOrder)
+        assertIs<UpdateOrderApiRequest.Limit>(updatedLimitBuyOrderApiResponse.order)
+        assertEquals(RequestStatus.Accepted, updatedLimitBuyOrderApiResponse.requestStatus)
 
         makerWsClient.assertOrderUpdatedMessageReceived { msg ->
-            validateLimitOrders(updatedLimitBuyOrder, msg.order as Order.Limit, true)
+            validateLimitOrders(updatedLimitBuyOrderApiResponse.order, msg.order as Order.Limit, true)
         }
         listOf(makerWsClient, takerWsClient).forEach { wsClient ->
             wsClient.assertOrderBookMessageReceived(
@@ -429,7 +452,7 @@ class OrderRoutesApiTest {
         }
 
         // place a sell order
-        val limitSellOrder = makerApiClient.createOrder(
+        val limitSellOrderApiResponse = makerApiClient.createOrder(
             CreateOrderApiRequest.Limit(
                 nonce = generateHexString(32),
                 marketId = btcEthMarketId,
@@ -441,12 +464,12 @@ class OrderRoutesApiTest {
                 makerWallet.signOrder(it)
             },
         )
-        assertIs<Order.Limit>(limitSellOrder)
-        assertEquals(limitSellOrder.status, OrderStatus.Open)
+        assertIs<CreateOrderApiRequest.Limit>(limitSellOrderApiResponse.order)
 
         makerWsClient.assertOrderCreatedMessageReceived { msg ->
-            validateLimitOrders(limitSellOrder, msg.order as Order.Limit, false)
+            validateLimitOrders(limitSellOrderApiResponse, msg.order as Order.Limit, false)
         }
+
         listOf(makerWsClient, takerWsClient).forEach { wsClient ->
             wsClient.assertOrderBookMessageReceived(
                 btcEthMarketId,
@@ -464,18 +487,21 @@ class OrderRoutesApiTest {
         }
 
         // update amount and price of the sell
-        val updatedLimitSellOrder = makerApiClient.updateOrder(
+        val updatedLimitSellOrderApiResponse = makerApiClient.updateOrder(
             UpdateOrderApiRequest.Limit(
-                orderId = limitSellOrder.id,
+                orderId = limitSellOrderApiResponse.orderId,
                 amount = makerWallet.formatAmount("0.00054321", "BTC"),
+                marketId = limitSellOrderApiResponse.order.marketId,
+                side = limitSellOrderApiResponse.order.side,
                 price = BigDecimal("17.550"),
             ),
         )
-        assertIs<Order.Limit>(updatedLimitSellOrder)
+        assertIs<UpdateOrderApiRequest.Limit>(updatedLimitSellOrderApiResponse.order)
+        assertEquals(RequestStatus.Accepted, updatedLimitSellOrderApiResponse.requestStatus)
 
         makerWsClient.assertOrderUpdatedMessageReceived { msg ->
             assertIs<Order.Limit>(msg.order)
-            validateLimitOrders(updatedLimitSellOrder, msg.order as Order.Limit, true)
+            validateLimitOrders(updatedLimitSellOrderApiResponse.order, msg.order as Order.Limit, true)
         }
         listOf(makerWsClient, takerWsClient).forEach { wsClient ->
             wsClient.assertOrderBookMessageReceived(
@@ -494,7 +520,7 @@ class OrderRoutesApiTest {
         }
 
         // place a buy order and see it gets executed
-        val marketBuyOrder = takerApiClient.createOrder(
+        val marketBuyOrderApiResponse = takerApiClient.createOrder(
             CreateOrderApiRequest.Market(
                 nonce = generateHexString(32),
                 marketId = btcEthMarketId,
@@ -506,23 +532,22 @@ class OrderRoutesApiTest {
             },
         )
 
-        assertIs<Order.Market>(marketBuyOrder)
-        assertEquals(marketBuyOrder.status, OrderStatus.Open)
+        assertIs<CreateOrderApiRequest.Market>(marketBuyOrderApiResponse.order)
 
         takerWsClient.apply {
             assertOrderCreatedMessageReceived { msg ->
-                assertEquals(marketBuyOrder.id, msg.order.id)
-                assertEquals(marketBuyOrder.amount, msg.order.amount)
-                assertEquals(marketBuyOrder.side, msg.order.side)
-                assertEquals(marketBuyOrder.marketId, msg.order.marketId)
-                assertEquals(marketBuyOrder.timing.createdAt, msg.order.timing.createdAt)
+                assertEquals(marketBuyOrderApiResponse.orderId, msg.order.id)
+                assertEquals(marketBuyOrderApiResponse.order.amount, msg.order.amount)
+                assertEquals(marketBuyOrderApiResponse.order.side, msg.order.side)
+                assertEquals(marketBuyOrderApiResponse.order.marketId, msg.order.marketId)
+                assertNotNull(msg.order.timing.createdAt)
             }
             assertTradeCreatedMessageReceived { msg ->
-                assertEquals(marketBuyOrder.id, msg.trade.orderId)
-                assertEquals(marketBuyOrder.marketId, msg.trade.marketId)
-                assertEquals(marketBuyOrder.side, msg.trade.side)
-                assertEquals(updatedLimitSellOrder.price, msg.trade.price)
-                assertEquals(marketBuyOrder.amount, msg.trade.amount)
+                assertEquals(marketBuyOrderApiResponse.orderId, msg.trade.orderId)
+                assertEquals(marketBuyOrderApiResponse.order.marketId, msg.trade.marketId)
+                assertEquals(marketBuyOrderApiResponse.order.side, msg.trade.side)
+                assertEquals(0, (updatedLimitSellOrderApiResponse.order as UpdateOrderApiRequest.Limit).price.compareTo(msg.trade.price))
+                assertEquals(marketBuyOrderApiResponse.order.amount, msg.trade.amount)
                 assertEquals(SettlementStatus.Pending, msg.trade.settlementStatus)
             }
             assertOrderUpdatedMessageReceived { msg ->
@@ -540,10 +565,10 @@ class OrderRoutesApiTest {
 
         makerWsClient.apply {
             assertTradeCreatedMessageReceived { msg ->
-                assertEquals(updatedLimitSellOrder.id, msg.trade.orderId)
-                assertEquals(updatedLimitSellOrder.marketId, msg.trade.marketId)
-                assertEquals(updatedLimitSellOrder.side, msg.trade.side)
-                assertEquals(updatedLimitSellOrder.price, msg.trade.price)
+                assertEquals(updatedLimitSellOrderApiResponse.order.orderId, msg.trade.orderId)
+                assertEquals(updatedLimitSellOrderApiResponse.order.marketId, msg.trade.marketId)
+                assertEquals(updatedLimitSellOrderApiResponse.order.side, msg.trade.side)
+                assertEquals(0, (updatedLimitSellOrderApiResponse.order as UpdateOrderApiRequest.Limit).price.compareTo(msg.trade.price))
                 assertEquals(takerWallet.formatAmount("0.00043210", "BTC"), msg.trade.amount)
                 assertEquals(SettlementStatus.Pending, msg.trade.settlementStatus)
             }
@@ -576,7 +601,7 @@ class OrderRoutesApiTest {
             )
         }
 
-        val trade = getTradesForOrders(listOf(marketBuyOrder.id)).first()
+        val trade = getTradesForOrders(listOf(marketBuyOrderApiResponse.orderId)).first()
 
         assertEquals(trade.amount, takerWallet.formatAmount("0.00043210", "BTC"))
         assertEquals(0, trade.price.compareTo(BigDecimal("17.550")))
@@ -609,11 +634,11 @@ class OrderRoutesApiTest {
             )
         }
         takerWsClient.assertTradeUpdatedMessageReceived { msg ->
-            assertEquals(marketBuyOrder.id, msg.trade.orderId)
+            assertEquals(marketBuyOrderApiResponse.orderId, msg.trade.orderId)
             assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
         }
         makerWsClient.assertTradeUpdatedMessageReceived { msg ->
-            assertEquals(updatedLimitSellOrder.id, msg.trade.orderId)
+            assertEquals(updatedLimitSellOrderApiResponse.order.orderId, msg.trade.orderId)
             assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
         }
 
@@ -635,7 +660,7 @@ class OrderRoutesApiTest {
         )
 
         // place a sell order and see it gets executed
-        val marketSellOrder = takerApiClient.createOrder(
+        val marketSellOrderApiResponse = takerApiClient.createOrder(
             CreateOrderApiRequest.Market(
                 nonce = generateHexString(32),
                 marketId = btcEthMarketId,
@@ -647,21 +672,20 @@ class OrderRoutesApiTest {
             },
         )
 
-        assertIs<Order.Market>(marketSellOrder)
-        assertEquals(marketSellOrder.status, OrderStatus.Open)
+        assertIs<CreateOrderApiRequest.Market>(marketSellOrderApiResponse.order)
 
         takerWsClient.apply {
             assertOrderCreatedMessageReceived { msg ->
-                assertEquals(marketSellOrder.id, msg.order.id)
-                assertEquals(marketSellOrder.amount, msg.order.amount)
-                assertEquals(marketSellOrder.side, msg.order.side)
-                assertEquals(marketSellOrder.marketId, msg.order.marketId)
-                assertEquals(marketSellOrder.timing.createdAt, msg.order.timing.createdAt)
+                assertEquals(marketSellOrderApiResponse.orderId, msg.order.id)
+                assertEquals(marketSellOrderApiResponse.order.amount, msg.order.amount)
+                assertEquals(marketSellOrderApiResponse.order.side, msg.order.side)
+                assertEquals(marketSellOrderApiResponse.order.marketId, msg.order.marketId)
+                assertNotNull(msg.order.timing.createdAt)
             }
             assertTradeCreatedMessageReceived { msg ->
-                assertEquals(marketSellOrder.id, msg.trade.orderId)
-                assertEquals(marketSellOrder.marketId, msg.trade.marketId)
-                assertEquals(marketSellOrder.side, msg.trade.side)
+                assertEquals(marketSellOrderApiResponse.orderId, msg.trade.orderId)
+                assertEquals(marketSellOrderApiResponse.order.marketId, msg.trade.marketId)
+                assertEquals(marketSellOrderApiResponse.order.side, msg.trade.side)
                 assertEquals(0, msg.trade.price.compareTo(BigDecimal("17.500")))
                 assertEquals(makerWallet.formatAmount("0.00012345", "BTC"), msg.trade.amount)
                 assertEquals(SettlementStatus.Pending, msg.trade.settlementStatus)
@@ -681,10 +705,10 @@ class OrderRoutesApiTest {
 
         makerWsClient.apply {
             assertTradeCreatedMessageReceived { msg ->
-                assertEquals(updatedLimitBuyOrder.id, msg.trade.orderId)
-                assertEquals(updatedLimitBuyOrder.marketId, msg.trade.marketId)
-                assertEquals(updatedLimitBuyOrder.side, msg.trade.side)
-                assertEquals(updatedLimitBuyOrder.price, msg.trade.price)
+                assertEquals(updatedLimitBuyOrderApiResponse.order.orderId, msg.trade.orderId)
+                assertEquals(updatedLimitBuyOrderApiResponse.order.marketId, msg.trade.marketId)
+                assertEquals(updatedLimitBuyOrderApiResponse.order.side, msg.trade.side)
+                assertEquals(0, (updatedLimitBuyOrderApiResponse.order as UpdateOrderApiRequest.Limit).price.compareTo(msg.trade.price))
                 assertEquals(makerWallet.formatAmount("0.00012345", "BTC"), msg.trade.amount)
                 assertEquals(SettlementStatus.Pending, msg.trade.settlementStatus)
             }
@@ -715,7 +739,7 @@ class OrderRoutesApiTest {
             )
         }
 
-        val trade2 = getTradesForOrders(listOf(marketSellOrder.id)).first()
+        val trade2 = getTradesForOrders(listOf(marketSellOrderApiResponse.orderId)).first()
         assertEquals(trade2.amount, takerWallet.formatAmount("0.00012345", "BTC"))
         assertEquals(0, trade2.price.compareTo(BigDecimal("17.500")))
 
@@ -747,11 +771,11 @@ class OrderRoutesApiTest {
             )
         }
         takerWsClient.assertTradeUpdatedMessageReceived { msg ->
-            assertEquals(marketSellOrder.id, msg.trade.orderId)
+            assertEquals(marketSellOrderApiResponse.orderId, msg.trade.orderId)
             assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
         }
         makerWsClient.assertTradeUpdatedMessageReceived { msg ->
-            assertEquals(updatedLimitBuyOrder.id, msg.trade.orderId)
+            assertEquals(updatedLimitBuyOrderApiResponse.order.orderId, msg.trade.orderId)
             assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
         }
 
@@ -774,19 +798,6 @@ class OrderRoutesApiTest {
 
         takerApiClient.cancelOpenOrders()
         takerWsClient.assertOrdersMessageReceived()
-        listOf(makerWsClient, takerWsClient).forEach { wsClient ->
-            wsClient.assertOrderBookMessageReceived(
-                btcEthMarketId,
-                OrderBook(
-                    marketId = btcEthMarketId,
-                    buy = emptyList(),
-                    sell = listOf(
-                        OrderBookEntry(price = "17.550", size = "0.00011111".toBigDecimal()),
-                    ),
-                    last = LastTrade("17.500", LastTradeDirection.Down),
-                ),
-            )
-        }
 
         makerApiClient.cancelOpenOrders()
         makerWsClient.assertOrdersMessageReceived()
@@ -810,18 +821,18 @@ class OrderRoutesApiTest {
                 assertEquals(2, msg.orders.size)
                 msg.orders[0].also { order ->
                     assertIs<Order.Market>(order)
-                    assertEquals(marketSellOrder.id, order.id)
-                    assertEquals(marketSellOrder.marketId, order.marketId)
-                    assertEquals(marketSellOrder.side, order.side)
-                    assertEquals(marketSellOrder.amount, order.amount)
-                    assertEquals(OrderStatus.Cancelled, order.status)
+                    assertEquals(marketSellOrderApiResponse.orderId, order.id)
+                    assertEquals(marketSellOrderApiResponse.order.marketId, order.marketId)
+                    assertEquals(marketSellOrderApiResponse.order.side, order.side)
+                    assertEquals(marketSellOrderApiResponse.order.amount, order.amount)
+                    assertEquals(OrderStatus.Partial, order.status)
                 }
                 msg.orders[1].also { order ->
                     assertIs<Order.Market>(order)
-                    assertEquals(marketBuyOrder.id, order.id)
-                    assertEquals(marketBuyOrder.marketId, order.marketId)
-                    assertEquals(marketBuyOrder.side, order.side)
-                    assertEquals(marketBuyOrder.amount, order.amount)
+                    assertEquals(marketBuyOrderApiResponse.orderId, order.id)
+                    assertEquals(marketBuyOrderApiResponse.order.marketId, order.marketId)
+                    assertEquals(marketBuyOrderApiResponse.order.side, order.side)
+                    assertEquals(marketBuyOrderApiResponse.order.amount, order.amount)
                     assertEquals(OrderStatus.Filled, order.status)
                 }
             }
@@ -830,19 +841,19 @@ class OrderRoutesApiTest {
             assertTradesMessageReceived { msg ->
                 assertEquals(2, msg.trades.size)
                 msg.trades[0].apply {
-                    assertEquals(marketSellOrder.id, orderId)
-                    assertEquals(marketSellOrder.marketId, marketId)
-                    assertEquals(marketSellOrder.side, side)
+                    assertEquals(marketSellOrderApiResponse.orderId, orderId)
+                    assertEquals(marketSellOrderApiResponse.order.marketId, marketId)
+                    assertEquals(marketSellOrderApiResponse.order.side, side)
                     assertEquals(0, price.compareTo(BigDecimal("17.500")))
                     assertEquals(makerWallet.formatAmount("0.00012345", "BTC"), amount)
                     assertEquals(SettlementStatus.Completed, settlementStatus)
                 }
                 msg.trades[1].apply {
-                    assertEquals(marketBuyOrder.id, orderId)
-                    assertEquals(marketBuyOrder.marketId, marketId)
-                    assertEquals(marketBuyOrder.side, side)
-                    assertEquals(updatedLimitSellOrder.price, price)
-                    assertEquals(marketBuyOrder.amount, amount)
+                    assertEquals(marketBuyOrderApiResponse.orderId, orderId)
+                    assertEquals(marketBuyOrderApiResponse.order.marketId, marketId)
+                    assertEquals(marketBuyOrderApiResponse.order.side, side)
+                    assertEquals(0, (updatedLimitSellOrderApiResponse.order as UpdateOrderApiRequest.Limit).price.compareTo(price))
+                    assertEquals(marketBuyOrderApiResponse.order.amount, amount)
                     assertEquals(SettlementStatus.Completed, settlementStatus)
                 }
             }
@@ -897,7 +908,7 @@ class OrderRoutesApiTest {
             ),
         )
 
-        assertEquals(3, createBatchLimitOrders.orders.count { it.status == OrderStatus.Open })
+        assertEquals(3, createBatchLimitOrders.createdOrders.count())
         repeat(3) { makerWsClient.assertOrderCreatedMessageReceived() }
 
         val batchOrderResponse = makerApiClient.batchOrders(
@@ -917,25 +928,39 @@ class OrderRoutesApiTest {
                 },
                 updateOrders = listOf(
                     UpdateOrderApiRequest.Limit(
-                        orderId = createBatchLimitOrders.orders[0].id,
+                        orderId = createBatchLimitOrders.createdOrders[0].orderId,
                         amount = makerWallet.formatAmount("0.0001", "BTC"),
+                        marketId = createBatchLimitOrders.createdOrders[0].order.marketId,
+                        side = createBatchLimitOrders.createdOrders[0].order.side,
                         price = BigDecimal("68405.000"),
                     ),
                     UpdateOrderApiRequest.Limit(
-                        orderId = createBatchLimitOrders.orders[1].id,
+                        orderId = createBatchLimitOrders.createdOrders[1].orderId,
                         amount = makerWallet.formatAmount("0.0002", "BTC"),
+                        marketId = createBatchLimitOrders.createdOrders[1].order.marketId,
+                        side = createBatchLimitOrders.createdOrders[2].order.side,
+                        price = BigDecimal("68405.000"),
+                    ),
+                    UpdateOrderApiRequest.Limit(
+                        orderId = OrderId.generate(),
+                        amount = makerWallet.formatAmount("0.0002", "BTC"),
+                        marketId = createBatchLimitOrders.createdOrders[1].order.marketId,
+                        side = createBatchLimitOrders.createdOrders[2].order.side,
                         price = BigDecimal("68405.000"),
                     ),
                 ),
                 cancelOrders = listOf(
-                    CancelUpdateOrderApiRequest(orderId = createBatchLimitOrders.orders[2].id),
+                    CancelOrderApiRequest(orderId = createBatchLimitOrders.createdOrders[2].orderId),
+                    CancelOrderApiRequest(orderId = OrderId.generate()),
                 ),
             ),
         )
 
-        assertEquals(6, batchOrderResponse.orders.count())
-        assertEquals(5, batchOrderResponse.orders.count { it.status == OrderStatus.Open })
-        assertEquals(1, batchOrderResponse.orders.count { it.status == OrderStatus.Cancelled })
+        assertEquals(3, batchOrderResponse.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
+        assertEquals(2, batchOrderResponse.updatedOrders.count { it.requestStatus == RequestStatus.Accepted })
+        assertEquals(1, batchOrderResponse.updatedOrders.count { it.requestStatus == RequestStatus.Rejected })
+        assertEquals(1, batchOrderResponse.canceledOrders.count { it.requestStatus == RequestStatus.Accepted })
+        assertEquals(1, batchOrderResponse.canceledOrders.count { it.requestStatus == RequestStatus.Rejected })
 
         repeat(3) { makerWsClient.assertOrderCreatedMessageReceived() }
         repeat(3) { makerWsClient.assertOrderUpdatedMessageReceived() }
@@ -1012,16 +1037,27 @@ class OrderRoutesApiTest {
         takerWsClient.close()
     }
 
-    private fun validateLimitOrders(left: Order.Limit, right: Order.Limit, updated: Boolean) {
-        assertEquals(left.id, right.id)
-        assertEquals(left.amount, right.amount)
-        assertEquals(left.side, right.side)
-        assertEquals(left.marketId, right.marketId)
-        assertEquals(left.price, right.price)
-        assertEquals(left.timing.createdAt, right.timing.createdAt)
+    private fun validateLimitOrders(response: CreateOrderApiResponse, order: Order.Limit, updated: Boolean) {
+        assertEquals(response.orderId, order.id)
+        assertEquals(response.order.amount, order.amount)
+        assertEquals(response.order.side, order.side)
+        assertEquals(response.order.marketId, order.marketId)
+        assertEquals(0, (response.order as CreateOrderApiRequest.Limit).price.compareTo(order.price))
+        assertNotNull(order.timing.createdAt)
         if (updated) {
-            assertNotNull(left.timing.updatedAt)
-            assertNotNull(right.timing.updatedAt)
+            assertNotNull(order.timing.updatedAt)
+        }
+    }
+
+    private fun validateLimitOrders(response: UpdateOrderApiRequest, order: Order.Limit, updated: Boolean) {
+        assertEquals(response.orderId, order.id)
+        assertEquals(response.amount, order.amount)
+        assertEquals(response.side, order.side)
+        assertEquals(response.marketId, order.marketId)
+        assertEquals(0, (response as UpdateOrderApiRequest.Limit).price.compareTo(order.price))
+        assertNotNull(order.timing.createdAt)
+        if (updated) {
+            assertNotNull(order.timing.updatedAt)
         }
     }
 
@@ -1090,7 +1126,7 @@ class OrderRoutesApiTest {
             .pollInSameThread()
             .pollDelay(Duration.ofMillis(100))
             .pollInterval(Duration.ofMillis(100))
-            .atMost(Duration.ofMillis(30000L))
+            .atMost(Duration.ofMillis(20000L))
             .until {
                 Faucet.mine()
                 transaction {

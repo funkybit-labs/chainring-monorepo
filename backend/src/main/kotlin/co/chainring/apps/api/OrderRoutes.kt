@@ -1,28 +1,36 @@
 package co.chainring.apps.api
 
+import co.chainring.apps.api.Examples.cancelOrderResponse
+import co.chainring.apps.api.Examples.createLimitOrderResponse
+import co.chainring.apps.api.Examples.createMarketOrderResponse
+import co.chainring.apps.api.Examples.updateLimitOrderResponse
 import co.chainring.apps.api.middleware.principal
 import co.chainring.apps.api.middleware.signedTokenSecurity
 import co.chainring.apps.api.model.BatchOrdersApiRequest
-import co.chainring.apps.api.model.CancelUpdateOrderApiRequest
+import co.chainring.apps.api.model.BatchOrdersApiResponse
+import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
+import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
+import co.chainring.apps.api.model.RequestStatus
 import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.TradesApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
-import co.chainring.apps.api.model.orderIsClosedError
+import co.chainring.apps.api.model.UpdateOrderApiResponse
+import co.chainring.apps.api.model.errorResponse
 import co.chainring.apps.api.model.orderNotFoundError
+import co.chainring.apps.api.model.unexpectedError
+import co.chainring.apps.api.services.ExchangeApiService
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
-import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.model.db.TradeId
 import co.chainring.core.model.db.WalletEntity
-import co.chainring.core.services.ExchangeService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -43,14 +51,14 @@ import org.http4k.lens.Query
 import org.http4k.lens.string
 import org.jetbrains.exposed.sql.transactions.transaction
 
-class OrderRoutes(private val exchangeService: ExchangeService) {
+class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
     private val logger = KotlinLogging.logger {}
 
     private val orderIdPathParam = Path.map(::OrderId, OrderId::value).of("orderOd", "Order Id")
 
     fun createOrder(): ContractRoute {
         val requestBody = Body.auto<CreateOrderApiRequest>().toLens()
-        val responseBody = Body.auto<Order>().toLens()
+        val responseBody = Body.auto<CreateOrderApiResponse>().toLens()
 
         return "orders" meta {
             operationId = "create-order"
@@ -65,30 +73,23 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             )
             returning(
                 Status.CREATED,
-                responseBody to Examples.marketOrderResponse,
+                responseBody to Examples.createMarketOrderResponse,
             )
             returning(
                 Status.CREATED,
-                responseBody to Examples.limitOrderResponse,
+                responseBody to Examples.createLimitOrderResponse,
             )
         } bindContract Method.POST to { request ->
             val apiRequest: CreateOrderApiRequest = requestBody(request)
 
-            val order = transaction {
-                OrderEntity.findByNonce(nonce = apiRequest.nonce)?.toOrderResponse()
-            }
-            when {
-                order != null -> {
+            ApiUtils.runCatchingValidation {
+                val response = exchangeApiService.addOrder(request.principal, apiRequest)
+                if (response.requestStatus == RequestStatus.Accepted) {
                     Response(Status.CREATED).with(
-                        responseBody of order,
+                        responseBody of response,
                     )
-                }
-                else -> {
-                    ApiUtils.runCatchingValidation {
-                        Response(Status.CREATED).with(
-                            responseBody of exchangeService.addOrder(request.principal, apiRequest),
-                        )
-                    }
+                } else {
+                    response.error?.let { errorResponse(Status.UNPROCESSABLE_ENTITY, it) } ?: unexpectedError()
                 }
             }
         }
@@ -96,7 +97,7 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
 
     fun updateOrder(): ContractRoute {
         val requestBody = Body.auto<UpdateOrderApiRequest>().toLens()
-        val responseBody = Body.auto<Order>().toLens()
+        val responseBody = Body.auto<UpdateOrderApiResponse>().toLens()
 
         return "orders" / orderIdPathParam meta {
             operationId = "update-order"
@@ -111,26 +112,23 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             )
             returning(
                 Status.OK,
-                responseBody to Examples.marketOrderResponse,
+                responseBody to Examples.updateLimitOrderResponse,
             )
             returning(
                 Status.OK,
-                responseBody to Examples.limitOrderResponse,
+                responseBody to Examples.updateMarketOrderResponse,
             )
         } bindContract Method.PATCH to { orderId ->
             fun handle(request: Request): Response {
                 val apiRequest: UpdateOrderApiRequest = requestBody(request)
-                val orderEntity = transaction { OrderEntity.findById(orderId) }
-                return when {
-                    orderEntity == null -> orderNotFoundError
-                    orderEntity.status.isFinal() -> orderIsClosedError
-
-                    else -> {
-                        ApiUtils.runCatchingValidation {
-                            Response(Status.OK).with(
-                                responseBody of exchangeService.updateOrder(request.principal, orderEntity, apiRequest),
-                            )
-                        }
+                return ApiUtils.runCatchingValidation {
+                    val response = exchangeApiService.updateOrder(request.principal, apiRequest)
+                    if (response.requestStatus == RequestStatus.Accepted) {
+                        Response(Status.OK).with(
+                            responseBody of response,
+                        )
+                    } else {
+                        response.error?.let { errorResponse(Status.UNPROCESSABLE_ENTITY, it) } ?: unexpectedError()
                     }
                 }
             }
@@ -149,19 +147,12 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             )
         } bindContract Method.DELETE to { orderId ->
             { request: Request ->
-                transaction {
-                    val order = OrderEntity.findById(orderId)
-                    when {
-                        order == null -> orderNotFoundError
-                        order.status == OrderStatus.Cancelled -> Response(Status.NO_CONTENT)
-                        order.status.isFinal() -> orderIsClosedError
-
-                        else -> {
-                            ApiUtils.runCatchingValidation {
-                                exchangeService.cancelOrder(request.principal, order)
-                                Response(Status.NO_CONTENT)
-                            }
-                        }
+                ApiUtils.runCatchingValidation {
+                    val response = exchangeApiService.cancelOrder(request.principal, orderId)
+                    if (response.requestStatus == RequestStatus.Accepted) {
+                        Response(Status.NO_CONTENT)
+                    } else {
+                        response.error?.let { errorResponse(Status.UNPROCESSABLE_ENTITY, it) } ?: unexpectedError()
                     }
                 }
             }
@@ -233,7 +224,7 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
             returning(Status.NO_CONTENT)
         } bindContract Method.DELETE to { request ->
             ApiUtils.runCatchingValidation {
-                exchangeService.cancelOpenOrders(
+                exchangeApiService.cancelOpenOrders(
                     transaction { WalletEntity.getOrCreate(request.principal) },
                 )
                 Response(Status.NO_CONTENT)
@@ -243,7 +234,7 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
 
     fun batchOrders(): ContractRoute {
         val requestBody = Body.auto<BatchOrdersApiRequest>().toLens()
-        val responseBody = Body.auto<OrdersApiResponse>().toLens()
+        val responseBody = Body.auto<BatchOrdersApiResponse>().toLens()
 
         return "batch/orders" meta {
             operationId = "batch-orders"
@@ -260,19 +251,24 @@ class OrderRoutes(private val exchangeService: ExchangeService) {
                         Examples.updateLimitOrderRequest,
                     ),
                     listOf(
-                        CancelUpdateOrderApiRequest(OrderId("123")),
+                        CancelOrderApiRequest(OrderId("123")),
                     ),
                 ),
             )
-            returning(Status.OK, responseBody to OrdersApiResponse(listOf(Examples.limitOrderResponse)))
+            returning(
+                Status.OK,
+                responseBody to BatchOrdersApiResponse(
+                    createdOrders = listOf(createMarketOrderResponse, createLimitOrderResponse),
+                    updatedOrders = listOf(updateLimitOrderResponse),
+                    canceledOrders = listOf(cancelOrderResponse),
+                ),
+            )
         } bindContract Method.POST to { request ->
             val apiRequest: BatchOrdersApiRequest = requestBody(request)
 
             ApiUtils.runCatchingValidation {
                 Response(Status.OK).with(
-                    responseBody of OrdersApiResponse(
-                        exchangeService.orderBatch(request.principal, apiRequest),
-                    ),
+                    responseBody of exchangeApiService.orderBatch(request.principal, apiRequest),
                 )
             }
         }

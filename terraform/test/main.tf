@@ -111,7 +111,7 @@ module "rds" {
   subnet_id_1     = module.vpc.private_subnet_id_1
   subnet_id_2     = module.vpc.private_subnet_id_2
   instance_class  = "db.t3.medium"
-  security_groups = [module.api.security_group_id, module.bastion.security_group.id]
+  security_groups = [module.api.security_group_id, module.bastion.security_group.id, module.sequencer.security_group_id]
   vpc             = module.vpc.vpc
   aws_region      = var.aws_region
   ci_role_arn     = data.terraform_remote_state.shared.outputs.ci_role_arn

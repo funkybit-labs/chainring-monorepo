@@ -27,9 +27,9 @@ data class LevelOrder(
     var levelIx: Int,
     var originalQuantity: BigInteger = quantity,
 ) {
-    fun update(order: Order) {
+    fun update(wallet: Long, order: Order) {
         this.guid = order.guid.toOrderGuid()
-        this.wallet = order.wallet.toWalletAddress()
+        this.wallet = wallet.toWalletAddress()
         this.quantity = order.amount.toBigInteger()
         this.originalQuantity = this.quantity
     }
@@ -97,13 +97,13 @@ class OrderBookLevel(val levelIx: Int, val side: BookSide, val price: BigDecimal
         totalQuantity = checkpoint.totalQuantity.toBigInteger()
     }
 
-    fun addOrder(order: Order): Pair<OrderDisposition, LevelOrder?> {
+    fun addOrder(wallet: Long, order: Order): Pair<OrderDisposition, LevelOrder?> {
         val nextTail = (orderTail + 1) % maxOrderCount
         return if (nextTail == orderHead) {
             OrderDisposition.Rejected to null
         } else {
             val levelOrder = orders[orderTail]
-            levelOrder.update(order)
+            levelOrder.update(wallet, order)
             totalQuantity += levelOrder.quantity
             orderTail = nextTail
             OrderDisposition.Accepted to levelOrder

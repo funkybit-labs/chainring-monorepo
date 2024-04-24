@@ -1,5 +1,6 @@
 package co.chainring.core.evm
 
+import co.chainring.core.blockchain.checksumAddress
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
@@ -27,7 +28,7 @@ class EIP712HelperTest {
         requests.forEach {
             val hash = EIP712Helper.computeHash(it, chainId, verifyingContract)
             val signature = ECHelper.signData(Credentials.create(privateKeyHex), hash)
-            assertTrue(ECHelper.isValidSignature(hash, signature, Address(credentials.address)))
+            assertTrue(ECHelper.isValidSignature(hash, signature, credentials.checksumAddress()))
         }
     }
 }

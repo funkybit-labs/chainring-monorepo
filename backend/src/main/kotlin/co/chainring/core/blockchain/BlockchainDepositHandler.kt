@@ -3,12 +3,19 @@ package co.chainring.core.blockchain
 import co.chainring.contracts.generated.Exchange
 import co.chainring.core.model.Address
 import co.chainring.core.model.TxHash
+import co.chainring.core.model.db.BalanceChange
+import co.chainring.core.model.db.BalanceEntity
+import co.chainring.core.model.db.BalanceType
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
 import co.chainring.core.model.db.WalletEntity
+import co.chainring.core.sequencer.SequencerClient
+import co.chainring.sequencer.core.Asset
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.reactivex.Flowable
+import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.web3j.crypto.Keys
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.EthFilter
@@ -23,7 +30,7 @@ interface DepositConfirmationHandler {
 
 class BlockchainDepositHandler(
     private val blockchainClient: BlockchainClient,
-    private val depositConfirmationHandler: DepositConfirmationHandler,
+    private val sequencerClient: SequencerClient,
     private val numConfirmations: Int = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toIntOrNull() ?: 1,
     private val pollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
 ) {
@@ -88,9 +95,9 @@ class BlockchainDepositHandler(
                             if (DepositEntity.findByTxHash(txHash) != null) {
                                 logger.debug { "Skipping already recorded deposit (tx hash: $txHash)" }
                             } else {
-                                val walletAddress = Address(depositEventResponse.from)
+                                val walletAddress = Address(Keys.toChecksumAddress(depositEventResponse.from))
                                 val wallet = WalletEntity.getOrCreate(walletAddress)
-                                val tokenAddress = Address(depositEventResponse.token).takeIf { it != Address.zero }
+                                val tokenAddress = Address(Keys.toChecksumAddress(depositEventResponse.token)).takeIf { it != Address.zero }
                                 val amount = depositEventResponse.amount
 
                                 DepositEntity.create(
@@ -135,7 +142,7 @@ class BlockchainDepositHandler(
                             pendingDeposit.update(DepositStatus.Confirmed)
 
                             try {
-                                depositConfirmationHandler.onExchangeContractDepositConfirmation(pendingDeposit)
+                                onExchangeContractDepositConfirmation(pendingDeposit)
                             } catch (e: Exception) {
                                 logger.error(e) { "DepositConfirmationCallback failed for $pendingDeposit" }
                             }
@@ -153,6 +160,16 @@ class BlockchainDepositHandler(
                 }
             }
         }
+    }
+
+    private fun onExchangeContractDepositConfirmation(deposit: DepositEntity) {
+        runBlocking {
+            sequencerClient.deposit(deposit.wallet.sequencerId.value, Asset(deposit.symbol.name), deposit.amount, deposit.guid.value)
+        }
+        BalanceEntity.updateBalances(
+            listOf(BalanceChange.Delta(deposit.wallet.id.value, deposit.symbol.guid.value, deposit.amount)),
+            BalanceType.Exchange,
+        )
     }
 
     private fun maxSeenBlockNumber() = transaction {
