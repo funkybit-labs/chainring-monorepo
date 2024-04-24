@@ -1,4 +1,7 @@
-import { OHLC, OHLCDuration } from 'websocketMessages'
+import { OHLC, OHLCDuration, OrderBook } from 'websocketMessages'
+import { OrderSide } from 'apiClient'
+import { parseUnits } from 'viem'
+import { Market } from 'markets'
 
 export const olhcDurationsMs: Record<OHLCDuration, number> = {
   ['P1M']: 60 * 1000,
@@ -64,4 +67,42 @@ function fillGaps(draft: OHLC[], newItem: OHLC, duration: number) {
       incomplete: false
     })
   }
+}
+
+export function getMarketPrice(
+  side: OrderSide,
+  amount: bigint,
+  market: Market,
+  orderBook: OrderBook
+): bigint | undefined {
+  const levels = (
+    side == 'Buy' ? orderBook.sell : orderBook.buy.toReversed()
+  ).map((l) => {
+    return {
+      size: parseUnits(l.size.toString(), market.baseSymbol.decimals),
+      price: parseUnits(l.price, market.quoteSymbol.decimals)
+    }
+  })
+
+  if (amount == 0n) {
+    return levels.length > 0 ? levels[levels.length - 1].price : undefined
+  }
+
+  let amountCovered = 0n
+  const orderChunks: { size: bigint; price: bigint }[] = []
+  while (amountCovered < amount && levels.length > 0) {
+    const level = levels.pop()!
+    const amountLeftToCover = amount - amountCovered
+    const orderChunk = {
+      size: amountLeftToCover < level.size ? amountLeftToCover : level.size,
+      price: level.price
+    }
+    amountCovered += orderChunk.size
+    orderChunks.push(orderChunk)
+  }
+
+  return (
+    orderChunks.reduce((acc, c) => acc + c.price * c.size, 0n) /
+    orderChunks.reduce((acc, c) => acc + c.size, 0n)
+  )
 }

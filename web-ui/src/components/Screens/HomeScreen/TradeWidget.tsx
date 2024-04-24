@@ -1,36 +1,134 @@
-import { apiClient, OrderSide, TradingSymbol } from 'apiClient'
+import { apiClient, OrderSide } from 'apiClient'
 import { classNames, cleanAndFormatNumberInput } from 'utils'
-import React, { useEffect, useState } from 'react'
+import React, {
+  ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState
+} from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Widget } from 'components/common/Widget'
 import SubmitButton from 'components/common/SubmitButton'
-import { Address, parseUnits } from 'viem'
+import { Address, formatUnits, parseUnits } from 'viem'
 import { isErrorFromAlias } from '@zodios/core'
 import { useConfig, useSignTypedData } from 'wagmi'
 import { addressZero, getDomain } from 'utils/eip712'
 import { Market } from 'markets'
 import Decimal from 'decimal.js'
+import { useWebsocketSubscription } from 'contexts/websocket'
+import { OrderBook, orderBookTopic, Publishable } from 'websocketMessages'
+import { getMarketPrice } from 'utils/pricesUtils'
 
 export default function TradeWidget({
   market,
   exchangeContractAddress,
-  walletAddress,
-  baseSymbol,
-  quoteSymbol
+  walletAddress
 }: {
   market: Market
   exchangeContractAddress: Address
   walletAddress: Address
-  baseSymbol: TradingSymbol
-  quoteSymbol: TradingSymbol
 }) {
   const config = useConfig()
   const { signTypedDataAsync } = useSignTypedData()
+
+  const baseSymbol = market.baseSymbol
+  const quoteSymbol = market.quoteSymbol
 
   const [side, setSide] = useState<OrderSide>('Buy')
   const [price, setPrice] = useState('')
   const [amount, setAmount] = useState('')
   const [isMarketOrder, setIsMarketOrder] = useState(false)
+  const [orderBook, setOrderBook] = useState<OrderBook | undefined>(undefined)
+
+  useWebsocketSubscription({
+    topics: useMemo(() => [orderBookTopic(market.id)], [market.id]),
+    handler: useCallback((message: Publishable) => {
+      if (message.type === 'OrderBook') {
+        setOrderBook(message)
+      }
+    }, [])
+  })
+
+  const marketPrice = useMemo(() => {
+    if (orderBook === undefined) {
+      return undefined
+    }
+
+    return getMarketPrice(
+      side,
+      parseUnits(amount, quoteSymbol.decimals),
+      market,
+      orderBook
+    )
+  }, [side, amount, orderBook, market, quoteSymbol.decimals])
+
+  const formattedMarketPrice = useMemo(() => {
+    if (marketPrice === undefined) {
+      return cleanAndFormatNumberInput('0', quoteSymbol.decimals)
+    } else {
+      return `~${cleanAndFormatNumberInput(
+        formatUnits(marketPrice, quoteSymbol.decimals),
+        quoteSymbol.decimals
+      )}`
+    }
+  }, [marketPrice, quoteSymbol.decimals])
+
+  const formattedNotional = useMemo(() => {
+    if (amount === '') {
+      return undefined
+    }
+
+    const parsedAmount = parseUnits(amount, baseSymbol.decimals)
+
+    if (isMarketOrder && marketPrice) {
+      return `~${cleanAndFormatNumberInput(
+        formatUnits(
+          (marketPrice * parsedAmount) / parseUnits('1', baseSymbol.decimals),
+          quoteSymbol.decimals
+        ),
+        quoteSymbol.decimals
+      )}`
+    } else if (price !== '') {
+      const parsedPrice = parseUnits(price, baseSymbol.decimals)
+      return cleanAndFormatNumberInput(
+        formatUnits(
+          (parsedPrice * parsedAmount) / parseUnits('1', baseSymbol.decimals),
+          quoteSymbol.decimals
+        ),
+        quoteSymbol.decimals
+      )
+    } else {
+      return undefined
+    }
+  }, [
+    price,
+    marketPrice,
+    amount,
+    isMarketOrder,
+    baseSymbol.decimals,
+    quoteSymbol.decimals
+  ])
+
+  function changeSide(newValue: OrderSide) {
+    if (!mutation.isPending && side != newValue) {
+      setSide(newValue)
+      setPrice('')
+      setAmount('')
+      setIsMarketOrder(false)
+    }
+  }
+
+  function handleAmountChange(e: ChangeEvent<HTMLInputElement>) {
+    setAmount(cleanAndFormatNumberInput(e.target.value, baseSymbol.decimals))
+  }
+
+  function handleMarketOrderFlagChange(e: ChangeEvent<HTMLInputElement>) {
+    if (!isMarketOrder && e.target.checked) {
+      setPrice('')
+    }
+    setIsMarketOrder(e.target.checked)
+  }
 
   const mutation = useMutation({
     mutationFn: apiClient.createOrder
@@ -112,7 +210,7 @@ export default function TradeWidget({
                 'cursor-pointer border-b-2 w-full',
                 side == 'Buy' ? 'border-b-lightBackground' : 'border-b-darkGray'
               )}
-              onClick={() => !mutation.isPending && setSide('Buy')}
+              onClick={() => changeSide('Buy')}
             >
               Buy {baseSymbol.name}
             </div>
@@ -123,7 +221,7 @@ export default function TradeWidget({
                   ? 'border-b-lightBackground'
                   : 'border-b-darkGray'
               )}
-              onClick={() => !mutation.isPending && setSide('Sell')}
+              onClick={() => changeSide('Sell')}
             >
               Sell {baseSymbol.name}
             </div>
@@ -142,14 +240,7 @@ export default function TradeWidget({
                       placeholder={'0.0'}
                       value={amount}
                       disabled={mutation.isPending}
-                      onChange={(e) => {
-                        setAmount(
-                          cleanAndFormatNumberInput(
-                            e.target.value,
-                            baseSymbol.decimals
-                          )
-                        )
-                      }}
+                      onChange={handleAmountChange}
                       className="w-full bg-black text-white disabled:bg-mutedGray"
                     />
                     <span className="absolute right-2 top-2 text-white">
@@ -166,9 +257,7 @@ export default function TradeWidget({
                       type="checkbox"
                       checked={isMarketOrder}
                       disabled={mutation.isPending}
-                      onChange={(e) => {
-                        setIsMarketOrder(e.target.checked)
-                      }}
+                      onChange={handleMarketOrderFlagChange}
                     />
                     <span className="pl-2">Market Order</span>
                   </label>
@@ -180,7 +269,11 @@ export default function TradeWidget({
                     <input
                       value={price}
                       disabled={isMarketOrder || mutation.isPending}
-                      placeholder={'0.0'}
+                      placeholder={
+                        isMarketOrder
+                          ? formattedMarketPrice
+                          : cleanAndFormatNumberInput('0', quoteSymbol.decimals)
+                      }
                       onChange={(e) => {
                         setPrice(
                           cleanAndFormatNumberInput(
@@ -225,14 +318,37 @@ export default function TradeWidget({
               }}
             />
           </p>
-          <p className="text-center text-white">
-            {`${side == 'Buy' ? 'Buying' : 'Selling'} ${amount} ${
-              baseSymbol.name
-            } ${
-              isMarketOrder
-                ? '(market order) '
-                : `for ${price} ${quoteSymbol.name}`
-            }`}
+          <p className="text-white">
+            {!!formattedNotional && (
+              <>
+                <div className={'inline-block'}>
+                  {side == 'Buy' ? 'Buying' : 'Selling'}
+                </div>{' '}
+                <div className={'inline-block whitespace-nowrap'}>
+                  {amount} {baseSymbol.name}
+                </div>{' '}
+                for{' '}
+                <div className={'inline-block whitespace-nowrap'}>
+                  {formattedNotional} {quoteSymbol.name}
+                </div>{' '}
+                at{' '}
+                {isMarketOrder ? (
+                  <>
+                    market price of{' '}
+                    <div className={'inline-block whitespace-nowrap'}>
+                      {formattedMarketPrice} {quoteSymbol.name}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    limit price of{' '}
+                    <div className={'inline-block whitespace-nowrap'}>
+                      {price} {quoteSymbol.name}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </p>
           <p className="text-center text-white">Fee: 0.05 {quoteSymbol.name}</p>
           <div className="pt-3 text-center">
