@@ -48,7 +48,7 @@ describe('PricesUtils', () => {
       mergeOHLC(
         [ohlc(60000, 'P1M', 2, 4, 1, 3)],
         [ohlc(12000, 'P1M', 2, 4, 1, 3)],
-        60000
+        'P1M'
       )
     ).toStrictEqual([ohlc(1000, 'P1M', 2, 4, 1, 3)])
   })
@@ -57,7 +57,7 @@ describe('PricesUtils', () => {
       mergeOHLC(
         [ohlc(60000, 'P1M', 2, 4, 1, 3)],
         [ohlc(60000, 'P1M', 2, 5, 1, 5)],
-        60000
+        'P1M'
       )
     ).toStrictEqual([ohlc(60000, 'P1M', 2, 5, 1, 5)])
   })
@@ -66,7 +66,7 @@ describe('PricesUtils', () => {
       mergeOHLC(
         [ohlc(60000, 'P1M', 2, 4, 1, 3), ohlc(120000, 'P1M', 2, 4, 1, 3)],
         [ohlc(120000, 'P1M', 2, 5, 1, 5), ohlc(180000, 'P1M', 3, 3, 3, 3)],
-        60000
+        'P1M'
       )
     ).toStrictEqual([
       ohlc(60000, 'P1M', 2, 4, 1, 3),
@@ -79,7 +79,7 @@ describe('PricesUtils', () => {
       mergeOHLC(
         [ohlc(60000, 'P1M', 2, 4, 1, 3), ohlc(120000, 'P1M', 3, 5, 0, 4)],
         [ohlc(300000, 'P1M', 2, 5, 1, 5)],
-        60000
+        'P1M'
       )
     ).toStrictEqual([
       ohlc(60000, 'P1M', 2, 4, 1, 3),

@@ -16,7 +16,7 @@ import {
   pricesTopic,
   Publishable
 } from 'websocketMessages'
-import { mergeOHLC } from 'utils/pricesUtils'
+import { mergeOHLC, olhcDurationsMs } from 'utils/pricesUtils'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { useWindowDimensions, widgetSize, WindowDimensions } from 'utils/layout'
 import { produce } from 'immer'
@@ -38,15 +38,6 @@ type PriceParameters = {
   tickRange: number
   gridSpacing: number
   ticks: number[]
-}
-
-const durationsMs: Record<OHLCDuration, number> = {
-  ['P1M']: 60 * 1000,
-  ['P5M']: 5 * 60 * 1000,
-  ['P15M']: 15 * 60 * 1000,
-  ['P1H']: 60 * 60 * 1000,
-  ['P4H']: 4 * 60 * 60 * 1000,
-  ['P1D']: 24 * 60 * 60 * 1000
 }
 
 type ViewPort = {
@@ -122,11 +113,11 @@ export function PricesWidget({ marketId }: { marketId: string }) {
       (message: Publishable) => {
         if (message.type === 'Prices') {
           if (message.full) {
-            setOhlc(mergeOHLC([], message.ohlc, durationsMs[duration]))
+            setOhlc(mergeOHLC([], message.ohlc, duration))
           } else {
             setOhlc(
               produce((draft) => {
-                mergeOHLC(draft, message.ohlc, durationsMs[duration])
+                mergeOHLC(draft, message.ohlc, duration)
               })
             )
           }
@@ -487,7 +478,7 @@ export function PricesWidget({ marketId }: { marketId: string }) {
       viewPort.latestStart
         ? viewPort.latestStart.getTime()
         : lastDate.getTime() +
-          durationsMs[viewportOhlc[viewportOhlc.length - 1].duration]
+          olhcDurationsMs[viewportOhlc[viewportOhlc.length - 1].duration]
     )
     if (endDate.getDate() == startDate.getDate()) {
       return `${startDate.toLocaleDateString()}, ${startDate.toLocaleTimeString()} to ${endDate.toLocaleTimeString()}`

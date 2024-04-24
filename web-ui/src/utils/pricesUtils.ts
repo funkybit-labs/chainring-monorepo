@@ -1,12 +1,21 @@
-import { OHLC } from 'websocketMessages'
+import { OHLC, OHLCDuration } from 'websocketMessages'
+
+export const olhcDurationsMs: Record<OHLCDuration, number> = {
+  ['P1M']: 60 * 1000,
+  ['P5M']: 5 * 60 * 1000,
+  ['P15M']: 15 * 60 * 1000,
+  ['P1H']: 60 * 60 * 1000,
+  ['P4H']: 4 * 60 * 60 * 1000,
+  ['P1D']: 24 * 60 * 60 * 1000
+}
 
 export function mergeOHLC(
   draft: OHLC[],
   incoming: OHLC[],
-  durationMs: number
+  duration: OHLCDuration
 ): OHLC[] {
   // update completes of last item before merge
-  updateLastItemCompleteness(draft, durationMs)
+  updateLastItemCompleteness(draft, olhcDurationsMs[duration])
 
   // merge new data
   incoming.forEach((newItem) => {
@@ -16,7 +25,7 @@ export function mergeOHLC(
     )
     if (index == -1) {
       // fill gaps before pushing new ohlc
-      fillGaps(draft, newItem, durationMs)
+      fillGaps(draft, newItem, olhcDurationsMs[duration])
 
       draft.push(newItem)
     } else {
@@ -24,7 +33,7 @@ export function mergeOHLC(
     }
   })
   // update completes of last item after merge
-  updateLastItemCompleteness(draft, durationMs)
+  updateLastItemCompleteness(draft, olhcDurationsMs[duration])
   return draft
 }
 
