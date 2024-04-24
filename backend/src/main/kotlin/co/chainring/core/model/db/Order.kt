@@ -371,8 +371,9 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 last = LastTrade(
                     price = lastTradePrice.setScale(priceScale, RoundingMode.HALF_EVEN).toString(),
                     direction = when {
-                        lastTradePrice >= prevTradePrice -> LastTradeDirection.Up
-                        else -> LastTradeDirection.Down
+                        lastTradePrice > prevTradePrice -> LastTradeDirection.Up
+                        lastTradePrice < prevTradePrice -> LastTradeDirection.Down
+                        else -> LastTradeDirection.Unchanged
                     },
                 ),
             )

@@ -50,7 +50,7 @@ class OrderBookTest : TestWithDb() {
                 sell = emptyList(),
                 last = LastTrade(
                     price = "0.000",
-                    direction = LastTradeDirection.Up,
+                    direction = LastTradeDirection.Unchanged,
                 ),
             ),
         )
@@ -118,7 +118,7 @@ class OrderBookTest : TestWithDb() {
                 sell = emptyList(),
                 last = LastTrade(
                     price = "0.000",
-                    direction = LastTradeDirection.Up,
+                    direction = LastTradeDirection.Unchanged,
                 ),
             ),
         )
@@ -167,7 +167,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 last = LastTrade(
                     price = "0.000",
-                    direction = LastTradeDirection.Up,
+                    direction = LastTradeDirection.Unchanged,
                 ),
             ),
         )
@@ -265,7 +265,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 last = LastTrade(
                     price = "0.000",
-                    direction = LastTradeDirection.Up,
+                    direction = LastTradeDirection.Unchanged,
                 ),
             ),
         )
@@ -462,7 +462,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 last = LastTrade(
                     price = "0.000",
-                    direction = LastTradeDirection.Up,
+                    direction = LastTradeDirection.Unchanged,
                 ),
             ),
         )
@@ -537,7 +537,7 @@ class OrderBookTest : TestWithDb() {
     }
 
     @Test
-    fun `last trade up`() {
+    fun `last trade down`() {
         verifyOrderBook(
             btcEthMarket,
             ordersInDb = listOf(
@@ -631,7 +631,7 @@ class OrderBookTest : TestWithDb() {
     }
 
     @Test
-    fun `last trade down`() {
+    fun `last trade up`() {
         verifyOrderBook(
             btcEthMarket,
             ordersInDb = listOf(
@@ -719,6 +719,100 @@ class OrderBookTest : TestWithDb() {
                 last = LastTrade(
                     price = "17.450",
                     direction = LastTradeDirection.Up,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `last trade unchanged`() {
+        verifyOrderBook(
+            btcEthMarket,
+            ordersInDb = listOf(
+                Order(
+                    OrderId("order_1"),
+                    btcEthMarket,
+                    OrderSide.Buy,
+                    OrderType.Limit,
+                    OrderStatus.Open,
+                    price = "17.50".toBigDecimal(),
+                    amount = "1".toBigDecimal(),
+                ),
+                Order(
+                    OrderId("order_2"),
+                    btcEthMarket,
+                    OrderSide.Sell,
+                    OrderType.Limit,
+                    OrderStatus.Partial,
+                    price = "17.55".toBigDecimal(),
+                    amount = "2".toBigDecimal(),
+                ),
+                Order(
+                    OrderId("order_3"),
+                    btcEthMarket,
+                    OrderSide.Buy,
+                    OrderType.Limit,
+                    OrderStatus.Filled,
+                    price = "17.45".toBigDecimal(),
+                    amount = "2".toBigDecimal(),
+                ),
+                Order(
+                    OrderId("order_4"),
+                    btcEthMarket,
+                    OrderSide.Sell,
+                    OrderType.Market,
+                    OrderStatus.Filled,
+                    price = null,
+                    amount = "2".toBigDecimal(),
+                ),
+                Order(
+                    OrderId("order_5"),
+                    btcEthMarket,
+                    OrderSide.Buy,
+                    OrderType.Limit,
+                    OrderStatus.Filled,
+                    price = "17.40".toBigDecimal(),
+                    amount = "2".toBigDecimal(),
+                ),
+                Order(
+                    OrderId("order_6"),
+                    btcEthMarket,
+                    OrderSide.Sell,
+                    OrderType.Market,
+                    OrderStatus.Filled,
+                    price = null,
+                    amount = "2".toBigDecimal(),
+                ),
+            ),
+            tradesInDb = listOf(
+                Trade(
+                    btcEthMarket,
+                    timeSinceHappened = 2.seconds,
+                    buyOrder = OrderId("order_5"),
+                    sellOrder = OrderId("order_6"),
+                    amount = "2".toBigDecimal(),
+                    price = "17.40".toBigDecimal(),
+                ),
+                Trade(
+                    btcEthMarket,
+                    timeSinceHappened = 1.seconds,
+                    buyOrder = OrderId("order_3"),
+                    sellOrder = OrderId("order_4"),
+                    amount = "2".toBigDecimal(),
+                    price = "17.40".toBigDecimal(),
+                ),
+            ),
+            expected = OrderBook(
+                marketId = btcEthMarket,
+                buy = listOf(
+                    OrderBookEntry(price = "17.500", size = "1".toBigDecimal()),
+                ),
+                sell = listOf(
+                    OrderBookEntry(price = "17.550", size = "2".toBigDecimal()),
+                ),
+                last = LastTrade(
+                    price = "17.400",
+                    direction = LastTradeDirection.Unchanged,
                 ),
             ),
         )

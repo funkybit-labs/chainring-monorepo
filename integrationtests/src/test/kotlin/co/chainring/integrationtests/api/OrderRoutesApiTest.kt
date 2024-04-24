@@ -397,7 +397,7 @@ class OrderRoutesApiTest {
                         OrderBookEntry(price = "17.450", size = "0.00013345".toBigDecimal()),
                     ),
                     sell = emptyList(),
-                    last = LastTrade("0.000", LastTradeDirection.Up),
+                    last = LastTrade("0.000", LastTradeDirection.Unchanged),
                 ),
             )
         }
@@ -423,7 +423,7 @@ class OrderRoutesApiTest {
                         OrderBookEntry(price = "17.500", size = "0.00012345".toBigDecimal()),
                     ),
                     sell = emptyList(),
-                    last = LastTrade("0.000", LastTradeDirection.Up),
+                    last = LastTrade("0.000", LastTradeDirection.Unchanged),
                 ),
             )
         }
@@ -458,7 +458,7 @@ class OrderRoutesApiTest {
                     sell = listOf(
                         OrderBookEntry(price = "17.600", size = "0.00154321".toBigDecimal()),
                     ),
-                    last = LastTrade("0.000", LastTradeDirection.Up),
+                    last = LastTrade("0.000", LastTradeDirection.Unchanged),
                 ),
             )
         }
@@ -488,7 +488,7 @@ class OrderRoutesApiTest {
                     sell = listOf(
                         OrderBookEntry(price = "17.550", size = "0.00054321".toBigDecimal()),
                     ),
-                    last = LastTrade("0.000", LastTradeDirection.Up),
+                    last = LastTrade("0.000", LastTradeDirection.Unchanged),
                 ),
             )
         }
