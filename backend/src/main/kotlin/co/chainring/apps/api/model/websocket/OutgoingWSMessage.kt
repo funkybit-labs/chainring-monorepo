@@ -48,6 +48,7 @@ data class OrderBookEntry(
 enum class LastTradeDirection {
     Up,
     Down,
+    Unchanged,
 }
 
 @Serializable

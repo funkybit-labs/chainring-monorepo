@@ -2,7 +2,12 @@ import { Widget } from 'components/common/Widget'
 import { calculateTickSpacing } from 'utils/orderBookUtils'
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
-import { OrderBook, Publishable, orderBookTopic } from 'websocketMessages'
+import {
+  OrderBook,
+  Publishable,
+  orderBookTopic,
+  Direction
+} from 'websocketMessages'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { useWindowDimensions, widgetSize, WindowDimensions } from 'utils/layout'
 
@@ -98,6 +103,17 @@ export function OrderBookWidget({ marketId }: { marketId: string }) {
   )
 }
 
+function directionStyle(direction: Direction) {
+  switch (direction) {
+    case 'Up':
+      return { color: '#10A327', symbol: '↑' }
+    case 'Down':
+      return { color: '#7F1D1D', symbol: '↓' }
+    case 'Unchanged':
+      return { color: 'transparent', symbol: '' }
+  }
+}
+
 export function OrderBook({
   params,
   orderBook
@@ -112,6 +128,8 @@ export function OrderBook({
   if (orderBook.buy.length === 0 && orderBook.sell.length === 0) {
     return <div className={'text-center'}>Empty</div>
   }
+
+  const direction = directionStyle(orderBook.last.direction)
 
   return (
     <svg width={params.bookWidth} height={params.bookHeight}>
@@ -145,9 +163,7 @@ export function OrderBook({
         fontSize="24px"
       >
         {orderBook.last.price}
-        <tspan fill={orderBook.last.direction == 'Up' ? '#10A327' : '#7F1D1D'}>
-          {orderBook.last.direction == 'Up' ? '↑' : '↓'}
-        </tspan>
+        <tspan fill={direction.color}>{direction.symbol}</tspan>
       </text>
       {orderBook.sell.map((l, i) => (
         <Fragment key={`${l.price}`}>

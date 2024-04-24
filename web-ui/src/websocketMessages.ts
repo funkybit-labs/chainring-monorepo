@@ -34,7 +34,7 @@ const OrderBookEntrySchema = z.object({
 })
 export type OrderBookEntry = z.infer<typeof OrderBookEntrySchema>
 
-const DirectionSchema = z.enum(['Up', 'Down'])
+const DirectionSchema = z.enum(['Up', 'Down', 'Unchanged'])
 export type Direction = z.infer<typeof DirectionSchema>
 
 const LastTradeSchema = z.object({
