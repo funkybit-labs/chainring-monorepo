@@ -37,8 +37,6 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.random.Random
-import kotlin.time.Duration.Companion.milliseconds
 
 private val logger = KotlinLogging.logger {}
 
@@ -65,13 +63,20 @@ class Broadcaster(val db: Database) {
     private val subscriptions = TopicSubscriptions()
     private val subscriptionsByPrincipal = ConcurrentHashMap<Principal, TopicSubscriptions>()
     private val lastPricePublish = mutableMapOf<Pair<MarketId, ConnectedClient>, Instant>()
-    private val rnd = Random(0)
     private val orderBooksByMarket = ConcurrentHashMap<MarketId, OrderBook>()
     private val pricesByMarketAndPeriod = ConcurrentHashMap<SubscriptionTopic.Prices, MutableList<OHLC>>()
 
-    private val pgListener = PgListener(db, "broadcaster-listener", "broadcaster_ctl") { notification ->
-        handleDbNotification(notification.parameter)
-    }
+    private val pgListener = PgListener(
+        db,
+        threadName = "broadcaster-listener",
+        channel = "broadcaster_ctl",
+        onReconnect = {
+            reloadPrices()
+        },
+        onNotifyLogic = { notification ->
+            handleDbNotification(notification.parameter)
+        },
+    )
 
     fun subscribe(topic: SubscriptionTopic, client: ConnectedClient) {
         subscriptions.getOrPut(topic) {
@@ -116,19 +121,19 @@ class Broadcaster(val db: Database) {
 
     fun start() {
         pgListener.start()
-        initializePrices()
+        reloadPrices()
     }
 
-    private fun initializePrices() {
+    private fun reloadPrices() {
         transaction {
             // load historical prices once, later only updates will be delivered via notify
             MarketEntity.all().map { it.guid.value }.forEach { market ->
-                OHLCDuration.entries.forEach { p ->
+                OHLCDuration.entries.forEach { duration ->
                     // equivalent to 7 days of 5 minutes intervals
-                    val startTime = Clock.System.now() - (p.durationMs() * 20 * 24 * 7).milliseconds
+                    val startTime = Clock.System.now() - duration.interval() * 20 * 24 * 7
 
-                    val ohlcEntities = OHLCEntity.findFrom(market, p, startTime = startTime)
-                    pricesByMarketAndPeriod[SubscriptionTopic.Prices(market, p)] = ohlcEntities.map { it.toWSResponse() }.toMutableList()
+                    val ohlcEntities = OHLCEntity.findFrom(market, duration, startTime = startTime)
+                    pricesByMarketAndPeriod[SubscriptionTopic.Prices(market, duration)] = ohlcEntities.map { it.toWSResponse() }.toMutableList()
                 }
             }
         }
@@ -159,7 +164,7 @@ class Broadcaster(val db: Database) {
             else -> Prices(
                 market = topic.marketId,
                 duration = topic.duration,
-                ohlc = pricesByMarketAndPeriod[topic]?.takeLastWhile { (it.start + it.duration.durationMs().milliseconds) > lastTimestamp } ?: listOf(),
+                ohlc = pricesByMarketAndPeriod[topic]?.takeLastWhile { it.start + it.duration.interval() > lastTimestamp } ?: listOf(),
                 full = false,
             )
         }

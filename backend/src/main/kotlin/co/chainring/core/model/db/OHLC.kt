@@ -34,6 +34,7 @@ import org.jetbrains.exposed.sql.statements.UpsertStatement
 import org.jetbrains.exposed.sql.upsert
 import java.math.BigDecimal
 import java.math.BigInteger
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -68,14 +69,14 @@ enum class OHLCDuration {
         }
     }
 
-    fun durationMs(): Long {
+    fun interval(): Duration {
         return when (this) {
-            P1M -> 1.minutes.inWholeMilliseconds
-            P5M -> 5.minutes.inWholeMilliseconds
-            P15M -> 15.minutes.inWholeMilliseconds
-            P1H -> 1.hours.inWholeMilliseconds
-            P4H -> 4.hours.inWholeMilliseconds
-            P1D -> 1.days.inWholeMilliseconds
+            P1M -> 1.minutes
+            P5M -> 5.minutes
+            P15M -> 15.minutes
+            P1H -> 1.hours
+            P4H -> 4.hours
+            P1D -> 1.days
         }
     }
 }
