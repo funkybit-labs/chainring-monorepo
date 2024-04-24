@@ -11,7 +11,7 @@ export function mergeOHLC(
   // merge new data
   incoming.forEach((newItem) => {
     // lookup if recent item is being replaced
-    const index = draft.findLastIndex(
+    const index = draft.findIndex(
       (i) => i.start.getTime() == newItem.start.getTime()
     )
     if (index == -1) {
