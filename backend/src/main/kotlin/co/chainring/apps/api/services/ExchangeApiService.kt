@@ -231,7 +231,7 @@ class ExchangeApiService(
                         entry.key.value,
                         walletEntity.address.toSequencerId().value,
                         orderIds,
-                        cancelAll = true
+                        cancelAll = true,
                     )
                 }
             }

@@ -293,9 +293,12 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         fun listOpenForWallet(wallet: WalletEntity): List<OrderEntity> {
             return OrderEntity
                 .find {
-                    (OrderTable.status.eq(OrderStatus.Open).or(
-                    OrderTable.status.eq(OrderStatus.Partial) and OrderTable.type.eq(OrderType.Limit))
-                ) and OrderTable.walletGuid.eq(wallet.guid) }
+                    (
+                        OrderTable.status.eq(OrderStatus.Open).or(
+                            OrderTable.status.eq(OrderStatus.Partial) and OrderTable.type.eq(OrderType.Limit),
+                        )
+                        ) and OrderTable.walletGuid.eq(wallet.guid)
+                }
                 .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
                 .toList()
         }

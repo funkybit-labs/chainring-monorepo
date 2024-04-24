@@ -182,7 +182,7 @@ open class SequencerClient {
         marketId: MarketId,
         wallet: Long,
         orderIds: List<OrderId>,
-        cancelAll: Boolean = false
+        cancelAll: Boolean = false,
     ): SequencerResponse {
         return orderBatch(marketId, wallet, emptyList(), emptyList(), orderIds, cancelAll = cancelAll)
     }

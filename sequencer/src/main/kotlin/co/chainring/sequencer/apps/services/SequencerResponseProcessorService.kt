@@ -210,7 +210,7 @@ object SequencerResponseProcessorService {
                     if (!cancelAll) {
                         broadcasterNotifications.add(
                             orderToUpdate.wallet.address,
-                            OrderUpdated(orderToUpdate.toOrderResponse())
+                            OrderUpdated(orderToUpdate.toOrderResponse()),
                         )
                     }
                 }
