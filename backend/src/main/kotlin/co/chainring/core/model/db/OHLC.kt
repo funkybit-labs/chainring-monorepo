@@ -116,7 +116,7 @@ class OHLCEntity(guid: EntityID<OHLCId>) : GUIDEntity<OHLCId>(guid) {
             high = this.high.toDouble(),
             low = this.low.toDouble(),
             close = this.close.toDouble(),
-            durationMs = this.duration.durationMs(),
+            duration = this.duration,
         )
     }
 

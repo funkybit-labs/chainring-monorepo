@@ -1,8 +1,21 @@
 import { Widget } from 'components/common/Widget'
 import { calculateTickSpacing } from 'utils/orderBookUtils'
-import React, { Fragment, useEffect, useMemo, useState } from 'react'
+import React, {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState
+} from 'react'
 import Spinner from 'components/common/Spinner'
-import { Direction, OHLC, pricesTopic, Publishable } from 'websocketMessages'
+import {
+  Direction,
+  OHLC,
+  OHLCDuration,
+  OHLCDurationSchema,
+  pricesTopic,
+  Publishable
+} from 'websocketMessages'
 import { mergeOHLC } from 'utils/pricesUtils'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { useWindowDimensions, widgetSize, WindowDimensions } from 'utils/layout'
@@ -27,22 +40,13 @@ type PriceParameters = {
   ticks: number[]
 }
 
-enum OHLCDuration {
-  P1M = 'P1M',
-  P5M = 'P5M',
-  P15M = 'P15M',
-  P1H = 'P1H',
-  P4H = 'P4H',
-  P1D = 'P1D'
-}
-
-const durations: Record<OHLCDuration, number> = {
-  [OHLCDuration.P1M]: 60 * 1000,
-  [OHLCDuration.P5M]: 5 * 60 * 1000,
-  [OHLCDuration.P15M]: 15 * 60 * 1000,
-  [OHLCDuration.P1H]: 60 * 60 * 1000,
-  [OHLCDuration.P4H]: 4 * 60 * 60 * 1000,
-  [OHLCDuration.P1D]: 24 * 60 * 60 * 1000
+const durationsMs: Record<OHLCDuration, number> = {
+  ['P1M']: 60 * 1000,
+  ['P5M']: 5 * 60 * 1000,
+  ['P15M']: 15 * 60 * 1000,
+  ['P1H']: 60 * 60 * 1000,
+  ['P4H']: 4 * 60 * 60 * 1000,
+  ['P1D']: 24 * 60 * 60 * 1000
 }
 
 type ViewPort = {
@@ -99,7 +103,7 @@ function calculateParameters(
 }
 
 export function PricesWidget({ marketId }: { marketId: string }) {
-  const [period, setPeriod] = useState<OHLCDuration>(OHLCDuration.P5M)
+  const [duration, setDuration] = useState<OHLCDuration>('P5M')
   const [viewPort, setViewPort] = useState<ViewPort>({
     earliestStart: undefined,
     latestStart: undefined
@@ -110,20 +114,26 @@ export function PricesWidget({ marketId }: { marketId: string }) {
   const maxCandles = 20
 
   useWebsocketSubscription({
-    topics: useMemo(() => [pricesTopic(marketId, period)], [marketId, period]),
-    handler: (message: Publishable) => {
-      if (message.type === 'Prices') {
-        if (message.full) {
-          setOhlc(mergeOHLC([], message.ohlc, durations[period]))
-        } else {
-          setOhlc(
-            produce((draft) => {
-              mergeOHLC(draft, message.ohlc, durations[period])
-            })
-          )
+    topics: useMemo(
+      () => [pricesTopic(marketId, duration)],
+      [marketId, duration]
+    ),
+    handler: useCallback(
+      (message: Publishable) => {
+        if (message.type === 'Prices') {
+          if (message.full) {
+            setOhlc(mergeOHLC([], message.ohlc, durationsMs[duration]))
+          } else {
+            setOhlc(
+              produce((draft) => {
+                mergeOHLC(draft, message.ohlc, durationsMs[duration])
+              })
+            )
+          }
         }
-      }
-    }
+      },
+      [duration]
+    )
   })
 
   // Allow keyboard zoom and pan
@@ -283,7 +293,7 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     lastLabel?: string
   ): string {
     const date = ohlc.start
-    if (ohlcDuration === OHLCDuration.P1D) {
+    if (ohlcDuration === 'P1D') {
       return weeklyLabel(date)
     } else {
       const hours = date.getHours()
@@ -291,10 +301,7 @@ export function PricesWidget({ marketId }: { marketId: string }) {
       if (hours < lastHours) {
         return weeklyLabel(date)
       } else {
-        if (
-          ohlcDuration === OHLCDuration.P1H ||
-          ohlcDuration === OHLCDuration.P4H
-        ) {
+        if (ohlcDuration === 'P1H' || ohlcDuration === 'P4H') {
           return (hours < 10 ? '0' + hours : hours) + ':00'
         } else {
           const minutes = date.getMinutes()
@@ -312,7 +319,7 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     return (
       <>
         {ohlc.map((l, i) => {
-          const label = calculateLabel(period, l, lastLabel)
+          const label = calculateLabel(duration, l, lastLabel)
           const oldLastLabel = lastLabel
           lastLabel = label
           const x = params.chartStartX + i * params.barWidth
@@ -431,11 +438,11 @@ export function PricesWidget({ marketId }: { marketId: string }) {
   }
 
   function zoomIn() {
-    const values = Object.values(OHLCDuration)
-    const idx = values.indexOf(period)
-    const inner = idx > 0 ? values[idx - 1] : period
+    const values = Object.values(OHLCDurationSchema.Values)
+    const idx = values.indexOf(duration)
+    const inner = idx > 0 ? values[idx - 1] : duration
+    setDuration(inner)
     setOhlc([])
-    setPeriod(inner)
     setViewPort({
       earliestStart: undefined,
       latestStart: undefined
@@ -443,11 +450,11 @@ export function PricesWidget({ marketId }: { marketId: string }) {
   }
 
   function zoomOut() {
-    const values = Object.values(OHLCDuration)
-    const idx = values.indexOf(period)
-    const outer = idx < values.length - 1 ? values[idx + 1] : period
+    const values = Object.values(OHLCDurationSchema.Values)
+    const idx = values.indexOf(duration)
+    const outer = idx < values.length - 1 ? values[idx + 1] : duration
+    setDuration(outer)
     setOhlc([])
-    setPeriod(outer)
     setViewPort({
       earliestStart: undefined,
       latestStart: undefined
@@ -455,13 +462,13 @@ export function PricesWidget({ marketId }: { marketId: string }) {
   }
 
   function canZoomOut(duration: OHLCDuration): boolean {
-    const values = Object.values(OHLCDuration)
+    const values = Object.values(OHLCDurationSchema.Values)
     const idx = values.indexOf(duration)
     return idx < values.length - 1
   }
 
   function canZoomIn(duration: OHLCDuration): boolean {
-    const values = Object.values(OHLCDuration)
+    const values = Object.values(OHLCDurationSchema.Values)
     const idx = values.indexOf(duration)
     return idx > 0
   }
@@ -479,7 +486,8 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     const endDate = new Date(
       viewPort.latestStart
         ? viewPort.latestStart.getTime()
-        : lastDate.getTime() + viewportOhlc[viewportOhlc.length - 1].durationMs
+        : lastDate.getTime() +
+          durationsMs[viewportOhlc[viewportOhlc.length - 1].duration]
     )
     if (endDate.getDate() == startDate.getDate()) {
       return `${startDate.toLocaleDateString()}, ${startDate.toLocaleTimeString()} to ${endDate.toLocaleTimeString()}`
@@ -497,15 +505,15 @@ export function PricesWidget({ marketId }: { marketId: string }) {
             <div className="shrink-0">
               <button
                 className="px-1 text-xl disabled:opacity-50"
-                disabled={!canZoomIn(period)}
+                disabled={!canZoomIn(duration)}
                 onClick={zoomIn}
               >
                 +
               </button>
-              <span>{period}</span>
+              <span>{duration}</span>
               <button
                 className="px-1 text-xl disabled:opacity-50"
-                disabled={!canZoomOut(period)}
+                disabled={!canZoomOut(duration)}
                 onClick={zoomOut}
               >
                 -

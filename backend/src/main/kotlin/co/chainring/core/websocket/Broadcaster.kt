@@ -37,11 +37,8 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger {}
 
@@ -148,34 +145,6 @@ class Broadcaster(val db: Database) {
         ),
     )
 
-    private fun mockOHLC(
-        marketId: MarketId,
-        startTime: Instant,
-        duration: kotlin.time.Duration,
-        count: Long,
-        full: Boolean,
-    ): List<OHLC> {
-        fun priceAdjust(range: Double, direction: Int) =
-            1 + (rnd.nextDouble() * range) + when (direction) {
-                0 -> -(range / 2)
-                -1 -> -(2 * range)
-                else -> 0.0
-            }
-        return (0 until count).map { i ->
-            val curPrice = mockPrices[marketId]!!
-            val nextPrice = curPrice * priceAdjust(if (full) 0.001 else 0.0001, 0)
-            mockPrices[marketId] = nextPrice
-            OHLC(
-                start = startTime.plus((duration.inWholeSeconds * i).seconds),
-                open = curPrice,
-                high = max(curPrice, nextPrice) * priceAdjust(0.0001, 1),
-                low = min(curPrice, nextPrice) * priceAdjust(0.0001, -1),
-                close = nextPrice,
-                durationMs = duration.inWholeMilliseconds,
-            )
-        }
-    }
-
     private fun sendPrices(topic: SubscriptionTopic.Prices, client: ConnectedClient) {
         val key = Pair(topic.marketId, client)
         val now = Clock.System.now()
@@ -190,7 +159,7 @@ class Broadcaster(val db: Database) {
             else -> Prices(
                 market = topic.marketId,
                 duration = topic.duration,
-                ohlc = pricesByMarketAndPeriod[topic]?.takeLastWhile { (it.start + it.durationMs.milliseconds) > lastTimestamp } ?: listOf(),
+                ohlc = pricesByMarketAndPeriod[topic]?.takeLastWhile { (it.start + it.duration.durationMs().milliseconds) > lastTimestamp } ?: listOf(),
                 full = false,
             )
         }

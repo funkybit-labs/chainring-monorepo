@@ -590,7 +590,7 @@ class OrderRoutesApiTest {
                     high = 17.55,
                     low = 17.55,
                     close = 17.55,
-                    durationMs = 300000,
+                    duration = OHLCDuration.P5M,
                 ),
                 msg.ohlc.last(),
             )
@@ -603,7 +603,7 @@ class OrderRoutesApiTest {
                     high = 17.55,
                     low = 17.55,
                     close = 17.55,
-                    durationMs = 300000,
+                    duration = OHLCDuration.P5M,
                 ),
                 msg.ohlc.last(),
             )
@@ -728,7 +728,7 @@ class OrderRoutesApiTest {
                     high = 17.55,
                     low = 17.5,
                     close = 17.5,
-                    durationMs = 300000,
+                    duration = OHLCDuration.P5M,
                 ),
                 msg.ohlc.last(),
             )
@@ -741,7 +741,7 @@ class OrderRoutesApiTest {
                     high = 17.55,
                     low = 17.5,
                     close = 17.5,
-                    durationMs = 300000,
+                    duration = OHLCDuration.P5M,
                 ),
                 msg.ohlc.last(),
             )
