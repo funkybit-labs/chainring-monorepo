@@ -3,22 +3,22 @@ import { useState, useEffect } from 'react'
 function minWidthByBreakpoint(breakpoint: string): number {
   return (
     {
-      sm: 640,
-      md: 768,
-      lg: 1024,
-      xl: 1280,
-      '2xl': 1536
+      sm: 750,
+      md: 1000,
+      lg: 1500,
+      xl: 1750,
+      '2xl': 2250
     }[breakpoint] ?? 0
   )
 }
 
 const columnsByMinWidth: { minWidth: number; columns: number }[] = [
   { minWidth: 0, columns: 1 },
-  { minWidth: 640, columns: 1 },
-  { minWidth: 768, columns: 1 },
-  { minWidth: 1024, columns: 2 },
-  { minWidth: 1280, columns: 3 },
-  { minWidth: 1536, columns: 3 }
+  { minWidth: 750, columns: 1 },
+  { minWidth: 1000, columns: 1 },
+  { minWidth: 1500, columns: 2 },
+  { minWidth: 1750, columns: 3 },
+  { minWidth: 2250, columns: 4 }
 ]
 
 export type WindowDimensions = { width: number; height: number }
@@ -29,7 +29,7 @@ export function getColumnsForWidth(width: number): number {
       return entry.columns
     }
   }
-  return 3
+  return 4
 }
 
 export function gridClasses() {
