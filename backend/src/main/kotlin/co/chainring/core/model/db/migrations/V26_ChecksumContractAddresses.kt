@@ -32,7 +32,7 @@ class V26_ChecksumContractAddresses : Migration() {
 
     override fun run() {
         transaction {
-            // checksum wallet address
+            // checksum erc20 contract address
             V26_SymbolTable.selectAll().where(V26_SymbolTable.contractAddress.isNotNull()).forEach { resultRow ->
                 val guid = resultRow[V26_SymbolTable.guid]
                 val checksumAddress = Keys.toChecksumAddress(resultRow[V26_SymbolTable.contractAddress])
@@ -42,6 +42,7 @@ class V26_ChecksumContractAddresses : Migration() {
                 }
             }
 
+            // checksum deployed contract address
             V26_DeployedSmartContract.selectAll().where(V26_DeployedSmartContract.deprecated.eq(false)).forEach { resultRow ->
                 val guid = resultRow[V26_DeployedSmartContract.guid]
                 val checksumProxyAddress = Keys.toChecksumAddress(resultRow[V26_DeployedSmartContract.proxyAddress])
