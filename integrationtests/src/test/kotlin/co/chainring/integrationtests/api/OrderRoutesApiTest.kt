@@ -53,6 +53,7 @@ import co.chainring.integrationtests.utils.subscribeToOrders
 import co.chainring.integrationtests.utils.subscribeToPrices
 import co.chainring.integrationtests.utils.subscribeToTrades
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.datetime.Clock
 import org.awaitility.kotlin.await
 import org.awaitility.kotlin.withAlias
 import org.http4k.client.WebsocketClient
@@ -76,6 +77,7 @@ import kotlin.test.assertNotNull
 class OrderRoutesApiTest {
     private val logger = KotlinLogging.logger {}
     private val btcEthMarketId = MarketId("BTC/ETH")
+    private val btcUsdcMarketId = MarketId("BTC/USDC")
     private val usdcDaiMarketId = MarketId("USDC/DAI")
 
     @Test
@@ -876,10 +878,10 @@ class OrderRoutesApiTest {
     @Test
     fun `order batches`() {
         val (makerApiClient, makerWallet, makerWsClient) =
-            setupTrader(usdcDaiMarketId, "0.5", "0.2", "USDC", "500")
+            setupTrader(btcUsdcMarketId, "0.5", "0.2", "USDC", "500", subscribeToOrderBook = false)
 
         val (takerApiClient, takerWallet, takerWsClient) =
-            setupTrader(usdcDaiMarketId, "0.5", null, "USDC", "500")
+            setupTrader(btcUsdcMarketId, "0.5", null, "USDC", "500", subscribeToOrderBook = false)
 
         // starting onchain balances
         val makerStartingBTCBalance = makerWallet.getExchangeNativeBalance()
@@ -890,7 +892,7 @@ class OrderRoutesApiTest {
         // place 3 orders
         val createBatchLimitOrders = makerApiClient.batchOrders(
             BatchOrdersApiRequest(
-                marketId = MarketId("BTC/USDC"),
+                marketId = btcUsdcMarketId,
                 createOrders = listOf("0.00001", "0.00002", "0.0003").map {
                     CreateOrderApiRequest.Limit(
                         nonce = generateHexString(32),
@@ -913,7 +915,7 @@ class OrderRoutesApiTest {
 
         val batchOrderResponse = makerApiClient.batchOrders(
             BatchOrdersApiRequest(
-                marketId = MarketId("BTC/USDC"),
+                marketId = btcUsdcMarketId,
                 createOrders = listOf("0.0004", "0.0005", "0.0006").map {
                     CreateOrderApiRequest.Limit(
                         nonce = generateHexString(32),
@@ -973,7 +975,7 @@ class OrderRoutesApiTest {
         takerApiClient.createOrder(
             CreateOrderApiRequest.Market(
                 nonce = generateHexString(32),
-                marketId = MarketId("BTC/USDC"),
+                marketId = btcUsdcMarketId,
                 side = OrderSide.Buy,
                 amount = takerOrderAmount,
                 signature = EvmSignature.emptySignature(),
@@ -986,11 +988,41 @@ class OrderRoutesApiTest {
             assertOrderCreatedMessageReceived()
             repeat(5) { assertTradeCreatedMessageReceived() }
             assertOrderUpdatedMessageReceived()
+            assertBalancesMessageReceived()
+            assertPricesMessageReceived(btcUsdcMarketId) { msg ->
+                assertEquals(
+                    OHLC(
+                        // initial ohlc in the BTC/USDC market
+                        // price is weighted across limit orders that have been filled within execution
+                        start = OHLCDuration.P5M.durationStart(Clock.System.now()),
+                        open = 68400.3,
+                        high = 68400.3,
+                        low = 68400.3,
+                        close = 68400.3,
+                        duration = OHLCDuration.P5M,
+                    ),
+                    msg.ohlc.last(),
+                )
+            }
         }
 
         makerWsClient.apply {
             repeat(5) { assertTradeCreatedMessageReceived() }
-            assertOrderUpdatedMessageReceived()
+            repeat(5) { assertOrderUpdatedMessageReceived() }
+            assertBalancesMessageReceived()
+            assertPricesMessageReceived(btcUsdcMarketId) { msg ->
+                assertEquals(
+                    OHLC(
+                        start = OHLCDuration.P5M.durationStart(Clock.System.now()),
+                        open = 68400.3,
+                        high = 68400.3,
+                        low = 68400.3,
+                        close = 68400.3,
+                        duration = OHLCDuration.P5M,
+                    ),
+                    msg.ohlc.last(),
+                )
+            }
         }
 
         // should be 8 filled orders
@@ -1067,16 +1099,22 @@ class OrderRoutesApiTest {
         nativeDepositAmount: String?,
         mintSymbol: String,
         mintAmount: String,
+        subscribeToOrderBook: Boolean = true,
+        subscribeToOrderPrices: Boolean = true,
     ): Triple<ApiClient, Wallet, WsClient> {
         val apiClient = ApiClient()
         val wallet = Wallet(apiClient)
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken).apply {
-            subscribeToOrderBook(marketId)
-            assertOrderBookMessageReceived(marketId)
+            if (subscribeToOrderBook) {
+                subscribeToOrderBook(marketId)
+                assertOrderBookMessageReceived(marketId)
+            }
 
-            subscribeToPrices(marketId)
-            assertPricesMessageReceived(marketId)
+            if (subscribeToOrderPrices) {
+                subscribeToPrices(marketId)
+                assertPricesMessageReceived(marketId)
+            }
 
             subscribeToOrders()
             assertOrdersMessageReceived()
