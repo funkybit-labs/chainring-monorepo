@@ -277,10 +277,6 @@ object SequencerResponseProcessorService {
                 val sumOfPricesByAmount = trades.sumOf { it.price * it.amount.toBigDecimal() }
                 val weightedPrice = (sumOfPricesByAmount / sumOfAmounts.toBigDecimal()).setScale(marketPriceScale, RoundingMode.HALF_UP)
 
-                logger.error { "DEBUG: updating OHLC" }
-                logger.error { "DEBUG: trade prices = ${trades.map{it.price}.joinToString()}, trade amounts = ${trades.map{it.amount}.joinToString()}" }
-                logger.error { "DEBUG: updating market=${market.guid.value}, market.tickSize=${market.tickSize}, marketPriceScale=$marketPriceScale, sumOfPricesByAmount=$sumOfPricesByAmount, sumOfAmounts=$sumOfAmounts, weightedPrice=$weightedPrice" }
-
                 OHLCEntity.updateWith(market.guid.value, trades.first().timestamp, weightedPrice, sumOfAmounts)
                     .map {
                         BroadcasterNotification.pricesForMarketPeriods(

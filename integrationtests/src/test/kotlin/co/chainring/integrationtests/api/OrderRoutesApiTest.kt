@@ -995,10 +995,10 @@ class OrderRoutesApiTest {
                         // initial ohlc in the BTC/USDC market
                         // price is weighted across limit orders that have been filled within execution
                         start = OHLCDuration.P5M.durationStart(Clock.System.now()),
-                        open = 68400.808,
-                        high = 68400.808,
-                        low = 68400.808,
-                        close = 68400.808,
+                        open = 68400.3,
+                        high = 68400.3,
+                        low = 68400.3,
+                        close = 68400.3,
                         duration = OHLCDuration.P5M,
                     ),
                     msg.ohlc.last(),
@@ -1014,10 +1014,10 @@ class OrderRoutesApiTest {
                 assertEquals(
                     OHLC(
                         start = OHLCDuration.P5M.durationStart(Clock.System.now()),
-                        open = 68400.808,
-                        high = 68400.808,
-                        low = 68400.808,
-                        close = 68400.808,
+                        open = 68400.3,
+                        high = 68400.3,
+                        low = 68400.3,
+                        close = 68400.3,
                         duration = OHLCDuration.P5M,
                     ),
                     msg.ohlc.last(),
