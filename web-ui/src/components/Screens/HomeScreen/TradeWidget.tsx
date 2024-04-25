@@ -1,5 +1,5 @@
-import { apiClient, OrderSide } from 'apiClient'
-import { classNames, cleanAndFormatNumberInput } from 'utils'
+import { apiClient, OrderSide, TradingSymbol } from 'apiClient'
+import { classNames } from 'utils'
 import React, {
   ChangeEvent,
   useCallback,
@@ -10,7 +10,7 @@ import React, {
 import { useMutation } from '@tanstack/react-query'
 import { Widget } from 'components/common/Widget'
 import SubmitButton from 'components/common/SubmitButton'
-import { Address, formatUnits, parseUnits } from 'viem'
+import { Address, formatUnits } from 'viem'
 import { isErrorFromAlias } from '@zodios/core'
 import { useConfig, useSignTypedData } from 'wagmi'
 import { addressZero, getDomain } from 'utils/eip712'
@@ -19,6 +19,7 @@ import Decimal from 'decimal.js'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { OrderBook, orderBookTopic, Publishable } from 'websocketMessages'
 import { getMarketPrice } from 'utils/pricesUtils'
+import useAmountInputState from 'hooks/useAmountInputState'
 
 export default function TradeWidget({
   market,
@@ -36,8 +37,27 @@ export default function TradeWidget({
   const quoteSymbol = market.quoteSymbol
 
   const [side, setSide] = useState<OrderSide>('Buy')
-  const [price, setPrice] = useState('')
-  const [amount, setAmount] = useState('')
+
+  const {
+    inputValue: priceInputValue,
+    setInputValue: setPriceInputValue,
+    valueInFundamentalUnits: price
+  } = useAmountInputState({
+    initialInputValue: '',
+    initialValue: 0n,
+    decimals: quoteSymbol.decimals
+  })
+
+  const {
+    inputValue: amountInputValue,
+    setInputValue: setAmountInputValue,
+    valueInFundamentalUnits: amount
+  } = useAmountInputState({
+    initialInputValue: '',
+    initialValue: 0n,
+    decimals: baseSymbol.decimals
+  })
+
   const [isMarketOrder, setIsMarketOrder] = useState(false)
   const [orderBook, setOrderBook] = useState<OrderBook | undefined>(undefined)
 
@@ -51,81 +71,38 @@ export default function TradeWidget({
   })
 
   const marketPrice = useMemo(() => {
-    if (orderBook === undefined) {
-      return undefined
-    }
+    if (orderBook === undefined) return 0n
+    return getMarketPrice(side, amount, market, orderBook)
+  }, [side, amount, orderBook, market])
 
-    return getMarketPrice(
-      side,
-      parseUnits(amount, quoteSymbol.decimals),
-      market,
-      orderBook
-    )
-  }, [side, amount, orderBook, market, quoteSymbol.decimals])
-
-  const formattedMarketPrice = useMemo(() => {
-    if (marketPrice === undefined) {
-      return cleanAndFormatNumberInput('0', quoteSymbol.decimals)
+  const notional = useMemo(() => {
+    if (isMarketOrder) {
+      return (marketPrice * amount) / BigInt(Math.pow(10, baseSymbol.decimals))
     } else {
-      return `~${cleanAndFormatNumberInput(
-        formatUnits(marketPrice, quoteSymbol.decimals),
-        quoteSymbol.decimals
-      )}`
+      return (price * amount) / BigInt(Math.pow(10, baseSymbol.decimals))
     }
-  }, [marketPrice, quoteSymbol.decimals])
-
-  const formattedNotional = useMemo(() => {
-    if (amount === '') {
-      return undefined
-    }
-
-    const parsedAmount = parseUnits(amount, baseSymbol.decimals)
-
-    if (isMarketOrder && marketPrice) {
-      return `~${cleanAndFormatNumberInput(
-        formatUnits(
-          (marketPrice * parsedAmount) / parseUnits('1', baseSymbol.decimals),
-          quoteSymbol.decimals
-        ),
-        quoteSymbol.decimals
-      )}`
-    } else if (price !== '') {
-      const parsedPrice = parseUnits(price, baseSymbol.decimals)
-      return cleanAndFormatNumberInput(
-        formatUnits(
-          (parsedPrice * parsedAmount) / parseUnits('1', baseSymbol.decimals),
-          quoteSymbol.decimals
-        ),
-        quoteSymbol.decimals
-      )
-    } else {
-      return undefined
-    }
-  }, [
-    price,
-    marketPrice,
-    amount,
-    isMarketOrder,
-    baseSymbol.decimals,
-    quoteSymbol.decimals
-  ])
+  }, [price, marketPrice, amount, isMarketOrder, baseSymbol.decimals])
 
   function changeSide(newValue: OrderSide) {
     if (!mutation.isPending && side != newValue) {
       setSide(newValue)
-      setPrice('')
-      setAmount('')
+      setPriceInputValue('')
+      setAmountInputValue('')
       setIsMarketOrder(false)
     }
   }
 
   function handleAmountChange(e: ChangeEvent<HTMLInputElement>) {
-    setAmount(cleanAndFormatNumberInput(e.target.value, baseSymbol.decimals))
+    setAmountInputValue(e.target.value)
+  }
+
+  function handlePriceChange(e: ChangeEvent<HTMLInputElement>) {
+    setPriceInputValue(e.target.value)
   }
 
   function handleMarketOrderFlagChange(e: ChangeEvent<HTMLInputElement>) {
     if (!isMarketOrder && e.target.checked) {
-      setPrice('')
+      setPriceInputValue('')
     }
     setIsMarketOrder(e.target.checked)
   }
@@ -145,7 +122,6 @@ export default function TradeWidget({
 
   async function submitOrder() {
     const nonce = crypto.randomUUID().replaceAll('-', '')
-    const bigIntAmount = parseUnits(amount, baseSymbol.decimals)
     const signature = await signTypedDataAsync({
       types: {
         EIP712Domain: [
@@ -169,10 +145,8 @@ export default function TradeWidget({
         sender: walletAddress,
         baseToken: baseSymbol.contractAddress ?? addressZero,
         quoteToken: quoteSymbol.contractAddress ?? addressZero,
-        amount: side == 'Buy' ? bigIntAmount : -bigIntAmount,
-        price: isMarketOrder
-          ? BigInt(0)
-          : parseUnits(price, quoteSymbol.decimals),
+        amount: side == 'Buy' ? amount : -amount,
+        price: isMarketOrder ? 0n : price,
         nonce: BigInt('0x' + nonce)
       }
     })
@@ -183,7 +157,7 @@ export default function TradeWidget({
         marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
         type: 'market',
         side: side,
-        amount: parseUnits(amount, baseSymbol.decimals).valueOf(),
+        amount: amount,
         signature: signature
       })
     } else {
@@ -192,8 +166,8 @@ export default function TradeWidget({
         marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
         type: 'limit',
         side: side,
-        amount: parseUnits(amount, baseSymbol.decimals),
-        price: new Decimal(price),
+        amount: amount,
+        price: new Decimal(priceInputValue),
         signature: signature
       })
     }
@@ -238,7 +212,7 @@ export default function TradeWidget({
                   <div className="relative">
                     <input
                       placeholder={'0.0'}
-                      value={amount}
+                      value={amountInputValue}
                       disabled={mutation.isPending}
                       onChange={handleAmountChange}
                       className="w-full bg-black text-white disabled:bg-mutedGray"
@@ -267,21 +241,14 @@ export default function TradeWidget({
                 <td>
                   <div className="relative">
                     <input
-                      value={price}
+                      value={priceInputValue}
                       disabled={isMarketOrder || mutation.isPending}
                       placeholder={
                         isMarketOrder
-                          ? formattedMarketPrice
-                          : cleanAndFormatNumberInput('0', quoteSymbol.decimals)
+                          ? `~${formatUnits(marketPrice, quoteSymbol.decimals)}`
+                          : '0.0'
                       }
-                      onChange={(e) => {
-                        setPrice(
-                          cleanAndFormatNumberInput(
-                            e.target.value,
-                            market.quoteDecimalPlaces
-                          )
-                        )
-                      }}
+                      onChange={handlePriceChange}
                       className="w-full bg-black text-white disabled:bg-mutedGray"
                     />
                     <span className="absolute right-2 top-2 text-white">
@@ -295,7 +262,8 @@ export default function TradeWidget({
           <p className="py-3">
             <SubmitButton
               disabled={
-                !((isMarketOrder || price) && amount) || mutation.isPending
+                !((isMarketOrder || price > 0) && amount > 0n) ||
+                mutation.isPending
               }
               onClick={submitOrder}
               error={
@@ -318,38 +286,50 @@ export default function TradeWidget({
               }}
             />
           </p>
-          <p className="text-white">
-            {!!formattedNotional && (
+          <div className="text-white">
+            {notional > 0n && (
               <>
                 <div className={'inline-block'}>
                   {side == 'Buy' ? 'Buying' : 'Selling'}
                 </div>{' '}
-                <div className={'inline-block whitespace-nowrap'}>
-                  {amount} {baseSymbol.name}
-                </div>{' '}
-                for{' '}
-                <div className={'inline-block whitespace-nowrap'}>
-                  {formattedNotional} {quoteSymbol.name}
-                </div>{' '}
+                <AmountWithSymbol
+                  amount={amount}
+                  symbol={baseSymbol}
+                  approximate={false}
+                />{' '}
                 at{' '}
                 {isMarketOrder ? (
                   <>
-                    market price of{' '}
-                    <div className={'inline-block whitespace-nowrap'}>
-                      {formattedMarketPrice} {quoteSymbol.name}
-                    </div>
+                    <AmountWithSymbol
+                      amount={notional}
+                      symbol={quoteSymbol}
+                      approximate={true}
+                    />{' '}
+                    for market price of{' '}
+                    <AmountWithSymbol
+                      amount={marketPrice}
+                      symbol={quoteSymbol}
+                      approximate={true}
+                    />
                   </>
                 ) : (
                   <>
-                    limit price of{' '}
-                    <div className={'inline-block whitespace-nowrap'}>
-                      {price} {quoteSymbol.name}
-                    </div>
+                    <AmountWithSymbol
+                      amount={notional}
+                      symbol={quoteSymbol}
+                      approximate={false}
+                    />{' '}
+                    for limit price of{' '}
+                    <AmountWithSymbol
+                      amount={price}
+                      symbol={quoteSymbol}
+                      approximate={false}
+                    />
                   </>
                 )}
               </>
             )}
-          </p>
+          </div>
           <p className="text-center text-white">Fee: 0.05 {quoteSymbol.name}</p>
           <div className="pt-3 text-center">
             {mutation.isSuccess ? (
@@ -359,5 +339,22 @@ export default function TradeWidget({
         </>
       }
     />
+  )
+}
+
+function AmountWithSymbol({
+  amount,
+  symbol,
+  approximate
+}: {
+  amount: bigint
+  symbol: TradingSymbol
+  approximate: boolean
+}) {
+  return (
+    <div className={'inline-block whitespace-nowrap'}>
+      {approximate && '~'}
+      {formatUnits(amount, symbol.decimals)} {symbol.name}
+    </div>
   )
 }

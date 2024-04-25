@@ -74,7 +74,7 @@ export function getMarketPrice(
   amount: bigint,
   market: Market,
   orderBook: OrderBook
-): bigint | undefined {
+): bigint {
   const levels = (
     side == 'Buy' ? orderBook.sell : orderBook.buy.toReversed()
   ).map((l) => {
@@ -85,7 +85,7 @@ export function getMarketPrice(
   })
 
   if (amount == 0n) {
-    return levels.length > 0 ? levels[levels.length - 1].price : undefined
+    return levels.length > 0 ? levels[levels.length - 1].price : 0n
   }
 
   let amountCovered = 0n
@@ -101,8 +101,12 @@ export function getMarketPrice(
     orderChunks.push(orderChunk)
   }
 
+  if (amountCovered == 0n) {
+    return 0n
+  }
+
+  // size-weighted average across levels consumed
   return (
-    orderChunks.reduce((acc, c) => acc + c.price * c.size, 0n) /
-    orderChunks.reduce((acc, c) => acc + c.size, 0n)
+    orderChunks.reduce((acc, c) => acc + c.price * c.size, 0n) / amountCovered
   )
 }
