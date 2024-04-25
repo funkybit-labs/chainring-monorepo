@@ -123,10 +123,6 @@ class OHLCEntity(guid: EntityID<OHLCId>) : GUIDEntity<OHLCId>(guid) {
 
     companion object : EntityClass<OHLCId, OHLCEntity>(OHLCTable) {
 
-        fun updateWith(tradeEntity: TradeEntity): List<OHLCEntity> {
-            return updateWith(tradeEntity.marketGuid.value, tradeEntity.timestamp, tradeEntity.price, tradeEntity.amount)
-        }
-
         fun updateWith(market: MarketId, tradeTimestamp: Instant, tradePrice: BigDecimal, tradeAmount: BigInteger): List<OHLCEntity> {
             return OHLCDuration.entries.map { ohlcDuration ->
                 ohlcDuration to ohlcDuration.durationStart(tradeTimestamp)

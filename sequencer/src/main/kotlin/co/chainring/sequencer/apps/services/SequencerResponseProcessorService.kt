@@ -55,6 +55,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigInteger
+import java.math.RoundingMode
 
 object SequencerResponseProcessorService {
 
@@ -261,16 +262,22 @@ object SequencerResponseProcessorService {
         // queue any blockchain txs for processing
         queueBlockchainTransactions(tradeEntities.map { it.toEip712Transaction() })
 
-        val ohlcNotifications = tradeEntities.map { trade ->
-            OHLCEntity.updateWith(trade).map {
-                BroadcasterNotification.pricesForMarketPeriods(
-                    trade.marketGuid.value,
-                    it.duration,
-                    listOf(it),
-                    full = false,
-                )
-            }
-        }.flatten().distinct()
+        val ohlcNotifications = tradeEntities.groupBy { it.market }
+            .map { (market, trades) ->
+                val sumOfAmounts = trades.sumOf { it.amount }
+                val sumOfPricesByAmount = trades.sumOf { it.price * it.amount.toBigDecimal() }
+                val weightedPrice = (sumOfPricesByAmount / sumOfAmounts.toBigDecimal()).setScale(market.tickSize.stripTrailingZeros().scale() + 1, RoundingMode.HALF_UP)
+
+                OHLCEntity.updateWith(market.guid.value, trades.first().timestamp, weightedPrice, sumOfAmounts)
+                    .map {
+                        BroadcasterNotification.pricesForMarketPeriods(
+                            market.guid.value,
+                            it.duration,
+                            listOf(it),
+                            full = false,
+                        )
+                    }
+            }.flatten()
 
         publishBroadcasterNotifications(
             broadcasterNotifications.flatMap { (address, notifications) ->
