@@ -144,13 +144,6 @@ class Broadcaster(val db: Database) {
         pgListener.stop()
     }
 
-    private val mockPrices = ConcurrentHashMap(
-        mapOf(
-            MarketId("BTC/ETH") to 17.2,
-            MarketId("USDC/DAI") to 1.05,
-        ),
-    )
-
     private fun sendPrices(topic: SubscriptionTopic.Prices, client: ConnectedClient) {
         val key = Pair(topic.marketId, client)
         val now = Clock.System.now()

@@ -111,9 +111,9 @@ class OrderBookTest : TestWithDb() {
             expected = OrderBook(
                 marketId = btcEthMarket,
                 buy = listOf(
-                    OrderBookEntry(price = "17.400", size = "7".toBigDecimal()),
-                    OrderBookEntry(price = "17.500", size = "1.5".toBigDecimal()),
                     OrderBookEntry(price = "17.550", size = "2.5".toBigDecimal()),
+                    OrderBookEntry(price = "17.500", size = "1.5".toBigDecimal()),
+                    OrderBookEntry(price = "17.400", size = "7".toBigDecimal()),
                 ),
                 sell = emptyList(),
                 last = LastTrade(
@@ -255,9 +255,9 @@ class OrderBookTest : TestWithDb() {
             expected = OrderBook(
                 marketId = btcEthMarket,
                 buy = listOf(
-                    OrderBookEntry(price = "17.400", size = "7".toBigDecimal()),
-                    OrderBookEntry(price = "17.500", size = "1.5".toBigDecimal()),
                     OrderBookEntry(price = "17.550", size = "2.5".toBigDecimal()),
+                    OrderBookEntry(price = "17.500", size = "1.5".toBigDecimal()),
+                    OrderBookEntry(price = "17.400", size = "7".toBigDecimal()),
                 ),
                 sell = listOf(
                     OrderBookEntry(price = "17.350", size = "2.5".toBigDecimal()),
@@ -452,9 +452,9 @@ class OrderBookTest : TestWithDb() {
             expected = OrderBook(
                 marketId = btcEthMarket,
                 buy = listOf(
-                    OrderBookEntry(price = "17.400", size = "7".toBigDecimal()),
-                    OrderBookEntry(price = "17.500", size = "1.5".toBigDecimal()),
                     OrderBookEntry(price = "17.550", size = "2.5".toBigDecimal()),
+                    OrderBookEntry(price = "17.500", size = "1.5".toBigDecimal()),
+                    OrderBookEntry(price = "17.400", size = "7".toBigDecimal()),
                 ),
                 sell = listOf(
                     OrderBookEntry(price = "17.350", size = "2.5".toBigDecimal()),

@@ -133,7 +133,7 @@ export function OrderBook({
 
   return (
     <svg width={params.bookWidth} height={params.bookHeight}>
-      {orderBook.buy.toReversed().map((l, i) => (
+      {orderBook.sell.map((l, i) => (
         <Fragment key={`${l.price}`}>
           <text
             x={0}
@@ -151,7 +151,7 @@ export function OrderBook({
             )}
             y={params.graphStartY + 8 + i * params.barHeight}
             height={params.barHeight}
-            fill="#10A327"
+            fill="#7F1D1D"
           />
         </Fragment>
       ))}
@@ -165,7 +165,7 @@ export function OrderBook({
         {orderBook.last.price}
         <tspan fill={direction.color}>{direction.symbol}</tspan>
       </text>
-      {orderBook.sell.map((l, i) => (
+      {orderBook.buy.map((l, i) => (
         <Fragment key={`${l.price}`}>
           <text
             x={0}
@@ -183,7 +183,7 @@ export function OrderBook({
             )}
             y={params.sellStartY + i * params.barHeight}
             height={params.barHeight}
-            fill="#7F1D1D"
+            fill="#10A327"
           />
         </Fragment>
       ))}

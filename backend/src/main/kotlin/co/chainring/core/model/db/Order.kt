@@ -320,13 +320,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                     .andWhere { OrderTable.status.inList(listOf(OrderStatus.Open, OrderStatus.Partial)) }
                     .andWhere { OrderTable.price.isNotNull() }
                     .groupBy(OrderTable.price)
-                    .orderBy(
-                        OrderTable.price,
-                        when (side) {
-                            OrderSide.Buy -> SortOrder.ASC
-                            OrderSide.Sell -> SortOrder.DESC
-                        },
-                    )
+                    .orderBy(OrderTable.price, SortOrder.DESC)
                     .toList()
                     .mapNotNull {
                         val price = it[OrderTable.price] ?: return@mapNotNull null

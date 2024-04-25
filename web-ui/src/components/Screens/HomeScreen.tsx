@@ -73,8 +73,6 @@ export default function HomeScreen() {
                 market={selectedMarket}
                 walletAddress={wallet.address}
                 exchangeContractAddress={exchangeContract.address}
-                baseSymbol={selectedMarket.baseSymbol}
-                quoteSymbol={selectedMarket.quoteSymbol}
               />
             )}
             <OrderBookWidget marketId={selectedMarket.id} />
