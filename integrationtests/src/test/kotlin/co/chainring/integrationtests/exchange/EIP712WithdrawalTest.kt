@@ -120,16 +120,6 @@ class EIP712WithdrawalTest {
             deposit(wallet, "USDC", amount)
         }
 
-        // invalid nonce
-        val invalidNonce = wallet.getNonce().plus(BigInteger.ONE)
-        withdrawalApiRequest = wallet.signWithdraw("USDC", BigInteger("5"), invalidNonce)
-        response = apiClient.createWithdrawal(withdrawalApiRequest)
-        assertEquals(WithdrawalStatus.Pending, response.withdrawal.status)
-        waitForFinalizedWithdrawal(response.withdrawal.id)
-        withdrawal = apiClient.getWithdrawal(response.withdrawal.id).withdrawal
-        assertEquals(WithdrawalStatus.Failed, withdrawal.status)
-        assertEquals("execution reverted: revert: Invalid Nonce", withdrawal.error)
-
         // invalid signature
         withdrawalApiRequest = wallet.signWithdraw("USDC", amount)
         // change the amount from what was signed

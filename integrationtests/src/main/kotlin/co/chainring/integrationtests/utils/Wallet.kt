@@ -68,9 +68,9 @@ class Wallet(
         return exchangeContract.withdraw(erc20TokenAddress(symbol), amount).sendAndWaitForConfirmation()
     }
 
-    fun signWithdraw(symbol: String?, amount: BigInteger, nonceOverride: BigInteger? = null): CreateWithdrawalApiRequest {
-        val nonce = nonceOverride ?: getNonce()
-        val tx = EIP712Transaction.WithdrawTx(address, symbol?.let { Address(erc20TokenAddress(symbol)) }, amount, nonce.toLong(), EvmSignature.emptySignature())
+    fun signWithdraw(symbol: String?, amount: BigInteger, nonceOverride: Long? = null): CreateWithdrawalApiRequest {
+        val nonce = nonceOverride ?: getWithdrawalNonce()
+        val tx = EIP712Transaction.WithdrawTx(address, symbol?.let { Address(erc20TokenAddress(symbol)) }, amount, nonce, EvmSignature.emptySignature())
         val signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress))
         return CreateWithdrawalApiRequest(WithdrawTx(tx.sender, tx.token, tx.amount, tx.nonce), signature)
     }
@@ -96,8 +96,8 @@ class Wallet(
         return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
     }
 
-    fun getNonce(): BigInteger {
-        return exchangeContract.nonces(address.value).sendAndWaitForConfirmation()
+    private fun getWithdrawalNonce(): Long {
+        return System.currentTimeMillis()
     }
 
     fun withdrawNative(amount: BigInteger): TransactionReceipt {

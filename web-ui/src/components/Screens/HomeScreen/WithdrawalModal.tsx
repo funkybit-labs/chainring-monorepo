@@ -55,7 +55,6 @@ export default function WithdrawalModal({
   const [withdrawalId, setWithdrawalId] = useState<string | null>(null)
   const [amount, setAmount] = useState('')
   const [submitPhase, setSubmitPhase] = useState<
-    | 'fetchingNonce'
     | 'waitingForTxSignature'
     | 'submittingRequest'
     | 'waitingForCompletion'
@@ -128,16 +127,9 @@ export default function WithdrawalModal({
   async function onSubmit() {
     setSubmitError(null)
     const parsedAmount = parseUnits(amount, symbol.decimals)
+    const nonce = Date.now()
     if (canSubmit) {
       try {
-        setSubmitPhase('fetchingNonce')
-        const nonce = await readContract(config, {
-          abi: ExchangeAbi,
-          address: exchangeContractAddress,
-          functionName: 'nonces',
-          args: [walletAddress]
-        })
-
         setSubmitPhase('waitingForTxSignature')
         const signature = symbol.contractAddress
           ? await signTypedDataAsync({
@@ -161,7 +153,7 @@ export default function WithdrawalModal({
                 walletAddress,
                 symbol.contractAddress!,
                 BigInt(parsedAmount),
-                nonce
+                BigInt(nonce)
               )
             })
           : await signTypedDataAsync({
@@ -183,7 +175,7 @@ export default function WithdrawalModal({
               message: getNativeWithdrawMessage(
                 walletAddress,
                 BigInt(parsedAmount),
-                nonce
+                BigInt(nonce)
               )
             })
 
@@ -193,7 +185,7 @@ export default function WithdrawalModal({
             sender: walletAddress,
             token: symbol.contractAddress,
             amount: BigInt(parsedAmount),
-            nonce: BigInt(nonce)
+            nonce: nonce
           },
           signature: signature
         })
@@ -238,8 +230,6 @@ export default function WithdrawalModal({
                   error={submitError}
                   caption={() => {
                     switch (submitPhase) {
-                      case 'fetchingNonce':
-                        return 'Fetching nonce'
                       case 'waitingForTxSignature':
                         return 'Waiting for Tx Signature'
                       case 'submittingRequest':
