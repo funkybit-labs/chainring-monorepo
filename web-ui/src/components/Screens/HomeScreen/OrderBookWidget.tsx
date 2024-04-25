@@ -6,7 +6,8 @@ import {
   OrderBook,
   Publishable,
   orderBookTopic,
-  Direction
+  Direction,
+  OrderBookEntry
 } from 'websocketMessages'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { useWindowDimensions, widgetSize, WindowDimensions } from 'utils/layout'
@@ -22,9 +23,11 @@ type OrderBookParameters = {
   lastPriceHeight: number
   maxSize: number
   bookHeight: number
-  sellStartY: number
+  buyStartY: number
   gridSpacing: number
   ticks: number[]
+  buyLevels: OrderBookEntry[]
+  sellLevels: OrderBookEntry[]
 }
 
 function calculateParameters(
@@ -39,16 +42,20 @@ function calculateParameters(
   const graphStartY = 20
   const barHeight = 18
   const lastPriceHeight = 50
+  const maxLevels = 10
+  const buyLevels = orderBook.buy.slice(0, maxLevels)
+  const sellLevels = orderBook.sell.slice(0, maxLevels)
   const maxSize = Math.max(
-    ...orderBook.sell.map((l) => l.size),
-    ...orderBook.buy.map((l) => l.size)
+    0.00000001,
+    ...sellLevels.map((l) => l.size),
+    ...buyLevels.map((l) => l.size)
   )
   const bookHeight =
     graphStartY +
     lastPriceHeight +
-    barHeight * (orderBook.buy.length + orderBook.sell.length)
-  const sellStartY =
-    graphStartY + lastPriceHeight + barHeight * orderBook.buy.length
+    barHeight * (buyLevels.length + sellLevels.length)
+  const buyStartY =
+    graphStartY + lastPriceHeight + barHeight * sellLevels.length
   const gridSpacing = calculateTickSpacing(0, maxSize, gridLines)
 
   const ticks: number[] = []
@@ -69,9 +76,11 @@ function calculateParameters(
     // more stable as the values move around
     maxSize: gridSpacing * (gridLines + 1),
     bookHeight,
-    sellStartY,
+    buyStartY,
     gridSpacing,
-    ticks
+    ticks,
+    buyLevels,
+    sellLevels
   }
 }
 
@@ -133,7 +142,7 @@ export function OrderBook({
 
   return (
     <svg width={params.bookWidth} height={params.bookHeight}>
-      {orderBook.sell.map((l, i) => (
+      {params.sellLevels.map((l, i) => (
         <Fragment key={`${l.price}`}>
           <text
             x={0}
@@ -157,7 +166,7 @@ export function OrderBook({
       ))}
       <text
         x={0}
-        y={params.sellStartY - 12}
+        y={params.buyStartY - 12}
         fill="white"
         textAnchor="left"
         fontSize="24px"
@@ -165,11 +174,11 @@ export function OrderBook({
         {orderBook.last.price}
         <tspan fill={direction.color}>{direction.symbol}</tspan>
       </text>
-      {orderBook.buy.map((l, i) => (
+      {params.buyLevels.map((l, i) => (
         <Fragment key={`${l.price}`}>
           <text
             x={0}
-            y={params.sellStartY + (i + 1) * params.barHeight - 4}
+            y={params.buyStartY + (i + 1) * params.barHeight - 4}
             fill="white"
             textAnchor="left"
           >
@@ -181,7 +190,7 @@ export function OrderBook({
               params.graphWidth,
               params.graphWidth * (l.size / params.maxSize)
             )}
-            y={params.sellStartY + i * params.barHeight}
+            y={params.buyStartY + i * params.barHeight}
             height={params.barHeight}
             fill="#10A327"
           />

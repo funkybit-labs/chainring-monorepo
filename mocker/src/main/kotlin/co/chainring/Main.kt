@@ -9,12 +9,12 @@ import kotlin.random.Random
 
 fun main() {
     val maker = Maker(
-        tightness = 10, skew = 0, levels = 10,
+        tightness = 5, skew = 0, levels = 10,
         native = BigDecimal.TEN.movePointRight(18).toBigInteger(),
         assets = mapOf(
             //"ETH" to 200.toFundamentalUnits(18),
-            "USDC" to 10.toFundamentalUnits(6),
-            "DAI" to 10.toFundamentalUnits(18)
+            "USDC" to 1000.toFundamentalUnits(6),
+            "DAI" to 500.toFundamentalUnits(18)
         )
     )
     val usdcDai = MarketId("USDC/DAI")
@@ -26,15 +26,15 @@ fun main() {
             sizeFactor = Random.nextDouble(5.0, 20.0),
             native = null,
             assets = mapOf(
-                "USDC" to 5.toFundamentalUnits(6),
-                "DAI" to 5.toFundamentalUnits(18)
+                "USDC" to 100.toFundamentalUnits(6),
+                "DAI" to 50.toFundamentalUnits(18)
             )
         )
     }
     takers.forEach {
         it.start(listOf(usdcDai))
     }
-    Thread.sleep(60000)
+    Thread.sleep(600000)
     maker.stop()
     takers.forEach {
         it.stop()
