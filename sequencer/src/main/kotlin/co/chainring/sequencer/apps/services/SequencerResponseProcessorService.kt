@@ -25,6 +25,7 @@ import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCEntity
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
+import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.OrderType
@@ -163,7 +164,7 @@ object SequencerResponseProcessorService {
         val broadcasterNotifications: BroadcasterNotifications = mutableMapOf()
 
         // handle trades
-        val tradeEntities = response.tradesCreatedList.mapNotNull {
+        val tradesWithTakerOrder: Map<TradeEntity, OrderEntity> = response.tradesCreatedList.mapNotNull {
             logger.debug { "Trade Created ${it.buyGuid}, ${it.sellGuid}, ${it.amount.toBigInteger()} ${it.price.toBigDecimal()} " }
             val buyOrder = OrderEntity.findBySequencerOrderId(it.buyGuid)
             val sellOrder = OrderEntity.findBySequencerOrderId(it.sellGuid)
@@ -193,11 +194,11 @@ object SequencerResponseProcessorService {
                 }
 
                 // build the transaction to settle
-                tradeEntity
+                tradeEntity to if (buyOrder.type == OrderType.Market) buyOrder else sellOrder
             } else {
                 null
             }
-        }
+        }.toMap()
 
         // update all orders that have changed
         response.ordersChangedList.forEach { orderChanged ->
@@ -260,10 +261,17 @@ object SequencerResponseProcessorService {
         }
 
         // queue any blockchain txs for processing
-        queueBlockchainTransactions(tradeEntities.map { it.toEip712Transaction() })
+        queueBlockchainTransactions(tradesWithTakerOrder.keys.map { it.toEip712Transaction() })
 
-        val ohlcNotifications = tradeEntities.groupBy { it.market }
-            .map { (market, trades) ->
+        val ohlcNotifications = tradesWithTakerOrder.toList()
+            .fold(mutableMapOf<OrderId, MutableList<TradeEntity>>()) { acc, pair ->
+                val trade = pair.first
+                val orderId = pair.second.id.value
+                acc[orderId] = acc.getOrDefault(orderId, mutableListOf()).also { it -> it.add(trade) }
+                acc
+            }
+            .map { (_, trades) ->
+                val market = trades.first().market
                 val marketPriceScale = market.tickSize.stripTrailingZeros().scale() + 1
                 val sumOfAmounts = trades.sumOf { it.amount }
                 val sumOfPricesByAmount = trades.sumOf { it.price * it.amount.toBigDecimal() }
