@@ -1,11 +1,10 @@
 package co.chainring.core
 
 import co.chainring.apps.api.model.BatchOrdersApiRequest
-import co.chainring.apps.api.model.CancelUpdateOrderApiRequest
+import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
-import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.websocket.Balances
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
@@ -256,7 +255,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                         }
                 },
                 updateOrders = emptyList(),
-                cancelOrders = currentOffers.map { CancelUpdateOrderApiRequest(it.id) } + currentBids.map { CancelUpdateOrderApiRequest(it.id) }
+                cancelOrders = currentOffers.map { CancelOrderApiRequest(it.id) } + currentBids.map { CancelOrderApiRequest(it.id) }
             )
         )
         result.mapLeft {

@@ -9,9 +9,9 @@ import kotlin.random.Random
 
 fun main() {
     val maker = Maker(
-        10, 0, 10,
-        BigDecimal.TEN.movePointRight(18).toBigInteger(),
-        mapOf(
+        tightness = 10, skew = 0, levels = 10,
+        native = BigDecimal.TEN.movePointRight(18).toBigInteger(),
+        assets = mapOf(
             //"ETH" to 200.toFundamentalUnits(18),
             "USDC" to 10.toFundamentalUnits(6),
             "DAI" to 10.toFundamentalUnits(18)
@@ -22,7 +22,10 @@ fun main() {
     maker.start(listOf(usdcDai))
     val takers = (1..5).map {
         Taker(
-            Random.nextLong(5000, 20000), Random.nextDouble(5.0, 20.0), null, mapOf(
+            rate = Random.nextLong(5000, 20000),
+            sizeFactor = Random.nextDouble(5.0, 20.0),
+            native = null,
+            assets = mapOf(
                 "USDC" to 5.toFundamentalUnits(6),
                 "DAI" to 5.toFundamentalUnits(18)
             )

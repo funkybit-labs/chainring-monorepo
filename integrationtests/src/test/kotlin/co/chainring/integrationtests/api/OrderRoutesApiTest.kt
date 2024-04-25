@@ -248,7 +248,7 @@ class OrderRoutesApiTest {
                 wallet.signOrder(it)
             },
         ).assertError(
-            ApiError(ReasonCode.ProcessingError, "Order price 2.015 is not a multiple of tick size 0.010000000000000000"),
+            ApiError(ReasonCode.ProcessingError, "Order price is not a multiple of tick size"),
         )
 
         val createLimitOrderResponse2 = apiClient.createOrder(
@@ -280,7 +280,7 @@ class OrderRoutesApiTest {
                 price = BigDecimal("2.015"),
             ),
         ).assertError(
-            ApiError(ReasonCode.ProcessingError, "Order price 2.015 is not a multiple of tick size 0.010000000000000000"),
+            ApiError(ReasonCode.ProcessingError, "Order price is not a multiple of tick size"),
         )
 
         // try updating and cancelling an order not created by this wallet
