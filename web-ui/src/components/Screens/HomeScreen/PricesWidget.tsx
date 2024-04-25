@@ -466,6 +466,15 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     return idx > 0
   }
 
+  function timeWithoutSeconds(date: Date): string {
+    const hours = date.getHours()
+    const minutes = date.getMinutes()
+    return (
+      (hours < 10 ? '0' + hours : hours) +
+      ':' +
+      (minutes < 10 ? '0' + minutes : minutes)
+    )
+  }
   // compute the title showing the date range being displayed
   function title(): string {
     const firstDate = viewportOhlc[0]?.start
@@ -483,10 +492,16 @@ export function PricesWidget({ marketId }: { marketId: string }) {
           olhcDurationsMs[viewportOhlc[viewportOhlc.length - 1].duration]
     )
     if (endDate.getDate() == startDate.getDate()) {
-      return `${startDate.toLocaleDateString()}, ${startDate.toLocaleTimeString()} to ${endDate.toLocaleTimeString()}`
+      return `${startDate.toLocaleDateString()}, ${timeWithoutSeconds(
+        startDate
+      )} to ${timeWithoutSeconds(endDate)}`
     } else {
       return `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`
     }
+  }
+
+  function durationLabel(duration: OHLCDuration): string {
+    return duration.replace('P', '').toLowerCase()
   }
 
   return (
@@ -503,7 +518,7 @@ export function PricesWidget({ marketId }: { marketId: string }) {
               >
                 +
               </button>
-              <span>{duration}</span>
+              <span>{durationLabel(duration)}</span>
               <button
                 className="px-1 text-xl disabled:opacity-50"
                 disabled={!canZoomOut(duration)}
