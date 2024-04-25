@@ -164,7 +164,7 @@ object SequencerResponseProcessorService {
         val broadcasterNotifications: BroadcasterNotifications = mutableMapOf()
 
         // handle trades
-        val tradesWithTakerOrder: Map<TradeEntity, OrderEntity> = response.tradesCreatedList.mapNotNull {
+        val tradesWithTakerOrder: List<Pair<TradeEntity, OrderEntity>> = response.tradesCreatedList.mapNotNull {
             logger.debug { "Trade Created ${it.buyGuid}, ${it.sellGuid}, ${it.amount.toBigInteger()} ${it.price.toBigDecimal()} " }
             val buyOrder = OrderEntity.findBySequencerOrderId(it.buyGuid)
             val sellOrder = OrderEntity.findBySequencerOrderId(it.sellGuid)
@@ -198,7 +198,7 @@ object SequencerResponseProcessorService {
             } else {
                 null
             }
-        }.toMap()
+        }
 
         // update all orders that have changed
         response.ordersChangedList.forEach { orderChanged ->
@@ -261,9 +261,9 @@ object SequencerResponseProcessorService {
         }
 
         // queue any blockchain txs for processing
-        queueBlockchainTransactions(tradesWithTakerOrder.keys.map { it.toEip712Transaction() })
+        queueBlockchainTransactions(tradesWithTakerOrder.map { it.first.toEip712Transaction() })
 
-        val ohlcNotifications = tradesWithTakerOrder.toList()
+        val ohlcNotifications = tradesWithTakerOrder
             .fold(mutableMapOf<OrderId, MutableList<TradeEntity>>()) { acc, pair ->
                 val trade = pair.first
                 val orderId = pair.second.id.value
