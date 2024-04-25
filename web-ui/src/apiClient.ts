@@ -238,7 +238,7 @@ const WithdrawTxSchema = z.object({
   sender: AddressSchema,
   token: AddressSchema.nullable(),
   amount: z.coerce.bigint(),
-  nonce: z.coerce.bigint()
+  nonce: z.number()
 })
 const CreateWithdrawalApiRequestSchema = z.object({
   tx: WithdrawTxSchema,
