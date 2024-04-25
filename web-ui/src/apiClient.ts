@@ -197,14 +197,17 @@ export const OrderSchema = z
     return {
       ...data,
       isFinal: function (): boolean {
-        return [
-          'Filled',
-          'Cancelled',
-          'Expired',
-          'Failed',
-          'Rejected',
-          'CrossesMarket'
-        ].includes(data.status)
+        return (
+          [
+            'Filled',
+            'Cancelled',
+            'Expired',
+            'Failed',
+            'Rejected',
+            'CrossesMarket'
+          ].includes(data.status) ||
+          (data.status == 'Partial' && data.type == 'market')
+        )
       }
     }
   })

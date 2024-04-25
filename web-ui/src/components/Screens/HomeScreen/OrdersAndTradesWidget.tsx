@@ -222,12 +222,19 @@ export default function OrdersAndTradesWidget({
                   >
                     <td>{format(trade.timestamp, 'MM/dd HH:mm:ss')}</td>
                     <td className="pl-4">{trade.side}</td>
-                    <td className="pl-4">{formatUnits(trade.amount, 18)}</td>
+                    <td className="pl-4">
+                      {formatUnits(trade.amount, market.baseSymbol.decimals)}
+                    </td>
                     <td className="pl-4">{trade.marketId}</td>
                     <td className="pl-4">
                       {trade.price.toFixed(market.quoteDecimalPlaces)}
                     </td>
-                    <td className="pl-4">{formatUnits(trade.feeAmount, 18)}</td>
+                    <td className="pl-4">
+                      {formatUnits(
+                        trade.feeAmount,
+                        market.quoteSymbol.decimals
+                      )}
+                    </td>
                     <td className="pl-4">{trade.settlementStatus}</td>
                   </tr>
                 )
