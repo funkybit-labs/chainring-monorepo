@@ -30,6 +30,7 @@ import net.openhft.chronicle.queue.TailerDirection
 import net.openhft.chronicle.queue.TailerState
 import net.openhft.chronicle.queue.impl.RollingChronicleQueue
 import java.lang.Thread.UncaughtExceptionHandler
+import java.math.BigDecimal
 import java.math.BigInteger
 import java.nio.file.Path
 import kotlin.concurrent.thread
@@ -56,14 +57,20 @@ class SequencerApp(
                 if (state.markets.containsKey(marketId)) {
                     error = SequencerError.MarketExists
                 } else {
+                    val tickSize = market.tickSize.toBigDecimal()
+                    val halfTick = tickSize.setScale(tickSize.scale() + 1).divide(BigDecimal.valueOf(2))
+                    val marketPrice = market.marketPrice.toBigDecimal()
                     state.markets[marketId] = Market(
                         marketId,
-                        market.tickSize.toBigDecimal(),
-                        market.marketPrice.toBigDecimal(),
+                        tickSize,
+                        marketPrice,
+                        marketPrice - halfTick,
+                        marketPrice + halfTick,
                         market.maxLevels,
                         market.maxOrdersPerLevel,
                         market.baseDecimals,
                         market.quoteDecimals,
+
                     )
                 }
                 sequencerResponse {
@@ -262,7 +269,7 @@ class SequencerApp(
             market.ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
                 val (oldBaseAssets, oldQuoteAssets) = market.assetsReservedForOrder(order)
                 if (oldBaseAssets > BigInteger.ZERO) { // LimitSell
-                    if (orderChange.price.toBigDecimal() > market.marketPrice) {
+                    if (orderChange.price.toBigDecimal() > market.bestBid) {
                         baseAssetsRequired.merge(
                             order.wallet,
                             orderChange.amount.toBigInteger() - order.quantity,
@@ -273,7 +280,7 @@ class SequencerApp(
                     }
                 }
                 if (oldQuoteAssets > BigInteger.ZERO) { // LimitBuy
-                    if (orderChange.price.toBigDecimal() < market.marketPrice) {
+                    if (orderChange.price.toBigDecimal() < market.bestOffer) {
                         quoteAssetsRequired.merge(
                             order.wallet,
                             (
@@ -316,6 +323,7 @@ class SequencerApp(
                         ?: BigInteger.ZERO
                     )
             ) {
+                logger.debug { "Wallet $wallet requires $required + ${market.baseAssetsRequired(wallet)} = ${required + market.baseAssetsRequired(wallet)} but only has ${state.balances[wallet]?.get(market.id.baseAsset())}" }
                 return SequencerError.ExceedsLimit
             }
         }
@@ -326,6 +334,7 @@ class SequencerApp(
                         ?: BigInteger.ZERO
                     )
             ) {
+                logger.debug { "Wallet $wallet requires $required + ${market.quoteAssetsRequired(wallet)} = ${required + market.quoteAssetsRequired(wallet)} but only has ${state.balances[wallet]?.get(market.id.quoteAsset())}" }
                 return SequencerError.ExceedsLimit
             }
         }

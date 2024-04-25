@@ -1,11 +1,11 @@
 package co.chainring.integrationtests.exchange
 
 import co.chainring.core.model.db.MarketId
-import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
-import co.chainring.integrationtests.testutils.assertOrderBookMessageReceived
-import co.chainring.integrationtests.testutils.blocking
-import co.chainring.integrationtests.testutils.subscribeToOrderBook
+import co.chainring.integrationtests.utils.ApiClient
+import co.chainring.integrationtests.utils.assertOrderBookMessageReceived
+import co.chainring.integrationtests.utils.blocking
+import co.chainring.integrationtests.utils.subscribeToOrderBook
 import org.http4k.client.WebsocketClient
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test

@@ -5,13 +5,13 @@ import co.chainring.apps.api.model.ReasonCode
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
-import co.chainring.integrationtests.testutils.ApiClient
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.BalanceHelper
 import co.chainring.integrationtests.testutils.ExpectedBalance
-import co.chainring.integrationtests.testutils.Faucet
-import co.chainring.integrationtests.testutils.Wallet
-import co.chainring.integrationtests.testutils.assertError
+import co.chainring.integrationtests.utils.ApiClient
+import co.chainring.integrationtests.utils.Faucet
+import co.chainring.integrationtests.utils.Wallet
+import co.chainring.integrationtests.utils.assertError
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.awaitility.kotlin.await
 import org.jetbrains.exposed.sql.transactions.transaction

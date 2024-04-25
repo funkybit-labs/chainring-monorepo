@@ -1,4 +1,4 @@
-package co.chainring.integrationtests.testutils
+package co.chainring.integrationtests.utils
 
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest

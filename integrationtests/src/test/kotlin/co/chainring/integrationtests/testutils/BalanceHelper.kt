@@ -1,5 +1,6 @@
 package co.chainring.integrationtests.testutils
 
+import co.chainring.integrationtests.utils.ApiClient
 import org.awaitility.kotlin.await
 import java.math.BigInteger
 import java.time.Duration

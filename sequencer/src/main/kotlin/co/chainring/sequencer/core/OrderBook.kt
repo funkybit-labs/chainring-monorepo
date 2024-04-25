@@ -60,7 +60,7 @@ data class LevelOrder(
     }
 }
 
-class OrderBookLevel(val levelIx: Int, val side: BookSide, val price: BigDecimal, val maxOrderCount: Int) {
+class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal, val maxOrderCount: Int) {
     val orders = Array(maxOrderCount) { _ -> LevelOrder(0L.toOrderGuid(), 0L.toWalletAddress(), BigInteger.ZERO, levelIx) }
     var totalQuantity = BigInteger.ZERO
     var orderHead = 0
@@ -199,7 +199,7 @@ class OrderBookLevel(val levelIx: Int, val side: BookSide, val price: BigDecimal
         result = 31 * result + price.hashCode()
         result = 31 * result + maxOrderCount
         result = 31 * result + orders.contentHashCode()
-        result = 31 * result + (totalQuantity.hashCode() ?: 0)
+        result = 31 * result + totalQuantity.hashCode()
         result = 31 * result + orderHead
         result = 31 * result + orderTail
         return result

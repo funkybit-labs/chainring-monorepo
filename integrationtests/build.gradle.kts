@@ -22,8 +22,8 @@ val grpcProtobufVersion = "1.62.2"
 val protobufKotlinVersion = "4.26.0"
 
 dependencies {
-    testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter-params")
+    implementation(kotlin("test"))
+    implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinxSerializationVersion")
 

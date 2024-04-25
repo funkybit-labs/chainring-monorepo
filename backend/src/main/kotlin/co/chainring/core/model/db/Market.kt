@@ -14,6 +14,8 @@ import java.math.BigDecimal
 value class MarketId(override val value: String) : EntityId {
     constructor(baseSymbol: SymbolEntity, quoteSymbol: SymbolEntity) : this("${baseSymbol.name}/${quoteSymbol.name}")
     override fun toString(): String = value
+    fun baseSymbol() = this.value.split('/', limit = 2)[0]
+    fun quoteSymbol() = this.value.split('/', limit = 2)[1]
 }
 
 object MarketTable : GUIDTable<MarketId>("market", ::MarketId) {

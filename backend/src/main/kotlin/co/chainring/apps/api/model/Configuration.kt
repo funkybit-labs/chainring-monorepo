@@ -35,6 +35,8 @@ data class Symbol(
 data class Market(
     val id: String,
     val baseSymbol: String,
+    val baseDecimals: Int,
     val quoteSymbol: String,
+    val quoteDecimals: Int,
     val tickSize: BigDecimalJson,
 )

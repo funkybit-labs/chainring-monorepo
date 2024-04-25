@@ -122,7 +122,7 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
     }
 
     val javaBackendWrappersOutputDir = File("${projectDir}/backend/src/main/java")
-    val javaTestWrappersOutputDir = File("${projectDir}/integrationtests/src/test/java")
+    val javaTestWrappersOutputDir = File("${projectDir}/integrationtests/src/main/java")
     val javaWrappersOutputDir = File("${projectDir}/src/main/java")
     val typeScriptAbiOutputDir = File("${projectDir}/web-ui/src/contracts")
 
