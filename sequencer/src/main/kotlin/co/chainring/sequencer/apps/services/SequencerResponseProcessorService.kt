@@ -264,9 +264,10 @@ object SequencerResponseProcessorService {
 
         val ohlcNotifications = tradeEntities.groupBy { it.market }
             .map { (market, trades) ->
+                val marketPriceScale = market.tickSize.stripTrailingZeros().scale() + 1
                 val sumOfAmounts = trades.sumOf { it.amount }
                 val sumOfPricesByAmount = trades.sumOf { it.price * it.amount.toBigDecimal() }
-                val weightedPrice = (sumOfPricesByAmount / sumOfAmounts.toBigDecimal()).setScale(market.tickSize.stripTrailingZeros().scale() + 1, RoundingMode.HALF_UP)
+                val weightedPrice = (sumOfPricesByAmount / sumOfAmounts.toBigDecimal()).setScale(marketPriceScale, RoundingMode.HALF_UP)
 
                 OHLCEntity.updateWith(market.guid.value, trades.first().timestamp, weightedPrice, sumOfAmounts)
                     .map {
