@@ -4,6 +4,13 @@ const defaultTheme = require('tailwindcss/defaultTheme')
 export default {
   content: ['./src/**/*.{mjs,js,ts,jsx,tsx}'],
   theme: {
+    screens: {
+      'sm': '750px',
+      'md': '1000px',
+      'lg': '1500px',
+      'xl': '1750px',
+      '2xl': '2250px',
+    },
     extend: {
       fontFamily: {
         sans: ['"Roboto Mono"', ...defaultTheme.fontFamily.sans]

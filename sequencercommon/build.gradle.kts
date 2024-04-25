@@ -5,8 +5,6 @@ plugins {
     kotlin("jvm")
     id("com.google.protobuf") version "0.9.4"
     id("org.jmailen.kotlinter") version "4.2.0"
-    id("com.google.cloud.tools.jib") version "3.4.1"
-    application
 }
 
 group = "co.censo"

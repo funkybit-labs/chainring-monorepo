@@ -64,7 +64,7 @@ export default function HomeScreen() {
 
           <div
             className={classNames(
-              'grid w-screen overflow-scroll gap-4 px-4 py-24',
+              'grid w-screen h-screen overflow-scroll gap-4 px-4 py-24',
               ...gridClasses()
             )}
           >
@@ -73,8 +73,6 @@ export default function HomeScreen() {
                 market={selectedMarket}
                 walletAddress={wallet.address}
                 exchangeContractAddress={exchangeContract.address}
-                baseSymbol={selectedMarket.baseSymbol}
-                quoteSymbol={selectedMarket.quoteSymbol}
               />
             )}
             <OrderBookWidget marketId={selectedMarket.id} />

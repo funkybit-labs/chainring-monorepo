@@ -1,4 +1,4 @@
-package co.chainring.integrationtests.testutils
+package co.chainring.integrationtests.utils
 
 import co.chainring.contracts.generated.MockERC20
 import co.chainring.core.blockchain.BlockchainClient

@@ -1,4 +1,4 @@
-package co.chainring.integrationtests.testutils
+package co.chainring.integrationtests.utils
 
 import org.awaitility.kotlin.await
 import org.awaitility.kotlin.withAlias

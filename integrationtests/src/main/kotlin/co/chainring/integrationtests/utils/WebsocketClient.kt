@@ -1,4 +1,4 @@
-package co.chainring.integrationtests.testutils
+package co.chainring.integrationtests.utils
 
 import co.chainring.apps.api.model.websocket.Balances
 import co.chainring.apps.api.model.websocket.IncomingWSMessage
@@ -49,6 +49,10 @@ fun WsClient.subscribeToTrades() {
 
 fun WsClient.subscribeToBalances() {
     send(IncomingWSMessage.Subscribe(SubscriptionTopic.Balances))
+}
+
+fun WsClient.unsubscribe(topic: SubscriptionTopic) {
+    send(IncomingWSMessage.Unsubscribe(topic))
 }
 
 fun WsClient.receivedDecoded(): Sequence<OutgoingWSMessage> =

@@ -71,7 +71,7 @@ val localDevFixtures = Fixtures(
         Fixtures.Market(
             baseSymbol = SymbolId(chainringDevChainId, "BTC"),
             quoteSymbol = SymbolId(chainringDevChainId, "USDC"),
-            tickSize = "0.05".toBigDecimal(),
+            tickSize = "1.00".toBigDecimal(),
             marketPrice = "68390.000".toBigDecimal()
         ),
     ),
@@ -110,5 +110,5 @@ val localDevFixtures = Fixtures(
 )
 
 private fun BigDecimal.toFundamentalUnits(decimals: Int): BigInteger {
-    return (this * BigDecimal("1e$decimals")).toBigInteger()
+    return this.movePointRight(decimals).toBigInteger()
 }

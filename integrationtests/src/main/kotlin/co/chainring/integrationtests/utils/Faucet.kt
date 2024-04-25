@@ -1,4 +1,4 @@
-package co.chainring.integrationtests.testutils
+package co.chainring.integrationtests.utils
 
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.model.Address

@@ -21,7 +21,6 @@ import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.core.with
 import org.http4k.format.KotlinxSerialization.auto
-import org.jetbrains.exposed.dao.with
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object ConfigRoutes {
@@ -67,7 +66,9 @@ object ConfigRoutes {
                             Market(
                                 id = "USDC/DAI",
                                 baseSymbol = "USDC",
+                                baseDecimals = 18,
                                 quoteSymbol = "DAI",
+                                quoteDecimals = 6,
                                 tickSize = "0.01".toBigDecimal(),
                             ),
                         ),
@@ -101,7 +102,9 @@ object ConfigRoutes {
                                 Market(
                                     id = market.id.value.toString(),
                                     baseSymbol = market.baseSymbol.name,
+                                    baseDecimals = market.baseSymbol.decimals.toInt(),
                                     quoteSymbol = market.quoteSymbol.name,
+                                    quoteDecimals = market.quoteSymbol.decimals.toInt(),
                                     tickSize = market.tickSize,
                                 )
                             },

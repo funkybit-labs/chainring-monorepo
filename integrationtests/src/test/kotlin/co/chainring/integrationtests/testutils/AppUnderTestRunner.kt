@@ -22,6 +22,8 @@ import co.chainring.core.model.db.WalletTable
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.model.db.WithdrawalTable
+import co.chainring.integrationtests.utils.ApiClient
+import co.chainring.integrationtests.utils.TestBlockchainClient
 import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
 import co.chainring.sequencer.apps.QueueProcessorApp
