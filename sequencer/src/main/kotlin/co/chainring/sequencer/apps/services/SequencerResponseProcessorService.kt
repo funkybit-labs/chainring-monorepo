@@ -279,7 +279,7 @@ object SequencerResponseProcessorService {
 
                 logger.error { "DEBUG: updating OHLC" }
                 logger.error { "DEBUG: trade prices = ${trades.map{it.price}.joinToString()}, trade amounts = ${trades.map{it.amount}.joinToString()}" }
-                logger.error { "DEBUG: updating market=${market.guid.value} marketPriceScale=$marketPriceScale, sumOfPricesByAmount=$sumOfPricesByAmount, sumOfAmounts=$sumOfAmounts, weightedPrice=$weightedPrice" }
+                logger.error { "DEBUG: updating market=${market.guid.value}, market.tickSize=${market.tickSize}, marketPriceScale=$marketPriceScale, sumOfPricesByAmount=$sumOfPricesByAmount, sumOfAmounts=$sumOfAmounts, weightedPrice=$weightedPrice" }
 
                 OHLCEntity.updateWith(market.guid.value, trades.first().timestamp, weightedPrice, sumOfAmounts)
                     .map {
