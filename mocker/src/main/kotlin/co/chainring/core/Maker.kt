@@ -224,7 +224,6 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
         val marketId = MarketId(market.id)
         val currentOffers = currentOrders[marketId]?.filter { it.side == OrderSide.Sell } ?: emptyList()
         val currentBids = currentOrders[marketId]?.filter { it.side == OrderSide.Buy } ?: emptyList()
-        val levels = max(currentOffers.size, currentBids.size)
         val(offerPrices, bidPrices) = offerAndBidPrices(market, levels, curPrice)
         val(offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
 
