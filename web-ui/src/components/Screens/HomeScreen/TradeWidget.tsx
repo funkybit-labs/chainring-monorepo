@@ -286,9 +286,9 @@ export default function TradeWidget({
               }}
             />
           </p>
-          <div className="text-white">
-            {notional > 0n && (
-              <>
+          {notional > 0n && (
+            <>
+              <div className="text-center text-sm text-white">
                 <div className={'inline-block'}>
                   {side == 'Buy' ? 'Buying' : 'Selling'}
                 </div>{' '}
@@ -327,10 +327,12 @@ export default function TradeWidget({
                     />
                   </>
                 )}
-              </>
-            )}
-          </div>
-          <p className="text-center text-white">Fee: 0.05 {quoteSymbol.name}</p>
+              </div>
+              <p className="pt-3 text-center text-sm text-white">
+                Fee: 0.05 {quoteSymbol.name}
+              </p>
+            </>
+          )}
           <div className="pt-3 text-center">
             {mutation.isSuccess ? (
               <div className="text-green">Order created!</div>
