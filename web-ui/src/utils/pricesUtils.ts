@@ -3,7 +3,7 @@ import { OrderSide } from 'apiClient'
 import { parseUnits } from 'viem'
 import { Market } from 'markets'
 
-export const olhcDurationsMs: Record<OHLCDuration, number> = {
+export const ohlcDurationsMs: Record<OHLCDuration, number> = {
   ['P1M']: 60 * 1000,
   ['P5M']: 5 * 60 * 1000,
   ['P15M']: 15 * 60 * 1000,
@@ -18,7 +18,7 @@ export function mergeOHLC(
   duration: OHLCDuration
 ): OHLC[] {
   // update completes of last item before merge
-  updateLastItemCompleteness(draft, olhcDurationsMs[duration])
+  updateLastItemCompleteness(draft, ohlcDurationsMs[duration])
 
   // merge new data
   incoming.forEach((newItem) => {
@@ -28,7 +28,7 @@ export function mergeOHLC(
     )
     if (index == -1) {
       // fill gaps before pushing new ohlc
-      fillGaps(draft, newItem, olhcDurationsMs[duration])
+      fillGaps(draft, newItem, ohlcDurationsMs[duration])
 
       draft.push(newItem)
     } else {
@@ -36,7 +36,7 @@ export function mergeOHLC(
     }
   })
   // update completes of last item after merge
-  updateLastItemCompleteness(draft, olhcDurationsMs[duration])
+  updateLastItemCompleteness(draft, ohlcDurationsMs[duration])
   return draft
 }
 

@@ -16,7 +16,7 @@ import {
   pricesTopic,
   Publishable
 } from 'websocketMessages'
-import { mergeOHLC, olhcDurationsMs } from 'utils/pricesUtils'
+import { mergeOHLC, ohlcDurationsMs } from 'utils/pricesUtils'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { useWindowDimensions, widgetSize, WindowDimensions } from 'utils/layout'
 import { produce } from 'immer'
@@ -41,8 +41,8 @@ type PriceParameters = {
 }
 
 type ViewPort = {
-  earliestStart: Date | undefined
-  latestStart: Date | undefined
+  earliestIndex: number | undefined
+  latestIndex: number | undefined
 }
 
 function calculateParameters(
@@ -96,13 +96,13 @@ function calculateParameters(
 export function PricesWidget({ marketId }: { marketId: string }) {
   const [duration, setDuration] = useState<OHLCDuration>('P5M')
   const [viewPort, setViewPort] = useState<ViewPort>({
-    earliestStart: undefined,
-    latestStart: undefined
+    earliestIndex: undefined,
+    latestIndex: undefined
   })
   const [ohlc, setOhlc] = useState<OHLC[]>([])
   const [params, setParams] = useState<PriceParameters>()
   const windowDimensions = useWindowDimensions()
-  const maxCandles = 20
+  const maxCandles = 30
 
   useWebsocketSubscription({
     topics: useMemo(
@@ -151,22 +151,19 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     // filter to candlesticks which are in the visible range
     function filterVisibleOhlc(viewPort: ViewPort, ohlc: OHLC[]): OHLC[] {
       if (ohlc.length > 0) {
-        if (viewPort.earliestStart === undefined) {
+        if (
+          viewPort.earliestIndex === undefined ||
+          (viewPort.latestIndex === undefined &&
+            ohlc.length - viewPort.earliestIndex! > maxCandles)
+        ) {
           setViewPort({
-            earliestStart:
-              ohlc[Math.max(ohlc.length - 1 - maxCandles, 0)].start,
-            latestStart: viewPort.latestStart
+            earliestIndex: Math.max(ohlc.length - maxCandles, 0),
+            latestIndex: viewPort.latestIndex
           })
           return []
         }
 
-        const latestStart = viewPort.latestStart
-          ? viewPort.latestStart
-          : ohlc[ohlc.length - 1].start
-
-        return ohlc.filter((l) => {
-          return l.start >= viewPort.earliestStart! && l.start <= latestStart!
-        })
+        return ohlc.slice(viewPort.earliestIndex, viewPort.latestIndex)
       } else {
         return []
       }
@@ -292,13 +289,23 @@ export function PricesWidget({ marketId }: { marketId: string }) {
       if (hours < lastHours) {
         return weeklyLabel(date)
       } else {
-        if (ohlcDuration === 'P1H' || ohlcDuration === 'P4H') {
+        if (
+          ohlcDuration === 'P15M' ||
+          ohlcDuration === 'P1H' ||
+          ohlcDuration === 'P4H'
+        ) {
           return (hours < 10 ? '0' + hours : hours) + ':00'
         } else {
           const minutes = date.getMinutes()
-          return (
-            date.getHours() + ':' + (minutes < 10 ? '0' + minutes : minutes)
-          )
+
+          const labelIntervalMinutes = ohlcDuration === 'P5M' ? 15 : 5
+          if (minutes % labelIntervalMinutes == 0) {
+            return (
+              date.getHours() + ':' + (minutes < 10 ? '0' + minutes : minutes)
+            )
+          } else {
+            return ''
+          }
         }
       }
     }
@@ -309,13 +316,13 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     let lastLabel: string | undefined
     return (
       <>
-        {ohlc.map((l, i) => {
-          const label = calculateLabel(duration, l, lastLabel)
+        {ohlc.map((candle, i) => {
+          const label = calculateLabel(duration, candle, lastLabel)
           const oldLastLabel = lastLabel
           lastLabel = label
           const x = params.chartStartX + i * params.barWidth
           return (
-            <Fragment key={l.start.getTime()}>
+            <Fragment key={candle.start.getTime()}>
               {i % 2 == 0 && (
                 <line
                   y1={params.chartStartY}
@@ -386,46 +393,40 @@ export function PricesWidget({ marketId }: { marketId: string }) {
 
   // prevent panning left in weekly zoom or if there are fewer than 10 panDistances left
   function panLeftAllowed() {
-    return !viewPort.earliestStart || viewPort.earliestStart > ohlc[0]?.start
+    return viewPort.earliestIndex && viewPort.earliestIndex > 0
   }
 
   // prevent panning right in weekly zoom or if there's no more data
   function panRightAllowed() {
-    return (
-      viewPort.latestStart &&
-      viewPort.latestStart < ohlc[ohlc.length - 1]?.start
-    )
+    return viewPort.latestIndex && viewPort.latestIndex < ohlc.length
   }
 
   function panLeft() {
     if (panLeftAllowed()) {
-      const earliestIndex = ohlc.findIndex(
-        (ohlc) => ohlc.start === viewPort.earliestStart
-      )
-      const newEarliestIndex = Math.max(earliestIndex - maxCandles, 0)
+      const newEarliestIndex = Math.max(viewPort.earliestIndex! - maxCandles, 0)
       const newLatestIndex = Math.min(
         newEarliestIndex + maxCandles,
         ohlc.length - 1
       )
 
       setViewPort({
-        earliestStart: ohlc[newEarliestIndex].start,
-        latestStart: ohlc[newLatestIndex].start
+        earliestIndex: newEarliestIndex,
+        latestIndex: newLatestIndex
       })
     }
   }
 
   function panRight() {
     if (panRightAllowed()) {
-      const latestIndex = ohlc.findIndex(
-        (ohlc) => ohlc.start === viewPort.latestStart
+      const newLatestIndex = Math.min(
+        viewPort.latestIndex! + maxCandles,
+        ohlc.length
       )
-      const newLatestIndex = Math.min(latestIndex + maxCandles, ohlc.length - 1)
       const newEarliestIndex = Math.max(newLatestIndex - maxCandles, 0)
 
       setViewPort({
-        earliestStart: ohlc[newEarliestIndex].start,
-        latestStart: ohlc[newLatestIndex].start
+        earliestIndex: newEarliestIndex,
+        latestIndex: newLatestIndex == ohlc.length ? undefined : newLatestIndex
       })
     }
   }
@@ -437,8 +438,8 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     setDuration(inner)
     setOhlc([])
     setViewPort({
-      earliestStart: undefined,
-      latestStart: undefined
+      earliestIndex: undefined,
+      latestIndex: undefined
     })
   }
 
@@ -449,8 +450,8 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     setDuration(outer)
     setOhlc([])
     setViewPort({
-      earliestStart: undefined,
-      latestStart: undefined
+      earliestIndex: undefined,
+      latestIndex: undefined
     })
   }
 
@@ -480,16 +481,19 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     const firstDate = viewportOhlc[0]?.start
     const lastDate = viewportOhlc[viewportOhlc.length - 1]?.start
     let startDate = firstDate
-    if (viewPort.earliestStart) {
+    if (viewPort.earliestIndex) {
       startDate = new Date(
-        Math.max(firstDate.getTime(), viewPort.earliestStart.getTime())
+        Math.max(
+          firstDate.getTime(),
+          ohlc[viewPort.earliestIndex].start.getTime()
+        )
       )
     }
     const endDate = new Date(
-      viewPort.latestStart
-        ? viewPort.latestStart.getTime()
+      viewPort.earliestIndex
+        ? ohlc[viewPort.earliestIndex].start
         : lastDate.getTime() +
-          olhcDurationsMs[viewportOhlc[viewportOhlc.length - 1].duration]
+          ohlcDurationsMs[viewportOhlc[viewportOhlc.length - 1].duration]
     )
     if (endDate.getDate() == startDate.getDate()) {
       return `${startDate.toLocaleDateString()}, ${timeWithoutSeconds(
