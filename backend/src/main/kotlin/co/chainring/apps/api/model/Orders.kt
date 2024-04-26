@@ -9,7 +9,6 @@ import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
-import co.chainring.core.model.db.OrderType
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import kotlinx.datetime.Instant
@@ -76,13 +75,6 @@ sealed class CreateOrderApiRequest {
             is Market -> null
         }
     }
-
-    fun getOrderType(): OrderType {
-        return when (this) {
-            is Market -> OrderType.Market
-            is Limit -> OrderType.Limit
-        }
-    }
 }
 
 @Serializable
@@ -101,15 +93,8 @@ sealed class UpdateOrderApiRequest {
     abstract val marketId: MarketId
     abstract val side: OrderSide
     abstract val amount: BigIntegerJson
-
-    @Serializable
-    @SerialName("market")
-    data class Market(
-        override val orderId: OrderId,
-        override val marketId: MarketId,
-        override val side: OrderSide,
-        override val amount: BigIntegerJson,
-    ) : UpdateOrderApiRequest()
+    abstract val nonce: String
+    abstract val signature: EvmSignature
 
     @Serializable
     @SerialName("limit")
@@ -119,12 +104,23 @@ sealed class UpdateOrderApiRequest {
         override val side: OrderSide,
         override val amount: BigIntegerJson,
         val price: BigDecimalJson,
-    ) : UpdateOrderApiRequest()
+        override val nonce: String,
+        override val signature: EvmSignature,
+    ) : UpdateOrderApiRequest() {
+        fun toEip712Transaction(sender: Address, baseToken: Address?, quoteToken: Address?, quoteDecimals: Int) = EIP712Transaction.Order(
+            sender,
+            baseToken ?: Address.zero,
+            quoteToken ?: Address.zero,
+            if (side == OrderSide.Buy) this.amount else this.amount.negate(),
+            this.price.toFundamentalUnits(quoteDecimals),
+            BigInteger(1, nonce.toHexBytes()),
+            this.signature,
+        )
+    }
 
-    fun getResolvedPrice(): BigDecimal? {
+    fun getResolvedPrice(): BigDecimal {
         return when (this) {
             is Limit -> price
-            is Market -> null
         }
     }
 }

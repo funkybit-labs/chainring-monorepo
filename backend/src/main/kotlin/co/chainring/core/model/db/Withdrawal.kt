@@ -3,6 +3,7 @@ package co.chainring.core.model.db
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.toEvmSignature
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
@@ -112,7 +113,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
 
     var signature by WithdrawalTable.signature.transform(
         toColumn = { it.value },
-        toReal = { EvmSignature(it) },
+        toReal = { it.toEvmSignature() },
     )
     var createdAt by WithdrawalTable.createdAt
     var createdBy by WithdrawalTable.createdBy

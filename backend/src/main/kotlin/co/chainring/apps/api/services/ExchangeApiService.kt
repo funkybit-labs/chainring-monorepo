@@ -98,7 +98,7 @@ class ExchangeApiService(
             // check price and market
             val price = checkPrice(market, request.getResolvedPrice())
             checkMarket(apiRequest.marketId, request.marketId)
-            // verify signatures on created owners
+            // verify signatures on created orders
             validateOrderSignature(
                 walletAddress,
                 request.marketId,
@@ -121,18 +121,28 @@ class ExchangeApiService(
         }
 
         // process any order updates
-        val ordersToUpdate = apiRequest.updateOrders.map {
-            val price = checkPrice(market, it.getResolvedPrice())
-            checkMarket(apiRequest.marketId, it.marketId)
+        val ordersToUpdate = apiRequest.updateOrders.map { request ->
+            val price = checkPrice(market, request.getResolvedPrice())
+            checkMarket(apiRequest.marketId, request.marketId)
+            // verify signatures on updated orders
+            validateOrderSignature(
+                walletAddress,
+                request.marketId,
+                request.amount,
+                request.side,
+                price,
+                request.nonce,
+                request.signature,
+            )
             SequencerClient.Order(
-                sequencerOrderId = it.orderId.toSequencerId().value,
-                amount = it.amount,
+                sequencerOrderId = request.orderId.toSequencerId().value,
+                amount = request.amount,
                 price = price?.toString(),
                 wallet = walletAddress.toSequencerId().value,
-                orderType = toSequencerOrderType(it is UpdateOrderApiRequest.Market, it.side),
-                nonce = null,
-                signature = null,
-                orderId = it.orderId,
+                orderType = toSequencerOrderType(false, request.side),
+                nonce = BigInteger(1, request.nonce.toHexBytes()),
+                signature = request.signature,
+                orderId = request.orderId,
             )
         }
 
@@ -151,6 +161,9 @@ class ExchangeApiService(
         return BatchOrdersApiResponse(
             createOrderRequestsByOrderId.map { (orderId, request) ->
                 val accepted = ordersUpdated.contains(orderId.toSequencerId().value)
+                if (!accepted) {
+                    logger.warn { "not accepted, response = $response, ${orderId.toSequencerId().value} $ordersUpdated" }
+                }
                 CreateOrderApiResponse(
                     orderId = orderId,
                     requestStatus = if (accepted) RequestStatus.Accepted else RequestStatus.Rejected,
@@ -311,15 +324,21 @@ class ExchangeApiService(
         )
 
         return blockchainClient.getContractAddress(ContractType.Exchange)?.let { verifyingContract ->
-            if (!ECHelper.isValidSignature(
-                    EIP712Helper.computeHash(
-                        tx,
-                        blockchainClient.chainId,
-                        verifyingContract,
-                    ),
-                    tx.signature,
-                    walletAddress,
-                )
+            if (
+                try {
+                    !ECHelper.isValidSignature(
+                        EIP712Helper.computeHash(
+                            tx,
+                            blockchainClient.chainId,
+                            verifyingContract,
+                        ),
+                        tx.signature,
+                        walletAddress,
+                    )
+                } catch (e: Exception) {
+                    logger.warn(e) { "Exception validating signature" }
+                    true
+                }
             ) {
                 throw ExchangeError("Invalid signature")
             }

@@ -28,6 +28,8 @@ class BatchOrderSerializerTest {
         price = BigDecimal("101000"),
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
+        nonce = "123",
+        signature = EvmSignature.emptySignature(),
     )
 
     @Test

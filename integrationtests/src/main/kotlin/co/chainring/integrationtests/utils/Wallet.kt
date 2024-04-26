@@ -4,6 +4,7 @@ import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.DeployedContract
 import co.chainring.apps.api.model.Symbol
+import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.WithdrawTx
 import co.chainring.contracts.generated.Exchange
 import co.chainring.core.blockchain.BlockchainClientConfig
@@ -92,6 +93,17 @@ class Wallet(
             address,
             symbols.first { it.name == baseSymbol }.contractAddress ?: Address.zero,
             symbols.first { it.name == quoteSymbol }.contractAddress ?: Address.zero,
+        )
+        return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
+    }
+
+    fun signOrder(request: UpdateOrderApiRequest.Limit): UpdateOrderApiRequest.Limit {
+        val (baseSymbol, quoteSymbol) = request.marketId.value.split("/")
+        val tx = request.toEip712Transaction(
+            address,
+            symbols.first { it.name == baseSymbol }.contractAddress ?: Address.zero,
+            symbols.first { it.name == quoteSymbol }.contractAddress ?: Address.zero,
+            symbols.first { it.name == quoteSymbol }.decimals.toInt(),
         )
         return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
     }

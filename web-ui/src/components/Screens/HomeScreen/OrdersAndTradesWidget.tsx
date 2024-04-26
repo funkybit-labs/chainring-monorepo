@@ -2,12 +2,12 @@ import { apiClient, Order, Trade, UpdateOrderRequest } from 'apiClient'
 import { useCallback, useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import { TrashIcon } from '@heroicons/react/24/outline'
-import { formatUnits, parseUnits } from 'viem'
+import { Address, formatUnits } from 'viem'
 import { format } from 'date-fns'
 import { produce } from 'immer'
 import { useMutation } from '@tanstack/react-query'
 import { isErrorFromAlias } from '@zodios/core'
-import { classNames, cleanAndFormatNumberInput } from 'utils'
+import { classNames } from 'utils'
 import { Modal } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
@@ -16,11 +16,18 @@ import { useWebsocketSubscription } from 'contexts/websocket'
 import { ordersTopic, Publishable, tradesTopic } from 'websocketMessages'
 import Decimal from 'decimal.js'
 import { getColumnsForWidth, useWindowDimensions } from 'utils/layout'
+import { addressZero, generateOrderNonce, getDomain } from 'utils/eip712'
+import { useConfig, useSignTypedData } from 'wagmi'
+import useAmountInputState from 'hooks/useAmountInputState'
 
 export default function OrdersAndTradesWidget({
-  markets
+  markets,
+  exchangeContractAddress,
+  walletAddress
 }: {
   markets: Markets
+  exchangeContractAddress: Address
+  walletAddress: Address
 }) {
   const [orders, setOrders] = useState<Order[]>(() => [])
   const [changedOrder, setChangedOrder] = useState<Order | null>(null)
@@ -178,6 +185,8 @@ export default function OrdersAndTradesWidget({
             isOpen={showChangeModal}
             order={changedOrder}
             markets={markets}
+            exchangeContractAddress={exchangeContractAddress}
+            walletAddress={walletAddress}
             close={() => setShowChangeModal(false)}
             onClosed={() => setChangedOrder(null)}
           />
@@ -266,26 +275,45 @@ export default function OrdersAndTradesWidget({
 function ChangeOrderModal({
   order,
   markets,
+  exchangeContractAddress,
+  walletAddress,
   isOpen,
   close,
   onClosed
 }: {
   order: Order
   markets: Markets
+  exchangeContractAddress: Address
+  walletAddress: Address
   isOpen: boolean
   close: () => void
   onClosed: () => void
 }) {
+  const config = useConfig()
   const market = markets.getById(order.marketId)
   const baseSymbol = market.baseSymbol
   const quoteSymbol = market.quoteSymbol
+  const { signTypedDataAsync } = useSignTypedData()
 
-  const [amount, setAmount] = useState(
-    formatUnits(order.amount, baseSymbol.decimals)
-  )
-  const [price, setPrice] = useState(
-    order.type == 'limit' ? String(order.price) : ''
-  )
+  const {
+    inputValue: priceInputValue,
+    setInputValue: setPriceInputValue,
+    valueInFundamentalUnits: price
+  } = useAmountInputState({
+    initialInputValue: order.type == 'limit' ? String(order.price) : '',
+    initialValue: 0n,
+    decimals: quoteSymbol.decimals
+  })
+
+  const {
+    inputValue: amountInputValue,
+    setInputValue: setAmountInputValue,
+    valueInFundamentalUnits: amount
+  } = useAmountInputState({
+    initialInputValue: formatUnits(order.amount, baseSymbol.decimals),
+    initialValue: 0n,
+    decimals: baseSymbol.decimals
+  })
 
   const mutation = useMutation({
     mutationFn: (payload: UpdateOrderRequest) =>
@@ -296,24 +324,46 @@ function ChangeOrderModal({
   })
 
   async function onSubmit() {
-    mutation.mutate(
-      order.type === 'market'
-        ? {
-            orderId: order.id,
-            type: 'market',
-            amount: parseUnits(amount, baseSymbol.decimals),
-            marketId: order.marketId,
-            side: order.side
-          }
-        : {
-            orderId: order.id,
-            type: 'limit',
-            amount: parseUnits(amount, baseSymbol.decimals),
-            price: new Decimal(price),
-            marketId: order.marketId,
-            side: order.side
-          }
-    )
+    const nonce = generateOrderNonce()
+    const signature = await signTypedDataAsync({
+      types: {
+        EIP712Domain: [
+          { name: 'name', type: 'string' },
+          { name: 'version', type: 'string' },
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' }
+        ],
+        Order: [
+          { name: 'sender', type: 'address' },
+          { name: 'baseToken', type: 'address' },
+          { name: 'quoteToken', type: 'address' },
+          { name: 'amount', type: 'int256' },
+          { name: 'price', type: 'uint256' },
+          { name: 'nonce', type: 'int256' }
+        ]
+      },
+      domain: getDomain(exchangeContractAddress, config.state.chainId),
+      primaryType: 'Order',
+      message: {
+        sender: walletAddress,
+        baseToken: baseSymbol.contractAddress ?? addressZero,
+        quoteToken: quoteSymbol.contractAddress ?? addressZero,
+        amount: order.side == 'Buy' ? amount : -amount,
+        price: BigInt(price),
+        nonce: BigInt('0x' + nonce)
+      }
+    })
+
+    mutation.mutate({
+      orderId: order.id,
+      type: 'limit',
+      amount: amount,
+      price: new Decimal(priceInputValue),
+      marketId: order.marketId,
+      side: order.side,
+      nonce: nonce,
+      signature: signature
+    })
   }
 
   return (
@@ -330,14 +380,10 @@ function ChangeOrderModal({
           <div>
             <label className="block">Amount</label>
             <AmountInput
-              value={amount}
+              value={amountInputValue}
               symbol={baseSymbol.name}
               disabled={mutation.isPending}
-              onChange={(e) =>
-                setAmount(
-                  cleanAndFormatNumberInput(e.target.value, baseSymbol.decimals)
-                )
-              }
+              onChange={(e) => setAmountInputValue(e.target.value)}
             />
           </div>
 
@@ -345,17 +391,10 @@ function ChangeOrderModal({
             <div>
               <label className="block">Price</label>
               <AmountInput
-                value={price}
+                value={priceInputValue}
                 symbol={quoteSymbol.name}
                 disabled={mutation.isPending}
-                onChange={(e) =>
-                  setPrice(
-                    cleanAndFormatNumberInput(
-                      e.target.value,
-                      market.quoteDecimalPlaces
-                    )
-                  )
-                }
+                onChange={(e) => setPriceInputValue(e.target.value)}
               />
             </div>
           )}

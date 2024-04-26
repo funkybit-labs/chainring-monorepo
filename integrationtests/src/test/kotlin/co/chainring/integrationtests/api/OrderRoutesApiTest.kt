@@ -19,6 +19,7 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
+import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
@@ -28,7 +29,7 @@ import co.chainring.core.model.db.TradeEntity
 import co.chainring.core.model.db.TradeId
 import co.chainring.core.model.db.TradeTable
 import co.chainring.core.utils.fromFundamentalUnits
-import co.chainring.core.utils.generateHexString
+import co.chainring.core.utils.generateOrderNonce
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.BalanceHelper
@@ -105,7 +106,7 @@ class OrderRoutesApiTest {
         }
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
-            nonce = generateHexString(32),
+            nonce = generateOrderNonce(),
             marketId = usdcDaiMarketId,
             side = OrderSide.Buy,
             amount = wallet.formatAmount("1", "USDC"),
@@ -128,6 +129,7 @@ class OrderRoutesApiTest {
         wsClient.assertOrderCreatedMessageReceived { msg ->
             assertIs<Order.Limit>(msg.order)
             validateLimitOrders(createLimitOrderResponse, msg.order as Order.Limit, false)
+            validateNonceAndSignatureStored(createLimitOrderResponse.orderId, limitOrderApiRequest.nonce, limitOrderApiRequest.signature)
         }
         wsClient.close()
 
@@ -140,14 +142,19 @@ class OrderRoutesApiTest {
         )
 
         // update order
+        val updateOrderApiRequest = UpdateOrderApiRequest.Limit(
+            orderId = createLimitOrderResponse.orderId,
+            marketId = createLimitOrderResponse.order.marketId,
+            side = createLimitOrderResponse.order.side,
+            amount = wallet.formatAmount("3", "USDC"),
+            price = BigDecimal("2.01"),
+            nonce = generateOrderNonce(),
+            signature = EvmSignature.emptySignature(),
+        ).let {
+            wallet.signOrder(it)
+        }
         val updatedOrderApiResponse = apiClient.updateOrder(
-            apiRequest = UpdateOrderApiRequest.Limit(
-                orderId = createLimitOrderResponse.orderId,
-                marketId = createLimitOrderResponse.order.marketId,
-                side = createLimitOrderResponse.order.side,
-                amount = wallet.formatAmount("3", "USDC"),
-                price = BigDecimal("2.01"),
-            ),
+            updateOrderApiRequest,
         )
         assertEquals(updatedOrderApiResponse.requestStatus, RequestStatus.Accepted)
         assertIs<UpdateOrderApiRequest.Limit>(updatedOrderApiResponse.order)
@@ -156,6 +163,7 @@ class OrderRoutesApiTest {
         wsClient.assertOrderUpdatedMessageReceived { msg ->
             assertIs<Order.Limit>(msg.order)
             validateLimitOrders(updatedOrderApiResponse.order, msg.order as Order.Limit, true)
+            validateNonceAndSignatureStored(createLimitOrderResponse.orderId, updateOrderApiRequest.nonce, updateOrderApiRequest.signature)
         }
 
         // cancel order is idempotent
@@ -205,16 +213,33 @@ class OrderRoutesApiTest {
                     side = OrderSide.Buy,
                     amount = BigDecimal("3").toFundamentalUnits(18),
                     price = BigDecimal("4"),
-                ),
+                    nonce = generateOrderNonce(),
+                    signature = EvmSignature.emptySignature(),
+                ).let {
+                    wallet.signOrder(it)
+                },
             ).assertError(ApiError(ReasonCode.RejectedBySequencer, "Rejected By Sequencer"))
 
             apiClient.tryCancelOrder(OrderId.generate()).assertError(ApiError(ReasonCode.ProcessingError, expectedError.message))
         }
 
+        // invalid signature (malformed signature)
+        apiClient.tryUpdateOrder(
+            apiRequest = UpdateOrderApiRequest.Limit(
+                orderId = OrderId.generate(),
+                marketId = usdcDaiMarketId,
+                side = OrderSide.Buy,
+                amount = BigDecimal("3").toFundamentalUnits(18),
+                price = BigDecimal("4"),
+                nonce = generateOrderNonce(),
+                signature = EvmSignature.emptySignature(),
+            ),
+        ).assertError(ApiError(ReasonCode.ProcessingError, "Invalid signature"))
+
         // try to submit an order that crosses the market
         val createLimitOrderResponse = apiClient.createOrder(
             CreateOrderApiRequest.Limit(
-                nonce = generateHexString(32),
+                nonce = generateOrderNonce(),
                 marketId = usdcDaiMarketId,
                 side = OrderSide.Buy,
                 amount = wallet.formatAmount("1", "USDC"),
@@ -240,7 +265,7 @@ class OrderRoutesApiTest {
         // try creating a limit order not a multiple of tick size
         apiClient.tryCreateOrder(
             CreateOrderApiRequest.Limit(
-                nonce = generateHexString(32),
+                nonce = generateOrderNonce(),
                 marketId = usdcDaiMarketId,
                 side = OrderSide.Buy,
                 amount = wallet.formatAmount("1", "USDC"),
@@ -255,7 +280,7 @@ class OrderRoutesApiTest {
 
         val createLimitOrderResponse2 = apiClient.createOrder(
             CreateOrderApiRequest.Limit(
-                nonce = generateHexString(32),
+                nonce = generateOrderNonce(),
                 marketId = usdcDaiMarketId,
                 side = OrderSide.Buy,
                 amount = wallet.formatAmount("1", "USDC"),
@@ -280,12 +305,16 @@ class OrderRoutesApiTest {
                 marketId = createLimitOrderResponse2.order.marketId,
                 side = createLimitOrderResponse2.order.side,
                 price = BigDecimal("2.015"),
-            ),
+                nonce = generateOrderNonce(),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                wallet.signOrder(it)
+            },
         ).assertError(
             ApiError(ReasonCode.ProcessingError, "Order price is not a multiple of tick size"),
         )
 
-        // try updating and cancelling an order not created by this wallet
+        // try updating and cancelling an order not created by this wallet - signature should fail
         val apiClient2 = ApiClient()
         apiClient2.tryUpdateOrder(
             apiRequest = UpdateOrderApiRequest.Limit(
@@ -294,9 +323,13 @@ class OrderRoutesApiTest {
                 marketId = createLimitOrderResponse2.order.marketId,
                 side = createLimitOrderResponse2.order.side,
                 price = BigDecimal("2.01"),
-            ),
+                nonce = generateOrderNonce(),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                wallet.signOrder(it)
+            },
         ).assertError(
-            ApiError(ReasonCode.RejectedBySequencer, "Rejected By Sequencer"),
+            ApiError(ReasonCode.ProcessingError, "Invalid signature"),
         )
         apiClient2.tryCancelOrder(
             createLimitOrderResponse2.orderId,
@@ -319,7 +352,11 @@ class OrderRoutesApiTest {
                 marketId = createLimitOrderResponse2.order.marketId,
                 side = createLimitOrderResponse2.order.side,
                 price = BigDecimal("2.01"),
-            ),
+                nonce = generateOrderNonce(),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                wallet.signOrder(it)
+            },
         ).assertError(
             ApiError(ReasonCode.RejectedBySequencer, "Rejected By Sequencer"),
         )
@@ -351,7 +388,7 @@ class OrderRoutesApiTest {
         }
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
-            nonce = generateHexString(32),
+            nonce = generateOrderNonce(),
             marketId = usdcDaiMarketId,
             side = OrderSide.Buy,
             amount = wallet.formatAmount("1", "USDC"),
@@ -361,7 +398,7 @@ class OrderRoutesApiTest {
             wallet.signOrder(it)
         }
         repeat(times = 10) {
-            apiClient.createOrder(wallet.signOrder(limitOrderApiRequest.copy(nonce = generateHexString(32))))
+            apiClient.createOrder(wallet.signOrder(limitOrderApiRequest.copy(nonce = generateOrderNonce())))
         }
         repeat(10) { wsClient.assertOrderCreatedMessageReceived() }
         assertEquals(10, apiClient.listOrders().orders.count { it.status != OrderStatus.Cancelled })
@@ -395,7 +432,7 @@ class OrderRoutesApiTest {
         // place an order and see that it gets accepted
         val limitBuyOrderApiResponse = makerApiClient.createOrder(
             CreateOrderApiRequest.Limit(
-                nonce = generateHexString(32),
+                nonce = generateOrderNonce(),
                 marketId = btcEthMarketId,
                 side = OrderSide.Buy,
                 amount = makerWallet.formatAmount("0.00013345", "BTC"),
@@ -431,7 +468,11 @@ class OrderRoutesApiTest {
                 marketId = limitBuyOrderApiResponse.order.marketId,
                 side = limitBuyOrderApiResponse.order.side,
                 price = BigDecimal("17.50"),
-            ),
+                nonce = generateOrderNonce(),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                makerWallet.signOrder(it)
+            },
         )
         assertIs<UpdateOrderApiRequest.Limit>(updatedLimitBuyOrderApiResponse.order)
         assertEquals(RequestStatus.Accepted, updatedLimitBuyOrderApiResponse.requestStatus)
@@ -456,7 +497,7 @@ class OrderRoutesApiTest {
         // place a sell order
         val limitSellOrderApiResponse = makerApiClient.createOrder(
             CreateOrderApiRequest.Limit(
-                nonce = generateHexString(32),
+                nonce = generateOrderNonce(),
                 marketId = btcEthMarketId,
                 side = OrderSide.Sell,
                 amount = makerWallet.formatAmount("0.00154321", "BTC"),
@@ -496,7 +537,11 @@ class OrderRoutesApiTest {
                 marketId = limitSellOrderApiResponse.order.marketId,
                 side = limitSellOrderApiResponse.order.side,
                 price = BigDecimal("17.550"),
-            ),
+                nonce = generateOrderNonce(),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                makerWallet.signOrder(it)
+            },
         )
         assertIs<UpdateOrderApiRequest.Limit>(updatedLimitSellOrderApiResponse.order)
         assertEquals(RequestStatus.Accepted, updatedLimitSellOrderApiResponse.requestStatus)
@@ -524,7 +569,7 @@ class OrderRoutesApiTest {
         // place a buy order and see it gets executed
         val marketBuyOrderApiResponse = takerApiClient.createOrder(
             CreateOrderApiRequest.Market(
-                nonce = generateHexString(32),
+                nonce = generateOrderNonce(),
                 marketId = btcEthMarketId,
                 side = OrderSide.Buy,
                 amount = takerWallet.formatAmount("0.00043210", "BTC"),
@@ -664,7 +709,7 @@ class OrderRoutesApiTest {
         // place a sell order and see it gets executed
         val marketSellOrderApiResponse = takerApiClient.createOrder(
             CreateOrderApiRequest.Market(
-                nonce = generateHexString(32),
+                nonce = generateOrderNonce(),
                 marketId = btcEthMarketId,
                 side = OrderSide.Sell,
                 amount = takerWallet.formatAmount("0.00012346", "BTC"),
@@ -895,7 +940,7 @@ class OrderRoutesApiTest {
                 marketId = btcUsdcMarketId,
                 createOrders = listOf("0.00001", "0.00002", "0.0003").map {
                     CreateOrderApiRequest.Limit(
-                        nonce = generateHexString(32),
+                        nonce = generateOrderNonce(),
                         marketId = MarketId("BTC/USDC"),
                         side = OrderSide.Sell,
                         amount = makerWallet.formatAmount(it, "BTC"),
@@ -918,7 +963,7 @@ class OrderRoutesApiTest {
                 marketId = btcUsdcMarketId,
                 createOrders = listOf("0.0004", "0.0005", "0.0006").map {
                     CreateOrderApiRequest.Limit(
-                        nonce = generateHexString(32),
+                        nonce = generateOrderNonce(),
                         marketId = MarketId("BTC/USDC"),
                         side = OrderSide.Sell,
                         amount = makerWallet.formatAmount(it, "BTC"),
@@ -935,21 +980,33 @@ class OrderRoutesApiTest {
                         marketId = createBatchLimitOrders.createdOrders[0].order.marketId,
                         side = createBatchLimitOrders.createdOrders[0].order.side,
                         price = BigDecimal("68405.000"),
-                    ),
+                        nonce = generateOrderNonce(),
+                        signature = EvmSignature.emptySignature(),
+                    ).let {
+                        makerWallet.signOrder(it)
+                    },
                     UpdateOrderApiRequest.Limit(
                         orderId = createBatchLimitOrders.createdOrders[1].orderId,
                         amount = makerWallet.formatAmount("0.0002", "BTC"),
                         marketId = createBatchLimitOrders.createdOrders[1].order.marketId,
                         side = createBatchLimitOrders.createdOrders[2].order.side,
                         price = BigDecimal("68405.000"),
-                    ),
+                        nonce = generateOrderNonce(),
+                        signature = EvmSignature.emptySignature(),
+                    ).let {
+                        makerWallet.signOrder(it)
+                    },
                     UpdateOrderApiRequest.Limit(
                         orderId = OrderId.generate(),
                         amount = makerWallet.formatAmount("0.0002", "BTC"),
                         marketId = createBatchLimitOrders.createdOrders[1].order.marketId,
                         side = createBatchLimitOrders.createdOrders[2].order.side,
                         price = BigDecimal("68405.000"),
-                    ),
+                        nonce = generateOrderNonce(),
+                        signature = EvmSignature.emptySignature(),
+                    ).let {
+                        makerWallet.signOrder(it)
+                    },
                 ),
                 cancelOrders = listOf(
                     CancelOrderApiRequest(orderId = createBatchLimitOrders.createdOrders[2].orderId),
@@ -974,7 +1031,7 @@ class OrderRoutesApiTest {
         // create a market orders that should match against the 5 limit orders
         takerApiClient.createOrder(
             CreateOrderApiRequest.Market(
-                nonce = generateHexString(32),
+                nonce = generateOrderNonce(),
                 marketId = btcUsdcMarketId,
                 side = OrderSide.Buy,
                 amount = takerOrderAmount,
@@ -1176,6 +1233,14 @@ class OrderRoutesApiTest {
     private fun getTradesForOrders(orderIds: List<OrderId>): List<TradeEntity> {
         return transaction {
             OrderExecutionEntity.findForOrders(orderIds).map { it.trade }
+        }
+    }
+
+    private fun validateNonceAndSignatureStored(orderId: OrderId, nonce: String, signature: EvmSignature) {
+        transaction {
+            val orderEntity = OrderEntity[orderId]
+            assertEquals(BigInteger(orderEntity.nonce, 16), BigInteger(nonce, 16))
+            assertEquals(orderEntity.signature, signature.value)
         }
     }
 }

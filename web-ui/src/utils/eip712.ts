@@ -36,3 +36,7 @@ export function getNativeWithdrawMessage(
     nonce: nonce
   }
 }
+
+export function generateOrderNonce(): string {
+  return crypto.randomUUID().replaceAll('-', '')
+}
