@@ -81,3 +81,23 @@ resource "aws_route53_record" "ssl-verify-labs" {
   zone_id = aws_route53_zone.zone-labs.zone_id
   records = ["6AB4DA2AACD91439399198CE41F99198.E4B1F4E180C8DBFA922101EA8A179C22.662bd4742044d.comodoca.com", ]
 }
+
+resource "aws_route53_record" "alt-web-hostname" {
+  name    = "www.chainringlabs.com"
+  type    = "CNAME"
+  ttl     = "300"
+  zone_id = aws_route53_zone.zone-labs.zone_id
+  records = ["www.chainring.co", ]
+}
+
+data "dns_a_record_set" "chainring-apex" {
+  host = "chainring.co"
+}
+
+resource "aws_route53_record" "apex-labs" {
+     zone_id = "${aws_route53_zone.zone-labs.zone_id}"
+     name    = "chainringlabs.com"
+     type    = "A"
+     ttl     = "300"
+     records = ["${data.dns_a_record_set.chainring-apex.addrs.0}"]
+}
