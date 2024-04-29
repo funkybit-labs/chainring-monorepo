@@ -80,9 +80,8 @@ class Wallet(
         val (baseSymbol, quoteSymbol) = request.marketId.value.split("/")
         val tx = request.toEip712Transaction(
             address,
-            symbols.first { it.name == baseSymbol }.contractAddress ?: Address.zero,
-            symbols.first { it.name == quoteSymbol }.contractAddress ?: Address.zero,
-            symbols.first { it.name == quoteSymbol }.decimals.toInt(),
+            symbols.first { it.name == baseSymbol },
+            symbols.first { it.name == quoteSymbol },
         )
         return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
     }
@@ -91,8 +90,8 @@ class Wallet(
         val (baseSymbol, quoteSymbol) = request.marketId.value.split("/")
         val tx = request.toEip712Transaction(
             address,
-            symbols.first { it.name == baseSymbol }.contractAddress ?: Address.zero,
-            symbols.first { it.name == quoteSymbol }.contractAddress ?: Address.zero,
+            symbols.first { it.name == baseSymbol },
+            symbols.first { it.name == quoteSymbol },
         )
         return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
     }
@@ -101,9 +100,8 @@ class Wallet(
         val (baseSymbol, quoteSymbol) = request.marketId.value.split("/")
         val tx = request.toEip712Transaction(
             address,
-            symbols.first { it.name == baseSymbol }.contractAddress ?: Address.zero,
-            symbols.first { it.name == quoteSymbol }.contractAddress ?: Address.zero,
-            symbols.first { it.name == quoteSymbol }.decimals.toInt(),
+            symbols.first { it.name == baseSymbol },
+            symbols.first { it.name == quoteSymbol },
         )
         return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
     }

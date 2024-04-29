@@ -312,36 +312,37 @@ class ExchangeApiService(
     }
 
     private fun validateOrderSignature(walletAddress: Address, marketId: MarketId, amount: BigInteger, side: OrderSide, price: BigDecimal?, nonce: String, signature: EvmSignature) {
-        val (baseSymbol, quoteSymbol) = marketId.value.split("/")
-        val tx = EIP712Transaction.Order(
-            walletAddress,
-            getContractAddress(baseSymbol),
-            getContractAddress(quoteSymbol),
-            if (side == OrderSide.Buy) amount else amount.negate(),
-            price?.toFundamentalUnits(getSymbol(quoteSymbol).decimals) ?: BigInteger.ZERO,
-            BigInteger(1, nonce.toHexBytes()),
-            signature,
-        )
+        val verifyingContract = blockchainClient.getContractAddress(ContractType.Exchange)
+            ?: throw ExchangeError("No deployed contract found")
 
-        return blockchainClient.getContractAddress(ContractType.Exchange)?.let { verifyingContract ->
-            if (
-                try {
-                    !ECHelper.isValidSignature(
-                        EIP712Helper.computeHash(
-                            tx,
-                            blockchainClient.chainId,
-                            verifyingContract,
-                        ),
-                        tx.signature,
-                        walletAddress,
-                    )
-                } catch (e: Exception) {
-                    logger.warn(e) { "Exception validating signature" }
-                    true
-                }
-            ) {
+        runCatching {
+            val (baseSymbol, quoteSymbol) = marketId.value.split("/")
+            val tx = EIP712Transaction.Order(
+                walletAddress,
+                getContractAddress(baseSymbol),
+                getContractAddress(quoteSymbol),
+                if (side == OrderSide.Buy) amount else amount.negate(),
+                price?.toFundamentalUnits(getSymbol(quoteSymbol).decimals) ?: BigInteger.ZERO,
+                BigInteger(1, nonce.toHexBytes()),
+                signature,
+            )
+
+            ECHelper.isValidSignature(
+                EIP712Helper.computeHash(
+                    tx,
+                    blockchainClient.chainId,
+                    verifyingContract,
+                ),
+                tx.signature,
+                walletAddress,
+            )
+        }.onFailure {
+            logger.warn(it) { "Exception validating signature" }
+            throw ExchangeError("Invalid signature")
+        }.getOrDefault(false).also { isValidSignature ->
+            if (!isValidSignature) {
                 throw ExchangeError("Invalid signature")
             }
-        } ?: throw ExchangeError("No deployed contract found")
+        }
     }
 }

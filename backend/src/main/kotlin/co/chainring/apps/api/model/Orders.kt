@@ -38,10 +38,10 @@ sealed class CreateOrderApiRequest {
         override val amount: BigIntegerJson,
         override val signature: EvmSignature,
     ) : CreateOrderApiRequest() {
-        fun toEip712Transaction(sender: Address, baseToken: Address?, quoteToken: Address?) = EIP712Transaction.Order(
+        fun toEip712Transaction(sender: Address, baseToken: co.chainring.apps.api.model.Symbol, quoteToken: co.chainring.apps.api.model.Symbol) = EIP712Transaction.Order(
             sender,
-            baseToken ?: Address.zero,
-            quoteToken ?: Address.zero,
+            baseToken.contractAddress ?: Address.zero,
+            quoteToken.contractAddress ?: Address.zero,
             if (side == OrderSide.Buy) this.amount else this.amount.negate(),
             BigInteger.ZERO,
             BigInteger(1, nonce.toHexBytes()),
@@ -59,12 +59,12 @@ sealed class CreateOrderApiRequest {
         val price: BigDecimalJson,
         override val signature: EvmSignature,
     ) : CreateOrderApiRequest() {
-        fun toEip712Transaction(sender: Address, baseToken: Address?, quoteToken: Address?, quoteDecimals: Int) = EIP712Transaction.Order(
+        fun toEip712Transaction(sender: Address, baseToken: co.chainring.apps.api.model.Symbol, quoteToken: co.chainring.apps.api.model.Symbol) = EIP712Transaction.Order(
             sender,
-            baseToken ?: Address.zero,
-            quoteToken ?: Address.zero,
+            baseToken.contractAddress ?: Address.zero,
+            quoteToken.contractAddress ?: Address.zero,
             if (side == OrderSide.Buy) this.amount else this.amount.negate(),
-            this.price.toFundamentalUnits(quoteDecimals),
+            this.price.toFundamentalUnits(quoteToken.decimals),
             BigInteger(1, nonce.toHexBytes()),
             this.signature,
         )
@@ -107,12 +107,12 @@ sealed class UpdateOrderApiRequest {
         override val nonce: String,
         override val signature: EvmSignature,
     ) : UpdateOrderApiRequest() {
-        fun toEip712Transaction(sender: Address, baseToken: Address?, quoteToken: Address?, quoteDecimals: Int) = EIP712Transaction.Order(
+        fun toEip712Transaction(sender: Address, baseToken: co.chainring.apps.api.model.Symbol, quoteToken: co.chainring.apps.api.model.Symbol) = EIP712Transaction.Order(
             sender,
-            baseToken ?: Address.zero,
-            quoteToken ?: Address.zero,
+            baseToken.contractAddress ?: Address.zero,
+            quoteToken.contractAddress ?: Address.zero,
             if (side == OrderSide.Buy) this.amount else this.amount.negate(),
-            this.price.toFundamentalUnits(quoteDecimals),
+            this.price.toFundamentalUnits(quoteToken.decimals),
             BigInteger(1, nonce.toHexBytes()),
             this.signature,
         )
