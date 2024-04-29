@@ -3,6 +3,7 @@ package co.chainring.apps.api
 import co.chainring.apps.BaseApp
 import co.chainring.apps.api.middleware.HttpTransactionLogger
 import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
+import co.chainring.apps.api.middleware.Tracer
 import co.chainring.apps.api.services.ExchangeApiService
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
@@ -87,6 +88,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                 },
                 endReportFn = { _, _, _ ->
                     MDC.remove("traceId")
+                    Tracer.reset()
                 },
             ),
         )

@@ -1,5 +1,7 @@
 package co.chainring.core.sequencer
 
+import co.chainring.apps.api.middleware.ServerSpans
+import co.chainring.apps.api.middleware.Tracer
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
@@ -91,37 +93,47 @@ open class SequencerClient {
         ordersToCancel: List<OrderId>,
         cancelAll: Boolean = false,
     ): SequencerResponse {
-        return stub.applyOrderBatch(
-            orderBatch {
-                this.marketId = marketId.value
-                this.wallet = wallet
-                this.ordersToAdd.addAll(
-                    ordersToAdd.map { toOrderDSL(it) },
-                )
-                this.ordersToChange.addAll(
-                    ordersToChange.map { toOrderDSL(it) },
-                )
-                this.ordersToCancel.addAll(
-                    ordersToCancel.map { toCancelOrderDSL(it) },
-                )
-                this.cancelAll = cancelAll
-            },
-        ).sequencerResponse
+        return Tracer.newCoroutineSpan(ServerSpans.sqrCli) {
+            stub.applyOrderBatch(
+                orderBatch {
+                    this.marketId = marketId.value
+                    this.wallet = wallet
+                    this.ordersToAdd.addAll(
+                        ordersToAdd.map { toOrderDSL(it) },
+                    )
+                    this.ordersToChange.addAll(
+                        ordersToChange.map { toOrderDSL(it) },
+                    )
+                    this.ordersToCancel.addAll(
+                        ordersToCancel.map { toCancelOrderDSL(it) },
+                    )
+                    this.cancelAll = cancelAll
+                },
+            )
+        }.also {
+            Tracer.newSpan(ServerSpans.gtw, it.processingTime)
+            Tracer.newSpan(ServerSpans.sqr, it.sequencerResponse.processingTime)
+        }.sequencerResponse
     }
 
     suspend fun createMarket(marketId: String, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal, baseDecimals: Int, quoteDecimals: Int): SequencerResponse {
-        return stub.addMarket(
-            market {
-                this.guid = UUID.randomUUID().toString()
-                this.marketId = marketId
-                this.tickSize = tickSize.toDecimalValue()
-                this.maxLevels = 1000
-                this.maxOrdersPerLevel = 1000
-                this.marketPrice = marketPrice.toDecimalValue()
-                this.baseDecimals = baseDecimals
-                this.quoteDecimals = quoteDecimals
-            },
-        ).sequencerResponse
+        return Tracer.newCoroutineSpan(ServerSpans.sqrCli) {
+            stub.addMarket(
+                market {
+                    this.guid = UUID.randomUUID().toString()
+                    this.marketId = marketId
+                    this.tickSize = tickSize.toDecimalValue()
+                    this.maxLevels = 1000
+                    this.maxOrdersPerLevel = 1000
+                    this.marketPrice = marketPrice.toDecimalValue()
+                    this.baseDecimals = baseDecimals
+                    this.quoteDecimals = quoteDecimals
+                },
+            )
+        }.also {
+            Tracer.newSpan(ServerSpans.gtw, it.processingTime)
+            Tracer.newSpan(ServerSpans.sqr, it.sequencerResponse.processingTime)
+        }.sequencerResponse
     }
 
     suspend fun deposit(
@@ -130,19 +142,24 @@ open class SequencerClient {
         amount: BigInteger,
         depositId: DepositId,
     ): SequencerResponse {
-        return stub.applyBalanceBatch(
-            balanceBatch {
-                this.guid = UUID.randomUUID().toString()
-                this.deposits.add(
-                    deposit {
-                        this.asset = asset.value
-                        this.wallet = wallet
-                        this.amount = amount.toIntegerValue()
-                        this.externalGuid = depositId.value
-                    },
-                )
-            },
-        ).sequencerResponse
+        return Tracer.newCoroutineSpan(ServerSpans.sqrCli) {
+            stub.applyBalanceBatch(
+                balanceBatch {
+                    this.guid = UUID.randomUUID().toString()
+                    this.deposits.add(
+                        deposit {
+                            this.asset = asset.value
+                            this.wallet = wallet
+                            this.amount = amount.toIntegerValue()
+                            this.externalGuid = depositId.value
+                        },
+                    )
+                },
+            )
+        }.also {
+            Tracer.newSpan(ServerSpans.gtw, it.processingTime)
+            Tracer.newSpan(ServerSpans.sqr, it.sequencerResponse.processingTime)
+        }.sequencerResponse
     }
 
     suspend fun withdraw(
@@ -153,21 +170,26 @@ open class SequencerClient {
         evmSignature: EvmSignature,
         withdrawalId: WithdrawalId,
     ): SequencerResponse {
-        return stub.applyBalanceBatch(
-            balanceBatch {
-                this.guid = UUID.randomUUID().toString()
-                this.withdrawals.add(
-                    withdrawal {
-                        this.asset = asset.value
-                        this.wallet = wallet
-                        this.amount = amount.toIntegerValue()
-                        this.nonce = nonce.toIntegerValue()
-                        this.signature = evmSignature.value
-                        this.externalGuid = withdrawalId.value
-                    },
-                )
-            },
-        ).sequencerResponse
+        return Tracer.newCoroutineSpan(ServerSpans.sqrCli) {
+            stub.applyBalanceBatch(
+                balanceBatch {
+                    this.guid = UUID.randomUUID().toString()
+                    this.withdrawals.add(
+                        withdrawal {
+                            this.asset = asset.value
+                            this.wallet = wallet
+                            this.amount = amount.toIntegerValue()
+                            this.nonce = nonce.toIntegerValue()
+                            this.signature = evmSignature.value
+                            this.externalGuid = withdrawalId.value
+                        },
+                    )
+                },
+            )
+        }.also {
+            Tracer.newSpan(ServerSpans.gtw, it.processingTime)
+            Tracer.newSpan(ServerSpans.sqr, it.sequencerResponse.processingTime)
+        }.sequencerResponse
     }
 
     suspend fun cancelOrder(
