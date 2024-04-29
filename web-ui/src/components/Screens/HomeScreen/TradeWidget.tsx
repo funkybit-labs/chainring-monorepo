@@ -13,13 +13,13 @@ import SubmitButton from 'components/common/SubmitButton'
 import { Address, formatUnits } from 'viem'
 import { isErrorFromAlias } from '@zodios/core'
 import { useConfig, useSignTypedData } from 'wagmi'
-import { addressZero, getDomain } from 'utils/eip712'
 import { Market } from 'markets'
 import Decimal from 'decimal.js'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { OrderBook, orderBookTopic, Publishable } from 'websocketMessages'
 import { getMarketPrice } from 'utils/pricesUtils'
 import useAmountInputState from 'hooks/useAmountInputState'
+import { addressZero, generateOrderNonce, getDomain } from 'utils/eip712'
 
 export default function TradeWidget({
   market,
@@ -121,7 +121,7 @@ export default function TradeWidget({
   }, [mutation])
 
   async function submitOrder() {
-    const nonce = crypto.randomUUID().replaceAll('-', '')
+    const nonce = generateOrderNonce()
     const signature = await signTypedDataAsync({
       types: {
         EIP712Domain: [

@@ -105,18 +105,11 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             security = signedTokenSecurity
             tags += listOf(Tag("orders"))
             receiving(
-                requestBody to Examples.updateMarketOrderRequest,
-            )
-            receiving(
                 requestBody to Examples.updateLimitOrderRequest,
             )
             returning(
                 Status.OK,
                 responseBody to Examples.updateLimitOrderResponse,
-            )
-            returning(
-                Status.OK,
-                responseBody to Examples.updateMarketOrderResponse,
             )
         } bindContract Method.PATCH to { orderId ->
             fun handle(request: Request): Response {

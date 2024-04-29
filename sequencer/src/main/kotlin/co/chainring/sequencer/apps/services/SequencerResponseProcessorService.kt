@@ -6,7 +6,6 @@ import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.core.evm.EIP712Transaction
-import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.BalanceChange
@@ -36,6 +35,7 @@ import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.model.db.publishBroadcasterNotifications
+import co.chainring.core.model.toEvmSignature
 import co.chainring.core.sequencer.depositId
 import co.chainring.core.sequencer.orderId
 import co.chainring.core.sequencer.sequencerOrderId
@@ -132,7 +132,7 @@ object SequencerResponseProcessorService {
                     toOrderSide(it.type),
                     it.amount.toBigInteger(),
                     it.price.toBigDecimal(),
-                    EvmSignature(it.signature),
+                    it.signature.toEvmSignature(),
                     it.guid.sequencerOrderId(),
                 )
             }
@@ -142,6 +142,8 @@ object SequencerResponseProcessorService {
                     it.externalGuid.orderId(),
                     it.amount.toBigInteger(),
                     it.price.toBigDecimal(),
+                    it.nonce.toBigInteger(),
+                    it.signature.toEvmSignature(),
                 )
             }
 

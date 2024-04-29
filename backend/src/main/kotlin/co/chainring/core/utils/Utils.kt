@@ -4,14 +4,13 @@ import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
 import org.bouncycastle.util.encoders.Hex
 import java.math.BigInteger
-import kotlin.random.Random
 
 fun generateHexString(length: Int = 64): String {
     val alphaChars = ('0'..'9').toList().toTypedArray() + ('a'..'f').toList().toTypedArray()
     return (1..length).map { alphaChars.random().toChar() }.toMutableList().joinToString("")
 }
 
-fun randomLong() = Random.nextLong()
+fun generateOrderNonce() = generateHexString(32)
 
 @OptIn(ExperimentalStdlibApi::class)
 fun ByteArray.toHex(add0x: Boolean = true) = (if (add0x) "0x" else "") + this.toHexString(HexFormat.Default)

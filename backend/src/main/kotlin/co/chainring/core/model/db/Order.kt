@@ -9,6 +9,7 @@ import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.SequencerOrderId
+import co.chainring.core.model.toEvmSignature
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.toByteArrayNoSign
 import co.chainring.core.utils.toFundamentalUnits
@@ -111,6 +112,8 @@ data class UpdateOrderAssignment(
     val orderId: OrderId,
     val amount: BigInteger,
     val price: BigDecimal?,
+    val nonce: BigInteger,
+    val signature: EvmSignature,
 )
 
 object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
@@ -210,7 +213,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         this.amount,
         this.price?.toFundamentalUnits(quoteDecimals) ?: BigInteger.ZERO,
         BigInteger(1, this.nonce.toHexBytes()),
-        EvmSignature(this.signature),
+        this.signature.toEvmSignature(),
     )
 
     companion object : EntityClass<OrderId, OrderEntity>(OrderTable) {
@@ -241,18 +244,14 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                         addBatch(EntityID(assignment.orderId, OrderTable))
                         this[OrderTable.amount] = assignment.amount.toBigDecimal()
                         this[OrderTable.price] = assignment.price
+                        this[OrderTable.nonce] = assignment.nonce.toByteArrayNoSign().toHex(false)
+                        this[OrderTable.signature] = assignment.signature.value
                         this[BalanceTable.updatedAt] = now
                         this[BalanceTable.updatedBy] = "system"
                     }
                     execute(TransactionManager.current())
                 }
             }
-        }
-
-        fun findByNonce(nonce: String): OrderEntity? {
-            return OrderEntity.find {
-                OrderTable.nonce.eq(nonce)
-            }.firstOrNull()
         }
 
         fun findBySequencerOrderId(sequencerOrderId: Long): OrderEntity? {

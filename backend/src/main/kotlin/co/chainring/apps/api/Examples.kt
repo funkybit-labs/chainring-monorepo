@@ -43,19 +43,14 @@ object Examples {
         signature = EvmSignature.emptySignature(),
     )
 
-    val updateMarketOrderRequest = UpdateOrderApiRequest.Market(
-        orderId = OrderId("123"),
-        amount = BigInteger("100"),
-        marketId = MarketId("BTC/ETH"),
-        side = OrderSide.Buy,
-    )
-
     val updateLimitOrderRequest = UpdateOrderApiRequest.Limit(
         orderId = OrderId("123"),
         amount = BigInteger("100"),
         price = BigDecimal("100"),
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
+        nonce = "123",
+        signature = EvmSignature.emptySignature(),
     )
 
     val createMarketOrderResponse = CreateOrderApiResponse(
@@ -70,12 +65,6 @@ object Examples {
         requestStatus = RequestStatus.Accepted,
         error = null,
         order = createLimitOrderRequest,
-    )
-
-    val updateMarketOrderResponse = UpdateOrderApiResponse(
-        requestStatus = RequestStatus.Accepted,
-        error = null,
-        order = updateMarketOrderRequest,
     )
 
     val updateLimitOrderResponse = UpdateOrderApiResponse(
