@@ -102,7 +102,7 @@ object SequencerResponseProcessorService {
             SequencerRequest.Type.ApplyOrderBatch -> {
                 if (response.error == SequencerError.None) {
                     WalletEntity.getBySequencerId(request.orderBatch.wallet.sequencerWalletId())?.let { wallet ->
-                        handleOrderBatchUpdates(request.orderBatch, wallet)
+                        handleOrderBatchUpdates(request.orderBatch, wallet, response)
                         handleSequencerResponse(
                             response,
                             wallet,
@@ -120,7 +120,7 @@ object SequencerResponseProcessorService {
     private fun error(response: SequencerResponse) =
         if (response.error != SequencerError.None) response.error.name else "Rejected by sequencer"
 
-    private fun handleOrderBatchUpdates(orderBatch: OrderBatch, wallet: WalletEntity) {
+    private fun handleOrderBatchUpdates(orderBatch: OrderBatch, wallet: WalletEntity, response: SequencerResponse) {
         if (orderBatch.ordersToAddList.isNotEmpty() || orderBatch.ordersToChangeList.isNotEmpty()) {
             val createAssignments = orderBatch.ordersToAddList.map {
                 CreateOrderAssignment(
@@ -134,15 +134,20 @@ object SequencerResponseProcessorService {
                     it.guid.sequencerOrderId(),
                 )
             }
+            val ordersChangeRejected = response.ordersChangeRejectedList.map { it.guid }.toSet()
 
-            val updateAssignments = orderBatch.ordersToChangeList.map {
-                UpdateOrderAssignment(
-                    it.externalGuid.orderId(),
-                    it.amount.toBigInteger(),
-                    it.price.toBigDecimal(),
-                    it.nonce.toBigInteger(),
-                    it.signature.toEvmSignature(),
-                )
+            val updateAssignments = orderBatch.ordersToChangeList.mapNotNull {
+                if (!ordersChangeRejected.contains(it.guid)) {
+                    UpdateOrderAssignment(
+                        it.externalGuid.orderId(),
+                        it.amount.toBigInteger(),
+                        it.price.toBigDecimal(),
+                        it.nonce.toBigInteger(),
+                        it.signature.toEvmSignature(),
+                    )
+                } else {
+                    null
+                }
             }
             val market = getMarket(MarketId(orderBatch.marketId))
 

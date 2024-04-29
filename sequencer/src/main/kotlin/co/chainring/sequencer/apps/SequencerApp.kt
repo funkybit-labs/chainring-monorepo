@@ -16,6 +16,7 @@ import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.BalanceChange
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderBatch
+import co.chainring.sequencer.proto.OrderChangeRejected
 import co.chainring.sequencer.proto.OrderChanged
 import co.chainring.sequencer.proto.SequencerError
 import co.chainring.sequencer.proto.SequencerRequest
@@ -89,6 +90,7 @@ class SequencerApp(
             }
             SequencerRequest.Type.ApplyOrderBatch -> {
                 var ordersChanged: List<OrderChanged> = emptyList()
+                var ordersChangeRejected: List<OrderChangeRejected> = emptyList()
                 var trades: List<TradeCreated> = emptyList()
                 var balanceChanges: List<BalanceChange> = emptyList()
                 val walletsAndAssetsWithBalanceChanges: MutableSet<Pair<WalletAddress, Asset>> = mutableSetOf()
@@ -103,6 +105,7 @@ class SequencerApp(
                     if (error == null) {
                         val result = market.applyOrderBatch(orderBatch)
                         ordersChanged = result.ordersChanged
+                        ordersChangeRejected = result.ordersChangeRejected
                         trades = result.createdTrades
                         balanceChanges = result.balanceChanges
                         // apply balance changes
@@ -138,6 +141,7 @@ class SequencerApp(
                     error?.let {
                         this.error = it
                     }
+                    this.ordersChangeRejected.addAll(ordersChangeRejected)
                 }
             }
 

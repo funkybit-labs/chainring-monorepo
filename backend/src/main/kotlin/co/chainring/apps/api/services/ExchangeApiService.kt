@@ -36,6 +36,7 @@ import co.chainring.core.sequencer.toSequencerId
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import co.chainring.sequencer.core.Asset
+import co.chainring.sequencer.proto.OrderChangeRejected.Reason
 import co.chainring.sequencer.proto.SequencerError
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
@@ -158,38 +159,42 @@ class ExchangeApiService(
             else -> throw ExchangeError("Unable to process request - ${response.error}")
         }
 
-        val ordersUpdated = response.ordersChangedList.map { it.guid }.toSet()
+        val failedUpdatesOrCancels = response.ordersChangeRejectedList.associateBy { it.guid }
 
         return BatchOrdersApiResponse(
             createOrderRequestsByOrderId.map { (orderId, request) ->
-                val accepted = ordersUpdated.contains(orderId.toSequencerId().value)
-                if (!accepted) {
-                    logger.warn { "not accepted, response = $response, ${orderId.toSequencerId().value} $ordersUpdated" }
-                }
                 CreateOrderApiResponse(
                     orderId = orderId,
-                    requestStatus = if (accepted) RequestStatus.Accepted else RequestStatus.Rejected,
-                    error = if (accepted) null else ApiError(ReasonCode.RejectedBySequencer, "Rejected By Sequencer"),
+                    requestStatus = RequestStatus.Accepted,
+                    error = null,
                     order = request,
                 )
             },
             apiRequest.updateOrders.map {
-                val accepted = ordersUpdated.contains(it.orderId.toSequencerId().value)
+                val rejected = failedUpdatesOrCancels[it.orderId.toSequencerId().value]
                 UpdateOrderApiResponse(
-                    requestStatus = if (accepted) RequestStatus.Accepted else RequestStatus.Rejected,
-                    error = if (accepted) null else ApiError(ReasonCode.RejectedBySequencer, "Rejected By Sequencer"),
+                    requestStatus = if (rejected == null) RequestStatus.Accepted else RequestStatus.Rejected,
+                    error = rejected?.reason?.let { reason -> ApiError(ReasonCode.RejectedBySequencer, reasonToMessage(reason)) },
                     order = it,
                 )
             },
             apiRequest.cancelOrders.map {
-                val accepted = ordersUpdated.contains(it.orderId.toSequencerId().value)
+                val rejected = failedUpdatesOrCancels[it.orderId.toSequencerId().value]
                 CancelOrderApiResponse(
                     orderId = it.orderId,
-                    requestStatus = if (accepted) RequestStatus.Accepted else RequestStatus.Rejected,
-                    error = if (accepted) null else ApiError(ReasonCode.RejectedBySequencer, "Rejected By Sequencer"),
+                    requestStatus = if (rejected == null) RequestStatus.Accepted else RequestStatus.Rejected,
+                    error = rejected?.reason?.let { reason -> ApiError(ReasonCode.RejectedBySequencer, reasonToMessage(reason)) },
                 )
             },
         )
+    }
+
+    private fun reasonToMessage(reason: Reason): String {
+        return when (reason) {
+            Reason.DoesNotExist -> "Order does not exist or is already finalized"
+            Reason.NotForWallet -> "Order not created by this wallet"
+            else -> ""
+        }
     }
 
     fun withdraw(withdrawTx: EIP712Transaction.WithdrawTx): WithdrawalId {

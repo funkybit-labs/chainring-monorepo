@@ -23,6 +23,16 @@ message TradeCreated {
   DecimalValue price = 4;
 }
 
+message OrderChangeRejected {
+  enum Reason {
+    None = 0;
+    DoesNotExist = 1;
+    NotForWallet = 2;
+  }
+  uint64 guid = 1;
+  Reason reason = 2;
+}
+
 message BalanceChange {
   uint64 wallet = 1;
   string asset = 2;
@@ -72,7 +82,8 @@ message SequencerResponse {
   repeated TradeCreated tradesCreated = 6;
   repeated BalanceChange balancesChanged = 7;
   repeated MarketCreated marketsCreated = 8;
-  optional StateDump stateDump = 9;
+  repeated OrderChangeRejected ordersChangeRejected = 9;
+  optional StateDump stateDump = 10;
 }
 
 message Sequenced {
