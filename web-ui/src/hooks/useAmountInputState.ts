@@ -9,7 +9,7 @@ export default function useAmountInputState({
   decimals
 }: {
   initialInputValue: string
-  initialValue: bigint
+  initialValue?: bigint
   decimals: number
 }): {
   inputValue: string
@@ -19,7 +19,9 @@ export default function useAmountInputState({
   const [inputValue, setInputValue] = useState(initialInputValue)
   const valueInFundamentalUnits = useMemo(() => {
     if (inputValue === initialInputValue) {
-      return initialValue
+      return initialValue === undefined
+        ? parseUnits(initialInputValue, decimals)
+        : initialValue
     } else {
       return parseUnits(inputValue, decimals)
     }
@@ -27,7 +29,7 @@ export default function useAmountInputState({
 
   return {
     inputValue,
-    setInputValue: function sanitizeAndSetInputValue(newValue: string) {
+    setInputValue: (newValue: string) => {
       setInputValue(cleanAndFormatNumberInput(newValue, decimals))
     },
     valueInFundamentalUnits

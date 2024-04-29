@@ -152,8 +152,10 @@ class ExchangeApiService(
             sequencerClient.orderBatch(market.id.value, walletAddress.toSequencerId().value, ordersToAdd, ordersToUpdate, ordersToCancel)
         }
 
-        if (response.error != SequencerError.None) {
-            throw ExchangeError("Unable to process request - ${response.error}")
+        when (response.error) {
+            SequencerError.None -> {}
+            SequencerError.ExceedsLimit -> throw ExchangeError("Order exceeds limit")
+            else -> throw ExchangeError("Unable to process request - ${response.error}")
         }
 
         val ordersUpdated = response.ordersChangedList.map { it.guid }.toSet()

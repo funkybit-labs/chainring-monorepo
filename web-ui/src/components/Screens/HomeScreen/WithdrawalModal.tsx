@@ -1,4 +1,4 @@
-import { Address, formatUnits, parseUnits } from 'viem'
+import { Address, formatUnits } from 'viem'
 import { BaseError, useConfig, useSignTypedData } from 'wagmi'
 import { ExchangeAbi } from 'contracts'
 import { useEffect, useState } from 'react'
@@ -13,7 +13,7 @@ import {
   getERC20WithdrawMessage,
   getNativeWithdrawMessage
 } from 'utils/eip712'
-import { cleanAndFormatNumberInput } from 'utils'
+import useAmountInputState from 'hooks/useAmountInputState'
 
 export default function WithdrawalModal({
   exchangeContractAddress,
@@ -53,7 +53,16 @@ export default function WithdrawalModal({
   })
 
   const [withdrawalId, setWithdrawalId] = useState<string | null>(null)
-  const [amount, setAmount] = useState('')
+
+  const {
+    inputValue: amountInputValue,
+    setInputValue: setAmountInputValue,
+    valueInFundamentalUnits: amount
+  } = useAmountInputState({
+    initialInputValue: '',
+    decimals: symbol.decimals
+  })
+
   const [submitPhase, setSubmitPhase] = useState<
     | 'waitingForTxSignature'
     | 'submittingRequest'
@@ -114,8 +123,7 @@ export default function WithdrawalModal({
 
     try {
       if (availableBalanceQuery.status == 'success') {
-        const parsedAmount = parseUnits(amount, symbol.decimals)
-        return parsedAmount > 0 && parsedAmount <= availableBalanceQuery.data
+        return amount > 0 && amount <= availableBalanceQuery.data
       } else {
         return false
       }
@@ -126,7 +134,6 @@ export default function WithdrawalModal({
 
   async function onSubmit() {
     setSubmitError(null)
-    const parsedAmount = parseUnits(amount, symbol.decimals)
     const nonce = Date.now()
     if (canSubmit) {
       try {
@@ -152,7 +159,7 @@ export default function WithdrawalModal({
               message: getERC20WithdrawMessage(
                 walletAddress,
                 symbol.contractAddress!,
-                BigInt(parsedAmount),
+                amount,
                 BigInt(nonce)
               )
             })
@@ -174,7 +181,7 @@ export default function WithdrawalModal({
               primaryType: 'Withdraw',
               message: getNativeWithdrawMessage(
                 walletAddress,
-                BigInt(parsedAmount),
+                amount,
                 BigInt(nonce)
               )
             })
@@ -184,7 +191,7 @@ export default function WithdrawalModal({
           tx: {
             sender: walletAddress,
             token: symbol.contractAddress,
-            amount: BigInt(parsedAmount),
+            amount: amount,
             nonce: nonce
           },
           signature: signature
@@ -209,14 +216,10 @@ export default function WithdrawalModal({
             return (
               <div className="mt-8">
                 <AmountInput
-                  value={amount}
+                  value={amountInputValue}
                   symbol={symbol.name}
                   disabled={submitPhase !== null}
-                  onChange={(e) =>
-                    setAmount(
-                      cleanAndFormatNumberInput(e.target.value, symbol.decimals)
-                    )
-                  }
+                  onChange={(e) => setAmountInputValue(e.target.value)}
                 />
 
                 <p className="mt-1 text-center text-sm text-darkGray">

@@ -2,7 +2,7 @@ import { apiClient, Order, Trade, UpdateOrderRequest } from 'apiClient'
 import { useCallback, useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import { TrashIcon } from '@heroicons/react/24/outline'
-import { Address, formatUnits } from 'viem'
+import { Address, formatUnits, parseUnits } from 'viem'
 import { format } from 'date-fns'
 import { produce } from 'immer'
 import { useMutation } from '@tanstack/react-query'
@@ -13,12 +13,18 @@ import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
 import Markets from 'markets'
 import { useWebsocketSubscription } from 'contexts/websocket'
-import { ordersTopic, Publishable, tradesTopic } from 'websocketMessages'
+import {
+  limitsTopic,
+  ordersTopic,
+  Publishable,
+  tradesTopic
+} from 'websocketMessages'
 import Decimal from 'decimal.js'
 import { getColumnsForWidth, useWindowDimensions } from 'utils/layout'
 import { addressZero, generateOrderNonce, getDomain } from 'utils/eip712'
 import { useConfig, useSignTypedData } from 'wagmi'
 import useAmountInputState from 'hooks/useAmountInputState'
+import { AmountWithSymbol } from 'components/common/AmountWithSymbol'
 
 export default function OrdersAndTradesWidget({
   markets,
@@ -296,24 +302,68 @@ function ChangeOrderModal({
   const { signTypedDataAsync } = useSignTypedData()
 
   const {
-    inputValue: priceInputValue,
-    setInputValue: setPriceInputValue,
-    valueInFundamentalUnits: price
-  } = useAmountInputState({
-    initialInputValue: order.type == 'limit' ? String(order.price) : '',
-    initialValue: 0n,
-    decimals: quoteSymbol.decimals
-  })
-
-  const {
     inputValue: amountInputValue,
     setInputValue: setAmountInputValue,
     valueInFundamentalUnits: amount
   } = useAmountInputState({
     initialInputValue: formatUnits(order.amount, baseSymbol.decimals),
-    initialValue: 0n,
     decimals: baseSymbol.decimals
   })
+
+  const {
+    inputValue: priceInputValue,
+    setInputValue: setPriceInputValue,
+    valueInFundamentalUnits: price
+  } = useAmountInputState({
+    initialInputValue: order.type == 'limit' ? String(order.price) : '',
+    decimals: baseSymbol.decimals
+  })
+
+  const [availableBaseBalance, setAvailableBaseBalance] = useState<
+    bigint | undefined
+  >(undefined)
+
+  const [availableQuoteBalance, setAvailableQuoteBalance] = useState<
+    bigint | undefined
+  >(undefined)
+
+  useWebsocketSubscription({
+    topics: useMemo(() => [limitsTopic(market.id)], [market.id]),
+    handler: useCallback((message: Publishable) => {
+      if (message.type === 'Limits') {
+        setAvailableBaseBalance(message.base)
+        setAvailableQuoteBalance(message.quote)
+      }
+    }, [])
+  })
+
+  const exceedsLimit = useMemo(() => {
+    if (
+      availableQuoteBalance === undefined ||
+      availableBaseBalance === undefined ||
+      order.type == 'market'
+    ) {
+      return false
+    }
+
+    const originalAmount = order.amount
+    const originalPrice = parseUnits(String(order.price), quoteSymbol.decimals)
+
+    if (order.side == 'Buy') {
+      return (
+        price * amount - originalPrice * originalAmount > availableQuoteBalance
+      )
+    } else {
+      return amount - originalAmount > availableBaseBalance
+    }
+  }, [
+    price,
+    amount,
+    order,
+    availableBaseBalance,
+    availableQuoteBalance,
+    quoteSymbol.decimals
+  ])
 
   const mutation = useMutation({
     mutationFn: (payload: UpdateOrderRequest) =>
@@ -322,6 +372,13 @@ function ChangeOrderModal({
       close()
     }
   })
+
+  const canSubmit = useMemo(() => {
+    if (mutation.isPending) return false
+    if (amount <= 0n) return false
+    if (price <= 0n && order.type === 'market') return false
+    return !exceedsLimit
+  }, [amount, price, order.type, mutation.isPending, exceedsLimit])
 
   async function onSubmit() {
     const nonce = generateOrderNonce()
@@ -400,14 +457,30 @@ function ChangeOrderModal({
           )}
         </div>
 
+        {exceedsLimit &&
+          availableQuoteBalance !== undefined &&
+          availableBaseBalance !== undefined && (
+            <div className="mt-2 text-center text-sm text-brightRed">
+              Your available balance of{' '}
+              {order.side == 'Buy' ? (
+                <AmountWithSymbol
+                  amount={availableQuoteBalance}
+                  symbol={quoteSymbol}
+                  approximate={false}
+                />
+              ) : (
+                <AmountWithSymbol
+                  amount={availableBaseBalance}
+                  symbol={baseSymbol}
+                  approximate={false}
+                />
+              )}
+              is not enough to cover this order change
+            </div>
+          )}
+
         <SubmitButton
-          disabled={
-            !(
-              amount &&
-              (order.type === 'market' || price) &&
-              !mutation.isPending
-            )
-          }
+          disabled={!canSubmit}
           onClick={onSubmit}
           error={
             mutation.isError

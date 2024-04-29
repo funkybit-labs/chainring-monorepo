@@ -39,6 +39,7 @@ import co.chainring.integrationtests.utils.Faucet
 import co.chainring.integrationtests.utils.Wallet
 import co.chainring.integrationtests.utils.assertBalancesMessageReceived
 import co.chainring.integrationtests.utils.assertError
+import co.chainring.integrationtests.utils.assertLimitsMessageReceived
 import co.chainring.integrationtests.utils.assertOrderBookMessageReceived
 import co.chainring.integrationtests.utils.assertOrderCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertOrderUpdatedMessageReceived
@@ -49,6 +50,7 @@ import co.chainring.integrationtests.utils.assertTradeUpdatedMessageReceived
 import co.chainring.integrationtests.utils.assertTradesMessageReceived
 import co.chainring.integrationtests.utils.blocking
 import co.chainring.integrationtests.utils.subscribeToBalances
+import co.chainring.integrationtests.utils.subscribeToLimits
 import co.chainring.integrationtests.utils.subscribeToOrderBook
 import co.chainring.integrationtests.utils.subscribeToOrders
 import co.chainring.integrationtests.utils.subscribeToPrices
@@ -93,6 +95,9 @@ class OrderRoutesApiTest {
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()
 
+        wsClient.subscribeToLimits(usdcDaiMarketId)
+        wsClient.assertLimitsMessageReceived(usdcDaiMarketId)
+
         Faucet.fund(wallet.address)
         wallet.mintERC20("DAI", wallet.formatAmount("14", "DAI"))
         val amountToDeposit = wallet.formatAmount("14", "DAI")
@@ -103,6 +108,10 @@ class OrderRoutesApiTest {
             assertEquals(1, msg.balances.size)
             assertEquals(Symbol("DAI"), msg.balances.first().symbol)
             assertEquals(BigInteger("14000000000000000000"), msg.balances.first().available)
+        }
+        wsClient.assertLimitsMessageReceived(usdcDaiMarketId) { msg ->
+            assertEquals(BigInteger("0"), msg.base)
+            assertEquals(BigInteger("14000000000000000000"), msg.quote)
         }
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
@@ -131,6 +140,10 @@ class OrderRoutesApiTest {
             validateLimitOrders(createLimitOrderResponse, msg.order as Order.Limit, false)
             validateNonceAndSignatureStored(createLimitOrderResponse.orderId, limitOrderApiRequest.nonce, limitOrderApiRequest.signature)
         }
+        wsClient.assertLimitsMessageReceived(usdcDaiMarketId) { msg ->
+            assertEquals(BigInteger("0"), msg.base)
+            assertEquals(BigInteger("13999999999998000000"), msg.quote)
+        }
         wsClient.close()
 
         // check that order is included in the orders list sent via websocket
@@ -140,6 +153,9 @@ class OrderRoutesApiTest {
             listOf(createLimitOrderResponse.orderId) + initialOrdersOverWs.map { it.id },
             wsClient.assertOrdersMessageReceived().orders.map { it.id },
         )
+
+        wsClient.subscribeToLimits(usdcDaiMarketId)
+        wsClient.assertLimitsMessageReceived(usdcDaiMarketId)
 
         // update order
         val updateOrderApiRequest = UpdateOrderApiRequest.Limit(
@@ -165,12 +181,20 @@ class OrderRoutesApiTest {
             validateLimitOrders(updatedOrderApiResponse.order, msg.order as Order.Limit, true)
             validateNonceAndSignatureStored(createLimitOrderResponse.orderId, updateOrderApiRequest.nonce, updateOrderApiRequest.signature)
         }
+        wsClient.assertLimitsMessageReceived(usdcDaiMarketId) { msg ->
+            assertEquals(BigInteger("0"), msg.base)
+            assertEquals(BigInteger("13999999999993970000"), msg.quote)
+        }
 
         // cancel order is idempotent
         apiClient.cancelOrder(createLimitOrderResponse.orderId)
         wsClient.assertOrderUpdatedMessageReceived { msg ->
             assertEquals(createLimitOrderResponse.orderId, msg.order.id)
             assertEquals(OrderStatus.Cancelled, msg.order.status)
+        }
+        wsClient.assertLimitsMessageReceived(usdcDaiMarketId) { msg ->
+            assertEquals(BigInteger("0"), msg.base)
+            assertEquals(BigInteger("14000000000000000000"), msg.quote)
         }
         val cancelledOrder = apiClient.getOrder(createLimitOrderResponse.orderId)
         assertEquals(OrderStatus.Cancelled, cancelledOrder.status)
@@ -366,7 +390,6 @@ class OrderRoutesApiTest {
     fun `list and cancel all open orders`() {
         val apiClient = ApiClient()
         val wallet = Wallet(apiClient)
-        apiClient.cancelOpenOrders()
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribeToOrders()
@@ -374,6 +397,9 @@ class OrderRoutesApiTest {
 
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()
+
+        wsClient.subscribeToLimits(usdcDaiMarketId)
+        wsClient.assertLimitsMessageReceived(usdcDaiMarketId)
 
         Faucet.fund(wallet.address)
         val amountToDeposit = wallet.formatAmount("30", "DAI")
@@ -386,6 +412,7 @@ class OrderRoutesApiTest {
             assertEquals(Symbol("DAI"), msg.balances.first().symbol)
             assertEquals(BigInteger("30000000000000000000"), msg.balances.first().available)
         }
+        wsClient.assertLimitsMessageReceived(usdcDaiMarketId)
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
             nonce = generateOrderNonce(),
@@ -400,7 +427,10 @@ class OrderRoutesApiTest {
         repeat(times = 10) {
             apiClient.createOrder(wallet.signOrder(limitOrderApiRequest.copy(nonce = generateOrderNonce())))
         }
-        repeat(10) { wsClient.assertOrderCreatedMessageReceived() }
+        repeat(10) {
+            wsClient.assertOrderCreatedMessageReceived()
+            wsClient.assertLimitsMessageReceived(usdcDaiMarketId)
+        }
         assertEquals(10, apiClient.listOrders().orders.count { it.status != OrderStatus.Cancelled })
 
         apiClient.cancelOpenOrders()
@@ -409,6 +439,7 @@ class OrderRoutesApiTest {
             assertNotEquals(initialOrdersOverWs, msg.orders)
             assertTrue(msg.orders.all { it.status == OrderStatus.Cancelled })
         }
+        wsClient.assertLimitsMessageReceived(usdcDaiMarketId)
 
         assertTrue(apiClient.listOrders().orders.all { it.status == OrderStatus.Cancelled })
 
@@ -443,8 +474,14 @@ class OrderRoutesApiTest {
             },
         )
         assertIs<CreateOrderApiRequest.Limit>(limitBuyOrderApiResponse.order)
-        makerWsClient.assertOrderCreatedMessageReceived { msg ->
-            validateLimitOrders(limitBuyOrderApiResponse, msg.order as Order.Limit, false)
+        makerWsClient.apply {
+            assertOrderCreatedMessageReceived { msg ->
+                validateLimitOrders(limitBuyOrderApiResponse, msg.order as Order.Limit, false)
+            }
+            assertLimitsMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(BigInteger("200000000000000000"), msg.base)
+                assertEquals(BigInteger("1997671297500000000"), msg.quote)
+            }
         }
 
         listOf(makerWsClient, takerWsClient).forEach { wsClient ->
@@ -493,6 +530,10 @@ class OrderRoutesApiTest {
                 ),
             )
         }
+        makerWsClient.assertLimitsMessageReceived(btcEthMarketId) { msg ->
+            assertEquals(BigInteger("200000000000000000"), msg.base)
+            assertEquals(BigInteger("1997839625000000000"), msg.quote)
+        }
 
         // place a sell order
         val limitSellOrderApiResponse = makerApiClient.createOrder(
@@ -509,8 +550,14 @@ class OrderRoutesApiTest {
         )
         assertIs<CreateOrderApiRequest.Limit>(limitSellOrderApiResponse.order)
 
-        makerWsClient.assertOrderCreatedMessageReceived { msg ->
-            validateLimitOrders(limitSellOrderApiResponse, msg.order as Order.Limit, false)
+        makerWsClient.apply {
+            assertOrderCreatedMessageReceived { msg ->
+                validateLimitOrders(limitSellOrderApiResponse, msg.order as Order.Limit, false)
+            }
+            assertLimitsMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(BigInteger("198456790000000000"), msg.base)
+                assertEquals(BigInteger("1997839625000000000"), msg.quote)
+            }
         }
 
         listOf(makerWsClient, takerWsClient).forEach { wsClient ->
@@ -564,6 +611,10 @@ class OrderRoutesApiTest {
                     last = LastTrade("0.000", LastTradeDirection.Unchanged),
                 ),
             )
+        }
+        makerWsClient.assertLimitsMessageReceived(btcEthMarketId) { msg ->
+            assertEquals(BigInteger("199456790000000000"), msg.base)
+            assertEquals(BigInteger("1997839625000000000"), msg.quote)
         }
 
         // place a buy order and see it gets executed
@@ -647,39 +698,52 @@ class OrderRoutesApiTest {
                 ),
             )
         }
-
         val trade = getTradesForOrders(listOf(marketBuyOrderApiResponse.orderId)).first()
+
+        takerWsClient.apply {
+            assertPricesMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(
+                    OHLC(
+                        start = OHLCDuration.P5M.durationStart(trade.timestamp),
+                        open = 17.55,
+                        high = 17.55,
+                        low = 17.55,
+                        close = 17.55,
+                        duration = OHLCDuration.P5M,
+                    ),
+                    msg.ohlc.last(),
+                )
+            }
+            assertLimitsMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(BigInteger("432100000000000"), msg.base)
+                assertEquals(BigInteger("1992416645000000000"), msg.quote)
+            }
+        }
+
+        makerWsClient.apply {
+            assertPricesMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(
+                    OHLC(
+                        start = OHLCDuration.P5M.durationStart(trade.timestamp),
+                        open = 17.55,
+                        high = 17.55,
+                        low = 17.55,
+                        close = 17.55,
+                        duration = OHLCDuration.P5M,
+                    ),
+                    msg.ohlc.last(),
+                )
+            }
+            assertLimitsMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(BigInteger("199456790000000000"), msg.base)
+                assertEquals(BigInteger("2005422980000000000"), msg.quote)
+            }
+        }
 
         assertEquals(trade.amount, takerWallet.formatAmount("0.00043210", "BTC"))
         assertEquals(0, trade.price.compareTo(BigDecimal("17.550")))
 
         waitForSettlementToFinish(listOf(trade.id.value))
-        takerWsClient.assertPricesMessageReceived(btcEthMarketId) { msg ->
-            assertEquals(
-                OHLC(
-                    start = OHLCDuration.P5M.durationStart(trade.timestamp),
-                    open = 17.55,
-                    high = 17.55,
-                    low = 17.55,
-                    close = 17.55,
-                    duration = OHLCDuration.P5M,
-                ),
-                msg.ohlc.last(),
-            )
-        }
-        makerWsClient.assertPricesMessageReceived(btcEthMarketId) { msg ->
-            assertEquals(
-                OHLC(
-                    start = OHLCDuration.P5M.durationStart(trade.timestamp),
-                    open = 17.55,
-                    high = 17.55,
-                    low = 17.55,
-                    close = 17.55,
-                    duration = OHLCDuration.P5M,
-                ),
-                msg.ohlc.last(),
-            )
-        }
         takerWsClient.assertTradeUpdatedMessageReceived { msg ->
             assertEquals(marketBuyOrderApiResponse.orderId, msg.trade.orderId)
             assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
@@ -791,39 +855,53 @@ class OrderRoutesApiTest {
         assertEquals(0, trade2.price.compareTo(BigDecimal("17.500")))
 
         waitForSettlementToFinish(listOf(trade2.id.value))
-        takerWsClient.assertPricesMessageReceived(btcEthMarketId) { msg ->
-            assertEquals(
-                OHLC(
-                    start = OHLCDuration.P5M.durationStart(trade.timestamp),
-                    open = 17.55,
-                    high = 17.55,
-                    low = 17.5,
-                    close = 17.5,
-                    duration = OHLCDuration.P5M,
-                ),
-                msg.ohlc.last(),
-            )
+
+        takerWsClient.apply {
+            assertPricesMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(
+                    OHLC(
+                        start = OHLCDuration.P5M.durationStart(trade.timestamp),
+                        open = 17.55,
+                        high = 17.55,
+                        low = 17.5,
+                        close = 17.5,
+                        duration = OHLCDuration.P5M,
+                    ),
+                    msg.ohlc.last(),
+                )
+            }
+            assertLimitsMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(BigInteger("308650000000000"), msg.base)
+                assertEquals(BigInteger("1994577020000000000"), msg.quote)
+            }
+            assertTradeUpdatedMessageReceived { msg ->
+                assertEquals(marketSellOrderApiResponse.orderId, msg.trade.orderId)
+                assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
+            }
         }
-        makerWsClient.assertPricesMessageReceived(btcEthMarketId) { msg ->
-            assertEquals(
-                OHLC(
-                    start = OHLCDuration.P5M.durationStart(trade.timestamp),
-                    open = 17.55,
-                    high = 17.55,
-                    low = 17.5,
-                    close = 17.5,
-                    duration = OHLCDuration.P5M,
-                ),
-                msg.ohlc.last(),
-            )
-        }
-        takerWsClient.assertTradeUpdatedMessageReceived { msg ->
-            assertEquals(marketSellOrderApiResponse.orderId, msg.trade.orderId)
-            assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
-        }
-        makerWsClient.assertTradeUpdatedMessageReceived { msg ->
-            assertEquals(updatedLimitBuyOrderApiResponse.order.orderId, msg.trade.orderId)
-            assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
+
+        makerWsClient.apply {
+            assertPricesMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(
+                    OHLC(
+                        start = OHLCDuration.P5M.durationStart(trade.timestamp),
+                        open = 17.55,
+                        high = 17.55,
+                        low = 17.5,
+                        close = 17.5,
+                        duration = OHLCDuration.P5M,
+                    ),
+                    msg.ohlc.last(),
+                )
+            }
+            assertLimitsMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(BigInteger("199580240000000000"), msg.base)
+                assertEquals(BigInteger("2005422980000000000"), msg.quote)
+            }
+            assertTradeUpdatedMessageReceived { msg ->
+                assertEquals(updatedLimitBuyOrderApiResponse.order.orderId, msg.trade.orderId)
+                assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
+            }
         }
 
         val baseQuantity2 = takerWallet.formatAmount("0.00012345", "BTC")
@@ -859,8 +937,9 @@ class OrderRoutesApiTest {
                 ),
             )
         }
+        makerWsClient.assertLimitsMessageReceived(btcEthMarketId)
 
-        // verify that client's websocket gets same orders, trades and order book on reconnect
+        // verify that client's websocket gets same state on reconnect
         takerWsClient.close()
         WebsocketClient.blocking(takerApiClient.authToken).apply {
             subscribeToOrders()
@@ -915,6 +994,12 @@ class OrderRoutesApiTest {
                     last = LastTrade("17.500", LastTradeDirection.Down),
                 ),
             )
+
+            subscribeToLimits(btcEthMarketId)
+            assertLimitsMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(BigInteger("308650000000000"), msg.base)
+                assertEquals(BigInteger("1994577020000000000"), msg.quote)
+            }
         }.close()
 
         makerWsClient.close()
@@ -957,6 +1042,10 @@ class OrderRoutesApiTest {
 
         assertEquals(3, createBatchLimitOrders.createdOrders.count())
         repeat(3) { makerWsClient.assertOrderCreatedMessageReceived() }
+        makerWsClient.assertLimitsMessageReceived(btcUsdcMarketId) { msg ->
+            assertEquals(BigInteger("199670000000000000"), msg.base)
+            assertEquals(BigInteger("500000000"), msg.quote)
+        }
 
         val batchOrderResponse = makerApiClient.batchOrders(
             BatchOrdersApiRequest(
@@ -1022,7 +1111,15 @@ class OrderRoutesApiTest {
         assertEquals(1, batchOrderResponse.canceledOrders.count { it.requestStatus == RequestStatus.Rejected })
 
         repeat(3) { makerWsClient.assertOrderCreatedMessageReceived() }
+        makerWsClient.assertLimitsMessageReceived(btcUsdcMarketId) { msg ->
+            assertEquals(BigInteger("197900000000000000"), msg.base)
+            assertEquals(BigInteger("500000000"), msg.quote)
+        }
         repeat(3) { makerWsClient.assertOrderUpdatedMessageReceived() }
+        makerWsClient.assertLimitsMessageReceived(btcUsdcMarketId) { msg ->
+            assertEquals(BigInteger("198200000000000000"), msg.base)
+            assertEquals(BigInteger("500000000"), msg.quote)
+        }
 
         assertEquals(5, makerApiClient.listOrders().orders.count { it.status == OrderStatus.Open })
 
@@ -1061,6 +1158,10 @@ class OrderRoutesApiTest {
                     msg.ohlc.last(),
                 )
             }
+            assertLimitsMessageReceived(btcUsdcMarketId) { msg ->
+                assertEquals(BigInteger("1800000000000000"), msg.base)
+                assertEquals(BigInteger("376879400"), msg.quote)
+            }
         }
 
         makerWsClient.apply {
@@ -1079,6 +1180,10 @@ class OrderRoutesApiTest {
                     ),
                     msg.ohlc.last(),
                 )
+            }
+            assertLimitsMessageReceived(btcUsdcMarketId) { msg ->
+                assertEquals(BigInteger("198200000000000000"), msg.base)
+                assertEquals(BigInteger("623120600"), msg.quote)
             }
         }
 
@@ -1181,6 +1286,9 @@ class OrderRoutesApiTest {
 
             subscribeToBalances()
             assertBalancesMessageReceived()
+
+            subscribeToLimits(marketId)
+            assertLimitsMessageReceived(marketId)
         }
 
         Faucet.fund(wallet.address, wallet.formatAmount(nativeAmount, "BTC"))
@@ -1201,7 +1309,10 @@ class OrderRoutesApiTest {
             deposit(wallet, mintSymbol, formattedMintAmount)
             formattedNativeAmount?.let { deposit(wallet, "BTC", it) }
         }
-        repeat(expectedBalances.size) { wsClient.assertBalancesMessageReceived() }
+        repeat(expectedBalances.size) {
+            wsClient.assertBalancesMessageReceived()
+            wsClient.assertLimitsMessageReceived(marketId)
+        }
 
         return Triple(apiClient, wallet, wsClient)
     }
