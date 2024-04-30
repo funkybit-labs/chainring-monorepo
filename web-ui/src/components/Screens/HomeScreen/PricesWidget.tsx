@@ -301,7 +301,7 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     const chosenInterval = labelIntervalExpressions.find(
       (expression) => expression.durationMillis >= minLabelInterval
     )
-    return chosenInterval?.expression!!
+    return chosenInterval ? chosenInterval.expression : ''
   }
 
   function calculateLabels(ohlc: OHLC[], chartWidth: number): string[] {
