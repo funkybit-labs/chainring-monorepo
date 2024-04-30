@@ -2,7 +2,7 @@ package co.chainring.apps.api.middleware
 
 object ServerSpans {
     val app = "app"
-    val sqrCli = "sqrCli"
+    val sqrClt = "sqrClt"
     val gtw = "gtw"
     val sqr = "sqr"
 }

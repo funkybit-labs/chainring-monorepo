@@ -93,7 +93,7 @@ open class SequencerClient {
         ordersToCancel: List<OrderId>,
         cancelAll: Boolean = false,
     ): SequencerResponse {
-        return Tracer.newCoroutineSpan(ServerSpans.sqrCli) {
+        return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
             stub.applyOrderBatch(
                 orderBatch {
                     this.marketId = marketId.value
@@ -117,7 +117,7 @@ open class SequencerClient {
     }
 
     suspend fun createMarket(marketId: String, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal, baseDecimals: Int, quoteDecimals: Int): SequencerResponse {
-        return Tracer.newCoroutineSpan(ServerSpans.sqrCli) {
+        return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
             stub.addMarket(
                 market {
                     this.guid = UUID.randomUUID().toString()
@@ -142,7 +142,7 @@ open class SequencerClient {
         amount: BigInteger,
         depositId: DepositId,
     ): SequencerResponse {
-        return Tracer.newCoroutineSpan(ServerSpans.sqrCli) {
+        return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
             stub.applyBalanceBatch(
                 balanceBatch {
                     this.guid = UUID.randomUUID().toString()
@@ -170,7 +170,7 @@ open class SequencerClient {
         evmSignature: EvmSignature,
         withdrawalId: WithdrawalId,
     ): SequencerResponse {
-        return Tracer.newCoroutineSpan(ServerSpans.sqrCli) {
+        return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
             stub.applyBalanceBatch(
                 balanceBatch {
                     this.guid = UUID.randomUUID().toString()

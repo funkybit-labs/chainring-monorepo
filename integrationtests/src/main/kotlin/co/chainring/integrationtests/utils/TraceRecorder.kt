@@ -40,7 +40,7 @@ interface TraceRecorder {
     fun startWSRecording(id: String, spanName: String)
     fun finishWSRecording(id: String, spanName: String, multivalue: Boolean = false)
 
-    fun printStatsAndFlush()
+    fun printStatsAndFlush(header: () -> String)
 
     companion object {
         val noOp = NoOpTraceRecorder()
@@ -57,7 +57,7 @@ class NoOpTraceRecorder : TraceRecorder {
     override fun startWSRecording(id: String, spanName: String) {}
 
     override fun finishWSRecording(id: String, spanName: String, multivalue: Boolean) {}
-    override fun printStatsAndFlush() {}
+    override fun printStatsAndFlush(header: () -> String) {}
 }
 
 object ClientSpans {
@@ -124,7 +124,7 @@ class FullTraceRecorder : TraceRecorder {
     private val spansOrder = listOf(
         ClientSpans.apiClient,
         ServerSpans.app,
-        ServerSpans.sqrCli,
+        ServerSpans.sqrClt,
         ServerSpans.gtw,
         ServerSpans.sqr,
         WSSpans.orderCreated,
@@ -132,13 +132,13 @@ class FullTraceRecorder : TraceRecorder {
         WSSpans.tradeCreated,
         WSSpans.tradeSettled,
     ).withIndex().associate { it.value to it.index }
-    override fun printStatsAndFlush() {
+    override fun printStatsAndFlush(header: () -> String) {
         val traces = tracesByOp
         tracesByOp = mutableMapOf()
 
         val output = buildString {
+            append("\n========= ${header()} =========\n")
             traces.entries.toList().sortedBy { it.key }.forEach { (op, traces: MutableList<TraceRecorder.Trace>) ->
-                append("\n===================\n")
                 append("Stats for: ${op.name}\n")
                 append("Total Traces: ${traces.size}\n")
 
@@ -161,11 +161,12 @@ class FullTraceRecorder : TraceRecorder {
                 listOf(50.0, 66.0, 75.0, 80.0, 90.0, 95.0, 98.0, 99.0, 100.0).forEach { p ->
                     sortedSpans.forEach { span ->
                         val value = latencies[span]?.let { percentile(it, p) } ?: "NA"
-                        append(" $p%: ${decimalFormat.format(value)}".padEnd(padding))
+                        append(" $p%: ${decimalFormat.format(value)}ns".padEnd(padding))
                     }
                     append("\n")
                 }
             }
+            append("===================")
         }
 
         logger.debug { output }

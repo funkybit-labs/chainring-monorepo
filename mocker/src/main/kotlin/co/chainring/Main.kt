@@ -5,24 +5,92 @@ import co.chainring.core.Taker
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.toFundamentalUnits
 import co.chainring.integrationtests.utils.TraceRecorder
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.math.BigDecimal
 import java.util.Timer
 import kotlin.concurrent.timerTask
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.minutes
+import kotlinx.datetime.Clock
 
 
-val interval = 10.minutes
+val start = Clock.System.now()
+
+val warmupInterval = 1.minutes
+val increaseLoadInterval = 15.minutes
+val maxLoadInterval = 3.minutes
+
 const val initialTakers = 5
-const val maxTakers = 100
-val newTakerInterval = interval / (maxTakers - initialTakers)
+const val maxTakers = 750
+val newTakerInterval = increaseLoadInterval / (maxTakers - initialTakers)
+
+const val initialMakers = 1
+const val maxMakers = 5
+val newMakerInterval = increaseLoadInterval / (maxMakers - initialMakers)
 
 val statsInterval = 1.minutes
 
+val logger = KotlinLogging.logger {}
+
 fun main() {
     val timer = Timer()
+    val makers = mutableListOf<Maker>()
+    val takers = mutableListOf<Taker>()
 
-    // maker
+    val usdcDai = MarketId("USDC/DAI")
+
+    // schedule metrics
+    val statsTask = timerTask {
+        TraceRecorder.full.printStatsAndFlush {
+            "${(Clock.System.now() - start)} elapsed since start. Running ${makers.size} makers and ${takers.size} takers"
+        }
+    }
+    timer.scheduleAtFixedRate(statsTask, statsInterval.inWholeMilliseconds, statsInterval.inWholeMilliseconds)
+
+    // initial load
+    (1..initialMakers).map {
+        makers.add(startMaker(usdcDai))
+    }
+    (1..initialTakers).map {
+        takers.add(startTaker(usdcDai))
+    }
+    // wait for system to warm caches
+    Thread.sleep(warmupInterval.inWholeMilliseconds)
+
+
+    // gradually increase load
+    timer.scheduleAtFixedRate(timerTask {
+        logger.debug { "Starting maker #${makers.size + 1}" }
+        makers.add(startMaker(usdcDai))
+        if (takers.size >= maxMakers) {
+            logger.debug { "Max number of makers achieved" }
+            this.cancel()
+        }
+    }, 0, newMakerInterval.inWholeMilliseconds)
+    timer.scheduleAtFixedRate(timerTask {
+        logger.debug { "Starting taker #${takers.size + 1}" }
+        takers.add(startTaker(usdcDai))
+        if (takers.size >= maxTakers) {
+            logger.debug { "Max number of takers achieved" }
+            this.cancel()
+        }
+    }, 0, newTakerInterval.inWholeMilliseconds)
+
+    // run on max load after rum up
+    Thread.sleep(increaseLoadInterval.inWholeMilliseconds + maxLoadInterval.inWholeMilliseconds)
+
+    // tear down
+    statsTask.cancel()
+    makers.forEach {
+        it.stop()
+    }
+    takers.forEach {
+        it.stop()
+    }
+    timer.cancel()
+}
+
+private fun startMaker(market: MarketId): Maker {
     val maker = Maker(
         tightness = 5, skew = 0, levels = 10,
         native = BigDecimal.TEN.movePointRight(18).toBigInteger(),
@@ -32,39 +100,13 @@ fun main() {
             "DAI" to 5000.toFundamentalUnits(18)
         )
     )
-    val usdcDai = MarketId("USDC/DAI")
-    val btcEth = MarketId("BTC/ETH")
-    maker.start(listOf(usdcDai))
-
-
-    // takers
-    val takers = mutableListOf<Taker>()
-    (1..initialTakers).map {
-        takers.add(startTaker(usdcDai))
-    }
-    timer.scheduleAtFixedRate(timerTask {
-        takers.add(startTaker(usdcDai))
-    }, newTakerInterval.inWholeMilliseconds, newTakerInterval.inWholeMilliseconds)
-
-    // print metrics
-    val statsTask = timerTask {
-        TraceRecorder.full.printStatsAndFlush()
-    }
-    timer.scheduleAtFixedRate(statsTask, statsInterval.inWholeMilliseconds, statsInterval.inWholeMilliseconds)
-
-    // tear down
-    Thread.sleep(interval.inWholeMilliseconds)
-    statsTask.cancel()
-    maker.stop()
-    takers.forEach {
-        it.stop()
-    }
-    timer.cancel()
+    maker.start(listOf(market))
+    return maker
 }
 
-private fun startTaker(usdcDai: MarketId): Taker {
+private fun startTaker(market: MarketId): Taker {
     val taker = Taker(
-        rate = Random.nextLong(5000, 20000),
+        rate = Random.nextLong(5000, 15000),
         sizeFactor = Random.nextDouble(5.0, 20.0),
         native = null,
         assets = mapOf(
@@ -72,6 +114,6 @@ private fun startTaker(usdcDai: MarketId): Taker {
             "DAI" to 50.toFundamentalUnits(18)
         )
     )
-    taker.start(listOf(usdcDai))
+    taker.start(listOf(market))
     return taker
 }
