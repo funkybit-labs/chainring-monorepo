@@ -22,6 +22,8 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+
     implementation("org.http4k:http4k-format-kotlinx-serialization:$http4kVersion")
     implementation("org.http4k:http4k-client-websocket:$http4kVersion")
     implementation("io.github.oshai:kotlin-logging-jvm:6.0.3")
@@ -42,5 +44,5 @@ kotlin {
 }
 
 application {
-    mainClass.set("co.chainring.mocker.MainKt")
+    mainClass = "co.chainring.mocker.MainKt"
 }

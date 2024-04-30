@@ -55,7 +55,7 @@ data class ApiCallFailure(
     val error: ApiError,
 )
 
-class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
+class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceRecorder: TraceRecorder = TraceRecorder.noOp) {
     val authToken: String = issueAuthToken(ecKeyPair = ecKeyPair)
 
     companion object {
@@ -160,7 +160,8 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
         tryGetConfiguration().assertSuccess()
 
     fun tryGetConfiguration(): Either<ApiCallFailure, ConfigurationApiResponse> =
-        execute(
+        executeAndTrace(
+            TraceRecorder.Op.GetConfiguration,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/config")
                 .get()
@@ -171,7 +172,8 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
         tryCreateOrder(apiRequest).assertSuccess()
 
     fun tryCreateOrder(apiRequest: CreateOrderApiRequest): Either<ApiCallFailure, CreateOrderApiResponse> =
-        execute(
+        executeAndTrace(
+            TraceRecorder.Op.CreateOrder,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
@@ -183,7 +185,8 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
         tryBatchOrders(apiRequest).assertSuccess()
 
     fun tryBatchOrders(apiRequest: BatchOrdersApiRequest): Either<ApiCallFailure, BatchOrdersApiResponse> =
-        execute(
+        executeAndTrace(
+            TraceRecorder.Op.BatchOrders,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/batch/orders")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
@@ -196,7 +199,8 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
     }
 
     fun tryUpdateOrder(apiRequest: UpdateOrderApiRequest): Either<ApiCallFailure, UpdateOrderApiResponse> =
-        execute(
+        executeAndTrace(
+            TraceRecorder.Op.UpdateOrder,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders/${apiRequest.orderId}")
                 .patch(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
@@ -208,7 +212,8 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
         tryCancelOrder(id).assertSuccess()
 
     fun tryCancelOrder(id: OrderId): Either<ApiCallFailure, Unit> =
-        execute(
+        executeAndTrace(
+            TraceRecorder.Op.CancelOrder,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders/$id")
                 .delete()
@@ -220,7 +225,8 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
         tryGetOrder(id).assertSuccess()
 
     fun tryGetOrder(id: OrderId): Either<ApiCallFailure, Order> =
-        execute(
+        executeAndTrace(
+            TraceRecorder.Op.GetOrder,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders/$id")
                 .get()
@@ -232,7 +238,8 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
         tryListOrders().assertSuccess()
 
     fun tryListOrders(): Either<ApiCallFailure, OrdersApiResponse> =
-        execute(
+        executeAndTrace(
+            TraceRecorder.Op.ListOrders,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders")
                 .get()
@@ -244,7 +251,8 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
         tryCancelOpenOrders().assertSuccess()
 
     fun tryCancelOpenOrders(): Either<ApiCallFailure, Unit> =
-        execute(
+        executeAndTrace(
+            TraceRecorder.Op.CancelOpenOrders,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders")
                 .delete()
@@ -256,7 +264,8 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
         tryCreateWithdrawal(apiRequest).assertSuccess()
 
     fun tryCreateWithdrawal(apiRequest: CreateWithdrawalApiRequest): Either<ApiCallFailure, WithdrawalApiResponse> =
-        execute(
+        executeAndTrace(
+            TraceRecorder.Op.CreateWithdrawal,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/withdrawals")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
@@ -268,7 +277,8 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
         tryGetWithdrawal(id).assertSuccess()
 
     fun tryGetWithdrawal(id: WithdrawalId): Either<ApiCallFailure, WithdrawalApiResponse> =
-        execute(
+        executeAndTrace(
+            TraceRecorder.Op.GetWithdrawal,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/withdrawals/$id")
                 .get()
@@ -280,7 +290,8 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
         tryGetBalances().assertSuccess()
 
     fun tryGetBalances(): Either<ApiCallFailure, BalancesApiResponse> =
-        execute(
+        executeAndTrace(
+            TraceRecorder.Op.GetBalances,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/balances")
                 .get()
@@ -288,8 +299,11 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair()) {
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
-    private fun execute(request: Request): Response =
-        httpClient.newCall(request).execute()
+    private fun executeAndTrace(op: TraceRecorder.Op, request: Request): Response {
+        return traceRecorder.record(op) {
+            httpClient.newCall(request).execute()
+        }
+    }
 }
 
 val json = Json {

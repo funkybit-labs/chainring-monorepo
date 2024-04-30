@@ -20,6 +20,8 @@ import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.utils.generateHexString
+import co.chainring.integrationtests.utils.TraceRecorder
+import co.chainring.integrationtests.utils.WSSpans
 import co.chainring.integrationtests.utils.blocking
 import co.chainring.integrationtests.utils.receivedDecoded
 import co.chainring.integrationtests.utils.subscribeToBalances
@@ -40,10 +42,10 @@ class Taker(
     private val sizeFactor: Double,
     native: BigInteger?,
     assets: Map<String, BigInteger>
-): Actor(native, assets) {
+) : Actor(native, assets) {
     private var currentOrder: Order.Market? = null
     private var markets = setOf<Market>()
-    private var marketPrices = mutableMapOf<MarketId,BigDecimal>()
+    private var marketPrices = mutableMapOf<MarketId, BigDecimal>()
     private val logger = KotlinLogging.logger {}
     private var listenerThread: Thread? = null
     private var listenerInitialized: Boolean = false
@@ -72,27 +74,33 @@ class Taker(
                         SubscriptionTopic.Trades -> {
                             when (val data = message.data) {
                                 is TradeCreated -> {
-                                    logger.info { "Received trade created" }
+                                    TraceRecorder.full.finishWSRecording(data.trade.orderId.value, WSSpans.tradeCreated, multivalue = true)
+                                    logger.info { "$id Received trade created" }
                                     pendingTrades.add(data.trade)
-
                                 }
+
                                 is TradeUpdated -> {
-                                    logger.info { "Received trade update" }
+                                    logger.info { "$id Received trade update" }
                                     val trade = data.trade
                                     if (trade.settlementStatus == SettlementStatus.Pending) {
+                                        TraceRecorder.full.finishWSRecording(trade.id.value, WSSpans.tradeCreated, multivalue = true)
                                         pendingTrades.add(trade)
                                     } else if (trade.settlementStatus == SettlementStatus.Completed) {
+                                        TraceRecorder.full.finishWSRecording(data.trade.orderId.value, WSSpans.tradeSettled, multivalue = true)
                                         pendingTrades.removeIf { it.id == trade.id }
                                         settledTrades.add(trade)
                                     }
                                     data.trade
                                 }
+
                                 is Trades -> {
-                                    logger.info { "Received ${data.trades.size} trade updates" }
+                                    logger.info { "$id Received ${data.trades.size} trade updates" }
                                     data.trades.forEach { trade ->
                                         if (trade.settlementStatus == SettlementStatus.Pending) {
+                                            TraceRecorder.full.finishWSRecording(trade.orderId.value, WSSpans.tradeCreated, multivalue = true)
                                             pendingTrades.add(trade)
                                         } else if (trade.settlementStatus == SettlementStatus.Completed) {
+                                            TraceRecorder.full.finishWSRecording(trade.orderId.value, WSSpans.tradeSettled, multivalue = true)
                                             pendingTrades.removeIf { it.id == trade.id }
                                             settledTrades.add(trade)
                                         }
@@ -101,13 +109,15 @@ class Taker(
                                 else -> {}
                             }
                         }
+
                         SubscriptionTopic.Balances -> {
                             val balanceData = message.data as Balances
                             balanceData.balances.forEach {
                                 balances[it.symbol.value] = it.available
                             }
-                            logger.info { "Balance update ${balanceData.balances}" }
+                            logger.info { "$id Balance update ${balanceData.balances}" }
                         }
+
                         SubscriptionTopic.Orders -> {
                             val orders = when (val data = message.data) {
                                 is Orders -> data.orders
@@ -116,12 +126,17 @@ class Taker(
                                 else -> emptyList()
                             }
                             orders.forEach { order ->
-                                logger.info { "Order update $order" }
+                                logger.info { "$id Order update $order" }
                                 when (order.status) {
+                                    OrderStatus.Open -> {
+                                        TraceRecorder.full.finishWSRecording(order.id.value, WSSpans.orderCreated)
+                                    }
+
                                     OrderStatus.Partial -> {
+                                        TraceRecorder.full.finishWSRecording(order.id.value, WSSpans.orderFilled, multivalue = true)
                                         currentOrder?.let { cur ->
                                             val filled = cur.amount - order.amount
-                                            logger.info { "Order ${order.id} filled $filled of ${cur.amount} remaining" }
+                                            logger.info { "$id Order ${order.id} filled $filled of ${cur.amount} remaining" }
                                             currentOrder = cur.copy(
                                                 amount = order.amount
                                             )
@@ -129,17 +144,18 @@ class Taker(
                                     }
 
                                     OrderStatus.Filled -> {
-                                        logger.info { "Order ${order.id} fully filled ${order.amount}" }
+                                        TraceRecorder.full.finishWSRecording(order.id.value, WSSpans.orderFilled)
+                                        logger.info { "$id Order ${order.id} fully filled ${order.amount}" }
                                         currentOrder = null
                                     }
 
                                     OrderStatus.Cancelled -> {
-                                        logger.info { "Order ${order.id} canceled" }
+                                        logger.info { "$id Order ${order.id} canceled" }
                                         currentOrder = null
                                     }
 
                                     OrderStatus.Expired -> {
-                                        logger.info { "Order ${order.id} expired" }
+                                        logger.info { "$id Order ${order.id} expired" }
                                         currentOrder = null
                                     }
 
@@ -147,20 +163,23 @@ class Taker(
                                 }
                             }
                         }
+
                         is SubscriptionTopic.Prices -> {
                             val prices = message.data as Prices
                             if (prices.full) {
-                                logger.info { "Full price update for ${prices.market}" }
+                                logger.info { "$id Full price update for ${prices.market}" }
                             } else {
-                                logger.info { "Incremental price update: $prices" }
+                                logger.info { "$id Incremental price update: $prices" }
                             }
                             prices.ohlc.lastOrNull()?.let {
                                 marketPrices[prices.market] = it.close.toBigDecimal()
                             }
                         }
+
                         else -> {}
                     }
-                } catch (_: InterruptedException) {}
+                } catch (_: InterruptedException) {
+                }
             }
             marketIds.forEach {
                 wsClient.unsubscribe(SubscriptionTopic.Prices(it, OHLCDuration.P5M))
@@ -182,11 +201,12 @@ class Taker(
                     val market = markets.find { it.id == marketId.value }!!
                     logger.debug { "$id: baseBalance $baseBalance, quoteBalance: $quoteBalance" }
                     marketPrices[marketId]?.let { price ->
-                        val side = if (baseBalance.toBigDecimal() < (quoteBalance.toBigDecimal()/price).movePointLeft(market.quoteDecimals - market.baseDecimals)) {
-                            OrderSide.Buy
-                        } else {
-                            OrderSide.Sell
-                        }
+                        val side =
+                            if (baseBalance.toBigDecimal() < (quoteBalance.toBigDecimal() / price).movePointLeft(market.quoteDecimals - market.baseDecimals)) {
+                                OrderSide.Buy
+                            } else {
+                                OrderSide.Sell
+                            }
                         val amount = when (side) {
                             OrderSide.Buy -> {
                                 quoteBalance.let { notional ->
@@ -195,6 +215,7 @@ class Taker(
                                     ).toBigInteger()
                                 } ?: BigInteger.ZERO
                             }
+
                             OrderSide.Sell -> {
                                 (baseBalance.toBigDecimal() / sizeFactor.toBigDecimal()).toBigInteger()
                             }
@@ -210,7 +231,13 @@ class Taker(
                             ).let {
                                 wallet.signOrder(it)
                             },
-                        )
+                        ).also { response ->
+                            TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.orderCreated)
+                            TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.orderFilled)
+                            TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.tradeCreated)
+                            TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.tradeSettled)
+
+                        }
                         logger.debug { "$id back from creating an order" }
                     }
                 }
