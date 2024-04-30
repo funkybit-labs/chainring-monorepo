@@ -139,7 +139,7 @@ class FullTraceRecorder : TraceRecorder {
         val output = buildString {
             append("\n========= ${header()} =========\n")
             traces.entries.toList().sortedBy { it.key }.forEach { (op, traces: MutableList<TraceRecorder.Trace>) ->
-                append("Stats for: ${op.name}\n")
+                append("\nStats for: ${op.name}\n")
                 append("Total Traces: ${traces.size}\n")
 
                 val latencies: Map<String, List<Long>> = traces.map { it.spans }.flatten().groupBy(
