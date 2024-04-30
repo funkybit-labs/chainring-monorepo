@@ -44,7 +44,7 @@ import org.web3j.crypto.Keys
 import java.net.HttpURLConnection
 import java.util.Base64
 
-val apiServerRootUrl = System.getenv("API_URL") ?: "http://localhost:9000"
+val apiServerRootUrl = System.getenv("API_URL") ?: "http://localhost:9999"
 val httpClient = OkHttpClient.Builder().build()
 val applicationJson = "application/json".toMediaType()
 
