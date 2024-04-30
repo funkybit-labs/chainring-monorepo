@@ -47,4 +47,8 @@ sealed class SubscriptionTopic {
     @Serializable
     @SerialName("Balances")
     data object Balances : SubscriptionTopic()
+
+    @Serializable
+    @SerialName("Limits")
+    data class Limits(val marketId: MarketId) : SubscriptionTopic()
 }

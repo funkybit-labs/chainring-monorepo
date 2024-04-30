@@ -1,4 +1,4 @@
-package co.chainring.core
+package co.chainring.mocker.core
 
 import java.math.BigDecimal
 import java.math.BigInteger

@@ -32,15 +32,20 @@ data class BroadcasterNotification(
 
         fun pricesForMarketPeriods(marketId: MarketId, duration: OHLCDuration, ohlc: List<OHLCEntity>, full: Boolean): BroadcasterNotification =
             BroadcasterNotification(Prices(marketId, duration, ohlc.map { it.toWSResponse() }, full), null)
+
+        fun limits(wallet: WalletEntity, market: MarketEntity): BroadcasterNotification =
+            BroadcasterNotification(OrderEntity.getLimits(market, wallet), recipient = wallet.address)
     }
 }
 
 fun publishBroadcasterNotifications(notifications: List<BroadcasterNotification>) {
-    logger.debug { "Scheduling broadcaster notifications: $notifications" }
-    TransactionManager.current().notifyDbListener(
-        "broadcaster_ctl",
-        BroadcasterJobEntity.create(notifications).value,
-    )
+    if (notifications.isNotEmpty()) {
+        logger.debug { "Scheduling broadcaster notifications: $notifications" }
+        TransactionManager.current().notifyDbListener(
+            "broadcaster_ctl",
+            BroadcasterJobEntity.create(notifications).value,
+        )
+    }
 }
 
 @JvmInline

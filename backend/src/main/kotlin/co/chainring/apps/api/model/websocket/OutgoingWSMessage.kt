@@ -2,6 +2,7 @@ package co.chainring.apps.api.model.websocket
 
 import co.chainring.apps.api.model.Balance
 import co.chainring.apps.api.model.BigDecimalJson
+import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.Trade
 import co.chainring.core.model.db.MarketId
@@ -116,4 +117,12 @@ data class OrderCreated(
 @SerialName("OrderUpdated")
 data class OrderUpdated(
     val order: Order,
+) : Publishable()
+
+@Serializable
+@SerialName("Limits")
+data class Limits(
+    val marketId: MarketId,
+    val base: BigIntegerJson,
+    val quote: BigIntegerJson,
 ) : Publishable()

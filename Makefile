@@ -47,6 +47,9 @@ run_backend:
 run_sequencer:
 	SANDBOX_MODE=true ./gradlew :sequencer:run
 
+run_mocker:
+	API_URL=http://localhost:9000 ./gradlew :mocker:run
+
 run_ui:
 	cd web-ui && pnpm install && pnpm run dev
 

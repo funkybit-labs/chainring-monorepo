@@ -1,9 +1,9 @@
-package co.chainring
+package co.chainring.mocker
 
-import co.chainring.core.Maker
-import co.chainring.core.Taker
 import co.chainring.core.model.db.MarketId
-import co.chainring.core.toFundamentalUnits
+import co.chainring.mocker.core.Maker
+import co.chainring.mocker.core.Taker
+import co.chainring.mocker.core.toFundamentalUnits
 import java.math.BigDecimal
 import kotlin.random.Random
 

@@ -21,8 +21,6 @@ import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.model.db.publishBroadcasterNotifications
-import co.chainring.core.utils.BroadcasterNotifications
-import co.chainring.core.utils.add
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -31,10 +29,6 @@ import org.web3j.utils.Numeric
 import java.math.BigInteger
 import kotlin.concurrent.thread
 import org.jetbrains.exposed.sql.transactions.transaction as dbTransaction
-
-interface TxConfirmationHandler {
-    fun onTxConfirmation(tx: EIP712Transaction, error: String?)
-}
 
 class BlockchainTransactionHandler(
     private val blockchainClient: BlockchainClient,
@@ -260,7 +254,7 @@ class BlockchainTransactionHandler(
 
     private fun onTxConfirmation(tx: EIP712Transaction, error: String?) {
         transaction {
-            val broadcasterNotifications: BroadcasterNotifications = mutableMapOf()
+            val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
             when (tx) {
                 is EIP712Transaction.WithdrawTx -> {
                     WithdrawalEntity.findPendingByWalletAndNonce(
@@ -335,17 +329,18 @@ class BlockchainTransactionHandler(
                         )
 
                         executions.forEach { execution ->
-                            broadcasterNotifications.add(execution.order.wallet.address, TradeUpdated(execution.toTradeResponse()))
+                            broadcasterNotifications.add(
+                                BroadcasterNotification(
+                                    TradeUpdated(execution.toTradeResponse()),
+                                    recipient = execution.order.wallet.address,
+                                ),
+                            )
                         }
                     }
                 }
             }
 
-            publishBroadcasterNotifications(
-                broadcasterNotifications.flatMap { (address, notifications) ->
-                    notifications.map { BroadcasterNotification(it, address) }
-                },
-            )
+            publishBroadcasterNotifications(broadcasterNotifications)
         }
     }
 }

@@ -1,4 +1,4 @@
-import { apiClient, OrderSide, TradingSymbol } from 'apiClient'
+import { apiClient, OrderSide } from 'apiClient'
 import { classNames } from 'utils'
 import React, {
   ChangeEvent,
@@ -16,10 +16,16 @@ import { useConfig, useSignTypedData } from 'wagmi'
 import { Market } from 'markets'
 import Decimal from 'decimal.js'
 import { useWebsocketSubscription } from 'contexts/websocket'
-import { OrderBook, orderBookTopic, Publishable } from 'websocketMessages'
+import {
+  limitsTopic,
+  OrderBook,
+  orderBookTopic,
+  Publishable
+} from 'websocketMessages'
 import { getMarketPrice } from 'utils/pricesUtils'
 import useAmountInputState from 'hooks/useAmountInputState'
 import { addressZero, generateOrderNonce, getDomain } from 'utils/eip712'
+import { AmountWithSymbol } from 'components/common/AmountWithSymbol'
 
 export default function TradeWidget({
   market,
@@ -44,7 +50,6 @@ export default function TradeWidget({
     valueInFundamentalUnits: price
   } = useAmountInputState({
     initialInputValue: '',
-    initialValue: 0n,
     decimals: quoteSymbol.decimals
   })
 
@@ -54,18 +59,35 @@ export default function TradeWidget({
     valueInFundamentalUnits: amount
   } = useAmountInputState({
     initialInputValue: '',
-    initialValue: 0n,
     decimals: baseSymbol.decimals
   })
 
   const [isMarketOrder, setIsMarketOrder] = useState(false)
-  const [orderBook, setOrderBook] = useState<OrderBook | undefined>(undefined)
 
+  const [orderBook, setOrderBook] = useState<OrderBook | undefined>(undefined)
   useWebsocketSubscription({
     topics: useMemo(() => [orderBookTopic(market.id)], [market.id]),
     handler: useCallback((message: Publishable) => {
       if (message.type === 'OrderBook') {
         setOrderBook(message)
+      }
+    }, [])
+  })
+
+  const [availableBaseBalance, setAvailableBaseBalance] = useState<
+    bigint | undefined
+  >(undefined)
+
+  const [availableQuoteBalance, setAvailableQuoteBalance] = useState<
+    bigint | undefined
+  >(undefined)
+
+  useWebsocketSubscription({
+    topics: useMemo(() => [limitsTopic(market.id)], [market.id]),
+    handler: useCallback((message: Publishable) => {
+      if (message.type === 'Limits') {
+        setAvailableBaseBalance(message.base)
+        setAvailableQuoteBalance(message.quote)
       }
     }, [])
   })
@@ -89,6 +111,7 @@ export default function TradeWidget({
       setPriceInputValue('')
       setAmountInputValue('')
       setIsMarketOrder(false)
+      mutation.reset()
     }
   }
 
@@ -110,6 +133,26 @@ export default function TradeWidget({
   const mutation = useMutation({
     mutationFn: apiClient.createOrder
   })
+
+  const canSubmit = useMemo(() => {
+    if (mutation.isPending) return false
+    if (amount <= 0n) return false
+    if (price <= 0n && !isMarketOrder) return false
+
+    if (side == 'Buy' && notional > (availableQuoteBalance || 0n)) return false
+    if (side == 'Sell' && amount > (availableBaseBalance || 0n)) return false
+
+    return true
+  }, [
+    mutation.isPending,
+    side,
+    amount,
+    price,
+    notional,
+    isMarketOrder,
+    availableQuoteBalance,
+    availableBaseBalance
+  ])
 
   useEffect(() => {
     if (mutation.isError || mutation.isSuccess) {
@@ -259,18 +302,28 @@ export default function TradeWidget({
               </tr>
             </tbody>
           </table>
-          <p className="py-3">
+          <div className="py-3 text-sm">
+            Available balance:{' '}
+            {availableQuoteBalance !== undefined &&
+              availableBaseBalance !== undefined && (
+                <AmountWithSymbol
+                  amount={
+                    side == 'Buy' ? availableQuoteBalance : availableBaseBalance
+                  }
+                  symbol={side == 'Buy' ? quoteSymbol : baseSymbol}
+                  approximate={false}
+                />
+              )}
+          </div>
+          <div className="pb-3">
             <SubmitButton
-              disabled={
-                !((isMarketOrder || price > 0) && amount > 0n) ||
-                mutation.isPending
-              }
+              disabled={!canSubmit}
               onClick={submitOrder}
               error={
                 mutation.isError
                   ? isErrorFromAlias(
                       apiClient.api,
-                      'updateOrder',
+                      'createOrder',
                       mutation.error
                     )
                     ? mutation.error.response.data.errors[0].displayMessage
@@ -285,7 +338,7 @@ export default function TradeWidget({
                 }
               }}
             />
-          </p>
+          </div>
           {notional > 0n && (
             <>
               <div className="text-center text-sm text-white">
@@ -341,22 +394,5 @@ export default function TradeWidget({
         </>
       }
     />
-  )
-}
-
-function AmountWithSymbol({
-  amount,
-  symbol,
-  approximate
-}: {
-  amount: bigint
-  symbol: TradingSymbol
-  approximate: boolean
-}) {
-  return (
-    <div className={'inline-block whitespace-nowrap'}>
-      {approximate && '~'}
-      {formatUnits(amount, symbol.decimals)} {symbol.name}
-    </div>
   )
 }
