@@ -4,11 +4,13 @@ import co.chainring.sequencer.proto.BalanceChange
 import co.chainring.sequencer.proto.MarketCheckpoint
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderBatch
+import co.chainring.sequencer.proto.OrderChangeRejected
 import co.chainring.sequencer.proto.OrderChanged
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.TradeCreated
 import co.chainring.sequencer.proto.balanceChange
 import co.chainring.sequencer.proto.marketCheckpoint
+import co.chainring.sequencer.proto.orderChangeRejected
 import co.chainring.sequencer.proto.orderChanged
 import co.chainring.sequencer.proto.tradeCreated
 import java.math.BigDecimal
@@ -72,17 +74,20 @@ data class Market(
         val createdTrades: List<TradeCreated>,
         val balanceChanges: List<BalanceChange>,
         val consumptionChanges: List<ConsumptionChange>,
+        val ordersChangeRejected: List<OrderChangeRejected>,
     )
 
     private fun sumBigIntegerPair(a: Pair<BigInteger, BigInteger>, b: Pair<BigInteger, BigInteger>) = Pair(a.first + b.first, a.second + b.second)
 
     fun applyOrderBatch(orderBatch: OrderBatch): AddOrdersResult {
         val ordersChanged = mutableListOf<OrderChanged>()
+        val ordersChangeRejected = mutableListOf<OrderChangeRejected>()
         val createdTrades = mutableListOf<TradeCreated>()
         val balanceChanges = mutableMapOf<Pair<WalletAddress, Asset>, BigInteger>()
         val consumptionChanges = mutableMapOf<WalletAddress, Pair<BigInteger, BigInteger>>()
         orderBatch.ordersToCancelList.forEach { cancelOrder ->
-            if (isOrderForWallet(orderBatch.wallet, cancelOrder.guid)) {
+            val validationResult = validateOrderForWallet(orderBatch.wallet, cancelOrder.guid)
+            if (validationResult == OrderChangeRejected.Reason.None) {
                 removeOrder(cancelOrder.guid.toOrderGuid())?.let { result ->
                     ordersChanged.add(
                         orderChanged {
@@ -96,10 +101,18 @@ data class Market(
                         ::sumBigIntegerPair,
                     )
                 }
+            } else {
+                ordersChangeRejected.add(
+                    orderChangeRejected {
+                        this.guid = cancelOrder.guid
+                        this.reason = validationResult
+                    },
+                )
             }
         }
         orderBatch.ordersToChangeList.forEach { orderChange ->
-            if (isOrderForWallet(orderBatch.wallet, orderChange.guid)) {
+            val validationResult = validateOrderForWallet(orderBatch.wallet, orderChange.guid)
+            if (validationResult == OrderChangeRejected.Reason.None) {
                 changeOrder(orderChange)?.let { changeOrderResult ->
                     ordersChanged.add(
                         orderChanged {
@@ -113,6 +126,13 @@ data class Market(
                         ::sumBigIntegerPair,
                     )
                 }
+            } else {
+                ordersChangeRejected.add(
+                    orderChangeRejected {
+                        this.guid = orderChange.guid
+                        this.reason = validationResult
+                    },
+                )
             }
         }
         orderBatch.ordersToAddList.forEach { order ->
@@ -213,6 +233,7 @@ data class Market(
                     ),
                 )
             },
+            ordersChangeRejected,
         )
     }
 
@@ -339,16 +360,16 @@ data class Market(
     }
 
     // if the order is found, returns wallet and how much of the base asset and quote asset it was consuming; null otherwise
-    fun removeOrder(guid: OrderGuid): RemoveOrderResult? {
+    private fun removeOrder(guid: OrderGuid): RemoveOrderResult? {
         var ret: RemoveOrderResult? = null
         ordersByGuid[guid]?.let { levelOrder ->
             val level = levels[levelOrder.levelIx]
-            if (level.side == BookSide.Buy) {
+            ret = if (level.side == BookSide.Buy) {
                 buyOrdersByWallet[levelOrder.wallet]?.remove(levelOrder)
-                ret = RemoveOrderResult(levelOrder.wallet, BigInteger.ZERO, notional(levelOrder.quantity, level.price, baseDecimals, quoteDecimals))
+                RemoveOrderResult(levelOrder.wallet, BigInteger.ZERO, notional(levelOrder.quantity, level.price, baseDecimals, quoteDecimals))
             } else {
                 sellOrdersByWallet[levelOrder.wallet]?.remove(levelOrder)
-                ret = RemoveOrderResult(levelOrder.wallet, levelOrder.quantity, BigInteger.ZERO)
+                RemoveOrderResult(levelOrder.wallet, levelOrder.quantity, BigInteger.ZERO)
             }
             level.removeLevelOrder(levelOrder)
             ordersByGuid.remove(guid)
@@ -451,7 +472,7 @@ data class Market(
 
     // this will only change an order's price and quantity
     // if the price change would alter the book side, no change is made
-    fun changeOrder(orderChange: Order): ChangeOrderResult? {
+    private fun changeOrder(orderChange: Order): ChangeOrderResult? {
         return ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
             val level = levels[order.levelIx]
             val newPrice = orderChange.price.toBigDecimal()
@@ -493,10 +514,14 @@ data class Market(
             }
         }
     }
-    fun isOrderForWallet(wallet: Long, orderGuid: Long): Boolean {
+    private fun validateOrderForWallet(wallet: Long, orderGuid: Long): OrderChangeRejected.Reason {
         return ordersByGuid[orderGuid.toOrderGuid()]?.let { order ->
-            wallet == order.wallet.value
-        } ?: false
+            if (wallet == order.wallet.value) {
+                OrderChangeRejected.Reason.None
+            } else {
+                OrderChangeRejected.Reason.NotForWallet
+            }
+        } ?: OrderChangeRejected.Reason.DoesNotExist
     }
 
     // equals and hashCode are overridden because of levels are stored in array

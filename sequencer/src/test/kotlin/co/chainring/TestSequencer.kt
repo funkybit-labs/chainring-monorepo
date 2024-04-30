@@ -9,6 +9,7 @@ import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.core.toOrderGuid
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.Order
+import co.chainring.sequencer.proto.OrderChangeRejected
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.SequencerError
 import co.chainring.sequencer.proto.SequencerResponse
@@ -267,11 +268,21 @@ class TestSequencer {
         sequencer.deposit(taker, marketId.quoteAsset(), BigDecimal.ONE.inWei())
         val response4 = sequencer.addOrder(marketId, BigInteger.valueOf(500), null, taker, Order.Type.MarketBuy)
         assertEquals(OrderDisposition.Filled, response4.ordersChangedList.first().disposition)
+
         // have taker try to cancel maker order
         val response5 = sequencer.cancelOrder(marketId, response3.orderGuid(), taker)
         assertEquals(0, response5.ordersChangedList.size)
+        assertEquals(1, response5.ordersChangeRejectedList.size)
+        assertEquals(OrderChangeRejected.Reason.NotForWallet, response5.ordersChangeRejectedList.first().reason)
+
         val response6 = sequencer.cancelOrder(marketId, response3.orderGuid(), maker)
         assertEquals(OrderDisposition.Canceled, response6.ordersChangedList.first().disposition)
+
+        // cancel an invalid order
+        val response7 = sequencer.cancelOrder(marketId, response3.orderGuid() + 2, maker)
+        assertEquals(0, response7.ordersChangedList.size)
+        assertEquals(1, response7.ordersChangeRejectedList.size)
+        assertEquals(OrderChangeRejected.Reason.DoesNotExist, response7.ordersChangeRejectedList.first().reason)
     }
 
     @Test
@@ -338,6 +349,19 @@ class TestSequencer {
 
         val response7 = sequencer.changeOrder(marketId, response5.orderGuid().toOrderGuid(), BigDecimal.ONE.inSats().toLong(), "9.95", maker)
         assertEquals(OrderDisposition.Accepted, response7.ordersChangedList.first().disposition)
+
+        // different wallet try to update an order
+        val taker = rnd.nextLong().toWalletAddress()
+        val response8 = sequencer.changeOrder(marketId, response5.orderGuid().toOrderGuid(), BigDecimal.ONE.inSats().toLong() - 1, "9.95", taker)
+        assertEquals(0, response8.ordersChangedList.size)
+        assertEquals(1, response8.ordersChangeRejectedList.size)
+        assertEquals(OrderChangeRejected.Reason.NotForWallet, response8.ordersChangeRejectedList.first().reason)
+
+        // update an invalid order.
+        val response9 = sequencer.changeOrder(marketId, (response5.orderGuid() + 1).toOrderGuid(), BigDecimal.ONE.inSats().toLong() - 1, "9.95", maker)
+        assertEquals(0, response9.ordersChangedList.size)
+        assertEquals(1, response9.ordersChangeRejectedList.size)
+        assertEquals(OrderChangeRejected.Reason.DoesNotExist, response9.ordersChangeRejectedList.first().reason)
     }
 
     @Test

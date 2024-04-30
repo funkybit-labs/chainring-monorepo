@@ -242,7 +242,7 @@ class OrderRoutesApiTest {
                 ).let {
                     wallet.signOrder(it)
                 },
-            ).assertError(ApiError(ReasonCode.RejectedBySequencer, "Rejected By Sequencer"))
+            ).assertError(ApiError(ReasonCode.RejectedBySequencer, "Order does not exist or is already finalized"))
 
             apiClient.tryCancelOrder(OrderId.generate()).assertError(ApiError(ReasonCode.ProcessingError, expectedError.message))
         }
@@ -358,7 +358,7 @@ class OrderRoutesApiTest {
         apiClient2.tryCancelOrder(
             createLimitOrderResponse2.orderId,
         ).assertError(
-            ApiError(ReasonCode.RejectedBySequencer, "Rejected By Sequencer"),
+            ApiError(ReasonCode.RejectedBySequencer, "Order not created by this wallet"),
         )
 
         // try update cancelled order
@@ -382,7 +382,7 @@ class OrderRoutesApiTest {
                 wallet.signOrder(it)
             },
         ).assertError(
-            ApiError(ReasonCode.RejectedBySequencer, "Rejected By Sequencer"),
+            ApiError(ReasonCode.RejectedBySequencer, "Order does not exist or is already finalized"),
         )
     }
 
