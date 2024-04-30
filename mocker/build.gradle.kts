@@ -44,5 +44,5 @@ kotlin {
 }
 
 application {
-    mainClass = "co.chainring.MainKt"
+    mainClass = "co.chainring.mocker.MainKt"
 }

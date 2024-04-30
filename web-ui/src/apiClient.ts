@@ -103,27 +103,19 @@ const CreateOrderApiResponseSchema = z.object({
   requestStatus: RequestStatusSchema
 })
 
-const UpdateMarketOrderSchema = z.object({
-  type: z.literal('market'),
-  orderId: z.string(),
-  amount: z.coerce.bigint(),
-  marketId: z.string(),
-  side: OrderSideSchema
-})
-export type UpdateMarketOrder = z.infer<typeof UpdateMarketOrderSchema>
-
 const UpdateLimitOrderSchema = z.object({
   type: z.literal('limit'),
   orderId: z.string(),
   amount: z.coerce.bigint(),
   price: decimal(),
   marketId: z.string(),
-  side: OrderSideSchema
+  side: OrderSideSchema,
+  nonce: z.string(),
+  signature: z.string()
 })
 export type UpdateLimitOrder = z.infer<typeof UpdateLimitOrderSchema>
 
 const UpdateOrderRequestSchema = z.discriminatedUnion('type', [
-  UpdateMarketOrderSchema,
   UpdateLimitOrderSchema
 ])
 export type UpdateOrderRequest = z.infer<typeof UpdateOrderRequestSchema>

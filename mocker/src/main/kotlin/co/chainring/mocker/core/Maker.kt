@@ -1,4 +1,4 @@
-package co.chainring.core
+package co.chainring.mocker.core
 
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CancelOrderApiRequest
@@ -21,7 +21,7 @@ import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.SettlementStatus
-import co.chainring.core.utils.generateHexString
+import co.chainring.core.utils.generateOrderNonce
 import co.chainring.integrationtests.utils.blocking
 import co.chainring.integrationtests.utils.receivedDecoded
 import co.chainring.integrationtests.utils.subscribeToBalances
@@ -232,7 +232,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                 marketId = marketId,
                 createOrders = offerPrices.mapIndexed { ix, price ->
                         CreateOrderApiRequest.Limit(
-                            nonce = generateHexString(32),
+                            nonce = generateOrderNonce(),
                             marketId = marketId,
                             side = OrderSide.Sell,
                             amount = offerAmounts[ix],
@@ -243,7 +243,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                         }
                 } + bidPrices.mapIndexed { ix, price ->
                         CreateOrderApiRequest.Limit(
-                            nonce = generateHexString(32),
+                            nonce = generateOrderNonce(),
                             marketId = marketId,
                             side = OrderSide.Buy,
                             amount = bidAmounts[ix],
@@ -276,7 +276,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                 val amount = offerAmounts[ix]
                 apiClient.createOrder(
                     CreateOrderApiRequest.Limit(
-                        nonce = generateHexString(32),
+                        nonce = generateOrderNonce(),
                         marketId = marketId,
                         side = OrderSide.Sell,
                         amount = amount,
@@ -291,7 +291,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                 val amount = bidAmounts[ix]
                 apiClient.createOrder(
                     CreateOrderApiRequest.Limit(
-                        nonce = generateHexString(32),
+                        nonce = generateOrderNonce(),
                         marketId = marketId,
                         side = OrderSide.Buy,
                         amount = amount,

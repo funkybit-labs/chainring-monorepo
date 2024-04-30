@@ -2,6 +2,7 @@ package co.chainring.integrationtests.utils
 
 import co.chainring.apps.api.model.websocket.Balances
 import co.chainring.apps.api.model.websocket.IncomingWSMessage
+import co.chainring.apps.api.model.websocket.Limits
 import co.chainring.apps.api.model.websocket.OrderBook
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
@@ -49,6 +50,10 @@ fun WsClient.subscribeToTrades() {
 
 fun WsClient.subscribeToBalances() {
     send(IncomingWSMessage.Subscribe(SubscriptionTopic.Balances))
+}
+
+fun WsClient.subscribeToLimits(marketId: MarketId) {
+    send(IncomingWSMessage.Subscribe(SubscriptionTopic.Limits(marketId)))
 }
 
 fun WsClient.unsubscribe(topic: SubscriptionTopic) {
@@ -102,3 +107,6 @@ fun WsClient.assertOrderBookMessageReceived(marketId: MarketId, expected: OrderB
     assertMessageReceived<OrderBook>(SubscriptionTopic.OrderBook(marketId)) { msg ->
         assertEquals(expected, msg)
     }
+
+fun WsClient.assertLimitsMessageReceived(marketId: MarketId, assertions: (Limits) -> Unit = {}): Limits =
+    assertMessageReceived<Limits>(SubscriptionTopic.Limits(marketId), assertions)

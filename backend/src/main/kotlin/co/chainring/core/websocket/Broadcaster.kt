@@ -1,6 +1,7 @@
 package co.chainring.core.websocket
 
 import co.chainring.apps.api.model.websocket.Balances
+import co.chainring.apps.api.model.websocket.Limits
 import co.chainring.apps.api.model.websocket.OHLC
 import co.chainring.apps.api.model.websocket.OrderBook
 import co.chainring.apps.api.model.websocket.OrderCreated
@@ -98,6 +99,7 @@ class Broadcaster(val db: Database) {
             is SubscriptionTopic.Trades -> sendTrades(client)
             is SubscriptionTopic.Orders -> sendOrders(client)
             is SubscriptionTopic.Balances -> sendBalances(client)
+            is SubscriptionTopic.Limits -> sendLimits(topic, client)
         }
     }
 
@@ -242,12 +244,30 @@ class Broadcaster(val db: Database) {
         }
     }
 
+    private fun sendLimits(topic: SubscriptionTopic.Limits, client: ConnectedClient) {
+        if (client.principal != null) {
+            transaction {
+                client.send(
+                    OutgoingWSMessage.Publish(
+                        topic,
+                        OrderEntity.getLimits(
+                            MarketEntity[topic.marketId],
+                            WalletEntity.getOrCreate(client.principal),
+                        ),
+                    ),
+                )
+            }
+        }
+    }
+
     private fun handleDbNotification(payload: String) {
         logger.debug { "received db notification with payload $payload" }
         try {
-            transaction {
-                BroadcasterJobEntity.findById(BroadcasterJobId(payload))?.notificationData
-            }?.forEach(::notify)
+            val notifications = transaction {
+                BroadcasterJobEntity.findById(BroadcasterJobId(payload))?.notificationData ?: emptyList()
+            }
+
+            notifications.forEach(::notify)
         } catch (e: Exception) {
             logger.error(e) { "Broadcaster: Unhandled exception" }
         }
@@ -266,6 +286,7 @@ class Broadcaster(val db: Database) {
             }
             is Trades, is TradeCreated, is TradeUpdated -> SubscriptionTopic.Trades
             is Balances -> SubscriptionTopic.Balances
+            is Limits -> SubscriptionTopic.Limits(notification.message.marketId)
         }
 
         val clients = if (notification.recipient == null) {

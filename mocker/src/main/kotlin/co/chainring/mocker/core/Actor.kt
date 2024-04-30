@@ -1,4 +1,4 @@
-package co.chainring.core
+package co.chainring.mocker.core
 
 import co.chainring.apps.api.model.Trade
 import co.chainring.integrationtests.utils.ApiClient

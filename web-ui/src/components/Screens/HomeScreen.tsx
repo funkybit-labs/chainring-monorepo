@@ -84,7 +84,13 @@ export default function HomeScreen() {
                 symbols={symbols}
               />
             )}
-            {wallet.address && <OrdersAndTradesWidget markets={markets} />}
+            {wallet.address && exchangeContract && (
+              <OrdersAndTradesWidget
+                markets={markets}
+                walletAddress={wallet.address}
+                exchangeContractAddress={exchangeContract.address}
+              />
+            )}
           </div>
         </div>
       ) : (

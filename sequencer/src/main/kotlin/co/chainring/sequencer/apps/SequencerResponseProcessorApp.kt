@@ -91,7 +91,7 @@ class QueueProcessorApp(
                     response,
                     request,
                 )
-                logger.debug { "storing last processed index $lastReadIndex}" }
+                logger.debug { "storing last processed index $lastReadIndex" }
                 SequencerResponseProcessorService.updateLastProcessedIndex(lastReadIndex)
             }
         } catch (t: Throwable) {

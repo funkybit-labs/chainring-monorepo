@@ -24,10 +24,6 @@ import java.math.BigInteger
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
-interface DepositConfirmationHandler {
-    fun onExchangeContractDepositConfirmation(deposit: DepositEntity)
-}
-
 class BlockchainDepositHandler(
     private val blockchainClient: BlockchainClient,
     private val sequencerClient: SequencerClient,

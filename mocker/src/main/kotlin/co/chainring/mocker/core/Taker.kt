@@ -1,4 +1,4 @@
-package co.chainring.core
+package co.chainring.mocker.core
 
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Market

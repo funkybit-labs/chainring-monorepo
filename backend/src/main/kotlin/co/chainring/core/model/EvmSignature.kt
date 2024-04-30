@@ -20,7 +20,11 @@ value class EvmSignature(val value: String) {
 
     companion object {
         fun emptySignature(): EvmSignature {
-            return EvmSignature(ByteArray(65).toHex())
+            return ByteArray(65).toHex().toEvmSignature()
         }
     }
+}
+
+fun String.toEvmSignature(): EvmSignature {
+    return EvmSignature(this)
 }

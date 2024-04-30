@@ -2,6 +2,7 @@ package co.chainring.core.evm
 
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.toEvmSignature
 import co.chainring.core.utils.toHex
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.web3j.crypto.Credentials
@@ -20,7 +21,7 @@ object ECHelper {
 
     fun signData(credentials: Credentials, hash: ByteArray): EvmSignature {
         val signature = Sign.signMessage(hash, credentials.ecKeyPair, false)
-        return EvmSignature((signature.r + signature.s + signature.v).toHex())
+        return (signature.r + signature.s + signature.v).toHex().toEvmSignature()
     }
 
     fun isValidSignature(messageHash: ByteArray, signature: EvmSignature, signerAddress: Address): Boolean {

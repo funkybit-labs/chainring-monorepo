@@ -3,12 +3,14 @@ package co.chainring.core.model.db
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.websocket.LastTrade
 import co.chainring.apps.api.model.websocket.LastTradeDirection
+import co.chainring.apps.api.model.websocket.Limits
 import co.chainring.apps.api.model.websocket.OrderBook
 import co.chainring.apps.api.model.websocket.OrderBookEntry
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.SequencerOrderId
+import co.chainring.core.model.toEvmSignature
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.toByteArrayNoSign
 import co.chainring.core.utils.toFundamentalUnits
@@ -21,12 +23,14 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.coalesce
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.div
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.times
 import org.jetbrains.exposed.sql.alias
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.batchInsert
+import org.jetbrains.exposed.sql.decimalLiteral
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
@@ -111,6 +115,8 @@ data class UpdateOrderAssignment(
     val orderId: OrderId,
     val amount: BigInteger,
     val price: BigDecimal?,
+    val nonce: BigInteger,
+    val signature: EvmSignature,
 )
 
 object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
@@ -210,7 +216,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         this.amount,
         this.price?.toFundamentalUnits(quoteDecimals) ?: BigInteger.ZERO,
         BigInteger(1, this.nonce.toHexBytes()),
-        EvmSignature(this.signature),
+        this.signature.toEvmSignature(),
     )
 
     companion object : EntityClass<OrderId, OrderEntity>(OrderTable) {
@@ -241,18 +247,14 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                         addBatch(EntityID(assignment.orderId, OrderTable))
                         this[OrderTable.amount] = assignment.amount.toBigDecimal()
                         this[OrderTable.price] = assignment.price
+                        this[OrderTable.nonce] = assignment.nonce.toByteArrayNoSign().toHex(false)
+                        this[OrderTable.signature] = assignment.signature.value
                         this[BalanceTable.updatedAt] = now
                         this[BalanceTable.updatedBy] = "system"
                     }
                     execute(TransactionManager.current())
                 }
             }
-        }
-
-        fun findByNonce(nonce: String): OrderEntity? {
-            return OrderEntity.find {
-                OrderTable.nonce.eq(nonce)
-            }.firstOrNull()
         }
 
         fun findBySequencerOrderId(sequencerOrderId: Long): OrderEntity? {
@@ -368,6 +370,54 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                         else -> LastTradeDirection.Unchanged
                     },
                 ),
+            )
+        }
+
+        fun getLimits(market: MarketEntity, wallet: WalletEntity): Limits {
+            val availableBalances = BalanceEntity
+                .getBalancesForWallet(wallet)
+                .filter { it.type == BalanceType.Available }
+                .associateBy { it.symbolGuid.value }
+
+            val totalBaseAmountCol = coalesce(
+                OrderTable.amount.sum(),
+                decimalLiteral(BigDecimal.ZERO),
+            ).alias("total_amount")
+
+            val totalBaseAmountReserved = OrderTable
+                .select(totalBaseAmountCol)
+                .where { OrderTable.walletGuid.eq(wallet.guid) }
+                .andWhere { OrderTable.marketGuid.eq(market.guid) }
+                .andWhere { OrderTable.status.inList(listOf(OrderStatus.Open, OrderStatus.Partial)) }
+                .andWhere { OrderTable.side.eq(OrderSide.Sell) }
+                .andWhere { OrderTable.type.eq(OrderType.Limit) }
+                .limit(1)
+                .first()[totalBaseAmountCol]
+                .toBigInteger()
+
+            val totalQuoteAmountCol = coalesce(
+                OrderTable
+                    .amount
+                    .times(coalesce(OrderTable.price, decimalLiteral(BigDecimal.ZERO)))
+                    .sum(),
+                decimalLiteral(BigDecimal.ZERO),
+            ).alias("total_amount")
+
+            val totalQuoteAmountReserved = OrderTable
+                .select(totalQuoteAmountCol)
+                .where { OrderTable.walletGuid.eq(wallet.guid) }
+                .andWhere { OrderTable.marketGuid.eq(market.guid) }
+                .andWhere { OrderTable.status.inList(listOf(OrderStatus.Open, OrderStatus.Partial)) }
+                .andWhere { OrderTable.side.eq(OrderSide.Buy) }
+                .andWhere { OrderTable.type.eq(OrderType.Limit) }
+                .limit(1)
+                .first()[totalQuoteAmountCol]
+                .toBigInteger()
+
+            return Limits(
+                marketId = market.id.value,
+                base = (availableBalances[market.baseSymbolGuid.value]?.balance ?: BigInteger.ZERO) - totalBaseAmountReserved,
+                quote = (availableBalances[market.quoteSymbolGuid.value]?.balance ?: BigInteger.ZERO) - totalQuoteAmountReserved,
             )
         }
     }

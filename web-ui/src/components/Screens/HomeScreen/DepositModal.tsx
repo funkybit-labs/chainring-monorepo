@@ -1,4 +1,4 @@
-import { Address, formatUnits, parseUnits } from 'viem'
+import { Address, formatUnits } from 'viem'
 import { BaseError, useConfig, useWriteContract } from 'wagmi'
 import { ERC20Abi, ExchangeAbi } from 'contracts'
 import { useState } from 'react'
@@ -13,7 +13,7 @@ import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
 import { TradingSymbol } from 'apiClient'
 import { useQuery } from '@tanstack/react-query'
-import { cleanAndFormatNumberInput } from 'utils'
+import useAmountInputState from 'hooks/useAmountInputState'
 
 export default function DepositModal({
   exchangeContractAddress,
@@ -48,7 +48,15 @@ export default function DepositModal({
     }
   })
 
-  const [amount, setAmount] = useState('')
+  const {
+    inputValue: amountInputValue,
+    setInputValue: setAmountInputValue,
+    valueInFundamentalUnits: amount
+  } = useAmountInputState({
+    initialInputValue: '',
+    decimals: symbol.decimals
+  })
+
   const [submitPhase, setSubmitPhase] = useState<
     | 'waitingForAllowanceApproval'
     | 'waitingForAllowanceReceipt'
@@ -65,9 +73,8 @@ export default function DepositModal({
 
     try {
       if (walletBalanceQuery.status == 'success') {
-        const parsedAmount = parseUnits(amount, symbol.decimals)
         const availableAmount = walletBalanceQuery.data
-        return parsedAmount > 0 && parsedAmount <= availableAmount
+        return amount > 0 && amount <= availableAmount
       } else {
         return false
       }
@@ -78,7 +85,6 @@ export default function DepositModal({
 
   async function onSubmit() {
     setSubmitError(null)
-    const parsedAmount = parseUnits(amount, symbol.decimals)
     if (canSubmit) {
       try {
         if (symbol.contractAddress) {
@@ -87,7 +93,7 @@ export default function DepositModal({
             abi: ERC20Abi,
             address: symbol.contractAddress,
             functionName: 'approve',
-            args: [exchangeContractAddress, parsedAmount]
+            args: [exchangeContractAddress, amount]
           })
 
           setSubmitPhase('waitingForAllowanceReceipt')
@@ -100,7 +106,7 @@ export default function DepositModal({
             abi: ExchangeAbi,
             address: exchangeContractAddress,
             functionName: 'deposit',
-            args: [symbol.contractAddress, parsedAmount]
+            args: [symbol.contractAddress, amount]
           })
 
           setSubmitPhase('waitingForDepositReceipt')
@@ -111,7 +117,7 @@ export default function DepositModal({
           setSubmitPhase('waitingForDepositApproval')
           const hash = await sendTransaction(config, {
             to: exchangeContractAddress,
-            value: parsedAmount
+            value: amount
           })
 
           setSubmitPhase('waitingForDepositReceipt')
@@ -142,14 +148,10 @@ export default function DepositModal({
             return (
               <div className="mt-8">
                 <AmountInput
-                  value={amount}
+                  value={amountInputValue}
                   symbol={symbol.name}
                   disabled={submitPhase !== null}
-                  onChange={(e) =>
-                    setAmount(
-                      cleanAndFormatNumberInput(e.target.value, symbol.decimals)
-                    )
-                  }
+                  onChange={(e) => setAmountInputValue(e.target.value)}
                 />
                 <p className="mt-1 text-center text-sm text-neutralGray">
                   Available balance:{' '}

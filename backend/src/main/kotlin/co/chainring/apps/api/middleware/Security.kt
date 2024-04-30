@@ -8,9 +8,9 @@ import co.chainring.apps.api.requestContexts
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.model.Address
-import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.toChecksumAddress
+import co.chainring.core.model.toEvmSignature
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -100,7 +100,7 @@ private fun validateSignature(signInMessage: SignInMessage, signature: String): 
     return runCatching {
         ECHelper.isValidSignature(
             messageHash = EIP712Helper.computeHash(signInMessage),
-            signature = EvmSignature(signature),
+            signature = signature.toEvmSignature(),
             signerAddress = Address(Keys.toChecksumAddress(signInMessage.address)),
         )
     }.getOrElse { false }
