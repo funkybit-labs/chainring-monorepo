@@ -1,5 +1,6 @@
 package co.chainring.integrationtests.utils
 
+import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.DeployedContract
@@ -103,6 +104,11 @@ class Wallet(
             symbols.first { it.name == baseSymbol },
             symbols.first { it.name == quoteSymbol },
         )
+        return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
+    }
+
+    fun signCancelOrder(request: CancelOrderApiRequest): CancelOrderApiRequest {
+        val tx = request.toEip712Transaction(address)
         return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
     }
 

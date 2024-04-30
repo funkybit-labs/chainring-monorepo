@@ -187,7 +187,18 @@ class OrderRoutesApiTest {
         }
 
         // cancel order is idempotent
-        apiClient.cancelOrder(createLimitOrderResponse.orderId)
+        apiClient.cancelOrder(
+            CancelOrderApiRequest(
+                orderId = createLimitOrderResponse.orderId,
+                marketId = createLimitOrderResponse.order.marketId,
+                amount = createLimitOrderResponse.order.amount,
+                side = createLimitOrderResponse.order.side,
+                nonce = generateOrderNonce(),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                wallet.signCancelOrder(it)
+            },
+        )
         wsClient.assertOrderUpdatedMessageReceived { msg ->
             assertEquals(createLimitOrderResponse.orderId, msg.order.id)
             assertEquals(OrderStatus.Cancelled, msg.order.status)
@@ -244,7 +255,18 @@ class OrderRoutesApiTest {
                 },
             ).assertError(ApiError(ReasonCode.RejectedBySequencer, "Order does not exist or is already finalized"))
 
-            apiClient.tryCancelOrder(OrderId.generate()).assertError(ApiError(ReasonCode.ProcessingError, expectedError.message))
+            apiClient.tryCancelOrder(
+                CancelOrderApiRequest(
+                    orderId = OrderId.generate(),
+                    marketId = usdcDaiMarketId,
+                    amount = BigInteger.ZERO,
+                    side = OrderSide.Buy,
+                    nonce = generateOrderNonce(),
+                    signature = EvmSignature.emptySignature(),
+                ).let {
+                    wallet.signCancelOrder(it)
+                },
+            ).assertError(ApiError(ReasonCode.RejectedBySequencer, "Order does not exist or is already finalized"))
         }
 
         // invalid signature (malformed signature)
@@ -340,6 +362,7 @@ class OrderRoutesApiTest {
 
         // try updating and cancelling an order not created by this wallet - signature should fail
         val apiClient2 = ApiClient()
+        val wallet2 = Wallet(apiClient2)
         apiClient2.tryUpdateOrder(
             apiRequest = UpdateOrderApiRequest.Limit(
                 orderId = createLimitOrderResponse2.orderId,
@@ -356,13 +379,49 @@ class OrderRoutesApiTest {
             ApiError(ReasonCode.ProcessingError, "Invalid signature"),
         )
         apiClient2.tryCancelOrder(
-            createLimitOrderResponse2.orderId,
+            CancelOrderApiRequest(
+                orderId = createLimitOrderResponse2.orderId,
+                marketId = createLimitOrderResponse2.order.marketId,
+                amount = createLimitOrderResponse2.order.amount,
+                side = createLimitOrderResponse2.order.side,
+                nonce = generateOrderNonce(),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                wallet2.signCancelOrder(it)
+            },
         ).assertError(
             ApiError(ReasonCode.RejectedBySequencer, "Order not created by this wallet"),
         )
 
+        // invalid signature
+        apiClient.tryCancelOrder(
+            CancelOrderApiRequest(
+                orderId = createLimitOrderResponse2.orderId,
+                marketId = createLimitOrderResponse2.order.marketId,
+                amount = createLimitOrderResponse2.order.amount,
+                side = createLimitOrderResponse2.order.side,
+                nonce = generateOrderNonce(),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                wallet2.signCancelOrder(it)
+            },
+        ).assertError(
+            ApiError(ReasonCode.ProcessingError, "Invalid signature"),
+        )
+
         // try update cancelled order
-        apiClient.cancelOrder(createLimitOrderResponse2.orderId)
+        apiClient.cancelOrder(
+            CancelOrderApiRequest(
+                orderId = createLimitOrderResponse2.orderId,
+                marketId = createLimitOrderResponse2.order.marketId,
+                amount = createLimitOrderResponse2.order.amount,
+                side = createLimitOrderResponse2.order.side,
+                nonce = generateOrderNonce(),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                wallet.signCancelOrder(it)
+            },
+        )
         wsClient.apply {
             assertOrderUpdatedMessageReceived { msg ->
                 assertEquals(createLimitOrderResponse2.orderId, msg.order.id)
@@ -1098,8 +1157,26 @@ class OrderRoutesApiTest {
                     },
                 ),
                 cancelOrders = listOf(
-                    CancelOrderApiRequest(orderId = createBatchLimitOrders.createdOrders[2].orderId),
-                    CancelOrderApiRequest(orderId = OrderId.generate()),
+                    CancelOrderApiRequest(
+                        orderId = createBatchLimitOrders.createdOrders[2].orderId,
+                        marketId = createBatchLimitOrders.createdOrders[2].order.marketId,
+                        amount = createBatchLimitOrders.createdOrders[2].order.amount,
+                        side = createBatchLimitOrders.createdOrders[2].order.side,
+                        nonce = generateOrderNonce(),
+                        signature = EvmSignature.emptySignature(),
+                    ).let {
+                        makerWallet.signCancelOrder(it)
+                    },
+                    CancelOrderApiRequest(
+                        orderId = OrderId.generate(),
+                        marketId = MarketId("BTC/USDC"),
+                        amount = BigInteger.ZERO,
+                        side = OrderSide.Buy,
+                        nonce = generateOrderNonce(),
+                        signature = EvmSignature.emptySignature(),
+                    ).let {
+                        makerWallet.signCancelOrder(it)
+                    },
                 ),
             ),
         )

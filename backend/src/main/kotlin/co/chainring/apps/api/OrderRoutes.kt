@@ -20,6 +20,7 @@ import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.errorResponse
 import co.chainring.apps.api.model.orderNotFoundError
+import co.chainring.apps.api.model.processingError
 import co.chainring.apps.api.model.unexpectedError
 import co.chainring.apps.api.services.ExchangeApiService
 import co.chainring.core.model.Symbol
@@ -130,22 +131,31 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
     }
 
     fun cancelOrder(): ContractRoute {
+        val requestBody = Body.auto<CancelOrderApiRequest>().toLens()
         return "orders" / orderIdPathParam meta {
             operationId = "cancel-order"
             summary = "Cancel order"
             security = signedTokenSecurity
             tags += listOf(Tag("orders"))
+            receiving(
+                requestBody to Examples.cancelOrderRequest,
+            )
             returning(
                 Status.NO_CONTENT,
             )
         } bindContract Method.DELETE to { orderId ->
             { request: Request ->
-                ApiUtils.runCatchingValidation {
-                    val response = exchangeApiService.cancelOrder(request.principal, orderId)
-                    if (response.requestStatus == RequestStatus.Accepted) {
-                        Response(Status.NO_CONTENT)
-                    } else {
-                        response.error?.let { errorResponse(Status.UNPROCESSABLE_ENTITY, it) } ?: unexpectedError()
+                val apiRequest: CancelOrderApiRequest = requestBody(request)
+                if (orderId != apiRequest.orderId) {
+                    processingError("Order Ids must match")
+                } else {
+                    ApiUtils.runCatchingValidation {
+                        val response = exchangeApiService.cancelOrder(request.principal, apiRequest)
+                        if (response.requestStatus == RequestStatus.Accepted) {
+                            Response(Status.NO_CONTENT)
+                        } else {
+                            response.error?.let { errorResponse(Status.UNPROCESSABLE_ENTITY, it) } ?: unexpectedError()
+                        }
                     }
                 }
             }
@@ -244,7 +254,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
                         Examples.updateLimitOrderRequest,
                     ),
                     listOf(
-                        CancelOrderApiRequest(OrderId("123")),
+                        Examples.cancelOrderRequest,
                     ),
                 ),
             )

@@ -1,4 +1,10 @@
-import { apiClient, Order, Trade, UpdateOrderRequest } from 'apiClient'
+import {
+  apiClient,
+  CancelOrderRequest,
+  Order,
+  Trade,
+  UpdateOrderRequest
+} from 'apiClient'
 import { useCallback, useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import { TrashIcon } from '@heroicons/react/24/outline'
@@ -40,6 +46,8 @@ export default function OrdersAndTradesWidget({
   const [showChangeModal, setShowChangeModal] = useState<boolean>(false)
   const [trades, setTrades] = useState<Trade[]>(() => [])
   const windowDimensions = useWindowDimensions()
+  const config = useConfig()
+  const { signTypedDataAsync } = useSignTypedData()
 
   useWebsocketSubscription({
     topics: useMemo(() => [ordersTopic, tradesTopic], []),
@@ -85,15 +93,47 @@ export default function OrdersAndTradesWidget({
     }, [])
   })
 
-  function cancelOrder(id: string) {
+  async function cancelOrder(order: Order) {
     if (confirm('Are you sure you want to cancel your order?')) {
-      cancelOrderMutation.mutate(id)
+      const nonce = generateOrderNonce()
+      const signature = await signTypedDataAsync({
+        types: {
+          EIP712Domain: [
+            { name: 'name', type: 'string' },
+            { name: 'version', type: 'string' },
+            { name: 'chainId', type: 'uint256' },
+            { name: 'verifyingContract', type: 'address' }
+          ],
+          CancelOrder: [
+            { name: 'sender', type: 'address' },
+            { name: 'marketId', type: 'string' },
+            { name: 'amount', type: 'int256' },
+            { name: 'nonce', type: 'int256' }
+          ]
+        },
+        domain: getDomain(exchangeContractAddress, config.state.chainId),
+        primaryType: 'CancelOrder',
+        message: {
+          sender: walletAddress,
+          marketId: order.marketId,
+          amount: order.side == 'Buy' ? order.amount : -order.amount,
+          nonce: BigInt('0x' + nonce)
+        }
+      })
+      cancelOrderMutation.mutate({
+        orderId: order.id,
+        amount: order.amount,
+        marketId: order.marketId,
+        side: order.side,
+        nonce: nonce,
+        signature: signature
+      })
     }
   }
 
   const cancelOrderMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiClient.cancelOrder(undefined, { params: { id } }),
+    mutationFn: (payload: CancelOrderRequest) =>
+      apiClient.cancelOrder(payload, { params: { id: payload.orderId } }),
     onError: (error) => {
       alert(
         isErrorFromAlias(apiClient.api, 'cancelOrder', error)
@@ -171,7 +211,7 @@ export default function OrdersAndTradesWidget({
                             Change
                           </button>
                           <button
-                            onClick={() => cancelOrder(order.id)}
+                            onClick={() => cancelOrder(order)}
                             disabled={!cancelOrderMutation.isIdle}
                           >
                             <TrashIcon className="size-4" />

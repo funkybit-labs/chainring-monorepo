@@ -1,6 +1,7 @@
 package co.chainring.apps.api
 
 import co.chainring.apps.api.model.Balance
+import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CancelOrderApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiResponse
@@ -71,6 +72,15 @@ object Examples {
         requestStatus = RequestStatus.Accepted,
         error = null,
         order = updateLimitOrderRequest,
+    )
+
+    val cancelOrderRequest = CancelOrderApiRequest(
+        orderId = OrderId("123"),
+        amount = BigInteger("100"),
+        marketId = MarketId("BTC/ETH"),
+        side = OrderSide.Buy,
+        nonce = "123",
+        signature = EvmSignature.emptySignature(),
     )
 
     val cancelOrderResponse = CancelOrderApiResponse(

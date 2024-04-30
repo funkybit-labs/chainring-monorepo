@@ -254,7 +254,29 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                         }
                 },
                 updateOrders = emptyList(),
-                cancelOrders = currentOffers.map { CancelOrderApiRequest(it.id) } + currentBids.map { CancelOrderApiRequest(it.id) }
+                cancelOrders = currentOffers.map {
+                    CancelOrderApiRequest(
+                        orderId = it.id,
+                        marketId = it.marketId,
+                        amount = it.amount,
+                        side = it.side,
+                        nonce = generateOrderNonce(),
+                        signature = EvmSignature.emptySignature()
+                    ).let { request ->
+                        wallet.signCancelOrder(request)
+                    }
+                } + currentBids.map {
+                    CancelOrderApiRequest(
+                        orderId = it.id,
+                        marketId = it.marketId,
+                        amount = it.amount,
+                        side = it.side,
+                        nonce = generateOrderNonce(),
+                        signature = EvmSignature.emptySignature()
+                    ).let { request ->
+                        wallet.signCancelOrder(request)
+                    }
+                }
             )
         )
         result.mapLeft {
