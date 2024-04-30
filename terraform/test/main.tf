@@ -147,3 +147,11 @@ module "sequencer" {
   vpc                                     = module.vpc.vpc
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
 }
+
+module "loadtest" {
+  source           = "../modules/loadtest"
+  name_prefix      = local.name_prefix
+  subnet_id        = module.vpc.private_subnet_id_2
+  vpc              = module.vpc.vpc
+  bastion_ip       = module.bastion.private_ip
+}
