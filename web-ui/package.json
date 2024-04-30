@@ -24,6 +24,7 @@
     "@zodios/plugins": "^10.6.0",
     "axios": "^1.6.8",
     "buffer": "^6.0.3",
+    "cron-parser": "^4.9.0",
     "cryptocurrency-icons": "^0.18.1",
     "date-fns": "^3.6.0",
     "decimal.js": "^10.4.3",
