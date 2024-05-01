@@ -1,6 +1,6 @@
 variable "subnet_id" {}
 variable "instance_type" {
-  default = "t3.large"
+  default = "m4.large"
 }
 variable "vpc" {}
 variable "name_prefix" {}
