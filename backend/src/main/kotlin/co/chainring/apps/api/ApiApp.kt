@@ -12,6 +12,7 @@ import co.chainring.core.blockchain.BlockchainTransactionHandler
 import co.chainring.core.blockchain.ContractsPublisher
 import co.chainring.core.db.DbConfig
 import co.chainring.core.sequencer.SequencerClient
+import co.chainring.core.utils.GCStatsProvider
 import co.chainring.core.websocket.Broadcaster
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.contract
@@ -79,6 +80,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val balanceRoutes = BalanceRoutes()
     private val orderRoutes = OrderRoutes(exchangeApiService)
 
+    private val gcStatsProvider = GCStatsProvider()
+
     private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
         .then(ServerFilters.Cors(corsPolicy))
         .then(
@@ -142,6 +145,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         contractsPublisher.updateContracts()
         blockchainTransactionHandler.start()
         blockchainDepositHandler.start()
+        gcStatsProvider.start()
         logger.info { "Started" }
     }
 
@@ -152,6 +156,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         server.stop()
         blockchainTransactionHandler.stop()
         blockchainDepositHandler.stop()
+        gcStatsProvider.stop()
         logger.info { "Stopped" }
     }
 }

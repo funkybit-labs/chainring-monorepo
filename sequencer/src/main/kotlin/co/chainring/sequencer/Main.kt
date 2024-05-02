@@ -1,5 +1,6 @@
 package co.chainring.sequencer
 
+import co.chainring.core.utils.GCStatsProvider
 import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.QueueProcessorApp
 import co.chainring.sequencer.apps.SequencerApp
@@ -14,6 +15,7 @@ fun main(args: Array<String>) {
     logger.info { "Starting with args: ${args.joinToString(" ")}" }
 
     try {
+        val gcStatsProvider = GCStatsProvider()
         val sequencer = SequencerApp(
             checkpointsPath = if (System.getenv("CHECKPOINTS_ENABLED").toBoolean()) {
                 Path.of(queueHome, "checkpoints")
@@ -30,11 +32,13 @@ fun main(args: Array<String>) {
         try {
             val gateway = GatewayApp()
             gateway.start()
+            gcStatsProvider.start()
             logger.info { "Started up" }
             gateway.blockUntilShutdown()
         } catch (e: Exception) {
             logger.error(e) { "Failed, stopping sequencer and exiting" }
         } finally {
+            gcStatsProvider.stop()
             sequencer.stop()
             queueProcessorApp.stop()
         }

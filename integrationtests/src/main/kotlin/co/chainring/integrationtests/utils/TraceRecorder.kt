@@ -5,8 +5,6 @@ import co.chainring.apps.api.middleware.Span
 import co.chainring.apps.api.middleware.Tracer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import okhttp3.Response
-import java.lang.management.GarbageCollectorMXBean
-import java.lang.management.ManagementFactory
 import kotlin.text.StringBuilder
 
 interface TraceRecorder {
@@ -136,7 +134,6 @@ class FullTraceRecorder : TraceRecorder {
         val output = buildString {
             appendLine()
             appendLine("========= $header =========")
-            printGcStats(this)
             printSpanStats(this, traces)
             appendLine("===================")
         }
@@ -173,22 +170,6 @@ class FullTraceRecorder : TraceRecorder {
                 }
                 sb.appendLine()
             }
-        }
-    }
-
-    private val gcBeans: MutableList<GarbageCollectorMXBean> = ManagementFactory.getGarbageCollectorMXBeans()
-    private var gcLastValues: MutableMap<String, Pair<Long, Long>> = mutableMapOf()
-    private fun printGcStats(sb: StringBuilder) {
-        sb.append("\n--- Garbage collection ---\n")
-        gcBeans.forEach { bean ->
-            val previousValues = gcLastValues.getOrDefault(bean.name, Pair(0, 0))
-            gcLastValues[bean.name] = Pair(bean.collectionCount, bean.collectionTime)
-
-            sb.appendLine("GC Name: ${bean.name}")
-            sb.appendLine("Collection Count: ${bean.collectionCount - previousValues.first} (${bean.collectionCount} from JVM start)")
-            sb.appendLine("Collection Time: ${bean.collectionTime - previousValues.second}ms (${bean.collectionTime}ms from JVM start)")
-            sb.appendLine("Memory Pools: ${bean.memoryPoolNames.joinToString(", ")}")
-            sb.appendLine("")
         }
     }
 }
