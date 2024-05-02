@@ -6,11 +6,13 @@ environment:
     AUTH_TOKEN_VALIDITY_INTERVAL: P1D
     SEQUENCER_HOST_NAME: test-sequencer.chainring.co
     SEQUENCER_PORT: "5337"
+    JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
   sequencer:
     QUEUE_HOME: "/data/queues/test"
     CHECKPOINTS_ENABLED: "false"
     SANDBOX_MODE: "true"
     DB_HOST: test-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
+    JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
   otterscan:
     ERIGON_URL: https://test-anvil.chainring.co
 services:
