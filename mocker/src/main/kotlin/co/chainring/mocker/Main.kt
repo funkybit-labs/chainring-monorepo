@@ -3,16 +3,20 @@ package co.chainring.mocker
 import co.chainring.core.model.db.MarketId
 import co.chainring.integrationtests.utils.TraceRecorder
 import co.chainring.integrationtests.utils.humanReadable
-import io.github.oshai.kotlinlogging.KotlinLogging
 import co.chainring.mocker.core.Maker
 import co.chainring.mocker.core.Taker
 import co.chainring.mocker.core.toFundamentalUnits
+import io.github.oshai.kotlinlogging.KotlinLogging
+import java.io.File
 import java.math.BigDecimal
 import java.util.Timer
 import kotlin.concurrent.timerTask
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 
 val start = Clock.System.now()
@@ -29,10 +33,12 @@ const val initialMakers = 1
 const val maxMakers = 2
 val newMakerInterval = increaseLoadInterval / (maxMakers - initialMakers)
 
-val statsInterval = 1.minutes
+val statsInterval = 10.seconds
 var statsPeriodStart = Clock.System.now()
 
 val logger = KotlinLogging.logger {}
+val statsOutputFile = getFilename()
+
 
 fun main() {
     val timer = Timer()
@@ -44,8 +50,13 @@ fun main() {
     // schedule metrics
     val statsTask = timerTask {
         val now = Clock.System.now()
-        TraceRecorder.full.printStatsAndFlush {
-            "Stats for last ${humanReadable(now - statsPeriodStart)} (${humanReadable(now - start)} elapsed since test start). Running ${makers.size} makers and ${takers.size} takers."
+        TraceRecorder.full.generateStatsAndFlush(
+            header = "Stats for last ${humanReadable(now - statsPeriodStart)} (${humanReadable(now - start)} elapsed since test start). " +
+                    "Running ${makers.size} makers and ${takers.size} takers."
+        ).let {
+            val statsOutputFile = File(statsOutputFile)
+            logger.debug { "Writing stats to: ${statsOutputFile.absolutePath}" }
+            statsOutputFile.appendText(it, Charsets.UTF_8)
         }
         statsPeriodStart = now
     }
@@ -122,4 +133,16 @@ private fun startTaker(market: MarketId): Taker {
     )
     taker.start(listOf(market))
     return taker
+}
+
+fun getFilename(): String {
+    val envFilename = System.getenv("LOADTEST_STATS_FILENAME")
+    if (envFilename != null && envFilename.isNotBlank()) return envFilename
+
+    val now = Clock.System.now()
+    val localDateTime = now.toLocalDateTime(TimeZone.currentSystemDefault())
+    val formattedDate = "${localDateTime.year}-${localDateTime.monthNumber.toString().padStart(2, '0')}-${localDateTime.dayOfMonth.toString().padStart(2, '0')}_"
+    val formattedTime = "${localDateTime.hour.toString().padStart(2, '0')}-${localDateTime.minute.toString().padStart(2, '0')}-${localDateTime.second.toString().padStart(2, '0')}"
+
+    return "loadtest_stats_$formattedDate$formattedTime.log"
 }

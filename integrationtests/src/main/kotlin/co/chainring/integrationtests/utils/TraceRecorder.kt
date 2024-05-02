@@ -42,7 +42,7 @@ interface TraceRecorder {
     fun startWSRecording(id: String, spanName: String)
     fun finishWSRecording(id: String, spanName: String)
 
-    fun printStatsAndFlush(header: () -> String)
+    fun generateStatsAndFlush(header: String): String
 
     companion object {
         val noOp = NoOpTraceRecorder()
@@ -59,7 +59,7 @@ class NoOpTraceRecorder : TraceRecorder {
     override fun startWSRecording(id: String, spanName: String) {}
 
     override fun finishWSRecording(id: String, spanName: String) {}
-    override fun printStatsAndFlush(header: () -> String) {}
+    override fun generateStatsAndFlush(header: String): String = ""
 }
 
 object ClientSpans {
@@ -129,19 +129,19 @@ class FullTraceRecorder : TraceRecorder {
     ).withIndex().associate { it.value to it.index }
     private val padding = 25
 
-    override fun printStatsAndFlush(header: () -> String) {
+    override fun generateStatsAndFlush(header: String): String {
         val traces = tracesByOp
         tracesByOp = mutableMapOf()
 
         val output = buildString {
             appendLine()
-            appendLine("========= ${header()} =========")
+            appendLine("========= $header =========")
             printGcStats(this)
             printSpanStats(this, traces)
             appendLine("===================")
         }
 
-        logger.debug { output }
+        return output
     }
 
     private fun printSpanStats(sb: StringBuilder, traces: MutableMap<TraceRecorder.Op, MutableList<TraceRecorder.Trace>>) {
