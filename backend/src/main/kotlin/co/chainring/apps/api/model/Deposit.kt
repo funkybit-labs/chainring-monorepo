@@ -22,6 +22,7 @@ data class Deposit(
     val status: Status,
     val error: String?,
     val createdAt: Instant,
+    val txHash: TxHash,
 ) {
     companion object {
         fun fromEntity(entity: DepositEntity): Deposit {
@@ -36,6 +37,7 @@ data class Deposit(
                 },
                 entity.error,
                 entity.createdAt,
+                entity.transactionHash,
             )
         }
     }

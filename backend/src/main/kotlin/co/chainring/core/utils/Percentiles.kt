@@ -1,4 +1,4 @@
-package co.chainring.integrationtests.utils
+package co.chainring.core.utils
 
 import kotlin.math.ceil
 

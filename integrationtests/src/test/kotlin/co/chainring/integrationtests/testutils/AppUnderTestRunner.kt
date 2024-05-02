@@ -16,12 +16,14 @@ import co.chainring.core.model.db.ExchangeTransactionTable
 import co.chainring.core.model.db.KeyValueStore
 import co.chainring.core.model.db.OrderExecutionTable
 import co.chainring.core.model.db.OrderTable
+import co.chainring.core.model.db.TelegramBotUserTable
+import co.chainring.core.model.db.TelegramBotUserWalletTable
 import co.chainring.core.model.db.TradeTable
 import co.chainring.core.model.db.WalletTable
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.model.db.WithdrawalTable
-import co.chainring.integrationtests.utils.ApiClient
+import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.TestBlockchainClient
 import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
@@ -116,13 +118,13 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
     }
 
     override fun beforeEach(context: ExtensionContext) {
-        ApiClient.resetSequencer()
+        TestApiClient.resetSequencer()
 
         localDevFixtures.markets.forEach { market ->
             val baseSymbol = localDevFixtures.symbols.first { it.id == market.baseSymbol }
             val quoteSymbol = localDevFixtures.symbols.first { it.id == market.quoteSymbol }
 
-            ApiClient.createMarketInSequencer(
+            TestApiClient.createMarketInSequencer(
                 TestRoutes.Companion.CreateMarketInSequencer(
                     id = "${baseSymbol.name}/${quoteSymbol.name}",
                     tickSize = market.tickSize,
@@ -135,6 +137,8 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
 
         transaction {
             KeyValueStore.deleteAll()
+            TelegramBotUserWalletTable.deleteAll()
+            TelegramBotUserTable.deleteAll()
             BroadcasterJobTable.deleteAll()
             ExchangeTransactionTable.deleteAll()
             BlockchainTransactionTable.deleteAll()

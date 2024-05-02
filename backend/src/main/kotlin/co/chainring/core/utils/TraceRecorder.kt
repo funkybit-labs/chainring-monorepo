@@ -1,4 +1,4 @@
-package co.chainring.integrationtests.utils
+package co.chainring.core.utils
 
 import co.chainring.apps.api.middleware.ServerSpans
 import co.chainring.apps.api.middleware.Span

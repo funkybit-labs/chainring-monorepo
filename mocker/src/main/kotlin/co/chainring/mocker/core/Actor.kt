@@ -1,9 +1,9 @@
 package co.chainring.mocker.core
 
 import co.chainring.apps.api.model.Trade
-import co.chainring.integrationtests.utils.ApiClient
+import co.chainring.core.client.rest.ApiClient
 import co.chainring.integrationtests.utils.Faucet
-import co.chainring.integrationtests.utils.TraceRecorder
+import co.chainring.core.utils.TraceRecorder
 import co.chainring.integrationtests.utils.Wallet
 import org.web3j.crypto.Keys
 import java.math.BigInteger

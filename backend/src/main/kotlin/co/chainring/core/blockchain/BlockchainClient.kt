@@ -1,11 +1,15 @@
 package co.chainring.core.blockchain
 
 import co.chainring.contracts.generated.ERC1967Proxy
+import co.chainring.contracts.generated.ERC20
 import co.chainring.contracts.generated.Exchange
 import co.chainring.contracts.generated.UUPSUpgradeable
 import co.chainring.core.model.Address
+import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.toEvmSignature
+import co.chainring.core.utils.toHex
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.reactivex.Flowable
 import kotlinx.coroutines.future.await
@@ -20,6 +24,7 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.Keys
+import org.web3j.crypto.Sign
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.DefaultBlockParameterName
@@ -108,7 +113,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
     )
     private val contractMap = mutableMapOf<ContractType, Address>()
 
-    private lateinit var exchangeContract: Exchange
+    lateinit var exchangeContract: Exchange
 
     companion object {
         val logger = KotlinLogging.logger {}
@@ -308,4 +313,29 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
 
     fun ethLogFlowable(filter: EthFilter): Flowable<Log> =
         web3j.ethLogFlowable(filter)
+
+    fun loadERC20(address: Address) = ERC20.load(address.value, web3j, transactionManager, gasProvider)
+
+    fun signData(hash: ByteArray): EvmSignature {
+        val signature = Sign.signMessage(hash, credentials.ecKeyPair, false)
+        return (signature.r + signature.s + signature.v).toHex().toEvmSignature()
+    }
+
+    fun getNativeBalance(address: Address) = web3j.ethGetBalance(address.value, DefaultBlockParameter.valueOf("latest")).send().balance
+
+    fun getERC20Balance(erc20Address: Address, walletAddress: Address): BigInteger {
+        return loadERC20(erc20Address).balanceOf(walletAddress.value).send()
+    }
+
+    fun sendTransaction(address: Address, data: String, amount: BigInteger): TxHash =
+        transactionManager.sendTransaction(
+            web3j.ethGasPrice().send().gasPrice,
+            gasProvider.gasLimit,
+            address.value,
+            data,
+            amount,
+        ).transactionHash.let { TxHash(it) }
+
+    fun asyncDepositNative(address: Address, amount: BigInteger): TxHash =
+        sendTransaction(address, "", amount)
 }

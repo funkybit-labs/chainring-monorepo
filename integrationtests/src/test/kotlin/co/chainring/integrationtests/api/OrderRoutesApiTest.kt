@@ -14,6 +14,13 @@ import co.chainring.apps.api.model.websocket.LastTradeDirection
 import co.chainring.apps.api.model.websocket.OHLC
 import co.chainring.apps.api.model.websocket.OrderBook
 import co.chainring.apps.api.model.websocket.OrderBookEntry
+import co.chainring.core.client.ws.blocking
+import co.chainring.core.client.ws.subscribeToBalances
+import co.chainring.core.client.ws.subscribeToLimits
+import co.chainring.core.client.ws.subscribeToOrderBook
+import co.chainring.core.client.ws.subscribeToOrders
+import co.chainring.core.client.ws.subscribeToPrices
+import co.chainring.core.client.ws.subscribeToTrades
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
@@ -32,9 +39,9 @@ import co.chainring.core.utils.generateOrderNonce
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.waitForBalance
-import co.chainring.integrationtests.utils.ApiClient
 import co.chainring.integrationtests.utils.ExpectedBalance
 import co.chainring.integrationtests.utils.Faucet
+import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.Wallet
 import co.chainring.integrationtests.utils.assertBalances
 import co.chainring.integrationtests.utils.assertBalancesMessageReceived
@@ -48,13 +55,6 @@ import co.chainring.integrationtests.utils.assertPricesMessageReceived
 import co.chainring.integrationtests.utils.assertTradeCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertTradeUpdatedMessageReceived
 import co.chainring.integrationtests.utils.assertTradesMessageReceived
-import co.chainring.integrationtests.utils.blocking
-import co.chainring.integrationtests.utils.subscribeToBalances
-import co.chainring.integrationtests.utils.subscribeToLimits
-import co.chainring.integrationtests.utils.subscribeToOrderBook
-import co.chainring.integrationtests.utils.subscribeToOrders
-import co.chainring.integrationtests.utils.subscribeToPrices
-import co.chainring.integrationtests.utils.subscribeToTrades
 import kotlinx.datetime.Clock
 import org.awaitility.kotlin.await
 import org.awaitility.kotlin.withAlias
@@ -83,7 +83,7 @@ class OrderRoutesApiTest {
 
     @Test
     fun `CRUD order`() {
-        val apiClient = ApiClient()
+        val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
 
         var wsClient = WebsocketClient.blocking(apiClient.authToken)
@@ -209,7 +209,7 @@ class OrderRoutesApiTest {
 
     @Test
     fun `CRUD order error cases`() {
-        val apiClient = ApiClient()
+        val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
@@ -322,7 +322,7 @@ class OrderRoutesApiTest {
         )
 
         // try updating and cancelling an order not created by this wallet - signature should fail
-        val apiClient2 = ApiClient()
+        val apiClient2 = TestApiClient()
         val wallet2 = Wallet(apiClient2)
         apiClient2.tryUpdateOrder(
             apiRequest = UpdateOrderApiRequest(
@@ -408,7 +408,7 @@ class OrderRoutesApiTest {
 
     @Test
     fun `list and cancel all open orders`() {
-        val apiClient = ApiClient()
+        val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
@@ -1313,8 +1313,8 @@ class OrderRoutesApiTest {
         mintAmount: String,
         subscribeToOrderBook: Boolean = true,
         subscribeToOrderPrices: Boolean = true,
-    ): Triple<ApiClient, Wallet, WsClient> {
-        val apiClient = ApiClient()
+    ): Triple<TestApiClient, Wallet, WsClient> {
+        val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken).apply {

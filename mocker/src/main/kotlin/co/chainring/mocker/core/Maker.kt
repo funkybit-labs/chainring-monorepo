@@ -22,13 +22,13 @@ import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.utils.generateOrderNonce
-import co.chainring.integrationtests.utils.blocking
-import co.chainring.integrationtests.utils.receivedDecoded
-import co.chainring.integrationtests.utils.subscribeToBalances
-import co.chainring.integrationtests.utils.subscribeToOrders
-import co.chainring.integrationtests.utils.subscribeToPrices
-import co.chainring.integrationtests.utils.subscribeToTrades
-import co.chainring.integrationtests.utils.unsubscribe
+import co.chainring.core.client.ws.blocking
+import co.chainring.core.client.ws.receivedDecoded
+import co.chainring.core.client.ws.subscribeToBalances
+import co.chainring.core.client.ws.subscribeToOrders
+import co.chainring.core.client.ws.subscribeToPrices
+import co.chainring.core.client.ws.subscribeToTrades
+import co.chainring.core.client.ws.unsubscribe
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.WsStatus
@@ -280,7 +280,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
             )
         )
         result.mapLeft {
-            logger.warn { "Could not apply batch: ${it.error.message}" }
+            logger.warn { "Could not apply batch: ${it.error?.message}" }
         }
         .map {
             logger.info { "Applied update batch" }
