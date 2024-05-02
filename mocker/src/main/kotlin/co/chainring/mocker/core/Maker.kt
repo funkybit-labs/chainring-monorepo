@@ -67,8 +67,8 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
             logger.info { "Market maker $id initialized, entering run-loop" }
             while (!stopping) {
                 try {
-                    val message = (wsClient.receivedDecoded().first() as OutgoingWSMessage.Publish)
-                    when (message.topic) {
+                    val message = (wsClient.receivedDecoded().firstOrNull() as OutgoingWSMessage.Publish?)
+                    when (message?.topic) {
                         SubscriptionTopic.Trades -> {
                             when (val data = message.data) {
                                 is TradeCreated -> {

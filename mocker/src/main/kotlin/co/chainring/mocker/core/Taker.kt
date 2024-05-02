@@ -69,12 +69,12 @@ class Taker(
             logger.info { "Taker $id initialized, entering run-loop" }
             while (!stopping) {
                 try {
-                    val message = (wsClient.receivedDecoded().first() as OutgoingWSMessage.Publish)
-                    when (message.topic) {
+                    val message = (wsClient.receivedDecoded().firstOrNull() as OutgoingWSMessage.Publish?)
+                    when (message?.topic) {
                         SubscriptionTopic.Trades -> {
                             when (val data = message.data) {
                                 is TradeCreated -> {
-                                    TraceRecorder.full.finishWSRecording(data.trade.orderId.value, WSSpans.tradeCreated, multivalue = true)
+                                    TraceRecorder.full.finishWSRecording(data.trade.orderId.value, WSSpans.tradeCreated)
                                     logger.info { "$id Received trade created" }
                                     pendingTrades.add(data.trade)
                                 }
@@ -83,10 +83,10 @@ class Taker(
                                     logger.info { "$id Received trade update" }
                                     val trade = data.trade
                                     if (trade.settlementStatus == SettlementStatus.Pending) {
-                                        TraceRecorder.full.finishWSRecording(trade.id.value, WSSpans.tradeCreated, multivalue = true)
+                                        TraceRecorder.full.finishWSRecording(trade.id.value, WSSpans.tradeCreated)
                                         pendingTrades.add(trade)
                                     } else if (trade.settlementStatus == SettlementStatus.Completed) {
-                                        TraceRecorder.full.finishWSRecording(data.trade.orderId.value, WSSpans.tradeSettled, multivalue = true)
+                                        TraceRecorder.full.finishWSRecording(data.trade.orderId.value, WSSpans.tradeSettled)
                                         pendingTrades.removeIf { it.id == trade.id }
                                         settledTrades.add(trade)
                                     }
@@ -97,10 +97,10 @@ class Taker(
                                     logger.info { "$id Received ${data.trades.size} trade updates" }
                                     data.trades.forEach { trade ->
                                         if (trade.settlementStatus == SettlementStatus.Pending) {
-                                            TraceRecorder.full.finishWSRecording(trade.orderId.value, WSSpans.tradeCreated, multivalue = true)
+                                            TraceRecorder.full.finishWSRecording(trade.orderId.value, WSSpans.tradeCreated)
                                             pendingTrades.add(trade)
                                         } else if (trade.settlementStatus == SettlementStatus.Completed) {
-                                            TraceRecorder.full.finishWSRecording(trade.orderId.value, WSSpans.tradeSettled, multivalue = true)
+                                            TraceRecorder.full.finishWSRecording(trade.orderId.value, WSSpans.tradeSettled)
                                             pendingTrades.removeIf { it.id == trade.id }
                                             settledTrades.add(trade)
                                         }
@@ -133,7 +133,7 @@ class Taker(
                                     }
 
                                     OrderStatus.Partial -> {
-                                        TraceRecorder.full.finishWSRecording(order.id.value, WSSpans.orderFilled, multivalue = true)
+                                        TraceRecorder.full.finishWSRecording(order.id.value, WSSpans.orderFilled)
                                         currentOrder?.let { cur ->
                                             val filled = cur.amount - order.amount
                                             logger.info { "$id Order ${order.id} filled $filled of ${cur.amount} remaining" }
@@ -256,10 +256,5 @@ class Taker(
             it.interrupt()
             it.join(1000)
         }
-    }
-
-    fun join() {
-        actorThread?.join()
-        listenerThread?.join()
     }
 }
