@@ -38,7 +38,7 @@ sealed class CreateOrderApiRequest {
         override val amount: BigIntegerJson,
         override val signature: EvmSignature,
     ) : CreateOrderApiRequest() {
-        fun toEip712Transaction(sender: Address, baseToken: co.chainring.apps.api.model.Symbol, quoteToken: co.chainring.apps.api.model.Symbol) = EIP712Transaction.Order(
+        override fun toEip712Transaction(sender: Address, baseToken: co.chainring.apps.api.model.Symbol, quoteToken: co.chainring.apps.api.model.Symbol) = EIP712Transaction.Order(
             sender,
             baseToken.contractAddress ?: Address.zero,
             quoteToken.contractAddress ?: Address.zero,
@@ -59,7 +59,7 @@ sealed class CreateOrderApiRequest {
         val price: BigDecimalJson,
         override val signature: EvmSignature,
     ) : CreateOrderApiRequest() {
-        fun toEip712Transaction(sender: Address, baseToken: co.chainring.apps.api.model.Symbol, quoteToken: co.chainring.apps.api.model.Symbol) = EIP712Transaction.Order(
+        override fun toEip712Transaction(sender: Address, baseToken: co.chainring.apps.api.model.Symbol, quoteToken: co.chainring.apps.api.model.Symbol) = EIP712Transaction.Order(
             sender,
             baseToken.contractAddress ?: Address.zero,
             quoteToken.contractAddress ?: Address.zero,
@@ -75,6 +75,8 @@ sealed class CreateOrderApiRequest {
             is Market -> null
         }
     }
+
+    abstract fun toEip712Transaction(sender: Address, baseToken: co.chainring.apps.api.model.Symbol, quoteToken: co.chainring.apps.api.model.Symbol): EIP712Transaction.Order
 }
 
 @Serializable
@@ -107,7 +109,7 @@ sealed class UpdateOrderApiRequest {
         override val nonce: String,
         override val signature: EvmSignature,
     ) : UpdateOrderApiRequest() {
-        fun toEip712Transaction(sender: Address, baseToken: co.chainring.apps.api.model.Symbol, quoteToken: co.chainring.apps.api.model.Symbol) = EIP712Transaction.Order(
+        override fun toEip712Transaction(sender: Address, baseToken: co.chainring.apps.api.model.Symbol, quoteToken: co.chainring.apps.api.model.Symbol) = EIP712Transaction.Order(
             sender,
             baseToken.contractAddress ?: Address.zero,
             quoteToken.contractAddress ?: Address.zero,
@@ -123,6 +125,8 @@ sealed class UpdateOrderApiRequest {
             is Limit -> price
         }
     }
+
+    abstract fun toEip712Transaction(sender: Address, baseToken: co.chainring.apps.api.model.Symbol, quoteToken: co.chainring.apps.api.model.Symbol): EIP712Transaction.Order
 }
 
 @Serializable
@@ -141,7 +145,20 @@ enum class RequestStatus {
 @Serializable
 data class CancelOrderApiRequest(
     val orderId: OrderId,
-)
+    val marketId: MarketId,
+    val side: OrderSide,
+    val amount: BigIntegerJson,
+    val nonce: String,
+    val signature: EvmSignature,
+) {
+    fun toEip712Transaction(sender: Address) = EIP712Transaction.CancelOrder(
+        sender,
+        marketId,
+        if (side == OrderSide.Buy) this.amount else this.amount.negate(),
+        BigInteger(1, nonce.toHexBytes()),
+        this.signature,
+    )
+}
 
 @Serializable
 data class CancelOrderApiResponse(

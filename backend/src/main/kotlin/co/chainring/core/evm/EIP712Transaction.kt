@@ -3,6 +3,7 @@ package co.chainring.core.evm
 import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.TradeId
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -12,6 +13,7 @@ import org.bouncycastle.util.encoders.Hex
 import org.web3j.abi.DefaultFunctionEncoder
 import org.web3j.abi.datatypes.DynamicStruct
 import org.web3j.crypto.StructuredData
+import org.web3j.crypto.transaction.type.TransactionType
 import java.math.BigInteger
 
 fun serializeTx(txType: ExchangeTransactions.TransactionType, struct: DynamicStruct): ByteArray {
@@ -22,12 +24,14 @@ enum class EIP712TransactionType {
     Withdraw,
     Order,
     Trade,
+    CancelOrder,
 }
 
 @Serializable
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("type")
 sealed class EIP712Transaction {
+    abstract val signature: EvmSignature
 
     @Serializable
     @SerialName("withdraw")
@@ -36,23 +40,21 @@ sealed class EIP712Transaction {
         val token: Address?,
         val amount: BigIntegerJson,
         val nonce: Long,
-        val signature: EvmSignature,
+        override val signature: EvmSignature,
     ) : EIP712Transaction() {
 
         override fun getTransactionType(): EIP712TransactionType {
             return EIP712TransactionType.Withdraw
         }
 
-        override fun getModel(): List<StructuredData.Entry> {
-            val model = mutableListOf<StructuredData.Entry>()
-            model.add(StructuredData.Entry("sender", "address"))
+        override fun getModel(): List<StructuredData.Entry> = listOfNotNull(
+            StructuredData.Entry("sender", "address"),
             token?.let {
-                model.add(StructuredData.Entry("token", "address"))
-            }
-            model.add(StructuredData.Entry("amount", "uint256"))
-            model.add(StructuredData.Entry("nonce", "uint64"))
-            return model
-        }
+                StructuredData.Entry("token", "address")
+            },
+            StructuredData.Entry("amount", "uint256"),
+            StructuredData.Entry("nonce", "uint64"),
+        )
 
         override fun getMessage(): Map<String, String> {
             val message = mutableMapOf<String, String>()
@@ -89,23 +91,21 @@ sealed class EIP712Transaction {
         val amount: BigIntegerJson,
         val price: BigIntegerJson,
         val nonce: BigIntegerJson,
-        val signature: EvmSignature,
+        override val signature: EvmSignature,
     ) : EIP712Transaction() {
 
         override fun getTransactionType(): EIP712TransactionType {
             return EIP712TransactionType.Order
         }
 
-        override fun getModel(): List<StructuredData.Entry> {
-            val model = mutableListOf<StructuredData.Entry>()
-            model.add(StructuredData.Entry("sender", "address"))
-            model.add(StructuredData.Entry("baseToken", "address"))
-            model.add(StructuredData.Entry("quoteToken", "address"))
-            model.add(StructuredData.Entry("amount", "int256"))
-            model.add(StructuredData.Entry("price", "uint256"))
-            model.add(StructuredData.Entry("nonce", "int256"))
-            return model
-        }
+        override fun getModel(): List<StructuredData.Entry> = listOf(
+            StructuredData.Entry("sender", "address"),
+            StructuredData.Entry("baseToken", "address"),
+            StructuredData.Entry("quoteToken", "address"),
+            StructuredData.Entry("amount", "int256"),
+            StructuredData.Entry("price", "uint256"),
+            StructuredData.Entry("nonce", "int256"),
+        )
 
         override fun getMessage(): Map<String, String> {
             return mapOf(
@@ -114,6 +114,41 @@ sealed class EIP712Transaction {
                 "quoteToken" to quoteToken.value,
                 "amount" to amount.toString(),
                 "price" to price.toString(),
+                "nonce" to nonce.toString(),
+            )
+        }
+
+        override fun getTxData(): ByteArray {
+            return ByteArray(0)
+        }
+    }
+
+    @Serializable
+    @SerialName("cancelOrder")
+    data class CancelOrder(
+        val sender: Address,
+        val marketId: MarketId,
+        val amount: BigIntegerJson,
+        val nonce: BigIntegerJson,
+        override val signature: EvmSignature,
+    ) : EIP712Transaction() {
+
+        override fun getTransactionType(): EIP712TransactionType {
+            return EIP712TransactionType.CancelOrder
+        }
+
+        override fun getModel(): List<StructuredData.Entry> = listOf(
+            StructuredData.Entry("sender", "address"),
+            StructuredData.Entry("marketId", "string"),
+            StructuredData.Entry("amount", "int256"),
+            StructuredData.Entry("nonce", "int256"),
+        )
+
+        override fun getMessage(): Map<String, String> {
+            return mapOf(
+                "sender" to sender.value,
+                "marketId" to marketId.value,
+                "amount" to amount.toString(),
                 "nonce" to nonce.toString(),
             )
         }
@@ -133,6 +168,7 @@ sealed class EIP712Transaction {
         val takerOrder: Order,
         val makerOrder: Order,
         val tradeId: TradeId,
+        override val signature: EvmSignature = EvmSignature.emptySignature(),
     ) : EIP712Transaction() {
 
         override fun getTransactionType(): EIP712TransactionType {

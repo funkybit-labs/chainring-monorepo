@@ -10,6 +10,7 @@ import co.chainring.apps.api.model.ApiErrors
 import co.chainring.apps.api.model.BalancesApiResponse
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.BatchOrdersApiResponse
+import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiResponse
@@ -208,15 +209,15 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
-    fun cancelOrder(id: OrderId) =
-        tryCancelOrder(id).assertSuccess()
+    fun cancelOrder(apiRequest: CancelOrderApiRequest) =
+        tryCancelOrder(apiRequest).assertSuccess()
 
-    fun tryCancelOrder(id: OrderId): Either<ApiCallFailure, Unit> =
+    fun tryCancelOrder(apiRequest: CancelOrderApiRequest): Either<ApiCallFailure, Unit> =
         executeAndTrace(
             TraceRecorder.Op.CancelOrder,
             Request.Builder()
-                .url("$apiServerRootUrl/v1/orders/$id")
-                .delete()
+                .url("$apiServerRootUrl/v1/orders/${apiRequest.orderId}")
+                .delete(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)

@@ -7,8 +7,10 @@ import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CancelOrderApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiResponse
+import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.RequestStatus
+import co.chainring.apps.api.model.Symbol
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.websocket.Orders
@@ -18,7 +20,6 @@ import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
-import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.ExchangeError
 import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.MarketEntity
@@ -33,7 +34,6 @@ import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.publishBroadcasterNotifications
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.sequencer.toSequencerId
-import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.proto.OrderChangeRejected.Reason
@@ -48,8 +48,8 @@ class ExchangeApiService(
     val blockchainClient: BlockchainClient,
     val sequencerClient: SequencerClient,
 ) {
-    private val symbolMap = mutableMapOf<String, SymbolEntity>()
-    private val marketMap = mutableMapOf<MarketId, MarketEntity>()
+    private val symbolMap = mutableMapOf<String, Symbol>()
+    private val marketMap = mutableMapOf<MarketId, Market>()
     private val logger = KotlinLogging.logger {}
 
     fun addOrder(
@@ -102,12 +102,7 @@ class ExchangeApiService(
             // verify signatures on created orders
             validateOrderSignature(
                 walletAddress,
-                request.marketId,
-                request.amount,
-                request.side,
-                price,
-                request.nonce,
-                request.signature,
+                request.toEip712Transaction(walletAddress, getSymbol(market.baseSymbol), getSymbol(market.quoteSymbol)),
             )
             SequencerClient.Order(
                 sequencerOrderId = orderId.toSequencerId().value,
@@ -128,12 +123,7 @@ class ExchangeApiService(
             // verify signatures on updated orders
             validateOrderSignature(
                 walletAddress,
-                request.marketId,
-                request.amount,
-                request.side,
-                price,
-                request.nonce,
-                request.signature,
+                request.toEip712Transaction(walletAddress, getSymbol(market.baseSymbol), getSymbol(market.quoteSymbol)),
             )
             SequencerClient.Order(
                 sequencerOrderId = request.orderId.toSequencerId().value,
@@ -147,10 +137,19 @@ class ExchangeApiService(
             )
         }
 
-        val ordersToCancel = apiRequest.cancelOrders.map { it.orderId }
+        // cancels
+        val ordersToCancel = apiRequest.cancelOrders.map { request ->
+            checkMarket(apiRequest.marketId, request.marketId)
+            // verify signatures on cancelled orders
+            validateOrderSignature(
+                walletAddress,
+                request.toEip712Transaction(walletAddress),
+            )
+            request.orderId
+        }
 
         val response = runBlocking {
-            sequencerClient.orderBatch(market.id.value, walletAddress.toSequencerId().value, ordersToAdd, ordersToUpdate, ordersToCancel)
+            sequencerClient.orderBatch(MarketId(market.id), walletAddress.toSequencerId().value, ordersToAdd, ordersToUpdate, ordersToCancel)
         }
 
         when (response.error) {
@@ -225,18 +224,16 @@ class ExchangeApiService(
         return withdrawalEntity.guid.value
     }
 
-    fun cancelOrder(walletAddress: Address, orderId: OrderId): CancelOrderApiResponse {
-        return transaction { OrderEntity.findById(orderId)?.market }?.let { market ->
-            orderBatch(
-                walletAddress,
-                BatchOrdersApiRequest(
-                    marketId = market.guid.value,
-                    createOrders = emptyList(),
-                    updateOrders = emptyList(),
-                    cancelOrders = listOf(CancelOrderApiRequest(orderId)),
-                ),
-            ).canceledOrders.first()
-        } ?: throw ExchangeError("Requested order does not exist")
+    fun cancelOrder(walletAddress: Address, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {
+        return orderBatch(
+            walletAddress,
+            BatchOrdersApiRequest(
+                marketId = cancelOrderApiRequest.marketId,
+                createOrders = emptyList(),
+                updateOrders = emptyList(),
+                cancelOrders = listOf(cancelOrderApiRequest),
+            ),
+        ).canceledOrders.first()
     }
 
     fun cancelOpenOrders(walletEntity: WalletEntity) {
@@ -273,15 +270,21 @@ class ExchangeApiService(
         }
     }
 
-    private fun getSymbol(asset: String): SymbolEntity {
+    private fun getSymbol(asset: String): Symbol {
         return symbolMap.getOrPut(asset) {
-            transaction { SymbolEntity.forChainAndName(blockchainClient.chainId, asset) }
+            transaction { SymbolEntity.forChainAndName(blockchainClient.chainId, asset) }.let {
+                Symbol(it.name, it.description, it.contractAddress, it.decimals)
+            }
         }
     }
 
-    private fun getMarket(marketId: MarketId): MarketEntity {
+    private fun getMarket(marketId: MarketId): Market {
         return marketMap.getOrPut(marketId) {
-            transaction { MarketEntity[marketId] }
+            transaction {
+                MarketEntity[marketId].let {
+                    Market(it.id.value.value, it.baseSymbol.name, it.baseSymbol.decimals.toInt(), it.quoteSymbol.name, it.quoteSymbol.decimals.toInt(), it.tickSize)
+                }
+            }
         }
     }
 
@@ -301,11 +304,7 @@ class ExchangeApiService(
         }
     }
 
-    private fun getContractAddress(asset: String): Address {
-        return getSymbol(asset).contractAddress ?: Address.zero
-    }
-
-    private fun checkPrice(market: MarketEntity, price: BigDecimal?): BigDecimal? {
+    private fun checkPrice(market: Market, price: BigDecimal?): BigDecimal? {
         if (price != null && BigDecimal.ZERO.compareTo(price.remainder(market.tickSize)) != 0) {
             throw ExchangeError("Order price is not a multiple of tick size")
         }
@@ -318,22 +317,11 @@ class ExchangeApiService(
         }
     }
 
-    private fun validateOrderSignature(walletAddress: Address, marketId: MarketId, amount: BigInteger, side: OrderSide, price: BigDecimal?, nonce: String, signature: EvmSignature) {
+    private fun validateOrderSignature(walletAddress: Address, tx: EIP712Transaction) {
         val verifyingContract = blockchainClient.getContractAddress(ContractType.Exchange)
             ?: throw ExchangeError("No deployed contract found")
 
         runCatching {
-            val (baseSymbol, quoteSymbol) = marketId.value.split("/")
-            val tx = EIP712Transaction.Order(
-                walletAddress,
-                getContractAddress(baseSymbol),
-                getContractAddress(quoteSymbol),
-                if (side == OrderSide.Buy) amount else amount.negate(),
-                price?.toFundamentalUnits(getSymbol(quoteSymbol).decimals) ?: BigInteger.ZERO,
-                BigInteger(1, nonce.toHexBytes()),
-                signature,
-            )
-
             ECHelper.isValidSignature(
                 EIP712Helper.computeHash(
                     tx,
@@ -352,4 +340,49 @@ class ExchangeApiService(
             }
         }
     }
+
+//    private fun validateOrderSignature(walletAddress: Address, marketId: MarketId, amount: BigInteger, side: OrderSide, price: BigDecimal?, nonce: String, signature: EvmSignature, isCancel: Boolean = false) {
+//        val verifyingContract = blockchainClient.getContractAddress(ContractType.Exchange)
+//            ?: throw ExchangeError("No deployed contract found")
+//
+//        runCatching {
+//            val tx = if (isCancel) {
+//                EIP712Transaction.CancelOrder(
+//                    walletAddress,
+//                    marketId,
+//                    if (side == OrderSide.Buy) amount else amount.negate(),
+//                    BigInteger(1, nonce.toHexBytes()),
+//                    signature,
+//                )
+//            } else {
+//                val (baseSymbol, quoteSymbol) = marketId.value.split("/")
+//                EIP712Transaction.Order(
+//                    walletAddress,
+//                    getContractAddress(baseSymbol),
+//                    getContractAddress(quoteSymbol),
+//                    if (side == OrderSide.Buy) amount else amount.negate(),
+//                    price?.toFundamentalUnits(getSymbol(quoteSymbol).decimals) ?: BigInteger.ZERO,
+//                    BigInteger(1, nonce.toHexBytes()),
+//                    signature,
+//                )
+//            }
+//
+//            ECHelper.isValidSignature(
+//                EIP712Helper.computeHash(
+//                    tx,
+//                    blockchainClient.chainId,
+//                    verifyingContract,
+//                ),
+//                tx.signature,
+//                walletAddress,
+//            )
+//        }.onFailure {
+//            logger.warn(it) { "Exception validating signature" }
+//            throw ExchangeError("Invalid signature")
+//        }.getOrDefault(false).also { isValidSignature ->
+//            if (!isValidSignature) {
+//                throw ExchangeError("Invalid signature")
+//            }
+//        }
+//    }
 }
