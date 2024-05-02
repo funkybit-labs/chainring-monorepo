@@ -133,16 +133,16 @@ class FullTraceRecorder : TraceRecorder {
 
         val output = buildString {
             appendLine()
-            appendLine("========= $header =========")
+            val headerString = "========= $header ========="
+            appendLine(headerString)
             printSpanStats(this, traces)
-            appendLine("===================")
+            appendLine("".padEnd(headerString.length, '='))
         }
 
         return output
     }
 
     private fun printSpanStats(sb: StringBuilder, traces: MutableMap<TraceRecorder.Op, MutableList<TraceRecorder.Trace>>) {
-        sb.appendLine("--- Spans ---")
         traces.entries.toList().sortedBy { it.key }.forEach { (op, traces: MutableList<TraceRecorder.Trace>) ->
             sb.appendLine()
             sb.appendLine("Stats for: ${op.name} (${traces.size} records)")

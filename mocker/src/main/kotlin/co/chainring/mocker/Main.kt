@@ -23,7 +23,7 @@ val start = Clock.System.now()
 
 val warmupInterval = 1.minutes
 val increaseLoadInterval = 5.minutes
-val onMaxLoadInterval = 5.minutes
+val onMaxLoadInterval = 10.minutes
 
 const val initialTakers = 5
 const val maxTakers = 100
@@ -33,7 +33,7 @@ const val initialMakers = 1
 const val maxMakers = 2
 val newMakerInterval = increaseLoadInterval / (maxMakers - initialMakers)
 
-val statsInterval = 10.seconds
+val statsInterval = 1.minutes
 var statsPeriodStart = Clock.System.now()
 
 val logger = KotlinLogging.logger {}

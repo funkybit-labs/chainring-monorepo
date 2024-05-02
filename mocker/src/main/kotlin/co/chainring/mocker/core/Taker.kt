@@ -257,9 +257,4 @@ class Taker(
             it.join(1000)
         }
     }
-
-    fun join() {
-        actorThread?.join()
-        listenerThread?.join()
-    }
 }
