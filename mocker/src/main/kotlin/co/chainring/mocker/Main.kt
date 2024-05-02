@@ -2,6 +2,7 @@ package co.chainring.mocker
 
 import co.chainring.core.model.db.MarketId
 import co.chainring.integrationtests.utils.TraceRecorder
+import co.chainring.integrationtests.utils.humanReadable
 import io.github.oshai.kotlinlogging.KotlinLogging
 import co.chainring.mocker.core.Maker
 import co.chainring.mocker.core.Taker
@@ -17,18 +18,19 @@ import kotlinx.datetime.Clock
 val start = Clock.System.now()
 
 val warmupInterval = 1.minutes
-val increaseLoadInterval = 15.minutes
-val maxLoadInterval = 3.minutes
+val increaseLoadInterval = 5.minutes
+val onMaxLoadInterval = 5.minutes
 
 const val initialTakers = 5
-const val maxTakers = 750
+const val maxTakers = 100
 val newTakerInterval = increaseLoadInterval / (maxTakers - initialTakers)
 
 const val initialMakers = 1
-const val maxMakers = 5
+const val maxMakers = 2
 val newMakerInterval = increaseLoadInterval / (maxMakers - initialMakers)
 
 val statsInterval = 1.minutes
+var statsPeriodStart = Clock.System.now()
 
 val logger = KotlinLogging.logger {}
 
@@ -41,9 +43,11 @@ fun main() {
 
     // schedule metrics
     val statsTask = timerTask {
+        val now = Clock.System.now()
         TraceRecorder.full.printStatsAndFlush {
-            "${(Clock.System.now() - start)} elapsed since start. Running ${makers.size} makers and ${takers.size} takers"
+            "Stats for last ${humanReadable(now - statsPeriodStart)} (${humanReadable(now - start)} elapsed since test start). Running ${makers.size} makers and ${takers.size} takers."
         }
+        statsPeriodStart = now
     }
     timer.scheduleAtFixedRate(statsTask, statsInterval.inWholeMilliseconds, statsInterval.inWholeMilliseconds)
 
@@ -60,24 +64,26 @@ fun main() {
 
     // gradually increase load
     timer.scheduleAtFixedRate(timerTask {
-        logger.debug { "Starting maker #${makers.size + 1}" }
-        makers.add(startMaker(usdcDai))
-        if (takers.size >= maxMakers) {
+        if (makers.size >= maxMakers) {
             logger.debug { "Max number of makers achieved" }
             this.cancel()
+        } else {
+            logger.debug { "Starting maker #${makers.size + 1}" }
+            makers.add(startMaker(usdcDai))
         }
     }, 0, newMakerInterval.inWholeMilliseconds)
     timer.scheduleAtFixedRate(timerTask {
-        logger.debug { "Starting taker #${takers.size + 1}" }
-        takers.add(startTaker(usdcDai))
         if (takers.size >= maxTakers) {
             logger.debug { "Max number of takers achieved" }
             this.cancel()
+        } else {
+            logger.debug { "Starting taker #${takers.size + 1}" }
+            takers.add(startTaker(usdcDai))
         }
     }, 0, newTakerInterval.inWholeMilliseconds)
 
     // run on max load after rum up
-    Thread.sleep(increaseLoadInterval.inWholeMilliseconds + maxLoadInterval.inWholeMilliseconds)
+    Thread.sleep(increaseLoadInterval.inWholeMilliseconds + onMaxLoadInterval.inWholeMilliseconds)
 
     // tear down
     statsTask.cancel()

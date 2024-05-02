@@ -5,7 +5,9 @@ import co.chainring.apps.api.middleware.Span
 import co.chainring.apps.api.middleware.Tracer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import okhttp3.Response
-import java.text.DecimalFormat
+import java.lang.management.GarbageCollectorMXBean
+import java.lang.management.ManagementFactory
+import kotlin.text.StringBuilder
 
 interface TraceRecorder {
     enum class Op {
@@ -38,7 +40,7 @@ interface TraceRecorder {
     fun record(op: Op, request: () -> Response): Response
 
     fun startWSRecording(id: String, spanName: String)
-    fun finishWSRecording(id: String, spanName: String, multivalue: Boolean = false)
+    fun finishWSRecording(id: String, spanName: String)
 
     fun printStatsAndFlush(header: () -> String)
 
@@ -56,7 +58,7 @@ class NoOpTraceRecorder : TraceRecorder {
 
     override fun startWSRecording(id: String, spanName: String) {}
 
-    override fun finishWSRecording(id: String, spanName: String, multivalue: Boolean) {}
+    override fun finishWSRecording(id: String, spanName: String) {}
     override fun printStatsAndFlush(header: () -> String) {}
 }
 
@@ -82,15 +84,9 @@ class FullTraceRecorder : TraceRecorder {
         }
     }
 
-    override fun finishWSRecording(id: String, spanName: String, multivalue: Boolean) {
+    override fun finishWSRecording(id: String, spanName: String) {
         val nanoTime = System.nanoTime()
-        val pendingRecord = if (multivalue) {
-            pendingEvents[id + spanName]
-        } else {
-            pendingEvents.remove(id + spanName)
-        }
-
-        pendingRecord?.let { pendingSpan ->
+        pendingEvents.remove(id + spanName)?.let { pendingSpan ->
             record(
                 op = TraceRecorder.Op.WS,
                 spans = listOf(Span(pendingSpan.name, pendingSpan.startedAt, nanoTime - pendingSpan.startedAt)),
@@ -119,8 +115,7 @@ class FullTraceRecorder : TraceRecorder {
         }
     }
 
-    private val padding = 25
-    private val decimalFormat = DecimalFormat("#,###.##")
+    private val percentiles = listOf(50.0, 66.0, 75.0, 80.0, 90.0, 95.0, 98.0, 99.0, 100.0)
     private val spansOrder = listOf(
         ClientSpans.apiClient,
         ServerSpans.app,
@@ -132,43 +127,68 @@ class FullTraceRecorder : TraceRecorder {
         WSSpans.tradeCreated,
         WSSpans.tradeSettled,
     ).withIndex().associate { it.value to it.index }
+    private val padding = 25
+
     override fun printStatsAndFlush(header: () -> String) {
         val traces = tracesByOp
         tracesByOp = mutableMapOf()
 
         val output = buildString {
-            append("\n========= ${header()} =========\n")
-            traces.entries.toList().sortedBy { it.key }.forEach { (op, traces: MutableList<TraceRecorder.Trace>) ->
-                append("\nStats for: ${op.name}\n")
-                append("Total Traces: ${traces.size}\n")
-
-                val latencies: Map<String, List<Long>> = traces.map { it.spans }.flatten().groupBy(
-                    keySelector = { span -> span.name },
-                    valueTransform = { span -> span.duration },
-                )
-
-                val sortedSpans = latencies.keys.sortedWith { a, b ->
-                    (spansOrder[a] ?: Int.MAX_VALUE).compareTo(spansOrder[b] ?: Int.MAX_VALUE)
-                }
-
-                sortedSpans.forEach { spanName ->
-                    val samplesCount = (latencies[spanName]?.size ?: 0).let { count ->
-                        if (traces.size != count) " ($count)" else ""
-                    }
-                    append((spanName + samplesCount).padEnd(padding))
-                }
-                append("\n")
-                listOf(50.0, 66.0, 75.0, 80.0, 90.0, 95.0, 98.0, 99.0, 100.0).forEach { p ->
-                    sortedSpans.forEach { span ->
-                        val value = latencies[span]?.let { percentile(it, p) } ?: "NA"
-                        append(" $p%: ${decimalFormat.format(value)}ns".padEnd(padding))
-                    }
-                    append("\n")
-                }
-            }
-            append("===================")
+            appendLine()
+            appendLine("========= ${header()} =========")
+            printGcStats(this)
+            printSpanStats(this, traces)
+            appendLine("===================")
         }
 
         logger.debug { output }
+    }
+
+    private fun printSpanStats(sb: StringBuilder, traces: MutableMap<TraceRecorder.Op, MutableList<TraceRecorder.Trace>>) {
+        sb.appendLine("--- Spans ---")
+        traces.entries.toList().sortedBy { it.key }.forEach { (op, traces: MutableList<TraceRecorder.Trace>) ->
+            sb.appendLine()
+            sb.appendLine("Stats for: ${op.name} (${traces.size} records)")
+
+            val latencies: Map<String, List<Long>> = traces.map { it.spans }.flatten().groupBy(
+                keySelector = { span -> span.name },
+                valueTransform = { span -> span.duration },
+            )
+
+            val sortedSpans = latencies.keys.sortedWith { a, b ->
+                (spansOrder[a] ?: Int.MAX_VALUE).compareTo(spansOrder[b] ?: Int.MAX_VALUE)
+            }
+
+            sortedSpans.forEach { spanName ->
+                val samplesCount = (latencies[spanName]?.size ?: 0).let { count ->
+                    if (traces.size != count) " ($count)" else ""
+                }
+                sb.append((spanName + samplesCount).padEnd(padding))
+            }
+            sb.appendLine()
+            percentiles.forEach { p ->
+                sortedSpans.forEach { span ->
+                    val value = latencies[span]?.let { humanReadableNanoseconds(percentile(it, p)) } ?: "NA"
+                    sb.append(" $p%: $value".padEnd(padding))
+                }
+                sb.appendLine()
+            }
+        }
+    }
+
+    private val gcBeans: MutableList<GarbageCollectorMXBean> = ManagementFactory.getGarbageCollectorMXBeans()
+    private var gcLastValues: MutableMap<String, Pair<Long, Long>> = mutableMapOf()
+    private fun printGcStats(sb: StringBuilder) {
+        sb.append("\n--- Garbage collection ---\n")
+        gcBeans.forEach { bean ->
+            val previousValues = gcLastValues.getOrDefault(bean.name, Pair(0, 0))
+            gcLastValues[bean.name] = Pair(bean.collectionCount, bean.collectionTime)
+
+            sb.appendLine("GC Name: ${bean.name}")
+            sb.appendLine("Collection Count: ${bean.collectionCount - previousValues.first} (${bean.collectionCount} from JVM start)")
+            sb.appendLine("Collection Time: ${bean.collectionTime - previousValues.second}ms (${bean.collectionTime}ms from JVM start)")
+            sb.appendLine("Memory Pools: ${bean.memoryPoolNames.joinToString(", ")}")
+            sb.appendLine("")
+        }
     }
 }
