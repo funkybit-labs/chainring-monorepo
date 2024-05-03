@@ -149,9 +149,9 @@ module "sequencer" {
 }
 
 module "loadtest" {
-  source           = "../modules/loadtest"
-  name_prefix      = local.name_prefix
-  subnet_id        = module.vpc.private_subnet_id_2
-  vpc              = module.vpc.vpc
-  bastion_ip       = module.bastion.private_ip
+  source      = "../modules/loadtest"
+  name_prefix = local.name_prefix
+  subnet_id   = module.vpc.private_subnet_id_2
+  vpc         = module.vpc.vpc
+  bastion_ip  = module.bastion.private_ip
 }

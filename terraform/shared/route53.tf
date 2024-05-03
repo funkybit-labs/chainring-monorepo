@@ -95,9 +95,9 @@ data "dns_a_record_set" "chainring-apex" {
 }
 
 resource "aws_route53_record" "apex-labs" {
-     zone_id = "${aws_route53_zone.zone-labs.zone_id}"
-     name    = "chainringlabs.com"
-     type    = "A"
-     ttl     = "300"
-     records = ["${data.dns_a_record_set.chainring-apex.addrs.0}"]
+  zone_id = aws_route53_zone.zone-labs.zone_id
+  name    = "chainringlabs.com"
+  type    = "A"
+  ttl     = "300"
+  records = ["${data.dns_a_record_set.chainring-apex.addrs.0}"]
 }
