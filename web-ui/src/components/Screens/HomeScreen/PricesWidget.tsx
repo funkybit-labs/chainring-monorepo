@@ -21,7 +21,7 @@ import { useWebsocketSubscription } from 'contexts/websocket'
 import { useWindowDimensions, widgetSize, WindowDimensions } from 'utils/layout'
 import { produce } from 'immer'
 import { parseExpression } from 'cron-parser'
-import { isDateMatchesCronExpression } from 'utils/dateUtils'
+import { doesDateMatchCronExpression } from 'utils/dateUtils'
 
 type PriceParameters = {
   totalWidth: number
@@ -311,7 +311,7 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     const labelExpression = chooseLabelFrequency(ohlc, chartWidth)
 
     return ohlc.map((v) => {
-      if (isDateMatchesCronExpression(labelExpression, v.start)) {
+      if (doesDateMatchCronExpression(labelExpression, v.start)) {
         return createLabel(v.start)
       }
       return ''

@@ -7,7 +7,7 @@ import {
   SixtyRange
 } from 'cron-parser'
 
-export const isDateMatchesCronExpression = (
+export const doesDateMatchCronExpression = (
   expression: string,
   date: Date,
   scope: string = 'second'
@@ -16,42 +16,29 @@ export const isDateMatchesCronExpression = (
   const scopeIndex = scopes.indexOf(scope.toLowerCase())
 
   if (scopeIndex === -1) {
-    throw new Error(`Invalid scope: ${scope}`)
+    return false
   }
 
+  let data
   try {
-    const data = parseExpression(expression).fields
-
-    if (
-      scopeIndex <= 0 &&
-      !data.second.includes(date.getUTCSeconds() as SixtyRange)
-    )
-      return false
-    if (
-      scopeIndex <= 1 &&
-      !data.minute.includes(date.getUTCMinutes() as SixtyRange)
-    )
-      return false
-    if (scopeIndex <= 2 && !data.hour.includes(date.getUTCHours() as HourRange))
-      return false
-    if (
-      scopeIndex <= 3 &&
-      !data.dayOfMonth.includes(date.getUTCDate() as DayOfTheMonthRange)
-    )
-      return false
-    if (
-      scopeIndex <= 4 &&
-      !data.month.includes((date.getUTCMonth() + 1) as MonthRange)
-    )
-      return false
-    if (
-      scopeIndex <= 5 &&
-      !data.dayOfWeek.includes(date.getUTCDay() as DayOfTheWeekRange)
-    )
-      return false
-
-    return true
+    data = parseExpression(expression).fields
   } catch (e) {
-    throw new Error(`isDateMatchesCronExpression error: ${e}`)
+    return false
   }
+
+  const checks = [
+    scopeIndex <= 0 &&
+      !data.second.includes(date.getUTCSeconds() as SixtyRange),
+    scopeIndex <= 1 &&
+      !data.minute.includes(date.getUTCMinutes() as SixtyRange),
+    scopeIndex <= 2 && !data.hour.includes(date.getUTCHours() as HourRange),
+    scopeIndex <= 3 &&
+      !data.dayOfMonth.includes(date.getUTCDate() as DayOfTheMonthRange),
+    scopeIndex <= 4 &&
+      !data.month.includes((date.getUTCMonth() + 1) as MonthRange),
+    scopeIndex <= 5 &&
+      !data.dayOfWeek.includes(date.getUTCDay() as DayOfTheWeekRange)
+  ]
+
+  return !checks.some((check) => check)
 }
