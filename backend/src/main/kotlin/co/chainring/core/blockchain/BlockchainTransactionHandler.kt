@@ -287,6 +287,8 @@ class BlockchainTransactionHandler(
 
                 is EIP712Transaction.Order -> {}
 
+                is EIP712Transaction.CancelOrder -> {}
+
                 is EIP712Transaction.Trade -> {
                     TradeEntity.findById(tx.tradeId)?.let { tradeEntity ->
                         if (error != null) {

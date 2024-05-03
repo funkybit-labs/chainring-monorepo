@@ -22,6 +22,11 @@ variable "deployer_key" {
   default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE7/1w7LSANgOrUQ1gSpwk+vJfc2vDAkOQHCFdHpg0uR deployer-key@chainring"
 }
 
+variable "loadtest_key" {
+  default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP8nY8Ix9r2Rh2Lxj0Kk9gQ0TupmCR4e+Sgh86sEPjUO loadtest-key@chainring"
+}
+
+
 terraform {
   required_version = "1.5.7"
 

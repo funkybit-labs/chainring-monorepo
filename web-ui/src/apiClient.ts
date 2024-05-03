@@ -124,6 +124,16 @@ const UpdateOrderApiResponseSchema = z.object({
   requestStatus: RequestStatusSchema
 })
 
+const CancelOrderRequestSchema = z.object({
+  orderId: z.string(),
+  amount: z.coerce.bigint(),
+  marketId: z.string(),
+  side: OrderSideSchema,
+  nonce: z.string(),
+  signature: z.string()
+})
+export type CancelOrderRequest = z.infer<typeof CancelOrderRequestSchema>
+
 const ExecutionRoleSchema = z.enum(['Maker', 'Taker'])
 export type ExecutionRole = z.infer<typeof ExecutionRoleSchema>
 
@@ -315,6 +325,13 @@ export const apiClient = new Zodios(apiBaseUrl, [
     method: 'delete',
     path: '/v1/orders/:id',
     alias: 'cancelOrder',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: CancelOrderRequestSchema
+      }
+    ],
     response: z.undefined(),
     errors: [
       {
