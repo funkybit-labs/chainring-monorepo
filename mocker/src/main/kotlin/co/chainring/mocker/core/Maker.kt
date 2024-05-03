@@ -56,7 +56,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                 wsClient.subscribeToPrices(it, OHLCDuration.P1M)
                 val prices = (wsClient.receivedDecoded().first() as OutgoingWSMessage.Publish).data as Prices
                 wsClient.unsubscribe(SubscriptionTopic.Prices(it, OHLCDuration.P1M))
-                createQuotes(it, levels, prices.ohlc.last().close.toBigDecimal())
+                createQuotes(it, levels, prices.ohlc.lastOrNull()?.close?.toBigDecimal() ?: 2.toBigDecimal())
             }
             marketIds.forEach {
                 wsClient.subscribeToPrices(it)

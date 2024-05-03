@@ -53,6 +53,7 @@ class Taker(
     private var stopping = false
 
     fun start(marketIds: List<MarketId>) {
+        marketIds.forEach { marketPrices[it] = 2.toBigDecimal() }
         val config = apiClient.getConfiguration()
         markets = config.markets.toSet()
         listenerThread = thread(start = true, name = "tkr-listen-$id", isDaemon = false) {
