@@ -20,6 +20,8 @@ import { mergeOHLC, ohlcDurationsMs } from 'utils/pricesUtils'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { useWindowDimensions, widgetSize, WindowDimensions } from 'utils/layout'
 import { produce } from 'immer'
+import { parseExpression } from 'cron-parser'
+import { doesDateMatchCronExpression } from 'utils/dateUtils'
 
 type PriceParameters = {
   totalWidth: number
@@ -102,7 +104,7 @@ export function PricesWidget({ marketId }: { marketId: string }) {
   const [ohlc, setOhlc] = useState<OHLC[]>([])
   const [params, setParams] = useState<PriceParameters>()
   const windowDimensions = useWindowDimensions()
-  const maxCandles = 30
+  const maxCandles = 50
 
   useWebsocketSubscription({
     topics: useMemo(
@@ -251,75 +253,101 @@ export function PricesWidget({ marketId }: { marketId: string }) {
     )
   }
 
-  // label for use at the weekly zoom level (e.g. Mar 19)
-  function weeklyLabel(date: Date): string {
-    return (
-      [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec'
-      ][date.getMonth()] +
-      ' ' +
-      date.getDate()
-    )
+  const labelIntervalExpressions = [
+    '0/1 * * * *',
+    '0/5 * * * *',
+    '0/15 * * * *',
+    '0/30 * * * *',
+    '0 0/1 * * *',
+    '0 0/2 * * *',
+    '0 0/3 * * *',
+    '0 0/4 * * *',
+    '0 0/6 * * *',
+    '0 0/12 * * *',
+    '0 0 1/1 * *',
+    '0 0 1/2 * *',
+    '0 0 1/7 * *',
+    '0 0 1/15 * *',
+    '0 0 1 1/1 *',
+    '0 0 1 1/2 *',
+    '0 0 1 1/3 *',
+    '0 0 1 1/4 *',
+    '0 0 1 1/6 *',
+    '0 0 1 1 *'
+  ].map((cron) => {
+    return {
+      expression: cron,
+      durationMillis: cronToMilliseconds(cron)
+    }
+  })
+
+  function cronToMilliseconds(cronExpression: string): number {
+    const initialDate = new Date('2024-01-01T00:00:00Z')
+    const expression = parseExpression(cronExpression, {
+      currentDate: initialDate
+    })
+    return expression.next().getTime() - initialDate.getTime()
   }
 
-  // x-axis label, based on zoom level
-  // the last label used is passed in to allow for special handling of day-crossings when zoomed in
-  function calculateLabel(
-    ohlcDuration: OHLCDuration,
-    ohlc: OHLC,
-    lastLabel?: string
-  ): string {
-    const date = ohlc.start
-    if (ohlcDuration === 'P1D') {
-      return weeklyLabel(date)
-    } else {
-      const hours = date.getHours()
-      const lastHours = lastLabel ? parseInt(lastLabel.slice(0, 2)) : 0
-      if (hours < lastHours) {
-        return weeklyLabel(date)
-      } else {
-        if (
-          ohlcDuration === 'P15M' ||
-          ohlcDuration === 'P1H' ||
-          ohlcDuration === 'P4H'
-        ) {
-          return (hours < 10 ? '0' + hours : hours) + ':00'
-        } else {
-          const minutes = date.getMinutes()
+  function chooseLabelFrequency(ohlc: OHLC[], chartWidth: number): string {
+    const ohlcStart = new Date(ohlc[0].start)
+    const ohlcEnd = new Date(ohlc[ohlc.length - 1].start)
+    const timeSpan = ohlcEnd.getTime() - ohlcStart.getTime()
+    const pixelsPerLabel = 50
+    const maxLabels = Math.floor(chartWidth / pixelsPerLabel)
+    const minLabelInterval = timeSpan / maxLabels
 
-          const labelIntervalMinutes = ohlcDuration === 'P5M' ? 15 : 5
-          if (minutes % labelIntervalMinutes == 0) {
-            return (
-              date.getHours() + ':' + (minutes < 10 ? '0' + minutes : minutes)
-            )
-          } else {
-            return ''
-          }
-        }
+    // Find ceiling interval to minLabelInterval
+    const chosenInterval = labelIntervalExpressions.find(
+      (expression) => expression.durationMillis >= minLabelInterval
+    )
+    return chosenInterval ? chosenInterval.expression : ''
+  }
+
+  function calculateLabels(ohlc: OHLC[], chartWidth: number): string[] {
+    if (!ohlc || ohlc.length == 0) {
+      return []
+    }
+    const labelExpression = chooseLabelFrequency(ohlc, chartWidth)
+
+    return ohlc.map((v) => {
+      if (doesDateMatchCronExpression(labelExpression, v.start)) {
+        return createLabel(v.start)
       }
+      return ''
+    })
+  }
+
+  function createLabel(date: Date) {
+    const month = date.getUTCMonth()
+    const day = date.getUTCDate()
+    const hours = date.getUTCHours()
+    const minutes = date.getUTCMinutes()
+
+    if (month === 0 && day === 1 && hours === 0 && minutes === 0) {
+      // Start of a year
+      return `${date.getFullYear()}`
+    } else if (hours === 0 && minutes === 0) {
+      // Start of a day
+      return `${date.toLocaleDateString('default', {
+        month: 'short',
+        day: 'numeric'
+      })}`
+    } else {
+      // Time only for more granular intervals
+      return `${hours.toString().padStart(2, '0')}:${minutes
+        .toString()
+        .padStart(2, '0')}`
     }
   }
 
   // draw the grid columns and x-axis labels
   function drawGridX(params: PriceParameters, ohlc: OHLC[]) {
-    let lastLabel: string | undefined
+    const labels = calculateLabels(ohlc, params.chartWidth)
     return (
       <>
         {ohlc.map((candle, i) => {
-          const label = calculateLabel(duration, candle, lastLabel)
-          const oldLastLabel = lastLabel
-          lastLabel = label
+          const label = labels[i]
           const x = params.chartStartX + i * params.barWidth
           return (
             <Fragment key={candle.start.getTime()}>
@@ -334,7 +362,7 @@ export function PricesWidget({ marketId }: { marketId: string }) {
                   strokeDasharray={0}
                 />
               )}
-              {label != oldLastLabel && (
+              {label && (
                 <text
                   x={x}
                   y={params.chartEndY + 12}
@@ -490,8 +518,8 @@ export function PricesWidget({ marketId }: { marketId: string }) {
       )
     }
     const endDate = new Date(
-      viewPort.earliestIndex
-        ? ohlc[viewPort.earliestIndex].start
+      viewPort.latestIndex
+        ? ohlc[viewPort.latestIndex].start
         : lastDate.getTime() +
           ohlcDurationsMs[viewportOhlc[viewportOhlc.length - 1].duration]
     )
