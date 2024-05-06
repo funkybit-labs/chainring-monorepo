@@ -13,7 +13,7 @@ export function Button({ caption, onClick, disabled, narrow }: Props) {
       className={classNames(
         'overflow-ellipsis overflow-hidden border-transparent rounded-lg bg-darkGray',
         narrow ? 'px-2 my-1 mx-1' : 'px-4 py-2',
-        'text-sm font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray',
+        'font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray',
         disabled ? 'text-neutralGray' : 'text-white hover:bg-mutedGray'
       )}
       onClick={onClick}

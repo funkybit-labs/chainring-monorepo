@@ -97,6 +97,11 @@ fun WsClient.assertTradeUpdatedMessageReceived(assertions: (TradeUpdated) -> Uni
 fun WsClient.assertBalancesMessageReceived(assertions: (Balances) -> Unit = {}): Balances =
     assertMessageReceived<Balances>(SubscriptionTopic.Balances, assertions)
 
+fun WsClient.assertBalancesMessageReceived(expected: List<ExpectedBalance>): Balances =
+    assertMessageReceived<Balances>(SubscriptionTopic.Balances) { msg ->
+        assertBalances(expected, msg.balances)
+    }
+
 fun WsClient.assertPricesMessageReceived(marketId: MarketId, duration: OHLCDuration = OHLCDuration.P5M, assertions: (Prices) -> Unit = {}): Prices =
     assertMessageReceived<Prices>(SubscriptionTopic.Prices(marketId, duration), assertions)
 

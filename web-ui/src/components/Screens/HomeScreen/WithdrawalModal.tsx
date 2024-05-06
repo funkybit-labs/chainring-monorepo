@@ -1,19 +1,21 @@
 import { Address, formatUnits } from 'viem'
-import { BaseError, useConfig, useSignTypedData } from 'wagmi'
+import { BaseError as WagmiError, useConfig, useSignTypedData } from 'wagmi'
 import { ExchangeAbi } from 'contracts'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { readContract } from 'wagmi/actions'
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
 import { apiClient, TradingSymbol } from 'apiClient'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getDomain,
   getERC20WithdrawMessage,
   getNativeWithdrawMessage
 } from 'utils/eip712'
 import useAmountInputState from 'hooks/useAmountInputState'
+import { withdrawalsQueryKey } from 'components/Screens/HomeScreen/balances/BalancesWidget'
+import { isErrorFromAlias } from '@zodios/core'
 
 export default function WithdrawalModal({
   exchangeContractAddress,
@@ -52,8 +54,6 @@ export default function WithdrawalModal({
     }
   })
 
-  const [withdrawalId, setWithdrawalId] = useState<string | null>(null)
-
   const {
     inputValue: amountInputValue,
     setInputValue: setAmountInputValue,
@@ -64,80 +64,16 @@ export default function WithdrawalModal({
   })
 
   const [submitPhase, setSubmitPhase] = useState<
-    | 'waitingForTxSignature'
-    | 'submittingRequest'
-    | 'waitingForCompletion'
-    | null
+    'waitingForApproval' | 'submittingRequest' | null
   >(null)
-  const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const withdrawalQuery = useQuery({
-    queryKey: ['withdrawal'],
-    queryFn: () => apiClient.getWithdrawal({ params: { id: withdrawalId! } }),
-    enabled: !!withdrawalId,
-    refetchInterval: withdrawalId ? 1000 : undefined
-  })
+  const queryClient = useQueryClient()
 
   const mutation = useMutation({
-    mutationFn: apiClient.createWithdrawal
-  })
-
-  useEffect(() => {
-    if (mutation.isPending) {
-      return
-    }
-    if (mutation.isError) {
-      setError(mutation.error.message)
-    } else if (mutation.isSuccess) {
-      setSubmitPhase('waitingForCompletion')
-      setWithdrawalId(mutation.data.withdrawal.id)
-    }
-    mutation.reset()
-  }, [mutation])
-
-  useEffect(() => {
-    if (
-      !withdrawalId ||
-      !withdrawalQuery.data ||
-      withdrawalId != withdrawalQuery.data.withdrawal.id ||
-      withdrawalQuery.data.withdrawal.status == 'Pending'
-    ) {
-      return
-    }
-    const status = withdrawalQuery.data.withdrawal.status
-    if (status == 'Complete') {
-      close()
-    } else if (status == 'Failed') {
-      setError(withdrawalQuery.data!.withdrawal.error)
-    }
-    setWithdrawalId(null)
-  }, [withdrawalId, withdrawalQuery, close])
-
-  function setError(error: string | null) {
-    setSubmitError(error)
-    setSubmitPhase(null)
-  }
-
-  const canSubmit = (function () {
-    if (submitPhase !== null) return false
-
-    try {
-      if (availableBalanceQuery.status == 'success') {
-        return amount > 0 && amount <= availableBalanceQuery.data
-      } else {
-        return false
-      }
-    } catch {
-      return false
-    }
-  })()
-
-  async function onSubmit() {
-    setSubmitError(null)
-    const nonce = Date.now()
-    if (canSubmit) {
+    mutationFn: async () => {
       try {
-        setSubmitPhase('waitingForTxSignature')
+        const nonce = Date.now()
+        setSubmitPhase('waitingForApproval')
         const signature = symbol.contractAddress
           ? await signTypedDataAsync({
               types: {
@@ -187,20 +123,40 @@ export default function WithdrawalModal({
             })
 
         setSubmitPhase('submittingRequest')
-        mutation.mutate({
-          tx: {
-            sender: walletAddress,
-            token: symbol.contractAddress,
-            amount: amount,
-            nonce: nonce
-          },
+        return await apiClient.createWithdrawal({
+          symbol: symbol.name,
+          amount: amount,
+          nonce: nonce,
           signature: signature
         })
-      } catch (err) {
-        setError((err as BaseError).shortMessage || 'Something went wrong')
+      } catch (error) {
+        setSubmitPhase(null)
+        throw Error(
+          isErrorFromAlias(apiClient.api, 'createWithdrawal', error)
+            ? error.response.data.errors[0].displayMessage
+            : (error as WagmiError).shortMessage || 'Something went wrong'
+        )
       }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: withdrawalsQueryKey })
+      close()
     }
-  }
+  })
+
+  const canSubmit = (function () {
+    if (submitPhase !== null) return false
+
+    try {
+      if (availableBalanceQuery.status == 'success') {
+        return amount > 0 && amount <= availableBalanceQuery.data
+      } else {
+        return false
+      }
+    } catch {
+      return false
+    }
+  })()
 
   return (
     <Modal
@@ -229,16 +185,14 @@ export default function WithdrawalModal({
 
                 <SubmitButton
                   disabled={!canSubmit}
-                  onClick={onSubmit}
-                  error={submitError}
+                  onClick={mutation.mutate}
+                  error={mutation.error?.message}
                   caption={() => {
                     switch (submitPhase) {
-                      case 'waitingForTxSignature':
-                        return 'Waiting for Tx Signature'
+                      case 'waitingForApproval':
+                        return 'Waiting for approval'
                       case 'submittingRequest':
                         return 'Submitting request'
-                      case 'waitingForCompletion':
-                        return 'Waiting for completion'
                       case null:
                         return 'Submit'
                     }

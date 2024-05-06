@@ -12,9 +12,13 @@ import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.BatchOrdersApiResponse
 import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.ConfigurationApiResponse
+import co.chainring.apps.api.model.CreateDepositApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
+import co.chainring.apps.api.model.DepositApiResponse
+import co.chainring.apps.api.model.ListDepositsApiResponse
+import co.chainring.apps.api.model.ListWithdrawalsApiResponse
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
@@ -24,6 +28,7 @@ import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.WithdrawalId
 import kotlinx.datetime.Clock
@@ -261,6 +266,45 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
+    fun createDeposit(apiRequest: CreateDepositApiRequest): DepositApiResponse =
+        tryCreateDeposit(apiRequest).assertSuccess()
+
+    fun tryCreateDeposit(apiRequest: CreateDepositApiRequest): Either<ApiCallFailure, DepositApiResponse> =
+        executeAndTrace(
+            TraceRecorder.Op.CreateDeposit,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/deposits")
+                .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
+
+    fun getDeposit(id: DepositId): DepositApiResponse =
+        tryGetDeposit(id).assertSuccess()
+
+    fun tryGetDeposit(id: DepositId): Either<ApiCallFailure, DepositApiResponse> =
+        executeAndTrace(
+            TraceRecorder.Op.GetWithdrawal,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/deposits/$id")
+                .get()
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
+    fun listDeposits(): ListDepositsApiResponse =
+        tryListDeposits().assertSuccess()
+
+    fun tryListDeposits(): Either<ApiCallFailure, ListDepositsApiResponse> =
+        executeAndTrace(
+            TraceRecorder.Op.ListDeposits,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/deposits")
+                .get()
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
     fun createWithdrawal(apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse =
         tryCreateWithdrawal(apiRequest).assertSuccess()
 
@@ -282,6 +326,19 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
             TraceRecorder.Op.GetWithdrawal,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/withdrawals/$id")
+                .get()
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
+    fun listWithdrawals(): ListWithdrawalsApiResponse =
+        tryListWithdrawals().assertSuccess()
+
+    fun tryListWithdrawals(): Either<ApiCallFailure, ListWithdrawalsApiResponse> =
+        executeAndTrace(
+            TraceRecorder.Op.ListWithdrawals,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/withdrawals")
                 .get()
                 .build()
                 .withAuthHeaders(ecKeyPair),

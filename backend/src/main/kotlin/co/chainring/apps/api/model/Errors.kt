@@ -21,12 +21,10 @@ data class ApiErrors(val errors: List<ApiError>)
 
 @Serializable
 enum class ReasonCode {
-    MarketNotSupported,
-
     OrderNotFound,
-    OrderIsClosed,
 
     WithdrawalNotFound,
+    DepositNotFound,
 
     SignatureNotValid,
     UnexpectedError,
@@ -50,11 +48,11 @@ fun errorResponse(
         .with(Header.CONTENT_TYPE of ContentType.APPLICATION_JSON)
 
 fun notFoundError(reason: ReasonCode, message: String): Response = errorResponse(Status.NOT_FOUND, ApiError(reason, message))
-fun badRequestError(reason: ReasonCode, message: String): Response = errorResponse(Status.BAD_REQUEST, ApiError(reason, message))
 
 fun processingError(message: String): Response = errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.ProcessingError, message))
+
+val invalidEIP712SignatureError: Response = errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.SignatureNotValid, "Invalid signature"))
+
 fun unexpectedError(): Response = errorResponse(Status.INTERNAL_SERVER_ERROR, ApiError(ReasonCode.UnexpectedError, "Unexpected Error"))
 
-val marketNotSupportedError = badRequestError(ReasonCode.MarketNotSupported, "Market is not supported")
 val orderNotFoundError = notFoundError(ReasonCode.OrderNotFound, "Requested order does not exist")
-val orderIsClosedError = badRequestError(ReasonCode.OrderIsClosed, "Order is already finalized")

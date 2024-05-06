@@ -1,6 +1,7 @@
 package co.chainring.apps.api.model
 
 import co.chainring.core.model.Address
+import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainId
 import kotlinx.serialization.Serializable
 
@@ -14,7 +15,7 @@ data class ConfigurationApiResponse(
 data class Chain(
     val id: ChainId,
     val contracts: List<DeployedContract>,
-    val symbols: List<Symbol>,
+    val symbols: List<SymbolInfo>,
 )
 
 @Serializable
@@ -24,7 +25,7 @@ data class DeployedContract(
 )
 
 @Serializable
-data class Symbol(
+data class SymbolInfo(
     val name: String,
     val description: String,
     val contractAddress: Address?,
@@ -34,9 +35,9 @@ data class Symbol(
 @Serializable
 data class Market(
     val id: String,
-    val baseSymbol: String,
+    val baseSymbol: Symbol,
     val baseDecimals: Int,
-    val quoteSymbol: String,
+    val quoteSymbol: Symbol,
     val quoteDecimals: Int,
     val tickSize: BigDecimalJson,
 )

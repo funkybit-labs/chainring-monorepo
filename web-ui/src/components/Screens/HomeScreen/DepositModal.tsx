@@ -1,19 +1,22 @@
 import { Address, formatUnits } from 'viem'
-import { BaseError, useConfig, useWriteContract } from 'wagmi'
+import { BaseError as WagmiError, useConfig } from 'wagmi'
 import { ERC20Abi, ExchangeAbi } from 'contracts'
 import { useState } from 'react'
 import {
   getBalance,
+  getTransactionCount,
   readContract,
-  sendTransaction,
-  waitForTransactionReceipt
+  sendTransaction
 } from 'wagmi/actions'
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import { TradingSymbol } from 'apiClient'
-import { useQuery } from '@tanstack/react-query'
+import { apiClient, TradingSymbol } from 'apiClient'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import useAmountInputState from 'hooks/useAmountInputState'
+import { depositsQueryKey } from 'components/Screens/HomeScreen/balances/BalancesWidget'
+import { encodeFunctionData, EncodeFunctionDataParameters } from 'viem'
+import { isErrorFromAlias } from '@zodios/core'
 
 export default function DepositModal({
   exchangeContractAddress,
@@ -59,14 +62,71 @@ export default function DepositModal({
 
   const [submitPhase, setSubmitPhase] = useState<
     | 'waitingForAllowanceApproval'
-    | 'waitingForAllowanceReceipt'
     | 'waitingForDepositApproval'
-    | 'waitingForDepositReceipt'
     | 'submittingDeposit'
     | null
   >(null)
-  const [submitError, setSubmitError] = useState<string | null>(null)
-  const { writeContractAsync } = useWriteContract()
+
+  const queryClient = useQueryClient()
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      try {
+        let depositHash: string
+
+        if (symbol.contractAddress) {
+          const transactionCount = await getTransactionCount(config, {
+            address: walletAddress
+          })
+
+          setSubmitPhase('waitingForAllowanceApproval')
+          await sendTransaction(config, {
+            to: symbol.contractAddress,
+            data: encodeFunctionData({
+              abi: ERC20Abi,
+              args: [exchangeContractAddress, amount],
+              functionName: 'approve'
+            } as EncodeFunctionDataParameters),
+            nonce: transactionCount
+          })
+
+          setSubmitPhase('waitingForDepositApproval')
+          depositHash = await sendTransaction(config, {
+            to: exchangeContractAddress,
+            data: encodeFunctionData({
+              abi: ExchangeAbi,
+              functionName: 'deposit',
+              args: [symbol.contractAddress, amount]
+            }),
+            nonce: transactionCount + 1
+          })
+        } else {
+          setSubmitPhase('waitingForDepositApproval')
+          depositHash = await sendTransaction(config, {
+            to: exchangeContractAddress,
+            value: amount
+          })
+        }
+
+        return await apiClient.createDeposit({
+          symbol: symbol.name,
+          amount: amount,
+          txHash: depositHash
+        })
+      } catch (error) {
+        setSubmitPhase(null)
+        throw Error(
+          isErrorFromAlias(apiClient.api, 'createDeposit', error)
+            ? error.response.data.errors[0].displayMessage
+            : (error as WagmiError).shortMessage || 'Something went wrong'
+        )
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: depositsQueryKey })
+      close()
+    }
+  })
 
   const canSubmit = (function () {
     if (submitPhase !== null) return false
@@ -82,57 +142,6 @@ export default function DepositModal({
       return false
     }
   })()
-
-  async function onSubmit() {
-    setSubmitError(null)
-    if (canSubmit) {
-      try {
-        if (symbol.contractAddress) {
-          setSubmitPhase('waitingForAllowanceApproval')
-          const approveHash = await writeContractAsync({
-            abi: ERC20Abi,
-            address: symbol.contractAddress,
-            functionName: 'approve',
-            args: [exchangeContractAddress, amount]
-          })
-
-          setSubmitPhase('waitingForAllowanceReceipt')
-          await waitForTransactionReceipt(config, {
-            hash: approveHash
-          })
-
-          setSubmitPhase('waitingForDepositApproval')
-          const depositHash = await writeContractAsync({
-            abi: ExchangeAbi,
-            address: exchangeContractAddress,
-            functionName: 'deposit',
-            args: [symbol.contractAddress, amount]
-          })
-
-          setSubmitPhase('waitingForDepositReceipt')
-          await waitForTransactionReceipt(config, {
-            hash: depositHash
-          })
-        } else {
-          setSubmitPhase('waitingForDepositApproval')
-          const hash = await sendTransaction(config, {
-            to: exchangeContractAddress,
-            value: amount
-          })
-
-          setSubmitPhase('waitingForDepositReceipt')
-          await waitForTransactionReceipt(config, { hash })
-        }
-
-        close()
-      } catch (err) {
-        setSubmitError(
-          (err as BaseError).shortMessage || 'Something went wrong'
-        )
-        setSubmitPhase(null)
-      }
-    }
-  }
 
   return (
     <Modal
@@ -160,18 +169,14 @@ export default function DepositModal({
 
                 <SubmitButton
                   disabled={!canSubmit}
-                  onClick={onSubmit}
-                  error={submitError}
+                  onClick={mutation.mutate}
+                  error={mutation.error?.message}
                   caption={() => {
                     switch (submitPhase) {
                       case 'waitingForAllowanceApproval':
                         return 'Waiting for allowance approval'
-                      case 'waitingForAllowanceReceipt':
-                        return 'Waiting for allowance receipt'
                       case 'waitingForDepositApproval':
                         return 'Waiting for deposit approval'
-                      case 'waitingForDepositReceipt':
-                        return 'Waiting for deposit receipt'
                       case 'submittingDeposit':
                         return 'Submitting Deposit'
                       case null:

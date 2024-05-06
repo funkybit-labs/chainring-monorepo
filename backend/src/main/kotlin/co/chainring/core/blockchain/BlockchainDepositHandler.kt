@@ -8,12 +8,14 @@ import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BalanceType
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
+import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.sequencer.core.Asset
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.reactivex.Flowable
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.crypto.Keys
 import org.web3j.protocol.core.DefaultBlockParameter
@@ -88,22 +90,24 @@ class BlockchainDepositHandler(
                         val txHash = TxHash(depositEventResponse.log.transactionHash)
 
                         transaction {
-                            if (DepositEntity.findByTxHash(txHash) != null) {
-                                logger.debug { "Skipping already recorded deposit (tx hash: $txHash)" }
-                            } else {
-                                val walletAddress = Address(Keys.toChecksumAddress(depositEventResponse.from))
-                                val wallet = WalletEntity.getOrCreate(walletAddress)
-                                val tokenAddress = Address(Keys.toChecksumAddress(depositEventResponse.token)).takeIf { it != Address.zero }
-                                val amount = depositEventResponse.amount
-
+                            val deposit = DepositEntity.findByTxHash(txHash)
+                            if (deposit == null) {
                                 DepositEntity.create(
-                                    chainId = chainId,
-                                    wallet = wallet,
-                                    tokenAddress = tokenAddress,
-                                    amount = amount,
+                                    wallet = WalletEntity.getOrCreate(Address(Keys.toChecksumAddress(depositEventResponse.from))),
+                                    symbol = SymbolEntity.forChainAndContractAddress(
+                                        chainId,
+                                        Address(Keys.toChecksumAddress(depositEventResponse.token)).takeIf { it != Address.zero },
+                                    ),
+                                    amount = depositEventResponse.amount,
                                     blockNumber = blockNumber,
                                     transactionHash = txHash,
                                 )
+                            } else {
+                                if (deposit.blockNumber != blockNumber) {
+                                    deposit.blockNumber = blockNumber
+                                    deposit.updatedAt = Clock.System.now()
+                                }
+                                logger.debug { "Skipping already recorded deposit (tx hash: $txHash)" }
                             }
                         }
                     }

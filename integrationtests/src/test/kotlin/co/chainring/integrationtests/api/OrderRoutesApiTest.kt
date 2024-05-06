@@ -15,7 +15,6 @@ import co.chainring.apps.api.model.websocket.OHLC
 import co.chainring.apps.api.model.websocket.OrderBook
 import co.chainring.apps.api.model.websocket.OrderBookEntry
 import co.chainring.core.model.EvmSignature
-import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
@@ -32,11 +31,12 @@ import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.generateOrderNonce
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
-import co.chainring.integrationtests.testutils.BalanceHelper
-import co.chainring.integrationtests.testutils.ExpectedBalance
+import co.chainring.integrationtests.testutils.waitForBalance
 import co.chainring.integrationtests.utils.ApiClient
+import co.chainring.integrationtests.utils.ExpectedBalance
 import co.chainring.integrationtests.utils.Faucet
 import co.chainring.integrationtests.utils.Wallet
+import co.chainring.integrationtests.utils.assertBalances
 import co.chainring.integrationtests.utils.assertBalancesMessageReceived
 import co.chainring.integrationtests.utils.assertError
 import co.chainring.integrationtests.utils.assertLimitsMessageReceived
@@ -55,7 +55,6 @@ import co.chainring.integrationtests.utils.subscribeToOrderBook
 import co.chainring.integrationtests.utils.subscribeToOrders
 import co.chainring.integrationtests.utils.subscribeToPrices
 import co.chainring.integrationtests.utils.subscribeToTrades
-import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import org.awaitility.kotlin.await
 import org.awaitility.kotlin.withAlias
@@ -78,7 +77,6 @@ import kotlin.test.assertNotNull
 
 @ExtendWith(AppUnderTestRunner::class)
 class OrderRoutesApiTest {
-    private val logger = KotlinLogging.logger {}
     private val btcEthMarketId = MarketId("BTC/ETH")
     private val btcUsdcMarketId = MarketId("BTC/USDC")
     private val usdcDaiMarketId = MarketId("USDC/DAI")
@@ -100,18 +98,14 @@ class OrderRoutesApiTest {
 
         Faucet.fund(wallet.address)
         wallet.mintERC20("DAI", wallet.formatAmount("14", "DAI"))
+
         val amountToDeposit = wallet.formatAmount("14", "DAI")
-        BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit))) {
-            deposit(wallet, "DAI", amountToDeposit)
-        }
-        wsClient.assertBalancesMessageReceived { msg ->
-            assertEquals(1, msg.balances.size)
-            assertEquals(Symbol("DAI"), msg.balances.first().symbol)
-            assertEquals(BigInteger("14000000000000000000"), msg.balances.first().available)
-        }
+        deposit(wallet, "DAI", amountToDeposit)
+        waitForBalance(apiClient, wsClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit)))
+
         wsClient.assertLimitsMessageReceived(usdcDaiMarketId) { msg ->
             assertEquals(BigInteger("0"), msg.base)
-            assertEquals(BigInteger("14000000000000000000"), msg.quote)
+            assertEquals(amountToDeposit, msg.quote)
         }
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
@@ -158,7 +152,7 @@ class OrderRoutesApiTest {
         wsClient.assertLimitsMessageReceived(usdcDaiMarketId)
 
         // update order
-        val updateOrderApiRequest = UpdateOrderApiRequest.Limit(
+        val updateOrderApiRequest = UpdateOrderApiRequest(
             orderId = createLimitOrderResponse.orderId,
             marketId = createLimitOrderResponse.order.marketId,
             side = createLimitOrderResponse.order.side,
@@ -173,9 +167,9 @@ class OrderRoutesApiTest {
             updateOrderApiRequest,
         )
         assertEquals(updatedOrderApiResponse.requestStatus, RequestStatus.Accepted)
-        assertIs<UpdateOrderApiRequest.Limit>(updatedOrderApiResponse.order)
+        assertIs<UpdateOrderApiRequest>(updatedOrderApiResponse.order)
         assertEquals(wallet.formatAmount("3", "USDC"), updatedOrderApiResponse.order.amount)
-        assertEquals(0, BigDecimal("2.01").compareTo((updatedOrderApiResponse.order as UpdateOrderApiRequest.Limit).price))
+        assertEquals(0, BigDecimal("2.01").compareTo(updatedOrderApiResponse.order.price))
         wsClient.assertOrderUpdatedMessageReceived { msg ->
             assertIs<Order.Limit>(msg.order)
             validateLimitOrders(updatedOrderApiResponse.order, msg.order as Order.Limit, true)
@@ -228,21 +222,15 @@ class OrderRoutesApiTest {
         Faucet.fund(wallet.address)
         val amountToDeposit = wallet.formatAmount("20", "DAI")
         wallet.mintERC20("DAI", amountToDeposit)
-        BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit))) {
-            deposit(wallet, "DAI", amountToDeposit)
-        }
-        wsClient.assertBalancesMessageReceived { msg ->
-            assertEquals(1, msg.balances.size)
-            assertEquals(Symbol("DAI"), msg.balances.first().symbol)
-            assertEquals(BigInteger("20000000000000000000"), msg.balances.first().available)
-        }
+        deposit(wallet, "DAI", amountToDeposit)
+        waitForBalance(apiClient, wsClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit)))
 
         // operation on non-existent order
         ApiError(ReasonCode.OrderNotFound, "Requested order does not exist").also { expectedError ->
             apiClient.tryGetOrder(OrderId.generate()).assertError(expectedError)
 
             apiClient.tryUpdateOrder(
-                apiRequest = UpdateOrderApiRequest.Limit(
+                apiRequest = UpdateOrderApiRequest(
                     orderId = OrderId.generate(),
                     marketId = usdcDaiMarketId,
                     side = OrderSide.Buy,
@@ -271,7 +259,7 @@ class OrderRoutesApiTest {
 
         // invalid signature (malformed signature)
         apiClient.tryUpdateOrder(
-            apiRequest = UpdateOrderApiRequest.Limit(
+            apiRequest = UpdateOrderApiRequest(
                 orderId = OrderId.generate(),
                 marketId = usdcDaiMarketId,
                 side = OrderSide.Buy,
@@ -280,7 +268,7 @@ class OrderRoutesApiTest {
                 nonce = generateOrderNonce(),
                 signature = EvmSignature.emptySignature(),
             ),
-        ).assertError(ApiError(ReasonCode.ProcessingError, "Invalid signature"))
+        ).assertError(ApiError(ReasonCode.SignatureNotValid, "Invalid signature"))
 
         // try to submit an order that crosses the market
         val createLimitOrderResponse = apiClient.createOrder(
@@ -345,7 +333,7 @@ class OrderRoutesApiTest {
 
         // try updating the price to something not a tick size
         apiClient.tryUpdateOrder(
-            apiRequest = UpdateOrderApiRequest.Limit(
+            apiRequest = UpdateOrderApiRequest(
                 orderId = createLimitOrderResponse2.orderId,
                 amount = wallet.formatAmount("1", "USDC"),
                 marketId = createLimitOrderResponse2.order.marketId,
@@ -364,7 +352,7 @@ class OrderRoutesApiTest {
         val apiClient2 = ApiClient()
         val wallet2 = Wallet(apiClient2)
         apiClient2.tryUpdateOrder(
-            apiRequest = UpdateOrderApiRequest.Limit(
+            apiRequest = UpdateOrderApiRequest(
                 orderId = createLimitOrderResponse2.orderId,
                 amount = wallet.formatAmount("1", "USDC"),
                 marketId = createLimitOrderResponse2.order.marketId,
@@ -376,7 +364,7 @@ class OrderRoutesApiTest {
                 wallet.signOrder(it)
             },
         ).assertError(
-            ApiError(ReasonCode.ProcessingError, "Invalid signature"),
+            ApiError(ReasonCode.SignatureNotValid, "Invalid signature"),
         )
         apiClient2.tryCancelOrder(
             CancelOrderApiRequest(
@@ -406,7 +394,7 @@ class OrderRoutesApiTest {
                 wallet2.signCancelOrder(it)
             },
         ).assertError(
-            ApiError(ReasonCode.ProcessingError, "Invalid signature"),
+            ApiError(ReasonCode.SignatureNotValid, "Invalid signature"),
         )
 
         // try update cancelled order
@@ -429,7 +417,7 @@ class OrderRoutesApiTest {
             }
         }
         apiClient.tryUpdateOrder(
-            apiRequest = UpdateOrderApiRequest.Limit(
+            apiRequest = UpdateOrderApiRequest(
                 orderId = createLimitOrderResponse2.orderId,
                 amount = wallet.formatAmount("3", "USDC"),
                 marketId = createLimitOrderResponse2.order.marketId,
@@ -463,14 +451,8 @@ class OrderRoutesApiTest {
         Faucet.fund(wallet.address)
         val amountToDeposit = wallet.formatAmount("30", "DAI")
         wallet.mintERC20("DAI", amountToDeposit)
-        BalanceHelper.waitForAndVerifyBalanceChange(apiClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit))) {
-            deposit(wallet, "DAI", amountToDeposit)
-        }
-        wsClient.assertBalancesMessageReceived { msg ->
-            assertEquals(1, msg.balances.size)
-            assertEquals(Symbol("DAI"), msg.balances.first().symbol)
-            assertEquals(BigInteger("30000000000000000000"), msg.balances.first().available)
-        }
+        deposit(wallet, "DAI", amountToDeposit)
+        waitForBalance(apiClient, wsClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit)))
         wsClient.assertLimitsMessageReceived(usdcDaiMarketId)
 
         val limitOrderApiRequest = CreateOrderApiRequest.Limit(
@@ -558,7 +540,7 @@ class OrderRoutesApiTest {
         }
 
         val updatedLimitBuyOrderApiResponse = makerApiClient.updateOrder(
-            UpdateOrderApiRequest.Limit(
+            UpdateOrderApiRequest(
                 orderId = limitBuyOrderApiResponse.orderId,
                 amount = makerWallet.formatAmount("0.00012345", "BTC"),
                 marketId = limitBuyOrderApiResponse.order.marketId,
@@ -570,7 +552,7 @@ class OrderRoutesApiTest {
                 makerWallet.signOrder(it)
             },
         )
-        assertIs<UpdateOrderApiRequest.Limit>(updatedLimitBuyOrderApiResponse.order)
+        assertIs<UpdateOrderApiRequest>(updatedLimitBuyOrderApiResponse.order)
         assertEquals(RequestStatus.Accepted, updatedLimitBuyOrderApiResponse.requestStatus)
 
         makerWsClient.assertOrderUpdatedMessageReceived { msg ->
@@ -637,7 +619,7 @@ class OrderRoutesApiTest {
 
         // update amount and price of the sell
         val updatedLimitSellOrderApiResponse = makerApiClient.updateOrder(
-            UpdateOrderApiRequest.Limit(
+            UpdateOrderApiRequest(
                 orderId = limitSellOrderApiResponse.orderId,
                 amount = makerWallet.formatAmount("0.00054321", "BTC"),
                 marketId = limitSellOrderApiResponse.order.marketId,
@@ -649,7 +631,7 @@ class OrderRoutesApiTest {
                 makerWallet.signOrder(it)
             },
         )
-        assertIs<UpdateOrderApiRequest.Limit>(updatedLimitSellOrderApiResponse.order)
+        assertIs<UpdateOrderApiRequest>(updatedLimitSellOrderApiResponse.order)
         assertEquals(RequestStatus.Accepted, updatedLimitSellOrderApiResponse.requestStatus)
 
         makerWsClient.assertOrderUpdatedMessageReceived { msg ->
@@ -703,7 +685,7 @@ class OrderRoutesApiTest {
                 assertEquals(marketBuyOrderApiResponse.orderId, msg.trade.orderId)
                 assertEquals(marketBuyOrderApiResponse.order.marketId, msg.trade.marketId)
                 assertEquals(marketBuyOrderApiResponse.order.side, msg.trade.side)
-                assertEquals(0, (updatedLimitSellOrderApiResponse.order as UpdateOrderApiRequest.Limit).price.compareTo(msg.trade.price))
+                assertEquals(0, (updatedLimitSellOrderApiResponse.order).price.compareTo(msg.trade.price))
                 assertEquals(marketBuyOrderApiResponse.order.amount, msg.trade.amount)
                 assertEquals(SettlementStatus.Pending, msg.trade.settlementStatus)
             }
@@ -725,7 +707,7 @@ class OrderRoutesApiTest {
                 assertEquals(updatedLimitSellOrderApiResponse.order.orderId, msg.trade.orderId)
                 assertEquals(updatedLimitSellOrderApiResponse.order.marketId, msg.trade.marketId)
                 assertEquals(updatedLimitSellOrderApiResponse.order.side, msg.trade.side)
-                assertEquals(0, (updatedLimitSellOrderApiResponse.order as UpdateOrderApiRequest.Limit).price.compareTo(msg.trade.price))
+                assertEquals(0, (updatedLimitSellOrderApiResponse.order).price.compareTo(msg.trade.price))
                 assertEquals(takerWallet.formatAmount("0.00043210", "BTC"), msg.trade.amount)
                 assertEquals(SettlementStatus.Pending, msg.trade.settlementStatus)
             }
@@ -803,31 +785,41 @@ class OrderRoutesApiTest {
         assertEquals(0, trade.price.compareTo(BigDecimal("17.550")))
 
         waitForSettlementToFinish(listOf(trade.id.value))
+
+        val baseQuantity = takerWallet.formatAmount("0.00043210", "BTC")
+        val notional = (trade.price * trade.amount.fromFundamentalUnits(takerWallet.decimals("BTC"))).toFundamentalUnits(takerWallet.decimals("ETH"))
+        assertBalances(
+            listOf(
+                ExpectedBalance("BTC", makerStartingBTCBalance - baseQuantity, makerStartingBTCBalance - baseQuantity),
+                ExpectedBalance("ETH", makerStartingETHBalance + notional, makerStartingETHBalance + notional),
+            ),
+            makerApiClient.getBalances().balances,
+        )
+        assertBalances(
+            listOf(
+                ExpectedBalance("BTC", takerStartingBTCBalance + baseQuantity, takerStartingBTCBalance + baseQuantity),
+                ExpectedBalance("ETH", takerStartingETHBalance - notional, takerStartingETHBalance - notional),
+            ),
+            takerApiClient.getBalances().balances,
+        )
+
+        takerWsClient.assertBalancesMessageReceived { msg ->
+            assertEquals(takerStartingBTCBalance + baseQuantity, msg.balances.first { it.symbol.value == "BTC" }.available)
+            assertEquals(takerStartingETHBalance - notional, msg.balances.first { it.symbol.value == "ETH" }.available)
+        }
         takerWsClient.assertTradeUpdatedMessageReceived { msg ->
             assertEquals(marketBuyOrderApiResponse.orderId, msg.trade.orderId)
             assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
+        }
+
+        makerWsClient.assertBalancesMessageReceived { msg ->
+            assertEquals(makerStartingBTCBalance - baseQuantity, msg.balances.first { it.symbol.value == "BTC" }.available)
+            assertEquals(makerStartingETHBalance + notional, msg.balances.first { it.symbol.value == "ETH" }.available)
         }
         makerWsClient.assertTradeUpdatedMessageReceived { msg ->
             assertEquals(updatedLimitSellOrderApiResponse.order.orderId, msg.trade.orderId)
             assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
         }
-
-        val baseQuantity = takerWallet.formatAmount("0.00043210", "BTC")
-        val notional = (trade.price * trade.amount.fromFundamentalUnits(takerWallet.decimals("BTC"))).toFundamentalUnits(takerWallet.decimals("ETH"))
-        BalanceHelper.verifyBalances(
-            makerApiClient,
-            listOf(
-                ExpectedBalance("BTC", makerStartingBTCBalance - baseQuantity, makerStartingBTCBalance - baseQuantity),
-                ExpectedBalance("ETH", makerStartingETHBalance + notional, makerStartingETHBalance + notional),
-            ),
-        )
-        BalanceHelper.verifyBalances(
-            takerApiClient,
-            listOf(
-                ExpectedBalance("BTC", takerStartingBTCBalance + baseQuantity, takerStartingBTCBalance + baseQuantity),
-                ExpectedBalance("ETH", takerStartingETHBalance - notional, takerStartingETHBalance - notional),
-            ),
-        )
 
         // place a sell order and see it gets executed
         val marketSellOrderApiResponse = takerApiClient.createOrder(
@@ -878,7 +870,7 @@ class OrderRoutesApiTest {
                 assertEquals(updatedLimitBuyOrderApiResponse.order.orderId, msg.trade.orderId)
                 assertEquals(updatedLimitBuyOrderApiResponse.order.marketId, msg.trade.marketId)
                 assertEquals(updatedLimitBuyOrderApiResponse.order.side, msg.trade.side)
-                assertEquals(0, (updatedLimitBuyOrderApiResponse.order as UpdateOrderApiRequest.Limit).price.compareTo(msg.trade.price))
+                assertEquals(0, updatedLimitBuyOrderApiResponse.order.price.compareTo(msg.trade.price))
                 assertEquals(makerWallet.formatAmount("0.00012345", "BTC"), msg.trade.amount)
                 assertEquals(SettlementStatus.Pending, msg.trade.settlementStatus)
             }
@@ -915,6 +907,23 @@ class OrderRoutesApiTest {
 
         waitForSettlementToFinish(listOf(trade2.id.value))
 
+        val baseQuantity2 = takerWallet.formatAmount("0.00012345", "BTC")
+        val notional2 = (trade2.price * trade2.amount.fromFundamentalUnits(takerWallet.decimals("BTC"))).toFundamentalUnits(takerWallet.decimals("ETH"))
+        assertBalances(
+            listOf(
+                ExpectedBalance("BTC", makerStartingBTCBalance - baseQuantity + baseQuantity2, makerStartingBTCBalance - baseQuantity + baseQuantity2),
+                ExpectedBalance("ETH", makerStartingETHBalance + notional - notional2, makerStartingETHBalance + notional - notional2),
+            ),
+            makerApiClient.getBalances().balances,
+        )
+        assertBalances(
+            listOf(
+                ExpectedBalance("BTC", takerStartingBTCBalance + baseQuantity - baseQuantity2, takerStartingBTCBalance + baseQuantity - baseQuantity2),
+                ExpectedBalance("ETH", takerStartingETHBalance - notional + notional2, takerStartingETHBalance - notional + notional2),
+            ),
+            takerApiClient.getBalances().balances,
+        )
+
         takerWsClient.apply {
             assertPricesMessageReceived(btcEthMarketId) { msg ->
                 assertEquals(
@@ -932,6 +941,10 @@ class OrderRoutesApiTest {
             assertLimitsMessageReceived(btcEthMarketId) { msg ->
                 assertEquals(BigInteger("308650000000000"), msg.base)
                 assertEquals(BigInteger("1994577020000000000"), msg.quote)
+            }
+            assertBalancesMessageReceived { msg ->
+                assertEquals(takerStartingBTCBalance + baseQuantity - baseQuantity2, msg.balances.first { it.symbol.value == "BTC" }.available)
+                assertEquals(takerStartingETHBalance - notional + notional2, msg.balances.first { it.symbol.value == "ETH" }.available)
             }
             assertTradeUpdatedMessageReceived { msg ->
                 assertEquals(marketSellOrderApiResponse.orderId, msg.trade.orderId)
@@ -957,28 +970,15 @@ class OrderRoutesApiTest {
                 assertEquals(BigInteger("199580240000000000"), msg.base)
                 assertEquals(BigInteger("2005422980000000000"), msg.quote)
             }
+            assertBalancesMessageReceived { msg ->
+                assertEquals(makerStartingBTCBalance - baseQuantity + baseQuantity2, msg.balances.first { it.symbol.value == "BTC" }.available)
+                assertEquals(makerStartingETHBalance + notional - notional2, msg.balances.first { it.symbol.value == "ETH" }.available)
+            }
             assertTradeUpdatedMessageReceived { msg ->
                 assertEquals(updatedLimitBuyOrderApiResponse.order.orderId, msg.trade.orderId)
                 assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
             }
         }
-
-        val baseQuantity2 = takerWallet.formatAmount("0.00012345", "BTC")
-        val notional2 = (trade2.price * trade2.amount.fromFundamentalUnits(takerWallet.decimals("BTC"))).toFundamentalUnits(takerWallet.decimals("ETH"))
-        BalanceHelper.verifyBalances(
-            makerApiClient,
-            listOf(
-                ExpectedBalance("BTC", makerStartingBTCBalance - baseQuantity + baseQuantity2, makerStartingBTCBalance - baseQuantity + baseQuantity2),
-                ExpectedBalance("ETH", makerStartingETHBalance + notional - notional2, makerStartingETHBalance + notional - notional2),
-            ),
-        )
-        BalanceHelper.verifyBalances(
-            takerApiClient,
-            listOf(
-                ExpectedBalance("BTC", takerStartingBTCBalance + baseQuantity - baseQuantity2, takerStartingBTCBalance + baseQuantity - baseQuantity2),
-                ExpectedBalance("ETH", takerStartingETHBalance - notional + notional2, takerStartingETHBalance - notional + notional2),
-            ),
-        )
 
         takerApiClient.cancelOpenOrders()
         takerWsClient.assertOrdersMessageReceived()
@@ -1037,7 +1037,7 @@ class OrderRoutesApiTest {
                     assertEquals(marketBuyOrderApiResponse.orderId, orderId)
                     assertEquals(marketBuyOrderApiResponse.order.marketId, marketId)
                     assertEquals(marketBuyOrderApiResponse.order.side, side)
-                    assertEquals(0, (updatedLimitSellOrderApiResponse.order as UpdateOrderApiRequest.Limit).price.compareTo(price))
+                    assertEquals(0, updatedLimitSellOrderApiResponse.order.price.compareTo(price))
                     assertEquals(marketBuyOrderApiResponse.order.amount, amount)
                     assertEquals(SettlementStatus.Completed, settlementStatus)
                 }
@@ -1122,7 +1122,7 @@ class OrderRoutesApiTest {
                     }
                 },
                 updateOrders = listOf(
-                    UpdateOrderApiRequest.Limit(
+                    UpdateOrderApiRequest(
                         orderId = createBatchLimitOrders.createdOrders[0].orderId,
                         amount = makerWallet.formatAmount("0.0001", "BTC"),
                         marketId = createBatchLimitOrders.createdOrders[0].order.marketId,
@@ -1133,7 +1133,7 @@ class OrderRoutesApiTest {
                     ).let {
                         makerWallet.signOrder(it)
                     },
-                    UpdateOrderApiRequest.Limit(
+                    UpdateOrderApiRequest(
                         orderId = createBatchLimitOrders.createdOrders[1].orderId,
                         amount = makerWallet.formatAmount("0.0002", "BTC"),
                         marketId = createBatchLimitOrders.createdOrders[1].order.marketId,
@@ -1144,7 +1144,7 @@ class OrderRoutesApiTest {
                     ).let {
                         makerWallet.signOrder(it)
                     },
-                    UpdateOrderApiRequest.Limit(
+                    UpdateOrderApiRequest(
                         orderId = OrderId.generate(),
                         amount = makerWallet.formatAmount("0.0002", "BTC"),
                         marketId = createBatchLimitOrders.createdOrders[1].order.marketId,
@@ -1286,19 +1286,19 @@ class OrderRoutesApiTest {
         }.reduce { acc, notionalForTrade -> acc + notionalForTrade }
 
         // val notional = (prices.first() * BigDecimal("0.0018")).toFundamentalUnits(takerWallet.decimals("USDC"))
-        BalanceHelper.verifyBalances(
-            makerApiClient,
+        assertBalances(
             listOf(
                 ExpectedBalance("BTC", makerStartingBTCBalance - takerOrderAmount, makerStartingBTCBalance - takerOrderAmount),
                 ExpectedBalance("USDC", makerStartingUSDCBalance + notional, makerStartingUSDCBalance + notional),
             ),
+            makerApiClient.getBalances().balances,
         )
-        BalanceHelper.verifyBalances(
-            takerApiClient,
+        assertBalances(
             listOf(
                 ExpectedBalance("BTC", takerStartingBTCBalance + takerOrderAmount, takerStartingBTCBalance + takerOrderAmount),
                 ExpectedBalance("USDC", takerStartingUSDCBalance - notional, takerStartingUSDCBalance - notional),
             ),
+            takerApiClient.getBalances().balances,
         )
 
         takerApiClient.cancelOpenOrders()
@@ -1325,7 +1325,7 @@ class OrderRoutesApiTest {
         assertEquals(response.amount, order.amount)
         assertEquals(response.side, order.side)
         assertEquals(response.marketId, order.marketId)
-        assertEquals(0, (response as UpdateOrderApiRequest.Limit).price.compareTo(order.price))
+        assertEquals(0, response.price.compareTo(order.price))
         assertNotNull(order.timing.createdAt)
         if (updated) {
             assertNotNull(order.timing.updatedAt)
@@ -1372,22 +1372,21 @@ class OrderRoutesApiTest {
         val formattedMintAmount = wallet.formatAmount(mintAmount, mintSymbol)
         wallet.mintERC20(mintSymbol, formattedMintAmount)
 
-        val formattedNativeAmount = nativeDepositAmount?.let { wallet.formatAmount(it, "BTC") }
+        deposit(wallet, mintSymbol, formattedMintAmount)
+        waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(mintSymbol, formattedMintAmount, formattedMintAmount)))
+        wsClient.assertLimitsMessageReceived(marketId)
 
-        val expectedBalances = listOfNotNull(
-            ExpectedBalance(mintSymbol, formattedMintAmount, formattedMintAmount),
-            formattedNativeAmount?.let { ExpectedBalance("BTC", it, it) },
-        )
-
-        BalanceHelper.waitForAndVerifyBalanceChange(
-            apiClient,
-            expectedBalances,
-        ) {
-            deposit(wallet, mintSymbol, formattedMintAmount)
-            formattedNativeAmount?.let { deposit(wallet, "BTC", it) }
-        }
-        repeat(expectedBalances.size) {
-            wsClient.assertBalancesMessageReceived()
+        nativeDepositAmount?.also {
+            val formattedNativeAmount = wallet.formatAmount(it, "BTC")
+            deposit(wallet, "BTC", formattedNativeAmount)
+            waitForBalance(
+                apiClient,
+                wsClient,
+                listOf(
+                    ExpectedBalance(mintSymbol, formattedMintAmount, formattedMintAmount),
+                    ExpectedBalance("BTC", formattedNativeAmount, formattedNativeAmount),
+                ),
+            )
             wsClient.assertLimitsMessageReceived(marketId)
         }
 

@@ -4,8 +4,9 @@ import co.chainring.apps.api.model.Chain
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.DeployedContract
 import co.chainring.apps.api.model.Market
-import co.chainring.apps.api.model.Symbol
+import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.core.model.Address
+import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainEntity
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
@@ -47,13 +48,13 @@ object ConfigRoutes {
                                     ),
                                 ),
                                 symbols = listOf(
-                                    Symbol(
+                                    SymbolInfo(
                                         name = "ETH",
                                         description = "Ethereum",
                                         contractAddress = null,
                                         decimals = 18u,
                                     ),
-                                    Symbol(
+                                    SymbolInfo(
                                         name = "USDC",
                                         description = "USD Coin",
                                         contractAddress = Address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
@@ -65,9 +66,9 @@ object ConfigRoutes {
                         markets = listOf(
                             Market(
                                 id = "USDC/DAI",
-                                baseSymbol = "USDC",
+                                baseSymbol = Symbol("USDC"),
                                 baseDecimals = 18,
-                                quoteSymbol = "DAI",
+                                quoteSymbol = Symbol("DAI"),
                                 quoteDecimals = 6,
                                 tickSize = "0.01".toBigDecimal(),
                             ),
@@ -89,7 +90,7 @@ object ConfigRoutes {
                                         )
                                     },
                                     symbols = SymbolEntity.forChain(chain.id.value).map {
-                                        Symbol(
+                                        SymbolInfo(
                                             name = it.name,
                                             description = it.description,
                                             contractAddress = it.contractAddress,
@@ -101,9 +102,9 @@ object ConfigRoutes {
                             markets = MarketEntity.all().map { market ->
                                 Market(
                                     id = market.id.value.toString(),
-                                    baseSymbol = market.baseSymbol.name,
+                                    baseSymbol = Symbol(market.baseSymbol.name),
                                     baseDecimals = market.baseSymbol.decimals.toInt(),
-                                    quoteSymbol = market.quoteSymbol.name,
+                                    quoteSymbol = Symbol(market.quoteSymbol.name),
                                     quoteDecimals = market.quoteSymbol.decimals.toInt(),
                                     tickSize = market.tickSize,
                                 )

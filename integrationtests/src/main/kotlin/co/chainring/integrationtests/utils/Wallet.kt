@@ -4,9 +4,8 @@ import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.DeployedContract
-import co.chainring.apps.api.model.Symbol
+import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.apps.api.model.UpdateOrderApiRequest
-import co.chainring.apps.api.model.WithdrawTx
 import co.chainring.contracts.generated.Exchange
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.ContractType
@@ -14,8 +13,13 @@ import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.Symbol
+import co.chainring.core.model.TxHash
+import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OrderSide
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHex
+import co.chainring.core.utils.toHexBytes
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
 import org.web3j.protocol.core.methods.response.TransactionReceipt
@@ -25,7 +29,7 @@ import java.math.BigInteger
 class Wallet(
     val walletKeypair: ECKeyPair,
     val contracts: List<DeployedContract>,
-    val symbols: List<Symbol>,
+    val symbols: List<SymbolInfo>,
 ) {
 
     companion object {
@@ -61,67 +65,104 @@ class Wallet(
         return exchangeContract.nativeBalances(address.value).sendAndWaitForConfirmation()
     }
 
+    fun asyncDepositNative(amount: BigInteger): TxHash =
+        blockchainClient.asyncDepositNative(exchangeContractAddress, amount)
+
+    fun depositNative(amount: BigInteger): TransactionReceipt {
+        return blockchainClient.depositNative(exchangeContractAddress, amount)
+    }
+
+    fun asyncDepositERC20(symbol: String, amount: BigInteger): TxHash {
+        val erc20Contract = loadErc20Contract(symbol)
+
+        blockchainClient.sendTransaction(
+            Address(erc20Contract.contractAddress),
+            erc20Contract.approve(exchangeContractAddress.value, amount).encodeFunctionCall(),
+            BigInteger.ZERO,
+        )
+
+        return blockchainClient.sendTransaction(
+            Address(exchangeContract.contractAddress),
+            exchangeContract.deposit(erc20TokenAddress(symbol), amount).encodeFunctionCall(),
+            BigInteger.ZERO,
+        )
+    }
+
     fun depositERC20(symbol: String, amount: BigInteger): TransactionReceipt {
         loadErc20Contract(symbol).approve(exchangeContractAddress.value, amount).sendAndWaitForConfirmation()
         return exchangeContract.deposit(erc20TokenAddress(symbol), amount).sendAndWaitForConfirmation()
-    }
-
-    fun withdrawERC20(symbol: String, amount: BigInteger): TransactionReceipt {
-        return exchangeContract.withdraw(erc20TokenAddress(symbol), amount).sendAndWaitForConfirmation()
-    }
-
-    fun signWithdraw(symbol: String?, amount: BigInteger, nonceOverride: Long? = null): CreateWithdrawalApiRequest {
-        val nonce = nonceOverride ?: getWithdrawalNonce()
-        val tx = EIP712Transaction.WithdrawTx(address, symbol?.let { Address(erc20TokenAddress(symbol)) }, amount, nonce, EvmSignature.emptySignature())
-        val signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress))
-        return CreateWithdrawalApiRequest(WithdrawTx(tx.sender, tx.token, tx.amount, tx.nonce), signature)
-    }
-
-    fun signOrder(request: CreateOrderApiRequest.Limit): CreateOrderApiRequest.Limit {
-        val (baseSymbol, quoteSymbol) = request.marketId.value.split("/")
-        val tx = request.toEip712Transaction(
-            address,
-            symbols.first { it.name == baseSymbol },
-            symbols.first { it.name == quoteSymbol },
-        )
-        return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
-    }
-
-    fun signOrder(request: CreateOrderApiRequest.Market): CreateOrderApiRequest.Market {
-        val (baseSymbol, quoteSymbol) = request.marketId.value.split("/")
-        val tx = request.toEip712Transaction(
-            address,
-            symbols.first { it.name == baseSymbol },
-            symbols.first { it.name == quoteSymbol },
-        )
-        return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
-    }
-
-    fun signOrder(request: UpdateOrderApiRequest.Limit): UpdateOrderApiRequest.Limit {
-        val (baseSymbol, quoteSymbol) = request.marketId.value.split("/")
-        val tx = request.toEip712Transaction(
-            address,
-            symbols.first { it.name == baseSymbol },
-            symbols.first { it.name == quoteSymbol },
-        )
-        return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
-    }
-
-    fun signCancelOrder(request: CancelOrderApiRequest): CancelOrderApiRequest {
-        val tx = request.toEip712Transaction(address)
-        return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
-    }
-
-    private fun getWithdrawalNonce(): Long {
-        return System.currentTimeMillis()
     }
 
     fun withdrawNative(amount: BigInteger): TransactionReceipt {
         return exchangeContract.withdraw(amount).sendAndWaitForConfirmation()
     }
 
-    fun depositNative(amount: BigInteger): TransactionReceipt {
-        return blockchainClient.depositNative(exchangeContractAddress, amount)
+    fun withdrawERC20(symbol: String, amount: BigInteger): TransactionReceipt {
+        return exchangeContract.withdraw(erc20TokenAddress(symbol), amount).sendAndWaitForConfirmation()
+    }
+
+    fun signWithdraw(symbol: String, amount: BigInteger, nonceOverride: Long? = null): CreateWithdrawalApiRequest {
+        val nonce = nonceOverride ?: getWithdrawalNonce()
+        val tx = EIP712Transaction.WithdrawTx(address, erc20TokenAddress(symbol)?.let { Address(it) }, amount, nonce, EvmSignature.emptySignature())
+        return CreateWithdrawalApiRequest(
+            Symbol(symbol),
+            amount,
+            nonce,
+            blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)),
+        )
+    }
+
+    fun signOrder(request: CreateOrderApiRequest.Limit): CreateOrderApiRequest.Limit =
+        request.copy(
+            signature = limitOrderEip712TxSignature(request.marketId, request.amount, request.price, request.side, request.nonce),
+        )
+
+    fun signOrder(request: CreateOrderApiRequest.Market): CreateOrderApiRequest.Market {
+        val (baseSymbol, quoteSymbol) = request.marketId.value.split("/").map { name -> symbols.first { it.name == name } }
+        val tx = EIP712Transaction.Order(
+            address,
+            baseToken = baseSymbol.contractAddress ?: Address.zero,
+            quoteToken = quoteSymbol.contractAddress ?: Address.zero,
+            amount = if (request.side == OrderSide.Buy) request.amount else request.amount.negate(),
+            price = BigInteger.ZERO,
+            nonce = BigInteger(1, request.nonce.toHexBytes()),
+            EvmSignature.emptySignature(),
+        )
+        return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
+    }
+
+    fun signOrder(request: UpdateOrderApiRequest): UpdateOrderApiRequest =
+        request.copy(
+            signature = limitOrderEip712TxSignature(request.marketId, request.amount, request.price, request.side, request.nonce),
+        )
+
+    fun signCancelOrder(request: CancelOrderApiRequest): CancelOrderApiRequest {
+        val tx = EIP712Transaction.CancelOrder(
+            address,
+            request.marketId,
+            if (request.side == OrderSide.Buy) request.amount else request.amount.negate(),
+            BigInteger(1, request.nonce.toHexBytes()),
+            EvmSignature.emptySignature(),
+        )
+        return request.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
+    }
+
+    private fun limitOrderEip712TxSignature(marketId: MarketId, amount: BigInteger, price: BigDecimal, side: OrderSide, nonce: String): EvmSignature {
+        val (baseSymbol, quoteSymbol) = marketId.value.split("/").map { name -> symbols.first { it.name == name } }
+        val tx = EIP712Transaction.Order(
+            address,
+            baseToken = baseSymbol.contractAddress ?: Address.zero,
+            quoteToken = quoteSymbol.contractAddress ?: Address.zero,
+            amount = if (side == OrderSide.Buy) amount else amount.negate(),
+            price = price.toFundamentalUnits(quoteSymbol.decimals),
+            nonce = BigInteger(1, nonce.toHexBytes()),
+            EvmSignature.emptySignature(),
+        )
+        return blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress))
+    }
+
+    private fun getWithdrawalNonce(): Long {
+        return System.currentTimeMillis()
     }
 
     fun formatAmount(amount: String, symbol: String): BigInteger {
@@ -130,8 +171,8 @@ class Wallet(
 
     fun decimals(symbol: String): Int = symbols.first { it.name == symbol }.decimals.toInt()
 
-    private fun loadErc20Contract(symbol: String) = blockchainClient.loadERC20Mock(erc20TokenAddress(symbol))
+    private fun loadErc20Contract(symbol: String) = blockchainClient.loadERC20Mock(erc20TokenAddress(symbol)!!)
 
     private fun erc20TokenAddress(symbol: String) =
-        symbols.first { it.name == symbol && it.contractAddress != null }.contractAddress!!.value
+        symbols.firstOrNull { it.name == symbol && it.contractAddress != null }?.contractAddress?.value
 }

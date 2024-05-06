@@ -209,15 +209,16 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         }
     }
 
-    fun toEip712Transaction(baseToken: Address, quoteToken: Address, quoteDecimals: Int) = EIP712Transaction.Order(
-        this.wallet.address,
-        baseToken,
-        quoteToken,
-        this.amount,
-        this.price?.toFundamentalUnits(quoteDecimals) ?: BigInteger.ZERO,
-        BigInteger(1, this.nonce.toHexBytes()),
-        this.signature.toEvmSignature(),
-    )
+    fun toEip712Transaction(baseToken: Address, quoteToken: Address, quoteDecimals: Int) =
+        EIP712Transaction.Order(
+            this.wallet.address,
+            baseToken,
+            quoteToken,
+            this.amount,
+            this.price?.toFundamentalUnits(quoteDecimals) ?: BigInteger.ZERO,
+            BigInteger(1, this.nonce.toHexBytes()),
+            this.signature.toEvmSignature(),
+        )
 
     companion object : EntityClass<OrderId, OrderEntity>(OrderTable) {
         fun batchUpdate(market: MarketEntity, wallet: WalletEntity, createAssignments: List<CreateOrderAssignment>, updateAssignments: List<UpdateOrderAssignment>) {

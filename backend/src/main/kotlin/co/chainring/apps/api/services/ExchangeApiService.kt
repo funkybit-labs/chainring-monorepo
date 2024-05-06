@@ -5,14 +5,22 @@ import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.BatchOrdersApiResponse
 import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CancelOrderApiResponse
+import co.chainring.apps.api.model.CreateDepositApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiResponse
+import co.chainring.apps.api.model.CreateWithdrawalApiRequest
+import co.chainring.apps.api.model.Deposit
+import co.chainring.apps.api.model.DepositApiResponse
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.ReasonCode
+import co.chainring.apps.api.model.RequestProcessingError
 import co.chainring.apps.api.model.RequestStatus
-import co.chainring.apps.api.model.Symbol
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.UpdateOrderApiResponse
+import co.chainring.apps.api.model.Withdrawal
+import co.chainring.apps.api.model.WithdrawalApiResponse
+import co.chainring.apps.api.model.invalidEIP712SignatureError
+import co.chainring.apps.api.model.processingError
 import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.ContractType
@@ -20,8 +28,9 @@ import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
-import co.chainring.core.model.ExchangeError
+import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.BroadcasterNotification
+import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
@@ -30,10 +39,10 @@ import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.WithdrawalEntity
-import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.publishBroadcasterNotifications
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.sequencer.toSequencerId
+import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.proto.OrderChangeRejected.Reason
@@ -48,7 +57,7 @@ class ExchangeApiService(
     val blockchainClient: BlockchainClient,
     val sequencerClient: SequencerClient,
 ) {
-    private val symbolMap = mutableMapOf<String, Symbol>()
+    private val symbolMap = mutableMapOf<Symbol, SymbolEntity>()
     private val marketMap = mutableMapOf<MarketId, Market>()
     private val logger = KotlinLogging.logger {}
 
@@ -84,68 +93,98 @@ class ExchangeApiService(
 
     fun orderBatch(
         walletAddress: Address,
-        apiRequest: BatchOrdersApiRequest,
+        batchOrdersRequest: BatchOrdersApiRequest,
     ): BatchOrdersApiResponse {
-        if (apiRequest.cancelOrders.isEmpty() && apiRequest.updateOrders.isEmpty() && apiRequest.createOrders.isEmpty()) {
+        if (batchOrdersRequest.cancelOrders.isEmpty() && batchOrdersRequest.updateOrders.isEmpty() && batchOrdersRequest.createOrders.isEmpty()) {
             return BatchOrdersApiResponse(emptyList(), emptyList(), emptyList())
         }
 
-        val createOrderRequestsByOrderId = apiRequest.createOrders.associateBy { OrderId.generate() }
+        val createOrderRequestsByOrderId = batchOrdersRequest.createOrders.associateBy { OrderId.generate() }
 
-        val market = getMarket(apiRequest.marketId)
+        val market = getMarket(batchOrdersRequest.marketId)
+        val baseSymbol = getSymbolEntity(market.baseSymbol)
+        val quoteSymbol = getSymbolEntity(market.quoteSymbol)
 
-        // process the orders to add
-        val ordersToAdd = createOrderRequestsByOrderId.map { (orderId, request) ->
-            // check price and market
-            val price = checkPrice(market, request.getResolvedPrice())
-            checkMarket(apiRequest.marketId, request.marketId)
-            // verify signatures on created orders
-            validateOrderSignature(
+        val ordersToAdd = createOrderRequestsByOrderId.map { (orderId, orderRequest) ->
+            val price = when (orderRequest) {
+                is CreateOrderApiRequest.Limit -> orderRequest.price
+                else -> null
+            }?.also { ensurePriceIsMultipleOfTickSize(market, it) }
+
+            ensureOrderMarketIdMatchesBatchMarketId(orderRequest.marketId, batchOrdersRequest)
+
+            verifyEIP712Signature(
                 walletAddress,
-                request.toEip712Transaction(walletAddress, getSymbol(market.baseSymbol), getSymbol(market.quoteSymbol)),
+                EIP712Transaction.Order(
+                    walletAddress,
+                    baseToken = baseSymbol.contractAddress ?: Address.zero,
+                    quoteToken = quoteSymbol.contractAddress ?: Address.zero,
+                    amount = if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
+                    price = when (orderRequest) {
+                        is CreateOrderApiRequest.Limit -> orderRequest.price.toFundamentalUnits(quoteSymbol.decimals)
+                        else -> BigInteger.ZERO
+                    },
+                    nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
+                    signature = orderRequest.signature,
+                ),
             )
+
             SequencerClient.Order(
                 sequencerOrderId = orderId.toSequencerId().value,
-                amount = request.amount,
+                amount = orderRequest.amount,
                 price = price?.toString(),
                 wallet = walletAddress.toSequencerId().value,
-                orderType = toSequencerOrderType(request is CreateOrderApiRequest.Market, request.side),
-                nonce = BigInteger(1, request.nonce.toHexBytes()),
-                signature = request.signature,
+                orderType = toSequencerOrderType(orderRequest is CreateOrderApiRequest.Market, orderRequest.side),
+                nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
+                signature = orderRequest.signature,
                 orderId = orderId,
             )
         }
 
-        // process any order updates
-        val ordersToUpdate = apiRequest.updateOrders.map { request ->
-            val price = checkPrice(market, request.getResolvedPrice())
-            checkMarket(apiRequest.marketId, request.marketId)
-            // verify signatures on updated orders
-            validateOrderSignature(
+        val ordersToUpdate = batchOrdersRequest.updateOrders.map { orderRequest ->
+            ensurePriceIsMultipleOfTickSize(market, orderRequest.price)
+            ensureOrderMarketIdMatchesBatchMarketId(orderRequest.marketId, batchOrdersRequest)
+
+            verifyEIP712Signature(
                 walletAddress,
-                request.toEip712Transaction(walletAddress, getSymbol(market.baseSymbol), getSymbol(market.quoteSymbol)),
+                EIP712Transaction.Order(
+                    walletAddress,
+                    baseToken = baseSymbol.contractAddress ?: Address.zero,
+                    quoteToken = quoteSymbol.contractAddress ?: Address.zero,
+                    amount = if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
+                    price = orderRequest.price.toFundamentalUnits(quoteSymbol.decimals),
+                    nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
+                    signature = orderRequest.signature,
+                ),
             )
+
             SequencerClient.Order(
-                sequencerOrderId = request.orderId.toSequencerId().value,
-                amount = request.amount,
-                price = price?.toString(),
+                sequencerOrderId = orderRequest.orderId.toSequencerId().value,
+                amount = orderRequest.amount,
+                price = orderRequest.price.toString(),
                 wallet = walletAddress.toSequencerId().value,
-                orderType = toSequencerOrderType(false, request.side),
-                nonce = BigInteger(1, request.nonce.toHexBytes()),
-                signature = request.signature,
-                orderId = request.orderId,
+                orderType = toSequencerOrderType(false, orderRequest.side),
+                nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
+                signature = orderRequest.signature,
+                orderId = orderRequest.orderId,
             )
         }
 
-        // cancels
-        val ordersToCancel = apiRequest.cancelOrders.map { request ->
-            checkMarket(apiRequest.marketId, request.marketId)
-            // verify signatures on cancelled orders
-            validateOrderSignature(
+        val ordersToCancel = batchOrdersRequest.cancelOrders.map { orderRequest ->
+            ensureOrderMarketIdMatchesBatchMarketId(orderRequest.marketId, batchOrdersRequest)
+
+            verifyEIP712Signature(
                 walletAddress,
-                request.toEip712Transaction(walletAddress),
+                EIP712Transaction.CancelOrder(
+                    walletAddress,
+                    batchOrdersRequest.marketId,
+                    if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
+                    BigInteger(1, orderRequest.nonce.toHexBytes()),
+                    orderRequest.signature,
+                ),
             )
-            request.orderId
+
+            orderRequest.orderId
         }
 
         val response = runBlocking {
@@ -154,8 +193,8 @@ class ExchangeApiService(
 
         when (response.error) {
             SequencerError.None -> {}
-            SequencerError.ExceedsLimit -> throw ExchangeError("Order exceeds limit")
-            else -> throw ExchangeError("Unable to process request - ${response.error}")
+            SequencerError.ExceedsLimit -> throw RequestProcessingError(processingError("Order exceeds limit"))
+            else -> throw RequestProcessingError(processingError("Unable to process request - ${response.error}"))
         }
 
         val failedUpdatesOrCancels = response.ordersChangeRejectedList.associateBy { it.guid }
@@ -169,7 +208,7 @@ class ExchangeApiService(
                     order = request,
                 )
             },
-            apiRequest.updateOrders.map {
+            batchOrdersRequest.updateOrders.map {
                 val rejected = failedUpdatesOrCancels[it.orderId.toSequencerId().value]
                 UpdateOrderApiResponse(
                     requestStatus = if (rejected == null) RequestStatus.Accepted else RequestStatus.Rejected,
@@ -177,7 +216,7 @@ class ExchangeApiService(
                     order = it,
                 )
             },
-            apiRequest.cancelOrders.map {
+            batchOrdersRequest.cancelOrders.map {
                 val rejected = failedUpdatesOrCancels[it.orderId.toSequencerId().value]
                 CancelOrderApiResponse(
                     orderId = it.orderId,
@@ -196,33 +235,56 @@ class ExchangeApiService(
         }
     }
 
-    fun withdraw(withdrawTx: EIP712Transaction.WithdrawTx): WithdrawalId {
-        val withdrawalId = WithdrawalId.generate()
-        val withdrawalEntity = transaction {
-            WithdrawalEntity.create(
-                withdrawalId,
-                withdrawTx.nonce,
-                blockchainClient.chainId,
-                WalletEntity.getByAddress(withdrawTx.sender)!!,
-                withdrawTx.token,
-                withdrawTx.amount,
-                withdrawTx.signature,
+    fun withdraw(walletAddress: Address, apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse {
+        val symbol = getSymbolEntity(apiRequest.symbol)
+
+        verifyEIP712Signature(
+            walletAddress,
+            EIP712Transaction.WithdrawTx(
+                walletAddress,
+                symbol.contractAddress,
+                apiRequest.amount,
+                apiRequest.nonce,
+                apiRequest.signature,
+            ),
+        )
+
+        val withdrawal = transaction {
+            Withdrawal.fromEntity(
+                WithdrawalEntity.createPending(
+                    WalletEntity.getByAddress(walletAddress),
+                    symbol,
+                    apiRequest.amount,
+                    apiRequest.nonce,
+                    apiRequest.signature,
+                ),
             )
         }
 
         runBlocking {
             sequencerClient.withdraw(
-                withdrawTx.sender.toSequencerId().value,
-                Asset(transaction { withdrawalEntity.symbol.name }),
-                withdrawTx.amount,
-                withdrawTx.nonce.toBigInteger(),
-                withdrawTx.signature,
-                withdrawalId,
+                walletAddress.toSequencerId().value,
+                Asset(symbol.name),
+                apiRequest.amount,
+                apiRequest.nonce.toBigInteger(),
+                apiRequest.signature,
+                withdrawal.id,
             )
         }
 
-        return withdrawalEntity.guid.value
+        return WithdrawalApiResponse(withdrawal)
     }
+
+    fun deposit(walletAddress: Address, apiRequest: CreateDepositApiRequest): DepositApiResponse =
+        transaction {
+            DepositEntity.create(
+                wallet = WalletEntity.getOrCreate(walletAddress),
+                symbol = getSymbolEntity(apiRequest.symbol),
+                amount = apiRequest.amount,
+                blockNumber = BigInteger.ZERO,
+                transactionHash = apiRequest.txHash,
+            ).let { DepositApiResponse(Deposit.fromEntity(it)) }
+        }
 
     fun cancelOrder(walletAddress: Address, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {
         return orderBatch(
@@ -270,11 +332,9 @@ class ExchangeApiService(
         }
     }
 
-    private fun getSymbol(asset: String): Symbol {
+    private fun getSymbolEntity(asset: Symbol): SymbolEntity {
         return symbolMap.getOrPut(asset) {
-            transaction { SymbolEntity.forChainAndName(blockchainClient.chainId, asset) }.let {
-                Symbol(it.name, it.description, it.contractAddress, it.decimals)
-            }
+            transaction { SymbolEntity.forChainAndName(blockchainClient.chainId, asset.value) }
         }
     }
 
@@ -282,7 +342,14 @@ class ExchangeApiService(
         return marketMap.getOrPut(marketId) {
             transaction {
                 MarketEntity[marketId].let {
-                    Market(it.id.value.value, it.baseSymbol.name, it.baseSymbol.decimals.toInt(), it.quoteSymbol.name, it.quoteSymbol.decimals.toInt(), it.tickSize)
+                    Market(
+                        it.id.value.value,
+                        baseSymbol = Symbol(it.baseSymbol.name),
+                        baseDecimals = it.baseSymbol.decimals.toInt(),
+                        quoteSymbol = Symbol(it.quoteSymbol.name),
+                        quoteDecimals = it.quoteSymbol.decimals.toInt(),
+                        tickSize = it.tickSize,
+                    )
                 }
             }
         }
@@ -304,85 +371,34 @@ class ExchangeApiService(
         }
     }
 
-    private fun checkPrice(market: Market, price: BigDecimal?): BigDecimal? {
-        if (price != null && BigDecimal.ZERO.compareTo(price.remainder(market.tickSize)) != 0) {
-            throw ExchangeError("Order price is not a multiple of tick size")
-        }
-        return price
-    }
-
-    private fun checkMarket(left: MarketId, right: MarketId) {
-        if (left != right) {
-            throw ExchangeError("Markets are different")
+    private fun ensurePriceIsMultipleOfTickSize(market: Market, price: BigDecimal) {
+        if (BigDecimal.ZERO.compareTo(price.remainder(market.tickSize)) != 0) {
+            throw RequestProcessingError(processingError("Order price is not a multiple of tick size"))
         }
     }
 
-    private fun validateOrderSignature(walletAddress: Address, tx: EIP712Transaction) {
-        val verifyingContract = blockchainClient.getContractAddress(ContractType.Exchange)
-            ?: throw ExchangeError("No deployed contract found")
+    private fun ensureOrderMarketIdMatchesBatchMarketId(orderMarketId: MarketId, apiRequest: BatchOrdersApiRequest) {
+        if (orderMarketId != apiRequest.marketId) {
+            throw RequestProcessingError(processingError("Orders in a batch request have to be in the same market"))
+        }
+    }
+
+    private fun verifyEIP712Signature(walletAddress: Address, tx: EIP712Transaction) {
+        val verifyingContract = blockchainClient.getContractAddress(ContractType.Exchange)!!
 
         runCatching {
             ECHelper.isValidSignature(
-                EIP712Helper.computeHash(
-                    tx,
-                    blockchainClient.chainId,
-                    verifyingContract,
-                ),
+                EIP712Helper.computeHash(tx, blockchainClient.chainId, verifyingContract),
                 tx.signature,
                 walletAddress,
             )
         }.onFailure {
-            logger.warn(it) { "Exception validating signature" }
-            throw ExchangeError("Invalid signature")
+            logger.warn(it) { "Exception verifying EIP712 signature" }
+            throw RequestProcessingError(invalidEIP712SignatureError)
         }.getOrDefault(false).also { isValidSignature ->
             if (!isValidSignature) {
-                throw ExchangeError("Invalid signature")
+                throw RequestProcessingError(invalidEIP712SignatureError)
             }
         }
     }
-
-//    private fun validateOrderSignature(walletAddress: Address, marketId: MarketId, amount: BigInteger, side: OrderSide, price: BigDecimal?, nonce: String, signature: EvmSignature, isCancel: Boolean = false) {
-//        val verifyingContract = blockchainClient.getContractAddress(ContractType.Exchange)
-//            ?: throw ExchangeError("No deployed contract found")
-//
-//        runCatching {
-//            val tx = if (isCancel) {
-//                EIP712Transaction.CancelOrder(
-//                    walletAddress,
-//                    marketId,
-//                    if (side == OrderSide.Buy) amount else amount.negate(),
-//                    BigInteger(1, nonce.toHexBytes()),
-//                    signature,
-//                )
-//            } else {
-//                val (baseSymbol, quoteSymbol) = marketId.value.split("/")
-//                EIP712Transaction.Order(
-//                    walletAddress,
-//                    getContractAddress(baseSymbol),
-//                    getContractAddress(quoteSymbol),
-//                    if (side == OrderSide.Buy) amount else amount.negate(),
-//                    price?.toFundamentalUnits(getSymbol(quoteSymbol).decimals) ?: BigInteger.ZERO,
-//                    BigInteger(1, nonce.toHexBytes()),
-//                    signature,
-//                )
-//            }
-//
-//            ECHelper.isValidSignature(
-//                EIP712Helper.computeHash(
-//                    tx,
-//                    blockchainClient.chainId,
-//                    verifyingContract,
-//                ),
-//                tx.signature,
-//                walletAddress,
-//            )
-//        }.onFailure {
-//            logger.warn(it) { "Exception validating signature" }
-//            throw ExchangeError("Invalid signature")
-//        }.getOrDefault(false).also { isValidSignature ->
-//            if (!isValidSignature) {
-//                throw ExchangeError("Invalid signature")
-//            }
-//        }
-//    }
 }

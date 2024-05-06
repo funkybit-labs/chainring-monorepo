@@ -258,7 +258,7 @@ class BlockchainTransactionHandler(
             when (tx) {
                 is EIP712Transaction.WithdrawTx -> {
                     WithdrawalEntity.findPendingByWalletAndNonce(
-                        WalletEntity.getByAddress(tx.sender)!!,
+                        WalletEntity.getByAddress(tx.sender),
                         tx.nonce,
                     )?.let {
                         it.update(
@@ -282,6 +282,7 @@ class BlockchainTransactionHandler(
                             ),
                             BalanceType.Exchange,
                         )
+                        broadcasterNotifications.add(BroadcasterNotification.walletBalances(it.wallet))
                     }
                 }
 
@@ -329,6 +330,10 @@ class BlockchainTransactionHandler(
                             }.flatten(),
                             BalanceType.Exchange,
                         )
+
+                        wallets.forEach { wallet ->
+                            broadcasterNotifications.add(BroadcasterNotification.walletBalances(wallet))
+                        }
 
                         executions.forEach { execution ->
                             broadcasterNotifications.add(

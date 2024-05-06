@@ -1,7 +1,6 @@
 package co.chainring.core.model.db
 
 import co.chainring.core.evm.EIP712Transaction
-import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.toEvmSignature
 import de.fxlae.typeid.TypeId
@@ -9,6 +8,8 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.dao.with
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import java.math.BigInteger
@@ -55,26 +56,23 @@ object WithdrawalTable : GUIDTable<WithdrawalId>("withdrawal", ::WithdrawalId) {
 }
 
 class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(guid) {
-
     companion object : EntityClass<WithdrawalId, WithdrawalEntity>(WithdrawalTable) {
-        fun create(
-            withdrawalId: WithdrawalId,
-            nonce: Long,
-            chainId: ChainId,
+        fun createPending(
             wallet: WalletEntity,
-            tokenAddress: Address?,
+            symbol: SymbolEntity,
             amount: BigInteger,
+            nonce: Long,
             signature: EvmSignature,
-        ) = WithdrawalEntity.new(withdrawalId) {
+        ) = WithdrawalEntity.new(WithdrawalId.generate()) {
             val now = Clock.System.now()
+            this.wallet = wallet
+            this.symbol = symbol
+            this.amount = amount
             this.nonce = nonce
-            this.createdAt = now
-            this.createdBy = "system"
-            this.walletGuid = wallet.guid
-            this.symbolGuid = SymbolEntity.forChainAndContractAddress(chainId, tokenAddress).guid
             this.signature = signature
             this.status = WithdrawalStatus.Pending
-            this.amount = amount
+            this.createdAt = now
+            this.createdBy = "system"
         }
 
         fun findPendingByWalletAndNonce(wallet: WalletEntity, nonce: Long): WithdrawalEntity? {
@@ -87,6 +85,14 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
             return WithdrawalEntity.find {
                 WithdrawalTable.status.eq(WithdrawalStatus.Pending)
             }.toList()
+        }
+
+        fun history(): List<WithdrawalEntity> {
+            return WithdrawalEntity
+                .all()
+                .with(WithdrawalEntity::symbol)
+                .orderBy(Pair(WithdrawalTable.createdAt, SortOrder.DESC))
+                .toList()
         }
     }
 

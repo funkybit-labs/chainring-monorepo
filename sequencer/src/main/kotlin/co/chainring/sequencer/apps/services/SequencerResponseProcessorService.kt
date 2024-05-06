@@ -1,6 +1,5 @@
 package co.chainring.sequencer.apps.services
 
-import co.chainring.apps.api.model.websocket.Balances
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.Orders
@@ -266,12 +265,7 @@ object SequencerResponseProcessorService {
                 BalanceType.Available,
             )
             walletMap.values.forEach {
-                broadcasterNotifications.add(
-                    BroadcasterNotification(
-                        Balances(BalanceEntity.balancesAsApiResponse(it).balances),
-                        recipient = it.address,
-                    ),
-                )
+                broadcasterNotifications.add(BroadcasterNotification.walletBalances(it))
             }
 
             response.balancesChangedList.forEach { change ->

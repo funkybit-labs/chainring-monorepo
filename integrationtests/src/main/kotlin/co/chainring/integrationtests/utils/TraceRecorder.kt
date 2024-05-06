@@ -20,7 +20,11 @@ interface TraceRecorder {
         ListTrades,
         GetBalances,
         GetWithdrawal,
+        ListWithdrawals,
+        GetDeposit,
+        ListDeposits,
         CreateWithdrawal,
+        CreateDeposit,
         WS,
     }
 
