@@ -90,17 +90,20 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
                 ?.let { it[DepositTable.blockNumber.max()]?.toBigInteger() }
         }
 
-        fun getPendingForUpdate(chainId: ChainId): List<DepositEntity> {
-            return DepositTable
+        fun getPendingForUpdate(chainId: ChainId): List<DepositEntity> =
+            getForUpdate(chainId, DepositStatus.Pending)
+
+        fun getConfirmedForUpdate(chainId: ChainId): List<DepositEntity> =
+            getForUpdate(chainId, DepositStatus.Confirmed)
+
+        private fun getForUpdate(chainId: ChainId, status: DepositStatus): List<DepositEntity> =
+            DepositTable
                 .join(SymbolTable, JoinType.INNER, SymbolTable.guid, DepositTable.symbolGuid)
                 .select(DepositTable.columns)
-                .where {
-                    SymbolTable.chainId.eq(chainId) and DepositTable.status.inList(listOf(DepositStatus.Pending))
-                }
+                .where { SymbolTable.chainId.eq(chainId) and DepositTable.status.eq(status) }
                 .forUpdate(ForUpdateOption.PostgreSQL.ForUpdate(mode = null, DepositTable))
                 .let { DepositEntity.wrapRows(it) }
                 .toList()
-        }
 
         fun history(): List<DepositEntity> {
             return DepositEntity

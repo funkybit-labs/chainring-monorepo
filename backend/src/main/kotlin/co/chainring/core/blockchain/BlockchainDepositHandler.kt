@@ -121,6 +121,7 @@ class BlockchainDepositHandler(
 
     private fun refreshPendingDeposits() {
         val pendingDeposits = DepositEntity.getPendingForUpdate(chainId)
+        val confirmedDeposits = DepositEntity.getConfirmedForUpdate(chainId)
 
         if (pendingDeposits.isNotEmpty()) {
             val currentBlock = blockchainClient.getBlockNumber()
@@ -129,6 +130,10 @@ class BlockchainDepositHandler(
             pendingDeposits.forEach {
                 refreshPendingDeposit(it, currentBlock)
             }
+        }
+
+        if (confirmedDeposits.isNotEmpty()) {
+            confirmedDeposits.forEach(::sendToSequencerAndComplete)
         }
     }
 
@@ -139,18 +144,14 @@ class BlockchainDepositHandler(
                     "0x1" -> {
                         val confirmationsReceived = confirmations(currentBlock, blockNumber)
                         if (confirmationsReceived >= numConfirmations) {
+                            BalanceEntity.updateBalances(
+                                listOf(BalanceChange.Delta(pendingDeposit.wallet.id.value, pendingDeposit.symbol.guid.value, pendingDeposit.amount)),
+                                BalanceType.Exchange,
+                            )
+
                             pendingDeposit.update(DepositStatus.Confirmed)
-
-                            try {
-                                onExchangeContractDepositConfirmation(pendingDeposit)
-                            } catch (e: Exception) {
-                                logger.error(e) { "DepositConfirmationCallback failed for $pendingDeposit" }
-                            }
-
-                            pendingDeposit.update(DepositStatus.Complete)
                         }
                     }
-
                     else -> {
                         val error = receipt.revertReason ?: "Unknown Error"
                         logger.error { "Deposit failed with revert reason $error" }
@@ -162,14 +163,15 @@ class BlockchainDepositHandler(
         }
     }
 
-    private fun onExchangeContractDepositConfirmation(deposit: DepositEntity) {
-        runBlocking {
-            sequencerClient.deposit(deposit.wallet.sequencerId.value, Asset(deposit.symbol.name), deposit.amount, deposit.guid.value)
+    private fun sendToSequencerAndComplete(deposit: DepositEntity) {
+        try {
+            runBlocking {
+                sequencerClient.deposit(deposit.wallet.sequencerId.value, Asset(deposit.symbol.name), deposit.amount, deposit.guid.value)
+            }
+            deposit.update(DepositStatus.Complete)
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to notify Sequencer about deposit ${deposit.guid}" }
         }
-        BalanceEntity.updateBalances(
-            listOf(BalanceChange.Delta(deposit.wallet.id.value, deposit.symbol.guid.value, deposit.amount)),
-            BalanceType.Exchange,
-        )
     }
 
     private fun maxSeenBlockNumber() = transaction {
