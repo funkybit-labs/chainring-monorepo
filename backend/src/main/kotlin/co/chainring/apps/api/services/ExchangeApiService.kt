@@ -250,15 +250,16 @@ class ExchangeApiService(
         )
 
         val withdrawal = transaction {
-            Withdrawal.fromEntity(
-                WithdrawalEntity.createPending(
-                    WalletEntity.getByAddress(walletAddress),
-                    symbol,
-                    apiRequest.amount,
-                    apiRequest.nonce,
-                    apiRequest.signature,
-                ),
-            )
+            WithdrawalEntity.createPending(
+                WalletEntity.getByAddress(walletAddress),
+                symbol,
+                apiRequest.amount,
+                apiRequest.nonce,
+                apiRequest.signature,
+            ).let {
+                it.refresh(flush = true)
+                Withdrawal.fromEntity(it)
+            }
         }
 
         runBlocking {
@@ -283,7 +284,10 @@ class ExchangeApiService(
                 amount = apiRequest.amount,
                 blockNumber = BigInteger.ZERO,
                 transactionHash = apiRequest.txHash,
-            ).let { DepositApiResponse(Deposit.fromEntity(it)) }
+            ).let {
+                it.refresh(flush = true)
+                DepositApiResponse(Deposit.fromEntity(it))
+            }
         }
 
     fun cancelOrder(walletAddress: Address, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {
