@@ -651,7 +651,7 @@ data class Market(
                     // update bestOffer only when order stays on the book
                     if (newPrice < bestOffer && limitChunkQuantity > BigInteger.ZERO) bestOffer = newPrice
 
-                    marketChunkQuantity - order.quantity to BigInteger.ZERO
+                    limitChunkQuantity - order.quantity to BigInteger.ZERO
                 }
                 removeOrder(order.guid)
                 val addOrderResult = addOrder(
