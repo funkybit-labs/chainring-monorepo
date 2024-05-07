@@ -329,7 +329,7 @@ data class Market(
         notional(it.quantity, levels[it.levelIx].price, baseDecimals, quoteDecimals)
     }?.reduceOrNull(::sumBigIntegers) ?: BigInteger.ZERO
 
-    private fun handleMarketOrder(order: Order, stopAtLevelIx: Int? = null): AddOrderResult {
+    private fun handleCrossingOrder(order: Order, stopAtLevelIx: Int? = null): AddOrderResult {
         val originalAmount = order.amount.toBigInteger()
         var remainingAmount = originalAmount
         val executions = mutableListOf<Execution>()
@@ -443,8 +443,8 @@ data class Market(
 
                 if (orderPrice <= bestBid) {
                     // in case when crossing market execute as market sell order until `levelIx`
-                    val marketOrderResult = handleMarketOrder(order, stopAtLevelIx = levelIx)
-                    val filledAmount = marketOrderResult.executions.sumOf { it.amount }
+                    val crossingOrderResult = handleCrossingOrder(order, stopAtLevelIx = levelIx)
+                    val filledAmount = crossingOrderResult.executions.sumOf { it.amount }
                     val remainingAmount = order.amount.toBigInteger() - filledAmount
 
                     if (remainingAmount > BigInteger.ZERO) {
@@ -456,11 +456,11 @@ data class Market(
                             // market part of the limit order can be rejected due to no liquidity yet in the empty market
                             // this happens because `bestBid` set to half tick away from the market price during market creation
                             // potentially can be solved by widening initial bestBid/bestOffer distance (e.g. outer boundaries of the market)
-                            if (marketOrderResult.disposition == OrderDisposition.Rejected) limitOrderDisposition else marketOrderResult.disposition,
-                            marketOrderResult.executions,
+                            if (crossingOrderResult.disposition == OrderDisposition.Rejected) limitOrderDisposition else crossingOrderResult.disposition,
+                            crossingOrderResult.executions,
                         )
                     } else {
-                        AddOrderResult(marketOrderResult.disposition, marketOrderResult.executions)
+                        AddOrderResult(crossingOrderResult.disposition, crossingOrderResult.executions)
                     }
                 } else {
                     // or just create a limit order
@@ -480,8 +480,8 @@ data class Market(
 
                 if (orderPrice >= bestOffer) {
                     // in case when crossing market execute as market buy order until `levelIx`
-                    val marketOrderResult = handleMarketOrder(order, stopAtLevelIx = levelIx)
-                    val filledAmount = marketOrderResult.executions.sumOf { it.amount }
+                    val crossingOrderResult = handleCrossingOrder(order, stopAtLevelIx = levelIx)
+                    val filledAmount = crossingOrderResult.executions.sumOf { it.amount }
                     val remainingAmount = order.amount.toBigInteger() - filledAmount
 
                     if (remainingAmount > BigInteger.ZERO) {
@@ -493,11 +493,11 @@ data class Market(
                             // market part of the limit order can be rejected due to no liquidity yet in the empty market
                             // this happens because `bestOffer` set to half tick away from the market price during market creation
                             // potentially can be solved by widening initial bestBid/bestOffer distance (e.g. outer boundaries of the market)
-                            if (marketOrderResult.disposition == OrderDisposition.Rejected) limitOrderDisposition else marketOrderResult.disposition,
-                            marketOrderResult.executions,
+                            if (crossingOrderResult.disposition == OrderDisposition.Rejected) limitOrderDisposition else crossingOrderResult.disposition,
+                            crossingOrderResult.executions,
                         )
                     } else {
-                        AddOrderResult(marketOrderResult.disposition, marketOrderResult.executions)
+                        AddOrderResult(crossingOrderResult.disposition, crossingOrderResult.executions)
                     }
                 } else {
                     // or just create a limit order
@@ -506,9 +506,9 @@ data class Market(
                 }
             }
         } else if (order.type == Order.Type.MarketBuy) {
-            handleMarketOrder(order)
+            handleCrossingOrder(order)
         } else if (order.type == Order.Type.MarketSell) {
-            handleMarketOrder(order)
+            handleCrossingOrder(order)
         } else {
             AddOrderResult(OrderDisposition.Rejected, noExecutions)
         }
