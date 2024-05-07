@@ -538,8 +538,8 @@ class TestSequencer {
         val response4 = sequencer.addOrder(marketId, BigInteger.ONE, "17.55", maker, Order.Type.LimitSell)
         assertEquals(OrderDisposition.Accepted, response4.ordersChangedList.first().disposition)
 
-        // can change the price to cross the book, disposition is 'Accepted' since there is no liquidity in the market
-        val response5 = sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 999L, "17.50", maker)
+        // can change the price to cross the market, disposition is 'Accepted' since there is no liquidity yet available in the market
+        val response5 = sequencer.changeOrder(marketId, response.orderGuid().toOrderGuid(), 999L, "15.50", maker)
         assertEquals(OrderDisposition.Accepted, response5.ordersChangedList.first().disposition)
 
         // check for a limit buy
