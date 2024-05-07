@@ -1,68 +1,39 @@
 package co.chainring.apps.api.model
 
-import co.chainring.core.evm.EIP712Transaction
-import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
+import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class WithdrawTx(
-    val sender: Address,
-    val token: Address?,
+data class CreateWithdrawalApiRequest(
+    val symbol: Symbol,
     val amount: BigIntegerJson,
     val nonce: Long,
-)
-
-@Serializable
-data class CreateWithdrawalApiRequest(
-    val tx: WithdrawTx,
     val signature: EvmSignature,
-) {
-
-    companion object {
-        fun fromEntity(entity: WithdrawalEntity): CreateWithdrawalApiRequest {
-            return CreateWithdrawalApiRequest(
-                WithdrawTx(
-                    entity.wallet.address,
-                    entity.symbol.contractAddress,
-                    entity.amount,
-                    entity.nonce,
-                ),
-                entity.signature,
-            )
-        }
-    }
-    fun toEip712Transaction() = EIP712Transaction.WithdrawTx(
-        tx.sender,
-        tx.token,
-        tx.amount,
-        tx.nonce,
-        signature,
-    )
-}
+)
 
 @Serializable
 data class Withdrawal(
     val id: WithdrawalId,
-    val tx: WithdrawTx,
+    val symbol: Symbol,
+    val amount: BigIntegerJson,
     val status: WithdrawalStatus,
     val error: String?,
+    val createdAt: Instant,
 ) {
     companion object {
         fun fromEntity(entity: WithdrawalEntity): Withdrawal {
             return Withdrawal(
                 entity.id.value,
-                WithdrawTx(
-                    entity.wallet.address,
-                    entity.symbol.contractAddress,
-                    entity.amount,
-                    entity.nonce,
-                ),
+                Symbol(entity.symbol.name),
+                entity.amount,
                 entity.status,
                 entity.error,
+                entity.createdAt,
             )
         }
     }
@@ -71,4 +42,9 @@ data class Withdrawal(
 @Serializable
 data class WithdrawalApiResponse(
     val withdrawal: Withdrawal,
+)
+
+@Serializable
+data class ListWithdrawalsApiResponse(
+    val withdrawals: List<Withdrawal>,
 )

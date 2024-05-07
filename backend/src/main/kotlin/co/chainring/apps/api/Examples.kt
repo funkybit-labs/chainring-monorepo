@@ -5,15 +5,15 @@ import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CancelOrderApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiResponse
+import co.chainring.apps.api.model.Deposit
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.RequestStatus
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.UpdateOrderApiResponse
-import co.chainring.apps.api.model.WithdrawTx
 import co.chainring.apps.api.model.Withdrawal
-import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Symbol
+import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
@@ -44,7 +44,7 @@ object Examples {
         signature = EvmSignature.emptySignature(),
     )
 
-    val updateLimitOrderRequest = UpdateOrderApiRequest.Limit(
+    val updateLimitOrderRequest = UpdateOrderApiRequest(
         orderId = OrderId("123"),
         amount = BigInteger("100"),
         price = BigDecimal("100"),
@@ -154,13 +154,19 @@ object Examples {
 
     var withdrawal = Withdrawal(
         WithdrawalId("id"),
-        WithdrawTx(
-            Address("0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"),
-            Address("0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"),
-            BigInteger("200000"),
-            1,
-        ),
+        Symbol("USDC"),
+        BigInteger("200000"),
         WithdrawalStatus.Pending,
-        null,
+        error = null,
+        createdAt = Clock.System.now(),
+    )
+
+    var deposit = Deposit(
+        DepositId("id"),
+        Symbol("USDC"),
+        BigInteger("200000"),
+        Deposit.Status.Pending,
+        error = null,
+        createdAt = Clock.System.now(),
     )
 }

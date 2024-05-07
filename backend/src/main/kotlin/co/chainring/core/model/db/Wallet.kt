@@ -10,6 +10,7 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.web3j.crypto.Keys
+import java.lang.RuntimeException
 
 @Serializable
 @JvmInline
@@ -32,7 +33,7 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
 
     companion object : EntityClass<WalletId, WalletEntity>(WalletTable) {
         fun getOrCreate(address: Address): WalletEntity {
-            return getByAddress(address) ?: run {
+            return findByAddress(address) ?: run {
                 WalletEntity.new(WalletId.generate(address)) {
                     this.address = address
                     this.sequencerId = address.toSequencerId()
@@ -41,7 +42,11 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
                 }
             }
         }
-        fun getByAddress(address: Address): WalletEntity? {
+
+        fun getByAddress(address: Address): WalletEntity =
+            findByAddress(address) ?: throw RuntimeException("Wallet not found for address $address")
+
+        fun findByAddress(address: Address): WalletEntity? {
             return WalletEntity.find {
                 WalletTable.address.eq(address.toChecksumAddress().value)
             }.firstOrNull()

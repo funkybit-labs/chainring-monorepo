@@ -103,7 +103,7 @@ const CreateOrderApiResponseSchema = z.object({
   requestStatus: RequestStatusSchema
 })
 
-const UpdateLimitOrderSchema = z.object({
+const UpdateOrderRequestSchema = z.object({
   type: z.literal('limit'),
   orderId: z.string(),
   amount: z.coerce.bigint(),
@@ -113,11 +113,6 @@ const UpdateLimitOrderSchema = z.object({
   nonce: z.string(),
   signature: z.string()
 })
-export type UpdateLimitOrder = z.infer<typeof UpdateLimitOrderSchema>
-
-const UpdateOrderRequestSchema = z.discriminatedUnion('type', [
-  UpdateLimitOrderSchema
-])
 export type UpdateOrderRequest = z.infer<typeof UpdateOrderRequestSchema>
 
 const UpdateOrderApiResponseSchema = z.object({
@@ -239,26 +234,55 @@ export const BalanceSchema = z.object({
 })
 export type Balance = z.infer<typeof BalanceSchema>
 
-const WithdrawTxSchema = z.object({
-  sender: AddressSchema,
-  token: AddressSchema.nullable(),
+const CreateDepositApiRequestSchema = z.object({
+  symbol: z.string(),
   amount: z.coerce.bigint(),
-  nonce: z.number()
+  txHash: z.string()
 })
+
+const DepositStatusSchema = z.enum(['Pending', 'Complete', 'Failed'])
+const DepositSchema = z.object({
+  id: z.string(),
+  symbol: z.string(),
+  amount: z.coerce.bigint(),
+  status: DepositStatusSchema,
+  error: z.string().nullable(),
+  createdAt: z.coerce.date()
+})
+export type Deposit = z.infer<typeof DepositSchema>
+
+const DepositApiResponseSchema = z.object({
+  deposit: DepositSchema
+})
+
+const ListDepositsApiResponseSchema = z.object({
+  deposits: z.array(DepositSchema)
+})
+
 const CreateWithdrawalApiRequestSchema = z.object({
-  tx: WithdrawTxSchema,
+  symbol: z.string(),
+  amount: z.coerce.bigint(),
+  nonce: z.number(),
   signature: z.string()
 })
 
 const WithdrawalStatusSchema = z.enum(['Pending', 'Complete', 'Failed'])
 const WithdrawalSchema = z.object({
   id: z.string(),
-  tx: WithdrawTxSchema,
+  symbol: z.string(),
+  amount: z.coerce.bigint(),
   status: WithdrawalStatusSchema,
-  error: z.string().nullable()
+  error: z.string().nullable(),
+  createdAt: z.coerce.date()
 })
+export type Withdrawal = z.infer<typeof WithdrawalSchema>
+
 const WithdrawalApiResponseSchema = z.object({
   withdrawal: WithdrawalSchema
+})
+
+const ListWithdrawalsApiResponseSchema = z.object({
+  withdrawals: z.array(WithdrawalSchema)
 })
 
 const ApiErrorSchema = z.object({
@@ -342,6 +366,31 @@ export const apiClient = new Zodios(apiBaseUrl, [
   },
   {
     method: 'post',
+    path: '/v1/deposits',
+    alias: 'createDeposit',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: CreateDepositApiRequestSchema
+      }
+    ],
+    response: DepositApiResponseSchema,
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'get',
+    path: '/v1/deposits',
+    alias: 'listDeposits',
+    response: ListDepositsApiResponseSchema
+  },
+  {
+    method: 'post',
     path: '/v1/withdrawals',
     alias: 'createWithdrawal',
     parameters: [
@@ -351,13 +400,19 @@ export const apiClient = new Zodios(apiBaseUrl, [
         schema: CreateWithdrawalApiRequestSchema
       }
     ],
-    response: WithdrawalApiResponseSchema
+    response: WithdrawalApiResponseSchema,
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
   },
   {
     method: 'get',
-    path: '/v1/withdrawals/:id',
-    alias: 'getWithdrawal',
-    response: WithdrawalApiResponseSchema
+    path: '/v1/withdrawals',
+    alias: 'listWithdrawals',
+    response: ListWithdrawalsApiResponseSchema
   }
 ])
 

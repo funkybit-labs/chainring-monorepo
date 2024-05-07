@@ -22,7 +22,7 @@ class BatchOrderSerializerTest {
         signature = EvmSignature.emptySignature(),
     )
 
-    private val updateLimitOrderRequest = UpdateOrderApiRequest.Limit(
+    private val updateLimitOrderRequest = UpdateOrderApiRequest(
         orderId = OrderId.generate(),
         amount = BigInteger("1000"),
         price = BigDecimal("101000"),

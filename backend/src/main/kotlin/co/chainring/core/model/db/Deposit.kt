@@ -1,13 +1,14 @@
 package co.chainring.core.model.db
 
-import co.chainring.core.model.Address
 import co.chainring.core.model.TxHash
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.dao.with
 import org.jetbrains.exposed.sql.JoinType
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.max
@@ -57,12 +58,10 @@ object DepositTable : GUIDTable<DepositId>("deposit", ::DepositId) {
 }
 
 class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
-
     companion object : EntityClass<DepositId, DepositEntity>(DepositTable) {
         fun create(
-            chainId: ChainId,
             wallet: WalletEntity,
-            tokenAddress: Address?,
+            symbol: SymbolEntity,
             amount: BigInteger,
             blockNumber: BigInteger,
             transactionHash: TxHash,
@@ -70,8 +69,8 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
             val now = Clock.System.now()
             this.createdAt = now
             this.createdBy = "system"
-            this.walletGuid = wallet.guid
-            this.symbolGuid = SymbolEntity.forChainAndContractAddress(chainId, tokenAddress).guid
+            this.wallet = wallet
+            this.symbol = symbol
             this.status = DepositStatus.Pending
             this.amount = amount
             this.blockNumber = blockNumber
@@ -91,15 +90,26 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
                 ?.let { it[DepositTable.blockNumber.max()]?.toBigInteger() }
         }
 
-        fun getPendingForUpdate(chainId: ChainId): List<DepositEntity> {
-            return DepositTable
+        fun getPendingForUpdate(chainId: ChainId): List<DepositEntity> =
+            getForUpdate(chainId, DepositStatus.Pending)
+
+        fun getConfirmedForUpdate(chainId: ChainId): List<DepositEntity> =
+            getForUpdate(chainId, DepositStatus.Confirmed)
+
+        private fun getForUpdate(chainId: ChainId, status: DepositStatus): List<DepositEntity> =
+            DepositTable
                 .join(SymbolTable, JoinType.INNER, SymbolTable.guid, DepositTable.symbolGuid)
                 .select(DepositTable.columns)
-                .where {
-                    SymbolTable.chainId.eq(chainId) and DepositTable.status.inList(listOf(DepositStatus.Pending))
-                }
+                .where { SymbolTable.chainId.eq(chainId) and DepositTable.status.eq(status) }
                 .forUpdate(ForUpdateOption.PostgreSQL.ForUpdate(mode = null, DepositTable))
                 .let { DepositEntity.wrapRows(it) }
+                .toList()
+
+        fun history(): List<DepositEntity> {
+            return DepositEntity
+                .all()
+                .with(DepositEntity::symbol)
+                .orderBy(Pair(DepositTable.createdAt, SortOrder.DESC))
                 .toList()
         }
     }

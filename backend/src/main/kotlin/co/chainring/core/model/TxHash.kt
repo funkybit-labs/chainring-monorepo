@@ -17,7 +17,7 @@ value class TxHash(val value: String) {
 
     companion object {
         fun emptyHash(): TxHash {
-            return TxHash(ByteArray(65).toHex())
+            return TxHash(ByteArray(32).toHex())
         }
     }
 }
