@@ -655,7 +655,6 @@ data class Market(
                 }
                 removeOrder(order.guid)
                 val addOrderResult = addOrder(
-                    // note: order object is reset during removal, 'order.wallet' will return 0
                     wallet.value,
                     order {
                         this.guid = orderChange.guid
@@ -664,6 +663,7 @@ data class Market(
                         this.price = orderChange.price
                     },
                 )
+                // note: 'order' object is reset during removal, 'order.wallet' returns 0
                 ChangeOrderResult(wallet, addOrderResult.disposition, addOrderResult.executions, baseAssetDelta, quoteAssetDelta)
             }
         }
