@@ -1,6 +1,7 @@
 package co.chainring.sequencer.apps
 
 import co.chainring.sequencer.core.Asset
+import co.chainring.sequencer.core.LevelOrder
 import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.SequencerState
@@ -62,16 +63,15 @@ class SequencerApp(
                     val halfTick = tickSize.setScale(tickSize.scale() + 1).divide(BigDecimal.valueOf(2))
                     val marketPrice = market.marketPrice.toBigDecimal()
                     state.markets[marketId] = Market(
-                        marketId,
-                        tickSize,
-                        marketPrice,
-                        marketPrice - halfTick,
-                        marketPrice + halfTick,
-                        market.maxLevels,
-                        market.maxOrdersPerLevel,
-                        market.baseDecimals,
-                        market.quoteDecimals,
-
+                        id = marketId,
+                        tickSize = tickSize,
+                        marketPrice = marketPrice,
+                        bestBid = marketPrice - halfTick,
+                        bestOffer = marketPrice + halfTick,
+                        maxLevels = market.maxLevels,
+                        maxOrdersPerLevel = market.maxOrdersPerLevel,
+                        baseDecimals = market.baseDecimals,
+                        quoteDecimals = market.quoteDecimals,
                     )
                 }
                 sequencerResponse {
@@ -259,7 +259,9 @@ class SequencerApp(
                     baseAssetsRequired.merge(orderBatch.wallet.toWalletAddress(), order.amount.toBigInteger(), ::sumBigIntegers)
                 }
                 Order.Type.LimitBuy -> {
-                    quoteAssetsRequired.merge(orderBatch.wallet.toWalletAddress(), notional(order.amount, order.price, market.baseDecimals, market.quoteDecimals), ::sumBigIntegers)
+                    val notional = calculateLimitBuyOrderNotional(order, market)
+
+                    quoteAssetsRequired.merge(orderBatch.wallet.toWalletAddress(), notional, ::sumBigIntegers)
                 }
                 Order.Type.MarketBuy -> {
                     // the quote assets required for a market buy depends on what the clearing price would be
@@ -269,43 +271,21 @@ class SequencerApp(
                 else -> {}
             }
         }
-        orderBatch.ordersToChangeList.forEach { orderChange ->
-            market.ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
+        orderBatch.ordersToChangeList.forEach { orderChange: Order ->
+            market.ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order: LevelOrder ->
                 val (oldBaseAssets, oldQuoteAssets) = market.assetsReservedForOrder(order)
                 if (oldBaseAssets > BigInteger.ZERO) { // LimitSell
-                    if (orderChange.price.toBigDecimal() > market.bestBid) {
-                        baseAssetsRequired.merge(
-                            order.wallet,
-                            orderChange.amount.toBigInteger() - order.quantity,
-                            ::sumBigIntegers,
-                        )
-                    } else {
-                        return SequencerError.ChangeCrossesMarket
-                    }
+                    baseAssetsRequired.merge(
+                        order.wallet,
+                        orderChange.amount.toBigInteger() - order.quantity,
+                        ::sumBigIntegers,
+                    )
                 }
                 if (oldQuoteAssets > BigInteger.ZERO) { // LimitBuy
-                    if (orderChange.price.toBigDecimal() < market.bestOffer) {
-                        quoteAssetsRequired.merge(
-                            order.wallet,
-                            (
-                                notional(
-                                    orderChange.amount,
-                                    orderChange.price,
-                                    market.baseDecimals,
-                                    market.quoteDecimals,
-                                ) -
-                                    notional(
-                                        order.quantity,
-                                        market.levels[order.levelIx].price,
-                                        market.baseDecimals,
-                                        market.quoteDecimals,
-                                    )
-                                ),
-                            ::sumBigIntegers,
-                        )
-                    } else {
-                        return SequencerError.ChangeCrossesMarket
-                    }
+                    val previousNotional = notional(order.quantity, market.levels[order.levelIx].price, market.baseDecimals, market.quoteDecimals)
+                    val notional = calculateLimitBuyOrderNotional(orderChange, market)
+
+                    quoteAssetsRequired.merge(order.wallet, notional - previousNotional, ::sumBigIntegers)
                 }
             }
         }
@@ -344,6 +324,24 @@ class SequencerApp(
         }
 
         return null
+    }
+
+    private fun calculateLimitBuyOrderNotional(order: Order, market: Market): BigInteger {
+        return if (order.price.toBigDecimal() >= market.bestOffer) {
+            // limit order crosses the market
+            val orderPrice = order.price.toBigDecimal()
+            val levelIx = market.levelIx(orderPrice)
+
+            val (clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger(), stopAtLevelIx = levelIx)
+            val remainingQuantity = order.amount.toBigInteger() - availableQuantity
+
+            val marketChunkNotional = notional(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals)
+            val limitChunkNotional = notional(remainingQuantity, orderPrice, market.baseDecimals, market.quoteDecimals)
+
+            marketChunkNotional + limitChunkNotional
+        } else {
+            notional(order.amount, order.price, market.baseDecimals, market.quoteDecimals)
+        }
     }
 
     override fun start() {

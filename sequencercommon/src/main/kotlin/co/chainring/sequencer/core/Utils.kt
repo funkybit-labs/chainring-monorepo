@@ -28,10 +28,10 @@ fun IntegerValue.toBigInteger(): BigInteger = BigInteger(
     this.value.toByteArray(),
 )
 
-fun sumBigIntegers(a: BigInteger, b: BigInteger) = a + b
+fun sumBigIntegers(a: BigInteger, b: BigInteger): BigInteger = a + b
 
-fun notional(amount: BigInteger, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int) =
+fun notional(amount: BigInteger, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int): BigInteger =
     (amount.toBigDecimal() * price).movePointRight(quoteDecimals - baseDecimals).toBigInteger()
 
-fun notional(amount: IntegerValue, price: DecimalValue, baseDecimals: Int, quoteDecimals: Int) =
+fun notional(amount: IntegerValue, price: DecimalValue, baseDecimals: Int, quoteDecimals: Int): BigInteger =
     notional(amount.toBigInteger(), price.toBigDecimal(), baseDecimals, quoteDecimals)

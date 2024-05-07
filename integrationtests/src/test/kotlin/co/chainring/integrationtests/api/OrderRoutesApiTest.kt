@@ -269,32 +269,6 @@ class OrderRoutesApiTest {
             ),
         ).assertError(ApiError(ReasonCode.SignatureNotValid, "Invalid signature"))
 
-        // try to submit an order that crosses the market
-        val createLimitOrderResponse = apiClient.createOrder(
-            CreateOrderApiRequest.Limit(
-                nonce = generateOrderNonce(),
-                marketId = usdcDaiMarketId,
-                side = OrderSide.Buy,
-                amount = wallet.formatAmount("1", "USDC"),
-                price = BigDecimal("3"),
-                signature = EvmSignature.emptySignature(),
-            ).let {
-                wallet.signOrder(it)
-            },
-        )
-
-        assertIs<CreateOrderApiRequest.Limit>(createLimitOrderResponse.order)
-
-        wsClient.apply {
-            assertOrderCreatedMessageReceived { msg ->
-                validateLimitOrders(createLimitOrderResponse, msg.order as Order.Limit, false)
-            }
-            assertOrderUpdatedMessageReceived { msg ->
-                assertEquals(createLimitOrderResponse.orderId, msg.order.id)
-                assertEquals(OrderStatus.CrossesMarket, msg.order.status)
-            }
-        }
-
         // try creating a limit order not a multiple of tick size
         apiClient.tryCreateOrder(
             CreateOrderApiRequest.Limit(
