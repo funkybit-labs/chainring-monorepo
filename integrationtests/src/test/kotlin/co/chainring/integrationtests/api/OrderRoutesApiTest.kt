@@ -226,36 +226,35 @@ class OrderRoutesApiTest {
         waitForBalance(apiClient, wsClient, listOf(ExpectedBalance("DAI", amountToDeposit, amountToDeposit)))
 
         // operation on non-existent order
-        ApiError(ReasonCode.OrderNotFound, "Requested order does not exist").also { expectedError ->
-            apiClient.tryGetOrder(OrderId.generate()).assertError(expectedError)
+        apiClient.tryGetOrder(OrderId.generate())
+            .assertError(ApiError(ReasonCode.OrderNotFound, "Requested order does not exist"))
 
-            apiClient.tryUpdateOrder(
-                apiRequest = UpdateOrderApiRequest(
-                    orderId = OrderId.generate(),
-                    marketId = usdcDaiMarketId,
-                    side = OrderSide.Buy,
-                    amount = BigDecimal("3").toFundamentalUnits(18),
-                    price = BigDecimal("4"),
-                    nonce = generateOrderNonce(),
-                    signature = EvmSignature.emptySignature(),
-                ).let {
-                    wallet.signOrder(it)
-                },
-            ).assertError(ApiError(ReasonCode.RejectedBySequencer, "Order does not exist or is already finalized"))
+        apiClient.tryUpdateOrder(
+            apiRequest = UpdateOrderApiRequest(
+                orderId = OrderId.generate(),
+                marketId = usdcDaiMarketId,
+                side = OrderSide.Buy,
+                amount = BigDecimal("3").toFundamentalUnits(18),
+                price = BigDecimal("4"),
+                nonce = generateOrderNonce(),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                wallet.signOrder(it)
+            },
+        ).assertError(ApiError(ReasonCode.RejectedBySequencer, "Order does not exist or is already finalized"))
 
-            apiClient.tryCancelOrder(
-                CancelOrderApiRequest(
-                    orderId = OrderId.generate(),
-                    marketId = usdcDaiMarketId,
-                    amount = BigInteger.ZERO,
-                    side = OrderSide.Buy,
-                    nonce = generateOrderNonce(),
-                    signature = EvmSignature.emptySignature(),
-                ).let {
-                    wallet.signCancelOrder(it)
-                },
-            ).assertError(ApiError(ReasonCode.RejectedBySequencer, "Order does not exist or is already finalized"))
-        }
+        apiClient.tryCancelOrder(
+            CancelOrderApiRequest(
+                orderId = OrderId.generate(),
+                marketId = usdcDaiMarketId,
+                amount = BigInteger.ZERO,
+                side = OrderSide.Buy,
+                nonce = generateOrderNonce(),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                wallet.signCancelOrder(it)
+            },
+        ).assertError(ApiError(ReasonCode.RejectedBySequencer, "Order does not exist or is already finalized"))
 
         // invalid signature (malformed signature)
         apiClient.tryUpdateOrder(

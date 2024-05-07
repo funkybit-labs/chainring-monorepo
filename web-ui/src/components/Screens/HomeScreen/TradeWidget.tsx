@@ -106,10 +106,12 @@ export default function TradeWidget({
 
   function handleAmountChange(e: ChangeEvent<HTMLInputElement>) {
     setAmountInputValue(e.target.value)
+    mutation.reset()
   }
 
   function handlePriceChange(e: ChangeEvent<HTMLInputElement>) {
     setPriceInputValue(e.target.value)
+    mutation.reset()
   }
 
   function handleMarketOrderFlagChange(e: ChangeEvent<HTMLInputElement>) {
@@ -117,6 +119,7 @@ export default function TradeWidget({
       setPriceInputValue('')
     }
     setIsMarketOrder(e.target.checked)
+    mutation.reset()
   }
 
   const mutation = useMutation({
@@ -180,7 +183,7 @@ export default function TradeWidget({
         )
       }
     },
-    onSettled: () => {
+    onSuccess: () => {
       setTimeout(mutation.reset, 3000)
     }
   })
@@ -301,20 +304,6 @@ export default function TradeWidget({
               />
             )}
           </div>
-          <div className="pb-3">
-            <SubmitButton
-              disabled={!canSubmit}
-              onClick={mutation.mutate}
-              error={mutation.error?.message}
-              caption={() => {
-                if (mutation.isPending) {
-                  return 'Submitting order...'
-                } else {
-                  return `${side} ${baseSymbol.name}`
-                }
-              }}
-            />
-          </div>
           {notional > 0n && (
             <>
               <div className="text-center text-sm text-white">
@@ -355,13 +344,25 @@ export default function TradeWidget({
                       approximate={false}
                     />
                   </>
-                )}
+                )}{' '}
+                with a fee of 0.05 {quoteSymbol.name}
               </div>
-              <p className="pt-3 text-center text-sm text-white">
-                Fee: 0.05 {quoteSymbol.name}
-              </p>
             </>
           )}
+          <div className="pb-3">
+            <SubmitButton
+              disabled={!canSubmit}
+              onClick={mutation.mutate}
+              error={mutation.error?.message}
+              caption={() => {
+                if (mutation.isPending) {
+                  return 'Submitting order...'
+                } else {
+                  return `${side} ${baseSymbol.name}`
+                }
+              }}
+            />
+          </div>
           <div className="pt-3 text-center">
             {mutation.isSuccess ? (
               <div className="text-green">Order created!</div>
