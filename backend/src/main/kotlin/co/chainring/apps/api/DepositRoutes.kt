@@ -97,7 +97,7 @@ class DepositRoutes(val exchangeApiService: ExchangeApiService) {
             operationId = "list-deposits"
             summary = "List deposits"
             security = signedTokenSecurity
-            tags += listOf(Tag("deposits"))
+            tags += listOf(Tag("deposit"))
             returning(
                 Status.OK,
                 responseBody to ListDepositsApiResponse(

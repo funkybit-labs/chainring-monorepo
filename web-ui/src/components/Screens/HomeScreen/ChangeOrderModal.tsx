@@ -177,7 +177,7 @@ export function ChangeOrderModal({
             />
           </div>
 
-          {order.type != 'market' && (
+          {order.type === 'limit' && (
             <div>
               <label className="block">Price</label>
               <AmountInput
@@ -194,7 +194,7 @@ export function ChangeOrderModal({
           quoteLimit !== undefined &&
           baseLimit !== undefined && (
             <div className="mt-2 text-center text-sm text-brightRed">
-              Will cross the limit of{' '}
+              Will exceed the limit of{' '}
               {order.side == 'Buy' ? (
                 <AmountWithSymbol
                   amount={quoteLimit}

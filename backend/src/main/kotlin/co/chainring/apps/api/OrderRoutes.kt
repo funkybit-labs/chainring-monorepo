@@ -65,7 +65,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "create-order"
             summary = "Create order"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             receiving(
                 requestBody to Examples.createMarketOrderRequest,
             )
@@ -101,7 +101,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "update-order"
             summary = "Update order"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             receiving(
                 requestBody to Examples.updateLimitOrderRequest,
             )
@@ -135,7 +135,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "cancel-order"
             summary = "Cancel order"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             receiving(
                 requestBody to Examples.cancelOrderRequest,
             )
@@ -166,7 +166,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "get-order"
             summary = "Get order"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             returning(
                 Status.OK,
                 responseBody to Examples.marketOrderResponse,
@@ -196,7 +196,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "list-orders"
             summary = "List orders"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             returning(
                 Status.OK,
                 responseBody to OrdersApiResponse(
@@ -220,7 +220,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "cancel-open-orders"
             summary = "Cancel open orders"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             returning(Status.NO_CONTENT)
         } bindContract Method.DELETE to { request ->
             exchangeApiService.cancelOpenOrders(
@@ -238,7 +238,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "batch-orders"
             summary = "Manage orders in batch"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             receiving(
                 requestBody to BatchOrdersApiRequest(
                     MarketId("BTC/ETH"),
@@ -275,7 +275,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "list-trades"
             summary = "List trades"
             security = signedTokenSecurity
-            tags += listOf(Tag("trades"))
+            tags += listOf(Tag("trade"))
             queries += Query.string().optional("before-timestamp", "Return trades executed before provided timestamp")
             queries += Query.string().optional("limit", "Number of trades to return")
             returning(

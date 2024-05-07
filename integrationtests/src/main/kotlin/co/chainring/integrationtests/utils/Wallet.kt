@@ -118,7 +118,8 @@ class Wallet(
         )
 
     fun signOrder(request: CreateOrderApiRequest.Market): CreateOrderApiRequest.Market {
-        val (baseSymbol, quoteSymbol) = request.marketId.value.split("/").map { name -> symbols.first { it.name == name } }
+        val (baseSymbol, quoteSymbol) = marketSymbols(request.marketId)
+
         val tx = EIP712Transaction.Order(
             address,
             baseToken = baseSymbol.contractAddress ?: Address.zero,
@@ -148,7 +149,7 @@ class Wallet(
     }
 
     private fun limitOrderEip712TxSignature(marketId: MarketId, amount: BigInteger, price: BigDecimal, side: OrderSide, nonce: String): EvmSignature {
-        val (baseSymbol, quoteSymbol) = marketId.value.split("/").map { name -> symbols.first { it.name == name } }
+        val (baseSymbol, quoteSymbol) = marketSymbols(marketId)
         val tx = EIP712Transaction.Order(
             address,
             baseToken = baseSymbol.contractAddress ?: Address.zero,
@@ -175,4 +176,11 @@ class Wallet(
 
     private fun erc20TokenAddress(symbol: String) =
         symbols.firstOrNull { it.name == symbol && it.contractAddress != null }?.contractAddress?.value
+
+    private fun marketSymbols(marketId: MarketId): Pair<SymbolInfo, SymbolInfo> =
+        marketId
+            .baseAndQuoteSymbols()
+            .let { (base, quote) ->
+                Pair(symbols.first { it.name == base }, symbols.first { it.name == quote })
+            }
 }
