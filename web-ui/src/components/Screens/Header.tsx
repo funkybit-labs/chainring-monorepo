@@ -35,7 +35,8 @@ export function Header({
         addEthereumChainParameter: {
           chainName: chain.name,
           nativeCurrency: chain.nativeCurrency,
-          rpcUrls: chain.rpcUrls.default.http
+          rpcUrls: chain.rpcUrls.default.http,
+          blockExplorerUrls: [chain.blockExplorers.default.url]
         },
         chainId: chain.id
       })
