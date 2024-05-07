@@ -81,7 +81,7 @@ object SequencerResponseProcessorService {
                         if (response.balancesChangedList.firstOrNull { it.wallet == withdrawal.wallet } == null) {
                             withdrawalEntity.update(WithdrawalStatus.Failed, error(response))
                         } else {
-                            handleSequencerResponse(response, withdrawalEntity.wallet, listOf())
+                            handleSequencerResponse(request, response, withdrawalEntity.wallet, listOf())
                             queueBlockchainTransactions(listOf(withdrawalEntity.toEip712Transaction()))
                         }
                     }
@@ -93,7 +93,7 @@ object SequencerResponseProcessorService {
                             ?.update(DepositStatus.Failed, error(response))
                     } else {
                         DepositEntity.findById(deposit.externalGuid.depositId())?.let {
-                            handleSequencerResponse(response, it.wallet, listOf())
+                            handleSequencerResponse(request, response, it.wallet, listOf())
                         }
                     }
                 }
@@ -104,6 +104,7 @@ object SequencerResponseProcessorService {
                     WalletEntity.getBySequencerId(request.orderBatch.wallet.sequencerWalletId())?.let { wallet ->
                         handleOrderBatchUpdates(request.orderBatch, wallet, response)
                         handleSequencerResponse(
+                            request,
                             response,
                             wallet,
                             request.orderBatch.ordersToChangeList.map { it.guid },
@@ -163,11 +164,13 @@ object SequencerResponseProcessorService {
         }
     }
 
-    private fun handleSequencerResponse(response: SequencerResponse, walletEntity: WalletEntity, ordersBeingUpdated: List<Long> = listOf(), cancelAll: Boolean = false) {
+    private fun handleSequencerResponse(request: SequencerRequest, response: SequencerResponse, walletEntity: WalletEntity, ordersBeingUpdated: List<Long> = listOf(), cancelAll: Boolean = false) {
         val timestamp = Clock.System.now()
 
         val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
         val limitsChanged = mutableSetOf<Pair<WalletEntity, MarketEntity>>()
+
+        val orderIdsInRequest: List<Long> = (request.orderBatch.ordersToAddList + request.orderBatch.ordersToChangeList).map { it.guid }
 
         // handle trades
         val tradesWithTakerOrder: List<Pair<TradeEntity, OrderEntity>> = response.tradesCreatedList.mapNotNull {
@@ -189,7 +192,7 @@ object SequencerResponseProcessorService {
                         timestamp = timestamp,
                         orderEntity = order,
                         tradeEntity = tradeEntity,
-                        role = if (order.type == OrderType.Market) ExecutionRole.Taker else ExecutionRole.Maker,
+                        role = if (orderIdsInRequest.contains(order.sequencerOrderId?.value)) ExecutionRole.Taker else ExecutionRole.Maker,
                         feeAmount = BigInteger.ZERO,
                         feeSymbol = Symbol(order.market.quoteSymbol.name),
                     )

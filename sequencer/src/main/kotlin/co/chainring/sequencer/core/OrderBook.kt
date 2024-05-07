@@ -227,6 +227,7 @@ data class RemoveOrderResult(
 data class ChangeOrderResult(
     val wallet: WalletAddress,
     val disposition: OrderDisposition,
+    val executions: List<Execution>,
     val baseAssetDelta: BigInteger,
     val quoteAssetDelta: BigInteger,
 )
