@@ -4,6 +4,7 @@ import co.chainring.contracts.generated.ERC1967Proxy
 import co.chainring.contracts.generated.Exchange
 import co.chainring.contracts.generated.UUPSUpgradeable
 import co.chainring.core.model.Address
+import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.ChainId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.reactivex.Flowable
@@ -262,6 +263,9 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
 
     fun getContractAddress(contractType: ContractType): Address? =
         contractMap[contractType]
+
+    fun getTransactionReceipt(txHash: TxHash): TransactionReceipt? =
+        getTransactionReceipt(txHash.value)
 
     fun getTransactionReceipt(txHash: String): TransactionReceipt? {
         val receipt = web3j.ethGetTransactionReceipt(txHash).send().transactionReceipt

@@ -5,6 +5,7 @@ import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.TxHash
 import co.chainring.core.model.toEvmSignature
 import co.chainring.core.utils.toHex
 import org.web3j.crypto.Sign
@@ -21,13 +22,25 @@ class TestBlockchainClient(val config: BlockchainClientConfig = BlockchainClient
 
     fun getNativeBalance(address: Address) = web3j.ethGetBalance(address.value, DefaultBlockParameter.valueOf("latest")).send().balance
 
+    fun sendTransaction(address: Address, data: String, amount: BigInteger): TxHash =
+        transactionManager.sendTransaction(
+            web3j.ethGasPrice().send().gasPrice,
+            gasProvider.gasLimit,
+            address.value,
+            data,
+            amount,
+        ).transactionHash.let { TxHash(it) }
+
+    fun asyncDepositNative(address: Address, amount: BigInteger): TxHash =
+        sendTransaction(address, "", amount)
+
     fun depositNative(address: Address, amount: BigInteger): TransactionReceipt {
         return Transfer(web3j, transactionManager).sendFunds(
             address.value,
             Convert.toWei(amount.toString(10), Convert.Unit.WEI),
             Convert.Unit.WEI,
             web3j.ethGasPrice().send().gasPrice,
-            config.contractCreationLimit,
+            gasProvider.gasLimit,
         ).sendAndWaitForConfirmation()
     }
 

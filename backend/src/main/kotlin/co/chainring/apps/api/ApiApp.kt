@@ -75,6 +75,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val blockchainTransactionHandler = BlockchainTransactionHandler(blockchainClient)
     private val blockchainDepositHandler = BlockchainDepositHandler(blockchainClient, sequencerClient)
 
+    private val depositRoutes = DepositRoutes(exchangeApiService)
     private val withdrawalRoutes = WithdrawalRoutes(exchangeApiService)
     private val balanceRoutes = BalanceRoutes()
     private val orderRoutes = OrderRoutes(exchangeApiService)
@@ -116,8 +117,12 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                             orderRoutes.batchOrders(),
                             orderRoutes.listTrades(),
                             balanceRoutes.getBalances(),
-                            withdrawalRoutes.getWithdrawal(),
-                            withdrawalRoutes.createWithdrawal(),
+                            depositRoutes.getDeposit,
+                            depositRoutes.createDeposit,
+                            depositRoutes.listDeposits,
+                            withdrawalRoutes.getWithdrawal,
+                            withdrawalRoutes.createWithdrawal,
+                            withdrawalRoutes.listWithdrawals,
                         )
 
                         if (enableTestRoutes) {

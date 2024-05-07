@@ -59,7 +59,7 @@ export function Header({
             </div>
           )}
 
-          <span className="m-2">
+          <span className="m-2 text-sm">
             {account.isConnected ? (
               <Button
                 caption={() => (

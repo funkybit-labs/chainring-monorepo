@@ -9,7 +9,7 @@ export default function SubmitButton({
   disabled: boolean
   onClick: () => void
   caption: () => string
-  error: string | null
+  error: string | null | undefined
 }) {
   return (
     <>

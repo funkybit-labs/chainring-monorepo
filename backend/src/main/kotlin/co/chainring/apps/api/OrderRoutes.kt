@@ -65,7 +65,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "create-order"
             summary = "Create order"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             receiving(
                 requestBody to Examples.createMarketOrderRequest,
             )
@@ -82,16 +82,13 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.POST to { request ->
             val apiRequest: CreateOrderApiRequest = requestBody(request)
-
-            ApiUtils.runCatchingValidation {
-                val response = exchangeApiService.addOrder(request.principal, apiRequest)
-                if (response.requestStatus == RequestStatus.Accepted) {
-                    Response(Status.CREATED).with(
-                        responseBody of response,
-                    )
-                } else {
-                    response.error?.let { errorResponse(Status.UNPROCESSABLE_ENTITY, it) } ?: unexpectedError()
-                }
+            val response = exchangeApiService.addOrder(request.principal, apiRequest)
+            if (response.requestStatus == RequestStatus.Accepted) {
+                Response(Status.CREATED).with(
+                    responseBody of response,
+                )
+            } else {
+                response.error?.let { errorResponse(Status.UNPROCESSABLE_ENTITY, it) } ?: unexpectedError()
             }
         }
     }
@@ -104,7 +101,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "update-order"
             summary = "Update order"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             receiving(
                 requestBody to Examples.updateLimitOrderRequest,
             )
@@ -115,7 +112,9 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
         } bindContract Method.PATCH to { orderId ->
             fun handle(request: Request): Response {
                 val apiRequest: UpdateOrderApiRequest = requestBody(request)
-                return ApiUtils.runCatchingValidation {
+                return if (orderId != apiRequest.orderId) {
+                    processingError("Invalid order id")
+                } else {
                     val response = exchangeApiService.updateOrder(request.principal, apiRequest)
                     if (response.requestStatus == RequestStatus.Accepted) {
                         Response(Status.OK).with(
@@ -136,7 +135,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "cancel-order"
             summary = "Cancel order"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             receiving(
                 requestBody to Examples.cancelOrderRequest,
             )
@@ -147,15 +146,13 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             { request: Request ->
                 val apiRequest: CancelOrderApiRequest = requestBody(request)
                 if (orderId != apiRequest.orderId) {
-                    processingError("Order Ids must match")
+                    processingError("Invalid order id")
                 } else {
-                    ApiUtils.runCatchingValidation {
-                        val response = exchangeApiService.cancelOrder(request.principal, apiRequest)
-                        if (response.requestStatus == RequestStatus.Accepted) {
-                            Response(Status.NO_CONTENT)
-                        } else {
-                            response.error?.let { errorResponse(Status.UNPROCESSABLE_ENTITY, it) } ?: unexpectedError()
-                        }
+                    val response = exchangeApiService.cancelOrder(request.principal, apiRequest)
+                    if (response.requestStatus == RequestStatus.Accepted) {
+                        Response(Status.NO_CONTENT)
+                    } else {
+                        response.error?.let { errorResponse(Status.UNPROCESSABLE_ENTITY, it) } ?: unexpectedError()
                     }
                 }
             }
@@ -169,7 +166,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "get-order"
             summary = "Get order"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             returning(
                 Status.OK,
                 responseBody to Examples.marketOrderResponse,
@@ -199,7 +196,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "list-orders"
             summary = "List orders"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             returning(
                 Status.OK,
                 responseBody to OrdersApiResponse(
@@ -223,15 +220,13 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "cancel-open-orders"
             summary = "Cancel open orders"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             returning(Status.NO_CONTENT)
         } bindContract Method.DELETE to { request ->
-            ApiUtils.runCatchingValidation {
-                exchangeApiService.cancelOpenOrders(
-                    transaction { WalletEntity.getOrCreate(request.principal) },
-                )
-                Response(Status.NO_CONTENT)
-            }
+            exchangeApiService.cancelOpenOrders(
+                transaction { WalletEntity.getOrCreate(request.principal) },
+            )
+            Response(Status.NO_CONTENT)
         }
     }
 
@@ -243,7 +238,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "batch-orders"
             summary = "Manage orders in batch"
             security = signedTokenSecurity
-            tags += listOf(Tag("orders"))
+            tags += listOf(Tag("order"))
             receiving(
                 requestBody to BatchOrdersApiRequest(
                     MarketId("BTC/ETH"),
@@ -267,13 +262,9 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
                 ),
             )
         } bindContract Method.POST to { request ->
-            val apiRequest: BatchOrdersApiRequest = requestBody(request)
-
-            ApiUtils.runCatchingValidation {
-                Response(Status.OK).with(
-                    responseBody of exchangeApiService.orderBatch(request.principal, apiRequest),
-                )
-            }
+            Response(Status.OK).with(
+                responseBody of exchangeApiService.orderBatch(request.principal, requestBody(request)),
+            )
         }
     }
 
@@ -284,7 +275,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             operationId = "list-trades"
             summary = "List trades"
             security = signedTokenSecurity
-            tags += listOf(Tag("trades"))
+            tags += listOf(Tag("trade"))
             queries += Query.string().optional("before-timestamp", "Return trades executed before provided timestamp")
             queries += Query.string().optional("limit", "Number of trades to return")
             returning(

@@ -1,5 +1,6 @@
 package co.chainring.core.model.db
 
+import co.chainring.apps.api.model.websocket.Balances
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.core.db.notifyDbListener
@@ -35,6 +36,12 @@ data class BroadcasterNotification(
 
         fun limits(wallet: WalletEntity, market: MarketEntity): BroadcasterNotification =
             BroadcasterNotification(OrderEntity.getLimits(market, wallet), recipient = wallet.address)
+
+        fun walletBalances(wallet: WalletEntity): BroadcasterNotification =
+            BroadcasterNotification(
+                Balances(BalanceEntity.balancesAsApiResponse(wallet).balances),
+                recipient = wallet.address,
+            )
     }
 }
 

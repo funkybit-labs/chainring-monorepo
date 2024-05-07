@@ -1,18 +1,12 @@
 import { apiClient, OrderSide } from 'apiClient'
 import { classNames } from 'utils'
-import React, {
-  ChangeEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState
-} from 'react'
+import React, { ChangeEvent, useCallback, useMemo, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Widget } from 'components/common/Widget'
 import SubmitButton from 'components/common/SubmitButton'
 import { Address, formatUnits } from 'viem'
 import { isErrorFromAlias } from '@zodios/core'
-import { useConfig, useSignTypedData } from 'wagmi'
+import { BaseError as WagmiError, useConfig, useSignTypedData } from 'wagmi'
 import { Market } from 'markets'
 import Decimal from 'decimal.js'
 import { useWebsocketSubscription } from 'contexts/websocket'
@@ -74,20 +68,15 @@ export default function TradeWidget({
     }, [])
   })
 
-  const [availableBaseBalance, setAvailableBaseBalance] = useState<
-    bigint | undefined
-  >(undefined)
-
-  const [availableQuoteBalance, setAvailableQuoteBalance] = useState<
-    bigint | undefined
-  >(undefined)
+  const [baseLimit, setBaseLimit] = useState<bigint | undefined>(undefined)
+  const [quoteLimit, setQuoteLimit] = useState<bigint | undefined>(undefined)
 
   useWebsocketSubscription({
     topics: useMemo(() => [limitsTopic(market.id)], [market.id]),
     handler: useCallback((message: Publishable) => {
       if (message.type === 'Limits') {
-        setAvailableBaseBalance(message.base)
-        setAvailableQuoteBalance(message.quote)
+        setBaseLimit(message.base)
+        setQuoteLimit(message.quote)
       }
     }, [])
   })
@@ -131,7 +120,69 @@ export default function TradeWidget({
   }
 
   const mutation = useMutation({
-    mutationFn: apiClient.createOrder
+    mutationFn: async () => {
+      try {
+        const nonce = generateOrderNonce()
+        const signature = await signTypedDataAsync({
+          types: {
+            EIP712Domain: [
+              { name: 'name', type: 'string' },
+              { name: 'version', type: 'string' },
+              { name: 'chainId', type: 'uint256' },
+              { name: 'verifyingContract', type: 'address' }
+            ],
+            Order: [
+              { name: 'sender', type: 'address' },
+              { name: 'baseToken', type: 'address' },
+              { name: 'quoteToken', type: 'address' },
+              { name: 'amount', type: 'int256' },
+              { name: 'price', type: 'uint256' },
+              { name: 'nonce', type: 'int256' }
+            ]
+          },
+          domain: getDomain(exchangeContractAddress, config.state.chainId),
+          primaryType: 'Order',
+          message: {
+            sender: walletAddress,
+            baseToken: baseSymbol.contractAddress ?? addressZero,
+            quoteToken: quoteSymbol.contractAddress ?? addressZero,
+            amount: side == 'Buy' ? amount : -amount,
+            price: isMarketOrder ? 0n : price,
+            nonce: BigInt('0x' + nonce)
+          }
+        })
+
+        if (isMarketOrder) {
+          return await apiClient.createOrder({
+            nonce: nonce,
+            marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
+            type: 'market',
+            side: side,
+            amount: amount,
+            signature: signature
+          })
+        } else {
+          return await apiClient.createOrder({
+            nonce: nonce,
+            marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
+            type: 'limit',
+            side: side,
+            amount: amount,
+            price: new Decimal(priceInputValue),
+            signature: signature
+          })
+        }
+      } catch (error) {
+        throw Error(
+          isErrorFromAlias(apiClient.api, 'createOrder', error)
+            ? error.response.data.errors[0].displayMessage
+            : (error as WagmiError).shortMessage || 'Something went wrong'
+        )
+      }
+    },
+    onSettled: () => {
+      setTimeout(mutation.reset, 3000)
+    }
   })
 
   const canSubmit = useMemo(() => {
@@ -139,8 +190,8 @@ export default function TradeWidget({
     if (amount <= 0n) return false
     if (price <= 0n && !isMarketOrder) return false
 
-    if (side == 'Buy' && notional > (availableQuoteBalance || 0n)) return false
-    if (side == 'Sell' && amount > (availableBaseBalance || 0n)) return false
+    if (side == 'Buy' && notional > (quoteLimit || 0n)) return false
+    if (side == 'Sell' && amount > (baseLimit || 0n)) return false
 
     return true
   }, [
@@ -150,71 +201,9 @@ export default function TradeWidget({
     price,
     notional,
     isMarketOrder,
-    availableQuoteBalance,
-    availableBaseBalance
+    quoteLimit,
+    baseLimit
   ])
-
-  useEffect(() => {
-    if (mutation.isError || mutation.isSuccess) {
-      const timerId: NodeJS.Timeout = setTimeout(() => {
-        mutation.reset()
-      }, 3000)
-      return () => clearTimeout(timerId)
-    }
-  }, [mutation])
-
-  async function submitOrder() {
-    const nonce = generateOrderNonce()
-    const signature = await signTypedDataAsync({
-      types: {
-        EIP712Domain: [
-          { name: 'name', type: 'string' },
-          { name: 'version', type: 'string' },
-          { name: 'chainId', type: 'uint256' },
-          { name: 'verifyingContract', type: 'address' }
-        ],
-        Order: [
-          { name: 'sender', type: 'address' },
-          { name: 'baseToken', type: 'address' },
-          { name: 'quoteToken', type: 'address' },
-          { name: 'amount', type: 'int256' },
-          { name: 'price', type: 'uint256' },
-          { name: 'nonce', type: 'int256' }
-        ]
-      },
-      domain: getDomain(exchangeContractAddress, config.state.chainId),
-      primaryType: 'Order',
-      message: {
-        sender: walletAddress,
-        baseToken: baseSymbol.contractAddress ?? addressZero,
-        quoteToken: quoteSymbol.contractAddress ?? addressZero,
-        amount: side == 'Buy' ? amount : -amount,
-        price: isMarketOrder ? 0n : price,
-        nonce: BigInt('0x' + nonce)
-      }
-    })
-
-    if (isMarketOrder) {
-      mutation.mutate({
-        nonce: nonce,
-        marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
-        type: 'market',
-        side: side,
-        amount: amount,
-        signature: signature
-      })
-    } else {
-      mutation.mutate({
-        nonce: nonce,
-        marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
-        type: 'limit',
-        side: side,
-        amount: amount,
-        price: new Decimal(priceInputValue),
-        signature: signature
-      })
-    }
-  }
 
   return (
     <Widget
@@ -303,33 +292,20 @@ export default function TradeWidget({
             </tbody>
           </table>
           <div className="py-3 text-sm">
-            Available balance:{' '}
-            {availableQuoteBalance !== undefined &&
-              availableBaseBalance !== undefined && (
-                <AmountWithSymbol
-                  amount={
-                    side == 'Buy' ? availableQuoteBalance : availableBaseBalance
-                  }
-                  symbol={side == 'Buy' ? quoteSymbol : baseSymbol}
-                  approximate={false}
-                />
-              )}
+            Limit:{' '}
+            {quoteLimit !== undefined && baseLimit !== undefined && (
+              <AmountWithSymbol
+                amount={side == 'Buy' ? quoteLimit : baseLimit}
+                symbol={side == 'Buy' ? quoteSymbol : baseSymbol}
+                approximate={false}
+              />
+            )}
           </div>
           <div className="pb-3">
             <SubmitButton
               disabled={!canSubmit}
-              onClick={submitOrder}
-              error={
-                mutation.isError
-                  ? isErrorFromAlias(
-                      apiClient.api,
-                      'createOrder',
-                      mutation.error
-                    )
-                    ? mutation.error.response.data.errors[0].displayMessage
-                    : 'Something went wrong'
-                  : ''
-              }
+              onClick={mutation.mutate}
+              error={mutation.error?.message}
               caption={() => {
                 if (mutation.isPending) {
                   return 'Submitting order...'

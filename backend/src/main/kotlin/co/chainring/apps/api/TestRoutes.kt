@@ -102,15 +102,13 @@ class TestRoutes(
                 Status.NO_CONTENT,
             )
         } bindContract Method.DELETE to { _ ->
-            ApiUtils.runCatchingValidation {
-                runBlocking {
-                    val sequencerResponse = sequencerClient.reset()
-                    if (sequencerResponse.hasError()) {
-                        throw RuntimeException("Failed to reset sequencer, error: ${sequencerResponse.error}")
-                    }
+            runBlocking {
+                val sequencerResponse = sequencerClient.reset()
+                if (sequencerResponse.hasError()) {
+                    throw RuntimeException("Failed to reset sequencer, error: ${sequencerResponse.error}")
                 }
-                Response(Status.NO_CONTENT)
             }
+            Response(Status.NO_CONTENT)
         }
 
     private val getSequencerState: ContractRoute = run {
@@ -172,74 +170,72 @@ class TestRoutes(
                 ),
             )
         } bindContract Method.GET to { _ ->
-            ApiUtils.runCatchingValidation {
-                runBlocking {
-                    val sequencerResponse = sequencerClient.getState()
-                    if (sequencerResponse.hasError()) {
-                        throw RuntimeException("Failed to get sequencer state, error: ${sequencerResponse.error}")
-                    }
-
-                    val walletAddresses = transaction {
-                        val walletIds = sequencerResponse.stateDump.balancesList.map { SequencerWalletId(it.wallet) }.toSet()
-                        WalletEntity
-                            .getBySequencerIds(walletIds)
-                            .associateBy(
-                                keySelector = { it.sequencerId.value },
-                                valueTransform = { it.address.value },
-                            )
-                    }
-
-                    Response(Status.OK).with(
-                        responseBody of StateDump(
-                            balances = sequencerResponse.stateDump.balancesList.map { b ->
-                                StateDump.Balance(
-                                    wallet = walletAddresses[b.wallet] ?: b.wallet.toString(),
-                                    asset = b.asset,
-                                    amount = b.amount.toBigInteger(),
-                                    consumed = b.consumedList.map { c ->
-                                        StateDump.Consumption(
-                                            marketId = c.marketId,
-                                            consumed = c.consumed.toBigInteger(),
-                                        )
-                                    },
-                                )
-                            },
-                            markets = sequencerResponse.stateDump.marketsList.map { m ->
-                                StateDump.Market(
-                                    id = m.id,
-                                    tickSize = m.tickSize.toBigDecimal(),
-                                    marketPrice = m.marketPrice.toBigDecimal(),
-                                    maxLevels = m.maxLevels,
-                                    maxOrdersPerLevel = m.maxOrdersPerLevel,
-                                    baseDecimals = m.baseDecimals,
-                                    quoteDecimals = m.quoteDecimals,
-                                    maxOfferIx = m.maxOfferIx,
-                                    minBidIx = m.minBidIx,
-                                    levels = m.levelsList.map { l ->
-                                        StateDump.OrderBookLevel(
-                                            levelIx = l.levelIx,
-                                            side = l.side.name,
-                                            price = l.price.toBigDecimal(),
-                                            maxOrderCount = l.maxOrderCount,
-                                            totalQuantity = l.totalQuantity.toBigInteger(),
-                                            orderHead = l.orderHead,
-                                            orderTail = l.orderTail,
-                                            orders = l.ordersList.map { lo ->
-                                                StateDump.LevelOrder(
-                                                    guid = lo.guid,
-                                                    wallet = walletAddresses[lo.wallet] ?: lo.wallet.toString(),
-                                                    quantity = lo.quantity.toBigInteger(),
-                                                    levelIx = lo.levelIx,
-                                                    originalQuantity = lo.originalQuantity.toBigInteger(),
-                                                )
-                                            },
-                                        )
-                                    },
-                                )
-                            },
-                        ),
-                    )
+            runBlocking {
+                val sequencerResponse = sequencerClient.getState()
+                if (sequencerResponse.hasError()) {
+                    throw RuntimeException("Failed to get sequencer state, error: ${sequencerResponse.error}")
                 }
+
+                val walletAddresses = transaction {
+                    val walletIds = sequencerResponse.stateDump.balancesList.map { SequencerWalletId(it.wallet) }.toSet()
+                    WalletEntity
+                        .getBySequencerIds(walletIds)
+                        .associateBy(
+                            keySelector = { it.sequencerId.value },
+                            valueTransform = { it.address.value },
+                        )
+                }
+
+                Response(Status.OK).with(
+                    responseBody of StateDump(
+                        balances = sequencerResponse.stateDump.balancesList.map { b ->
+                            StateDump.Balance(
+                                wallet = walletAddresses[b.wallet] ?: b.wallet.toString(),
+                                asset = b.asset,
+                                amount = b.amount.toBigInteger(),
+                                consumed = b.consumedList.map { c ->
+                                    StateDump.Consumption(
+                                        marketId = c.marketId,
+                                        consumed = c.consumed.toBigInteger(),
+                                    )
+                                },
+                            )
+                        },
+                        markets = sequencerResponse.stateDump.marketsList.map { m ->
+                            StateDump.Market(
+                                id = m.id,
+                                tickSize = m.tickSize.toBigDecimal(),
+                                marketPrice = m.marketPrice.toBigDecimal(),
+                                maxLevels = m.maxLevels,
+                                maxOrdersPerLevel = m.maxOrdersPerLevel,
+                                baseDecimals = m.baseDecimals,
+                                quoteDecimals = m.quoteDecimals,
+                                maxOfferIx = m.maxOfferIx,
+                                minBidIx = m.minBidIx,
+                                levels = m.levelsList.map { l ->
+                                    StateDump.OrderBookLevel(
+                                        levelIx = l.levelIx,
+                                        side = l.side.name,
+                                        price = l.price.toBigDecimal(),
+                                        maxOrderCount = l.maxOrderCount,
+                                        totalQuantity = l.totalQuantity.toBigInteger(),
+                                        orderHead = l.orderHead,
+                                        orderTail = l.orderTail,
+                                        orders = l.ordersList.map { lo ->
+                                            StateDump.LevelOrder(
+                                                guid = lo.guid,
+                                                wallet = walletAddresses[lo.wallet] ?: lo.wallet.toString(),
+                                                quantity = lo.quantity.toBigInteger(),
+                                                levelIx = lo.levelIx,
+                                                originalQuantity = lo.originalQuantity.toBigInteger(),
+                                            )
+                                        },
+                                    )
+                                },
+                            )
+                        },
+                    ),
+                )
             }
         }
     }
@@ -264,22 +260,20 @@ class TestRoutes(
                 Status.CREATED,
             )
         } bindContract Method.POST to { request ->
-            ApiUtils.runCatchingValidation {
-                val payload = requestBody(request)
-                runBlocking {
-                    val sequencerResponse = sequencerClient.createMarket(
-                        marketId = payload.id,
-                        tickSize = payload.tickSize,
-                        marketPrice = payload.marketPrice,
-                        baseDecimals = payload.baseDecimals,
-                        quoteDecimals = payload.quoteDecimals,
-                    )
-                    if (sequencerResponse.hasError()) {
-                        throw RuntimeException("Failed to create market in sequencer, error: ${sequencerResponse.error}")
-                    }
+            val payload = requestBody(request)
+            runBlocking {
+                val sequencerResponse = sequencerClient.createMarket(
+                    marketId = payload.id,
+                    tickSize = payload.tickSize,
+                    marketPrice = payload.marketPrice,
+                    baseDecimals = payload.baseDecimals,
+                    quoteDecimals = payload.quoteDecimals,
+                )
+                if (sequencerResponse.hasError()) {
+                    throw RuntimeException("Failed to create market in sequencer, error: ${sequencerResponse.error}")
                 }
-                Response(Status.CREATED)
             }
+            Response(Status.CREATED)
         }
     }
 

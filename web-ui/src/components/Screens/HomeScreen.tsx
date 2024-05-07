@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from 'apiClient'
 import { useAccount } from 'wagmi'
-import BalancesWidget from 'components/Screens/HomeScreen/BalancesWidget'
+import BalancesWidget from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import { Header } from 'components/Screens/Header'
 import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
 import TradeWidget from 'components/Screens/HomeScreen/TradeWidget'
