@@ -35,7 +35,7 @@ export type Publish = {
 
 const OrderBookEntrySchema = z.object({
   price: z.string(),
-  size: z.number()
+  size: z.coerce.number()
 })
 export type OrderBookEntry = z.infer<typeof OrderBookEntrySchema>
 
