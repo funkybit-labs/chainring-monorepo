@@ -22,6 +22,12 @@ export const chain = defineChain({
   },
   rpcUrls: {
     default: { http: [import.meta.env.ENV_CHAIN_JSON_RPC_URL] }
+  },
+  blockExplorers: {
+    default: {
+      name: import.meta.env.ENV_CHAIN_BLOCK_EXPLORER_NAME,
+      url: import.meta.env.ENV_CHAIN_BLOCK_EXPLORER_URL
+    }
   }
 })
 
