@@ -35,14 +35,8 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
         val symbolEntities = fixtures.symbols.map { symbol ->
             val contractAddress = if (symbol.isNative) null else symbolContractAddresses.first { it.symbolId == symbol.id }.address
 
-            SymbolEntity.findById(SymbolId(symbol.chainId, symbol.name))
-                ?.also {
-                    it.contractAddress = contractAddress
-                    it.decimals = symbol.decimals.toUByte()
-                    it.flush()
-                    println("Updated symbol ${it.name} with guid=${it.guid.value}")
-                }
-                ?: run {
+            when(val symbolEntity = SymbolEntity.findById(SymbolId(symbol.chainId, symbol.name))) {
+                null -> {
                     SymbolEntity.create(
                         symbol.name,
                         symbol.chainId,
@@ -54,21 +48,24 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                         println("Created symbol ${symbol.name} with guid=${it.guid.value}")
                     }
                 }
+                else -> {
+                    symbolEntity.also {
+                        it.contractAddress = contractAddress
+                        it.decimals = symbol.decimals.toUByte()
+                        it.flush()
+                        println("Updated symbol ${it.name} with guid=${it.guid.value}")
+                    }
+                }
+            }
+
         }.associateBy { it.id.value }
 
         fixtures.markets.forEach { (baseSymbolId, quoteSymbolId, tickSize, marketPrice) ->
             val baseSymbol = symbolEntities.getValue(baseSymbolId)
             val quoteSymbol = symbolEntities.getValue(quoteSymbolId)
 
-            MarketEntity.findById(MarketId(baseSymbol, quoteSymbol))
-                ?.also {
-                    it.baseSymbol = baseSymbol
-                    it.quoteSymbol = quoteSymbol
-                    it.tickSize = tickSize
-                    it.flush()
-                    println("Updated market ${it.guid.value}")
-                }
-                ?: run {
+            when (val marketEntity = MarketEntity.findById(MarketId(baseSymbol, quoteSymbol))) {
+                null -> {
                     MarketEntity
                         .create(baseSymbol, quoteSymbol, tickSize)
                         .also {
@@ -83,6 +80,17 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                             )
                         }
                 }
+
+                else -> {
+                    marketEntity.also {
+                        it.baseSymbol = baseSymbol
+                        it.quoteSymbol = quoteSymbol
+                        it.tickSize = tickSize
+                        it.flush()
+                        println("Updated market ${it.guid.value}")
+                    }
+                }
+            }
         }
     }
 }
