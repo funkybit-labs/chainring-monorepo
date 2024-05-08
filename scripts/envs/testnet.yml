@@ -7,10 +7,12 @@ environment:
     SEQUENCER_PORT: "5337"
     EVM_FEE_ACCOUNT_ADDRESS: "0x5E027795ec717ae1cAfa705F93720C02aB429b95"
     DEFAULT_MAX_PRIORITY_FEE_PER_GAS_WEI: "100000000"
+    SLACK_ERROR_REPORTING_CHANNEL_ID: C072KKXNN68
   sequencer:
     QUEUE_HOME: "/data/queues/testnet"
     CHECKPOINTS_ENABLED: "true"
     DB_HOST: testnet-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
+    SLACK_ERROR_REPORTING_CHANNEL_ID: C072KKXNN68
 services:
   api:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
@@ -20,9 +22,11 @@ services:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-45c44b9b-ac53-47ab-8997-6d5d799ce4bc-OY4iRs
       EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/api/EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY-3R6syW
       EVM_SUBMITTER_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/api/EVM_SUBMITTER_PRIVATE_KEY-kEoDjh
+      SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   sequencer:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer
     count: 1
     environment: sequencer
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-45c44b9b-ac53-47ab-8997-6d5d799ce4bc-OY4iRs
+      SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
