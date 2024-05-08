@@ -2,10 +2,7 @@ package co.chainring.tasks
 
 import co.chainring.core.db.DbConfig
 import co.chainring.core.db.connect
-import co.chainring.core.db.notifyDbListener
 import co.chainring.core.model.db.BlockchainNonceEntity
-import co.chainring.core.model.db.BroadcasterJobEntity
-import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.ChainEntity
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
@@ -35,46 +32,57 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
             }
         }
 
-         val symbolEntities = fixtures.symbols.map { symbol ->
-             SymbolEntity.findById(SymbolId(symbol.chainId, symbol.name))
-                 ?: run {
-                     SymbolEntity.create(
-                         symbol.name,
-                         symbol.chainId,
-                         contractAddress = if (symbol.isNative) {
-                             null
-                         } else {
-                             symbolContractAddresses.first { it.symbolId == symbol.id }.address
-                         },
-                         decimals = symbol.decimals.toUByte(),
-                         description = ""
-                     ).also {
-                         it.flush()
-                         println("Created symbol ${symbol.name} with guid=${it.guid.value}")
-                     }
-                 }
-         }.associateBy { it.id.value }
+        val symbolEntities = fixtures.symbols.map { symbol ->
+            val contractAddress = if (symbol.isNative) null else symbolContractAddresses.first { it.symbolId == symbol.id }.address
+
+            SymbolEntity.findById(SymbolId(symbol.chainId, symbol.name))
+                ?.also {
+                    it.contractAddress = contractAddress
+                    it.decimals = symbol.decimals.toUByte()
+                    it.flush()
+                    println("Updated symbol ${it.name} with guid=${it.guid.value}")
+                }
+                ?: run {
+                    SymbolEntity.create(
+                        symbol.name,
+                        symbol.chainId,
+                        contractAddress = contractAddress,
+                        decimals = symbol.decimals.toUByte(),
+                        description = ""
+                    ).also {
+                        it.flush()
+                        println("Created symbol ${symbol.name} with guid=${it.guid.value}")
+                    }
+                }
+        }.associateBy { it.id.value }
 
         fixtures.markets.forEach { (baseSymbolId, quoteSymbolId, tickSize, marketPrice) ->
             val baseSymbol = symbolEntities.getValue(baseSymbolId)
             val quoteSymbol = symbolEntities.getValue(quoteSymbolId)
 
-            if (MarketEntity.findById(MarketId(baseSymbol, quoteSymbol)) == null) {
-                val marketEntity = MarketEntity
-                    .create(baseSymbol, quoteSymbol, tickSize)
-                    .also {
-                        it.flush()
-                    }
+            MarketEntity.findById(MarketId(baseSymbol, quoteSymbol))
+                ?.also {
+                    it.baseSymbol = baseSymbol
+                    it.quoteSymbol = quoteSymbol
+                    it.tickSize = tickSize
+                    it.flush()
+                    println("Updated market ${it.guid.value}")
+                }
+                ?: run {
+                    MarketEntity
+                        .create(baseSymbol, quoteSymbol, tickSize)
+                        .also {
+                            it.flush()
+                            println("Created market ${it.guid.value}")
 
-                println("Created market ${marketEntity.guid.value}")
-
-                OHLCEntity.updateWith(
-                    market = marketEntity.guid.value,
-                    tradeTimestamp = Clock.System.now() - 1.hours,
-                    tradePrice = marketPrice,
-                    tradeAmount = BigInteger("0"),
-                )
-            }
+                            OHLCEntity.updateWith(
+                                market = it.guid.value,
+                                tradeTimestamp = Clock.System.now() - 1.hours,
+                                tradePrice = marketPrice,
+                                tradeAmount = BigInteger.ZERO,
+                            )
+                        }
+                }
         }
     }
 }
