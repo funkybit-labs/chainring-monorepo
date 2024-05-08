@@ -9,8 +9,10 @@
                         value='{"$resolver": "message", "stringified": false}'/>/>
             </JsonTemplateLayout>
         </Console>
+        <ErrorReporter name="ErrorReporter" />
         <Async name="AsyncAppender">
             <AppenderRef ref="Console"/>
+            <AppenderRef ref="ErrorReporter" level="error"/>
         </Async>
     </Appenders>
     <Loggers>

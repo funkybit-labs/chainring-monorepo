@@ -53,7 +53,8 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
       ],
       "Resource": [
         "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:${var.name_prefix}/${var.task_name}/*",
-        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*"
+        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*",
+        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:slack-error-reporter-token-*"
       ]
     }
   ]
