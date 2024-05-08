@@ -40,7 +40,8 @@ resource "aws_iam_role_policy" "sequencer_execution_role_policy" {
           "secretsmanager:GetSecretValue"
       ],
       "Resource": [
-        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*"
+        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*",
+        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:slack-error-reporter-token-*"
       ]
     }
   ]

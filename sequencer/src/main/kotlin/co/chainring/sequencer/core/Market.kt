@@ -26,8 +26,6 @@ data class Market(
     val id: MarketId,
     val tickSize: BigDecimal,
     var marketPrice: BigDecimal,
-    var bestBid: BigDecimal,
-    var bestOffer: BigDecimal,
     val maxLevels: Int,
     val maxOrdersPerLevel: Int,
     val baseDecimals: Int,
@@ -37,8 +35,9 @@ data class Market(
 ) {
     private val halfTick = tickSize.setScale(tickSize.scale() + 1) / BigDecimal.valueOf(2)
 
-    private fun marketIx(): Int =
-        min(maxLevels / 2, (marketPrice - halfTick).divideToIntegralValue(tickSize).toInt())
+    private fun marketIx(): Int = min(maxLevels / 2, (marketPrice - halfTick).divideToIntegralValue(tickSize).toInt())
+
+    fun levelIx(price: BigDecimal): Int = (price - levels[0].price).divideToIntegralValue(tickSize).toInt()
 
     val levels: Array<OrderBookLevel> = marketIx().let { marketIx ->
         Array(maxLevels) { n ->
@@ -59,6 +58,8 @@ data class Market(
             }
         }
     }
+    var bestBid: BigDecimal = levels.first().price
+    var bestOffer: BigDecimal = levels.last().price
 
     // TODO - change these mutable maps to a HashMap that pre-allocates
     private val buyOrdersByWallet = mutableMapOf<WalletAddress, CopyOnWriteArrayList<LevelOrder>>()
@@ -450,13 +451,10 @@ data class Market(
                     if (remainingAmount > BigInteger.ZERO) {
                         // and then create limit order for the remaining amount
                         val adjustedOrder = order.copy { amount = remainingAmount.toIntegerValue() }
-                        val limitOrderDisposition = createLimitSellOrder(levelIx, wallet, adjustedOrder)
+                        createLimitSellOrder(levelIx, wallet, adjustedOrder)
 
                         AddOrderResult(
-                            // market part of the limit order can be rejected due to no liquidity yet in the empty market
-                            // this happens because `bestBid` set to half tick away from the market price during market creation
-                            // potentially can be solved by widening initial bestBid/bestOffer distance (e.g. outer boundaries of the market)
-                            if (crossingOrderResult.disposition == OrderDisposition.Rejected) limitOrderDisposition else crossingOrderResult.disposition,
+                            crossingOrderResult.disposition,
                             crossingOrderResult.executions,
                         )
                     } else {
@@ -487,13 +485,10 @@ data class Market(
                     if (remainingAmount > BigInteger.ZERO) {
                         // and then create limit order for the remaining amount
                         val adjustedOrder = order.copy { amount = remainingAmount.toIntegerValue() }
-                        val limitOrderDisposition = createLimitBuyOrder(levelIx, wallet, adjustedOrder)
+                        createLimitBuyOrder(levelIx, wallet, adjustedOrder)
 
                         AddOrderResult(
-                            // market part of the limit order can be rejected due to no liquidity yet in the empty market
-                            // this happens because `bestOffer` set to half tick away from the market price during market creation
-                            // potentially can be solved by widening initial bestBid/bestOffer distance (e.g. outer boundaries of the market)
-                            if (crossingOrderResult.disposition == OrderDisposition.Rejected) limitOrderDisposition else crossingOrderResult.disposition,
+                            crossingOrderResult.disposition,
                             crossingOrderResult.executions,
                         )
                     } else {
@@ -678,10 +673,6 @@ data class Market(
         } ?: OrderChangeRejected.Reason.DoesNotExist
     }
 
-    fun levelIx(price: BigDecimal): Int {
-        return (price - levels[0].price).divideToIntegralValue(tickSize).toInt()
-    }
-
     // equals and hashCode are overridden because of levels are stored in array
     // see https://kotlinlang.org/docs/arrays.html#compare-arrays
     override fun equals(other: Any?): Boolean {
@@ -761,19 +752,17 @@ data class Market(
                 quoteDecimals = checkpoint.quoteDecimals,
                 minBidIx = checkpoint.minBidIx,
                 maxOfferIx = checkpoint.maxOfferIx,
-                bestBid = checkpoint.bestBid?.toBigDecimal()
-                    ?: (
-                        checkpoint.marketPrice.toBigDecimal() - tickSize.setScale(tickSize.scale() + 1)
-                            .divide(BigDecimal.valueOf(2))
-                        ),
-                bestOffer = checkpoint.bestOffer?.toBigDecimal()
-                    ?: (
-                        checkpoint.marketPrice.toBigDecimal() + tickSize.setScale(tickSize.scale() + 1)
-                            .divide(
-                                BigDecimal.valueOf(2),
-                            )
-                        ),
             ).apply {
+                bestBid = checkpoint.bestBid?.toBigDecimal() ?: (
+                    checkpoint.marketPrice.toBigDecimal() - tickSize.setScale(tickSize.scale() + 1)
+                        .divide(BigDecimal.valueOf(2))
+                    )
+
+                bestOffer = checkpoint.bestOffer?.toBigDecimal() ?: (
+                    checkpoint.marketPrice.toBigDecimal() + tickSize.setScale(tickSize.scale() + 1)
+                        .divide(BigDecimal.valueOf(2))
+                    )
+
                 checkpoint.levelsList.forEach { levelCheckpoint ->
                     this.levels[levelCheckpoint.levelIx].fromCheckpoint(levelCheckpoint)
                 }
