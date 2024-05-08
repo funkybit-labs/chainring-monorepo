@@ -9,6 +9,7 @@ import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.contracts.generated.Exchange
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.ContractType
+import co.chainring.core.client.rest.ApiClient
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address

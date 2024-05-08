@@ -22,3 +22,7 @@ value class Address(val value: String) {
 fun Address.toChecksumAddress(): Address {
     return Address(Keys.toChecksumAddress(this.value))
 }
+
+fun Address.abbreviated(): String {
+    return this.value.take(6) + "..." + this.value.takeLast(4)
+}

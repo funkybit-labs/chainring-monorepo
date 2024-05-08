@@ -3,19 +3,19 @@ package co.chainring.integrationtests.api
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ListWithdrawalsApiResponse
 import co.chainring.apps.api.model.ReasonCode
+import co.chainring.core.client.ws.blocking
+import co.chainring.core.client.ws.subscribeToBalances
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.waitForBalance
-import co.chainring.integrationtests.utils.ApiClient
 import co.chainring.integrationtests.utils.ExpectedBalance
 import co.chainring.integrationtests.utils.Faucet
+import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.Wallet
 import co.chainring.integrationtests.utils.assertBalancesMessageReceived
 import co.chainring.integrationtests.utils.assertError
-import co.chainring.integrationtests.utils.blocking
-import co.chainring.integrationtests.utils.subscribeToBalances
 import org.awaitility.kotlin.await
 import org.http4k.client.WebsocketClient
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -30,7 +30,7 @@ import kotlin.test.Test
 class WithdrawalTest {
     @Test
     fun withdrawals() {
-        val apiClient = ApiClient()
+        val apiClient = TestApiClient()
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()
@@ -185,7 +185,7 @@ class WithdrawalTest {
 
     @Test
     fun `withdrawal errors`() {
-        val apiClient = ApiClient()
+        val apiClient = TestApiClient()
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()

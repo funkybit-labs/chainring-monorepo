@@ -83,7 +83,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
         fun findForOrder(orderEntity: OrderEntity): List<OrderExecutionEntity> {
             return OrderExecutionEntity.find {
                 OrderExecutionTable.orderGuid.eq(orderEntity.guid)
-            }.toList()
+            }.orderBy(Pair(OrderExecutionTable.timestamp, SortOrder.DESC)).toList()
         }
 
         fun findForOrders(orderIds: List<OrderId>): List<OrderExecutionEntity> {

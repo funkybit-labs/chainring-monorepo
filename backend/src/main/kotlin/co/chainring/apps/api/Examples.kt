@@ -13,6 +13,7 @@ import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.Withdrawal
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Symbol
+import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
@@ -168,5 +169,6 @@ object Examples {
         Deposit.Status.Pending,
         error = null,
         createdAt = Clock.System.now(),
+        TxHash.emptyHash(),
     )
 }

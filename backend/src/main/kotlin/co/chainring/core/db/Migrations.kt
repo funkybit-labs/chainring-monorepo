@@ -18,6 +18,7 @@ import co.chainring.core.model.db.migrations.V23_OHLC
 import co.chainring.core.model.db.migrations.V24_KeyValueStore
 import co.chainring.core.model.db.migrations.V25_ChecksumWalletAddresses
 import co.chainring.core.model.db.migrations.V26_ChecksumContractAddresses
+import co.chainring.core.model.db.migrations.V27_TelegramBotTables
 import co.chainring.core.model.db.migrations.V2_ERC20Token
 import co.chainring.core.model.db.migrations.V3_UpdateDeployedSmartContract
 import co.chainring.core.model.db.migrations.V4_AddDecimalsToERC20Token
@@ -54,4 +55,5 @@ val migrations = listOf(
     V24_KeyValueStore(),
     V25_ChecksumWalletAddresses(),
     V26_ChecksumContractAddresses(),
+    V27_TelegramBotTables(),
 )

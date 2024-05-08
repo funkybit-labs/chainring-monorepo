@@ -1,8 +1,8 @@
 package co.chainring.mocker
 
 import co.chainring.core.model.db.MarketId
-import co.chainring.integrationtests.utils.TraceRecorder
-import co.chainring.integrationtests.utils.humanReadable
+import co.chainring.core.utils.TraceRecorder
+import co.chainring.core.utils.humanReadable
 import co.chainring.mocker.core.Maker
 import co.chainring.mocker.core.Taker
 import co.chainring.mocker.core.toFundamentalUnits
@@ -13,7 +13,6 @@ import java.util.Timer
 import kotlin.concurrent.timerTask
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime

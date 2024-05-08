@@ -5,7 +5,7 @@ import co.chainring.core.blockchain.ContractType
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
-import co.chainring.integrationtests.utils.ApiClient
+import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.Wallet
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -22,7 +22,7 @@ class DepositAndWithdrawalTest {
 
     @Test
     fun testConfiguration() {
-        val apiClient = ApiClient()
+        val apiClient = TestApiClient()
         val config = apiClient.getConfiguration().chains.first()
         assertEquals(config.contracts.size, 1)
         assertEquals(config.contracts[0].name, ContractType.Exchange.name)
@@ -39,7 +39,7 @@ class DepositAndWithdrawalTest {
 
     @Test
     fun testERC20DepositsAndWithdrawals() {
-        val apiClient = ApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
+        val apiClient = TestApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
         val wallet = Wallet(apiClient)
         val decimals = wallet.symbols.first { it.name == "USDC" }.decimals.toInt()
 
@@ -64,7 +64,7 @@ class DepositAndWithdrawalTest {
 
     @Test
     fun testNativeDepositsAndWithdrawals() {
-        val apiClient = ApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
+        val apiClient = TestApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
         val wallet = Wallet(apiClient)
         val decimals = wallet.symbols.first { it.contractAddress == null }.decimals.toInt()
 
