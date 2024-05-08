@@ -14,7 +14,6 @@ import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.DepositTable
 import co.chainring.core.model.db.ExchangeTransactionTable
 import co.chainring.core.model.db.KeyValueStore
-import co.chainring.core.model.db.OHLCTable
 import co.chainring.core.model.db.OrderExecutionTable
 import co.chainring.core.model.db.OrderTable
 import co.chainring.core.model.db.TradeTable
@@ -140,7 +139,6 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             ExchangeTransactionTable.deleteAll()
             BlockchainTransactionTable.deleteAll()
             OrderExecutionTable.deleteAll()
-            OHLCTable.deleteAll()
             TradeTable.deleteAll()
             OrderTable.deleteAll()
             DepositTable.deleteAll()
