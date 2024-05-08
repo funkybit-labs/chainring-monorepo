@@ -404,8 +404,6 @@ class TestSequencerCheckpoints {
                         marketPrice = BigDecimal("17.525"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
-                        bestBid = BigDecimal("17.52"),
-                        bestOffer = BigDecimal("17.53"),
                     ),
                 ),
             ),
@@ -434,8 +432,6 @@ class TestSequencerCheckpoints {
                         marketPrice = BigDecimal("17.525"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
-                        bestBid = BigDecimal("17.52"),
-                        bestOffer = BigDecimal("17.53"),
                     ).also { market ->
                         listOf(
                             order {
@@ -487,8 +483,6 @@ class TestSequencerCheckpoints {
                         marketPrice = BigDecimal("17.525"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
-                        bestBid = BigDecimal("17.52"),
-                        bestOffer = BigDecimal("17.53"),
                     ).also { market ->
                         listOf(
                             order {
@@ -542,8 +536,6 @@ class TestSequencerCheckpoints {
                         marketPrice = BigDecimal("17.525"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
-                        bestBid = BigDecimal("17.52"),
-                        bestOffer = BigDecimal("17.53"),
                     ).also { market ->
                         listOf(
                             order {
@@ -594,8 +586,6 @@ class TestSequencerCheckpoints {
                         marketPrice = BigDecimal("70000"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
-                        bestBid = BigDecimal("69999"),
-                        bestOffer = BigDecimal("70001"),
                     ).also { market ->
                         listOf(
                             order {
