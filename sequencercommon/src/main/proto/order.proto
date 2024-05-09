@@ -47,5 +47,4 @@ enum OrderDisposition {
   Failed = 4;
   Canceled = 5;
   AutoReduced = 6;
-  CrossesMarket = 7;
 }

@@ -65,7 +65,6 @@ enum SequencerError {
   MarketExists = 2;
   UnknownMarket = 3;
   ExceedsLimit = 4;
-  ChangeCrossesMarket = 5;
 }
 
 message StateDump {
