@@ -71,15 +71,14 @@ enum class OrderStatus {
     Expired,
     Rejected,
     Failed,
-    CrossesMarket,
     ;
 
     fun isFinal(): Boolean {
-        return this in listOf(Filled, Cancelled, Expired, Failed, Rejected, CrossesMarket)
+        return this in listOf(Filled, Cancelled, Expired, Failed, Rejected)
     }
 
     fun isError(): Boolean {
-        return this in listOf(Failed, Rejected, CrossesMarket)
+        return this in listOf(Failed, Rejected)
     }
 
     companion object {
@@ -92,7 +91,6 @@ enum class OrderStatus {
                 OrderDisposition.UNRECOGNIZED,
                 -> Failed
                 OrderDisposition.Canceled -> Cancelled
-                OrderDisposition.CrossesMarket -> CrossesMarket
                 OrderDisposition.Rejected -> Rejected
                 OrderDisposition.AutoReduced -> Open
             }

@@ -331,7 +331,6 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
             OrderStatus.Cancelled -> "cancelled"
             OrderStatus.Open -> if (isCreated) "opened" else "updated"
             OrderStatus.Expired -> "expired"
-            OrderStatus.CrossesMarket -> "crossed market"
         }
         val executionPrice = when (order.status) {
             OrderStatus.Partial, OrderStatus.Filled -> "at price of ${order.executions.first().price.setScale(6, RoundingMode.FLOOR).toPlainString()}"

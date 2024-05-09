@@ -358,15 +358,6 @@ class OrderBookTest : TestWithDb() {
                     amount = "2".toBigDecimal(),
                 ),
                 Order(
-                    OrderId("order_10"),
-                    btcEthMarket,
-                    OrderSide.Buy,
-                    OrderType.Limit,
-                    OrderStatus.CrossesMarket,
-                    price = "17.35".toBigDecimal(),
-                    amount = "2".toBigDecimal(),
-                ),
-                Order(
                     OrderId("order_11"),
                     btcEthMarket,
                     OrderSide.Buy,
