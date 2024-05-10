@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* removing axes from the prices graph */
+.x-axis line {
+  display: none;
+}
+.x-axis path {
+  display: none;
+}
+.y-axis line {
+  display: none;
+}
+.y-axis path {
+  display: none;
+}

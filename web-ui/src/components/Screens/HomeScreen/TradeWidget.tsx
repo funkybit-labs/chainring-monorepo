@@ -210,7 +210,6 @@ export default function TradeWidget({
 
   return (
     <Widget
-      title="Trade"
       contents={
         <>
           <div className="flex w-full text-center text-lg font-medium">

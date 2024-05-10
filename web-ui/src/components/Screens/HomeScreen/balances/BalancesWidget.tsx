@@ -50,7 +50,6 @@ export default function BalancesWidget({
 
   return (
     <Widget
-      title={'Balances'}
       contents={
         !!withdrawalsQuery.data && !!depositsQuery.data ? (
           <>

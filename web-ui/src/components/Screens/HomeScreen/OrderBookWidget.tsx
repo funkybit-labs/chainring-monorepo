@@ -105,10 +105,7 @@ export function OrderBookWidget({ marketId }: { marketId: string }) {
   }, [orderBook, windowDimensions])
 
   return (
-    <Widget
-      title={'Order Book'}
-      contents={<OrderBook params={params} orderBook={orderBook} />}
-    />
+    <Widget contents={<OrderBook params={params} orderBook={orderBook} />} />
   )
 }
 

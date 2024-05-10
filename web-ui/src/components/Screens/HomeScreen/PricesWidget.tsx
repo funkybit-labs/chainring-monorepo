@@ -538,7 +538,6 @@ export function PricesWidget({ marketId }: { marketId: string }) {
 
   return (
     <Widget
-      title={'Prices'}
       contents={
         <div>
           <div className="flex flex-row align-middle">
