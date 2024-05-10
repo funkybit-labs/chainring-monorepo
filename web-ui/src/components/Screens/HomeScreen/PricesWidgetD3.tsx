@@ -89,7 +89,7 @@ export function PricesWidgetD3({ market }: { market: Market }) {
           <div className="flex flex-row align-middle">
             <Title market={market} price={lastPrice()} delta={0.07} />
           </div>
-          <div className="flex w-full justify-between place-items-center text-sm py-4">
+          <div className="flex w-full place-items-center justify-between py-4 text-sm">
             <div className="text-left">
               <IntervalsDisplay
                 selectedInterval={interval}
@@ -104,7 +104,7 @@ export function PricesWidgetD3({ market }: { market: Market }) {
               <LastUpdated lastUpdated={lastUpdated} />
             </div>
           </div>
-          <div className="w-full h-full p-4 min-h-[500px]">
+          <div className="size-full min-h-[500px] p-4">
             <OHLCChart
               data={ohlc}
               interval={interval}
@@ -181,7 +181,7 @@ function OHLCChart({ data, interval, intervalTouched }: OHLCChartProps) {
       .domain([new Date(now.getTime() - xDomainMs), now])
       .range([0, innerWidth])
 
-    let yScale = d3.scaleLinear().range([innerHeight, 0])
+    const yScale = d3.scaleLinear().range([innerHeight, 0])
 
     const xAxis = d3.axisBottom(xScale)
     const yAxis = d3.axisRight(yScale) //.ticks(20)
@@ -263,21 +263,21 @@ function Title({
 }) {
   return (
     <div className="flex w-full justify-between text-xl font-semibold">
-      <div className="text-left place-items-center">
+      <div className="place-items-center text-left">
         <SymbolIcon
           symbol={market.baseSymbol.name}
           className="inline-block size-7"
         />
         <SymbolIcon
           symbol={market.quoteSymbol.name}
-          className="inline-block size-7 mr-4"
+          className="mr-4 inline-block size-7"
         />
         {market.baseSymbol.name}
         <span className="">/</span>
         {market.quoteSymbol.name}
         <span className="ml-4">Price</span>
       </div>
-      <div className="flex text-right place-items-center gap-4">
+      <div className="flex place-items-center gap-4 text-right">
         {price}
         <div className="text-sm">
           <DeltaDisplay delta={delta} />
@@ -346,7 +346,7 @@ function IntervalsDisplay({
           {value}
         </button>
       ))}
-      <span className="text-darkBluishGray3 text-xs pl-10">
+      <span className="pl-10 text-xs text-darkBluishGray3">
         ({selectedDuration})
       </span>
     </div>

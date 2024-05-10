@@ -17,7 +17,7 @@ export function MarketSelector({
     <div className="w-40">
       <Listbox value={selected} onChange={onChange}>
         <div className="relative">
-          <Listbox.Button className="relative w-full cursor-default rounded-md py-2 pl-3 pr-10 text-left bg-darkBluishGray7 transition-colors duration-300 ease-in-out hover:bg-darkBluishGray6 hover:text-white">
+          <Listbox.Button className="relative w-full cursor-default rounded-md bg-darkBluishGray7 py-2 pl-3 pr-10 text-left transition-colors duration-300 ease-in-out hover:bg-darkBluishGray6 hover:text-white">
             <MarketTitle market={selected} />
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <ChevronDownIcon
@@ -32,12 +32,12 @@ export function MarketSelector({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Listbox.Options className="absolute max-h-60 w-full overflow-auto rounded-md mt-1 py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none bg-darkBluishGray7">
+            <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-darkBluishGray7 py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none">
               {markets.map((market) => (
                 <Listbox.Option
                   key={market.id}
                   className={
-                    'relative cursor-default select-none py-2 px-4 hover:bg-darkBluishGray6 hover:text-white'
+                    'relative cursor-default select-none px-4 py-2 hover:bg-darkBluishGray6 hover:text-white'
                   }
                   value={market}
                 >
@@ -71,7 +71,7 @@ function MarketTitle({ market }: { market: Market }) {
       />
       <SymbolIcon
         symbol={market.quoteSymbol.name}
-        className="inline-block size-4 mr-2"
+        className="mr-2 inline-block size-4"
       />
       {market.baseSymbol.name}
       <span className="">/</span>

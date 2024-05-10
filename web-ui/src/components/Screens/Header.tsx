@@ -44,7 +44,7 @@ export function Header({
 
   return (
     <>
-      <div className="fixed z-50 flex h-20 w-full flex-row place-items-center justify-between p-0 bg-darkBluishGray10 text-darkBluishGray1 text-sm">
+      <div className="fixed z-50 flex h-20 w-full flex-row place-items-center justify-between bg-darkBluishGray10 p-0 text-sm text-darkBluishGray1">
         <span>
           <img className="m-6 inline-block h-10 " src={logo} alt="ChainRing" />
         </span>
