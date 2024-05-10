@@ -10,19 +10,17 @@ import {
   OrderBookEntry
 } from 'websocketMessages'
 import { useWebsocketSubscription } from 'contexts/websocket'
-import { useWindowDimensions, widgetSize, WindowDimensions } from 'utils/layout'
+import { useMeasure } from 'react-use'
 
 type OrderBookParameters = {
-  bookWidth: number
   gridLines: number
-  graphStartX: number
-  graphEndX: number
   graphWidth: number
   graphStartY: number
   barHeight: number
+  barGap: number
   lastPriceHeight: number
   maxSize: number
-  bookHeight: number
+  graphHeight: number
   buyStartY: number
   gridSpacing: number
   ticks: number[]
@@ -32,15 +30,13 @@ type OrderBookParameters = {
 
 function calculateParameters(
   orderBook: OrderBook,
-  windowDimensions: WindowDimensions
+  width: number
 ): OrderBookParameters {
-  const bookWidth = widgetSize(windowDimensions.width)
+  const graphWidth = width - 32
   const gridLines = 6
-  const graphStartX = 60
-  const graphEndX = bookWidth - 20
-  const graphWidth = graphEndX - graphStartX
   const graphStartY = 20
-  const barHeight = 18
+  const barHeight = 20
+  const barGap = 8
   const lastPriceHeight = 50
   const maxLevels = 10
   const buyLevels = orderBook.buy.slice(0, maxLevels)
@@ -50,12 +46,16 @@ function calculateParameters(
     ...sellLevels.map((l) => l.size),
     ...buyLevels.map((l) => l.size)
   )
-  const bookHeight =
+  const graphHeight =
     graphStartY +
     lastPriceHeight +
-    barHeight * (buyLevels.length + sellLevels.length)
+    barHeight * (buyLevels.length + sellLevels.length) +
+    barGap * (buyLevels.length + sellLevels.length - 2)
   const buyStartY =
-    graphStartY + lastPriceHeight + barHeight * sellLevels.length
+    graphStartY +
+    lastPriceHeight +
+    barHeight * sellLevels.length +
+    barGap * (sellLevels.length - 1)
   const gridSpacing = calculateTickSpacing(0, maxSize, gridLines)
 
   const ticks: number[] = []
@@ -64,18 +64,16 @@ function calculateParameters(
   }
 
   return {
-    bookWidth,
     gridLines,
-    graphStartX,
-    graphEndX,
     graphWidth,
     graphStartY,
     barHeight,
+    barGap,
     lastPriceHeight,
     // we adjust the max size to be the grid line past the last one, which keeps the grid lines
     // more stable as the values move around
     maxSize: gridSpacing * (gridLines + 1),
-    bookHeight,
+    graphHeight,
     buyStartY,
     gridSpacing,
     ticks,
@@ -87,7 +85,8 @@ function calculateParameters(
 export function OrderBookWidget({ marketId }: { marketId: string }) {
   const [orderBook, setOrderBook] = useState<OrderBook>()
   const [params, setParams] = useState<OrderBookParameters>()
-  const windowDimensions = useWindowDimensions()
+
+  const [ref, { width }] = useMeasure()
 
   useWebsocketSubscription({
     topics: useMemo(() => [orderBookTopic(marketId)], [marketId]),
@@ -100,21 +99,24 @@ export function OrderBookWidget({ marketId }: { marketId: string }) {
 
   useEffect(() => {
     if (orderBook) {
-      setParams(calculateParameters(orderBook, windowDimensions))
+      setParams(calculateParameters(orderBook, width))
     }
-  }, [orderBook, windowDimensions])
+  }, [orderBook, width])
 
   return (
-    <Widget contents={<OrderBook params={params} orderBook={orderBook} />} />
+    <Widget
+      wrapperRef={ref}
+      contents={<OrderBook params={params} orderBook={orderBook} />}
+    />
   )
 }
 
 function directionStyle(direction: Direction) {
   switch (direction) {
     case 'Up':
-      return { color: '#10A327', symbol: '↑' }
+      return { color: '#42C66B', symbol: ' ↘︎' }
     case 'Down':
-      return { color: '#7F1D1D', symbol: '↓' }
+      return { color: '#FF7169', symbol: ' ↘︎' }
     case 'Unchanged':
       return { color: 'transparent', symbol: '' }
   }
@@ -137,98 +139,117 @@ export function OrderBook({
 
   const direction = directionStyle(orderBook.last.direction)
 
+  // so that we don't draw ticks through the price labels, find out how long the first label is (they should all be
+  // the same size) and assume 12px / character -- dynamically measuring svg text would be more accurate but
+  // complicated
+  const labelWidth = (params.sellLevels[0] ?? params.buyLevels[0])?.price.length
+  const minimumTickX = labelWidth * 12
+
   return (
-    <svg width={params.bookWidth} height={params.bookHeight}>
+    <svg width={params.graphWidth} height={params.graphHeight}>
       {params.sellLevels.map((l, i) => (
         <Fragment key={`${l.price}`}>
-          <text
-            x={0}
-            y={params.graphStartY + 4 + (i + 1) * params.barHeight}
-            fill="white"
-            textAnchor="left"
-          >
-            {l.price}
-          </text>
           <rect
-            x={params.graphStartX}
+            x={0}
             width={Math.min(
               params.graphWidth,
               params.graphWidth * (l.size / params.maxSize)
             )}
-            y={params.graphStartY + 8 + i * params.barHeight}
+            y={
+              params.graphStartY + 8 + i * params.barHeight + i * params.barGap
+            }
             height={params.barHeight}
-            fill="#7F1D1D"
+            fill="#FF716933"
           />
+          <text
+            x={0}
+            y={
+              params.graphStartY +
+              4 +
+              (i + 1) * params.barHeight +
+              i * params.barGap
+            }
+            fill="#FF7169"
+            textAnchor="left"
+            fontWeight={600}
+          >
+            {l.price}
+          </text>
         </Fragment>
       ))}
+
+      {params.buyLevels.map((l, i) => (
+        <Fragment key={`${l.price}`}>
+          <rect
+            x={0}
+            width={Math.min(
+              params.graphWidth,
+              params.graphWidth * (l.size / params.maxSize)
+            )}
+            y={params.buyStartY + i * params.barHeight + i * params.barGap}
+            height={params.barHeight}
+            fill="#42C66B33"
+          />
+          <text
+            x={0}
+            y={
+              params.buyStartY +
+              (i + 1) * params.barHeight +
+              i * params.barGap -
+              4
+            }
+            fill="#42C66B"
+            textAnchor="left"
+            fontWeight={600}
+          >
+            {l.price}
+          </text>
+        </Fragment>
+      ))}
+      {params.ticks.slice(1).map((tick, i) => {
+        const xPos =
+          (i + 1) * params.gridSpacing * (params.graphWidth / params.maxSize)
+        return (
+          xPos > minimumTickX && (
+            <Fragment key={`tick-${i}`}>
+              <text
+                x={xPos}
+                y={params.graphStartY}
+                fill="white"
+                textAnchor="middle"
+              >
+                {tick}
+              </text>
+              <line
+                x1={xPos}
+                y1={params.graphStartY + 8}
+                x2={xPos}
+                y2={params.buyStartY - params.lastPriceHeight}
+                stroke="white"
+                strokeDasharray={8}
+              />
+              <line
+                x1={xPos}
+                y1={params.buyStartY}
+                x2={xPos}
+                y2={params.graphHeight}
+                stroke="white"
+                strokeDasharray={8}
+              />
+            </Fragment>
+          )
+        )
+      })}
       <text
         x={0}
         y={params.buyStartY - 12}
-        fill="white"
+        fill={direction.color}
         textAnchor="left"
         fontSize="24px"
       >
         {orderBook.last.price}
         <tspan fill={direction.color}>{direction.symbol}</tspan>
       </text>
-      {params.buyLevels.map((l, i) => (
-        <Fragment key={`${l.price}`}>
-          <text
-            x={0}
-            y={params.buyStartY + (i + 1) * params.barHeight - 4}
-            fill="white"
-            textAnchor="left"
-          >
-            {l.price}
-          </text>
-          <rect
-            x={params.graphStartX}
-            width={Math.min(
-              params.graphWidth,
-              params.graphWidth * (l.size / params.maxSize)
-            )}
-            y={params.buyStartY + i * params.barHeight}
-            height={params.barHeight}
-            fill="#10A327"
-          />
-        </Fragment>
-      ))}
-      {params.ticks.slice(1).map((tick, i) => (
-        <Fragment key={`tick-${i}`}>
-          <text
-            x={
-              params.graphStartX +
-              (i + 1) *
-                params.gridSpacing *
-                (params.graphWidth / params.maxSize)
-            }
-            y={params.graphStartY}
-            fill="white"
-            textAnchor="middle"
-          >
-            {tick}
-          </text>
-          <line
-            x1={
-              params.graphStartX +
-              (i + 1) *
-                params.gridSpacing *
-                (params.graphWidth / params.maxSize)
-            }
-            y1={params.graphStartY + 8}
-            x2={
-              params.graphStartX +
-              (i + 1) *
-                params.gridSpacing *
-                (params.graphWidth / params.maxSize)
-            }
-            y2={params.bookHeight}
-            stroke="white"
-            strokeDasharray={4}
-            strokeOpacity={0.7}
-          />
-        </Fragment>
-      ))}
     </svg>
   )
 }
