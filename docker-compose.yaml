@@ -5,6 +5,8 @@ services:
     image: anvil # custom image (./anvil/Dockerfile)
     container_name: anvil
     restart: always
+    environment:
+      CHAIN_ID: 1337
     ports:
       - "8545:8545"
     volumes:
