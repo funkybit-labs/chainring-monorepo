@@ -6,3 +6,4 @@ build
 cache
 broadcast
 lib
+.DS_Store
