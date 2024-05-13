@@ -23,3 +23,13 @@
 .y-axis-grid text {
   display: none;
 }
+
+@layer utilities {
+  .bg-switch {
+    background: url("assets/Switch.svg") no-repeat center;
+  }
+
+  .bg-switch-alt {
+    background: url("assets/Switch-Alt.svg") no-repeat center;
+  }
+}
