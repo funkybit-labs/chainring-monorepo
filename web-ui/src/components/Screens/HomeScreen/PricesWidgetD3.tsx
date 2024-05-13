@@ -156,7 +156,9 @@ function OHLCChart({
   )
   useEffect(() => {
     if (params.interval) {
+      // store new interval and reset zoom
       intervalRef.current = params.interval
+      zoomRef.current = d3.zoomIdentity
     }
   }, [params.interval])
 
@@ -239,14 +241,6 @@ function OHLCChart({
       drawChart(event.transform.rescaleX(xScale))
     })
 
-  // reset zoom on when updating interval
-  useEffect(() => {
-    if (params.interval) {
-      // @ts-expect-error @definitelytyped/no-unnecessary-generics
-      svg.call(zoom.transform, d3.zoomIdentity)
-    }
-  }, [params.interval])
-
   function drawChart(newXScale: d3.ScaleTime<number, number, never>) {
     // calculate visible range
     const visibleData: OHLC[] = ohlc.filter((d) => {
@@ -286,7 +280,7 @@ function OHLCChart({
     // remove all candles that are not in visible data
     candles.exit().remove()
 
-    // add groups for missing elements
+    // add groups for new elements
     const candlesEnter = candles.enter().append('g').attr('class', 'ohlc')
 
     // update positions
