@@ -14,14 +14,19 @@
 
 .x-axis line {
   stroke: #313D4E;
-  stroke-dasharray: 5 10
+  stroke-dasharray: 5 10;
 }
 .y-axis-grid line {
   stroke: #313D4E;
-  stroke-dasharray: 5 10
+  stroke-dasharray: 5 10;
 }
 .y-axis-grid text {
   display: none;
+}
+.y-axis-ohlc {}
+.y-axis-bg {
+  stroke: #1B222B;
+  stroke-width: 30;
 }
 
 @layer utilities {

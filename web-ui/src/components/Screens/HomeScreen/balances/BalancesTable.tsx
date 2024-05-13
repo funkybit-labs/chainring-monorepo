@@ -1,6 +1,6 @@
 import { Address, formatUnits } from 'viem'
 import TradingSymbols from 'tradingSymbols'
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { Fragment, useCallback, useMemo, useState } from 'react'
 import { Balance, TradingSymbol } from 'apiClient'
 import { useQueryClient } from '@tanstack/react-query'
 import { useWebsocketSubscription } from 'contexts/websocket'
@@ -13,6 +13,9 @@ import {
   depositsQueryKey,
   withdrawalsQueryKey
 } from 'components/Screens/HomeScreen/balances/BalancesWidget'
+import Deposit from 'assets/Deposit.svg'
+import Withdrawal from 'assets/Withdrawal.svg'
+import Add from 'assets/Add.svg'
 
 export function BalancesTable({
   walletAddress,
@@ -59,58 +62,56 @@ export function BalancesTable({
   }
 
   return (
-    <div className="h-64 overflow-scroll">
-      <table className="relative w-full text-left text-sm">
-        <thead className="sticky top-0 bg-black">
-          <tr key="header">
-            <th className="min-w-32 pb-1">Asset</th>
-            <th className="min-w-32 pb-1">Balance</th>
-            <th className="pb-1"></th>
-            <th className="pb-1"></th>
-          </tr>
-          <tr key="header-divider">
-            <th className="h-px bg-lightBackground p-0"></th>
-            <th className="h-px bg-lightBackground p-0"></th>
-            <th className="h-px bg-lightBackground p-0"></th>
-            <th className="h-px bg-lightBackground p-0"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {[symbols.native].concat(symbols.erc20).map((symbol) => {
-            const balance = balances.find(
-              (balance) => balance.symbol == symbol.name
-            ) || { symbol: symbol.name, total: 0n, available: 0n }
-            return (
-              <tr key={symbol.name}>
-                <td className="mr-2 whitespace-nowrap pt-2 align-text-top">
-                  <SymbolIcon
-                    symbol={symbol}
-                    className="mr-2 inline-block size-6"
-                  />
-                  {symbol.name}
-                </td>
-                <td className="w-full pt-2 text-left align-text-top">
-                  {formatUnits(balance.available, symbol.decimals)}
-                </td>
-                <td className="pr-1 pt-2 text-xs">
-                  <Button
-                    caption={() => <>Deposit</>}
-                    onClick={() => openDepositModal(symbol)}
-                    disabled={false}
-                  />
-                </td>
-                <td className="pt-2 text-xs">
-                  <Button
-                    caption={() => <>Withdraw</>}
-                    onClick={() => openWithdrawModal(symbol)}
-                    disabled={balance.available === 0n}
-                  />
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+    <>
+      <div className="grid max-h-72 auto-rows-max grid-cols-[max-content_3fr_1fr_1fr] overflow-scroll">
+        {[symbols.native].concat(symbols.erc20).map((symbol) => {
+          const balance = balances.find(
+            (balance) => balance.symbol == symbol.name
+          ) || { symbol: symbol.name, total: 0n, available: 0n }
+          return (
+            <Fragment key={symbol.name}>
+              <div className="mb-4 inline-block whitespace-nowrap align-text-top">
+                <SymbolIcon
+                  symbol={symbol}
+                  className="mr-2 inline-block size-6"
+                />
+                {symbol.name}
+              </div>
+              <div className="mb-4 inline-block w-full text-center align-text-top">
+                {formatUnits(balance.available, symbol.decimals)}
+              </div>
+              <div className="mb-4 mr-4 inline-block text-xs">
+                <Button
+                  caption={() => (
+                    <span className="whitespace-nowrap">
+                      Deposit{' '}
+                      <img className="inline" src={Deposit} alt={'Deposit'} />
+                    </span>
+                  )}
+                  onClick={() => openDepositModal(symbol)}
+                  disabled={false}
+                />
+              </div>
+              <div className="mb-4 inline-block text-xs">
+                <Button
+                  caption={() => (
+                    <span className="whitespace-nowrap">
+                      Withdraw{' '}
+                      <img
+                        className="inline"
+                        src={Withdrawal}
+                        alt={'Withdrawal'}
+                      />
+                    </span>
+                  )}
+                  onClick={() => openWithdrawModal(symbol)}
+                  disabled={balance.available === 0n}
+                />
+              </div>
+            </Fragment>
+          )
+        })}
+      </div>
 
       {depositSymbol && (
         <DepositModal
@@ -133,6 +134,6 @@ export function BalancesTable({
           onClosed={() => setWithdrawSymbol(null)}
         />
       )}
-    </div>
+    </>
   )
 }

@@ -5,12 +5,12 @@ import { mergeOHLC, ohlcDurationsMs } from 'utils/pricesUtils'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { produce } from 'immer'
 import * as d3 from 'd3'
-import { D3ZoomEvent, scaleTime } from 'd3'
 
 import { Market } from 'markets'
 import SymbolIcon from 'components/common/SymbolIcon'
 import { classNames } from 'utils'
 import { useMeasure } from 'react-use'
+import { addDuration, maxDate, subtractDuration } from 'utils/dateUtils'
 
 enum PricesInterval {
   PT1H = '1h',
@@ -32,14 +32,20 @@ const intervalToOHLCDuration: { [key in PricesInterval]: OHLCDuration } = {
   [PricesInterval.YTD]: 'P1D'
 }
 
-const intervalToMs: { [key in PricesInterval]: number } = {
-  [PricesInterval.PT1H]: 60 * 60 * 1000,
-  [PricesInterval.PT6H]: 6 * 60 * 60 * 1000,
-  [PricesInterval.P1D]: 24 * 60 * 60 * 1000,
-  [PricesInterval.P7D]: 7 * 60 * 60 * 1000,
-  [PricesInterval.P1M]: 30 * 60 * 60 * 1000,
-  [PricesInterval.P6M]: 182 * 60 * 60 * 1000,
-  [PricesInterval.YTD]: 364 * 60 * 60 * 1000
+function subtractInterval(date: Date, interval: PricesInterval): Date {
+  if (interval === PricesInterval.YTD) {
+    return new Date(date.getFullYear(), 0, 1)
+  } else {
+    const number = {
+      [PricesInterval.PT1H]: 60 * 60 * 1000,
+      [PricesInterval.PT6H]: 6 * 60 * 60 * 1000,
+      [PricesInterval.P1D]: 24 * 60 * 60 * 1000,
+      [PricesInterval.P7D]: 7 * 24 * 60 * 60 * 1000,
+      [PricesInterval.P1M]: 30 * 24 * 60 * 60 * 1000,
+      [PricesInterval.P6M]: 182 * 24 * 60 * 60 * 1000
+    }[interval]
+    return new Date(date.getTime() - number)
+  }
 }
 
 export function PricesWidgetD3({ market }: { market: Market }) {
@@ -149,7 +155,9 @@ function OHLCChart({
   )
   useEffect(() => {
     if (params.interval) {
+      // store new interval and reset zoom
       intervalRef.current = params.interval
+      zoomRef.current = d3.zoomIdentity
     }
   }, [params.interval])
 
@@ -157,45 +165,27 @@ function OHLCChart({
   const innerWidth = params.width - margin.left - margin.right
   const innerHeight = params.height - margin.top - margin.bottom
 
-  const svg = d3
-    .select(ref.current)
-    .attr('width', params.width)
-    .attr('height', params.height)
-    .style('overflow', 'hidden')
-
-  if (svg.select('.x-axis').size() == 0 && params.width > 0) {
-    // add placeholders, axes will be rendered later in drawChart
-    svg.append('g').attr('class', 'x-axis text-darkBluishGray4 text-xs') // x-axis
-
-    svg.append('g').attr('class', 'y-axis-grid') // grid
-    svg.append('g').attr('class', 'y-axis-ohlc') // ohlc
-    // y-axis background, relevant for ohlc to slide under
-    svg
-      .append('g')
-      .attr('class', 'y-axis-bg')
-      .append('rect')
-      .attr('x', innerWidth + 10)
-      .attr('y', 0)
-      .attr('width', margin.right)
-      .attr('height', innerHeight)
-      .attr('stroke', '#1B222B')
-      .attr('stroke-width', 30)
-
-    svg.append('g').attr('class', 'y-axis text-darkBluishGray4 text-xs') // y-axis
-  }
-
+  const svg = d3.select(ref.current)
+  const domainStart = subtractInterval(new Date(), intervalRef.current)
+  const adjustedDomainStart =
+    ohlc.length > 0
+      ? maxDate(
+          subtractDuration(ohlc[0].start, ohlcDurationsMs[params.duration] * 2),
+          domainStart
+        )
+      : domainStart
   // setup and position scales
-  const xScale = scaleTime()
+  const xScale = d3
+    .scaleTime()
     .domain([
-      new Date(new Date().getTime() - intervalToMs[intervalRef.current]),
-      new Date(new Date().getTime() + ohlcDurationsMs[params.duration] * 2)
+      adjustedDomainStart,
+      addDuration(new Date(), ohlcDurationsMs[params.duration] * 2)
     ])
     .range([0, innerWidth])
   const xAxis = d3
     .axisBottom(xScale)
     .tickSizeOuter(0)
     .tickSizeInner(-innerHeight)
-  svg.select('.x-axis').attr('transform', `translate(0,${innerHeight})`)
 
   const yScale = d3.scaleLinear().range([innerHeight, 0])
   const yAxis = d3.axisRight(yScale).tickSize(0)
@@ -203,34 +193,24 @@ function OHLCChart({
     .axisRight(yScale)
     .tickSizeOuter(0)
     .tickSizeInner(-innerWidth)
-  svg.select('.y-axis').attr('transform', `translate(${innerWidth},0)`)
-  svg.select('.y-axis-grid').attr('transform', `translate(${innerWidth},0)`)
 
   // setup zoom and panning
   const zoom = d3
     .zoom()
     // limit panning
     .translateExtent([
-      [ohlc.length > 0 ? xScale(ohlc[0].start) * 1.15 : -100, innerHeight],
+      [ohlc.length > 0 ? xScale(ohlc[0].start) - 1000 : -1000, innerHeight],
       [innerWidth * 1.15 + (margin.left + margin.right), innerHeight]
     ])
     // limit zoom-in/out
     .scaleExtent([0.2, 5])
-    .on('zoom', (event: D3ZoomEvent<SVGGElement, OHLC>) => {
+    .on('zoom', (event: d3.D3ZoomEvent<SVGGElement, OHLC>) => {
       if (zoomRef.current.k != event.transform.k && event.transform.k != 1) {
         params.onIntervalReset()
       }
       zoomRef.current = event.transform
       drawChart(event.transform.rescaleX(xScale))
     })
-
-  // reset zoom on when updating interval
-  useEffect(() => {
-    if (params.interval) {
-      // @ts-expect-error @definitelytyped/no-unnecessary-generics
-      svg.call(zoom.transform, d3.zoomIdentity)
-    }
-  }, [params.interval])
 
   function drawChart(newXScale: d3.ScaleTime<number, number, never>) {
     // calculate visible range
@@ -259,7 +239,10 @@ function OHLCChart({
 
     // calculate candle width
     const candleWidth =
-      (newXScale(ohlc[1].start) - newXScale(ohlc[0].start)) * 0.9
+      newXScale.length >= 2
+        ? (newXScale(ohlc[1].start) - newXScale(ohlc[0].start)) * 0.6
+        : 1
+    const lineWidth = candleWidth * 0.2
 
     // select ohlc candles
     const candles = svg
@@ -270,46 +253,91 @@ function OHLCChart({
     // remove all candles that are not in visible data
     candles.exit().remove()
 
-    // add groups for missing elements
+    // add groups for new elements
     const candlesEnter = candles.enter().append('g').attr('class', 'ohlc')
 
     // update positions
     candlesEnter
-      .append('line')
+      .append('rect')
       .attr('class', 'range')
       .merge(candles.select('.range'))
-      .attr('x1', (d) => newXScale(d.start))
-      .attr('x2', (d) => newXScale(d.start))
-      .attr('y1', (d) => yScale(d.high))
-      .attr('y2', (d) => yScale(d.low))
-      .attr('stroke', (d) => (d.close > d.open ? '#39CF63' : '#FF5A50'))
-      .attr('stroke-width', 1)
+      .attr('x', (d) => newXScale(d.start) - lineWidth / 2)
+      .attr('width', lineWidth)
+      .attr('y', (d) => Math.min(yScale(d.low), yScale(d.high)))
+      .attr(
+        'height',
+        (d) =>
+          Math.max(yScale(d.low), yScale(d.high)) -
+          Math.min(yScale(d.low), yScale(d.high))
+      )
+      .attr('rx', candleWidth / 10)
+      .attr('fill', (d) => (d.close > d.open ? '#39CF63' : '#FF5A50'))
 
     candlesEnter
-      .append('line')
+      .append('rect')
       .attr('class', 'open-close')
       .merge(candles.select('.open-close'))
-      .attr('x1', (d) => newXScale(d.start)) // Offset by 2 pixels to the left for open
-      .attr('x2', (d) => newXScale(d.start)) // Offset by 2 pixels to the right for close
-      .attr('y1', (d) =>
-        Math.abs(yScale(d.open) - yScale(d.close)) < 1
-          ? yScale(d.open) - 0.5
-          : yScale(d.open)
-      )
-      .attr('y2', (d) =>
-        Math.abs(yScale(d.open) - yScale(d.close)) < 1
-          ? yScale(d.close) + 0.5
-          : yScale(d.close)
-      )
-      .attr('stroke', (d) => (d.close >= d.open ? '#39CF63' : '#FF5A50'))
-      .attr('stroke-width', candleWidth)
+      .attr('x', (d) => newXScale(d.start) - candleWidth / 2)
+      .attr('width', candleWidth)
+      .attr('y', (d) => {
+        const height =
+          Math.max(yScale(d.open), yScale(d.close)) -
+          Math.min(yScale(d.open), yScale(d.close))
+
+        const y = Math.min(yScale(d.open), yScale(d.close))
+        if (height < lineWidth) {
+          // place exactly in the middle
+          return y - (lineWidth - height) / 2
+        } else {
+          return y
+        }
+      })
+      .attr('height', (d) => {
+        const height =
+          Math.max(yScale(d.open), yScale(d.close)) -
+          Math.min(yScale(d.open), yScale(d.close))
+
+        if (height < lineWidth) {
+          return lineWidth
+        } else {
+          return height
+        }
+      })
+      .attr('rx', candleWidth / 10)
+      .attr('fill', (d) => (d.close >= d.open ? '#39CF63' : '#FF5A50'))
   }
 
   // listen to zoom events, and then call transform first time to draw the graph
   // @ts-expect-error @definitelytyped/no-unnecessary-generics
   svg.call(zoom).call(zoom.transform, zoomRef.current)
 
-  return <svg ref={ref} />
+  return (
+    <svg
+      ref={ref}
+      width={params.width}
+      height={params.height}
+      style={{ overflow: 'hidden' }}
+    >
+      <g
+        className="x-axis text-xs text-darkBluishGray4"
+        transform={`translate(0,${innerHeight})`}
+      />
+      <g className="y-axis-grid" transform={`translate(${innerWidth},0)`} />
+      <g className="y-axis-ohlc" />
+      <g className="y-axis-bg">
+        <rect
+          x={innerWidth + 10}
+          y="0"
+          width={margin.right}
+          height={innerHeight}
+        />
+      </g>
+      <g
+        className="y-axis text-xs text-darkBluishGray4"
+        transform={`translate(${innerWidth},0)`}
+      />
+    </svg>
+  )
 }
 
 function Title({ market, price }: { market: Market; price: string }) {
