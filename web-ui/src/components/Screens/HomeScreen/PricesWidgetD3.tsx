@@ -37,7 +37,7 @@ function subtractInterval(date: Date, interval: PricesInterval): Date {
   if (interval === PricesInterval.YTD) {
     return new Date(date.getFullYear(), 0, 1)
   } else {
-    let number = {
+    const number = {
       [PricesInterval.PT1H]: 60 * 60 * 1000,
       [PricesInterval.PT6H]: 6 * 60 * 60 * 1000,
       [PricesInterval.P1D]: 24 * 60 * 60 * 1000,
@@ -174,9 +174,9 @@ function OHLCChart({
     // add placeholders, axes will be rendered later in drawChart
     svg.append('g').attr('class', 'x-axis text-darkBluishGray4 text-xs') // x-axis
 
-    svg.append('g').attr('class', 'y-axis-grid') // grid
+    svg.append('g').attr('class', 'y-axis-grid') // grid layer, it should be below ohlc and y-axis background
     svg.append('g').attr('class', 'y-axis-ohlc') // ohlc
-    // y-axis background, relevant for ohlc to slide under
+    // y-axis background, needed for ohlc to hide under it
     svg
       .append('g')
       .attr('class', 'y-axis-bg')
@@ -191,16 +191,14 @@ function OHLCChart({
     svg.append('g').attr('class', 'y-axis text-darkBluishGray4 text-xs') // y-axis
   }
 
-  let domainStart = subtractInterval(new Date(), intervalRef.current)
-  let adjustedDomainStart =
+  const domainStart = subtractInterval(new Date(), intervalRef.current)
+  const adjustedDomainStart =
     ohlc.length > 0
       ? maxDate(
           subtractDuration(ohlc[0].start, ohlcDurationsMs[params.duration] * 2),
           domainStart
         )
       : domainStart
-  console.log(domainStart)
-  console.log(adjustedDomainStart)
   // setup and position scales
   const xScale = scaleTime()
     .domain([
@@ -276,7 +274,8 @@ function OHLCChart({
 
     // calculate candle width
     const candleWidth =
-      (newXScale(ohlc[1].start) - newXScale(ohlc[0].start)) * 0.9
+      (newXScale(ohlc[1].start) - newXScale(ohlc[0].start)) * 0.6
+    const lineWidth = candleWidth * 0.2
 
     // select ohlc candles
     const candles = svg
@@ -292,34 +291,53 @@ function OHLCChart({
 
     // update positions
     candlesEnter
-      .append('line')
+      .append('rect')
       .attr('class', 'range')
       .merge(candles.select('.range'))
-      .attr('x1', (d) => newXScale(d.start))
-      .attr('x2', (d) => newXScale(d.start))
-      .attr('y1', (d) => yScale(d.high))
-      .attr('y2', (d) => yScale(d.low))
-      .attr('stroke', (d) => (d.close > d.open ? '#39CF63' : '#FF5A50'))
-      .attr('stroke-width', 1)
+      .attr('x', (d) => newXScale(d.start) - lineWidth / 2)
+      .attr('width', lineWidth)
+      .attr('y', (d) => Math.min(yScale(d.low), yScale(d.high)))
+      .attr(
+        'height',
+        (d) =>
+          Math.max(yScale(d.low), yScale(d.high)) -
+          Math.min(yScale(d.low), yScale(d.high))
+      )
+      .attr('rx', candleWidth / 10)
+      .attr('fill', (d) => (d.close > d.open ? '#39CF63' : '#FF5A50'))
 
     candlesEnter
-      .append('line')
+      .append('rect')
       .attr('class', 'open-close')
       .merge(candles.select('.open-close'))
-      .attr('x1', (d) => newXScale(d.start)) // Offset by 2 pixels to the left for open
-      .attr('x2', (d) => newXScale(d.start)) // Offset by 2 pixels to the right for close
-      .attr('y1', (d) =>
-        Math.abs(yScale(d.open) - yScale(d.close)) < 1
-          ? yScale(d.open) - 0.5
-          : yScale(d.open)
-      )
-      .attr('y2', (d) =>
-        Math.abs(yScale(d.open) - yScale(d.close)) < 1
-          ? yScale(d.close) + 0.5
-          : yScale(d.close)
-      )
-      .attr('stroke', (d) => (d.close >= d.open ? '#39CF63' : '#FF5A50'))
-      .attr('stroke-width', candleWidth)
+      .attr('x', (d) => newXScale(d.start) - candleWidth / 2)
+      .attr('width', candleWidth)
+      .attr('y', (d) => {
+        const height =
+          Math.max(yScale(d.open), yScale(d.close)) -
+          Math.min(yScale(d.open), yScale(d.close))
+
+        const y = Math.min(yScale(d.open), yScale(d.close))
+        if (height < lineWidth) {
+          // place exactly in the middle
+          return y - (lineWidth - height) / 2
+        } else {
+          return y
+        }
+      })
+      .attr('height', (d) => {
+        const height =
+          Math.max(yScale(d.open), yScale(d.close)) -
+          Math.min(yScale(d.open), yScale(d.close))
+
+        if (height < lineWidth) {
+          return lineWidth
+        } else {
+          return height
+        }
+      })
+      .attr('rx', candleWidth / 10)
+      .attr('fill', (d) => (d.close >= d.open ? '#39CF63' : '#FF5A50'))
   }
 
   // listen to zoom events, and then call transform first time to draw the graph
