@@ -16,7 +16,7 @@ import java.math.BigDecimal
 import kotlin.test.Test
 
 @ExtendWith(AppUnderTestRunner::class)
-class DepositAndWithdrawalTest {
+class DepositTest {
 
     private val walletPrivateKeyHex = "0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97"
 
@@ -38,7 +38,7 @@ class DepositAndWithdrawalTest {
     }
 
     @Test
-    fun testERC20DepositsAndWithdrawals() {
+    fun testERC20Deposits() {
         val apiClient = TestApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
         val wallet = Wallet(apiClient)
         val decimals = wallet.symbols.first { it.name == "USDC" }.decimals.toInt()
@@ -55,15 +55,10 @@ class DepositAndWithdrawalTest {
         wallet.depositERC20("USDC", depositAmount)
         assertEquals(wallet.getExchangeERC20Balance("USDC"), startingUsdcExchangeBalance + depositAmount)
         assertEquals(wallet.getWalletERC20Balance("USDC"), startingUsdcWalletBalance + mintAmount - depositAmount)
-
-        val withdrawalAmount = BigDecimal("12").toFundamentalUnits(decimals)
-        wallet.withdrawERC20("USDC", withdrawalAmount)
-        assertEquals(wallet.getExchangeERC20Balance("USDC"), startingUsdcExchangeBalance + depositAmount - withdrawalAmount)
-        assertEquals(wallet.getWalletERC20Balance("USDC"), startingUsdcWalletBalance + mintAmount - depositAmount + withdrawalAmount)
     }
 
     @Test
-    fun testNativeDepositsAndWithdrawals() {
+    fun testNativeDeposits() {
         val apiClient = TestApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
         val wallet = Wallet(apiClient)
         val decimals = wallet.symbols.first { it.contractAddress == null }.decimals.toInt()
@@ -76,11 +71,5 @@ class DepositAndWithdrawalTest {
         val depositGasCost = depositTxReceipt.gasUsed * Numeric.decodeQuantity(depositTxReceipt.effectiveGasPrice)
         assertEquals(wallet.getExchangeNativeBalance(), startingExchangeBalance + depositAmount)
         assertEquals(wallet.getWalletNativeBalance(), startingWalletBalance - depositAmount - depositGasCost)
-
-        val withdrawalAmount = BigDecimal("2").toFundamentalUnits(decimals)
-        val withdrawalTxReceipt = wallet.withdrawNative(withdrawalAmount)
-        val withdrawalGasCost = withdrawalTxReceipt.gasUsed * Numeric.decodeQuantity(withdrawalTxReceipt.effectiveGasPrice)
-        assertEquals(wallet.getExchangeNativeBalance(), startingExchangeBalance + depositAmount - withdrawalAmount)
-        assertEquals(wallet.getWalletNativeBalance(), startingWalletBalance - depositAmount + withdrawalAmount - depositGasCost - withdrawalGasCost)
     }
 }

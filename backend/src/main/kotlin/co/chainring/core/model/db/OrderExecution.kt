@@ -58,6 +58,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             feeAmount = this.feeAmount,
             feeSymbol = this.feeSymbol,
             settlementStatus = this.trade.settlementStatus,
+            error = this.trade.error,
         )
     }
 

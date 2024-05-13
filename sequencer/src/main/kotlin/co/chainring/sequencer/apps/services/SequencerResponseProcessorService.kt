@@ -98,6 +98,12 @@ object SequencerResponseProcessorService {
                         }
                     }
                 }
+
+                if (request.balanceBatch.failedWithdrawalsList.isNotEmpty() ||
+                    request.balanceBatch.failedSettlementsList.isNotEmpty()
+                ) {
+                    handleSequencerResponse(request, response, null, listOf())
+                }
             }
 
             SequencerRequest.Type.ApplyOrderBatch -> {
@@ -165,7 +171,7 @@ object SequencerResponseProcessorService {
         }
     }
 
-    private fun handleSequencerResponse(request: SequencerRequest, response: SequencerResponse, walletEntity: WalletEntity, ordersBeingUpdated: List<Long> = listOf(), cancelAll: Boolean = false) {
+    private fun handleSequencerResponse(request: SequencerRequest, response: SequencerResponse, walletEntity: WalletEntity?, ordersBeingUpdated: List<Long> = listOf(), cancelAll: Boolean = false) {
         val timestamp = Clock.System.now()
 
         val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
@@ -236,7 +242,7 @@ object SequencerResponseProcessorService {
                 }
             }
         }
-        if (cancelAll) {
+        if (cancelAll && walletEntity != null) {
             broadcasterNotifications.add(
                 BroadcasterNotification(
                     Orders(

@@ -1,4 +1,4 @@
-import { Address, formatUnits } from 'viem'
+import { Address, formatUnits, zeroAddress } from 'viem'
 import { BaseError as WagmiError, useConfig, useSignTypedData } from 'wagmi'
 import { ExchangeAbi } from 'contracts'
 import { useState } from 'react'
@@ -48,8 +48,8 @@ export default function WithdrawalModal({
         : await readContract(config, {
             abi: ExchangeAbi,
             address: exchangeContractAddress,
-            functionName: 'nativeBalances',
-            args: [walletAddress]
+            functionName: 'balances',
+            args: [walletAddress, zeroAddress]
           })
     }
   })

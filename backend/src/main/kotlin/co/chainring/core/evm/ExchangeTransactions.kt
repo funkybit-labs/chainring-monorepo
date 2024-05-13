@@ -17,14 +17,16 @@ sealed class ExchangeTransactions {
         SettleTrade,
     }
 
-    class Withdraw(sender: String, token: String, amount: BigInteger, nonce: BigInteger) : StaticStruct(
+    class Withdraw(sequence: Long, sender: String, token: String, amount: BigInteger, nonce: BigInteger) : StaticStruct(
+        Uint256(sequence),
         Address(160, sender),
         Address(160, token),
         Uint256(amount),
         Uint64(nonce),
     )
 
-    class WithdrawNative(sender: String, amount: BigInteger, nonce: BigInteger) : StaticStruct(
+    class WithdrawNative(sequence: Long, sender: String, amount: BigInteger, nonce: BigInteger) : StaticStruct(
+        Uint256(sequence),
         Address(160, sender),
         Uint256(amount),
         Uint64(nonce),
@@ -53,6 +55,7 @@ sealed class ExchangeTransactions {
     )
 
     class SettleTrade(
+        sequence: Long,
         baseToken: String,
         quoteToken: String,
         amount: BigInteger,
@@ -62,6 +65,7 @@ sealed class ExchangeTransactions {
         takerOrder: OrderWithSignature,
         makerOrder: OrderWithSignature,
     ) : DynamicStruct(
+        Uint256(sequence),
         Address(160, baseToken),
         Address(160, quoteToken),
         Int256(amount),

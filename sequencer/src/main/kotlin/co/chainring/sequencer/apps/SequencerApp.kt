@@ -166,6 +166,37 @@ class SequencerApp(
                     }
                 }
 
+                balanceBatch.failedWithdrawalsList.forEach { failedWithdrawal ->
+                    val wallet = failedWithdrawal.wallet.toWalletAddress()
+                    val asset = failedWithdrawal.asset.toAsset()
+                    val amount = failedWithdrawal.amount.toBigInteger()
+                    state.balances.getOrPut(wallet) { mutableMapOf() }.merge(asset, amount, ::sumBigIntegers)
+                    balancesChanged.merge(Pair(wallet, asset), amount, ::sumBigIntegers)
+                }
+
+                balanceBatch.failedSettlementsList.forEach { failedSettlement ->
+                    val marketId = MarketId(failedSettlement.marketId)
+                    state.markets[marketId]?.let { market ->
+                        val baseAsset = market.id.baseAsset()
+                        val quoteAsset = market.id.quoteAsset()
+                        val baseAmount = failedSettlement.trade.amount.toBigInteger()
+                        val negatedBaseAmount = baseAmount.negate()
+                        val price = failedSettlement.trade.price.toBigDecimal()
+                        val notional = notional(baseAmount, price, market.baseDecimals, market.quoteDecimals)
+                        val negatedNotional = notional.negate()
+                        val buyWallet = failedSettlement.buyWallet.toWalletAddress()
+                        val sellWallet = failedSettlement.sellWallet.toWalletAddress()
+                        state.balances.getOrPut(sellWallet) { mutableMapOf() }.merge(baseAsset, baseAmount, ::sumBigIntegers)
+                        balancesChanged.merge(Pair(sellWallet, baseAsset), baseAmount, ::sumBigIntegers)
+                        state.balances.getOrPut(sellWallet) { mutableMapOf() }.merge(quoteAsset, negatedNotional, ::sumBigIntegers)
+                        balancesChanged.merge(Pair(sellWallet, quoteAsset), negatedNotional, ::sumBigIntegers)
+                        state.balances.getOrPut(buyWallet) { mutableMapOf() }.merge(baseAsset, negatedBaseAmount, ::sumBigIntegers)
+                        balancesChanged.merge(Pair(buyWallet, baseAsset), negatedBaseAmount, ::sumBigIntegers)
+                        state.balances.getOrPut(buyWallet) { mutableMapOf() }.merge(quoteAsset, notional, ::sumBigIntegers)
+                        balancesChanged.merge(Pair(buyWallet, quoteAsset), notional, ::sumBigIntegers)
+                    }
+                }
+
                 sequencerResponse {
                     this.guid = balanceBatch.guid
                     this.sequence = sequence

@@ -5,6 +5,7 @@ import "order.proto";
 import "market.proto";
 import "balance.proto";
 import "checkpoint.proto";
+import "trade.proto";
 
 option java_multiple_files = true;
 option java_package = "co.chainring.sequencer.proto";
@@ -14,13 +15,6 @@ message OrderChanged {
   uint64 guid = 1;
   OrderDisposition disposition = 2;
   optional IntegerValue newQuantity = 3;
-}
-
-message TradeCreated {
-  uint64 buyGuid = 1;
-  uint64 sellGuid = 2;
-  IntegerValue amount = 3;
-  DecimalValue price = 4;
 }
 
 message OrderChangeRejected {

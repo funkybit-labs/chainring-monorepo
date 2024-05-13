@@ -12,6 +12,7 @@ import co.chainring.core.model.db.BlockchainTransactionTable
 import co.chainring.core.model.db.BroadcasterJobTable
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.DepositTable
+import co.chainring.core.model.db.ExchangeTransactionBatchTable
 import co.chainring.core.model.db.ExchangeTransactionTable
 import co.chainring.core.model.db.KeyValueStore
 import co.chainring.core.model.db.OrderExecutionTable
@@ -154,6 +155,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             TelegramBotUserTable.deleteAll()
             BroadcasterJobTable.deleteAll()
             ExchangeTransactionTable.deleteAll()
+            ExchangeTransactionBatchTable.deleteAll()
             BlockchainTransactionTable.deleteAll()
             OrderExecutionTable.deleteAll()
             TradeTable.deleteAll()

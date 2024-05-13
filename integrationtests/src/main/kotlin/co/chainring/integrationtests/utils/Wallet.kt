@@ -63,7 +63,7 @@ class Wallet(
     }
 
     fun getExchangeNativeBalance(): BigInteger {
-        return exchangeContract.nativeBalances(address.value).sendAndWaitForConfirmation()
+        return exchangeContract.balances(address.value, Address.zero.value).sendAndWaitForConfirmation()
     }
 
     fun asyncDepositNative(amount: BigInteger): TxHash =
@@ -92,14 +92,6 @@ class Wallet(
     fun depositERC20(symbol: String, amount: BigInteger): TransactionReceipt {
         loadErc20Contract(symbol).approve(exchangeContractAddress.value, amount).sendAndWaitForConfirmation()
         return exchangeContract.deposit(erc20TokenAddress(symbol), amount).sendAndWaitForConfirmation()
-    }
-
-    fun withdrawNative(amount: BigInteger): TransactionReceipt {
-        return exchangeContract.withdraw(amount).sendAndWaitForConfirmation()
-    }
-
-    fun withdrawERC20(symbol: String, amount: BigInteger): TransactionReceipt {
-        return exchangeContract.withdraw(erc20TokenAddress(symbol), amount).sendAndWaitForConfirmation()
     }
 
     fun signWithdraw(symbol: String, amount: BigInteger, nonceOverride: Long? = null): CreateWithdrawalApiRequest {

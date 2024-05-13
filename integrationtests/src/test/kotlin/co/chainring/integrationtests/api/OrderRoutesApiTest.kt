@@ -22,6 +22,9 @@ import co.chainring.core.client.ws.subscribeToOrders
 import co.chainring.core.client.ws.subscribeToPrices
 import co.chainring.core.client.ws.subscribeToTrades
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.db.ExchangeTransactionEntity
+import co.chainring.core.model.db.ExchangeTransactionStatus
+import co.chainring.core.model.db.ExchangeTransactionTable
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
@@ -34,11 +37,14 @@ import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.model.db.TradeEntity
 import co.chainring.core.model.db.TradeId
 import co.chainring.core.model.db.TradeTable
+import co.chainring.core.model.db.WithdrawalEntity
+import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.generateOrderNonce
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.waitForBalance
+import co.chainring.integrationtests.testutils.waitForFinalizedWithdrawal
 import co.chainring.integrationtests.utils.ExpectedBalance
 import co.chainring.integrationtests.utils.Faucet
 import co.chainring.integrationtests.utils.TestApiClient
@@ -60,6 +66,7 @@ import org.awaitility.kotlin.await
 import org.awaitility.kotlin.withAlias
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.WsClient
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.and
@@ -1366,6 +1373,235 @@ class OrderRoutesApiTest {
         return Triple(apiClient, wallet, wsClient)
     }
 
+    @Test
+    fun `settlement failure`() {
+        val (takerApiClient, takerWallet, takerWsClient) =
+            setupTrader(btcEthMarketId, "0.5", "0.1", "ETH", "2")
+
+        val (makerApiClient, makerWallet, makerWsClient) =
+            setupTrader(btcEthMarketId, "0.5", null, "ETH", "2")
+
+        // starting onchain balances
+        val makerStartingBTCBalance = makerWallet.getExchangeNativeBalance()
+        val makerStartingETHBalance = makerWallet.getExchangeERC20Balance("ETH")
+        val takerStartingBTCBalance = takerWallet.getExchangeNativeBalance()
+        val takerStartingETHBalance = takerWallet.getExchangeERC20Balance("ETH")
+
+        val btcWithdrawalAmount = takerWallet.formatAmount("0.015", "BTC")
+
+        val pendingBtcWithdrawal = takerApiClient.createWithdrawal(takerWallet.signWithdraw("BTC", btcWithdrawalAmount)).withdrawal
+        assertEquals(WithdrawalStatus.Pending, pendingBtcWithdrawal.status)
+
+        takerWsClient.apply {
+            assertBalancesMessageReceived { msg ->
+                assertEquals(takerStartingBTCBalance - btcWithdrawalAmount, msg.balances.first { it.symbol.value == "BTC" }.available)
+                assertEquals(takerStartingETHBalance, msg.balances.first { it.symbol.value == "ETH" }.available)
+            }
+            assertLimitsMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(takerStartingBTCBalance - btcWithdrawalAmount, msg.base)
+                assertEquals(takerStartingETHBalance, msg.quote)
+            }
+        }
+
+        waitForFinalizedWithdrawal(pendingBtcWithdrawal.id)
+
+        takerWsClient.apply {
+            assertBalancesMessageReceived { msg ->
+                assertEquals(takerStartingBTCBalance - btcWithdrawalAmount, msg.balances.first { it.symbol.value == "BTC" }.total)
+            }
+        }
+
+        // hack to resubmit the same transaction again bypassing the sequencer. This way taker will not have a
+        // sufficient on chain balance for the order so settlement will fail.
+        transaction {
+            WithdrawalEntity[pendingBtcWithdrawal.id].status = WithdrawalStatus.Pending
+            val withdrawalExchangeTransaction = ExchangeTransactionEntity.all()
+                .orderBy(ExchangeTransactionTable.sequenceId to SortOrder.DESC)
+                .limit(1).first()
+            withdrawalExchangeTransaction.status = ExchangeTransactionStatus.Pending
+        }
+
+        waitForFinalizedWithdrawal(pendingBtcWithdrawal.id)
+
+        takerWsClient.apply {
+            assertBalancesMessageReceived { msg ->
+                assertEquals(takerStartingBTCBalance - btcWithdrawalAmount - btcWithdrawalAmount, msg.balances.first { it.symbol.value == "BTC" }.total)
+            }
+        }
+
+        // place a limit order
+        val limitBuyOrderApiResponse = makerApiClient.createOrder(
+            CreateOrderApiRequest.Limit(
+                nonce = generateOrderNonce(),
+                marketId = btcEthMarketId,
+                side = OrderSide.Buy,
+                amount = makerWallet.formatAmount("0.08", "BTC"),
+                price = BigDecimal("17.55"),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                makerWallet.signOrder(it)
+            },
+        )
+        assertIs<CreateOrderApiRequest.Limit>(limitBuyOrderApiResponse.order)
+        makerWsClient.apply {
+            assertOrderCreatedMessageReceived { msg ->
+                validateLimitOrders(limitBuyOrderApiResponse, msg.order as Order.Limit, false)
+            }
+            assertLimitsMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(BigInteger.ZERO, msg.base)
+                assertEquals(BigInteger("596000000000000000"), msg.quote)
+            }
+        }
+
+        listOf(makerWsClient, takerWsClient).forEach { wsClient ->
+            wsClient.assertOrderBookMessageReceived(
+                btcEthMarketId,
+                OrderBook(
+                    marketId = btcEthMarketId,
+                    buy = listOf(
+                        OrderBookEntry(price = "17.550", size = "0.08".toBigDecimal()),
+                    ),
+                    sell = emptyList(),
+                    last = LastTrade("0.000", LastTradeDirection.Unchanged),
+                ),
+            )
+        }
+
+        // place a sell order
+        val marketBuyOrderApiResponse = takerApiClient.createOrder(
+            CreateOrderApiRequest.Market(
+                nonce = generateOrderNonce(),
+                marketId = btcEthMarketId,
+                side = OrderSide.Sell,
+                amount = takerWallet.formatAmount("0.08", "BTC"),
+                signature = EvmSignature.emptySignature(),
+            ).let {
+                takerWallet.signOrder(it)
+            },
+        )
+
+        assertIs<CreateOrderApiRequest.Market>(marketBuyOrderApiResponse.order)
+
+        takerWsClient.apply {
+            assertOrderCreatedMessageReceived { msg ->
+                assertEquals(marketBuyOrderApiResponse.orderId, msg.order.id)
+                assertEquals(marketBuyOrderApiResponse.order.amount, msg.order.amount)
+                assertEquals(marketBuyOrderApiResponse.order.side, msg.order.side)
+                assertEquals(marketBuyOrderApiResponse.order.marketId, msg.order.marketId)
+                assertNotNull(msg.order.timing.createdAt)
+            }
+            assertTradeCreatedMessageReceived { msg ->
+                assertEquals(marketBuyOrderApiResponse.orderId, msg.trade.orderId)
+                assertEquals(marketBuyOrderApiResponse.order.marketId, msg.trade.marketId)
+                assertEquals(marketBuyOrderApiResponse.order.side, msg.trade.side)
+                assertEquals(0, BigDecimal("17.55").compareTo(msg.trade.price))
+                assertEquals(marketBuyOrderApiResponse.order.amount, msg.trade.amount)
+                assertEquals(SettlementStatus.Pending, msg.trade.settlementStatus)
+            }
+            assertOrderUpdatedMessageReceived { msg ->
+                assertEquals(OrderStatus.Filled, msg.order.status)
+                assertEquals(1, msg.order.executions.size)
+                assertEquals(msg.order.executions[0].amount, takerWallet.formatAmount("0.08", "BTC"))
+                assertEquals(0, msg.order.executions[0].price.compareTo(BigDecimal("17.550")))
+                assertEquals(msg.order.executions[0].role, ExecutionRole.Taker)
+            }
+            assertBalancesMessageReceived { msg ->
+                assertEquals(BigInteger("3404000000000000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
+                assertEquals(BigInteger("5000000000000000"), msg.balances.first { it.symbol.value == "BTC" }.available)
+            }
+        }
+
+        makerWsClient.apply {
+            assertTradeCreatedMessageReceived { msg ->
+                assertEquals(limitBuyOrderApiResponse.orderId, msg.trade.orderId)
+                assertEquals(limitBuyOrderApiResponse.order.marketId, msg.trade.marketId)
+                assertEquals(limitBuyOrderApiResponse.order.side, msg.trade.side)
+                assertEquals(0, BigDecimal("17.55").compareTo(msg.trade.price))
+                assertEquals(takerWallet.formatAmount("0.08", "BTC"), msg.trade.amount)
+                assertEquals(SettlementStatus.Pending, msg.trade.settlementStatus)
+            }
+            assertOrderUpdatedMessageReceived { msg ->
+                assertEquals(OrderStatus.Filled, msg.order.status)
+                assertEquals(1, msg.order.executions.size)
+                assertEquals(msg.order.executions[0].amount, makerWallet.formatAmount("0.08", "BTC"))
+                assertEquals(0, msg.order.executions[0].price.compareTo(BigDecimal("17.550")))
+                assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
+            }
+            assertBalancesMessageReceived { msg ->
+                assertEquals(BigInteger("596000000000000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
+                assertEquals(BigInteger("80000000000000000"), msg.balances.first { it.symbol.value == "BTC" }.available)
+            }
+        }
+
+        listOf(makerWsClient, takerWsClient).forEach { wsClient ->
+            wsClient.assertOrderBookMessageReceived(
+                btcEthMarketId,
+                OrderBook(
+                    marketId = btcEthMarketId,
+                    buy = listOf(),
+                    sell = listOf(),
+                    last = LastTrade("17.550", LastTradeDirection.Up),
+                ),
+            )
+        }
+        val trade = getTradesForOrders(listOf(marketBuyOrderApiResponse.orderId)).first()
+
+        takerWsClient.apply {
+            assertPricesMessageReceived(btcEthMarketId)
+            assertLimitsMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(BigInteger("5000000000000000"), msg.base)
+                assertEquals(BigInteger("3404000000000000000"), msg.quote)
+            }
+        }
+
+        makerWsClient.apply {
+            assertPricesMessageReceived(btcEthMarketId)
+            assertLimitsMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(BigInteger("80000000000000000"), msg.base)
+                assertEquals(BigInteger("596000000000000000"), msg.quote)
+            }
+        }
+
+        assertEquals(trade.amount, takerWallet.formatAmount("0.08", "BTC"))
+        assertEquals(0, trade.price.compareTo(BigDecimal("17.550")))
+
+        waitForSettlementToFinish(listOf(trade.id.value), SettlementStatus.Failed)
+
+        takerWsClient.apply {
+            assertTradeUpdatedMessageReceived { msg ->
+                assertEquals(marketBuyOrderApiResponse.orderId, msg.trade.orderId)
+                assertEquals(SettlementStatus.Failed, msg.trade.settlementStatus)
+                assertEquals("Insufficient Balance", msg.trade.error)
+            }
+            assertBalancesMessageReceived { msg ->
+                assertEquals(takerStartingBTCBalance - btcWithdrawalAmount, msg.balances.first { it.symbol.value == "BTC" }.available)
+                assertEquals(takerStartingETHBalance, msg.balances.first { it.symbol.value == "ETH" }.available)
+            }
+            assertLimitsMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(takerStartingBTCBalance - btcWithdrawalAmount, msg.base)
+                assertEquals(takerStartingETHBalance, msg.quote)
+            }
+        }
+
+        makerWsClient.apply {
+            assertTradeUpdatedMessageReceived { msg ->
+                assertEquals(limitBuyOrderApiResponse.orderId, msg.trade.orderId)
+                assertEquals(SettlementStatus.Failed, msg.trade.settlementStatus)
+                assertEquals("Insufficient Balance", msg.trade.error)
+            }
+            assertBalancesMessageReceived { msg ->
+                assertEquals(makerStartingBTCBalance, msg.balances.first { it.symbol.value == "BTC" }.available)
+                assertEquals(makerStartingETHBalance, msg.balances.first { it.symbol.value == "ETH" }.available)
+            }
+            assertLimitsMessageReceived(btcEthMarketId) { msg ->
+                assertEquals(makerStartingBTCBalance, msg.base)
+                assertEquals(makerStartingETHBalance, msg.quote)
+            }
+        }
+
+        makerWsClient.close()
+    }
+
     private fun deposit(wallet: Wallet, asset: String, amount: BigInteger) {
         // deposit onchain and update sequencer
         if (asset == "BTC") {
@@ -1375,7 +1611,7 @@ class OrderRoutesApiTest {
         }
     }
 
-    private fun waitForSettlementToFinish(tradeIds: List<TradeId>) {
+    private fun waitForSettlementToFinish(tradeIds: List<TradeId>, expectedStatus: SettlementStatus = SettlementStatus.Completed) {
         await
             .withAlias("Waiting for trade settlement to finish. TradeIds: ${tradeIds.joinToString { it.value }}")
             .pollInSameThread()
@@ -1385,7 +1621,7 @@ class OrderRoutesApiTest {
             .until {
                 Faucet.mine()
                 transaction {
-                    TradeEntity.count(TradeTable.guid.inList(tradeIds) and TradeTable.settlementStatus.eq(SettlementStatus.Completed))
+                    TradeEntity.count(TradeTable.guid.inList(tradeIds) and TradeTable.settlementStatus.eq(expectedStatus))
                 } == tradeIds.size.toLong()
             }
     }

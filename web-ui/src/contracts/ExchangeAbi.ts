@@ -59,6 +59,21 @@ export default [
     },
     {
         "type": "function",
+        "name": "batchHash",
+        "inputs": [
+            
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "bytes32",
+                "internalType": "bytes32"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
         "name": "deposit",
         "inputs": [
             {
@@ -179,25 +194,6 @@ export default [
     },
     {
         "type": "function",
-        "name": "nativeBalances",
-        "inputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
         "name": "owner",
         "inputs": [
             
@@ -210,6 +206,21 @@ export default [
             }
         ],
         "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "prepareBatch",
+        "inputs": [
+            {
+                "name": "transactions",
+                "type": "bytes[]",
+                "internalType": "bytes[]"
+            }
+        ],
+        "outputs": [
+            
+        ],
+        "stateMutability": "nonpayable"
     },
     {
         "type": "function",
@@ -229,6 +240,17 @@ export default [
     {
         "type": "function",
         "name": "renounceOwnership",
+        "inputs": [
+            
+        ],
+        "outputs": [
+            
+        ],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "rollbackBatch",
         "inputs": [
             
         ],
@@ -269,7 +291,7 @@ export default [
     },
     {
         "type": "function",
-        "name": "submitTransactions",
+        "name": "submitBatch",
         "inputs": [
             {
                 "name": "transactions",
@@ -365,41 +387,6 @@ export default [
             
         ],
         "stateMutability": "payable"
-    },
-    {
-        "type": "function",
-        "name": "withdraw",
-        "inputs": [
-            {
-                "name": "_amount",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "outputs": [
-            
-        ],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "withdraw",
-        "inputs": [
-            {
-                "name": "_token",
-                "type": "address",
-                "internalType": "address"
-            },
-            {
-                "name": "_amount",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "outputs": [
-            
-        ],
-        "stateMutability": "nonpayable"
     },
     {
         "type": "event",
@@ -591,6 +578,25 @@ export default [
                 "type": "address",
                 "indexed": true,
                 "internalType": "address"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "PrepareTransactionFailed",
+        "inputs": [
+            {
+                "name": "sequence",
+                "type": "uint64",
+                "indexed": false,
+                "internalType": "uint64"
+            },
+            {
+                "name": "errorCode",
+                "type": "uint8",
+                "indexed": false,
+                "internalType": "enum IExchange.ErrorCode"
             }
         ],
         "anonymous": false

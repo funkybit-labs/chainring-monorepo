@@ -729,6 +729,247 @@ class TestSequencer {
         assertEquals(BigInteger.ZERO, reducedOffer2.newQuantity.toBigInteger())
     }
 
+    @Test
+    fun `test failed withdrawals`() {
+        val sequencer = SequencerClient()
+        val rnd = Random(0)
+        val walletAddress = rnd.nextLong().toWalletAddress()
+        val asset = "ETH".toAsset()
+        val amount = BigInteger.valueOf(1000)
+        // do a deposit
+        sequencer.deposit(walletAddress, asset, amount)
+        // withdraw half
+        sequencer.withdrawal(walletAddress, asset, amount / BigInteger.TWO)
+
+        // withdraw other half
+        sequencer.withdrawal(walletAddress, asset, amount / BigInteger.TWO)
+
+        // fail the 2 withdrawals
+        sequencer.failedWithdrawals(walletAddress, asset, listOf(amount / BigInteger.TWO, amount / BigInteger.TWO))
+
+        // should still be able to withdraw full amount since we rolled back the 2 halves
+        sequencer.withdrawal(walletAddress, asset, amount)
+    }
+
+    @Test
+    fun `Test failed settlements`() {
+        val sequencer = SequencerClient()
+
+        val marketId = MarketId("BTC8/ETH8")
+        sequencer.createMarket(marketId)
+        val maker = 123456789L.toWalletAddress()
+        val taker = 555111555L.toWalletAddress()
+        // maker deposits some of both assets -- 2 BTC, 2 ETH
+        val makerBaseBalance = BigDecimal("2").inSats()
+        val makerQuoteBalance = BigDecimal("2").inWei()
+        sequencer.deposit(maker, marketId.baseAsset(), makerBaseBalance)
+        sequencer.deposit(maker, marketId.quoteAsset(), makerQuoteBalance)
+        // place an order and see that it gets accepted
+        val response = sequencer.addOrder(marketId, BigDecimal("0.00012345").inSats(), "17.500", maker, Order.Type.LimitBuy)
+        assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
+
+        // place a sell order
+        val response2 = sequencer.addOrder(marketId, BigDecimal("0.00054321").inSats(), "17.550", maker, Order.Type.LimitSell)
+        assertEquals(OrderDisposition.Accepted, response2.ordersChangedList.first().disposition)
+
+        // place a market buy and see that it gets executed
+        sequencer.deposit(taker, marketId.quoteAsset(), BigDecimal.ONE.inWei())
+        sequencer.deposit(taker, marketId.baseAsset(), BigDecimal.ONE.inSats())
+
+        val response3 = sequencer.addOrder(marketId, BigDecimal("0.00043210").inSats(), null, taker, Order.Type.MarketBuy)
+        assertEquals(2, response3.ordersChangedCount)
+        val takerOrder = response3.ordersChangedList[0]
+        assertEquals(OrderDisposition.Filled, takerOrder.disposition)
+        val makerOrder = response3.ordersChangedList[1]
+        assertEquals(OrderDisposition.PartiallyFilled, makerOrder.disposition)
+        assertEquals(response2.orderGuid(), makerOrder.guid)
+        val trade = response3.tradesCreatedList.first()
+        assertEquals("17.550".toBigDecimal().toDecimalValue(), trade.price)
+        assertEquals(BigDecimal("0.00043210").inSats().toIntegerValue(), trade.amount)
+        assertEquals(makerOrder.guid, trade.sellGuid)
+        assertEquals(takerOrder.guid, trade.buyGuid)
+
+        // each of the maker and taker should have two balance changed messages, one for each asset
+        verifyBalanceChanges(
+            marketId = marketId,
+            balancesChangedList = response3.balancesChangedList,
+            makerWallet = maker,
+            takerWallet = taker,
+            expectedTakerBaseBalanceChange = BigDecimal("0.00043210").inSats(),
+            expectedTakerQuoteBalanceChange = -BigDecimal("0.007583355").inWei(),
+        )
+
+        // now rollback the settlement - all the balances should be back to their original values
+        val failedSettlementResponse = sequencer.failedSettlement(taker, maker, marketId, trade)
+        verifyBalanceChanges(
+            marketId = marketId,
+            balancesChangedList = failedSettlementResponse.balancesChangedList,
+            makerWallet = maker,
+            takerWallet = taker,
+            expectedTakerBaseBalanceChange = -BigDecimal("0.00043210").inSats(),
+            expectedTakerQuoteBalanceChange = BigDecimal("0.007583355").inWei(),
+        )
+        // all balances should be back to original values
+        sequencer.withdrawal(maker, marketId.baseAsset(), BigDecimal.TEN.inSats(), makerBaseBalance)
+        sequencer.withdrawal(maker, marketId.quoteAsset(), BigDecimal.TEN.inWei(), makerQuoteBalance)
+        sequencer.withdrawal(taker, marketId.baseAsset(), BigDecimal.TEN.inSats(), BigDecimal.ONE.inSats())
+        sequencer.withdrawal(taker, marketId.quoteAsset(), BigDecimal.TEN.inWei(), BigDecimal.ONE.inWei())
+    }
+
+    @Test
+    fun `Test autoreduce on failed settlements`() {
+        val sequencer = SequencerClient()
+
+        val marketId = MarketId("BTC9/ETH9")
+        sequencer.createMarket(marketId)
+        val maker = 123456789L.toWalletAddress()
+        val taker = 555111555L.toWalletAddress()
+        // maker deposits some of both assets -- 2 BTC, 2 ETH
+        val makerBaseBalance = BigDecimal("2").inSats()
+        val makerQuoteBalance = BigDecimal("10").inWei()
+        sequencer.deposit(maker, marketId.baseAsset(), makerBaseBalance)
+        sequencer.deposit(maker, marketId.quoteAsset(), makerQuoteBalance)
+
+        // place a sell order
+        val response = sequencer.addOrder(marketId, BigDecimal("2").inSats(), "17.550", maker, Order.Type.LimitSell)
+        assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
+
+        // place a market buy and see that it gets executed
+        sequencer.deposit(taker, marketId.quoteAsset(), BigDecimal("40").inWei())
+        sequencer.deposit(taker, marketId.baseAsset(), BigDecimal.ONE.inSats())
+
+        val response2 = sequencer.addOrder(marketId, BigDecimal("1").inSats(), null, taker, Order.Type.MarketBuy)
+        assertEquals(2, response2.ordersChangedCount)
+        val takerOrder = response2.ordersChangedList[0]
+        assertEquals(OrderDisposition.Filled, takerOrder.disposition)
+        val makerOrder = response2.ordersChangedList[1]
+        assertEquals(OrderDisposition.PartiallyFilled, makerOrder.disposition)
+        assertEquals(response.orderGuid(), makerOrder.guid)
+        val trade = response2.tradesCreatedList.first()
+        assertEquals("17.550".toBigDecimal().toDecimalValue(), trade.price)
+        assertEquals(BigDecimal("1").inSats().toIntegerValue(), trade.amount)
+        assertEquals(makerOrder.guid, trade.sellGuid)
+        assertEquals(takerOrder.guid, trade.buyGuid)
+
+        // each of the maker and taker should have two balance changed messages, one for each asset
+        verifyBalanceChanges(
+            marketId = marketId,
+            balancesChangedList = response2.balancesChangedList,
+            makerWallet = maker,
+            takerWallet = taker,
+            expectedTakerBaseBalanceChange = BigDecimal("1").inSats(),
+            expectedTakerQuoteBalanceChange = -BigDecimal("17.55").inWei(),
+        )
+
+        // place an order for taker to sell 2 BTC - they started with 1 and just bought 1, so they have 2 total
+        val response3 = sequencer.addOrder(marketId, BigDecimal("2").inSats(), "17.500", taker, Order.Type.LimitSell)
+        assertEquals(OrderDisposition.Accepted, response3.ordersChangedList.first().disposition)
+
+        // now rollback the settlement - all the balances should be back to their original values
+        val failedSettlementResponse = sequencer.failedSettlement(taker, maker, marketId, trade)
+        verifyBalanceChanges(
+            marketId = marketId,
+            balancesChangedList = failedSettlementResponse.balancesChangedList,
+            makerWallet = maker,
+            takerWallet = taker,
+            expectedTakerBaseBalanceChange = -BigDecimal("1").inSats(),
+            expectedTakerQuoteBalanceChange = BigDecimal("17.55").inWei(),
+        )
+        assertEquals(failedSettlementResponse.ordersChangedList.size, 1)
+        val reducedBid = failedSettlementResponse.ordersChangedList.find { it.guid == response3.orderGuid() }!!
+        assertEquals(OrderDisposition.AutoReduced, reducedBid.disposition)
+        assertEquals(BigDecimal("1").inSats(), reducedBid.newQuantity.toBigInteger())
+
+        // all balances should be back to original values
+        sequencer.withdrawal(maker, marketId.baseAsset(), BigDecimal.TEN.inSats(), makerBaseBalance)
+        sequencer.withdrawal(maker, marketId.quoteAsset(), BigDecimal("100").inWei(), makerQuoteBalance)
+        sequencer.withdrawal(taker, marketId.baseAsset(), BigDecimal.TEN.inSats(), BigDecimal.ONE.inSats())
+        sequencer.withdrawal(taker, marketId.quoteAsset(), BigDecimal("100").inWei(), BigDecimal("40").inWei())
+    }
+
+    @Test
+    fun `Test failed settlements - balances can go negative`() {
+        val sequencer = SequencerClient()
+
+        val marketId = MarketId("BTC10/ETH10")
+        sequencer.createMarket(marketId)
+        val maker = 123456789L.toWalletAddress()
+        val taker = 555111555L.toWalletAddress()
+        // maker deposits some of both assets -- 2 BTC, 2 ETH
+        val makerBaseBalance = BigDecimal("2").inSats()
+        val makerQuoteBalance = BigDecimal("2").inWei()
+        sequencer.deposit(maker, marketId.baseAsset(), makerBaseBalance)
+        sequencer.deposit(maker, marketId.quoteAsset(), makerQuoteBalance)
+
+        // place an order and see that it gets accepted
+        val response = sequencer.addOrder(marketId, BigDecimal("0.00012345").inSats(), "17.500", maker, Order.Type.LimitBuy)
+        assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
+
+        // place a sell order
+        val response2 = sequencer.addOrder(marketId, BigDecimal("0.00054321").inSats(), "17.550", maker, Order.Type.LimitSell)
+        assertEquals(OrderDisposition.Accepted, response2.ordersChangedList.first().disposition)
+
+        // place a market buy and see that it gets executed
+        sequencer.deposit(taker, marketId.quoteAsset(), BigDecimal.ONE.inWei())
+        sequencer.deposit(taker, marketId.baseAsset(), BigDecimal.ONE.inSats())
+
+        val response3 = sequencer.addOrder(marketId, BigDecimal("0.00043210").inSats(), null, taker, Order.Type.MarketBuy)
+        assertEquals(2, response3.ordersChangedCount)
+        val takerOrder = response3.ordersChangedList[0]
+        assertEquals(OrderDisposition.Filled, takerOrder.disposition)
+        val makerOrder = response3.ordersChangedList[1]
+        assertEquals(OrderDisposition.PartiallyFilled, makerOrder.disposition)
+        assertEquals(response2.orderGuid(), makerOrder.guid)
+        val trade = response3.tradesCreatedList.first()
+        assertEquals("17.550".toBigDecimal().toDecimalValue(), trade.price)
+        assertEquals(BigDecimal("0.00043210").inSats().toIntegerValue(), trade.amount)
+        assertEquals(makerOrder.guid, trade.sellGuid)
+        assertEquals(takerOrder.guid, trade.buyGuid)
+
+        verifyBalanceChanges(
+            marketId = marketId,
+            balancesChangedList = response3.balancesChangedList,
+            makerWallet = maker,
+            takerWallet = taker,
+            expectedTakerBaseBalanceChange = BigDecimal("0.00043210").inSats(),
+            expectedTakerQuoteBalanceChange = -BigDecimal("0.007583355").inWei(),
+        )
+
+        // balances now should be:
+        //   maker BTC1 = 2 - 0.00043210 = 1.99956790
+        //         ETH1 = 2 + .007583355 = 2.007583355
+        //   taker BTC1 = 0.00043210
+        //         ETH1 = 1 - .007583355 = 0.992416645
+        // withdraw everything
+        sequencer.withdrawal(maker, marketId.baseAsset(), BigDecimal.TEN.inSats(), BigDecimal("1.999567905").inSats())
+        sequencer.withdrawal(maker, marketId.quoteAsset(), BigDecimal.TEN.inWei(), BigDecimal("2.007583355").inWei())
+        sequencer.withdrawal(taker, marketId.baseAsset(), BigDecimal.TEN.inSats(), BigDecimal("1.00043210").inSats())
+        sequencer.withdrawal(taker, marketId.quoteAsset(), BigDecimal.TEN.inWei(), BigDecimal("0.992416645").inWei())
+
+        // now rollback the settlement - some balances go negative (takers base balance, and makers quote balance
+        val failedSettlementResponse = sequencer.failedSettlement(taker, maker, marketId, trade)
+        verifyBalanceChanges(
+            marketId = marketId,
+            balancesChangedList = failedSettlementResponse.balancesChangedList,
+            makerWallet = maker,
+            takerWallet = taker,
+            expectedTakerBaseBalanceChange = -BigDecimal("0.00043210").inSats(),
+            expectedTakerQuoteBalanceChange = BigDecimal("0.007583355").inWei(),
+        )
+        sequencer.withdrawal(maker, marketId.baseAsset(), BigDecimal.TEN.inSats(), BigDecimal("0.00043210").inSats())
+        sequencer.withdrawal(taker, marketId.quoteAsset(), BigDecimal.TEN.inWei(), BigDecimal("0.007583355").inWei())
+        // no balance change for these two since they went negative
+        sequencer.withdrawal(maker, marketId.quoteAsset(), BigDecimal.TEN.inWei(), null)
+        sequencer.withdrawal(taker, marketId.baseAsset(), BigDecimal.TEN.inSats(), null)
+
+        // now deposit to take balance positive and withdraw all to make sure adjustments are properly applied
+        sequencer.deposit(maker, marketId.quoteAsset(), BigDecimal.ONE.inWei())
+        sequencer.deposit(taker, marketId.baseAsset(), BigDecimal.ONE.inSats())
+
+        sequencer.withdrawal(maker, marketId.quoteAsset(), BigDecimal.TEN.inWei(), BigDecimal("0.992416645").inWei())
+        sequencer.withdrawal(taker, marketId.baseAsset(), BigDecimal.TEN.inSats(), BigDecimal("0.999567905").inSats())
+    }
+
     private fun verifyBalanceChanges(
         marketId: MarketId,
         balancesChangedList: MutableList<BalanceChange>,
