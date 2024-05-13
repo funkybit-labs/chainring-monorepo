@@ -5,7 +5,6 @@ import { mergeOHLC, ohlcDurationsMs } from 'utils/pricesUtils'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { produce } from 'immer'
 import * as d3 from 'd3'
-import { D3ZoomEvent, scaleTime } from 'd3'
 
 import { Market } from 'markets'
 import SymbolIcon from 'components/common/SymbolIcon'
@@ -166,33 +165,7 @@ function OHLCChart({
   const innerWidth = params.width - margin.left - margin.right
   const innerHeight = params.height - margin.top - margin.bottom
 
-  const svg = d3
-    .select(ref.current)
-    .attr('width', params.width)
-    .attr('height', params.height)
-    .style('overflow', 'hidden')
-
-  if (svg.select('.x-axis').size() == 0 && params.width > 0) {
-    // add placeholders, axes will be rendered later in drawChart
-    svg.append('g').attr('class', 'x-axis text-darkBluishGray4 text-xs') // x-axis
-
-    svg.append('g').attr('class', 'y-axis-grid') // grid layer, it should be below ohlc and y-axis background
-    svg.append('g').attr('class', 'y-axis-ohlc') // ohlc
-    // y-axis background, needed for ohlc to hide under it
-    svg
-      .append('g')
-      .attr('class', 'y-axis-bg')
-      .append('rect')
-      .attr('x', innerWidth + 10)
-      .attr('y', 0)
-      .attr('width', margin.right)
-      .attr('height', innerHeight)
-      .attr('stroke', '#1B222B')
-      .attr('stroke-width', 30)
-
-    svg.append('g').attr('class', 'y-axis text-darkBluishGray4 text-xs') // y-axis
-  }
-
+  const svg = d3.select(ref.current)
   const domainStart = subtractInterval(new Date(), intervalRef.current)
   const adjustedDomainStart =
     ohlc.length > 0
@@ -202,7 +175,8 @@ function OHLCChart({
         )
       : domainStart
   // setup and position scales
-  const xScale = scaleTime()
+  const xScale = d3
+    .scaleTime()
     .domain([
       adjustedDomainStart,
       addDuration(new Date(), ohlcDurationsMs[params.duration] * 2)
@@ -212,7 +186,6 @@ function OHLCChart({
     .axisBottom(xScale)
     .tickSizeOuter(0)
     .tickSizeInner(-innerHeight)
-  svg.select('.x-axis').attr('transform', `translate(0,${innerHeight})`)
 
   const yScale = d3.scaleLinear().range([innerHeight, 0])
   const yAxis = d3.axisRight(yScale).tickSize(0)
@@ -220,20 +193,18 @@ function OHLCChart({
     .axisRight(yScale)
     .tickSizeOuter(0)
     .tickSizeInner(-innerWidth)
-  svg.select('.y-axis').attr('transform', `translate(${innerWidth},0)`)
-  svg.select('.y-axis-grid').attr('transform', `translate(${innerWidth},0)`)
 
   // setup zoom and panning
   const zoom = d3
     .zoom()
     // limit panning
     .translateExtent([
-      [ohlc.length > 0 ? xScale(ohlc[0].start) - 1000 : -200, innerHeight],
+      [ohlc.length > 0 ? xScale(ohlc[0].start) - 1000 : -1000, innerHeight],
       [innerWidth * 1.15 + (margin.left + margin.right), innerHeight]
     ])
     // limit zoom-in/out
     .scaleExtent([0.2, 5])
-    .on('zoom', (event: D3ZoomEvent<SVGGElement, OHLC>) => {
+    .on('zoom', (event: d3.D3ZoomEvent<SVGGElement, OHLC>) => {
       if (zoomRef.current.k != event.transform.k && event.transform.k != 1) {
         params.onIntervalReset()
       }
@@ -338,7 +309,33 @@ function OHLCChart({
   // @ts-expect-error @definitelytyped/no-unnecessary-generics
   svg.call(zoom).call(zoom.transform, zoomRef.current)
 
-  return <svg ref={ref} />
+  return (
+    <svg
+      ref={ref}
+      width={params.width}
+      height={params.height}
+      style={{ overflow: 'hidden' }}
+    >
+      <g
+        className="x-axis text-xs text-darkBluishGray4"
+        transform={`translate(0,${innerHeight})`}
+      />
+      <g className="y-axis-grid" transform={`translate(${innerWidth},0)`} />
+      <g className="y-axis-ohlc" />
+      <g className="y-axis-bg">
+        <rect
+          x={innerWidth + 10}
+          y="0"
+          width={margin.right}
+          height={innerHeight}
+        />
+      </g>
+      <g
+        className="y-axis text-xs text-darkBluishGray4"
+        transform={`translate(${innerWidth},0)`}
+      />
+    </svg>
+  )
 }
 
 function Title({ market, price }: { market: Market; price: string }) {
