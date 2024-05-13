@@ -2,16 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
-/* removing axes from the prices graph */
+.x-axis .domain {
+  display: none;
+}
+.y-axis .domain {
+  display: none;
+}
+.y-axis-grid .domain {
+  display: none;
+}
+
 .x-axis line {
-  display: none;
+  stroke: #313D4E;
+  stroke-dasharray: 5 10
 }
-.x-axis path {
-  display: none;
+.y-axis-grid line {
+  stroke: #313D4E;
+  stroke-dasharray: 5 10
 }
-.y-axis line {
-  display: none;
-}
-.y-axis path {
+.y-axis-grid text {
   display: none;
 }
