@@ -11,6 +11,7 @@ import { Market } from 'markets'
 import SymbolIcon from 'components/common/SymbolIcon'
 import { classNames } from 'utils'
 import { useMeasure } from 'react-use'
+import { addDuration, maxDate, subtractDuration } from 'utils/dateUtils'
 
 enum PricesInterval {
   PT1H = '1h',
@@ -32,14 +33,20 @@ const intervalToOHLCDuration: { [key in PricesInterval]: OHLCDuration } = {
   [PricesInterval.YTD]: 'P1D'
 }
 
-const intervalToMs: { [key in PricesInterval]: number } = {
-  [PricesInterval.PT1H]: 60 * 60 * 1000,
-  [PricesInterval.PT6H]: 6 * 60 * 60 * 1000,
-  [PricesInterval.P1D]: 24 * 60 * 60 * 1000,
-  [PricesInterval.P7D]: 7 * 60 * 60 * 1000,
-  [PricesInterval.P1M]: 30 * 60 * 60 * 1000,
-  [PricesInterval.P6M]: 182 * 60 * 60 * 1000,
-  [PricesInterval.YTD]: 364 * 60 * 60 * 1000
+function subtractInterval(date: Date, interval: PricesInterval): Date {
+  if (interval === PricesInterval.YTD) {
+    return new Date(date.getFullYear(), 0, 1)
+  } else {
+    let number = {
+      [PricesInterval.PT1H]: 60 * 60 * 1000,
+      [PricesInterval.PT6H]: 6 * 60 * 60 * 1000,
+      [PricesInterval.P1D]: 24 * 60 * 60 * 1000,
+      [PricesInterval.P7D]: 7 * 24 * 60 * 60 * 1000,
+      [PricesInterval.P1M]: 30 * 24 * 60 * 60 * 1000,
+      [PricesInterval.P6M]: 182 * 24 * 60 * 60 * 1000
+    }[interval]
+    return new Date(date.getTime() - number)
+  }
 }
 
 export function PricesWidgetD3({ market }: { market: Market }) {
@@ -184,11 +191,21 @@ function OHLCChart({
     svg.append('g').attr('class', 'y-axis text-darkBluishGray4 text-xs') // y-axis
   }
 
+  let domainStart = subtractInterval(new Date(), intervalRef.current)
+  let adjustedDomainStart =
+    ohlc.length > 0
+      ? maxDate(
+          subtractDuration(ohlc[0].start, ohlcDurationsMs[params.duration] * 2),
+          domainStart
+        )
+      : domainStart
+  console.log(domainStart)
+  console.log(adjustedDomainStart)
   // setup and position scales
   const xScale = scaleTime()
     .domain([
-      new Date(new Date().getTime() - intervalToMs[intervalRef.current]),
-      new Date(new Date().getTime() + ohlcDurationsMs[params.duration] * 2)
+      adjustedDomainStart,
+      addDuration(new Date(), ohlcDurationsMs[params.duration] * 2)
     ])
     .range([0, innerWidth])
   const xAxis = d3
@@ -211,7 +228,7 @@ function OHLCChart({
     .zoom()
     // limit panning
     .translateExtent([
-      [ohlc.length > 0 ? xScale(ohlc[0].start) * 1.15 : -100, innerHeight],
+      [ohlc.length > 0 ? xScale(ohlc[0].start) - 1000 : -200, innerHeight],
       [innerWidth * 1.15 + (margin.left + margin.right), innerHeight]
     ])
     // limit zoom-in/out
