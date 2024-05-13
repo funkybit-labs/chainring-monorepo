@@ -26,10 +26,18 @@ export default {
       darkBluishGray3: "#89919D",
       darkBluishGray2: "#A0A6B1",
       darkBluishGray1: "#BABEC5",
+      lightBluishGray5: "#CDD1D7",
       primary4: "#FF8718",
       primary5: "#E4720B",
       olhcGreen: "#39CF63",
       olhcRed: "#FF5A50",
+
+      // status colors
+      statusOrange: "#FFA337",
+      statusYellow: "#FFEB82",
+      statusRed: "#FF7169",
+      statusBlue: "#2D94FF",
+      statusGreen: "#42C66B",
 
       // legacy
       lightBackground: "#B5CBCD",
@@ -55,6 +63,9 @@ export default {
     },
     {
       pattern: /col-span-/,
+    },
+    {
+      pattern: /text-status/,
     }
   ]
 }

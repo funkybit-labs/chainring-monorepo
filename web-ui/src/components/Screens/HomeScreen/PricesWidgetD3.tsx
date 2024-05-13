@@ -268,7 +268,9 @@ function OHLCChart({
 
     // calculate candle width
     const candleWidth =
-      (newXScale(ohlc[1].start) - newXScale(ohlc[0].start)) * 0.6
+      newXScale.length >= 2
+        ? (newXScale(ohlc[1].start) - newXScale(ohlc[0].start)) * 0.6
+        : 1
     const lineWidth = candleWidth * 0.2
 
     // select ohlc candles
