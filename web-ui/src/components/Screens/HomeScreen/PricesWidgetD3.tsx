@@ -1,7 +1,7 @@
 import { Widget } from 'components/common/Widget'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { OHLC, OHLCDuration, pricesTopic, Publishable } from 'websocketMessages'
-import { mergeOHLC } from 'utils/pricesUtils'
+import { mergeOHLC, ohlcDurationsMs } from 'utils/pricesUtils'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { produce } from 'immer'
 import * as d3 from 'd3'
@@ -12,7 +12,7 @@ import SymbolIcon from 'components/common/SymbolIcon'
 import { classNames } from 'utils'
 import { useMeasure } from 'react-use'
 
-enum Interval {
+enum PricesInterval {
   PT1H = '1h',
   PT6H = '6h',
   P1D = '1d',
@@ -22,34 +22,32 @@ enum Interval {
   YTD = 'YTD'
 }
 
-export type D3Event<T extends Event, E extends Element> = T & {
-  currentTarget: E
+const intervalToOHLCDuration: { [key in PricesInterval]: OHLCDuration } = {
+  [PricesInterval.PT1H]: 'P1M',
+  [PricesInterval.PT6H]: 'P5M',
+  [PricesInterval.P1D]: 'P15M',
+  [PricesInterval.P7D]: 'P1H',
+  [PricesInterval.P1M]: 'P4H',
+  [PricesInterval.P6M]: 'P1D',
+  [PricesInterval.YTD]: 'P1D'
 }
 
-const intervalToOHLCDuration: { [key in Interval]: OHLCDuration } = {
-  [Interval.PT1H]: 'P1M',
-  [Interval.PT6H]: 'P5M',
-  [Interval.P1D]: 'P15M',
-  [Interval.P7D]: 'P1H',
-  [Interval.P1M]: 'P4H',
-  [Interval.P6M]: 'P1D',
-  [Interval.YTD]: 'P1D'
-}
-
-const intervalToMs: { [key in Interval]: number } = {
-  [Interval.PT1H]: 60 * 60 * 1000,
-  [Interval.PT6H]: 6 * 60 * 60 * 1000,
-  [Interval.P1D]: 24 * 60 * 60 * 1000,
-  [Interval.P7D]: 7 * 60 * 60 * 1000,
-  [Interval.P1M]: 30 * 60 * 60 * 1000,
-  [Interval.P6M]: 182 * 60 * 60 * 1000,
-  [Interval.YTD]: 364 * 60 * 60 * 1000
+const intervalToMs: { [key in PricesInterval]: number } = {
+  [PricesInterval.PT1H]: 60 * 60 * 1000,
+  [PricesInterval.PT6H]: 6 * 60 * 60 * 1000,
+  [PricesInterval.P1D]: 24 * 60 * 60 * 1000,
+  [PricesInterval.P7D]: 7 * 60 * 60 * 1000,
+  [PricesInterval.P1M]: 30 * 60 * 60 * 1000,
+  [PricesInterval.P6M]: 182 * 60 * 60 * 1000,
+  [PricesInterval.YTD]: 364 * 60 * 60 * 1000
 }
 
 export function PricesWidgetD3({ market }: { market: Market }) {
   const [ref, { width }] = useMeasure()
 
-  const [interval, setInterval] = useState<Interval | null>(Interval.PT6H)
+  const [interval, setInterval] = useState<PricesInterval | null>(
+    PricesInterval.PT6H
+  )
   const [duration, setDuration] = useState<OHLCDuration>('P5M')
   const [ohlc, setOhlc] = useState<OHLC[]>([])
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
@@ -101,9 +99,9 @@ export function PricesWidgetD3({ market }: { market: Market }) {
               <IntervalsDisplay
                 selectedInterval={interval}
                 selectedDuration={duration}
-                onChange={(int: Interval) => {
-                  setInterval(int)
+                onChange={(int: PricesInterval) => {
                   setDuration(intervalToOHLCDuration[int])
+                  setInterval(int)
                 }}
               />
             </div>
@@ -115,10 +113,11 @@ export function PricesWidgetD3({ market }: { market: Market }) {
             <OHLCChart
               ohlc={ohlc}
               params={{
-                width: width - 60, // paddings
+                width: Math.max(width - 60, 0), // paddings
                 height: 500,
                 interval: interval,
-                intervalTouched: () => setInterval(null)
+                duration: duration,
+                onIntervalReset: () => setInterval(null)
               }}
             />
           </div>
@@ -131,8 +130,9 @@ export function PricesWidgetD3({ market }: { market: Market }) {
 type PricesParameters = {
   width: number
   height: number
-  interval: Interval | null
-  intervalTouched: () => void
+  interval: PricesInterval | null
+  duration: OHLCDuration
+  onIntervalReset: () => void
 }
 
 function OHLCChart({
@@ -144,15 +144,13 @@ function OHLCChart({
 }) {
   const ref = useRef<SVGSVGElement>(null)
   const zoomRef = useRef(d3.zoomIdentity)
-
-  const lastValidInterval = useRef(
-    params.interval ? intervalToMs[params.interval] : 6 * 60 * 60 * 1000
+  const intervalRef = useRef<PricesInterval>(
+    params.interval ? params.interval : PricesInterval.PT6H
   )
-  const xDomainMs = useMemo(() => {
-    if (params.interval !== null) {
-      lastValidInterval.current = intervalToMs[params.interval]
+  useEffect(() => {
+    if (params.interval) {
+      intervalRef.current = params.interval
     }
-    return lastValidInterval.current
   }, [params.interval])
 
   const margin = { top: 0, bottom: 15, left: 0, right: 30 }
@@ -188,7 +186,10 @@ function OHLCChart({
 
   // setup and position scales
   const xScale = scaleTime()
-    .domain([new Date(new Date().getTime() - xDomainMs), new Date()])
+    .domain([
+      new Date(new Date().getTime() - intervalToMs[intervalRef.current]),
+      new Date(new Date().getTime() + ohlcDurationsMs[params.duration] * 2)
+    ])
     .range([0, innerWidth])
   const xAxis = d3
     .axisBottom(xScale)
@@ -216,8 +217,8 @@ function OHLCChart({
     // limit zoom-in/out
     .scaleExtent([0.2, 5])
     .on('zoom', (event: D3ZoomEvent<SVGGElement, OHLC>) => {
-      if (zoomRef.current.k != event.transform.k) {
-        params.intervalTouched()
+      if (zoomRef.current.k != event.transform.k && event.transform.k != 1) {
+        params.onIntervalReset()
       }
       zoomRef.current = event.transform
       drawChart(event.transform.rescaleX(xScale))
@@ -356,12 +357,12 @@ function IntervalsDisplay({
   selectedDuration,
   onChange
 }: {
-  selectedInterval: Interval | null
+  selectedInterval: PricesInterval | null
   selectedDuration: OHLCDuration
-  onChange: (interval: Interval) => void
+  onChange: (interval: PricesInterval) => void
 }) {
   // Convert the enum into an array of values for rendering
-  const intervalValues = Object.values(Interval)
+  const intervalValues = Object.values(PricesInterval)
 
   return (
     <div className="flex flex-row gap-2">
