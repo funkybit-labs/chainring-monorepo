@@ -67,7 +67,7 @@ function MarketTitle({ market }: { market: Market }) {
     <div className="flex place-items-center truncate">
       <SymbolIcon
         symbol={market.baseSymbol.name}
-        className="inline-block size-4"
+        className="relative left-1 inline-block size-4"
       />
       <SymbolIcon
         symbol={market.quoteSymbol.name}

@@ -4,7 +4,7 @@ import { useAccount } from 'wagmi'
 import BalancesWidget from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import { Header } from 'components/Screens/Header'
 import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
-import TradeWidget from 'components/Screens/HomeScreen/TradeWidget'
+import OrderTicketWidget from 'components/Screens/HomeScreen/OrderTicketWidget'
 import { useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
 import OrdersAndTradesWidget from 'components/Screens/HomeScreen/OrdersAndTradesWidget'
@@ -75,7 +75,7 @@ export default function HomeScreen() {
                 </div>
                 <div className="col-span-1 space-y-4">
                   {wallet.address && exchangeContract && (
-                    <TradeWidget
+                    <OrderTicketWidget
                       market={selectedMarket}
                       walletAddress={wallet.address}
                       exchangeContractAddress={exchangeContract.address}

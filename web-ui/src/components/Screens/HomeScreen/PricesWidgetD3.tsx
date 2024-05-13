@@ -346,7 +346,7 @@ function Title({ market, price }: { market: Market; price: string }) {
       <div className="place-items-center text-left">
         <SymbolIcon
           symbol={market.baseSymbol.name}
-          className="inline-block size-7"
+          className="relative left-1 inline-block size-7"
         />
         <SymbolIcon
           symbol={market.quoteSymbol.name}

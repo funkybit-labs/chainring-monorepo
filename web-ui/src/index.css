@@ -23,9 +23,18 @@
 .y-axis-grid text {
   display: none;
 }
-
 .y-axis-ohlc {}
 .y-axis-bg {
   stroke: #1B222B;
   stroke-width: 30;
+}
+
+@layer utilities {
+  .bg-switch {
+    background: url("assets/Switch.svg") no-repeat center;
+  }
+
+  .bg-switch-alt {
+    background: url("assets/Switch-Alt.svg") no-repeat center;
+  }
 }
