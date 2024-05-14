@@ -82,14 +82,16 @@ export function PricesWidgetD3({ market }: { market: Market }) {
     )
   })
 
-  function lastPrice(): string {
+  function lastPrice(): number | null {
     if (ohlc.length > 0) {
-      return ohlc[ohlc.length - 1].close.toFixed(
-        market.tickSize.decimalPlaces() + 1
-      )
+      return ohlc[ohlc.length - 1].close
     } else {
-      return ''
+      return null
     }
+  }
+
+  function formatPrice(price: number | null) {
+    return price ? price.toFixed(market.tickSize.decimalPlaces() + 1) : ''
   }
 
   return (
@@ -98,7 +100,7 @@ export function PricesWidgetD3({ market }: { market: Market }) {
       contents={
         <div className="min-h-[600px]">
           <div className="flex flex-row align-middle">
-            <Title market={market} price={lastPrice()} />
+            <Title market={market} price={formatPrice(lastPrice())} />
           </div>
           <div className="flex w-full place-items-center justify-between py-4 text-sm">
             <div className="text-left">
@@ -115,11 +117,12 @@ export function PricesWidgetD3({ market }: { market: Market }) {
               <LastUpdated lastUpdated={lastUpdated} />
             </div>
           </div>
-          <div className="size-full min-h-[500px] p-4">
+          <div className="size-full min-h-[500px] pl-2 pt-4">
             <OHLCChart
               ohlc={ohlc}
+              lastPrice={lastPrice()}
               params={{
-                width: Math.max(width - 60, 0), // paddings
+                width: Math.max(width - 40, 0), // paddings
                 height: 500,
                 interval: interval,
                 duration: duration,
@@ -143,10 +146,12 @@ type PricesParameters = {
 
 function OHLCChart({
   params,
-  ohlc
+  ohlc,
+  lastPrice
 }: {
   params: PricesParameters
   ohlc: OHLC[]
+  lastPrice: number | null
 }) {
   const ref = useRef<SVGSVGElement>(null)
   const zoomRef = useRef(d3.zoomIdentity)
@@ -161,7 +166,13 @@ function OHLCChart({
     }
   }, [params.interval])
 
-  const margin = { top: 0, bottom: 15, left: 0, right: 30 }
+  const margin = {
+    top: 0,
+    bottom: 15,
+    left: 0,
+    // calculate 8 pixels for every price digit
+    right: lastPrice ? lastPrice.toFixed(2).length * 8 : 30
+  }
   const innerWidth = params.width - margin.left - margin.right
   const innerHeight = params.height - margin.top - margin.bottom
 
@@ -188,7 +199,10 @@ function OHLCChart({
     .tickSizeInner(-innerHeight)
 
   const yScale = d3.scaleLinear().range([innerHeight, 0])
-  const yAxis = d3.axisRight(yScale).tickSize(0)
+  const yAxis = d3
+    .axisRight(yScale)
+    .tickSize(0)
+    .tickFormat((x: d3.NumberValue) => x.valueOf().toFixed(2))
   const yAxisGrid = d3
     .axisRight(yScale)
     .tickSizeOuter(0)
@@ -236,6 +250,16 @@ function OHLCChart({
     svg.select('.y-axis').call(yAxis.scale(yScale))
     // @ts-expect-error @definitelytyped/no-unnecessary-generics
     svg.select('.y-axis-grid').call(yAxisGrid.scale(yScale))
+    const currentPriceSelection = svg.select('.y-axis-current-price')
+    if (lastPrice) {
+      currentPriceSelection.attr(
+        'transform',
+        `translate(0,${yScale(lastPrice)})`
+      )
+      currentPriceSelection.select('text').text(lastPrice.toFixed(2))
+    } else {
+      currentPriceSelection.attr('transform', `translate(0,-10)`)
+    }
 
     // calculate candle width
     const candleWidth =
@@ -271,7 +295,7 @@ function OHLCChart({
           Math.min(yScale(d.low), yScale(d.high))
       )
       .attr('rx', candleWidth / 10)
-      .attr('fill', (d) => (d.close > d.open ? '#39CF63' : '#FF5A50'))
+      .attr('fill', (d) => (d.close >= d.open ? '#39CF63' : '#FF5A50'))
 
     candlesEnter
       .append('rect')
@@ -316,7 +340,10 @@ function OHLCChart({
       ref={ref}
       width={params.width}
       height={params.height}
-      style={{ overflow: 'hidden' }}
+      style={{
+        overflow: 'hidden'
+        //backgroundColor: 'green'
+      }}
     >
       <g
         className="x-axis text-xs text-darkBluishGray4"
@@ -325,17 +352,23 @@ function OHLCChart({
       <g className="y-axis-grid" transform={`translate(${innerWidth},0)`} />
       <g className="y-axis-ohlc" />
       <g className="y-axis-bg">
-        <rect
-          x={innerWidth + 10}
-          y="0"
-          width={margin.right}
-          height={innerHeight}
-        />
+        <rect x={innerWidth} y="0" width={margin.right} height={innerHeight} />
       </g>
       <g
         className="y-axis text-xs text-darkBluishGray4"
         transform={`translate(${innerWidth},0)`}
       />
+      <g className="y-axis-current-price text-xs">
+        <line x1="0" x2={innerWidth} y1="0" y2="0" />
+        <rect
+          x={innerWidth - 5}
+          y="-10"
+          width={margin.right + 5}
+          height="20"
+          rx="3"
+        />
+        <text transform={`translate(${innerWidth - 1},4)`}>17.85</text>
+      </g>
     </svg>
   )
 }

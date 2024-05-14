@@ -25,8 +25,18 @@
 }
 .y-axis-ohlc {}
 .y-axis-bg {
-  stroke: #1B222B;
-  stroke-width: 30;
+  fill: #1B222B;
+}
+.y-axis-current-price {
+  fill: #FF8718;
+}
+.y-axis-current-price text {
+  fill: white;
+}
+.y-axis-current-price line {
+  stroke: #FF8718;
+  stroke-width: 0.5;
+  stroke-dasharray: 1 1;
 }
 
 @layer utilities {

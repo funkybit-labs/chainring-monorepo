@@ -15,7 +15,6 @@ import {
 } from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import Deposit from 'assets/Deposit.svg'
 import Withdrawal from 'assets/Withdrawal.svg'
-import Add from 'assets/Add.svg'
 
 export function BalancesTable({
   walletAddress,
