@@ -25,6 +25,8 @@ value class ExchangeTransactionId(override val value: String) : EntityId {
 enum class ExchangeTransactionStatus {
     Pending,
     Assigned,
+    Failed,
+    Completed,
 }
 
 object ExchangeTransactionTable : GUIDTable<ExchangeTransactionId>("exchange_transaction", ::ExchangeTransactionId) {
@@ -41,7 +43,11 @@ object ExchangeTransactionTable : GUIDTable<ExchangeTransactionId>("exchange_tra
         { value -> ExchangeTransactionStatus.valueOf(value as String) },
         { PGEnum("ExchangeTransactionStatus", it) },
     )
-    val blockchainTransactionGuid = reference("blockchain_transaction_guid", BlockchainTransactionTable).index().nullable()
+    val exchangeTransactionBatchGuid = reference(
+        "exchange_transaction_batch_guid",
+        ExchangeTransactionBatchTable,
+    ).index().nullable()
+    val error = varchar("error", 10485760).nullable()
 
     init {
         index(
@@ -81,13 +87,13 @@ class ExchangeTransactionEntity(guid: EntityID<ExchangeTransactionId>) : GUIDEnt
             }
         }
 
-        fun assignToBlockchainTransaction(ids: List<ExchangeTransactionId>, tx: BlockchainTransactionEntity) {
+        fun assignToBatch(ids: List<ExchangeTransactionId>, batch: ExchangeTransactionBatchEntity) {
             val now = Clock.System.now()
             ExchangeTransactionTable.update({
                 ExchangeTransactionTable.guid.inList(ids)
             }) {
                 it[this.status] = ExchangeTransactionStatus.Assigned
-                it[this.blockchainTransactionGuid] = tx.guid
+                it[this.exchangeTransactionBatchGuid] = batch.guid
                 it[this.updatedAt] = now
                 it[this.updatedBy] = "system"
             }
@@ -100,11 +106,38 @@ class ExchangeTransactionEntity(guid: EntityID<ExchangeTransactionId>) : GUIDEnt
             }.orderBy(ExchangeTransactionTable.sequenceId to SortOrder.ASC).limit(limit).toList()
         }
 
-        fun findExchangeTransactionsForBlockchainTransaction(blockchainTransactionId: BlockchainTransactionId): List<ExchangeTransactionEntity> {
+        fun findAssignedExchangeTransactionsForBatch(batchEntity: ExchangeTransactionBatchEntity): List<ExchangeTransactionEntity> {
             return ExchangeTransactionEntity.find {
-                ExchangeTransactionTable.blockchainTransactionGuid.eq(blockchainTransactionId)
+                ExchangeTransactionTable.exchangeTransactionBatchGuid.eq(batchEntity.guid) and
+                    ExchangeTransactionTable.status.eq(ExchangeTransactionStatus.Assigned)
             }.orderBy(ExchangeTransactionTable.sequenceId to SortOrder.ASC).toList()
         }
+
+        fun findForBatchAndSequence(batchEntity: ExchangeTransactionBatchEntity, sequenceId: Int): ExchangeTransactionEntity? {
+            return ExchangeTransactionEntity.find {
+                ExchangeTransactionTable.exchangeTransactionBatchGuid.eq(batchEntity.guid) and
+                    ExchangeTransactionTable.sequenceId.eq(sequenceId)
+            }.firstOrNull()
+        }
+
+        fun markAsCompleted(batch: ExchangeTransactionBatchEntity) {
+            val now = Clock.System.now()
+            ExchangeTransactionTable.update({
+                ExchangeTransactionTable.exchangeTransactionBatchGuid.eq(batch.guid) and
+                    ExchangeTransactionTable.status.eq(ExchangeTransactionStatus.Assigned)
+            }) {
+                it[this.status] = ExchangeTransactionStatus.Completed
+                it[this.updatedAt] = now
+                it[this.updatedBy] = "system"
+            }
+        }
+    }
+
+    fun markAsFailed(error: String) {
+        this.status = ExchangeTransactionStatus.Failed
+        this.error = error
+        this.updatedAt = Clock.System.now()
+        this.updatedBy = "system"
     }
 
     var createdAt by ExchangeTransactionTable.createdAt
@@ -118,6 +151,8 @@ class ExchangeTransactionEntity(guid: EntityID<ExchangeTransactionId>) : GUIDEnt
     var chainId by ExchangeTransactionTable.chainId
     var chain by ChainEntity referencedOn ExchangeTransactionTable.chainId
 
-    var blockchainTransactionGuid by ExchangeTransactionTable.blockchainTransactionGuid
-    var blockchainTransaction by BlockchainTransactionEntity optionalReferencedOn ExchangeTransactionTable.blockchainTransactionGuid
+    var error by ExchangeTransactionTable.error
+
+    var exchangeTransactionBatchGuid by ExchangeTransactionTable.exchangeTransactionBatchGuid
+    var exchangeTransactionBatch by ExchangeTransactionBatchEntity optionalReferencedOn ExchangeTransactionTable.exchangeTransactionBatchGuid
 }

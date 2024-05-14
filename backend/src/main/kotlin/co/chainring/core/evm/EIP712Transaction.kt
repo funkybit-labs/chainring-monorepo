@@ -67,16 +67,16 @@ sealed class EIP712Transaction {
             return message
         }
 
-        override fun getTxData(): ByteArray {
+        override fun getTxData(sequence: Long): ByteArray {
             return if (token != null) {
                 serializeTx(
                     ExchangeTransactions.TransactionType.Withdraw,
-                    ExchangeTransactions.WithdrawWithSignature(ExchangeTransactions.Withdraw(sender.value, token.value, amount, nonce.toBigInteger()), signature.toByteArray()),
+                    ExchangeTransactions.WithdrawWithSignature(ExchangeTransactions.Withdraw(sequence, sender.value, token.value, amount, nonce.toBigInteger()), signature.toByteArray()),
                 )
             } else {
                 serializeTx(
                     ExchangeTransactions.TransactionType.WithdrawNative,
-                    ExchangeTransactions.WithdrawNativeWithSignature(ExchangeTransactions.WithdrawNative(sender.value, amount, nonce.toBigInteger()), signature.toByteArray()),
+                    ExchangeTransactions.WithdrawNativeWithSignature(ExchangeTransactions.WithdrawNative(sequence, sender.value, amount, nonce.toBigInteger()), signature.toByteArray()),
                 )
             }
         }
@@ -118,7 +118,7 @@ sealed class EIP712Transaction {
             )
         }
 
-        override fun getTxData(): ByteArray {
+        override fun getTxData(sequence: Long): ByteArray {
             return ByteArray(0)
         }
     }
@@ -153,7 +153,7 @@ sealed class EIP712Transaction {
             )
         }
 
-        override fun getTxData(): ByteArray {
+        override fun getTxData(sequence: Long): ByteArray {
             return ByteArray(0)
         }
     }
@@ -183,10 +183,11 @@ sealed class EIP712Transaction {
             return emptyMap()
         }
 
-        override fun getTxData(): ByteArray {
+        override fun getTxData(sequence: Long): ByteArray {
             return serializeTx(
                 ExchangeTransactions.TransactionType.SettleTrade,
                 ExchangeTransactions.SettleTrade(
+                    sequence,
                     baseToken.value,
                     quoteToken.value,
                     amount,
@@ -219,5 +220,5 @@ sealed class EIP712Transaction {
     abstract fun getModel(): List<StructuredData.Entry>
     abstract fun getTransactionType(): EIP712TransactionType
     abstract fun getMessage(): Map<String, String>
-    abstract fun getTxData(): ByteArray
+    abstract fun getTxData(sequence: Long): ByteArray
 }

@@ -48,6 +48,7 @@ object TradeTable : GUIDTable<TradeId>("trade", ::TradeId) {
         { PGEnum("SettlementStatus", it) },
     )
     val settledAt = timestamp("settled_at").nullable()
+    val error = varchar("error", 10485760).nullable()
 }
 
 class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
@@ -91,8 +92,9 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
         this.settlementStatus = SettlementStatus.Completed
     }
 
-    fun failSettlement() {
+    fun failSettlement(error: String?) {
         this.settlementStatus = SettlementStatus.Failed
+        this.error = error
     }
 
     var createdAt by TradeTable.createdAt
@@ -107,4 +109,5 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
 
     var settlementStatus by TradeTable.settlementStatus
     var settledAt by TradeTable.settledAt
+    var error by TradeTable.error
 }

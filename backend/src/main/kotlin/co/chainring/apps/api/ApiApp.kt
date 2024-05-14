@@ -72,7 +72,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val broadcaster = Broadcaster(db)
 
     private val exchangeApiService = ExchangeApiService(blockchainClient, sequencerClient)
-    private val blockchainTransactionHandler = BlockchainTransactionHandler(blockchainClient)
+    private val blockchainTransactionHandler = BlockchainTransactionHandler(blockchainClient, sequencerClient)
     private val blockchainDepositHandler = BlockchainDepositHandler(blockchainClient, sequencerClient)
 
     private val depositRoutes = DepositRoutes(exchangeApiService)

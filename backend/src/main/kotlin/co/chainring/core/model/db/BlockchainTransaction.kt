@@ -8,8 +8,6 @@ import kotlinx.serialization.Serializable
 import org.http4k.format.KotlinxSerialization.json
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import java.math.BigInteger
@@ -68,7 +66,6 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
         fun create(
             chainId: ChainId,
             transactionData: BlockchainTransactionData,
-            transactions: List<ExchangeTransactionEntity>,
         ): BlockchainTransactionEntity {
             val entity = BlockchainTransactionEntity.new(BlockchainTransactionId.generate()) {
                 val now = Clock.System.now()
@@ -78,26 +75,7 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
                 this.transactionData = transactionData
                 this.chainId = EntityID(chainId, ChainTable)
             }
-            entity.refresh(flush = true)
-            ExchangeTransactionEntity.assignToBlockchainTransaction(transactions.map { it.guid.value }, entity)
             return entity
-        }
-
-        fun getUncompletedForUpdate(chainId: ChainId): List<BlockchainTransactionEntity> {
-            return BlockchainTransactionEntity
-                .find {
-                    BlockchainTransactionTable.chainId.eq(chainId) and
-                        BlockchainTransactionTable.status.inList(
-                            listOf(
-                                BlockchainTransactionStatus.Pending,
-                                BlockchainTransactionStatus.Submitted,
-                                BlockchainTransactionStatus.Confirmed,
-                            ),
-                        )
-                }
-                .orderBy(BlockchainTransactionTable.sequenceId to SortOrder.ASC)
-                .forUpdate()
-                .toList()
         }
     }
 

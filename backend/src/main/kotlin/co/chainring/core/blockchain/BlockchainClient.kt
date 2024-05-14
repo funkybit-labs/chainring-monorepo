@@ -238,11 +238,7 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
     }
 
     suspend fun getExchangeBalance(address: Address, tokenAddress: Address): BigInteger {
-        return if (tokenAddress == Address.zero) {
-            exchangeContract.nativeBalances(address.value).sendAsync().await()
-        } else {
-            exchangeContract.balances(address.value, tokenAddress.value).sendAsync().await()
-        }
+        return exchangeContract.balances(address.value, tokenAddress.value).sendAsync().await()
     }
 
     suspend fun getExchangeBalances(walletAddress: Address, tokenAddresses: List<Address>): Map<Address, BigInteger> =

@@ -1,6 +1,7 @@
 syntax = "proto3";
 package sequencer;
 import "bignum.proto";
+import "trade.proto";
 
 option java_multiple_files = true;
 option java_package = "co.chainring.sequencer.proto";
@@ -22,8 +23,23 @@ message Withdrawal {
   string externalGuid = 6;
 }
 
+message FailedWithdrawal {
+  string asset = 1;
+  uint64 wallet = 2;
+  IntegerValue amount = 3;
+}
+
+message FailedSettlement {
+  uint64 buyWallet = 1;
+  uint64 sellWallet = 2;
+  string marketId = 3;
+  TradeCreated trade = 4;
+}
+
 message BalanceBatch {
   string guid = 1;
   repeated Deposit deposits = 2;
   repeated Withdrawal withdrawals = 3;
+  repeated FailedWithdrawal failedWithdrawals = 4;
+  repeated FailedSettlement failedSettlements = 5;
 }

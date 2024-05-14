@@ -21,6 +21,7 @@ data class Trade(
     val feeAmount: BigIntegerJson,
     val feeSymbol: Symbol,
     val settlementStatus: SettlementStatus,
+    val error: String? = null,
 )
 
 @Serializable

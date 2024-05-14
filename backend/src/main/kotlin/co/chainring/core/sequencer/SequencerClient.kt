@@ -22,6 +22,7 @@ import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.balanceBatch
 import co.chainring.sequencer.proto.cancelOrder
 import co.chainring.sequencer.proto.deposit
+import co.chainring.sequencer.proto.failedWithdrawal
 import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderBatch
@@ -182,6 +183,64 @@ open class SequencerClient {
                             this.nonce = nonce.toIntegerValue()
                             this.signature = evmSignature.value
                             this.externalGuid = withdrawalId.value
+                        },
+                    )
+                },
+            )
+        }.also {
+            Tracer.newSpan(ServerSpans.gtw, it.processingTime)
+            Tracer.newSpan(ServerSpans.sqr, it.sequencerResponse.processingTime)
+        }.sequencerResponse
+    }
+
+    suspend fun failWithdraw(
+        wallet: Long,
+        asset: Asset,
+        amount: BigInteger,
+    ): SequencerResponse {
+        return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
+            stub.applyBalanceBatch(
+                balanceBatch {
+                    this.guid = UUID.randomUUID().toString()
+                    this.failedWithdrawals.add(
+                        failedWithdrawal {
+                            this.asset = asset.value
+                            this.wallet = wallet
+                            this.amount = amount.toIntegerValue()
+                        },
+                    )
+                },
+            )
+        }.also {
+            Tracer.newSpan(ServerSpans.gtw, it.processingTime)
+            Tracer.newSpan(ServerSpans.sqr, it.sequencerResponse.processingTime)
+        }.sequencerResponse
+    }
+
+    suspend fun failSettlement(
+        buyWallet: Long,
+        sellWallet: Long,
+        marketId: MarketId,
+        buyOrderId: OrderId,
+        sellOrderId: OrderId,
+        amount: BigInteger,
+        price: BigDecimal,
+    ): SequencerResponse {
+        return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
+            stub.applyBalanceBatch(
+                balanceBatch {
+                    this.guid = UUID.randomUUID().toString()
+                    this.failedSettlements.add(
+                        co.chainring.sequencer.proto.failedSettlement {
+                            this.buyWallet = buyWallet
+                            this.sellWallet = sellWallet
+                            this.marketId = marketId.value
+                            this.trade = co.chainring.sequencer.proto.tradeCreated {
+                                this.buyGuid = buyOrderId.toSequencerId().value
+                                this.sellGuid = sellOrderId.toSequencerId().value
+                                this.amount = amount.toIntegerValue()
+                                this.price = price.toDecimalValue()
+                            }
                         },
                     )
                 },

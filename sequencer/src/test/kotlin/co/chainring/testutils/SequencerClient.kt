@@ -13,6 +13,7 @@ import co.chainring.sequencer.core.toMarketId
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerResponse
+import co.chainring.sequencer.proto.TradeCreated
 import co.chainring.sequencer.proto.balanceBatch
 import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.order
@@ -165,4 +166,61 @@ class SequencerClient {
 
     fun deposit(walletAddress: WalletAddress, asset: Asset, amount: BigInteger) = depositsAndWithdrawals(walletAddress, asset, listOf(amount))
     fun withdrawal(walletAddress: WalletAddress, asset: Asset, amount: BigInteger, expectedAmount: BigInteger? = amount) = depositsAndWithdrawals(walletAddress, asset, listOf(-amount), expectedAmount?.negate())
+
+    fun failedWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigInteger>, expectedAmount: BigInteger? = amounts.sum()): SequencerResponse {
+        val failedWithdrawalsResponse = sequencer.processRequest(
+            sequencerRequest {
+                this.guid = UUID.randomUUID().toString()
+                this.type = SequencerRequest.Type.ApplyBalanceBatch
+                this.balanceBatch = balanceBatch {
+                    this.guid = UUID.randomUUID().toString()
+                    this.failedWithdrawals.addAll(
+                        amounts.map {
+                            co.chainring.sequencer.proto.failedWithdrawal {
+                                this.asset = asset.value
+                                this.wallet = walletAddress.value
+                                this.amount = it.toIntegerValue()
+                            }
+                        },
+                    )
+                }
+            },
+        )
+        if (expectedAmount != null) {
+            assertEquals(1, failedWithdrawalsResponse.balancesChangedCount)
+            val withdrawal = failedWithdrawalsResponse.balancesChangedList.first()
+            assertEquals(asset.value, withdrawal.asset)
+            assertEquals(walletAddress.value, withdrawal.wallet)
+            assertEquals(expectedAmount, withdrawal.delta.toBigInteger())
+        } else {
+            assertEquals(0, failedWithdrawalsResponse.balancesChangedCount)
+        }
+        return failedWithdrawalsResponse
+    }
+
+    fun failedSettlement(buyWalletAddress: WalletAddress, sellWalletAddress: WalletAddress, marketId: MarketId, trade: TradeCreated): SequencerResponse {
+        val failedSettlementsResponse = sequencer.processRequest(
+            sequencerRequest {
+                this.guid = UUID.randomUUID().toString()
+                this.type = SequencerRequest.Type.ApplyBalanceBatch
+                this.balanceBatch = balanceBatch {
+                    this.guid = UUID.randomUUID().toString()
+                    this.failedSettlements.add(
+                        co.chainring.sequencer.proto.failedSettlement {
+                            this.buyWallet = buyWalletAddress.value
+                            this.sellWallet = sellWalletAddress.value
+                            this.marketId = marketId.value
+                            this.trade = co.chainring.sequencer.proto.tradeCreated {
+                                this.buyGuid = trade.buyGuid
+                                this.sellGuid = trade.sellGuid
+                                this.amount = trade.amount
+                                this.price = trade.price
+                            }
+                        },
+                    )
+                }
+            },
+        )
+        return failedSettlementsResponse
+    }
 }
