@@ -53,7 +53,7 @@ export default function HomeScreen() {
   return (
     <WebsocketProvider wallet={wallet}>
       {markets && selectedMarket ? (
-        <div className="bg-darkBluishGray10">
+        <div className="min-h-screen bg-darkBluishGray10">
           <Header
             markets={markets}
             selectedMarket={selectedMarket}
