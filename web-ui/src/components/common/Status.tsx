@@ -35,8 +35,6 @@ export function Status({
         return 'Completed'
       case 'Failed':
       case 'Rejected':
-      case 'CrossesMarket':
-        return 'Failed'
       case 'Cancelled':
         return 'Canceled'
       case 'Open':
