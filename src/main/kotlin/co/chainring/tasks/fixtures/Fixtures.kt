@@ -7,6 +7,8 @@ import java.math.BigDecimal
 import java.math.BigInteger
 
 data class Fixtures(
+    val makerFeeRateInBps: Int,
+    val takerFeeRateInBps: Int,
     val chains: List<Chain>,
     val symbols: List<Symbol>,
     val markets: List<Market>,
@@ -42,6 +44,8 @@ data class Fixtures(
 }
 
 fun getFixtures(chainringChainId: ChainId) = Fixtures(
+    makerFeeRateInBps = 100,
+    takerFeeRateInBps = 200,
     chains = listOf(
         Fixtures.Chain(chainringChainId, "chainring-dev", Address("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"))
     ),

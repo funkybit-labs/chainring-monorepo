@@ -28,8 +28,8 @@ import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.TestBlockchainClient
 import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
-import co.chainring.sequencer.apps.QueueProcessorApp
 import co.chainring.sequencer.apps.SequencerApp
+import co.chainring.sequencer.apps.SequencerResponseProcessorApp
 import co.chainring.tasks.fixtures.Fixtures
 import co.chainring.tasks.fixtures.getFixtures
 import co.chainring.tasks.migrateDatabase
@@ -71,7 +71,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                         checkpointsPath = null,
                         inSandboxMode = true,
                     )
-                    private val queueProcessorApp = QueueProcessorApp(
+                    private val sequencerResponseProcessorApp = SequencerResponseProcessorApp(
                         sequencerApp.inputQueue,
                         sequencerApp.outputQueue,
                     )
@@ -86,7 +86,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
 
                         if (!isIntegrationRun) {
                             sequencerApp.start()
-                            queueProcessorApp.start()
+                            sequencerResponseProcessorApp.start()
                             gatewayApp.start()
                             transaction {
                                 DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, blockchainClient.chainId)?.deprecated = true
@@ -128,11 +128,19 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
 
     override fun beforeEach(context: ExtensionContext) {
         TestApiClient.resetSequencer()
+        transaction {
+            KeyValueStore.deleteAll()
+        }
 
         val fixtures: Fixtures = context
             .root
             .getStore(ExtensionContext.Namespace.GLOBAL)
             .get("fixtures", Fixtures::class.java)
+
+        TestApiClient.setFeeRatesInSequencer(
+            maker = fixtures.makerFeeRateInBps,
+            taker = fixtures.takerFeeRateInBps,
+        )
 
         fixtures.markets.forEach { market ->
             val baseSymbol = fixtures.symbols.first { it.id == market.baseSymbol }
@@ -150,7 +158,6 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
         }
 
         transaction {
-            KeyValueStore.deleteAll()
             TelegramBotUserWalletTable.deleteAll()
             TelegramBotUserTable.deleteAll()
             BroadcasterJobTable.deleteAll()

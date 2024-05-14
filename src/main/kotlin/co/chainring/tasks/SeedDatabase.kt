@@ -4,6 +4,7 @@ import co.chainring.core.db.DbConfig
 import co.chainring.core.db.connect
 import co.chainring.core.model.db.BlockchainNonceEntity
 import co.chainring.core.model.db.ChainEntity
+import co.chainring.core.model.db.KeyValueStore
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCEntity
@@ -22,6 +23,9 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
     TransactionManager.defaultDatabase = db
 
     transaction {
+        KeyValueStore.setInt("MakerFeeRateInBps", fixtures.makerFeeRateInBps)
+        KeyValueStore.setInt("TakerFeeRateInBps", fixtures.takerFeeRateInBps)
+
         fixtures.chains.forEach { chain ->
             if (ChainEntity.findById(chain.id) == null) {
                 ChainEntity.create(chain.id, chain.name).flush()

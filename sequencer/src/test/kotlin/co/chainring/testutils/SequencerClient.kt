@@ -15,6 +15,7 @@ import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.TradeCreated
 import co.chainring.sequencer.proto.balanceBatch
+import co.chainring.sequencer.proto.feeRatesInBps
 import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderBatch
@@ -24,6 +25,7 @@ import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.UUID
 import kotlin.random.Random
+import kotlin.test.assertNotNull
 
 class SequencerClient {
     private val sequencer = SequencerApp(checkpointsPath = null)
@@ -118,6 +120,24 @@ class SequencerClient {
         assertEquals(marketId, createdMarket.marketId.toMarketId())
         assertEquals(tickSize, createdMarket.tickSize.toBigDecimal())
     }
+
+    fun setFeeRates(makerFeeRatInBps: Int, takerFeeRateInBps: Int) {
+        val response = sequencer.processRequest(
+            sequencerRequest {
+                this.guid = UUID.randomUUID().toString()
+                this.type = SequencerRequest.Type.SetFeeRates
+                this.feeRates = feeRatesInBps {
+                    this.maker = makerFeeRatInBps
+                    this.taker = takerFeeRateInBps
+                }
+            },
+        )
+        val feeRatesSet = response.feeRatesSet
+        assertNotNull(feeRatesSet)
+        assertEquals(makerFeeRatInBps, feeRatesSet.maker)
+        assertEquals(takerFeeRateInBps, feeRatesSet.taker)
+    }
+
     private fun List<BigInteger>.sum() = this.reduce { a, b -> a + b }
 
     fun depositsAndWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigInteger>, expectedAmount: BigInteger? = amounts.sum()): SequencerResponse {
@@ -210,12 +230,7 @@ class SequencerClient {
                             this.buyWallet = buyWalletAddress.value
                             this.sellWallet = sellWalletAddress.value
                             this.marketId = marketId.value
-                            this.trade = co.chainring.sequencer.proto.tradeCreated {
-                                this.buyGuid = trade.buyGuid
-                                this.sellGuid = trade.sellGuid
-                                this.amount = trade.amount
-                                this.price = trade.price
-                            }
+                            this.trade = trade
                         },
                     )
                 }

@@ -52,29 +52,17 @@ import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.newQuantityOrNull
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
-import org.jetbrains.exposed.sql.transactions.transaction
-import java.math.BigInteger
 import java.math.RoundingMode
 import kotlin.time.Duration.Companion.hours
 
 object SequencerResponseProcessorService {
-
     private val logger = KotlinLogging.logger {}
 
     private val symbolMap = mutableMapOf<String, SymbolEntity>()
     private val marketMap = mutableMapOf<MarketId, MarketEntity>()
     private val chainId by lazy { ChainEntity.all().first().id.value }
-    private val keyName = "LastProcessedOutputIndex"
 
-    fun getLastProcessedIndex() = transaction {
-        KeyValueStore.getLong(keyName)
-    }
-
-    fun updateLastProcessedIndex(lastProcessedIndex: Long) = transaction {
-        KeyValueStore.setLong(keyName, lastProcessedIndex)
-    }
-
-    fun onSequencerResponseReceived(response: SequencerResponse, request: SequencerRequest) {
+    fun processResponse(response: SequencerResponse, request: SequencerRequest) {
         when (request.type) {
             SequencerRequest.Type.ApplyBalanceBatch -> {
                 request.balanceBatch!!.withdrawalsList.forEach { withdrawal ->
@@ -118,6 +106,13 @@ object SequencerResponseProcessorService {
                             cancelAll = request.orderBatch.cancelAll,
                         )
                     }
+                }
+            }
+
+            SequencerRequest.Type.SetFeeRates -> {
+                if (response.error == SequencerError.None) {
+                    KeyValueStore.setInt("MakerFeeRateInBps", response.feeRatesSet.maker)
+                    KeyValueStore.setInt("TakerFeeRateInBps", response.feeRatesSet.taker)
                 }
             }
 
@@ -180,17 +175,17 @@ object SequencerResponseProcessorService {
         val orderIdsInRequest: List<Long> = (request.orderBatch.ordersToAddList + request.orderBatch.ordersToChangeList).map { it.guid }
 
         // handle trades
-        val tradesWithTakerOrder: List<Pair<TradeEntity, OrderEntity>> = response.tradesCreatedList.mapNotNull {
-            logger.debug { "Trade Created ${it.buyGuid}, ${it.sellGuid}, ${it.amount.toBigInteger()} ${it.price.toBigDecimal()} " }
-            val buyOrder = OrderEntity.findBySequencerOrderId(it.buyGuid)
-            val sellOrder = OrderEntity.findBySequencerOrderId(it.sellGuid)
+        val tradesWithTakerOrder: List<Pair<TradeEntity, OrderEntity>> = response.tradesCreatedList.mapNotNull { trade ->
+            logger.debug { "Trade Created: buyOrderGuid=${trade.buyOrderGuid}, sellOrderGuid=${trade.sellOrderGuid}, amount=${trade.amount.toBigInteger()} price=${trade.price.toBigDecimal()}, buyerFee=${trade.buyerFee.toBigInteger()}, sellerFee=${trade.sellerFee.toBigInteger()}" }
+            val buyOrder = OrderEntity.findBySequencerOrderId(trade.buyOrderGuid)
+            val sellOrder = OrderEntity.findBySequencerOrderId(trade.sellOrderGuid)
 
             if (buyOrder != null && sellOrder != null) {
                 val tradeEntity = TradeEntity.create(
                     timestamp = timestamp,
                     market = buyOrder.market,
-                    amount = it.amount.toBigInteger(),
-                    price = it.price.toBigDecimal(),
+                    amount = trade.amount.toBigInteger(),
+                    price = trade.price.toBigDecimal(),
                 )
 
                 // create executions for both
@@ -199,8 +194,16 @@ object SequencerResponseProcessorService {
                         timestamp = timestamp,
                         orderEntity = order,
                         tradeEntity = tradeEntity,
-                        role = if (orderIdsInRequest.contains(order.sequencerOrderId?.value)) ExecutionRole.Taker else ExecutionRole.Maker,
-                        feeAmount = BigInteger.ZERO,
+                        role = if (orderIdsInRequest.contains(order.sequencerOrderId?.value)) {
+                            ExecutionRole.Taker
+                        } else {
+                            ExecutionRole.Maker
+                        },
+                        feeAmount = if (order == buyOrder) {
+                            trade.buyerFee.toBigInteger()
+                        } else {
+                            trade.sellerFee.toBigInteger()
+                        },
                         feeSymbol = Symbol(order.market.quoteSymbol.name),
                     )
 

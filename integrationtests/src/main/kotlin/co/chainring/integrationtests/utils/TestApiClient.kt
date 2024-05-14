@@ -100,6 +100,36 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             }
         }
 
+        fun setFeeRatesInSequencer(maker: Int, taker: Int) =
+            setFeeRatesInSequencer(TestRoutes.Companion.SetFeeRatesInSequencer(maker = maker, taker = taker))
+
+        fun setFeeRatesInSequencer(apiRequest: TestRoutes.Companion.SetFeeRatesInSequencer) {
+            execute(
+                Request.Builder()
+                    .url("$apiServerRootUrl/v1/sequencer-fee-rates")
+                    .put(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
+                    .build(),
+            ).also { httpResponse ->
+                if (httpResponse.code != HttpURLConnection.HTTP_OK) {
+                    throw AbnormalApiResponseException(httpResponse)
+                }
+            }
+        }
+
+        fun getConfiguration(): ConfigurationApiResponse {
+            val httpResponse = execute(
+                Request.Builder()
+                    .url("$apiServerRootUrl/v1/config")
+                    .get()
+                    .build(),
+            )
+
+            return when (httpResponse.code) {
+                HttpURLConnection.HTTP_OK -> json.decodeFromString<ConfigurationApiResponse>(httpResponse.body?.string()!!)
+                else -> throw AbnormalApiResponseException(httpResponse)
+            }
+        }
+
         private fun execute(request: Request): Response =
             httpClient.newCall(request).execute()
     }

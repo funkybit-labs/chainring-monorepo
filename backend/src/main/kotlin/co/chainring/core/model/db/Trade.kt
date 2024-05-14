@@ -71,19 +71,23 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
 
     fun toEip712Transaction(): EIP712Transaction.Trade {
         val executions = OrderExecutionEntity.findForTrade(this)
-        val takerOrder = executions.first { it.role == ExecutionRole.Taker }.order
-        val makerOrder = executions.first { it.role == ExecutionRole.Maker }.order
+        val takerOrderExecution = executions.first { it.role == ExecutionRole.Taker }
+        val makerOrderExecution = executions.first { it.role == ExecutionRole.Maker }
+        val takerOrder = takerOrderExecution.order
+        val makerOrder = makerOrderExecution.order
         val baseTokenAddress = this.market.baseSymbol.contractAddress ?: Address.zero
         val quoteTokenAddress = this.market.quoteSymbol.contractAddress ?: Address.zero
         val quoteDecimals = this.market.quoteSymbol.decimals.toInt()
         return EIP712Transaction.Trade(
-            baseTokenAddress,
-            quoteTokenAddress,
-            if (takerOrder.side == OrderSide.Buy) this.amount else this.amount.negate(),
-            this.price.toFundamentalUnits(quoteDecimals),
-            takerOrder.toEip712Transaction(baseTokenAddress, quoteTokenAddress, quoteDecimals),
-            makerOrder.toEip712Transaction(baseTokenAddress, quoteTokenAddress, quoteDecimals),
-            this.guid.value,
+            baseToken = baseTokenAddress,
+            quoteToken = quoteTokenAddress,
+            amount = if (takerOrder.side == OrderSide.Buy) this.amount else this.amount.negate(),
+            price = this.price.toFundamentalUnits(quoteDecimals),
+            takerOrder = takerOrder.toEip712Transaction(baseTokenAddress, quoteTokenAddress, quoteDecimals),
+            makerOrder = makerOrder.toEip712Transaction(baseTokenAddress, quoteTokenAddress, quoteDecimals),
+            tradeId = this.guid.value,
+            takerFee = takerOrderExecution.feeAmount,
+            makerFee = makerOrderExecution.feeAmount,
         )
     }
 

@@ -64,6 +64,7 @@ dependencies {
 
     implementation(project(":backend"))
     implementation(project(":sequencer"))
+    implementation(project(":sequencercommon"))
     testImplementation(project(mapOf("path" to ":")))
 }
 

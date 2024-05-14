@@ -3,9 +3,13 @@ package co.chainring.sequencer.core
 import co.chainring.sequencer.proto.BalancesCheckpoint
 import co.chainring.sequencer.proto.BalancesCheckpointKt.BalanceKt.consumption
 import co.chainring.sequencer.proto.BalancesCheckpointKt.balance
+import co.chainring.sequencer.proto.FeeRatesInBps
 import co.chainring.sequencer.proto.MarketCheckpoint
+import co.chainring.sequencer.proto.MetaInfoCheckpoint
 import co.chainring.sequencer.proto.StateDump
 import co.chainring.sequencer.proto.balancesCheckpoint
+import co.chainring.sequencer.proto.feeRatesInBps
+import co.chainring.sequencer.proto.metaInfoCheckpoint
 import co.chainring.sequencer.proto.stateDump
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.FileInputStream
@@ -22,6 +26,7 @@ data class SequencerState(
     val markets: MutableMap<MarketId, Market> = mutableMapOf(),
     val balances: MutableMap<WalletAddress, BalanceByAsset> = mutableMapOf(),
     val consumed: MutableMap<WalletAddress, ConsumedByAsset> = mutableMapOf(),
+    var feeRatesInBps: FeeRatesInBps = FeeRatesInBps.getDefaultInstance(),
 ) {
     private val logger = KotlinLogging.logger {}
 
@@ -29,6 +34,7 @@ data class SequencerState(
         balances.clear()
         markets.clear()
         consumed.clear()
+        feeRatesInBps = FeeRatesInBps.getDefaultInstance()
     }
 
     fun load(sourceDir: Path) {
@@ -53,15 +59,16 @@ data class SequencerState(
         }
 
         measureNanoTime {
-            val marketIds = FileInputStream(Path.of(sourceDir.toString(), "markets").toFile()).use { inputStream ->
-                String(inputStream.readAllBytes()).let {
-                    if (it.isEmpty()) {
-                        emptyList()
-                    } else {
-                        it.split(",").map(::MarketId)
-                    }
-                }
+            val metaInfoCheckpoint = FileInputStream(Path.of(sourceDir.toString(), "metainfo").toFile()).use { inputStream ->
+                MetaInfoCheckpoint.parseFrom(inputStream)
             }
+
+            this.feeRatesInBps = feeRatesInBps {
+                this.maker = metaInfoCheckpoint.makerFeeRate
+                this.taker = metaInfoCheckpoint.takerFeeRate
+            }
+
+            val marketIds = metaInfoCheckpoint.marketsList.map(::MarketId)
 
             marketIds.forEach { marketId ->
                 val marketCheckpointFileName = "market_${marketId.baseAsset()}_${marketId.quoteAsset()}"
@@ -81,9 +88,13 @@ data class SequencerState(
 
         // we are writing a list of markets into a separate file first so that
         // when loading we could be sure that checkpoint files for all markets are present
-        FileOutputStream(Path.of(destinationDir.toString(), "markets").toFile()).use { outputStream ->
-            val marketIds = this.markets.keys.map { it.value }.sorted().joinToString(",")
-            outputStream.write(marketIds.toByteArray())
+        FileOutputStream(Path.of(destinationDir.toString(), "metainfo").toFile()).use { outputStream ->
+            val marketIds = this.markets.keys.map { it.value }.sorted()
+            metaInfoCheckpoint {
+                this.markets.addAll(marketIds)
+                this.makerFeeRate = feeRatesInBps.maker
+                this.takerFeeRate = feeRatesInBps.taker
+            }.writeTo(outputStream)
         }
 
         measureNanoTime {
@@ -114,6 +125,7 @@ data class SequencerState(
             marketsMap.forEach { (_, market) ->
                 this.markets.add(market.toCheckpoint())
             }
+            this.feeRates = feeRatesInBps
         }
     }
 

@@ -23,7 +23,7 @@ export default function HomeScreen() {
 
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
 
-  const { exchangeContract, markets, symbols } = useMemo(() => {
+  const { exchangeContract, markets, symbols, feeRatesInBps } = useMemo(() => {
     const config = configQuery.data
     const chainConfig = config?.chains.find(
       (chain) => chain.id === (wallet.chainId || config.chains[0]?.id)
@@ -37,10 +37,13 @@ export default function HomeScreen() {
     const markets =
       config && symbols ? new Markets(config.markets, symbols) : null
 
+    const feeRatesInBps = config && config.feeRatesInBps
+
     return {
       exchangeContract,
       markets,
-      symbols
+      symbols,
+      feeRatesInBps
     }
   }, [configQuery.data, wallet.chainId])
 
@@ -52,7 +55,7 @@ export default function HomeScreen() {
 
   return (
     <WebsocketProvider wallet={wallet}>
-      {markets && selectedMarket ? (
+      {markets && feeRatesInBps && selectedMarket ? (
         <div className="min-h-screen bg-darkBluishGray10">
           <Header
             markets={markets}
@@ -78,6 +81,7 @@ export default function HomeScreen() {
                     market={selectedMarket}
                     walletAddress={wallet.address}
                     exchangeContractAddress={exchangeContract?.address}
+                    feeRatesInBps={feeRatesInBps}
                   />
                   <OrderBookWidget marketId={selectedMarket.id} />
                 </div>

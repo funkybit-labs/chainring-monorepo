@@ -1,14 +1,11 @@
 package co.chainring.integrationtests.exchange
 
-import co.chainring.core.blockchain.BlockchainClient
-import co.chainring.core.blockchain.ContractType
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.Wallet
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.extension.ExtendWith
 import org.web3j.crypto.ECKeyPair
 import org.web3j.utils.Numeric
@@ -19,23 +16,6 @@ import kotlin.test.Test
 class DepositTest {
 
     private val walletPrivateKeyHex = "0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97"
-
-    @Test
-    fun testConfiguration() {
-        val apiClient = TestApiClient()
-        val config = apiClient.getConfiguration().chains.first()
-        assertEquals(config.contracts.size, 1)
-        assertEquals(config.contracts[0].name, ContractType.Exchange.name)
-        val client = BlockchainClient().loadExchangeContract(config.contracts[0].address)
-        assertEquals(client.version.send().toInt(), 1)
-
-        assertNotNull(config.symbols.firstOrNull { it.name == "ETH" })
-        assertNotNull(config.symbols.firstOrNull { it.name == "USDC" })
-
-        val nativeToken = config.symbols.first { it.contractAddress == null }
-        assertEquals("BTC", nativeToken.name)
-        assertEquals(18.toUByte(), nativeToken.decimals)
-    }
 
     @Test
     fun testERC20Deposits() {

@@ -9,6 +9,13 @@ import kotlinx.serialization.Serializable
 data class ConfigurationApiResponse(
     val chains: List<Chain>,
     val markets: List<Market>,
+    val feeRatesInBps: FeeRatesInBps,
+)
+
+@Serializable
+data class FeeRatesInBps(
+    val maker: Int,
+    val taker: Int,
 )
 
 @Serializable

@@ -411,17 +411,17 @@ class BlockchainTransactionHandler(
                             )
                             broadcasterNotifications.add(BroadcasterNotification.walletBalances(it.wallet))
                         } else {
-                            val response = runBlocking {
+                            val sequencerResponse = runBlocking {
                                 sequencerClient.failWithdraw(
                                     tx.sender.toSequencerId().value,
                                     Asset(it.symbol.name),
                                     tx.amount,
                                 )
                             }
-                            if (response.error == SequencerError.None) {
+                            if (sequencerResponse.error == SequencerError.None) {
                                 logger.debug { "Successfully notified sequencer" }
                             } else {
-                                logger.error { "Sequencer failed with error ${response.error} - fail withdrawals" }
+                                logger.error { "Sequencer failed with error ${sequencerResponse.error} - fail withdrawals" }
                             }
                         }
                     }
@@ -437,10 +437,16 @@ class BlockchainTransactionHandler(
 
                         if (error != null) {
                             logger.error { "settlement failed for ${tx.tradeId} - error is <$error>" }
+
                             tradeEntity.failSettlement(error)
-                            val buyOrder = executions.first { it.order.side == OrderSide.Buy }.order
-                            val sellOrder = executions.first { it.order.side == OrderSide.Sell }.order
-                            val response = runBlocking {
+
+                            val buyExecution = executions.first { it.order.side == OrderSide.Buy }
+                            val buyOrder = buyExecution.order
+
+                            val sellExecution = executions.first { it.order.side == OrderSide.Sell }
+                            val sellOrder = sellExecution.order
+
+                            val sequencerResponse = runBlocking {
                                 sequencerClient.failSettlement(
                                     buyWallet = buyOrder.wallet.address.toSequencerId().value,
                                     sellWallet = sellOrder.wallet.address.toSequencerId().value,
@@ -449,12 +455,14 @@ class BlockchainTransactionHandler(
                                     sellOrderId = sellOrder.guid.value,
                                     amount = tradeEntity.amount,
                                     price = tradeEntity.price,
+                                    buyerFee = buyExecution.feeAmount,
+                                    sellerFee = sellExecution.feeAmount,
                                 )
                             }
-                            if (response.error == SequencerError.None) {
+                            if (sequencerResponse.error == SequencerError.None) {
                                 logger.debug { "Successfully notified sequencer" }
                             } else {
-                                logger.error { "Sequencer failed with error ${response.error} - failed settlements" }
+                                logger.error { "Sequencer failed with error ${sequencerResponse.error} - failed settlements" }
                             }
                         } else {
                             logger.debug { "settlement completed for ${tx.tradeId}" }

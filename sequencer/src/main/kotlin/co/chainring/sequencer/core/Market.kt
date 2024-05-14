@@ -1,6 +1,7 @@
 package co.chainring.sequencer.core
 
 import co.chainring.sequencer.proto.BalanceChange
+import co.chainring.sequencer.proto.FeeRatesInBps
 import co.chainring.sequencer.proto.MarketCheckpoint
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderBatch
@@ -82,7 +83,7 @@ data class Market(
 
     private fun sumBigIntegerPair(a: Pair<BigInteger, BigInteger>, b: Pair<BigInteger, BigInteger>) = Pair(a.first + b.first, a.second + b.second)
 
-    fun applyOrderBatch(orderBatch: OrderBatch): AddOrdersResult {
+    fun applyOrderBatch(orderBatch: OrderBatch, feeRatesInBps: FeeRatesInBps): AddOrdersResult {
         val ordersChanged = mutableListOf<OrderChanged>()
         val ordersChangeRejected = mutableListOf<OrderChangeRejected>()
         val createdTrades = mutableListOf<TradeCreated>()
@@ -91,7 +92,7 @@ data class Market(
         orderBatch.ordersToCancelList.forEach { cancelOrder ->
             val validationResult = validateOrderForWallet(orderBatch.wallet, cancelOrder.guid)
             if (validationResult == OrderChangeRejected.Reason.None) {
-                removeOrder(cancelOrder.guid.toOrderGuid())?.let { result ->
+                removeOrder(cancelOrder.guid.toOrderGuid(), feeRatesInBps)?.let { result ->
                     ordersChanged.add(
                         orderChanged {
                             this.guid = cancelOrder.guid
@@ -118,7 +119,7 @@ data class Market(
             if (validationResult == OrderChangeRejected.Reason.None) {
                 ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
                     val side = levels[order.levelIx].side
-                    changeOrder(orderChange)?.let { changeOrderResult: ChangeOrderResult ->
+                    changeOrder(orderChange, feeRatesInBps)?.let { changeOrderResult: ChangeOrderResult ->
                         ordersChanged.add(
                             orderChanged {
                                 this.guid = orderChange.guid
@@ -133,7 +134,7 @@ data class Market(
                         changeOrderResult.executions.forEach { execution ->
                             processExecution(
                                 wallet = orderBatch.wallet.toWalletAddress(),
-                                order = order {
+                                takerOrder = order {
                                     this.guid = orderChange.guid
                                     // type is not available on orderChange, therefore resolving from the level
                                     this.type = if (side == BookSide.Buy) Order.Type.LimitBuy else Order.Type.LimitSell
@@ -145,6 +146,7 @@ data class Market(
                                 ordersChanged = ordersChanged,
                                 balanceChanges = balanceChanges,
                                 consumptionChanges = consumptionChanges,
+                                feeRatesInBps = feeRatesInBps,
                             )
                         }
                     }
@@ -159,7 +161,7 @@ data class Market(
             }
         }
         orderBatch.ordersToAddList.forEach { order ->
-            val orderResult = addOrder(orderBatch.wallet, order)
+            val orderResult = addOrder(orderBatch.wallet, order, feeRatesInBps)
             ordersChanged.add(
                 orderChanged {
                     this.guid = order.guid
@@ -169,12 +171,19 @@ data class Market(
             if (orderResult.disposition == OrderDisposition.Accepted || orderResult.disposition == OrderDisposition.PartiallyFilled) {
                 // immediately filled limit order's amount should not count to consumption
                 val filledAmount = orderResult.executions.sumOf { it.amount }
+
+                val feeRateInBps = when (orderResult.disposition) {
+                    OrderDisposition.Accepted -> feeRatesInBps.maker
+                    OrderDisposition.PartiallyFilled -> feeRatesInBps.taker
+                    else -> throw RuntimeException("Unexpected order disposition")
+                }
+
                 when (order.type) {
                     Order.Type.LimitBuy -> consumptionChanges.merge(
                         orderBatch.wallet.toWalletAddress(),
                         Pair(
                             BigInteger.ZERO,
-                            notional(order.amount.toBigInteger() - filledAmount, order.price.toBigDecimal(), baseDecimals, quoteDecimals),
+                            notionalPlusFee(order.amount.toBigInteger() - filledAmount, order.price.toBigDecimal(), baseDecimals, quoteDecimals, feeRateInBps),
                         ),
                         ::sumBigIntegerPair,
                     )
@@ -191,12 +200,13 @@ data class Market(
             orderResult.executions.forEach { execution ->
                 processExecution(
                     wallet = orderBatch.wallet.toWalletAddress(),
-                    order = order,
+                    takerOrder = order,
                     execution = execution,
                     createdTrades = createdTrades,
                     ordersChanged = ordersChanged,
                     balanceChanges = balanceChanges,
                     consumptionChanges = consumptionChanges,
+                    feeRatesInBps = feeRatesInBps,
                 )
             }
         }
@@ -235,26 +245,60 @@ data class Market(
 
     private fun processExecution(
         wallet: WalletAddress,
-        order: Order,
+        takerOrder: Order,
         execution: Execution,
         createdTrades: MutableList<TradeCreated>,
         ordersChanged: MutableList<OrderChanged>,
         balanceChanges: MutableMap<Pair<WalletAddress, Asset>, BigInteger>,
         consumptionChanges: MutableMap<WalletAddress, Pair<BigInteger, BigInteger>>,
+        feeRatesInBps: FeeRatesInBps,
     ) {
+        val notional = notional(execution.amount, execution.price, baseDecimals, quoteDecimals)
+
+        val base = id.baseAsset()
+        val quote = id.quoteAsset()
+
+        val buyOrderGuid: Long
+        val buyer: WalletAddress
+        val buyerFee: BigInteger
+
+        val sellOrderGuid: Long
+        val seller: WalletAddress
+        val sellerFee: BigInteger
+
+        if (takerOrder.type == Order.Type.MarketBuy || takerOrder.type == Order.Type.LimitBuy) {
+            buyOrderGuid = takerOrder.guid
+            buyer = wallet
+            buyerFee = notionalFee(notional, feeRatesInBps.taker)
+
+            sellOrderGuid = execution.counterOrder.guid.value
+            seller = execution.counterOrder.wallet
+            sellerFee = notionalFee(notional, execution.counterOrder.feeRateInBps)
+
+            consumptionChanges.merge(seller, Pair(-execution.amount, BigInteger.ZERO), ::sumBigIntegerPair)
+        } else {
+            buyOrderGuid = execution.counterOrder.guid.value
+            buyer = execution.counterOrder.wallet
+            buyerFee = notionalFee(notional, execution.counterOrder.feeRateInBps)
+
+            sellOrderGuid = takerOrder.guid
+            seller = wallet
+            sellerFee = notionalFee(notional, feeRatesInBps.taker)
+
+            consumptionChanges.merge(buyer, Pair(BigInteger.ZERO, -(notional + buyerFee)), ::sumBigIntegerPair)
+        }
+
         createdTrades.add(
             tradeCreated {
-                if (order.type == Order.Type.MarketBuy || order.type == Order.Type.LimitBuy) {
-                    buyGuid = order.guid
-                    sellGuid = execution.counterOrder.guid.value
-                } else {
-                    buyGuid = execution.counterOrder.guid.value
-                    sellGuid = order.guid
-                }
+                this.buyOrderGuid = buyOrderGuid
+                this.buyerFee = buyerFee.toIntegerValue()
+                this.sellOrderGuid = sellOrderGuid
+                this.sellerFee = sellerFee.toIntegerValue()
                 amount = execution.amount.toIntegerValue()
                 price = execution.price.toDecimalValue()
             },
         )
+
         ordersChanged.add(
             orderChanged {
                 this.guid = execution.counterOrder.guid.value
@@ -266,19 +310,11 @@ data class Market(
                 }
             },
         )
-        val notional = notional(execution.amount, execution.price, baseDecimals, quoteDecimals)
-        val base = id.baseAsset()
-        val quote = id.quoteAsset()
-        val (buyer, seller) = if (order.type == Order.Type.MarketBuy || order.type == Order.Type.LimitBuy) wallet to execution.counterOrder.wallet else execution.counterOrder.wallet to wallet
-        balanceChanges.merge(Pair(buyer, quote), -notional, ::sumBigIntegers)
+
+        balanceChanges.merge(Pair(buyer, quote), -(notional + buyerFee), ::sumBigIntegers)
         balanceChanges.merge(Pair(seller, base), -execution.amount, ::sumBigIntegers)
         balanceChanges.merge(Pair(buyer, base), execution.amount, ::sumBigIntegers)
-        balanceChanges.merge(Pair(seller, quote), notional, ::sumBigIntegers)
-        if (order.type == Order.Type.MarketBuy || order.type == Order.Type.LimitBuy) {
-            consumptionChanges.merge(execution.counterOrder.wallet, Pair(-execution.amount, BigInteger.ZERO), ::sumBigIntegerPair)
-        } else {
-            consumptionChanges.merge(execution.counterOrder.wallet, Pair(BigInteger.ZERO, -notional), ::sumBigIntegerPair)
-        }
+        balanceChanges.merge(Pair(seller, quote), notional - sellerFee, ::sumBigIntegers)
     }
 
     fun autoReduce(walletAddress: WalletAddress, asset: Asset, limit: BigInteger): List<OrderChanged> {
@@ -304,7 +340,7 @@ data class Market(
             buyOrdersByWallet[walletAddress]?.let { buyOrders ->
                 buyOrders.sortedByDescending { it.levelIx }.mapNotNull { levelOrder ->
                     val price = levels[levelOrder.levelIx].price
-                    val notionalAmount = notional(levelOrder.quantity, price, baseDecimals, quoteDecimals)
+                    val notionalAmount = notionalPlusFee(levelOrder.quantity, price, baseDecimals, quoteDecimals, levelOrder.feeRateInBps)
                     if (notionalAmount + total <= limit) {
                         total += notionalAmount
                         null
@@ -324,11 +360,13 @@ data class Market(
         }
     }
 
-    fun baseAssetsRequired(wallet: WalletAddress): BigInteger = sellOrdersByWallet[wallet]?.map { it.quantity }?.reduceOrNull(::sumBigIntegers) ?: BigInteger.ZERO
+    fun baseAssetsRequired(wallet: WalletAddress): BigInteger =
+        sellOrdersByWallet[wallet]?.map { it.quantity }?.reduceOrNull(::sumBigIntegers) ?: BigInteger.ZERO
 
-    fun quoteAssetsRequired(wallet: WalletAddress): BigInteger = buyOrdersByWallet[wallet]?.map {
-        notional(it.quantity, levels[it.levelIx].price, baseDecimals, quoteDecimals)
-    }?.reduceOrNull(::sumBigIntegers) ?: BigInteger.ZERO
+    fun quoteAssetsRequired(wallet: WalletAddress): BigInteger =
+        buyOrdersByWallet[wallet]?.map { order ->
+            notionalPlusFee(order.quantity, levels[order.levelIx].price, baseDecimals, quoteDecimals, order.feeRateInBps)
+        }?.reduceOrNull(::sumBigIntegers) ?: BigInteger.ZERO
 
     private fun handleCrossingOrder(order: Order, stopAtLevelIx: Int? = null): AddOrderResult {
         val originalAmount = order.amount.toBigInteger()
@@ -414,13 +452,13 @@ data class Market(
     }
 
     // if the order is found, returns wallet and how much of the base asset and quote asset it was consuming; null otherwise
-    private fun removeOrder(guid: OrderGuid): RemoveOrderResult? {
+    private fun removeOrder(guid: OrderGuid, feeRatesInBps: FeeRatesInBps): RemoveOrderResult? {
         var ret: RemoveOrderResult? = null
         ordersByGuid[guid]?.let { levelOrder ->
             val level = levels[levelOrder.levelIx]
             ret = if (level.side == BookSide.Buy) {
                 buyOrdersByWallet[levelOrder.wallet]?.remove(levelOrder)
-                RemoveOrderResult(levelOrder.wallet, BigInteger.ZERO, notional(levelOrder.quantity, level.price, baseDecimals, quoteDecimals))
+                RemoveOrderResult(levelOrder.wallet, BigInteger.ZERO, notionalPlusFee(levelOrder.quantity, level.price, baseDecimals, quoteDecimals, feeRatesInBps.maker))
             } else {
                 sellOrdersByWallet[levelOrder.wallet]?.remove(levelOrder)
                 RemoveOrderResult(levelOrder.wallet, levelOrder.quantity, BigInteger.ZERO)
@@ -431,7 +469,7 @@ data class Market(
         return ret
     }
 
-    fun addOrder(wallet: Long, order: Order): AddOrderResult {
+    fun addOrder(wallet: Long, order: Order, feeRatesInBps: FeeRatesInBps): AddOrderResult {
         return if (order.type == Order.Type.LimitSell) {
             val orderPrice = order.price.toBigDecimal()
             val levelIx = (orderPrice - levels[0].price).divideToIntegralValue(tickSize).toInt()
@@ -451,7 +489,7 @@ data class Market(
                     if (remainingAmount > BigInteger.ZERO) {
                         // and then create limit order for the remaining amount
                         val adjustedOrder = order.copy { amount = remainingAmount.toIntegerValue() }
-                        createLimitSellOrder(levelIx, wallet, adjustedOrder)
+                        createLimitSellOrder(levelIx, wallet, adjustedOrder, feeRatesInBps.maker)
 
                         AddOrderResult(
                             crossingOrderResult.disposition,
@@ -462,7 +500,7 @@ data class Market(
                     }
                 } else {
                     // or just create a limit order
-                    val disposition = createLimitSellOrder(levelIx, wallet, order)
+                    val disposition = createLimitSellOrder(levelIx, wallet, order, feeRatesInBps.maker)
                     AddOrderResult(disposition, noExecutions)
                 }
             }
@@ -485,7 +523,7 @@ data class Market(
                     if (remainingAmount > BigInteger.ZERO) {
                         // and then create limit order for the remaining amount
                         val adjustedOrder = order.copy { amount = remainingAmount.toIntegerValue() }
-                        createLimitBuyOrder(levelIx, wallet, adjustedOrder)
+                        createLimitBuyOrder(levelIx, wallet, adjustedOrder, feeRatesInBps.maker)
 
                         AddOrderResult(
                             crossingOrderResult.disposition,
@@ -496,7 +534,7 @@ data class Market(
                     }
                 } else {
                     // or just create a limit order
-                    val disposition = createLimitBuyOrder(levelIx, wallet, order)
+                    val disposition = createLimitBuyOrder(levelIx, wallet, order, feeRatesInBps.maker)
                     AddOrderResult(disposition, noExecutions)
                 }
             }
@@ -509,9 +547,9 @@ data class Market(
         }
     }
 
-    private fun createLimitBuyOrder(levelIx: Int, wallet: Long, order: Order): OrderDisposition {
+    private fun createLimitBuyOrder(levelIx: Int, wallet: Long, order: Order, feeRateInBps: Int): OrderDisposition {
         val orderPrice = order.price.toBigDecimal()
-        val (disposition, levelOrder) = levels[levelIx].addOrder(wallet, order)
+        val (disposition, levelOrder) = levels[levelIx].addOrder(wallet, order, feeRateInBps)
         if (disposition == OrderDisposition.Accepted) {
             buyOrdersByWallet.getOrPut(levelOrder!!.wallet) { CopyOnWriteArrayList() }.add(levelOrder)
             ordersByGuid[levelOrder.guid] = levelOrder
@@ -523,9 +561,9 @@ data class Market(
         return disposition
     }
 
-    private fun createLimitSellOrder(levelIx: Int, wallet: Long, order: Order): OrderDisposition {
+    private fun createLimitSellOrder(levelIx: Int, wallet: Long, order: Order, feeRateInBps: Int): OrderDisposition {
         val orderPrice = order.price.toBigDecimal()
-        val (disposition, levelOrder) = levels[levelIx].addOrder(wallet, order)
+        val (disposition, levelOrder) = levels[levelIx].addOrder(wallet, order, feeRateInBps)
         if (disposition == OrderDisposition.Accepted) {
             sellOrdersByWallet.getOrPut(levelOrder!!.wallet) { CopyOnWriteArrayList() }.add(levelOrder)
             ordersByGuid[levelOrder.guid] = levelOrder
@@ -592,7 +630,7 @@ data class Market(
     fun assetsReservedForOrder(levelOrder: LevelOrder): Pair<BigInteger, BigInteger> {
         val level = levels[levelOrder.levelIx]
         return if (level.side == BookSide.Buy) {
-            BigInteger.ZERO to notional(levelOrder.quantity, level.price, baseDecimals, quoteDecimals)
+            BigInteger.ZERO to notionalPlusFee(levelOrder.quantity, level.price, baseDecimals, quoteDecimals, levelOrder.feeRateInBps)
         } else {
             levelOrder.quantity to BigInteger.ZERO
         }
@@ -600,7 +638,7 @@ data class Market(
 
     // this will change an order's price and quantity.
     // if the price change would cross the market order will be filled (partially)
-    private fun changeOrder(orderChange: Order): ChangeOrderResult? {
+    private fun changeOrder(orderChange: Order, feeRatesInBps: FeeRatesInBps): ChangeOrderResult? {
         return ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
             val wallet = order.wallet
             val level = levels[order.levelIx]
@@ -610,14 +648,14 @@ data class Market(
             if (newPrice.compareTo(level.price) == 0) {
                 // price stays same, quantity changes
                 val baseAssetDelta = if (level.side == BookSide.Buy) BigInteger.ZERO else quantityDelta
-                val quoteAssetDelta = if (level.side == BookSide.Buy) notional(quantityDelta, level.price, baseDecimals, quoteDecimals) else BigInteger.ZERO
+                val quoteAssetDelta = if (level.side == BookSide.Buy) notionalPlusFee(quantityDelta, level.price, baseDecimals, quoteDecimals, feeRatesInBps.maker) else BigInteger.ZERO
                 level.totalQuantity += quantityDelta
                 order.quantity = newQuantity
                 ChangeOrderResult(order.wallet, OrderDisposition.Accepted, noExecutions, baseAssetDelta, quoteAssetDelta)
             } else {
                 // price change results into deleting existing and re-adding new order
                 val (baseAssetDelta, quoteAssetDelta) = if (level.side == BookSide.Buy) {
-                    val previousNotional = notional(order.quantity, levels[order.levelIx].price, baseDecimals, quoteDecimals)
+                    val previousNotionalAndFee = notionalPlusFee(order.quantity, levels[order.levelIx].price, baseDecimals, quoteDecimals, order.feeRateInBps)
 
                     val notionalDelta = if (newPrice >= bestOffer) {
                         // with the updated price limit order crosses the market
@@ -626,18 +664,18 @@ data class Market(
                         val remainingQuantity = orderChange.amount.toBigInteger() - availableQuantity
 
                         // traded on crossing market notional chuck should be excluded from quoteAssetDelta
-                        val limitChunkNotional = notional(remainingQuantity, newPrice, baseDecimals, quoteDecimals)
+                        val limitChunkNotionalAndFee = notionalPlusFee(remainingQuantity, newPrice, baseDecimals, quoteDecimals, feeRatesInBps.maker)
 
-                        limitChunkNotional - previousNotional
+                        limitChunkNotionalAndFee - previousNotionalAndFee
                     } else {
-                        val orderChangeNotional = notional(newQuantity, newPrice, baseDecimals, quoteDecimals)
-                        orderChangeNotional - previousNotional
+                        val orderChangeNotionalAndFee = notionalPlusFee(newQuantity, newPrice, baseDecimals, quoteDecimals, feeRatesInBps.maker)
+                        orderChangeNotionalAndFee - previousNotionalAndFee
                     }
 
                     // update bestBid only when order stays on the book
-                    if (newPrice > bestBid && (previousNotional + notionalDelta) > BigInteger.ZERO) bestBid = newPrice
+                    if (newPrice > bestBid && (previousNotionalAndFee + notionalDelta) > BigInteger.ZERO) bestBid = newPrice
 
-                    BigInteger.ZERO to notionalDelta
+                    Pair(BigInteger.ZERO, notionalDelta)
                 } else {
                     val levelIx = levelIx(newPrice)
                     val marketChunkQuantity = clearingQuantityForMarketSell(newQuantity, stopAtLevelIx = levelIx)
@@ -646,9 +684,9 @@ data class Market(
                     // update bestOffer only when order stays on the book
                     if (newPrice < bestOffer && limitChunkQuantity > BigInteger.ZERO) bestOffer = newPrice
 
-                    limitChunkQuantity - order.quantity to BigInteger.ZERO
+                    Pair(limitChunkQuantity - order.quantity, BigInteger.ZERO)
                 }
-                removeOrder(order.guid)
+                removeOrder(order.guid, feeRatesInBps)
                 val addOrderResult = addOrder(
                     wallet.value,
                     order {
@@ -657,6 +695,7 @@ data class Market(
                         this.amount = orderChange.amount
                         this.price = orderChange.price
                     },
+                    feeRatesInBps,
                 )
                 // note: 'order' object is reset during removal, 'order.wallet' returns 0
                 ChangeOrderResult(wallet, addOrderResult.disposition, addOrderResult.executions, baseAssetDelta, quoteAssetDelta)

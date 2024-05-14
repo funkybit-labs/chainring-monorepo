@@ -3,6 +3,7 @@ package co.chainring.apps.api
 import co.chainring.apps.api.model.Chain
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.DeployedContract
+import co.chainring.apps.api.model.FeeRatesInBps
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.core.model.Address
@@ -10,6 +11,7 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainEntity
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
+import co.chainring.core.model.db.KeyValueStore
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.SymbolEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -73,6 +75,10 @@ object ConfigRoutes {
                                 tickSize = "0.01".toBigDecimal(),
                             ),
                         ),
+                        feeRatesInBps = FeeRatesInBps(
+                            maker = 100,
+                            taker = 200,
+                        ),
                     ),
             )
         } bindContract Method.GET to { _ ->
@@ -109,6 +115,10 @@ object ConfigRoutes {
                                     tickSize = market.tickSize,
                                 )
                             },
+                            feeRatesInBps = FeeRatesInBps(
+                                maker = KeyValueStore.getInt("MakerFeeRateInBps") ?: 0,
+                                taker = KeyValueStore.getInt("TakerFeeRateInBps") ?: 0,
+                            ),
                         ),
                 )
             }

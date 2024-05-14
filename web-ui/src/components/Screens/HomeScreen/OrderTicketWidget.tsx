@@ -1,4 +1,4 @@
-import { apiClient, OrderSide } from 'apiClient'
+import { apiClient, FeeRatesInBps, OrderSide } from 'apiClient'
 import { classNames } from 'utils'
 import React, {
   ChangeEvent,
@@ -33,11 +33,13 @@ import { useWeb3Modal } from '@web3modal/wagmi/react'
 export default function OrderTicketWidget({
   market,
   exchangeContractAddress,
-  walletAddress
+  walletAddress,
+  feeRatesInBps
 }: {
   market: Market
   exchangeContractAddress?: Address
   walletAddress?: Address
+  feeRatesInBps: FeeRatesInBps
 }) {
   const config = useConfig()
   const { signTypedDataAsync } = useSignTypedData()
@@ -105,15 +107,24 @@ export default function OrderTicketWidget({
     return getMarketPrice(side, baseAmount, market, orderBook)
   }, [side, baseAmount, orderBook, market])
 
-  const notional = useMemo(() => {
+  const { notional, fee } = useMemo(() => {
     if (isLimitOrder) {
-      return (price * baseAmount) / BigInt(Math.pow(10, baseSymbol.decimals))
+      const notional =
+        (price * baseAmount) / BigInt(Math.pow(10, baseSymbol.decimals))
+      return {
+        notional,
+        fee: (notional * feeRatesInBps.maker) / 10000n
+      }
     } else {
-      return (
+      const notional =
         (marketPrice * baseAmount) / BigInt(Math.pow(10, baseSymbol.decimals))
-      )
+
+      return {
+        notional,
+        fee: (notional * feeRatesInBps.taker) / 10000n
+      }
     }
-  }, [price, marketPrice, baseAmount, isLimitOrder, baseSymbol.decimals])
+  }, [price, marketPrice, baseAmount, isLimitOrder, baseSymbol, feeRatesInBps])
 
   function changeSide(newValue: OrderSide) {
     if (!mutation.isPending && side != newValue) {
@@ -473,7 +484,13 @@ export default function OrderTicketWidget({
                       />
                     </>
                   )}
-                  <div>FEE: 0.05 {quoteSymbol.name}</div>
+                  <div>
+                    <AmountWithSymbol
+                      amount={fee}
+                      symbol={quoteSymbol}
+                      approximate={true}
+                    />
+                  </div>
                 </div>
               </>
             )}

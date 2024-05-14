@@ -23,6 +23,14 @@ object KeyValueStore : Table("key_value_store") {
         }
     }
 
+    fun getInt(key: String): Int? {
+        return getValue(key)?.toInt()
+    }
+
+    fun setInt(key: String, value: Int) {
+        setValue(key, value.toString())
+    }
+
     fun getLong(key: String): Long? {
         return getValue(key)?.toLong()
     }

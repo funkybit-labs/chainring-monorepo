@@ -7,8 +7,10 @@ option java_package = "co.chainring.sequencer.proto";
 option java_outer_classname = "TradeSchema";
 
 message TradeCreated {
-  uint64 buyGuid = 1;
-  uint64 sellGuid = 2;
+  uint64 buyOrderGuid = 1;
+  uint64 sellOrderGuid = 2;
   IntegerValue amount = 3;
   DecimalValue price = 4;
+  IntegerValue buyerFee = 5;
+  IntegerValue sellerFee = 6;
 }

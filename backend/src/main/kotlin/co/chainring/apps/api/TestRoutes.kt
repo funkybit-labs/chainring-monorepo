@@ -38,7 +38,15 @@ class TestRoutes(
         )
 
         @Serializable
+        data class SetFeeRatesInSequencer(
+            val maker: Int,
+            val taker: Int,
+        )
+
+        @Serializable
         data class StateDump(
+            val makerFeeRate: Int,
+            val takerFeeRate: Int,
             val balances: List<Balance>,
             val markets: List<Market>,
         ) {
@@ -121,6 +129,8 @@ class TestRoutes(
             returning(
                 Status.OK,
                 responseBody to StateDump(
+                    takerFeeRate = 100,
+                    makerFeeRate = 100,
                     balances = listOf(
                         StateDump.Balance(
                             wallet = "wallet",
@@ -188,6 +198,8 @@ class TestRoutes(
 
                 Response(Status.OK).with(
                     responseBody of StateDump(
+                        makerFeeRate = sequencerResponse.stateDump.feeRates.maker,
+                        takerFeeRate = sequencerResponse.stateDump.feeRates.taker,
                         balances = sequencerResponse.stateDump.balancesList.map { b ->
                             StateDump.Balance(
                                 wallet = walletAddresses[b.wallet] ?: b.wallet.toString(),
@@ -277,8 +289,40 @@ class TestRoutes(
         }
     }
 
+    private val setFeeRatesInSequencer: ContractRoute = run {
+        val requestBody = Body.auto<SetFeeRatesInSequencer>().toLens()
+
+        "sequencer-fee-rates" meta {
+            operationId = "sequencer-fee-rates"
+            summary = "Set fee rates in Sequencer"
+            tags += listOf(Tag("test"))
+            receiving(
+                requestBody to SetFeeRatesInSequencer(
+                    maker = 100,
+                    taker = 200,
+                ),
+            )
+            returning(
+                Status.CREATED,
+            )
+        } bindContract Method.PUT to { request ->
+            val payload = requestBody(request)
+            runBlocking {
+                val sequencerResponse = sequencerClient.setFeeRates(
+                    maker = payload.maker,
+                    taker = payload.taker,
+                )
+                if (sequencerResponse.hasError()) {
+                    throw RuntimeException("Failed to set fee rates in sequencer, error: ${sequencerResponse.error}")
+                }
+            }
+            Response(Status.OK)
+        }
+    }
+
     val routes = listOf(
         createMarketInSequencer,
+        setFeeRatesInSequencer,
         resetSequencer,
         getSequencerState,
     )

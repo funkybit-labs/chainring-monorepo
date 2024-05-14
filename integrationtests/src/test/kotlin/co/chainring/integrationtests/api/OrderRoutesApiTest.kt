@@ -45,6 +45,7 @@ import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.waitForBalance
 import co.chainring.integrationtests.testutils.waitForFinalizedWithdrawal
+import co.chainring.integrationtests.utils.ExchangeClient
 import co.chainring.integrationtests.utils.ExpectedBalance
 import co.chainring.integrationtests.utils.Faucet
 import co.chainring.integrationtests.utils.TestApiClient
@@ -61,6 +62,7 @@ import co.chainring.integrationtests.utils.assertPricesMessageReceived
 import co.chainring.integrationtests.utils.assertTradeCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertTradeUpdatedMessageReceived
 import co.chainring.integrationtests.utils.assertTradesMessageReceived
+import co.chainring.sequencer.core.sum
 import kotlinx.datetime.Clock
 import org.awaitility.kotlin.await
 import org.awaitility.kotlin.withAlias
@@ -469,6 +471,10 @@ class OrderRoutesApiTest {
 
     @Test
     fun `order execution`() {
+        val exchangeClient = ExchangeClient()
+
+        val initialFeeAccountEthBalance = exchangeClient.getFeeBalance("ETH")
+
         val (takerApiClient, takerWallet, takerWsClient) =
             setupTrader(btcEthMarketId, "0.5", null, "ETH", "2")
 
@@ -667,6 +673,8 @@ class OrderRoutesApiTest {
                 assertEquals(marketBuyOrderApiResponse.order.side, msg.trade.side)
                 assertEquals(0, (updatedLimitSellOrderApiResponse.order).price.compareTo(msg.trade.price))
                 assertEquals(marketBuyOrderApiResponse.order.amount, msg.trade.amount)
+                assertEquals(takerWallet.formatAmount("0.0001516671", "ETH"), msg.trade.feeAmount)
+                assertEquals("ETH", msg.trade.feeSymbol.value)
                 assertEquals(SettlementStatus.Pending, msg.trade.settlementStatus)
             }
             assertOrderUpdatedMessageReceived { msg ->
@@ -677,7 +685,7 @@ class OrderRoutesApiTest {
                 assertEquals(msg.order.executions[0].role, ExecutionRole.Taker)
             }
             assertBalancesMessageReceived { msg ->
-                assertEquals(BigInteger("1992416645000000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
+                assertEquals(BigInteger("1992264977900000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
                 assertEquals(BigInteger("432100000000000"), msg.balances.first { it.symbol.value == "BTC" }.available)
             }
         }
@@ -688,7 +696,9 @@ class OrderRoutesApiTest {
                 assertEquals(updatedLimitSellOrderApiResponse.order.marketId, msg.trade.marketId)
                 assertEquals(updatedLimitSellOrderApiResponse.order.side, msg.trade.side)
                 assertEquals(0, (updatedLimitSellOrderApiResponse.order).price.compareTo(msg.trade.price))
-                assertEquals(takerWallet.formatAmount("0.00043210", "BTC"), msg.trade.amount)
+                assertEquals(makerWallet.formatAmount("0.00043210", "BTC"), msg.trade.amount)
+                assertEquals(makerWallet.formatAmount("0.00007583355", "ETH"), msg.trade.feeAmount)
+                assertEquals("ETH", msg.trade.feeSymbol.value)
                 assertEquals(SettlementStatus.Pending, msg.trade.settlementStatus)
             }
             assertOrderUpdatedMessageReceived { msg ->
@@ -699,7 +709,7 @@ class OrderRoutesApiTest {
                 assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
             }
             assertBalancesMessageReceived { msg ->
-                assertEquals(BigInteger("2007583355000000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
+                assertEquals(BigInteger("2007507521450000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
                 assertEquals(BigInteger("199567900000000000"), msg.balances.first { it.symbol.value == "BTC" }.available)
             }
         }
@@ -737,7 +747,7 @@ class OrderRoutesApiTest {
             }
             assertLimitsMessageReceived(btcEthMarketId) { msg ->
                 assertEquals(BigInteger("432100000000000"), msg.base)
-                assertEquals(BigInteger("1992416645000000000"), msg.quote)
+                assertEquals(BigInteger("1992264977900000000"), msg.quote)
             }
         }
 
@@ -757,7 +767,7 @@ class OrderRoutesApiTest {
             }
             assertLimitsMessageReceived(btcEthMarketId) { msg ->
                 assertEquals(BigInteger("199456790000000000"), msg.base)
-                assertEquals(BigInteger("2005422980000000000"), msg.quote)
+                assertEquals(BigInteger("2005347146450000000"), msg.quote)
             }
         }
 
@@ -768,24 +778,27 @@ class OrderRoutesApiTest {
 
         val baseQuantity = takerWallet.formatAmount("0.00043210", "BTC")
         val notional = (trade.price * trade.amount.fromFundamentalUnits(takerWallet.decimals("BTC"))).toFundamentalUnits(takerWallet.decimals("ETH"))
+        val makerFee = notional * BigInteger.valueOf(100) / BigInteger.valueOf(10000)
+        val takerFee = notional * BigInteger.valueOf(200) / BigInteger.valueOf(10000)
+
         assertBalances(
             listOf(
                 ExpectedBalance("BTC", makerStartingBTCBalance - baseQuantity, makerStartingBTCBalance - baseQuantity),
-                ExpectedBalance("ETH", makerStartingETHBalance + notional, makerStartingETHBalance + notional),
+                ExpectedBalance("ETH", makerStartingETHBalance + notional - makerFee, makerStartingETHBalance + notional - makerFee),
             ),
             makerApiClient.getBalances().balances,
         )
         assertBalances(
             listOf(
                 ExpectedBalance("BTC", takerStartingBTCBalance + baseQuantity, takerStartingBTCBalance + baseQuantity),
-                ExpectedBalance("ETH", takerStartingETHBalance - notional, takerStartingETHBalance - notional),
+                ExpectedBalance("ETH", takerStartingETHBalance - notional - takerFee, takerStartingETHBalance - notional - takerFee),
             ),
             takerApiClient.getBalances().balances,
         )
 
         takerWsClient.assertBalancesMessageReceived { msg ->
             assertEquals(takerStartingBTCBalance + baseQuantity, msg.balances.first { it.symbol.value == "BTC" }.available)
-            assertEquals(takerStartingETHBalance - notional, msg.balances.first { it.symbol.value == "ETH" }.available)
+            assertEquals(takerStartingETHBalance - notional - takerFee, msg.balances.first { it.symbol.value == "ETH" }.available)
         }
         takerWsClient.assertTradeUpdatedMessageReceived { msg ->
             assertEquals(marketBuyOrderApiResponse.orderId, msg.trade.orderId)
@@ -794,7 +807,7 @@ class OrderRoutesApiTest {
 
         makerWsClient.assertBalancesMessageReceived { msg ->
             assertEquals(makerStartingBTCBalance - baseQuantity, msg.balances.first { it.symbol.value == "BTC" }.available)
-            assertEquals(makerStartingETHBalance + notional, msg.balances.first { it.symbol.value == "ETH" }.available)
+            assertEquals(makerStartingETHBalance + notional - makerFee, msg.balances.first { it.symbol.value == "ETH" }.available)
         }
         makerWsClient.assertTradeUpdatedMessageReceived { msg ->
             assertEquals(updatedLimitSellOrderApiResponse.order.orderId, msg.trade.orderId)
@@ -829,7 +842,9 @@ class OrderRoutesApiTest {
                 assertEquals(marketSellOrderApiResponse.order.marketId, msg.trade.marketId)
                 assertEquals(marketSellOrderApiResponse.order.side, msg.trade.side)
                 assertEquals(0, msg.trade.price.compareTo(BigDecimal("17.500")))
-                assertEquals(makerWallet.formatAmount("0.00012345", "BTC"), msg.trade.amount)
+                assertEquals(takerWallet.formatAmount("0.00012345", "BTC"), msg.trade.amount)
+                assertEquals(takerWallet.formatAmount("0.0000432075", "ETH"), msg.trade.feeAmount)
+                assertEquals("ETH", msg.trade.feeSymbol.value)
                 assertEquals(SettlementStatus.Pending, msg.trade.settlementStatus)
             }
             assertOrderUpdatedMessageReceived { msg ->
@@ -840,7 +855,7 @@ class OrderRoutesApiTest {
                 assertEquals(ExecutionRole.Taker, msg.order.executions[0].role)
             }
             assertBalancesMessageReceived { msg ->
-                assertEquals(BigInteger("1994577020000000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
+                assertEquals(BigInteger("1994382145400000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
                 assertEquals(BigInteger("308650000000000"), msg.balances.first { it.symbol.value == "BTC" }.available)
             }
         }
@@ -852,6 +867,8 @@ class OrderRoutesApiTest {
                 assertEquals(updatedLimitBuyOrderApiResponse.order.side, msg.trade.side)
                 assertEquals(0, updatedLimitBuyOrderApiResponse.order.price.compareTo(msg.trade.price))
                 assertEquals(makerWallet.formatAmount("0.00012345", "BTC"), msg.trade.amount)
+                assertEquals(makerWallet.formatAmount("0.00002160375", "ETH"), msg.trade.feeAmount)
+                assertEquals("ETH", msg.trade.feeSymbol.value)
                 assertEquals(SettlementStatus.Pending, msg.trade.settlementStatus)
             }
             assertOrderUpdatedMessageReceived { msg ->
@@ -862,7 +879,7 @@ class OrderRoutesApiTest {
                 assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
             }
             assertBalancesMessageReceived { msg ->
-                assertEquals(BigInteger("2005422980000000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
+                assertEquals(BigInteger("2005325542700000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
                 assertEquals(BigInteger("199691350000000000"), msg.balances.first { it.symbol.value == "BTC" }.available)
             }
         }
@@ -889,17 +906,35 @@ class OrderRoutesApiTest {
 
         val baseQuantity2 = takerWallet.formatAmount("0.00012345", "BTC")
         val notional2 = (trade2.price * trade2.amount.fromFundamentalUnits(takerWallet.decimals("BTC"))).toFundamentalUnits(takerWallet.decimals("ETH"))
+        val makerFee2 = notional2 * BigInteger.valueOf(100) / BigInteger.valueOf(10000)
+        val takerFee2 = notional2 * BigInteger.valueOf(200) / BigInteger.valueOf(10000)
         assertBalances(
             listOf(
-                ExpectedBalance("BTC", makerStartingBTCBalance - baseQuantity + baseQuantity2, makerStartingBTCBalance - baseQuantity + baseQuantity2),
-                ExpectedBalance("ETH", makerStartingETHBalance + notional - notional2, makerStartingETHBalance + notional - notional2),
+                ExpectedBalance(
+                    "BTC",
+                    total = makerStartingBTCBalance - baseQuantity + baseQuantity2,
+                    available = makerStartingBTCBalance - baseQuantity + baseQuantity2,
+                ),
+                ExpectedBalance(
+                    "ETH",
+                    total = makerStartingETHBalance + (notional - makerFee) - (notional2 + makerFee2),
+                    available = makerStartingETHBalance + (notional - makerFee) - (notional2 + makerFee2),
+                ),
             ),
             makerApiClient.getBalances().balances,
         )
         assertBalances(
             listOf(
-                ExpectedBalance("BTC", takerStartingBTCBalance + baseQuantity - baseQuantity2, takerStartingBTCBalance + baseQuantity - baseQuantity2),
-                ExpectedBalance("ETH", takerStartingETHBalance - notional + notional2, takerStartingETHBalance - notional + notional2),
+                ExpectedBalance(
+                    "BTC",
+                    total = takerStartingBTCBalance + baseQuantity - baseQuantity2,
+                    available = takerStartingBTCBalance + baseQuantity - baseQuantity2,
+                ),
+                ExpectedBalance(
+                    "ETH",
+                    total = takerStartingETHBalance - (notional + takerFee) + (notional2 - takerFee2),
+                    available = takerStartingETHBalance - (notional + takerFee) + (notional2 - takerFee2),
+                ),
             ),
             takerApiClient.getBalances().balances,
         )
@@ -920,11 +955,11 @@ class OrderRoutesApiTest {
             }
             assertLimitsMessageReceived(btcEthMarketId) { msg ->
                 assertEquals(BigInteger("308650000000000"), msg.base)
-                assertEquals(BigInteger("1994577020000000000"), msg.quote)
+                assertEquals(BigInteger("1994382145400000000"), msg.quote)
             }
             assertBalancesMessageReceived { msg ->
                 assertEquals(takerStartingBTCBalance + baseQuantity - baseQuantity2, msg.balances.first { it.symbol.value == "BTC" }.available)
-                assertEquals(takerStartingETHBalance - notional + notional2, msg.balances.first { it.symbol.value == "ETH" }.available)
+                assertEquals(takerStartingETHBalance - (notional + takerFee) + (notional2 - takerFee2), msg.balances.first { it.symbol.value == "ETH" }.available)
             }
             assertTradeUpdatedMessageReceived { msg ->
                 assertEquals(marketSellOrderApiResponse.orderId, msg.trade.orderId)
@@ -948,11 +983,11 @@ class OrderRoutesApiTest {
             }
             assertLimitsMessageReceived(btcEthMarketId) { msg ->
                 assertEquals(BigInteger("199580240000000000"), msg.base)
-                assertEquals(BigInteger("2005422980000000000"), msg.quote)
+                assertEquals(BigInteger("2005325542700000000"), msg.quote)
             }
             assertBalancesMessageReceived { msg ->
                 assertEquals(makerStartingBTCBalance - baseQuantity + baseQuantity2, msg.balances.first { it.symbol.value == "BTC" }.available)
-                assertEquals(makerStartingETHBalance + notional - notional2, msg.balances.first { it.symbol.value == "ETH" }.available)
+                assertEquals(makerStartingETHBalance + (notional - makerFee) - (notional2 + makerFee2), msg.balances.first { it.symbol.value == "ETH" }.available)
             }
             assertTradeUpdatedMessageReceived { msg ->
                 assertEquals(updatedLimitBuyOrderApiResponse.order.orderId, msg.trade.orderId)
@@ -1011,6 +1046,8 @@ class OrderRoutesApiTest {
                     assertEquals(marketSellOrderApiResponse.order.side, side)
                     assertEquals(0, price.compareTo(BigDecimal("17.500")))
                     assertEquals(makerWallet.formatAmount("0.00012345", "BTC"), amount)
+                    assertEquals(takerWallet.formatAmount("0.0000432075", "ETH"), feeAmount)
+                    assertEquals("ETH", feeSymbol.value)
                     assertEquals(SettlementStatus.Completed, settlementStatus)
                 }
                 msg.trades[1].apply {
@@ -1019,6 +1056,8 @@ class OrderRoutesApiTest {
                     assertEquals(marketBuyOrderApiResponse.order.side, side)
                     assertEquals(0, updatedLimitSellOrderApiResponse.order.price.compareTo(price))
                     assertEquals(marketBuyOrderApiResponse.order.amount, amount)
+                    assertEquals(takerWallet.formatAmount("0.0001516671", "ETH"), feeAmount)
+                    assertEquals("ETH", feeSymbol.value)
                     assertEquals(SettlementStatus.Completed, settlementStatus)
                 }
             }
@@ -1037,11 +1076,17 @@ class OrderRoutesApiTest {
             subscribeToLimits(btcEthMarketId)
             assertLimitsMessageReceived(btcEthMarketId) { msg ->
                 assertEquals(BigInteger("308650000000000"), msg.base)
-                assertEquals(BigInteger("1994577020000000000"), msg.quote)
+                assertEquals(BigInteger("1994382145400000000"), msg.quote)
             }
         }.close()
 
         makerWsClient.close()
+
+        // verify that fees have settled correctly on chain
+        assertEquals(
+            makerFee + takerFee + makerFee2 + takerFee2,
+            exchangeClient.getFeeBalance("ETH") - initialFeeAccountEthBalance,
+        )
     }
 
     @Test
@@ -1217,7 +1262,7 @@ class OrderRoutesApiTest {
             }
             assertLimitsMessageReceived(btcUsdcMarketId) { msg ->
                 assertEquals(BigInteger("1800000000000000"), msg.base)
-                assertEquals(BigInteger("376879400"), msg.quote)
+                assertEquals(BigInteger("374416988"), msg.quote)
             }
         }
 
@@ -1240,7 +1285,7 @@ class OrderRoutesApiTest {
             }
             assertLimitsMessageReceived(btcUsdcMarketId) { msg ->
                 assertEquals(BigInteger("198200000000000000"), msg.base)
-                assertEquals(BigInteger("623120600"), msg.quote)
+                assertEquals(BigInteger("621889395"), msg.quote)
             }
         }
 
@@ -1261,22 +1306,25 @@ class OrderRoutesApiTest {
 
         waitForSettlementToFinish(trades.map { it.id.value })
 
-        val notional = trades.map {
+        val notionals = trades.map {
             (it.price * it.amount.fromFundamentalUnits(makerWallet.decimals("BTC"))).toFundamentalUnits(takerWallet.decimals("USDC"))
-        }.reduce { acc, notionalForTrade -> acc + notionalForTrade }
+        }
 
-        // val notional = (prices.first() * BigDecimal("0.0018")).toFundamentalUnits(takerWallet.decimals("USDC"))
+        val notional = notionals.sum()
+        val makerFees = notionals.map { it * BigInteger.valueOf(100) / BigInteger.valueOf(10000) }.sum()
+        val takerFees = notionals.map { it * BigInteger.valueOf(200) / BigInteger.valueOf(10000) }.sum()
+
         assertBalances(
             listOf(
                 ExpectedBalance("BTC", makerStartingBTCBalance - takerOrderAmount, makerStartingBTCBalance - takerOrderAmount),
-                ExpectedBalance("USDC", makerStartingUSDCBalance + notional, makerStartingUSDCBalance + notional),
+                ExpectedBalance("USDC", makerStartingUSDCBalance + notional - makerFees, makerStartingUSDCBalance + notional - makerFees),
             ),
             makerApiClient.getBalances().balances,
         )
         assertBalances(
             listOf(
                 ExpectedBalance("BTC", takerStartingBTCBalance + takerOrderAmount, takerStartingBTCBalance + takerOrderAmount),
-                ExpectedBalance("USDC", takerStartingUSDCBalance - notional, takerStartingUSDCBalance - notional),
+                ExpectedBalance("USDC", takerStartingUSDCBalance - notional - takerFees, takerStartingUSDCBalance - notional - takerFees),
             ),
             takerApiClient.getBalances().balances,
         )
@@ -1286,91 +1334,6 @@ class OrderRoutesApiTest {
 
         makerWsClient.close()
         takerWsClient.close()
-    }
-
-    private fun validateLimitOrders(response: CreateOrderApiResponse, order: Order.Limit, updated: Boolean) {
-        assertEquals(response.orderId, order.id)
-        assertEquals(response.order.amount, order.amount)
-        assertEquals(response.order.side, order.side)
-        assertEquals(response.order.marketId, order.marketId)
-        assertEquals(0, (response.order as CreateOrderApiRequest.Limit).price.compareTo(order.price))
-        assertNotNull(order.timing.createdAt)
-        if (updated) {
-            assertNotNull(order.timing.updatedAt)
-        }
-    }
-
-    private fun validateLimitOrders(response: UpdateOrderApiRequest, order: Order.Limit, updated: Boolean) {
-        assertEquals(response.orderId, order.id)
-        assertEquals(response.amount, order.amount)
-        assertEquals(response.side, order.side)
-        assertEquals(response.marketId, order.marketId)
-        assertEquals(0, response.price.compareTo(order.price))
-        assertNotNull(order.timing.createdAt)
-        if (updated) {
-            assertNotNull(order.timing.updatedAt)
-        }
-    }
-
-    private fun setupTrader(
-        marketId: MarketId,
-        nativeAmount: String,
-        nativeDepositAmount: String?,
-        mintSymbol: String,
-        mintAmount: String,
-        subscribeToOrderBook: Boolean = true,
-        subscribeToOrderPrices: Boolean = true,
-    ): Triple<TestApiClient, Wallet, WsClient> {
-        val apiClient = TestApiClient()
-        val wallet = Wallet(apiClient)
-
-        val wsClient = WebsocketClient.blocking(apiClient.authToken).apply {
-            if (subscribeToOrderBook) {
-                subscribeToOrderBook(marketId)
-                assertOrderBookMessageReceived(marketId)
-            }
-
-            if (subscribeToOrderPrices) {
-                subscribeToPrices(marketId)
-                assertPricesMessageReceived(marketId)
-            }
-
-            subscribeToOrders()
-            assertOrdersMessageReceived()
-
-            subscribeToTrades()
-            assertTradesMessageReceived()
-
-            subscribeToBalances()
-            assertBalancesMessageReceived()
-
-            subscribeToLimits(marketId)
-            assertLimitsMessageReceived(marketId)
-        }
-
-        Faucet.fund(wallet.address, wallet.formatAmount(nativeAmount, "BTC"))
-        val formattedMintAmount = wallet.formatAmount(mintAmount, mintSymbol)
-        wallet.mintERC20(mintSymbol, formattedMintAmount)
-
-        deposit(wallet, mintSymbol, formattedMintAmount)
-        waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(mintSymbol, formattedMintAmount, formattedMintAmount)))
-        wsClient.assertLimitsMessageReceived(marketId)
-
-        nativeDepositAmount?.also {
-            val formattedNativeAmount = wallet.formatAmount(it, "BTC")
-            deposit(wallet, "BTC", formattedNativeAmount)
-            waitForBalance(
-                apiClient,
-                wsClient,
-                listOf(
-                    ExpectedBalance(mintSymbol, formattedMintAmount, formattedMintAmount),
-                    ExpectedBalance("BTC", formattedNativeAmount, formattedNativeAmount),
-                ),
-            )
-            wsClient.assertLimitsMessageReceived(marketId)
-        }
-
-        return Triple(apiClient, wallet, wsClient)
     }
 
     @Test
@@ -1506,7 +1469,7 @@ class OrderRoutesApiTest {
                 assertEquals(msg.order.executions[0].role, ExecutionRole.Taker)
             }
             assertBalancesMessageReceived { msg ->
-                assertEquals(BigInteger("3404000000000000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
+                assertEquals(BigInteger("3375920000000000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
                 assertEquals(BigInteger("5000000000000000"), msg.balances.first { it.symbol.value == "BTC" }.available)
             }
         }
@@ -1528,7 +1491,7 @@ class OrderRoutesApiTest {
                 assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
             }
             assertBalancesMessageReceived { msg ->
-                assertEquals(BigInteger("596000000000000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
+                assertEquals(BigInteger("581960000000000000"), msg.balances.first { it.symbol.value == "ETH" }.available)
                 assertEquals(BigInteger("80000000000000000"), msg.balances.first { it.symbol.value == "BTC" }.available)
             }
         }
@@ -1550,7 +1513,7 @@ class OrderRoutesApiTest {
             assertPricesMessageReceived(btcEthMarketId)
             assertLimitsMessageReceived(btcEthMarketId) { msg ->
                 assertEquals(BigInteger("5000000000000000"), msg.base)
-                assertEquals(BigInteger("3404000000000000000"), msg.quote)
+                assertEquals(BigInteger("3375920000000000000"), msg.quote)
             }
         }
 
@@ -1558,7 +1521,7 @@ class OrderRoutesApiTest {
             assertPricesMessageReceived(btcEthMarketId)
             assertLimitsMessageReceived(btcEthMarketId) { msg ->
                 assertEquals(BigInteger("80000000000000000"), msg.base)
-                assertEquals(BigInteger("596000000000000000"), msg.quote)
+                assertEquals(BigInteger("581960000000000000"), msg.quote)
             }
         }
 
@@ -1600,6 +1563,91 @@ class OrderRoutesApiTest {
         }
 
         makerWsClient.close()
+    }
+
+    private fun validateLimitOrders(response: CreateOrderApiResponse, order: Order.Limit, updated: Boolean) {
+        assertEquals(response.orderId, order.id)
+        assertEquals(response.order.amount, order.amount)
+        assertEquals(response.order.side, order.side)
+        assertEquals(response.order.marketId, order.marketId)
+        assertEquals(0, (response.order as CreateOrderApiRequest.Limit).price.compareTo(order.price))
+        assertNotNull(order.timing.createdAt)
+        if (updated) {
+            assertNotNull(order.timing.updatedAt)
+        }
+    }
+
+    private fun validateLimitOrders(response: UpdateOrderApiRequest, order: Order.Limit, updated: Boolean) {
+        assertEquals(response.orderId, order.id)
+        assertEquals(response.amount, order.amount)
+        assertEquals(response.side, order.side)
+        assertEquals(response.marketId, order.marketId)
+        assertEquals(0, response.price.compareTo(order.price))
+        assertNotNull(order.timing.createdAt)
+        if (updated) {
+            assertNotNull(order.timing.updatedAt)
+        }
+    }
+
+    private fun setupTrader(
+        marketId: MarketId,
+        nativeAmount: String,
+        nativeDepositAmount: String?,
+        mintSymbol: String,
+        mintAmount: String,
+        subscribeToOrderBook: Boolean = true,
+        subscribeToOrderPrices: Boolean = true,
+    ): Triple<TestApiClient, Wallet, WsClient> {
+        val apiClient = TestApiClient()
+        val wallet = Wallet(apiClient)
+
+        val wsClient = WebsocketClient.blocking(apiClient.authToken).apply {
+            if (subscribeToOrderBook) {
+                subscribeToOrderBook(marketId)
+                assertOrderBookMessageReceived(marketId)
+            }
+
+            if (subscribeToOrderPrices) {
+                subscribeToPrices(marketId)
+                assertPricesMessageReceived(marketId)
+            }
+
+            subscribeToOrders()
+            assertOrdersMessageReceived()
+
+            subscribeToTrades()
+            assertTradesMessageReceived()
+
+            subscribeToBalances()
+            assertBalancesMessageReceived()
+
+            subscribeToLimits(marketId)
+            assertLimitsMessageReceived(marketId)
+        }
+
+        Faucet.fund(wallet.address, wallet.formatAmount(nativeAmount, "BTC"))
+        val formattedMintAmount = wallet.formatAmount(mintAmount, mintSymbol)
+        wallet.mintERC20(mintSymbol, formattedMintAmount)
+
+        deposit(wallet, mintSymbol, formattedMintAmount)
+        waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(mintSymbol, formattedMintAmount, formattedMintAmount)))
+        wsClient.assertLimitsMessageReceived(marketId)
+
+        nativeDepositAmount?.also {
+            val formattedNativeAmount = wallet.formatAmount(it, "BTC")
+            deposit(wallet, "BTC", formattedNativeAmount)
+            waitForBalance(
+                apiClient,
+                wsClient,
+                listOf(
+                    ExpectedBalance(mintSymbol, formattedMintAmount, formattedMintAmount),
+                    ExpectedBalance("BTC", formattedNativeAmount, formattedNativeAmount),
+                ),
+            )
+            wsClient.assertLimitsMessageReceived(marketId)
+        }
+
+        return Triple(apiClient, wallet, wsClient)
     }
 
     private fun deposit(wallet: Wallet, asset: String, amount: BigInteger) {

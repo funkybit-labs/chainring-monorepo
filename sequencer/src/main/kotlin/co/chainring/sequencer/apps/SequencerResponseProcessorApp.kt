@@ -2,6 +2,7 @@ package co.chainring.sequencer.apps
 
 import co.chainring.apps.BaseApp
 import co.chainring.core.db.DbConfig
+import co.chainring.core.model.db.KeyValueStore
 import co.chainring.sequencer.apps.services.SequencerResponseProcessorService
 import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerResponse
@@ -13,7 +14,7 @@ import kotlin.concurrent.thread
 
 val dbConfig: DbConfig = DbConfig()
 
-class QueueProcessorApp(
+class SequencerResponseProcessorApp(
     val inputQueue: RollingChronicleQueue,
     val outputQueue: RollingChronicleQueue,
 ) : BaseApp(dbConfig) {
@@ -23,14 +24,14 @@ class QueueProcessorApp(
 
     override fun start() {
         super.start()
-        logger.info { "Starting Queue Processor" }
+        logger.info { "Starting Sequencer Response Processor" }
         stop = false
 
-        processorThread = thread(start = false, name = "queue_processor", isDaemon = false) {
+        processorThread = thread(start = false, name = "sequencer_response_processor", isDaemon = false) {
             val inputTailer = inputQueue.createTailer("queue_processor")
             val outputTailer = outputQueue.createTailer("queue_processor")
 
-            val lastIndex = SequencerResponseProcessorService.getLastProcessedIndex()?.let {
+            val lastIndex = getLastProcessedIndex()?.let {
                 minOf(it, outputQueue.lastIndex())
             } ?: outputQueue.lastIndex()
             outputTailer.moveToIndex(lastIndex + 1)
@@ -87,12 +88,9 @@ class QueueProcessorApp(
                     }}Processing sequence ${response.sequence} request = <$request> response=<$response>"
                 }
 
-                SequencerResponseProcessorService.onSequencerResponseReceived(
-                    response,
-                    request,
-                )
+                SequencerResponseProcessorService.processResponse(response, request)
                 logger.debug { "storing last processed index $lastReadIndex" }
-                SequencerResponseProcessorService.updateLastProcessedIndex(lastReadIndex)
+                updateLastProcessedIndex(lastReadIndex)
             }
         } catch (t: Throwable) {
             logger.error(t) { "Failed processing response" }
@@ -111,5 +109,15 @@ class QueueProcessorApp(
         processorThread.join(100)
         processorThread.stop()
         logger.info { "Stopped" }
+    }
+
+    private val lastProcessedOutputIndexKey = "LastProcessedOutputIndex"
+
+    private fun getLastProcessedIndex() = transaction {
+        KeyValueStore.getLong(lastProcessedOutputIndexKey)
+    }
+
+    private fun updateLastProcessedIndex(lastProcessedIndex: Long) = transaction {
+        KeyValueStore.setLong(lastProcessedOutputIndexKey, lastProcessedIndex)
     }
 }

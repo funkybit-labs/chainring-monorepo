@@ -24,20 +24,23 @@ data class LevelOrder(
     var guid: OrderGuid,
     var wallet: WalletAddress,
     var quantity: BigInteger,
+    var feeRateInBps: Int,
     var levelIx: Int,
     var originalQuantity: BigInteger = quantity,
 ) {
-    fun update(wallet: Long, order: Order) {
+    fun update(wallet: Long, order: Order, feeRateInBps: Int) {
         this.guid = order.guid.toOrderGuid()
         this.wallet = wallet.toWalletAddress()
         this.quantity = order.amount.toBigInteger()
         this.originalQuantity = this.quantity
+        this.feeRateInBps = feeRateInBps
     }
 
     fun reset() {
         this.guid = OrderGuid.none
         this.wallet = WalletAddress.none
         this.quantity = BigInteger.ZERO
+        this.feeRateInBps = 0
         this.originalQuantity = this.quantity
     }
 
@@ -48,6 +51,7 @@ data class LevelOrder(
             this.quantity = this@LevelOrder.quantity.toIntegerValue()
             this.levelIx = this@LevelOrder.levelIx
             this.originalQuantity = this@LevelOrder.originalQuantity.toIntegerValue()
+            this.feeRateInBps = this@LevelOrder.feeRateInBps
         }
     }
 
@@ -57,11 +61,14 @@ data class LevelOrder(
         this.quantity = checkpoint.quantity.toBigInteger()
         this.levelIx = checkpoint.levelIx
         this.originalQuantity = checkpoint.originalQuantity.toBigInteger()
+        this.feeRateInBps = checkpoint.feeRateInBps
     }
 }
 
 class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal, val maxOrderCount: Int) {
-    val orders = Array(maxOrderCount) { _ -> LevelOrder(0L.toOrderGuid(), 0L.toWalletAddress(), BigInteger.ZERO, levelIx) }
+    val orders = Array(maxOrderCount) { _ ->
+        LevelOrder(guid = 0L.toOrderGuid(), wallet = 0L.toWalletAddress(), quantity = BigInteger.ZERO, feeRateInBps = 0, levelIx = levelIx)
+    }
     var totalQuantity = BigInteger.ZERO
     var orderHead = 0
     var orderTail = 0
@@ -97,13 +104,13 @@ class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal
         totalQuantity = checkpoint.totalQuantity.toBigInteger()
     }
 
-    fun addOrder(wallet: Long, order: Order): Pair<OrderDisposition, LevelOrder?> {
+    fun addOrder(wallet: Long, order: Order, feeRateInBps: Int): Pair<OrderDisposition, LevelOrder?> {
         val nextTail = (orderTail + 1) % maxOrderCount
         return if (nextTail == orderHead) {
             OrderDisposition.Rejected to null
         } else {
             val levelOrder = orders[orderTail]
-            levelOrder.update(wallet, order)
+            levelOrder.update(wallet, order, feeRateInBps)
             totalQuantity += levelOrder.quantity
             orderTail = nextTail
             OrderDisposition.Accepted to levelOrder
