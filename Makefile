@@ -50,6 +50,9 @@ run_sequencer:
 run_mocker:
 	API_URL=http://localhost:9000 ./gradlew :mocker:run
 
+run_telegrambot:
+	API_URL=http://localhost:9000 ./gradlew :telegrambot:run
+
 run_ui:
 	cd web-ui && pnpm install && pnpm run dev
 

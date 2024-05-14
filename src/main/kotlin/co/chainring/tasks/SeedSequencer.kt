@@ -4,7 +4,9 @@ import co.chainring.core.sequencer.SequencerClient
 import co.chainring.tasks.fixtures.Fixtures
 import kotlinx.coroutines.runBlocking
 
-fun seedSequencer(fixtures: Fixtures, sequencerClient: SequencerClient) {
+val sequencerClient = SequencerClient()
+
+fun seedSequencer(fixtures: Fixtures) {
     runBlocking {
         fixtures.markets.forEach { market ->
             val baseSymbol = fixtures.symbols.first { it.id == market.baseSymbol }

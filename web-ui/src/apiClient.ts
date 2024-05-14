@@ -156,8 +156,7 @@ const OrderStatusSchema = z.enum([
   'Cancelled',
   'Expired',
   'Failed',
-  'Rejected',
-  'CrossesMarket'
+  'Rejected'
 ])
 export type OrderStatus = z.infer<typeof OrderStatusSchema>
 
@@ -195,14 +194,9 @@ export const OrderSchema = z
       ...data,
       isFinal: function (): boolean {
         return (
-          [
-            'Filled',
-            'Cancelled',
-            'Expired',
-            'Failed',
-            'Rejected',
-            'CrossesMarket'
-          ].includes(data.status) ||
+          ['Filled', 'Cancelled', 'Expired', 'Failed', 'Rejected'].includes(
+            data.status
+          ) ||
           (data.status == 'Partial' && data.type == 'market')
         )
       }

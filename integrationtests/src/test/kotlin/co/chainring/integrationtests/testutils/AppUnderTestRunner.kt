@@ -16,18 +16,21 @@ import co.chainring.core.model.db.ExchangeTransactionTable
 import co.chainring.core.model.db.KeyValueStore
 import co.chainring.core.model.db.OrderExecutionTable
 import co.chainring.core.model.db.OrderTable
+import co.chainring.core.model.db.TelegramBotUserTable
+import co.chainring.core.model.db.TelegramBotUserWalletTable
 import co.chainring.core.model.db.TradeTable
 import co.chainring.core.model.db.WalletTable
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.model.db.WithdrawalTable
-import co.chainring.integrationtests.utils.ApiClient
+import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.TestBlockchainClient
 import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
 import co.chainring.sequencer.apps.QueueProcessorApp
 import co.chainring.sequencer.apps.SequencerApp
-import co.chainring.tasks.fixtures.localDevFixtures
+import co.chainring.tasks.fixtures.Fixtures
+import co.chainring.tasks.fixtures.getFixtures
 import co.chainring.tasks.migrateDatabase
 import co.chainring.tasks.seedBlockchain
 import co.chainring.tasks.seedDatabase
@@ -45,6 +48,14 @@ import java.time.Duration
 // This extension allows us to start the app under test only once
 class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
     override fun beforeAll(context: ExtensionContext) {
+        val blockchainClient = TestBlockchainClient(BlockchainClientConfig())
+        val fixtures = getFixtures(blockchainClient.chainId)
+
+        context
+            .root
+            .getStore(ExtensionContext.Namespace.GLOBAL)
+            .put("fixtures", fixtures)
+
         context
             .root
             .getStore(ExtensionContext.Namespace.GLOBAL)
@@ -63,7 +74,6 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                         sequencerApp.inputQueue,
                         sequencerApp.outputQueue,
                     )
-                    private val blockchainClient = TestBlockchainClient(BlockchainClientConfig())
 
                     private val isIntegrationRun = (getenv("INTEGRATION_RUN") ?: "0") == "1"
 
@@ -93,8 +103,8 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                                 transaction { DeployedSmartContractEntity.validContracts(blockchainClient.chainId).map { it.name } == listOf(ContractType.Exchange.name) }
                             }
 
-                        val symbolContractAddresses = seedBlockchain(localDevFixtures, blockchainClient.config.url, blockchainClient.config.privateKeyHex)
-                        seedDatabase(localDevFixtures, symbolContractAddresses)
+                        val symbolContractAddresses = seedBlockchain(fixtures)
+                        seedDatabase(fixtures, symbolContractAddresses)
 
                         // during tests block will be mined manually
                         blockchainClient.setAutoMining(false)
@@ -116,13 +126,18 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
     }
 
     override fun beforeEach(context: ExtensionContext) {
-        ApiClient.resetSequencer()
+        TestApiClient.resetSequencer()
 
-        localDevFixtures.markets.forEach { market ->
-            val baseSymbol = localDevFixtures.symbols.first { it.id == market.baseSymbol }
-            val quoteSymbol = localDevFixtures.symbols.first { it.id == market.quoteSymbol }
+        val fixtures: Fixtures = context
+            .root
+            .getStore(ExtensionContext.Namespace.GLOBAL)
+            .get("fixtures", Fixtures::class.java)
 
-            ApiClient.createMarketInSequencer(
+        fixtures.markets.forEach { market ->
+            val baseSymbol = fixtures.symbols.first { it.id == market.baseSymbol }
+            val quoteSymbol = fixtures.symbols.first { it.id == market.quoteSymbol }
+
+            TestApiClient.createMarketInSequencer(
                 TestRoutes.Companion.CreateMarketInSequencer(
                     id = "${baseSymbol.name}/${quoteSymbol.name}",
                     tickSize = market.tickSize,
@@ -135,6 +150,8 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
 
         transaction {
             KeyValueStore.deleteAll()
+            TelegramBotUserWalletTable.deleteAll()
+            TelegramBotUserTable.deleteAll()
             BroadcasterJobTable.deleteAll()
             ExchangeTransactionTable.deleteAll()
             BlockchainTransactionTable.deleteAll()

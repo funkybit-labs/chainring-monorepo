@@ -1,9 +1,8 @@
-package co.chainring.integrationtests.utils
+package co.chainring.core.client.rest
 
 import arrow.core.Either
 import arrow.core.raise.either
 import arrow.core.raise.ensure
-import co.chainring.apps.api.TestRoutes
 import co.chainring.apps.api.middleware.SignInMessage
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ApiErrors
@@ -31,6 +30,7 @@ import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.WithdrawalId
+import co.chainring.core.utils.TraceRecorder
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
@@ -41,9 +41,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.fail
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
@@ -58,10 +55,10 @@ class AbnormalApiResponseException(val response: Response) : Exception()
 
 data class ApiCallFailure(
     val httpCode: Int,
-    val error: ApiError,
+    val error: ApiError?,
 )
 
-class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceRecorder: TraceRecorder = TraceRecorder.noOp) {
+open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceRecorder: TraceRecorder = TraceRecorder.noOp) {
     val authToken: String = issueAuthToken(ecKeyPair = ecKeyPair)
 
     companion object {
@@ -104,66 +101,9 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
             return "${Base64.getUrlEncoder().encodeToString(body.toByteArray())}.${signature.value}"
         }
 
-        fun getOpenApiDocumentation(): String {
-            val httpResponse = execute(
-                Request.Builder()
-                    .url("$apiServerRootUrl/v1/openapi.json")
-                    .get()
-                    .build(),
-            )
-            return if (httpResponse.code == HttpURLConnection.HTTP_OK) {
-                httpResponse.body?.string()!!
-            } else {
-                throw AbnormalApiResponseException(httpResponse)
-            }
-        }
-
-        fun resetSequencer() {
-            execute(
-                Request.Builder()
-                    .url("$apiServerRootUrl/v1/sequencer")
-                    .delete()
-                    .build(),
-            ).also { httpResponse ->
-                if (httpResponse.code != HttpURLConnection.HTTP_NO_CONTENT) {
-                    throw AbnormalApiResponseException(httpResponse)
-                }
-            }
-        }
-
-        fun getSequencerStateDump(): TestRoutes.Companion.StateDump {
-            val httpResponse = execute(
-                Request.Builder()
-                    .url("$apiServerRootUrl/v1/sequencer-state")
-                    .get()
-                    .build(),
-            )
-
-            return when (httpResponse.code) {
-                HttpURLConnection.HTTP_OK -> json.decodeFromString<TestRoutes.Companion.StateDump>(httpResponse.body?.string()!!)
-                else -> throw AbnormalApiResponseException(httpResponse)
-            }
-        }
-
-        fun createMarketInSequencer(apiRequest: TestRoutes.Companion.CreateMarketInSequencer) {
-            execute(
-                Request.Builder()
-                    .url("$apiServerRootUrl/v1/sequencer-markets")
-                    .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
-                    .build(),
-            ).also { httpResponse ->
-                if (httpResponse.code != HttpURLConnection.HTTP_CREATED) {
-                    throw AbnormalApiResponseException(httpResponse)
-                }
-            }
-        }
-
         private fun execute(request: Request): Response =
             httpClient.newCall(request).execute()
     }
-
-    fun getConfiguration(): ConfigurationApiResponse =
-        tryGetConfiguration().assertSuccess()
 
     fun tryGetConfiguration(): Either<ApiCallFailure, ConfigurationApiResponse> =
         executeAndTrace(
@@ -173,9 +113,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .get()
                 .build(),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
-
-    fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
-        tryCreateOrder(apiRequest).assertSuccess()
 
     fun tryCreateOrder(apiRequest: CreateOrderApiRequest): Either<ApiCallFailure, CreateOrderApiResponse> =
         executeAndTrace(
@@ -187,9 +124,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
-    fun batchOrders(apiRequest: BatchOrdersApiRequest): BatchOrdersApiResponse =
-        tryBatchOrders(apiRequest).assertSuccess()
-
     fun tryBatchOrders(apiRequest: BatchOrdersApiRequest): Either<ApiCallFailure, BatchOrdersApiResponse> =
         executeAndTrace(
             TraceRecorder.Op.BatchOrders,
@@ -199,10 +133,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
-
-    fun updateOrder(apiRequest: UpdateOrderApiRequest): UpdateOrderApiResponse {
-        return tryUpdateOrder(apiRequest).assertSuccess()
-    }
 
     fun tryUpdateOrder(apiRequest: UpdateOrderApiRequest): Either<ApiCallFailure, UpdateOrderApiResponse> =
         executeAndTrace(
@@ -214,9 +144,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
-    fun cancelOrder(apiRequest: CancelOrderApiRequest) =
-        tryCancelOrder(apiRequest).assertSuccess()
-
     fun tryCancelOrder(apiRequest: CancelOrderApiRequest): Either<ApiCallFailure, Unit> =
         executeAndTrace(
             TraceRecorder.Op.CancelOrder,
@@ -226,9 +153,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
-
-    fun getOrder(id: OrderId): Order =
-        tryGetOrder(id).assertSuccess()
 
     fun tryGetOrder(id: OrderId): Either<ApiCallFailure, Order> =
         executeAndTrace(
@@ -240,9 +164,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
-    fun listOrders(): OrdersApiResponse =
-        tryListOrders().assertSuccess()
-
     fun tryListOrders(): Either<ApiCallFailure, OrdersApiResponse> =
         executeAndTrace(
             TraceRecorder.Op.ListOrders,
@@ -252,9 +173,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
-
-    fun cancelOpenOrders() =
-        tryCancelOpenOrders().assertSuccess()
 
     fun tryCancelOpenOrders(): Either<ApiCallFailure, Unit> =
         executeAndTrace(
@@ -266,9 +184,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
-    fun createDeposit(apiRequest: CreateDepositApiRequest): DepositApiResponse =
-        tryCreateDeposit(apiRequest).assertSuccess()
-
     fun tryCreateDeposit(apiRequest: CreateDepositApiRequest): Either<ApiCallFailure, DepositApiResponse> =
         executeAndTrace(
             TraceRecorder.Op.CreateDeposit,
@@ -278,9 +193,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
-
-    fun getDeposit(id: DepositId): DepositApiResponse =
-        tryGetDeposit(id).assertSuccess()
 
     fun tryGetDeposit(id: DepositId): Either<ApiCallFailure, DepositApiResponse> =
         executeAndTrace(
@@ -292,9 +204,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
-    fun listDeposits(): ListDepositsApiResponse =
-        tryListDeposits().assertSuccess()
-
     fun tryListDeposits(): Either<ApiCallFailure, ListDepositsApiResponse> =
         executeAndTrace(
             TraceRecorder.Op.ListDeposits,
@@ -304,9 +213,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
-
-    fun createWithdrawal(apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse =
-        tryCreateWithdrawal(apiRequest).assertSuccess()
 
     fun tryCreateWithdrawal(apiRequest: CreateWithdrawalApiRequest): Either<ApiCallFailure, WithdrawalApiResponse> =
         executeAndTrace(
@@ -318,9 +224,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
-    fun getWithdrawal(id: WithdrawalId): WithdrawalApiResponse =
-        tryGetWithdrawal(id).assertSuccess()
-
     fun tryGetWithdrawal(id: WithdrawalId): Either<ApiCallFailure, WithdrawalApiResponse> =
         executeAndTrace(
             TraceRecorder.Op.GetWithdrawal,
@@ -331,9 +234,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
-    fun listWithdrawals(): ListWithdrawalsApiResponse =
-        tryListWithdrawals().assertSuccess()
-
     fun tryListWithdrawals(): Either<ApiCallFailure, ListWithdrawalsApiResponse> =
         executeAndTrace(
             TraceRecorder.Op.ListWithdrawals,
@@ -343,9 +243,6 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
-
-    fun getBalances(): BalancesApiResponse =
-        tryGetBalances().assertSuccess()
 
     fun tryGetBalances(): Either<ApiCallFailure, BalancesApiResponse> =
         executeAndTrace(
@@ -362,14 +259,63 @@ class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceReco
             httpClient.newCall(request).execute()
         }
     }
+
+    open fun getConfiguration(): ConfigurationApiResponse =
+        tryGetConfiguration().throwOrReturn()
+
+    open fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
+        tryCreateOrder(apiRequest).throwOrReturn()
+
+    open fun batchOrders(apiRequest: BatchOrdersApiRequest): BatchOrdersApiResponse =
+        tryBatchOrders(apiRequest).throwOrReturn()
+
+    open fun updateOrder(apiRequest: UpdateOrderApiRequest): UpdateOrderApiResponse {
+        return tryUpdateOrder(apiRequest).throwOrReturn()
+    }
+
+    open fun cancelOrder(apiRequest: CancelOrderApiRequest) =
+        tryCancelOrder(apiRequest).throwOrReturn()
+
+    open fun getOrder(id: OrderId): Order =
+        tryGetOrder(id).throwOrReturn()
+
+    open fun listOrders(): OrdersApiResponse =
+        tryListOrders().throwOrReturn()
+
+    open fun cancelOpenOrders() =
+        tryCancelOpenOrders().throwOrReturn()
+
+    open fun createDeposit(apiRequest: CreateDepositApiRequest): DepositApiResponse =
+        tryCreateDeposit(apiRequest).throwOrReturn()
+
+    open fun getDeposit(id: DepositId): DepositApiResponse =
+        tryGetDeposit(id).throwOrReturn()
+
+    open fun listDeposits(): ListDepositsApiResponse =
+        tryListDeposits().throwOrReturn()
+
+    open fun createWithdrawal(apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse =
+        tryCreateWithdrawal(apiRequest).throwOrReturn()
+
+    open fun getWithdrawal(id: WithdrawalId): WithdrawalApiResponse =
+        tryGetWithdrawal(id).throwOrReturn()
+
+    open fun listWithdrawals(): ListWithdrawalsApiResponse =
+        tryListWithdrawals().throwOrReturn()
+
+    open fun getBalances(): BalancesApiResponse =
+        tryGetBalances().throwOrReturn()
+}
+
+fun <T> Either<ApiCallFailure, T>.throwOrReturn(): T {
+    if (this.isLeft()) {
+        throw Exception(this.leftOrNull()?.error?.displayMessage ?: "Unknown Error")
+    }
+    return this.getOrNull()!!
 }
 
 val json = Json {
     this.ignoreUnknownKeys = true
-}
-
-val prettyJsonFormatter = Json {
-    this.prettyPrint = true
 }
 
 fun Request.withAuthHeaders(ecKeyPair: ECKeyPair?): Request =
@@ -378,16 +324,6 @@ fun Request.withAuthHeaders(ecKeyPair: ECKeyPair?): Request =
     } else {
         addHeaders(ApiClient.authHeaders(ecKeyPair))
     }
-
-fun Response.apiError(): ApiError? {
-    return this.body?.string()?.let {
-        try {
-            json.decodeFromString<ApiErrors>(it).errors.single()
-        } catch (e: Exception) {
-            null
-        }
-    }
-}
 
 inline fun <reified T> Response.toErrorOrPayload(expectedStatusCode: Int): Either<ApiCallFailure, T> {
     return either {
@@ -402,9 +338,7 @@ inline fun <reified T> Response.toErrorOrPayload(expectedStatusCode: Int): Eithe
                 }
             }
 
-            assertNotNull(apiError, "API call failed with code: $code, body: $bodyString")
-
-            ApiCallFailure(code, apiError!!)
+            ApiCallFailure(code, apiError)
         }
 
         json.decodeFromString<T>(bodyString!!)
@@ -424,39 +358,9 @@ fun Response.toErrorOrUnit(expectedStatusCode: Int): Either<ApiCallFailure, Unit
                 }
             }
 
-            assertNotNull(apiError, "API call failed with code: $code, body: $bodyString")
-
-            ApiCallFailure(code, apiError!!)
+            ApiCallFailure(code, apiError)
         }
     }
-}
-
-fun <T> Either<ApiCallFailure, T>.assertSuccess(): T {
-    if (this.isLeft()) {
-        fail(
-            "Unexpected API error: ${this.leftOrNull()}. ${
-                runCatching { ApiClient.getSequencerStateDump() }.map { " Sequencer state: ${prettyJsonFormatter.encodeToString(it) }" }
-            }",
-        )
-    }
-    return this.getOrNull()!!
-}
-
-fun Either<ApiCallFailure, Any>.assertError(expectedHttpCode: Int, expectedError: ApiError) {
-    if (this.isRight()) {
-        fail("Expected API error, but got a success response")
-    }
-    val failure = this.leftOrNull()!!
-    assertEquals(expectedHttpCode, failure.httpCode)
-    assertEquals(expectedError, failure.error)
-}
-
-fun Either<ApiCallFailure, Any>.assertError(expectedError: ApiError) {
-    if (this.isRight()) {
-        fail("Expected API error, but got a success response")
-    }
-    val failure = this.leftOrNull()!!
-    assertEquals(expectedError, failure.error)
 }
 
 private fun Request.addHeaders(headers: Headers): Request =
@@ -469,10 +373,6 @@ private fun Request.addHeaders(headers: Headers): Request =
                 .addAll(headers)
                 .build(),
         ).build()
-
-fun base64UrlEncode(input: String): String {
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(input.toByteArray())
-}
 
 val Headers.Companion.empty: Headers
     get() = emptyMap<String, String>().toHeaders()

@@ -1,6 +1,7 @@
 package co.chainring.tasks
 
 import co.chainring.contracts.generated.MockERC20
+import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.GasProvider
 import co.chainring.core.db.DbConfig
@@ -17,8 +18,7 @@ import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.Keys
-import org.web3j.protocol.Web3jService
-import org.web3j.protocol.core.JsonRpc2_0Web3j
+import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.methods.response.VoidResponse
 import org.web3j.protocol.http.HttpService
@@ -32,8 +32,9 @@ data class SymbolContractAddress(
     val address: Address
 )
 
-fun seedBlockchain(fixtures: Fixtures, chainRpcUrl: String, privateKey: String): List<SymbolContractAddress> {
-    val blockchainClient = BlockchainClient(BlockchainClientConfig(url = chainRpcUrl, privateKeyHex = privateKey))
+val blockchainClient = FixturesBlockchainClient()
+
+fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
     val db = Database.connect(DbConfig())
     TransactionManager.defaultDatabase = db
 
@@ -87,57 +88,7 @@ fun seedBlockchain(fixtures: Fixtures, chainRpcUrl: String, privateKey: String):
     return symbolContractAddresses
 }
 
-private class BlockchainClient(config: BlockchainClientConfig = BlockchainClientConfig()) {
-    class AnvilRpc(web3jService: Web3jService) : JsonRpc2_0Web3j(
-        web3jService, System.getenv("EVM_NETWORK_POLLING_INTERVAL")?.toLong() ?: 1000L, Async.defaultExecutorService()
-    ) {
-        fun setBalance(address: Address, amount: BigInteger): Request<String, VoidResponse?> =
-            Request(
-                "anvil_setBalance",
-                listOf<String>(address.value, Numeric.encodeQuantity(amount)),
-                web3jService,
-                VoidResponse::class.java
-            )
-
-        fun setAutomine(value: Boolean): Request<Boolean, VoidResponse?> =
-            Request(
-                "evm_setAutomine",
-                listOf(value),
-                web3jService,
-                VoidResponse::class.java
-            )
-
-        fun mineBlock(): Request<String, VoidResponse?> =
-            Request(
-                "anvil_mine",
-                listOf<String>(),
-                web3jService,
-                VoidResponse::class.java
-            )
-    }
-
-    private val web3j = AnvilRpc(HttpService(config.url, OkHttpClient.Builder().build()))
-    private val credentials = Credentials.create(config.privateKeyHex)
-    private val chainId = ChainId(web3j.ethChainId().send().chainId)
-    private val transactionManager = RawTransactionManager(
-        web3j,
-        credentials,
-        chainId.value.toLong(),
-        PollingTransactionReceiptProcessor(
-            web3j,
-            config.deploymentPollingIntervalInMs,
-            config.maxPollingAttempts.toInt(),
-        ),
-    )
-
-    private val gasProvider = GasProvider(
-        contractCreationLimit = config.contractCreationLimit,
-        contractInvocationLimit = config.contractInvocationLimit,
-        defaultMaxPriorityFeePerGas = config.defaultMaxPriorityFeePerGasInWei,
-        chainId = chainId.toLong(),
-        web3j = web3j,
-    )
-
+class FixturesBlockchainClient(config: BlockchainClientConfig = BlockchainClientConfig(enableWeb3jLogging = false)) : BlockchainClient(config) {
     fun deployMockERC20(tokenName: String, decimals: BigInteger): Address {
         val contract = MockERC20.deploy(
             web3j,
@@ -148,15 +99,6 @@ private class BlockchainClient(config: BlockchainClientConfig = BlockchainClient
             decimals
         ).send()
         return Address(Keys.toChecksumAddress(contract.contractAddress))
-    }
-
-    fun getERC20Balance(tokenContractAddress: Address, holder: Address): BigInteger {
-        return MockERC20.load(
-            tokenContractAddress.value,
-            web3j,
-            transactionManager,
-            gasProvider
-        ).balanceOf(holder.value).send()
     }
 
     fun mintERC20(
@@ -185,15 +127,12 @@ private class BlockchainClient(config: BlockchainClientConfig = BlockchainClient
         ).burn(receiver.value, amount).send()
     }
 
-    fun setNativeBalance(
-        address: Address,
-        amount: BigInteger
-    ) {
-        web3j.setBalance(address, amount).send()
-    }
-
-    fun mineBlock() = web3j.mineBlock().send()
-    fun activateAutomine() = web3j.setAutomine(value = true).send()
-    fun deactivateAutomine() = web3j.setAutomine(value = false).send()
+    fun setNativeBalance(address: Address, amount: BigInteger) =
+        Request(
+            "anvil_setBalance",
+            listOf<String>(address.value, Numeric.encodeQuantity(amount)),
+            web3jService,
+            VoidResponse::class.java
+        ).send()
 }
 

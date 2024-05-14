@@ -55,8 +55,11 @@ dependencies {
     implementation("org.http4k:http4k-format-argo:$http4kVersion")
     implementation("org.http4k:http4k-server-netty:$http4kVersion")
     implementation("org.http4k:http4k-client-okhttp:$http4kVersion")
+    implementation("org.http4k:http4k-client-websocket:$http4kVersion")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    implementation("io.arrow-kt:arrow-core:1.2.1")
 
     implementation("de.fxlae:typeid-java:0.2.0")
     implementation("org.awaitility:awaitility-kotlin:4.2.0")

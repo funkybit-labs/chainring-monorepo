@@ -105,22 +105,26 @@ class Broadcaster(val db: Database) {
         }
     }
 
-    fun unsubscribe(topic: SubscriptionTopic, client: ConnectedClient) {
+    fun unsubscribe(topic: SubscriptionTopic, client: ConnectedClient): Boolean {
         subscriptions[topic]?.remove(client)
         if (topic is SubscriptionTopic.Prices) {
             lastPricePublish.remove(Pair(topic.marketId, client))
         }
-        client.principal?.also { principal ->
+        return client.principal?.let { principal ->
             subscriptionsByPrincipal[principal]?.get(topic)?.remove(client)
-        }
+            subscriptionsByPrincipal[principal]?.get(topic)?.isNotEmpty() ?: false
+        } ?: false
     }
 
     fun unsubscribe(client: ConnectedClient) {
-        subscriptions.keys.forEach { topic ->
+        val hasSubscriptions = subscriptions.keys.map { topic ->
             unsubscribe(topic, client)
-        }
+        }.toSet().contains(true)
+
         client.principal?.also { principal ->
-            subscriptionsByPrincipal.remove(principal)
+            if (!hasSubscriptions) {
+                subscriptionsByPrincipal.remove(principal)
+            }
         }
     }
 
