@@ -65,32 +65,28 @@ export default function HomeScreen() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2 space-y-4">
                   <PricesWidget market={selectedMarket} />
-                  {wallet.address && symbols && exchangeContract && (
+                  {symbols && (
                     <BalancesWidget
                       walletAddress={wallet.address}
-                      exchangeContractAddress={exchangeContract.address}
+                      exchangeContractAddress={exchangeContract?.address}
                       symbols={symbols}
                     />
                   )}
                 </div>
                 <div className="col-span-1 space-y-4">
-                  {wallet.address && exchangeContract && (
-                    <OrderTicketWidget
-                      market={selectedMarket}
-                      walletAddress={wallet.address}
-                      exchangeContractAddress={exchangeContract.address}
-                    />
-                  )}
+                  <OrderTicketWidget
+                    market={selectedMarket}
+                    walletAddress={wallet.address}
+                    exchangeContractAddress={exchangeContract?.address}
+                  />
                   <OrderBookWidget marketId={selectedMarket.id} />
                 </div>
                 <div className="col-span-3  space-y-4">
-                  {wallet.address && exchangeContract && (
-                    <OrdersAndTradesWidget
-                      markets={markets}
-                      walletAddress={wallet.address}
-                      exchangeContractAddress={exchangeContract.address}
-                    />
-                  )}
+                  <OrdersAndTradesWidget
+                    markets={markets}
+                    walletAddress={wallet.address}
+                    exchangeContractAddress={exchangeContract?.address}
+                  />
                 </div>
               </div>
             </div>

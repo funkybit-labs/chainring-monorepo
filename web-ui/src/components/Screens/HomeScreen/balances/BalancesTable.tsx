@@ -21,8 +21,8 @@ export function BalancesTable({
   exchangeContractAddress,
   symbols
 }: {
-  walletAddress: Address
-  exchangeContractAddress: Address
+  walletAddress?: Address
+  exchangeContractAddress?: Address
   symbols: TradingSymbols
 }) {
   const [depositSymbol, setDepositSymbol] = useState<TradingSymbol | null>(null)
@@ -81,6 +81,7 @@ export function BalancesTable({
               </div>
               <div className="mb-4 mr-4 inline-block text-xs">
                 <Button
+                  style={'normal'}
                   caption={() => (
                     <span className="whitespace-nowrap">
                       Deposit{' '}
@@ -93,6 +94,7 @@ export function BalancesTable({
               </div>
               <div className="mb-4 inline-block text-xs">
                 <Button
+                  style={'normal'}
                   caption={() => (
                     <span className="whitespace-nowrap">
                       Withdraw{' '}
@@ -115,8 +117,8 @@ export function BalancesTable({
       {depositSymbol && (
         <DepositModal
           isOpen={showDepositModal}
-          exchangeContractAddress={exchangeContractAddress}
-          walletAddress={walletAddress}
+          exchangeContractAddress={exchangeContractAddress!}
+          walletAddress={walletAddress!}
           symbol={depositSymbol}
           close={() => setShowDepositModal(false)}
           onClosed={() => setDepositSymbol(null)}
@@ -126,8 +128,8 @@ export function BalancesTable({
       {withdrawSymbol && (
         <WithdrawalModal
           isOpen={showWithdrawalModal}
-          exchangeContractAddress={exchangeContractAddress}
-          walletAddress={walletAddress}
+          exchangeContractAddress={exchangeContractAddress!}
+          walletAddress={walletAddress!}
           symbol={withdrawSymbol}
           close={() => setShowWithdrawalModal(false)}
           onClosed={() => setWithdrawSymbol(null)}

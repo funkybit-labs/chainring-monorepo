@@ -18,6 +18,8 @@ import { MarketTitle } from 'components/Screens/HomeScreen/MarketSelector'
 import { Status } from 'components/common/Status'
 import Edit from 'assets/Edit.svg'
 import Trash from 'assets/Trash.svg'
+import { Button } from 'components/common/Button'
+import { useWeb3Modal } from '@web3modal/wagmi/react'
 
 export default function OrdersAndTradesWidget({
   markets,
@@ -25,8 +27,8 @@ export default function OrdersAndTradesWidget({
   walletAddress
 }: {
   markets: Markets
-  exchangeContractAddress: Address
-  walletAddress: Address
+  exchangeContractAddress?: Address
+  walletAddress?: Address
 }) {
   const [orders, setOrders] = useState<Order[]>(() => [])
   const [changedOrder, setChangedOrder] = useState<Order | null>(null)
@@ -38,6 +40,7 @@ export default function OrdersAndTradesWidget({
   const [selectedTab, setSelectedTab] = useState<'orders' | 'trade-history'>(
     'orders'
   )
+  const { open: openWalletConnectModal } = useWeb3Modal()
 
   useWebsocketSubscription({
     topics: useMemo(() => [ordersTopic, tradesTopic], []),
@@ -101,10 +104,10 @@ export default function OrdersAndTradesWidget({
             { name: 'nonce', type: 'int256' }
           ]
         },
-        domain: getDomain(exchangeContractAddress, config.state.chainId),
+        domain: getDomain(exchangeContractAddress!, config.state.chainId),
         primaryType: 'CancelOrder',
         message: {
-          sender: walletAddress,
+          sender: walletAddress!,
           marketId: order.marketId,
           amount: order.side == 'Buy' ? order.amount : -order.amount,
           nonce: BigInt('0x' + nonce)
@@ -223,8 +226,8 @@ export default function OrdersAndTradesWidget({
             isOpen={showChangeModal}
             order={changedOrder}
             markets={markets}
-            exchangeContractAddress={exchangeContractAddress}
-            walletAddress={walletAddress}
+            exchangeContractAddress={exchangeContractAddress!}
+            walletAddress={walletAddress!}
             close={() => setShowChangeModal(false)}
             onClosed={() => setChangedOrder(null)}
           />
@@ -341,14 +344,32 @@ export default function OrdersAndTradesWidget({
             </div>
           </div>
           <div className="mt-4">
-            {(function () {
-              switch (selectedTab) {
-                case 'orders':
-                  return ordersContent()
-                case 'trade-history':
-                  return tradeHistoryContent()
-              }
-            })()}
+            {walletAddress !== undefined &&
+            exchangeContractAddress !== undefined ? (
+              (function () {
+                switch (selectedTab) {
+                  case 'orders':
+                    return ordersContent()
+                  case 'trade-history':
+                    return tradeHistoryContent()
+                }
+              })()
+            ) : (
+              <div className="flex w-full flex-col place-items-center">
+                <div className="mb-4 text-darkBluishGray2">
+                  If you want to see your{' '}
+                  {selectedTab == 'orders' ? 'orders' : 'trade history'},
+                  connect your wallet.
+                </div>
+                <Button
+                  primary={true}
+                  caption={() => <>Connect Wallet</>}
+                  style={'normal'}
+                  disabled={false}
+                  onClick={() => openWalletConnectModal({ view: 'Connect' })}
+                />
+              </div>
+            )}
           </div>
         </>
       }
