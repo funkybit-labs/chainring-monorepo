@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+.svg-main {
+}
+.svg-disabled-overlay {
+}
+.svg-disabled-overlay rect {
+  fill: #1B222B;
+  opacity: 0.8;
+}
 .x-axis .domain {
   display: none;
 }

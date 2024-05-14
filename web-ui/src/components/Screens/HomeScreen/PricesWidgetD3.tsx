@@ -56,6 +56,7 @@ export function PricesWidgetD3({ market }: { market: Market }) {
   )
   const [duration, setDuration] = useState<OHLCDuration>('P5M')
   const [ohlc, setOhlc] = useState<OHLC[]>([])
+  const [ohlcLoaded, setOhlcLoaded] = useState<boolean>(false)
   const [dailyChange, setDailyChange] = useState<number | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
@@ -78,6 +79,7 @@ export function PricesWidgetD3({ market }: { market: Market }) {
             setDailyChange(message.dailyChange)
           }
           setLastUpdated(new Date())
+          setOhlcLoaded(true)
         }
       },
       [duration]
@@ -111,6 +113,7 @@ export function PricesWidgetD3({ market }: { market: Market }) {
                 selectedDuration={duration}
                 onChange={(int: PricesInterval) => {
                   setDuration(intervalToOHLCDuration[int])
+                  setOhlcLoaded(false)
                   setInterval(int)
                 }}
               />
@@ -121,6 +124,7 @@ export function PricesWidgetD3({ market }: { market: Market }) {
           </div>
           <div className="size-full min-h-[500px] pl-2 pt-4">
             <OHLCChart
+              disabled={!ohlcLoaded}
               ohlc={ohlc}
               lastPrice={lastPrice()}
               params={{
@@ -147,10 +151,12 @@ type PricesParameters = {
 }
 
 function OHLCChart({
+  disabled,
   params,
   ohlc,
   lastPrice
 }: {
+  disabled: boolean
   params: PricesParameters
   ohlc: OHLC[]
   lastPrice: number | null
@@ -335,7 +341,13 @@ function OHLCChart({
 
   // listen to zoom events, and then call transform first time to draw the graph
   // @ts-expect-error @definitelytyped/no-unnecessary-generics
-  svg.call(zoom).call(zoom.transform, zoomRef.current)
+  svg.select('.svg-main').call(zoom).call(zoom.transform, zoomRef.current)
+
+  // blocking overlay area
+  svg
+    .select('.svg-disabled-overlay')
+    .classed('hidden', !disabled)
+    .classed('block', disabled)
 
   return (
     <svg
@@ -344,32 +356,48 @@ function OHLCChart({
       height={params.height}
       style={{
         overflow: 'hidden'
-        //backgroundColor: 'green'
       }}
     >
-      <g
-        className="x-axis text-xs text-darkBluishGray4"
-        transform={`translate(0,${innerHeight})`}
-      />
-      <g className="y-axis-grid" transform={`translate(${innerWidth},0)`} />
-      <g className="y-axis-ohlc" />
-      <g className="y-axis-bg">
-        <rect x={innerWidth} y="0" width={margin.right} height={innerHeight} />
-      </g>
-      <g
-        className="y-axis text-xs text-darkBluishGray4"
-        transform={`translate(${innerWidth},0)`}
-      />
-      <g className="y-axis-current-price text-xs">
-        <line x1="0" x2={innerWidth} y1="0" y2="0" />
+      <g className="svg-main">
         <rect
-          x={innerWidth - 5}
-          y="-10"
-          width={margin.right + 5}
-          height="20"
-          rx="3"
+          className="opacity-0"
+          x="0"
+          y="0"
+          width={params.width}
+          height={params.height}
         />
-        <text transform={`translate(${innerWidth - 1},4)`}>17.85</text>
+        <g
+          className="x-axis text-xs text-darkBluishGray4"
+          transform={`translate(0,${innerHeight})`}
+        />
+        <g className="y-axis-grid" transform={`translate(${innerWidth},0)`} />
+        <g className="y-axis-ohlc" />
+        <g className="y-axis-bg">
+          <rect
+            x={innerWidth}
+            y="0"
+            width={margin.right}
+            height={innerHeight}
+          />
+        </g>
+        <g
+          className="y-axis text-xs text-darkBluishGray4"
+          transform={`translate(${innerWidth},0)`}
+        />
+        <g className="y-axis-current-price text-xs">
+          <line x1="0" x2={innerWidth} y1="0" y2="0" />
+          <rect
+            x={innerWidth - 5}
+            y="-10"
+            width={margin.right + 5}
+            height="20"
+            rx="3"
+          />
+          <text transform={`translate(${innerWidth - 1},4)`}>17.85</text>
+        </g>
+      </g>
+      <g className="svg-disabled-overlay">
+        <rect x="0" y="0" width={params.width} height={params.height} />
       </g>
     </svg>
   )
