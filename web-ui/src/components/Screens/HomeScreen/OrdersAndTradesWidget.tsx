@@ -1,7 +1,6 @@
 import { apiClient, CancelOrderRequest, Order, Trade } from 'apiClient'
-import { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
-import { TrashIcon } from '@heroicons/react/24/outline'
 import { Address, formatUnits } from 'viem'
 import { format } from 'date-fns'
 import { produce } from 'immer'
@@ -15,6 +14,12 @@ import { getColumnsForWidth, useWindowDimensions } from 'utils/layout'
 import { generateOrderNonce, getDomain } from 'utils/eip712'
 import { useConfig, useSignTypedData } from 'wagmi'
 import { ChangeOrderModal } from 'components/Screens/HomeScreen/ChangeOrderModal'
+import { MarketTitle } from 'components/Screens/HomeScreen/MarketSelector'
+import { Status } from 'components/common/Status'
+import Edit from 'assets/Edit.svg'
+import Trash from 'assets/Trash.svg'
+import { Button } from 'components/common/Button'
+import { useWeb3Modal } from '@web3modal/wagmi/react'
 
 export default function OrdersAndTradesWidget({
   markets,
@@ -22,8 +27,8 @@ export default function OrdersAndTradesWidget({
   walletAddress
 }: {
   markets: Markets
-  exchangeContractAddress: Address
-  walletAddress: Address
+  exchangeContractAddress?: Address
+  walletAddress?: Address
 }) {
   const [orders, setOrders] = useState<Order[]>(() => [])
   const [changedOrder, setChangedOrder] = useState<Order | null>(null)
@@ -32,6 +37,10 @@ export default function OrdersAndTradesWidget({
   const windowDimensions = useWindowDimensions()
   const config = useConfig()
   const { signTypedDataAsync } = useSignTypedData()
+  const [selectedTab, setSelectedTab] = useState<'orders' | 'trade-history'>(
+    'orders'
+  )
+  const { open: openWalletConnectModal } = useWeb3Modal()
 
   useWebsocketSubscription({
     topics: useMemo(() => [ordersTopic, tradesTopic], []),
@@ -95,10 +104,10 @@ export default function OrdersAndTradesWidget({
             { name: 'nonce', type: 'int256' }
           ]
         },
-        domain: getDomain(exchangeContractAddress, config.state.chainId),
+        domain: getDomain(exchangeContractAddress!, config.state.chainId),
         primaryType: 'CancelOrder',
         message: {
-          sender: walletAddress,
+          sender: walletAddress!,
           marketId: order.marketId,
           amount: order.side == 'Buy' ? order.amount : -order.amount,
           nonce: BigInt('0x' + nonce)
@@ -140,24 +149,15 @@ export default function OrdersAndTradesWidget({
       <>
         <div className="max-h-96 min-h-24 overflow-scroll">
           <table className="relative w-full text-left text-sm">
-            <thead className="sticky top-0 bg-black">
+            <thead className="sticky top-0 font-normal text-darkBluishGray2">
               <tr key="header">
-                <th className="min-w-32">Date</th>
-                <th className="min-w-16 pl-4">Side</th>
-                <th className="min-w-20 pl-4">Amount</th>
-                <th className="min-w-20 pl-4">Market</th>
-                <th className="min-w-20 pl-4">Price</th>
-                <th className="min-w-20 pl-4">Status</th>
-                <th className="pl-4"></th>
-              </tr>
-              <tr key="header-divider">
-                <th className="h-px bg-lightBackground p-0"></th>
-                <th className="h-px bg-lightBackground p-0"></th>
-                <th className="h-px bg-lightBackground p-0"></th>
-                <th className="h-px bg-lightBackground p-0"></th>
-                <th className="h-px bg-lightBackground p-0"></th>
-                <th className="h-px bg-lightBackground p-0"></th>
-                <th className="h-px bg-lightBackground p-0"></th>
+                <td className="pl-4">Date</td>
+                <td className="pl-4">Side</td>
+                <td className="pl-4">Amount</td>
+                <td className="pl-4">Price</td>
+                <td className="pl-4">Market</td>
+                <td className="pl-4 text-center">Status</td>
+                <td className="px-4">Edit</td>
               </tr>
             </thead>
             <tbody>
@@ -168,37 +168,48 @@ export default function OrdersAndTradesWidget({
                   <tr
                     key={order.id}
                     className={classNames(
-                      'duration-200 ease-in-out hover:cursor-default hover:bg-mutedGray',
-                      order.status == 'Cancelled' ? 'line-through' : ''
+                      'duration-200 ease-in-out hover:cursor-default hover:bg-darkBluishGray6'
                     )}
                   >
-                    <td>{format(order.timing.createdAt, 'MM/dd HH:mm:ss')}</td>
+                    <td className="h-12 rounded-l pl-4">
+                      <span className="mr-2 text-lightBluishGray5">
+                        {format(order.timing.createdAt, 'MM/dd')}
+                      </span>
+                      <span className="text-white">
+                        {format(order.timing.createdAt, 'HH:mm:ss a')}
+                      </span>
+                    </td>
                     <td className="pl-4">{order.side}</td>
                     <td className="pl-4">
                       {formatUnits(order.amount, market.baseSymbol.decimals)}
                     </td>
-                    <td className="pl-4">{order.marketId}</td>
                     <td className="pl-4">
                       {order.type == 'limit'
                         ? order.price.toFixed(market.quoteDecimalPlaces)
                         : 'MKT'}
                     </td>
-                    <td className="pl-4">{order.status}</td>
-                    <td className="py-1 pl-4">
+                    <td className="pl-4">
+                      <MarketTitle market={market} />
+                    </td>
+                    <td className="pl-4 text-center">
+                      <Status status={order.status} />
+                    </td>
+                    <td className="rounded-r py-1 pl-4">
                       {!order.isFinal() && (
                         <div className="flex items-center gap-2">
                           <button
-                            className="rounded-lg bg-darkGray px-2 py-0.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray"
+                            className="rounded bg-darkBluishGray7 p-2 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray"
                             onClick={() => openEditModal(order)}
                             disabled={!cancelOrderMutation.isIdle}
                           >
-                            Change
+                            <img src={Edit} alt={'Change'} />
                           </button>
                           <button
+                            className="rounded bg-darkBluishGray7 p-2 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray"
                             onClick={() => cancelOrder(order)}
                             disabled={!cancelOrderMutation.isIdle}
                           >
-                            <TrashIcon className="size-4" />
+                            <img src={Trash} alt={'Cancel'} />
                           </button>
                         </div>
                       )}
@@ -215,8 +226,8 @@ export default function OrdersAndTradesWidget({
             isOpen={showChangeModal}
             order={changedOrder}
             markets={markets}
-            exchangeContractAddress={exchangeContractAddress}
-            walletAddress={walletAddress}
+            exchangeContractAddress={exchangeContractAddress!}
+            walletAddress={walletAddress!}
             close={() => setShowChangeModal(false)}
             onClosed={() => setChangedOrder(null)}
           />
@@ -230,24 +241,15 @@ export default function OrdersAndTradesWidget({
       <>
         <div className="max-h-96 min-h-24 overflow-scroll">
           <table className="relative w-full text-left text-sm">
-            <thead className="sticky top-0 bg-black">
+            <thead className="sticky top-0 font-normal text-darkBluishGray2">
               <tr key="header">
-                <th className="min-w-32">Date</th>
-                <th className="min-w-16 pl-4">Side</th>
-                <th className="min-w-20 pl-4">Amount</th>
-                <th className="min-w-20 pl-4">Market</th>
-                <th className="min-w-20 pl-4">Price</th>
-                <th className="min-w-20 pl-4">Fee</th>
-                <th className="min-w-20 pl-4">Settlement</th>
-              </tr>
-              <tr key="header-divider">
-                <th className="h-px bg-lightBackground p-0"></th>
-                <th className="h-px bg-lightBackground p-0"></th>
-                <th className="h-px bg-lightBackground p-0"></th>
-                <th className="h-px bg-lightBackground p-0"></th>
-                <th className="h-px bg-lightBackground p-0"></th>
-                <th className="h-px bg-lightBackground p-0"></th>
-                <th className="h-px bg-lightBackground p-0"></th>
+                <td className="pl-4">Date</td>
+                <td className="pl-4">Side</td>
+                <td className="pl-4">Amount</td>
+                <td className="pl-4">Price</td>
+                <td className="pl-4">Fee</td>
+                <td className="pl-4">Market</td>
+                <td className="pl-4 text-center">Status</td>
               </tr>
             </thead>
             <tbody>
@@ -257,14 +259,20 @@ export default function OrdersAndTradesWidget({
                 return (
                   <tr
                     key={`${trade.id}-${trade.side}`}
-                    className="duration-200 ease-in-out hover:cursor-default hover:bg-mutedGray"
+                    className="duration-200 ease-in-out hover:cursor-default hover:bg-darkBluishGray6"
                   >
-                    <td>{format(trade.timestamp, 'MM/dd HH:mm:ss')}</td>
+                    <td className="h-12 rounded-l pl-4">
+                      <span className="mr-2 text-lightBluishGray5">
+                        {format(trade.timestamp, 'MM/dd')}
+                      </span>
+                      <span className="text-white">
+                        {format(trade.timestamp, 'HH:mm:ss a')}
+                      </span>
+                    </td>
                     <td className="pl-4">{trade.side}</td>
                     <td className="pl-4">
                       {formatUnits(trade.amount, market.baseSymbol.decimals)}
                     </td>
-                    <td className="pl-4">{trade.marketId}</td>
                     <td className="pl-4">
                       {trade.price.toFixed(market.quoteDecimalPlaces)}
                     </td>
@@ -274,7 +282,12 @@ export default function OrdersAndTradesWidget({
                         market.quoteSymbol.decimals
                       )}
                     </td>
-                    <td className="pl-4">{trade.settlementStatus}</td>
+                    <td className="pl-4">
+                      <MarketTitle market={market} />
+                    </td>
+                    <td className="rounded-r pl-4 text-center">
+                      <Status status={trade.settlementStatus} />
+                    </td>
                   </tr>
                 )
               })}
@@ -290,11 +303,74 @@ export default function OrdersAndTradesWidget({
       span={Math.min(2, getColumnsForWidth(windowDimensions.width))}
       contents={
         <>
-          <div className="font-bold">Orders</div>
-          {ordersContent()}
-          <hr />
-          <div className="mt-4 font-bold">Trade History</div>
-          {tradeHistoryContent()}
+          <div className="flex w-full text-center font-medium">
+            <div
+              className={classNames(
+                'cursor-pointer border-b-2 mr-4 w-full h-10 flex-col content-end pb-1',
+                selectedTab == 'orders'
+                  ? 'border-b-primary4'
+                  : 'border-b-darkBluishGray3'
+              )}
+              onClick={() => setSelectedTab('orders')}
+            >
+              <div
+                className={
+                  selectedTab == 'orders'
+                    ? 'text-primary4'
+                    : 'text-darkBluishGray3'
+                }
+              >
+                Orders
+              </div>
+            </div>
+            <div
+              className={classNames(
+                'cursor-pointer border-b-2 ml-4 w-full h-10 flex-col content-end pb-1',
+                selectedTab == 'trade-history'
+                  ? 'border-b-primary4'
+                  : 'border-b-darkBluishGray3'
+              )}
+              onClick={() => setSelectedTab('trade-history')}
+            >
+              <div
+                className={
+                  selectedTab == 'trade-history'
+                    ? 'text-primary4'
+                    : 'text-darkBluishGray3'
+                }
+              >
+                Trade History
+              </div>
+            </div>
+          </div>
+          <div className="mt-4">
+            {walletAddress !== undefined &&
+            exchangeContractAddress !== undefined ? (
+              (function () {
+                switch (selectedTab) {
+                  case 'orders':
+                    return ordersContent()
+                  case 'trade-history':
+                    return tradeHistoryContent()
+                }
+              })()
+            ) : (
+              <div className="flex w-full flex-col place-items-center">
+                <div className="mb-4 text-darkBluishGray2">
+                  If you want to see your{' '}
+                  {selectedTab == 'orders' ? 'orders' : 'trade history'},
+                  connect your wallet.
+                </div>
+                <Button
+                  primary={true}
+                  caption={() => <>Connect Wallet</>}
+                  style={'normal'}
+                  disabled={false}
+                  onClick={() => openWalletConnectModal({ view: 'Connect' })}
+                />
+              </div>
+            )}
+          </div>
         </>
       }
     />
