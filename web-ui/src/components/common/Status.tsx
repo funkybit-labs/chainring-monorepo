@@ -92,7 +92,7 @@ export function Status({
         className={classNames(
           textColor(),
           'font-medium',
-          'flex place-items-center'
+          'bg-darkBluishGray8 px-4 py-2 rounded min-w-16'
         )}
       >
         <img className="mr-2 inline" src={icon()} alt={universalStatus} />

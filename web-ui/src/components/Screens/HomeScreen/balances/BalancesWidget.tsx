@@ -136,7 +136,7 @@ export default function BalancesWidget({
                 )}
               </div>
             </div>
-            <div className="mt-4">
+            <div className="mt-8">
               {(function () {
                 switch (selectedTab) {
                   case 'available':

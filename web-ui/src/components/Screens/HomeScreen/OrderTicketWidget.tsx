@@ -175,10 +175,12 @@ export default function OrderTicketWidget({
                 market,
                 orderBook
               )
-        const quantity =
-          (quoteAmount * BigInt(Math.pow(10, baseSymbol.decimals))) /
-          indicativePrice
-        setBaseAmountInputValue(formatUnits(quantity, baseSymbol.decimals))
+        if (indicativePrice !== 0n) {
+          const quantity =
+            (quoteAmount * BigInt(Math.pow(10, baseSymbol.decimals))) /
+            indicativePrice
+          setBaseAmountInputValue(formatUnits(quantity, baseSymbol.decimals))
+        }
       }
     }
   }, [

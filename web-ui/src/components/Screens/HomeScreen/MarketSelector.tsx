@@ -62,7 +62,7 @@ export function MarketSelector({
   )
 }
 
-function MarketTitle({ market }: { market: Market }) {
+export function MarketTitle({ market }: { market: Market }) {
   return (
     <div className="flex place-items-center truncate">
       <SymbolIcon

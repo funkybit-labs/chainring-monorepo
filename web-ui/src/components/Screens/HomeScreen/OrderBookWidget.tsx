@@ -114,11 +114,11 @@ export function OrderBookWidget({ marketId }: { marketId: string }) {
 function directionStyle(direction: Direction) {
   switch (direction) {
     case 'Up':
-      return { color: '#42C66B', symbol: ' ↘︎' }
+      return { textColor: '#42C66B', arrowColor: '#42C66B', symbol: ' ↗︎' }
     case 'Down':
-      return { color: '#FF7169', symbol: ' ↘︎' }
+      return { textColor: '#FF7169', arrowColor: '#FF7169', symbol: ' ↘︎' }
     case 'Unchanged':
-      return { color: 'transparent', symbol: '' }
+      return { textColor: '#BABEC5', arrowColor: 'transparent', symbol: '' }
   }
 }
 
@@ -243,12 +243,12 @@ export function OrderBook({
       <text
         x={0}
         y={params.buyStartY - 12}
-        fill={direction.color}
+        fill={direction.textColor}
         textAnchor="left"
         fontSize="24px"
       >
         {orderBook.last.price}
-        <tspan fill={direction.color}>{direction.symbol}</tspan>
+        <tspan fill={direction.arrowColor}>{direction.symbol}</tspan>
       </text>
     </svg>
   )
