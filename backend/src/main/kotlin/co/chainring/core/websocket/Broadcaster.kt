@@ -39,6 +39,7 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.time.Duration.Companion.hours
 
 private val logger = KotlinLogging.logger {}
 
@@ -67,6 +68,7 @@ class Broadcaster(val db: Database) {
     private val lastPricePublish = mutableMapOf<Pair<MarketId, ConnectedClient>, Instant>()
     private val orderBooksByMarket = ConcurrentHashMap<MarketId, OrderBook>()
     private val pricesByMarketAndPeriod = ConcurrentHashMap<SubscriptionTopic.Prices, MutableList<OHLC>>()
+    private val pricesDailyChangeByMarket = ConcurrentHashMap<MarketId, Double>()
 
     private val pgListener = PgListener(
         db,
@@ -139,8 +141,17 @@ class Broadcaster(val db: Database) {
                     // equivalent to 7 days of 5 minutes intervals
                     val startTime = Clock.System.now() - duration.interval() * 20 * 24 * 7
 
-                    val ohlcEntities = OHLCEntity.findFrom(market, duration, startTime = startTime)
+                    val ohlcEntities = OHLCEntity.fetchForMarketStartingFrom(market, duration, startTime = startTime)
                     pricesByMarketAndPeriod[SubscriptionTopic.Prices(market, duration)] = ohlcEntities.map { it.toWSResponse() }.toMutableList()
+                }
+
+                pricesByMarketAndPeriod[SubscriptionTopic.Prices(market, OHLCDuration.P1M)]?.let { ohlcs ->
+                    ohlcs.lastOrNull()?.let { lastOhlc ->
+                        val nowMinus24h = OHLCDuration.P1M.durationStart(Clock.System.now() - 24.hours)
+                        OHLCEntity.findSingleByClosestStartTime(market, OHLCDuration.P1M, nowMinus24h)?.let { h24Ohlc ->
+                            pricesDailyChangeByMarket[market] = lastOhlc.close - h24Ohlc.close.toDouble()
+                        }
+                    }
                 }
             }
         }
@@ -160,12 +171,14 @@ class Broadcaster(val db: Database) {
                 duration = topic.duration,
                 ohlc = pricesByMarketAndPeriod[topic] ?: listOf(),
                 full = true,
+                dailyChange = pricesDailyChangeByMarket[topic.marketId] ?: 0.0,
             )
             else -> Prices(
                 market = topic.marketId,
                 duration = topic.duration,
                 ohlc = pricesByMarketAndPeriod[topic]?.takeLastWhile { it.start + it.duration.interval() > lastTimestamp } ?: listOf(),
                 full = false,
+                dailyChange = pricesDailyChangeByMarket[topic.marketId] ?: 0.0,
             )
         }
 
@@ -206,6 +219,7 @@ class Broadcaster(val db: Database) {
                 }
             }
         }
+        pricesDailyChangeByMarket[key.marketId] = message.dailyChange
     }
 
     private fun sendOrderBook(topic: SubscriptionTopic.OrderBook, client: ConnectedClient) {

@@ -1,6 +1,6 @@
 import { Fragment } from 'react'
 import { Listbox, Transition } from '@headlessui/react'
-import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
+import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import SymbolIcon from 'components/common/SymbolIcon'
 import Markets, { Market } from 'markets'
 
@@ -14,14 +14,14 @@ export function MarketSelector({
   onChange: (newValue: Market) => void
 }) {
   return (
-    <div className="w-52">
+    <div className="w-40">
       <Listbox value={selected} onChange={onChange}>
-        <div className="relative mt-1">
-          <Listbox.Button className="relative w-full cursor-default rounded-lg border border-black bg-neutralGray py-2 pl-3 pr-10 text-left">
+        <div className="relative">
+          <Listbox.Button className="relative w-full cursor-default rounded-md bg-darkBluishGray7 py-2 pl-3 pr-10 text-left transition-colors duration-300 ease-in-out hover:bg-darkBluishGray6 hover:text-white">
             <MarketTitle market={selected} />
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-              <ChevronUpDownIcon
-                className="size-5 text-black"
+              <ChevronDownIcon
+                className="size-5 text-darkBluishGray1"
                 aria-hidden="true"
               />
             </span>
@@ -32,12 +32,12 @@ export function MarketSelector({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md border border-black bg-neutralGray py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none">
+            <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-darkBluishGray7 py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none">
               {markets.map((market) => (
                 <Listbox.Option
                   key={market.id}
                   className={
-                    'relative cursor-default select-none py-2 pl-10 pr-4 text-black'
+                    'relative cursor-default select-none px-4 py-2 hover:bg-darkBluishGray6 hover:text-white'
                   }
                   value={market}
                 >
@@ -45,16 +45,11 @@ export function MarketSelector({
                     <>
                       <div
                         className={`block truncate ${
-                          selected ? 'font-medium' : 'font-normal'
+                          selected ? 'font-bold text-white' : 'font-normal'
                         }`}
                       >
                         <MarketTitle market={market} />
                       </div>
-                      {selected ? (
-                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-black">
-                          <CheckIcon className="size-5" aria-hidden="true" />
-                        </span>
-                      ) : null}
                     </>
                   )}
                 </Listbox.Option>
@@ -72,14 +67,14 @@ function MarketTitle({ market }: { market: Market }) {
     <div className="flex place-items-center truncate">
       <SymbolIcon
         symbol={market.baseSymbol.name}
-        className="mr-1 inline-block size-5"
+        className="relative left-1 inline-block size-4"
       />
-      {market.baseSymbol.name}
-      <span className="mx-1">/</span>
       <SymbolIcon
         symbol={market.quoteSymbol.name}
-        className="mr-1 inline-block size-5"
+        className="mr-2 inline-block size-4"
       />
+      {market.baseSymbol.name}
+      <span className="">/</span>
       {market.quoteSymbol.name}
     </div>
   )

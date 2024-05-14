@@ -1,115 +1,69 @@
 import { Widget } from 'components/common/Widget'
-import { calculateTickSpacing } from 'utils/orderBookUtils'
-import React, {
-  Fragment,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState
-} from 'react'
-import Spinner from 'components/common/Spinner'
-import {
-  Direction,
-  OHLC,
-  OHLCDuration,
-  OHLCDurationSchema,
-  pricesTopic,
-  Publishable
-} from 'websocketMessages'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { OHLC, OHLCDuration, pricesTopic, Publishable } from 'websocketMessages'
 import { mergeOHLC, ohlcDurationsMs } from 'utils/pricesUtils'
 import { useWebsocketSubscription } from 'contexts/websocket'
-import { useWindowDimensions, widgetSize, WindowDimensions } from 'utils/layout'
 import { produce } from 'immer'
-import { parseExpression } from 'cron-parser'
-import { doesDateMatchCronExpression } from 'utils/dateUtils'
+import * as d3 from 'd3'
 
-type PriceParameters = {
-  totalWidth: number
-  totalHeight: number
-  gridLines: number
-  chartStartX: number
-  chartEndX: number
-  chartWidth: number
-  chartStartY: number
-  chartEndY: number
-  chartHeight: number
-  barWidth: number
-  minPrice: number
-  maxPrice: number
-  priceRange: number
-  tickRange: number
-  gridSpacing: number
-  ticks: number[]
+import { Market } from 'markets'
+import SymbolIcon from 'components/common/SymbolIcon'
+import { classNames } from 'utils'
+import { useMeasure } from 'react-use'
+import { addDuration, maxDate, subtractDuration } from 'utils/dateUtils'
+
+enum PricesInterval {
+  PT1H = '1h',
+  PT6H = '6h',
+  P1D = '1d',
+  P7D = '7d',
+  P1M = '1m',
+  P6M = '6m',
+  YTD = 'YTD'
 }
 
-type ViewPort = {
-  earliestIndex: number | undefined
-  latestIndex: number | undefined
+const intervalToOHLCDuration: { [key in PricesInterval]: OHLCDuration } = {
+  [PricesInterval.PT1H]: 'P1M',
+  [PricesInterval.PT6H]: 'P5M',
+  [PricesInterval.P1D]: 'P15M',
+  [PricesInterval.P7D]: 'P1H',
+  [PricesInterval.P1M]: 'P4H',
+  [PricesInterval.P6M]: 'P1D',
+  [PricesInterval.YTD]: 'P1D'
 }
 
-function calculateParameters(
-  ohlc: OHLC[],
-  windowDimensions: WindowDimensions
-): PriceParameters {
-  const totalWidth = widgetSize(windowDimensions.width)
-  const gridLines = 5
-  const chartStartX = 20
-  const chartEndX = totalWidth - 80
-  const chartWidth = chartEndX - chartStartX
-  const barWidth = Math.floor(chartWidth / ohlc.length)
-  const minPrice = Math.min(...ohlc.map((o) => o.low))
-  const maxPrice = Math.max(...ohlc.map((o) => o.high))
-  const priceRange = maxPrice - minPrice
-  const gridSpacing = Math.max(
-    calculateTickSpacing(minPrice, maxPrice, gridLines),
-    0.05
+function subtractInterval(date: Date, interval: PricesInterval): Date {
+  if (interval === PricesInterval.YTD) {
+    return new Date(date.getFullYear(), 0, 1)
+  } else {
+    const number = {
+      [PricesInterval.PT1H]: 60 * 60 * 1000,
+      [PricesInterval.PT6H]: 6 * 60 * 60 * 1000,
+      [PricesInterval.P1D]: 24 * 60 * 60 * 1000,
+      [PricesInterval.P7D]: 7 * 24 * 60 * 60 * 1000,
+      [PricesInterval.P1M]: 30 * 24 * 60 * 60 * 1000,
+      [PricesInterval.P6M]: 182 * 24 * 60 * 60 * 1000
+    }[interval]
+    return new Date(date.getTime() - number)
+  }
+}
+
+export function PricesWidget({ market }: { market: Market }) {
+  const [ref, { width }] = useMeasure()
+
+  const [interval, setInterval] = useState<PricesInterval | null>(
+    PricesInterval.PT6H
   )
-  const totalHeight = 385
-  const chartStartY = 20
-  const chartEndY = totalHeight - 60
-
-  const minTick = Math.floor(minPrice / gridSpacing) * gridSpacing
-
-  const ticks: number[] = [minTick]
-  while (ticks[ticks.length - 1] < maxPrice) {
-    ticks.push(ticks[ticks.length - 1] + gridSpacing)
-  }
-
-  return {
-    totalWidth,
-    gridLines,
-    chartStartX,
-    chartEndX,
-    chartWidth,
-    chartStartY,
-    chartEndY,
-    chartHeight: chartEndY - chartStartY,
-    barWidth,
-    priceRange,
-    minPrice,
-    maxPrice,
-    totalHeight,
-    gridSpacing,
-    ticks,
-    tickRange: ticks[ticks.length - 1] - ticks[0]
-  }
-}
-
-export function PricesWidget({ marketId }: { marketId: string }) {
   const [duration, setDuration] = useState<OHLCDuration>('P5M')
-  const [viewPort, setViewPort] = useState<ViewPort>({
-    earliestIndex: undefined,
-    latestIndex: undefined
-  })
   const [ohlc, setOhlc] = useState<OHLC[]>([])
-  const [params, setParams] = useState<PriceParameters>()
-  const windowDimensions = useWindowDimensions()
-  const maxCandles = 50
+  const [ohlcLoaded, setOhlcLoaded] = useState<boolean>(false)
+  const [dailyChange, setDailyChange] = useState<number | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   useWebsocketSubscription({
     topics: useMemo(
-      () => [pricesTopic(marketId, duration)],
-      [marketId, duration]
+      () => [pricesTopic(market.id, duration)],
+      [market, duration]
     ),
     handler: useCallback(
       (message: Publishable) => {
@@ -122,480 +76,447 @@ export function PricesWidget({ marketId }: { marketId: string }) {
                 mergeOHLC(draft, message.ohlc, duration)
               })
             )
+            setDailyChange(message.dailyChange)
           }
+          setLastUpdated(new Date())
+          setOhlcLoaded(true)
         }
       },
       [duration]
     )
   })
 
-  // Allow keyboard zoom and pan
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'ArrowLeft') {
-        panLeft()
-      } else if (event.key === 'ArrowRight') {
-        panRight()
-      } else if (event.key === '+') {
-        zoomIn()
-      } else if (event.key === '-') {
-        zoomOut()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown, false)
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  })
-
-  const viewportOhlc = useMemo(() => {
-    // filter to candlesticks which are in the visible range
-    function filterVisibleOhlc(viewPort: ViewPort, ohlc: OHLC[]): OHLC[] {
-      if (ohlc.length > 0) {
-        if (
-          viewPort.earliestIndex === undefined ||
-          (viewPort.latestIndex === undefined &&
-            ohlc.length - viewPort.earliestIndex! > maxCandles)
-        ) {
-          setViewPort({
-            earliestIndex: Math.max(ohlc.length - maxCandles, 0),
-            latestIndex: viewPort.latestIndex
-          })
-          return []
-        }
-
-        return ohlc.slice(viewPort.earliestIndex, viewPort.latestIndex)
-      } else {
-        return []
-      }
-    }
-
-    const visibleOhlc = filterVisibleOhlc(viewPort, ohlc)
-
-    if (visibleOhlc.length > 0) {
-      setParams(calculateParameters(visibleOhlc, windowDimensions))
-    }
-
-    return visibleOhlc
-  }, [ohlc, viewPort, windowDimensions])
-
-  // draw the body of a candlestick, with some special treatment if it is marked as "incomplete"
-  function drawCandle(params: PriceParameters, l: OHLC, i: number) {
-    if (params) {
-      return (
-        <rect
-          x={i * params.barWidth + params.chartStartX + 5}
-          width={params.barWidth - 3}
-          y={priceToY(params, Math.max(l.open, l.close))}
-          height={
-            (params.chartHeight *
-              Math.max(
-                Math.abs(l.open - l.close),
-                params.gridSpacing * 0.005
-              )) /
-            params.tickRange
-          }
-          fill={l.close < l.open ? '#7F1D1D' : '#10A327'}
-          stroke={
-            l.incomplete
-              ? l.close < l.open
-                ? '#7F1D1D'
-                : '#10A327'
-              : undefined
-          }
-          strokeDasharray={l.incomplete ? 2 : 0}
-          strokeWidth={2}
-          fillOpacity={l.incomplete ? 0.5 : 1}
-        />
-      )
-    }
-  }
-
-  // draw a wick (either Up or Down)
-  function drawWick(
-    params: PriceParameters,
-    l: OHLC,
-    i: number,
-    direction: Direction
-  ) {
-    if (params) {
-      return (
-        <line
-          x1={
-            i * params.barWidth +
-            5 +
-            params.chartStartX +
-            (params.barWidth - 4) / 2
-          }
-          x2={
-            i * params.barWidth +
-            5 +
-            params.chartStartX +
-            (params.barWidth - 4) / 2
-          }
-          y1={priceToY(
-            params,
-            (direction == 'Up' ? Math.max : Math.min)(l.open, l.close)
-          )}
-          y2={priceToY(params, direction == 'Up' ? l.high : l.low)}
-          stroke={l.close < l.open ? '#7F1D1D' : '#10A327'}
-        />
-      )
-    }
-  }
-
-  // calculates the y position based on the price
-  function priceToY(params: PriceParameters, price: number) {
-    return (
-      params.chartEndY -
-      (params.chartHeight * (price - params.ticks[0])) / params.tickRange
-    )
-  }
-
-  const labelIntervalExpressions = [
-    '0/1 * * * *',
-    '0/5 * * * *',
-    '0/15 * * * *',
-    '0/30 * * * *',
-    '0 0/1 * * *',
-    '0 0/2 * * *',
-    '0 0/3 * * *',
-    '0 0/4 * * *',
-    '0 0/6 * * *',
-    '0 0/12 * * *',
-    '0 0 1/1 * *',
-    '0 0 1/2 * *',
-    '0 0 1/7 * *',
-    '0 0 1/15 * *',
-    '0 0 1 1/1 *',
-    '0 0 1 1/2 *',
-    '0 0 1 1/3 *',
-    '0 0 1 1/4 *',
-    '0 0 1 1/6 *',
-    '0 0 1 1 *'
-  ].map((cron) => {
-    return {
-      expression: cron,
-      durationMillis: cronToMilliseconds(cron)
-    }
-  })
-
-  function cronToMilliseconds(cronExpression: string): number {
-    const initialDate = new Date('2024-01-01T00:00:00Z')
-    const expression = parseExpression(cronExpression, {
-      currentDate: initialDate
-    })
-    return expression.next().getTime() - initialDate.getTime()
-  }
-
-  function chooseLabelFrequency(ohlc: OHLC[], chartWidth: number): string {
-    const ohlcStart = new Date(ohlc[0].start)
-    const ohlcEnd = new Date(ohlc[ohlc.length - 1].start)
-    const timeSpan = ohlcEnd.getTime() - ohlcStart.getTime()
-    const pixelsPerLabel = 50
-    const maxLabels = Math.floor(chartWidth / pixelsPerLabel)
-    const minLabelInterval = timeSpan / maxLabels
-
-    // Find ceiling interval to minLabelInterval
-    const chosenInterval = labelIntervalExpressions.find(
-      (expression) => expression.durationMillis >= minLabelInterval
-    )
-    return chosenInterval ? chosenInterval.expression : ''
-  }
-
-  function calculateLabels(ohlc: OHLC[], chartWidth: number): string[] {
-    if (!ohlc || ohlc.length == 0) {
-      return []
-    }
-    const labelExpression = chooseLabelFrequency(ohlc, chartWidth)
-
-    return ohlc.map((v) => {
-      if (doesDateMatchCronExpression(labelExpression, v.start)) {
-        return createLabel(v.start)
-      }
-      return ''
-    })
-  }
-
-  function createLabel(date: Date) {
-    const month = date.getUTCMonth()
-    const day = date.getUTCDate()
-    const hours = date.getUTCHours()
-    const minutes = date.getUTCMinutes()
-
-    if (month === 0 && day === 1 && hours === 0 && minutes === 0) {
-      // Start of a year
-      return `${date.getFullYear()}`
-    } else if (hours === 0 && minutes === 0) {
-      // Start of a day
-      return `${date.toLocaleDateString('default', {
-        month: 'short',
-        day: 'numeric'
-      })}`
+  function lastPrice(): number | null {
+    if (ohlc.length > 0) {
+      return ohlc[ohlc.length - 1].close
     } else {
-      // Time only for more granular intervals
-      return `${hours.toString().padStart(2, '0')}:${minutes
-        .toString()
-        .padStart(2, '0')}`
+      return null
     }
-  }
-
-  // draw the grid columns and x-axis labels
-  function drawGridX(params: PriceParameters, ohlc: OHLC[]) {
-    const labels = calculateLabels(ohlc, params.chartWidth)
-    return (
-      <>
-        {ohlc.map((candle, i) => {
-          const label = labels[i]
-          const x = params.chartStartX + i * params.barWidth
-          return (
-            <Fragment key={candle.start.getTime()}>
-              {i % 2 == 0 && (
-                <line
-                  y1={params.chartStartY}
-                  y2={params.chartEndY}
-                  x1={x}
-                  x2={x}
-                  stroke="white"
-                  strokeOpacity={0.7}
-                  strokeDasharray={0}
-                />
-              )}
-              {label && (
-                <text
-                  x={x}
-                  y={params.chartEndY + 12}
-                  fill={'white'}
-                  transform={`rotate(45,${x},${params.chartEndY + 12})`}
-                >
-                  {label}
-                </text>
-              )}
-            </Fragment>
-          )
-        })}
-        <line
-          y1={params.chartStartY}
-          y2={params.chartEndY}
-          x1={params.chartEndX + 4}
-          x2={params.chartEndX + 4}
-          stroke="white"
-          strokeOpacity={0.7}
-          strokeDasharray={0}
-        />
-      </>
-    )
-  }
-
-  // draw the grid rows and y-axis labels
-  function drawGridY(params: PriceParameters) {
-    return (
-      <>
-        {params.ticks.map((t) => {
-          const y = priceToY(params, t)
-          return (
-            <Fragment key={t}>
-              <line
-                x1={params.chartStartX}
-                x2={params.chartEndX + 4}
-                y1={y}
-                y2={y}
-                stroke="white"
-                strokeOpacity={0.7}
-              />
-              <text x={params.chartEndX + 12} y={y + 5} fill={'white'}>
-                {
-                  // dynamically adjust the number of decimals based on the grid spacing
-                  t.toFixed(
-                    Math.max(0, -Math.floor(Math.log10(params.gridSpacing)))
-                  )
-                }
-              </text>
-            </Fragment>
-          )
-        })}
-      </>
-    )
-  }
-
-  // prevent panning left in weekly zoom or if there are fewer than 10 panDistances left
-  function panLeftAllowed() {
-    return viewPort.earliestIndex && viewPort.earliestIndex > 0
-  }
-
-  // prevent panning right in weekly zoom or if there's no more data
-  function panRightAllowed() {
-    return viewPort.latestIndex && viewPort.latestIndex < ohlc.length
-  }
-
-  function panLeft() {
-    if (panLeftAllowed()) {
-      const newEarliestIndex = Math.max(viewPort.earliestIndex! - maxCandles, 0)
-      const newLatestIndex = Math.min(
-        newEarliestIndex + maxCandles,
-        ohlc.length - 1
-      )
-
-      setViewPort({
-        earliestIndex: newEarliestIndex,
-        latestIndex: newLatestIndex
-      })
-    }
-  }
-
-  function panRight() {
-    if (panRightAllowed()) {
-      const newLatestIndex = Math.min(
-        viewPort.latestIndex! + maxCandles,
-        ohlc.length
-      )
-      const newEarliestIndex = Math.max(newLatestIndex - maxCandles, 0)
-
-      setViewPort({
-        earliestIndex: newEarliestIndex,
-        latestIndex: newLatestIndex == ohlc.length ? undefined : newLatestIndex
-      })
-    }
-  }
-
-  function zoomIn() {
-    const values = Object.values(OHLCDurationSchema.Values)
-    const idx = values.indexOf(duration)
-    const inner = idx > 0 ? values[idx - 1] : duration
-    setDuration(inner)
-    setOhlc([])
-    setViewPort({
-      earliestIndex: undefined,
-      latestIndex: undefined
-    })
-  }
-
-  function zoomOut() {
-    const values = Object.values(OHLCDurationSchema.Values)
-    const idx = values.indexOf(duration)
-    const outer = idx < values.length - 1 ? values[idx + 1] : duration
-    setDuration(outer)
-    setOhlc([])
-    setViewPort({
-      earliestIndex: undefined,
-      latestIndex: undefined
-    })
-  }
-
-  function canZoomOut(duration: OHLCDuration): boolean {
-    const values = Object.values(OHLCDurationSchema.Values)
-    const idx = values.indexOf(duration)
-    return idx < values.length - 1
-  }
-
-  function canZoomIn(duration: OHLCDuration): boolean {
-    const values = Object.values(OHLCDurationSchema.Values)
-    const idx = values.indexOf(duration)
-    return idx > 0
-  }
-
-  function timeWithoutSeconds(date: Date): string {
-    const hours = date.getHours()
-    const minutes = date.getMinutes()
-    return (
-      (hours < 10 ? '0' + hours : hours) +
-      ':' +
-      (minutes < 10 ? '0' + minutes : minutes)
-    )
-  }
-  // compute the title showing the date range being displayed
-  function title(): string {
-    const firstDate = viewportOhlc[0]?.start
-    const lastDate = viewportOhlc[viewportOhlc.length - 1]?.start
-    let startDate = firstDate
-    if (viewPort.earliestIndex) {
-      startDate = new Date(
-        Math.max(
-          firstDate.getTime(),
-          ohlc[viewPort.earliestIndex].start.getTime()
-        )
-      )
-    }
-    const endDate = new Date(
-      viewPort.latestIndex
-        ? ohlc[viewPort.latestIndex].start
-        : lastDate.getTime() +
-          ohlcDurationsMs[viewportOhlc[viewportOhlc.length - 1].duration]
-    )
-    if (endDate.getDate() == startDate.getDate()) {
-      return `${startDate.toLocaleDateString()}, ${timeWithoutSeconds(
-        startDate
-      )} to ${timeWithoutSeconds(endDate)}`
-    } else {
-      return `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`
-    }
-  }
-
-  function durationLabel(duration: OHLCDuration): string {
-    return duration.replace('P', '').toLowerCase()
   }
 
   return (
     <Widget
-      title={'Prices'}
+      wrapperRef={ref}
       contents={
-        <div>
+        <div className="min-h-[600px]">
           <div className="flex flex-row align-middle">
-            <div className="shrink-0">
-              <button
-                className="px-1 text-xl disabled:opacity-50"
-                disabled={!canZoomIn(duration)}
-                onClick={zoomIn}
-              >
-                +
-              </button>
-              <span>{durationLabel(duration)}</span>
-              <button
-                className="px-1 text-xl disabled:opacity-50"
-                disabled={!canZoomOut(duration)}
-                onClick={zoomOut}
-              >
-                -
-              </button>
-              <button
-                className="px-1 text-xl disabled:opacity-50"
-                disabled={!panLeftAllowed()}
-                onClick={() => panLeft()}
-              >
-                ←
-              </button>
-              <button
-                className="px-1 text-xl disabled:opacity-50"
-                disabled={!panRightAllowed()}
-                onClick={() => panRight()}
-              >
-                →
-              </button>
-            </div>
-            {
-              <div className="flex w-full justify-around align-middle">
-                {viewportOhlc.length > 0 && params && title()}
-              </div>
-            }
+            <Title
+              market={market}
+              price={lastPrice()}
+              dailyChange={dailyChange}
+            />
           </div>
-          {viewportOhlc.length > 0 && params ? (
-            <svg width={params.totalWidth} height={params.totalHeight}>
-              {drawGridY(params)}
-              {drawGridX(params, viewportOhlc)}
-              {viewportOhlc.map((l, i) => (
-                <Fragment key={`${l.start}`}>
-                  {drawCandle(params, l, i)}
-                  {drawWick(params, l, i, 'Up')}
-                  {drawWick(params, l, i, 'Down')}
-                </Fragment>
-              ))}
-            </svg>
-          ) : (
-            <Spinner />
-          )}
+          <div className="flex w-full place-items-center justify-between py-4 text-sm">
+            <div className="text-left">
+              <IntervalsDisplay
+                selectedInterval={interval}
+                onChange={(int: PricesInterval) => {
+                  const newDuration = intervalToOHLCDuration[int]
+                  if (duration != newDuration) {
+                    setDuration(newDuration)
+                    setOhlcLoaded(false)
+                  }
+                  setInterval(int)
+                }}
+              />
+            </div>
+            <div className="text-right text-xs text-darkBluishGray2">
+              <LastUpdated lastUpdated={lastUpdated} />
+            </div>
+          </div>
+          <div className="size-full min-h-[500px] pl-2 pt-4">
+            <OHLCChart
+              disabled={!ohlcLoaded}
+              ohlc={ohlc}
+              lastPrice={lastPrice()}
+              params={{
+                width: Math.max(width - 40, 0), // paddings
+                height: 500,
+                interval: interval,
+                duration: duration,
+                onIntervalReset: () => setInterval(null)
+              }}
+            />
+          </div>
         </div>
       }
     />
+  )
+}
+
+type PricesParameters = {
+  width: number
+  height: number
+  interval: PricesInterval | null
+  duration: OHLCDuration
+  onIntervalReset: () => void
+}
+
+function OHLCChart({
+  disabled,
+  params,
+  ohlc,
+  lastPrice
+}: {
+  disabled: boolean
+  params: PricesParameters
+  ohlc: OHLC[]
+  lastPrice: number | null
+}) {
+  const ref = useRef<SVGSVGElement>(null)
+  const zoomRef = useRef(d3.zoomIdentity)
+  const intervalRef = useRef<PricesInterval>(
+    params.interval ? params.interval : PricesInterval.PT6H
+  )
+  useEffect(() => {
+    if (params.interval) {
+      // store new interval and reset zoom
+      intervalRef.current = params.interval
+      zoomRef.current = d3.zoomIdentity
+    }
+  }, [params.interval])
+
+  const margin = {
+    top: 0,
+    bottom: 15,
+    left: 0,
+    // calculate 8 pixels for every price digit
+    right: lastPrice ? lastPrice.toFixed(2).length * 8 : 30
+  }
+  const innerWidth = params.width - margin.left - margin.right
+  const innerHeight = params.height - margin.top - margin.bottom
+
+  const svg = d3.select(ref.current)
+  const domainStart = subtractInterval(new Date(), intervalRef.current)
+  const adjustedDomainStart =
+    ohlc.length > 0
+      ? maxDate(
+          subtractDuration(ohlc[0].start, ohlcDurationsMs[params.duration] * 2),
+          domainStart
+        )
+      : domainStart
+  // setup and position scales
+  const xScale = d3
+    .scaleTime()
+    .domain([
+      adjustedDomainStart,
+      addDuration(new Date(), ohlcDurationsMs[params.duration] * 2)
+    ])
+    .range([0, innerWidth])
+  const xAxis = d3
+    .axisBottom(xScale)
+    .tickSizeOuter(0)
+    .tickSizeInner(-innerHeight)
+
+  const yScale = d3.scaleLinear().range([innerHeight, 0])
+  const yAxis = d3
+    .axisRight(yScale)
+    .tickSize(0)
+    .tickFormat((x: d3.NumberValue) => x.valueOf().toFixed(2))
+  const yAxisGrid = d3
+    .axisRight(yScale)
+    .tickSizeOuter(0)
+    .tickSizeInner(-innerWidth)
+
+  // setup zoom and panning
+  const zoom = d3
+    .zoom()
+    // limit panning
+    .translateExtent([
+      [ohlc.length > 0 ? xScale(ohlc[0].start) - 1000 : -1000, innerHeight],
+      [innerWidth * 1.15 + (margin.left + margin.right), innerHeight]
+    ])
+    // limit zoom-in/out
+    .scaleExtent([0.2, 5])
+    .on('zoom', (event: d3.D3ZoomEvent<SVGGElement, OHLC>) => {
+      if (zoomRef.current.k != event.transform.k && event.transform.k != 1) {
+        params.onIntervalReset()
+      }
+      zoomRef.current = event.transform
+      drawChart(event.transform.rescaleX(xScale))
+    })
+
+  function drawChart(newXScale: d3.ScaleTime<number, number, never>) {
+    // calculate visible range
+    const visibleData: OHLC[] = ohlc.filter((d) => {
+      return (
+        // add some pixels for smooth bar to slide outside of viewport
+        newXScale(d.start) >= -25 && newXScale(d.start) <= innerWidth + 25
+      )
+    })
+    if (visibleData.length == 0) return
+
+    // scale x axis
+    // @ts-expect-error @definitelytyped/no-unnecessary-generics
+    svg.select('.x-axis').call(xAxis.scale(newXScale))
+
+    // scale y axis
+    const yMin = d3.min(visibleData, (d) => d.low)
+    const yMax = d3.max(visibleData, (d) => d.high)
+    if (yMin && yMax) {
+      yScale.domain([yMin, yMax])
+    }
+    // @ts-expect-error @definitelytyped/no-unnecessary-generics
+    svg.select('.y-axis').call(yAxis.scale(yScale))
+    // @ts-expect-error @definitelytyped/no-unnecessary-generics
+    svg.select('.y-axis-grid').call(yAxisGrid.scale(yScale))
+    const currentPriceSelection = svg.select('.y-axis-current-price')
+    if (lastPrice) {
+      currentPriceSelection.attr(
+        'transform',
+        `translate(0,${yScale(lastPrice)})`
+      )
+      currentPriceSelection.select('text').text(lastPrice.toFixed(2))
+    } else {
+      currentPriceSelection.attr('transform', `translate(0,-10)`)
+    }
+
+    // calculate candle width
+    const candleWidth =
+      ohlc.length >= 2
+        ? Math.abs(newXScale(ohlc[1].start) - newXScale(ohlc[0].start)) * 0.6
+        : 1
+    const lineWidth = candleWidth * 0.2
+
+    // select ohlc candles
+    const candles = svg
+      .selectAll('.y-axis-ohlc')
+      .selectAll('.ohlc')
+      .data(visibleData, (d) => (d as OHLC).start.toString())
+
+    // remove all candles that are not in visible data
+    candles.exit().remove()
+
+    // add groups for new elements
+    const candlesEnter = candles.enter().append('g').attr('class', 'ohlc')
+
+    // update positions
+    candlesEnter
+      .append('rect')
+      .attr('class', 'range')
+      .merge(candles.select('.range'))
+      .attr('x', (d) => newXScale(d.start) - lineWidth / 2)
+      .attr('width', lineWidth)
+      .attr('y', (d) => Math.min(yScale(d.low), yScale(d.high)))
+      .attr(
+        'height',
+        (d) =>
+          Math.max(yScale(d.low), yScale(d.high)) -
+          Math.min(yScale(d.low), yScale(d.high))
+      )
+      .attr('rx', candleWidth / 10)
+      .attr('fill', (d) => (d.close >= d.open ? '#39CF63' : '#FF5A50'))
+
+    candlesEnter
+      .append('rect')
+      .attr('class', 'open-close')
+      .merge(candles.select('.open-close'))
+      .attr('x', (d) => newXScale(d.start) - candleWidth / 2)
+      .attr('width', candleWidth)
+      .attr('y', (d) => {
+        const height =
+          Math.max(yScale(d.open), yScale(d.close)) -
+          Math.min(yScale(d.open), yScale(d.close))
+
+        const y = Math.min(yScale(d.open), yScale(d.close))
+        if (height < lineWidth) {
+          // place exactly in the middle
+          return y - (lineWidth - height) / 2
+        } else {
+          return y
+        }
+      })
+      .attr('height', (d) => {
+        const height =
+          Math.max(yScale(d.open), yScale(d.close)) -
+          Math.min(yScale(d.open), yScale(d.close))
+
+        if (height < lineWidth) {
+          return lineWidth
+        } else {
+          return height
+        }
+      })
+      .attr('rx', candleWidth / 10)
+      .attr('fill', (d) => (d.close >= d.open ? '#39CF63' : '#FF5A50'))
+  }
+
+  // listen to zoom events, and then call transform first time to draw the graph
+  // @ts-expect-error @definitelytyped/no-unnecessary-generics
+  svg.select('.svg-main').call(zoom).call(zoom.transform, zoomRef.current)
+
+  // blocking overlay area
+  svg
+    .select('.svg-disabled-overlay')
+    .classed('hidden', !disabled)
+    .classed('block', disabled)
+
+  return (
+    <svg
+      ref={ref}
+      width={params.width}
+      height={params.height}
+      style={{
+        overflow: 'hidden'
+      }}
+    >
+      <g className="svg-main">
+        <rect
+          className="opacity-0"
+          x="0"
+          y="0"
+          width={params.width}
+          height={params.height}
+        />
+        <g
+          className="x-axis text-xs text-darkBluishGray4"
+          transform={`translate(0,${innerHeight})`}
+        />
+        <g className="y-axis-grid" transform={`translate(${innerWidth},0)`} />
+        <g className="y-axis-ohlc" />
+        <g className="y-axis-bg">
+          <rect
+            x={innerWidth}
+            y="0"
+            width={margin.right}
+            height={innerHeight}
+          />
+        </g>
+        <g
+          className="y-axis text-xs text-darkBluishGray4"
+          transform={`translate(${innerWidth},0)`}
+        />
+        <g className="y-axis-current-price text-xs">
+          <line x1="0" x2={innerWidth} y1="0" y2="0" />
+          <rect
+            x={innerWidth - 5}
+            y="-10"
+            width={margin.right + 5}
+            height="20"
+            rx="3"
+          />
+          <text transform={`translate(${innerWidth - 1},4)`}>17.85</text>
+        </g>
+      </g>
+      <g className="svg-disabled-overlay">
+        <rect x="0" y="0" width={params.width} height={params.height} />
+      </g>
+    </svg>
+  )
+}
+
+function formatPrice(market: Market, price: number | null) {
+  return price ? price.toFixed(market.tickSize.decimalPlaces() + 1) : ''
+}
+
+function Title({
+  market,
+  price,
+  dailyChange
+}: {
+  market: Market
+  price: number | null
+  dailyChange: number | null
+}) {
+  return (
+    <div className="flex w-full justify-between text-xl font-semibold">
+      <div className="place-items-center text-left">
+        <SymbolIcon
+          symbol={market.baseSymbol.name}
+          className="relative left-1 inline-block size-7"
+        />
+        <SymbolIcon
+          symbol={market.quoteSymbol.name}
+          className="mr-4 inline-block size-7"
+        />
+        {market.baseSymbol.name}
+        <span className="">/</span>
+        {market.quoteSymbol.name}
+        <span className="ml-4">Price</span>
+      </div>
+      <div className="flex place-items-center gap-4 text-right">
+        {formatPrice(market, price)}
+        <div className="text-sm text-darkBluishGray2">
+          <DailyChangeDisplay price={price} dailyChange={dailyChange} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DailyChangeDisplay({
+  price,
+  dailyChange
+}: {
+  price: number | null
+  dailyChange: number | null
+}) {
+  const getColor = (dailyChange: number) => {
+    if (dailyChange > 0) return 'text-olhcGreen'
+    if (dailyChange < 0) return 'text-olhcRed'
+    return 'text-darkBluishGray3'
+  }
+
+  if (price && dailyChange) {
+    const formattedDailyChange = `${dailyChange >= 0 ? '+' : ''}${(
+      (dailyChange / price) *
+      100
+    ).toFixed(2)}%`
+    return (
+      <div className="flex place-items-center gap-2">
+        <div className={getColor(dailyChange)}>{formattedDailyChange}</div>
+        <div className="text-xs">1d</div>
+      </div>
+    )
+  } else {
+    return <></>
+  }
+}
+
+function LastUpdated({ lastUpdated }: { lastUpdated: Date | null }) {
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear()
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const day = date.getDate().toString().padStart(2, '0')
+    const hours = date.getHours()
+    const minutes = date.getMinutes().toString().padStart(2, '0')
+
+    const isPM = hours >= 12
+    const formattedHours = ((hours + 11) % 12) + 1 // Convert 24h to 12h
+    const amPm = isPM ? 'PM' : 'AM'
+
+    return `Page Last updated ${year}/${month}/${day} ${formattedHours}:${minutes} ${amPm}`
+  }
+
+  return <div>{lastUpdated ? formatDate(lastUpdated) : ''}</div>
+}
+
+function IntervalsDisplay({
+  selectedInterval,
+  onChange
+}: {
+  selectedInterval: PricesInterval | null
+  onChange: (interval: PricesInterval) => void
+}) {
+  // Convert the enum into an array of values for rendering
+  const intervalValues = Object.values(PricesInterval)
+
+  return (
+    <div className="flex flex-row gap-2">
+      {intervalValues.map((value, index) => (
+        <button
+          key={index}
+          className={classNames(
+            'w-11 bg-darkBluishGray8 rounded transition-colors duration-300 ease-in-out',
+            intervalValues[index] == selectedInterval
+              ? 'border text-primary4'
+              : 'text-darkBluishGray3 hover:text-white'
+          )}
+          onClick={() => onChange(intervalValues[index])}
+        >
+          {value}
+        </button>
+      ))}
+    </div>
   )
 }

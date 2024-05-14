@@ -1,5 +1,4 @@
-import logo from 'assets/logo.svg'
-import logoName from 'assets/chainring-logo-name.png'
+import logo from 'assets/logo-name.svg'
 import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { useAccount, useSwitchChain } from 'wagmi'
 import { addressDisplay } from 'utils'
@@ -45,24 +44,15 @@ export function Header({
 
   return (
     <>
-      <div className="fixed z-50 flex h-20 w-full flex-row place-items-center justify-between bg-neutralGray p-0">
+      <div className="fixed z-50 flex h-20 w-full flex-row place-items-center justify-between bg-darkBluishGray10 p-0 text-sm text-darkBluishGray1">
         <span>
-          <img
-            className="m-2 inline-block size-16"
-            src={logo}
-            alt="ChainRing"
-          />
-          <img
-            className="m-2 inline-block aspect-auto h-max w-32 shrink-0 grow-0"
-            src={logoName}
-            alt="ChainRing"
-          />
+          <img className="m-6 inline-block h-10 " src={logo} alt="ChainRing" />
         </span>
 
         <div className="flex">
           {selectedMarket && (
-            <div className="flex items-center gap-4">
-              Market:{' '}
+            <div className="flex items-center gap-1">
+              Market:
               <MarketSelector
                 markets={markets}
                 selected={selectedMarket}
@@ -71,14 +61,14 @@ export function Header({
             </div>
           )}
 
-          <span className="m-2 text-sm">
+          <span className="mx-5">
             {account.isConnected ? (
               <Button
                 caption={() => (
                   <span>
                     {icon && (
                       <img
-                        className="mr-2 inline-block size-8"
+                        className="mr-2 inline-block size-5"
                         src={icon}
                         alt={name ?? ''}
                       />
@@ -88,11 +78,13 @@ export function Header({
                 )}
                 onClick={() => openWalletConnectModal({ view: 'Account' })}
                 disabled={false}
+                primary={false}
               />
             ) : (
               <Button
                 caption={() => <>Connect Wallet</>}
                 onClick={() => openWalletConnectModal({ view: 'Connect' })}
+                primary={true}
                 disabled={false}
               />
             )}

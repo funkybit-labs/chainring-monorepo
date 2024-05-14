@@ -288,7 +288,6 @@ export default function OrdersAndTradesWidget({
   return (
     <Widget
       span={Math.min(2, getColumnsForWidth(windowDimensions.width))}
-      title={'Orders & Trade History'}
       contents={
         <>
           <div className="font-bold">Orders</div>

@@ -50,50 +50,87 @@ export default function BalancesWidget({
 
   return (
     <Widget
-      title={'Balances'}
       contents={
         !!withdrawalsQuery.data && !!depositsQuery.data ? (
           <>
             <div className="flex w-full text-center font-medium">
               <div
                 className={classNames(
-                  'cursor-pointer border-b-2 w-full h-10 flex-col content-end pb-1',
+                  'cursor-pointer border-b-2 mr-4 w-full h-10 flex-col content-end pb-1',
                   selectedTab == 'available'
-                    ? 'border-b-lightBackground'
-                    : 'border-b-darkGray'
+                    ? 'border-b-primary4'
+                    : 'border-b-darkBluishGray3'
                 )}
                 onClick={() => setSelectedTab('available')}
               >
-                <div>Available</div>
+                <div
+                  className={
+                    selectedTab == 'available'
+                      ? 'text-primary4'
+                      : 'text-darkBluishGray3'
+                  }
+                >
+                  Available
+                </div>
               </div>
               <div
                 className={classNames(
-                  'cursor-pointer border-b-2 w-full h-10 flex-col content-end pb-1',
+                  'cursor-pointer border-b-2 mx-4 w-full h-10 flex-col content-end pb-1',
                   selectedTab == 'deposits'
-                    ? 'border-b-lightBackground'
-                    : 'border-b-darkGray'
+                    ? 'border-b-primary4'
+                    : 'border-b-darkBluishGray3'
                 )}
                 onClick={() => setSelectedTab('deposits')}
               >
-                <div>Deposits</div>
+                <div
+                  className={
+                    selectedTab == 'deposits'
+                      ? 'text-primary4'
+                      : 'text-darkBluishGray3'
+                  }
+                >
+                  Deposits
+                </div>
                 {pendingDepositsCount > 0 && (
-                  <div className="whitespace-nowrap text-xs">
+                  <div
+                    className={classNames(
+                      'whitespace-nowrap text-xs',
+                      selectedTab == 'deposits'
+                        ? 'text-primary4'
+                        : 'text-darkBluishGray3'
+                    )}
+                  >
                     ({pendingDepositsCount} pending)
                   </div>
                 )}
               </div>
               <div
                 className={classNames(
-                  'cursor-pointer border-b-2 w-full h-10 flex-col content-end pb-1',
+                  'cursor-pointer border-b-2 ml-4 w-full h-10 flex-col content-end pb-1',
                   selectedTab == 'withdrawals'
-                    ? 'border-b-lightBackground'
-                    : 'border-b-darkGray'
+                    ? 'border-b-primary4'
+                    : 'border-b-darkBluishGray3'
                 )}
                 onClick={() => setSelectedTab('withdrawals')}
               >
-                <div>Withdrawals</div>
+                <div
+                  className={
+                    selectedTab == 'withdrawals'
+                      ? 'text-primary4'
+                      : 'text-darkBluishGray3'
+                  }
+                >
+                  Withdrawals
+                </div>
                 {pendingWithdrawalsCount > 0 && (
-                  <div className="whitespace-nowrap text-xs">
+                  <div
+                    className={classNames(
+                      'whitespace-nowrap text-xs',
+                      selectedTab == 'withdrawals'
+                        ? 'text-primary4'
+                        : 'text-darkBluishGray3'
+                    )}
+                  >
                     ({pendingWithdrawalsCount} pending)
                   </div>
                 )}

@@ -17,6 +17,29 @@ export default {
       }
     },
     colors: {
+      darkBluishGray10: "#1A1B21",
+      darkBluishGray9: "#1B222B",
+      darkBluishGray8: "#1F2A39",
+      darkBluishGray7: "#313D4E",
+      darkBluishGray6: "#444F5F",
+      darkBluishGray4: "#6F7885",
+      darkBluishGray3: "#89919D",
+      darkBluishGray2: "#A0A6B1",
+      darkBluishGray1: "#BABEC5",
+      lightBluishGray5: "#CDD1D7",
+      primary4: "#FF8718",
+      primary5: "#E4720B",
+      olhcGreen: "#39CF63",
+      olhcRed: "#FF5A50",
+
+      // status colors
+      statusOrange: "#FFA337",
+      statusYellow: "#FFEB82",
+      statusRed: "#FF7169",
+      statusBlue: "#2D94FF",
+      statusGreen: "#42C66B",
+
+      // legacy
       lightBackground: "#B5CBCD",
       darkBackground: "#66B0B6",
       neutralGray: "#8C8C8C",
@@ -40,6 +63,9 @@ export default {
     },
     {
       pattern: /col-span-/,
+    },
+    {
+      pattern: /text-status/,
     }
   ]
 }

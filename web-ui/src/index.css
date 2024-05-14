@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.svg-main {
+}
+.svg-disabled-overlay {
+}
+.svg-disabled-overlay rect {
+  fill: #1B222B;
+  opacity: 0.8;
+}
+.x-axis .domain {
+  display: none;
+}
+.y-axis .domain {
+  display: none;
+}
+.y-axis-grid .domain {
+  display: none;
+}
+
+.x-axis line {
+  stroke: #313D4E;
+  stroke-dasharray: 5 10;
+}
+.y-axis-grid line {
+  stroke: #313D4E;
+  stroke-dasharray: 5 10;
+}
+.y-axis-grid text {
+  display: none;
+}
+.y-axis-ohlc {}
+.y-axis-bg {
+  fill: #1B222B;
+}
+.y-axis-current-price {
+  fill: #FF8718;
+}
+.y-axis-current-price text {
+  fill: white;
+}
+.y-axis-current-price line {
+  stroke: #FF8718;
+  stroke-width: 0.5;
+  stroke-dasharray: 1 1;
+}
+
+@layer utilities {
+  .bg-switch {
+    background: url("assets/Switch.svg") no-repeat center;
+  }
+
+  .bg-switch-alt {
+    background: url("assets/Switch-Alt.svg") no-repeat center;
+  }
+}

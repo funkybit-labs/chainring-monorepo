@@ -156,20 +156,26 @@ class OHLCEntity(guid: EntityID<OHLCId>) : GUIDEntity<OHLCId>(guid) {
                 )
                 (ohlcDuration to ohlcStart)
             }.mapNotNull { (ohlcDuration, ohlcStart) ->
-                findSingle(market, ohlcDuration, ohlcStart)
+                findSingleByExactStartTime(market, ohlcDuration, ohlcStart)
             }
         }
 
-        fun findFrom(market: MarketId, duration: OHLCDuration, startTime: Instant): List<OHLCEntity> {
+        fun fetchForMarketStartingFrom(market: MarketId, duration: OHLCDuration, startTime: Instant): List<OHLCEntity> {
             return OHLCEntity.find {
                 OHLCTable.marketGuid.eq(market) and OHLCTable.duration.eq(duration) and OHLCTable.start.greaterEq(startTime)
             }.orderBy(OHLCTable.start to SortOrder.ASC).toList()
         }
 
-        fun findSingle(market: MarketId, duration: OHLCDuration, startTime: Instant): OHLCEntity? {
+        private fun findSingleByExactStartTime(market: MarketId, duration: OHLCDuration, startTime: Instant): OHLCEntity? {
             return OHLCEntity.find {
                 OHLCTable.marketGuid.eq(market) and OHLCTable.duration.eq(duration) and OHLCTable.start.eq(startTime)
             }.orderBy(OHLCTable.start to SortOrder.ASC).singleOrNull()
+        }
+
+        fun findSingleByClosestStartTime(market: MarketId, duration: OHLCDuration, startTime: Instant): OHLCEntity? {
+            return OHLCEntity.find {
+                OHLCTable.marketGuid.eq(market) and OHLCTable.duration.eq(duration) and OHLCTable.start.greaterEq(startTime)
+            }.orderBy(OHLCTable.start to SortOrder.ASC).limit(1).singleOrNull()
         }
     }
 

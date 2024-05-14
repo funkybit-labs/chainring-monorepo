@@ -20,6 +20,7 @@ import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.KeyValueStore
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OHLCEntity
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
@@ -54,6 +55,7 @@ import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigInteger
 import java.math.RoundingMode
+import kotlin.time.Duration.Companion.hours
 
 object SequencerResponseProcessorService {
 
@@ -305,13 +307,16 @@ object SequencerResponseProcessorService {
                 val sumOfPricesByAmount = trades.sumOf { it.price * it.amount.toBigDecimal() }
                 val weightedPrice = (sumOfPricesByAmount / sumOfAmounts.toBigDecimal()).setScale(marketPriceScale, RoundingMode.HALF_UP)
 
+                val h24ClosePrice = OHLCEntity.findSingleByClosestStartTime(market.guid.value, OHLCDuration.P1M, OHLCDuration.P1M.durationStart(Clock.System.now() - 24.hours))?.close
+
                 OHLCEntity.updateWith(market.guid.value, trades.first().timestamp, weightedPrice, sumOfAmounts)
                     .map {
                         BroadcasterNotification.pricesForMarketPeriods(
-                            market.guid.value,
-                            it.duration,
-                            listOf(it),
+                            marketId = market.guid.value,
+                            duration = it.duration,
+                            ohlc = listOf(it),
                             full = false,
+                            dailyChange = h24ClosePrice?.let { weightedPrice.toDouble() - it.toDouble() } ?: 0.0,
                         )
                     }
             }.flatten()

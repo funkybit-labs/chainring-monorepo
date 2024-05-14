@@ -235,6 +235,8 @@ const CreateDepositApiRequestSchema = z.object({
 })
 
 const DepositStatusSchema = z.enum(['Pending', 'Complete', 'Failed'])
+export type DepositStatus = z.infer<typeof DepositStatusSchema>
+
 const DepositSchema = z.object({
   id: z.string(),
   symbol: z.string(),
@@ -261,6 +263,7 @@ const CreateWithdrawalApiRequestSchema = z.object({
 })
 
 const WithdrawalStatusSchema = z.enum(['Pending', 'Complete', 'Failed'])
+export type WithdrawalStatus = z.infer<typeof WithdrawalStatusSchema>
 const WithdrawalSchema = z.object({
   id: z.string(),
   symbol: z.string(),
