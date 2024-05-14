@@ -31,8 +31,8 @@ data class BroadcasterNotification(
                     BroadcasterNotification(orderBook, recipient = null)
                 }
 
-        fun pricesForMarketPeriods(marketId: MarketId, duration: OHLCDuration, ohlc: List<OHLCEntity>, full: Boolean): BroadcasterNotification =
-            BroadcasterNotification(Prices(marketId, duration, ohlc.map { it.toWSResponse() }, full), null)
+        fun pricesForMarketPeriods(marketId: MarketId, duration: OHLCDuration, ohlc: List<OHLCEntity>, full: Boolean, dailyChange: Double): BroadcasterNotification =
+            BroadcasterNotification(Prices(marketId, duration, ohlc.map { it.toWSResponse() }, full, dailyChange), null)
 
         fun limits(wallet: WalletEntity, market: MarketEntity): BroadcasterNotification =
             BroadcasterNotification(OrderEntity.getLimits(market, wallet), recipient = wallet.address)

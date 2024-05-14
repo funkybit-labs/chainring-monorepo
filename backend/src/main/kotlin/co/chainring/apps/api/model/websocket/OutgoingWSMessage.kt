@@ -65,6 +65,7 @@ data class Prices(
     val duration: OHLCDuration,
     val ohlc: List<OHLC>,
     val full: Boolean,
+    val dailyChange: Double,
 ) : Publishable()
 
 @Serializable

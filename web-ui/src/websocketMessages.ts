@@ -80,7 +80,8 @@ export type OHLC = z.infer<typeof OHLCSchema>
 export const PricesSchema = z.object({
   type: z.literal('Prices'),
   full: z.boolean(),
-  ohlc: z.array(OHLCSchema)
+  ohlc: z.array(OHLCSchema),
+  dailyChange: z.number()
 })
 export type Prices = z.infer<typeof PricesSchema>
 

@@ -56,6 +56,7 @@ export function PricesWidgetD3({ market }: { market: Market }) {
   )
   const [duration, setDuration] = useState<OHLCDuration>('P5M')
   const [ohlc, setOhlc] = useState<OHLC[]>([])
+  const [dailyChange, setDailyChange] = useState<number | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   useWebsocketSubscription({
@@ -74,6 +75,7 @@ export function PricesWidgetD3({ market }: { market: Market }) {
                 mergeOHLC(draft, message.ohlc, duration)
               })
             )
+            setDailyChange(message.dailyChange)
           }
           setLastUpdated(new Date())
         }
@@ -90,17 +92,17 @@ export function PricesWidgetD3({ market }: { market: Market }) {
     }
   }
 
-  function formatPrice(price: number | null) {
-    return price ? price.toFixed(market.tickSize.decimalPlaces() + 1) : ''
-  }
-
   return (
     <Widget
       wrapperRef={ref}
       contents={
         <div className="min-h-[600px]">
           <div className="flex flex-row align-middle">
-            <Title market={market} price={formatPrice(lastPrice())} />
+            <Title
+              market={market}
+              price={lastPrice()}
+              dailyChange={dailyChange}
+            />
           </div>
           <div className="flex w-full place-items-center justify-between py-4 text-sm">
             <div className="text-left">
@@ -373,7 +375,19 @@ function OHLCChart({
   )
 }
 
-function Title({ market, price }: { market: Market; price: string }) {
+function formatPrice(market: Market, price: number | null) {
+  return price ? price.toFixed(market.tickSize.decimalPlaces() + 1) : ''
+}
+
+function Title({
+  market,
+  price,
+  dailyChange
+}: {
+  market: Market
+  price: number | null
+  dailyChange: number | null
+}) {
   return (
     <div className="flex w-full justify-between text-xl font-semibold">
       <div className="place-items-center text-left">
@@ -390,9 +404,43 @@ function Title({ market, price }: { market: Market; price: string }) {
         {market.quoteSymbol.name}
         <span className="ml-4">Price</span>
       </div>
-      <div className="flex place-items-center gap-4 text-right">{price}</div>
+      <div className="flex place-items-center gap-4 text-right">
+        {formatPrice(market, price)}
+        <div className="text-sm text-darkBluishGray2">
+          <DailyChangeDisplay price={price} dailyChange={dailyChange} />
+        </div>
+      </div>
     </div>
   )
+}
+
+function DailyChangeDisplay({
+  price,
+  dailyChange
+}: {
+  price: number | null
+  dailyChange: number | null
+}) {
+  const getColor = (dailyChange: number) => {
+    if (dailyChange > 0) return 'text-olhcGreen'
+    if (dailyChange < 0) return 'text-olhcRed'
+    return 'text-darkBluishGray3'
+  }
+
+  if (price && dailyChange) {
+    const formattedDailyChange = `${dailyChange >= 0 ? '+' : ''}${(
+      (dailyChange / price) *
+      100
+    ).toFixed(2)}%`
+    return (
+      <div className="flex place-items-center gap-2">
+        <div className={getColor(dailyChange)}>{formattedDailyChange}</div>
+        <div className="text-xs">1d</div>
+      </div>
+    )
+  } else {
+    return <></>
+  }
 }
 
 function LastUpdated({ lastUpdated }: { lastUpdated: Date | null }) {
