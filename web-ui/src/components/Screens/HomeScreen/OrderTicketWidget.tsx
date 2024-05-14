@@ -27,6 +27,8 @@ import useAmountInputState from 'hooks/useAmountInputState'
 import { addressZero, generateOrderNonce, getDomain } from 'utils/eip712'
 import { AmountWithSymbol } from 'components/common/AmountWithSymbol'
 import SymbolIcon from 'components/common/SymbolIcon'
+import { Button } from 'components/common/Button'
+import { useWeb3Modal } from '@web3modal/wagmi/react'
 
 export default function OrderTicketWidget({
   market,
@@ -34,8 +36,8 @@ export default function OrderTicketWidget({
   walletAddress
 }: {
   market: Market
-  exchangeContractAddress: Address
-  walletAddress: Address
+  exchangeContractAddress?: Address
+  walletAddress?: Address
 }) {
   const config = useConfig()
   const { signTypedDataAsync } = useSignTypedData()
@@ -86,6 +88,7 @@ export default function OrderTicketWidget({
 
   const [baseLimit, setBaseLimit] = useState<bigint | undefined>(undefined)
   const [quoteLimit, setQuoteLimit] = useState<bigint | undefined>(undefined)
+  const { open: openWalletConnectModal } = useWeb3Modal()
 
   useWebsocketSubscription({
     topics: useMemo(() => [limitsTopic(market.id)], [market.id]),
@@ -237,10 +240,10 @@ export default function OrderTicketWidget({
               { name: 'nonce', type: 'int256' }
             ]
           },
-          domain: getDomain(exchangeContractAddress, config.state.chainId),
+          domain: getDomain(exchangeContractAddress!, config.state.chainId),
           primaryType: 'Order',
           message: {
-            sender: walletAddress,
+            sender: walletAddress!,
             baseToken: baseSymbol.contractAddress ?? addressZero,
             quoteToken: quoteSymbol.contractAddress ?? addressZero,
             amount: side == 'Buy' ? baseAmount : -baseAmount,
@@ -474,19 +477,31 @@ export default function OrderTicketWidget({
                 </div>
               </>
             )}
-          <div>
-            <SubmitButton
-              disabled={!canSubmit}
-              onClick={mutation.mutate}
-              error={mutation.error?.message}
-              caption={() => {
-                if (mutation.isPending) {
-                  return 'Submitting order...'
-                } else {
-                  return side
-                }
-              }}
-            />
+          <div className="w-full">
+            {walletAddress && exchangeContractAddress ? (
+              <SubmitButton
+                disabled={!canSubmit}
+                onClick={mutation.mutate}
+                error={mutation.error?.message}
+                caption={() => {
+                  if (mutation.isPending) {
+                    return 'Submitting order...'
+                  } else {
+                    return side
+                  }
+                }}
+              />
+            ) : (
+              <div className="mt-4">
+                <Button
+                  caption={() => <>Connect Wallet</>}
+                  onClick={() => openWalletConnectModal({ view: 'Connect' })}
+                  disabled={false}
+                  primary={true}
+                  style={'full'}
+                />
+              </div>
+            )}
           </div>
           {mutation.isSuccess && (
             <div className="pt-3 text-center">

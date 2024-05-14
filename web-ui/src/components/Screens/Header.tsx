@@ -64,6 +64,7 @@ export function Header({
           <span className="mx-5">
             {account.isConnected ? (
               <Button
+                style={'normal'}
                 caption={() => (
                   <span>
                     {icon && (
@@ -82,6 +83,7 @@ export function Header({
               />
             ) : (
               <Button
+                style={'normal'}
                 caption={() => <>Connect Wallet</>}
                 onClick={() => openWalletConnectModal({ view: 'Connect' })}
                 primary={true}
