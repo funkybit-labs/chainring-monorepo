@@ -11,7 +11,7 @@ import OrdersAndTradesWidget from 'components/Screens/HomeScreen/OrdersAndTrades
 import TradingSymbols from 'tradingSymbols'
 import Markets, { Market } from 'markets'
 import { WebsocketProvider } from 'contexts/websocket'
-import { PricesWidgetD3 } from 'components/Screens/HomeScreen/PricesWidgetD3'
+import { PricesWidget } from 'components/Screens/HomeScreen/PricesWidget'
 
 export default function HomeScreen() {
   const configQuery = useQuery({
@@ -64,7 +64,7 @@ export default function HomeScreen() {
             <div className="w-3/4 min-w-[1200px]">
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2 space-y-4">
-                  <PricesWidgetD3 market={selectedMarket} />
+                  <PricesWidget market={selectedMarket} />
                   {wallet.address && symbols && exchangeContract && (
                     <BalancesWidget
                       walletAddress={wallet.address}
