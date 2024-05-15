@@ -178,7 +178,7 @@ function OHLCChart({
 
   const margin = {
     top: 0,
-    bottom: 15,
+    bottom: 18,
     left: 0,
     // calculate 8 pixels for every price digit
     right: lastPrice ? lastPrice.toFixed(2).length * 8 : 30
@@ -203,10 +203,28 @@ function OHLCChart({
       addDuration(new Date(), ohlcDurationsMs[params.duration] * 2)
     ])
     .range([0, innerWidth])
+
   const xAxis = d3
     .axisBottom(xScale)
     .tickSizeOuter(0)
     .tickSizeInner(-innerHeight)
+    .ticks(5)
+    .tickFormat((d) => {
+      const date = d instanceof Date ? d : new Date(d.valueOf())
+      if (d3.timeHour(date) < date) {
+        return d3.timeFormat('%H:%M')(date) // 24-hour clock [00,23] + minute [00,59]
+      }
+      if (d3.timeDay(date) < date) {
+        return d3.timeFormat('%H:%M')(date) // 24-hour clock [00,23] + minute [00,59]
+      }
+      if (d3.timeMonth(date) < date) {
+        return d3.timeFormat('%b %-d')(date) // abbreviated month name + day of the month without padding
+      }
+      if (d3.timeYear(date) < date) {
+        return d3.timeFormat('%B')(date) // full month name
+      }
+      return d3.timeFormat('%Y')(date) // year with century
+    })
 
   const yScale = d3.scaleLinear().range([innerHeight, 0])
   const yAxis = d3
@@ -217,6 +235,40 @@ function OHLCChart({
     .axisRight(yScale)
     .tickSizeOuter(0)
     .tickSizeInner(-innerWidth)
+
+  function updateMouseProjections(mouseX: number, mouseY: number) {
+    svg
+      .select('.x-axis-mouse-projection')
+      .classed('hidden', mouseX > innerWidth)
+      .attr('transform', `translate(${mouseX},0)`)
+      .select('text')
+      .text(
+        d3.timeFormat(`%_d %b %y %H:%M`)(
+          zoomRef.current.rescaleX(xScale).invert(mouseX)
+        )
+      )
+
+    svg
+      .select('.y-axis-mouse-projection')
+      .classed('hidden', false)
+      .attr('transform', `translate(0,${mouseY})`)
+      .select('text')
+      .text(yScale.invert(mouseY).toFixed(2))
+  }
+
+  const handleMouseMove = (event: MouseEvent) => {
+    const [mouseX, mouseY] = d3.pointer(event)
+    updateMouseProjections(mouseX, mouseY)
+  }
+  const handleMouseLeave = () => {
+    svg.select('.x-axis-mouse-projection').classed('hidden', true)
+    svg.select('.y-axis-mouse-projection').classed('hidden', true)
+  }
+
+  svg
+    .on('mousemove', handleMouseMove)
+    .on('mouseup', handleMouseMove)
+    .on('mouseleave', handleMouseLeave)
 
   // setup zoom and panning
   const zoom = d3
@@ -240,13 +292,13 @@ function OHLCChart({
     // calculate visible range
     const visibleData: OHLC[] = ohlc.filter((d) => {
       return (
-        // add some pixels for smooth bar to slide outside of viewport
+        // add some pixels to let bars slide outside of viewport before disappearing
         newXScale(d.start) >= -25 && newXScale(d.start) <= innerWidth + 25
       )
     })
     if (visibleData.length == 0) return
 
-    // scale x axis
+    // scale x-axis
     // @ts-expect-error @definitelytyped/no-unnecessary-generics
     svg.select('.x-axis').call(xAxis.scale(newXScale))
 
@@ -254,22 +306,22 @@ function OHLCChart({
     const yMin = d3.min(visibleData, (d) => d.low)
     const yMax = d3.max(visibleData, (d) => d.high)
     if (yMin && yMax) {
-      yScale.domain([yMin, yMax])
+      yScale.domain([yMin * 0.995, yMax * 1.005])
     }
     // @ts-expect-error @definitelytyped/no-unnecessary-generics
     svg.select('.y-axis').call(yAxis.scale(yScale))
     // @ts-expect-error @definitelytyped/no-unnecessary-generics
     svg.select('.y-axis-grid').call(yAxisGrid.scale(yScale))
-    const currentPriceSelection = svg.select('.y-axis-current-price')
-    if (lastPrice) {
-      currentPriceSelection.attr(
-        'transform',
-        `translate(0,${yScale(lastPrice)})`
-      )
-      currentPriceSelection.select('text').text(lastPrice.toFixed(2))
-    } else {
-      currentPriceSelection.attr('transform', `translate(0,-10)`)
-    }
+
+    // update current price tracker
+    svg
+      .select('.y-axis-current-price')
+      .classed('hidden', !lastPrice)
+      .transition()
+      .duration(150)
+      .attr('transform', `translate(0,${lastPrice ? yScale(lastPrice) : 0})`)
+      .select('text')
+      .text(lastPrice ? lastPrice.toFixed(2) : '')
 
     // calculate candle width
     const candleWidth =
@@ -360,7 +412,7 @@ function OHLCChart({
         overflow: 'hidden'
       }}
     >
-      <g className="svg-main">
+      <g className="svg-main cursor-crosshair">
         <rect
           className="opacity-0"
           x="0"
@@ -386,16 +438,35 @@ function OHLCChart({
           className="y-axis text-xs text-darkBluishGray4"
           transform={`translate(${innerWidth},0)`}
         />
-        <g className="y-axis-current-price text-xs">
+        <g className="y-axis-current-price hidden text-xs">
           <line x1="0" x2={innerWidth} y1="0" y2="0" />
           <rect
-            x={innerWidth - 5}
+            x={innerWidth - 3}
+            y="-9"
+            width={margin.right + 3}
+            height="18"
+            rx="3"
+          />
+          <text transform={`translate(${innerWidth + 1},4)`} />
+        </g>
+        <g className="y-axis-mouse-projection hidden text-xs">
+          <line x1="0" x2={innerWidth} y1="0" y2="0" />
+          <rect
+            x={innerWidth - 3}
             y="-10"
-            width={margin.right + 5}
+            width={margin.right + 3}
             height="20"
             rx="3"
           />
-          <text transform={`translate(${innerWidth - 1},4)`}>17.85</text>
+          <text transform={`translate(${innerWidth + 1},4)`} />
+        </g>
+        <g className="x-axis-mouse-projection hidden text-xs">
+          <line x1="0" x2="0" y1="0" y2={innerHeight} />
+          <rect x="-50" y={innerHeight - 2} width="100" height="18" rx="3" />
+          <text
+            className="whitespace-pre"
+            transform={`translate(-45,${innerHeight + 11})`}
+          />
         </g>
       </g>
       <g className="svg-disabled-overlay">

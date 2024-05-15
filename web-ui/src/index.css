@@ -35,16 +35,47 @@
 .y-axis-bg {
   fill: #1B222B;
 }
+
 .y-axis-current-price {
   fill: #FF8718;
 }
 .y-axis-current-price text {
   fill: white;
+  font-family: sans-serif;
 }
 .y-axis-current-price line {
   stroke: #FF8718;
   stroke-width: 0.5;
   stroke-dasharray: 1 1;
+}
+
+.y-axis-mouse-projection {
+  fill: #313D4E;
+}
+.y-axis-mouse-projection rect {
+  stroke-width: 0;
+}
+.y-axis-mouse-projection text {
+  fill: #BABEC5;
+  font-family: sans-serif;
+}
+.y-axis-mouse-projection line {
+  stroke: #BABEC5;
+  stroke-width: 0.5;
+  stroke-dasharray: 2 2;
+}
+
+.x-axis-mouse-projection {
+  fill: #313D4E;
+}
+.x-axis-mouse-projection text {
+  fill: #BABEC5;
+  font-family: sans-serif;
+}
+.x-axis-mouse-projection line {
+  stroke: #BABEC5;
+  stroke-width: 0.5;
+  stroke-dasharray: 2 2;
 }
 
 @layer utilities {
