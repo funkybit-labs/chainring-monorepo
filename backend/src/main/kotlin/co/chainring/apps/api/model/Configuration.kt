@@ -3,12 +3,14 @@ package co.chainring.apps.api.model
 import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.FeeRates
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class ConfigurationApiResponse(
     val chains: List<Chain>,
     val markets: List<Market>,
+    val feeRates: FeeRates,
 )
 
 @Serializable

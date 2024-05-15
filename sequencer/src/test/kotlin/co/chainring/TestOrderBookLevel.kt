@@ -1,6 +1,7 @@
 package co.chainring
 
 import co.chainring.sequencer.core.BookSide
+import co.chainring.sequencer.core.FeeRate
 import co.chainring.sequencer.core.OrderBookLevel
 import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
@@ -21,7 +22,7 @@ class TestOrderBookLevel {
     fun test() {
         val obl = OrderBookLevel(300, BookSide.Buy, BigDecimal.ONE, 1000)
         (0 until 100).forEach { _ ->
-            assertEquals(obl.addOrder(0L, getNextOrder()).first, OrderDisposition.Accepted, "failed at $nextOrderId")
+            assertEquals(obl.addOrder(0L, getNextOrder(), feeRate = FeeRate.zero).first, OrderDisposition.Accepted, "failed at $nextOrderId")
         }
         assertEquals(obl.orderHead, 0)
         assertEquals(obl.orderTail, 100)
@@ -39,10 +40,10 @@ class TestOrderBookLevel {
 
         // fill up to max orders which is obl.maxOrderCount - 1
         (0 until obl.maxOrderCount - 100 + 7).forEach { _ ->
-            assertEquals(obl.addOrder(0L, getNextOrder()).first, OrderDisposition.Accepted, "failed at $nextOrderId")
+            assertEquals(obl.addOrder(0L, getNextOrder(), feeRate = FeeRate.zero).first, OrderDisposition.Accepted, "failed at $nextOrderId")
         }
         // make sure we fail if we hit the max
-        assertEquals(obl.addOrder(0L, getNextOrder(false)).first, OrderDisposition.Rejected)
+        assertEquals(obl.addOrder(0L, getNextOrder(false), feeRate = FeeRate.zero).first, OrderDisposition.Rejected)
         assertEquals(expectedOrderIdSet.size, obl.maxOrderCount - 1)
         assertEquals(5, obl.orderTail)
         assertEquals(6, obl.orderHead)

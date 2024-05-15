@@ -8,6 +8,7 @@ import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.SequencerOrderId
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.db.DepositId
+import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.WithdrawalId
@@ -16,16 +17,18 @@ import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.proto.GatewayGrpcKt
-import co.chainring.sequencer.proto.GetStateRequest
-import co.chainring.sequencer.proto.ResetRequest
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.balanceBatch
 import co.chainring.sequencer.proto.cancelOrder
 import co.chainring.sequencer.proto.deposit
 import co.chainring.sequencer.proto.failedWithdrawal
+import co.chainring.sequencer.proto.feeRates
+import co.chainring.sequencer.proto.getStateRequest
 import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderBatch
+import co.chainring.sequencer.proto.resetRequest
+import co.chainring.sequencer.proto.setFeeRatesRequest
 import co.chainring.sequencer.proto.withdrawal
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.grpc.ManagedChannel
@@ -137,6 +140,23 @@ open class SequencerClient {
         }.sequencerResponse
     }
 
+    suspend fun setFeeRates(feeRates: FeeRates): SequencerResponse {
+        return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
+            stub.setFeeRates(
+                setFeeRatesRequest {
+                    this.guid = UUID.randomUUID().toString()
+                    this.feeRates = feeRates {
+                        this.maker = feeRates.maker.value
+                        this.taker = feeRates.taker.value
+                    }
+                },
+            )
+        }.also {
+            Tracer.newSpan(ServerSpans.gtw, it.processingTime)
+            Tracer.newSpan(ServerSpans.sqr, it.sequencerResponse.processingTime)
+        }.sequencerResponse
+    }
+
     suspend fun deposit(
         wallet: Long,
         asset: Asset,
@@ -225,6 +245,8 @@ open class SequencerClient {
         sellOrderId: OrderId,
         amount: BigInteger,
         price: BigDecimal,
+        buyerFee: BigInteger,
+        sellerFee: BigInteger,
     ): SequencerResponse {
         return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
             stub.applyBalanceBatch(
@@ -236,10 +258,12 @@ open class SequencerClient {
                             this.sellWallet = sellWallet
                             this.marketId = marketId.value
                             this.trade = co.chainring.sequencer.proto.tradeCreated {
-                                this.buyGuid = buyOrderId.toSequencerId().value
-                                this.sellGuid = sellOrderId.toSequencerId().value
+                                this.buyOrderGuid = buyOrderId.toSequencerId().value
+                                this.sellOrderGuid = sellOrderId.toSequencerId().value
                                 this.amount = amount.toIntegerValue()
                                 this.price = price.toDecimalValue()
+                                this.buyerFee = buyerFee.toIntegerValue()
+                                this.sellerFee = sellerFee.toIntegerValue()
                             }
                         },
                     )
@@ -269,11 +293,19 @@ open class SequencerClient {
     }
 
     suspend fun reset(): SequencerResponse {
-        return stub.reset(ResetRequest.getDefaultInstance()).sequencerResponse
+        return stub.reset(
+            resetRequest {
+                this.guid = UUID.randomUUID().toString()
+            },
+        ).sequencerResponse
     }
 
     suspend fun getState(): SequencerResponse {
-        return stub.getState(GetStateRequest.getDefaultInstance()).sequencerResponse
+        return stub.getState(
+            getStateRequest {
+                this.guid = UUID.randomUUID().toString()
+            },
+        ).sequencerResponse
     }
 
     private fun toOrderDSL(order: Order) = order {

@@ -4,8 +4,11 @@ import co.chainring.sequencer.proto.BalancesCheckpoint
 import co.chainring.sequencer.proto.BalancesCheckpointKt.BalanceKt.consumption
 import co.chainring.sequencer.proto.BalancesCheckpointKt.balance
 import co.chainring.sequencer.proto.MarketCheckpoint
+import co.chainring.sequencer.proto.MetaInfoCheckpoint
 import co.chainring.sequencer.proto.StateDump
 import co.chainring.sequencer.proto.balancesCheckpoint
+import co.chainring.sequencer.proto.feeRates
+import co.chainring.sequencer.proto.metaInfoCheckpoint
 import co.chainring.sequencer.proto.stateDump
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.FileInputStream
@@ -18,10 +21,24 @@ import kotlin.system.measureNanoTime
 typealias BalanceByAsset = MutableMap<Asset, BigInteger>
 typealias ConsumedByAsset = MutableMap<Asset, MutableMap<MarketId, BigInteger>>
 
+data class FeeRates(
+    val maker: FeeRate,
+    val taker: FeeRate,
+) {
+    companion object {
+        fun fromPercents(maker: Double, taker: Double): FeeRates =
+            FeeRates(
+                maker = FeeRate.fromPercents(maker),
+                taker = FeeRate.fromPercents(taker),
+            )
+    }
+}
+
 data class SequencerState(
     val markets: MutableMap<MarketId, Market> = mutableMapOf(),
     val balances: MutableMap<WalletAddress, BalanceByAsset> = mutableMapOf(),
     val consumed: MutableMap<WalletAddress, ConsumedByAsset> = mutableMapOf(),
+    var feeRates: FeeRates = FeeRates(maker = FeeRate.zero, taker = FeeRate.zero),
 ) {
     private val logger = KotlinLogging.logger {}
 
@@ -29,6 +46,7 @@ data class SequencerState(
         balances.clear()
         markets.clear()
         consumed.clear()
+        feeRates = FeeRates(maker = FeeRate.zero, taker = FeeRate.zero)
     }
 
     fun load(sourceDir: Path) {
@@ -53,15 +71,16 @@ data class SequencerState(
         }
 
         measureNanoTime {
-            val marketIds = FileInputStream(Path.of(sourceDir.toString(), "markets").toFile()).use { inputStream ->
-                String(inputStream.readAllBytes()).let {
-                    if (it.isEmpty()) {
-                        emptyList()
-                    } else {
-                        it.split(",").map(::MarketId)
-                    }
-                }
+            val metaInfoCheckpoint = FileInputStream(Path.of(sourceDir.toString(), "metainfo").toFile()).use { inputStream ->
+                MetaInfoCheckpoint.parseFrom(inputStream)
             }
+
+            feeRates = FeeRates(
+                maker = FeeRate(metaInfoCheckpoint.makerFeeRate),
+                taker = FeeRate(metaInfoCheckpoint.takerFeeRate),
+            )
+
+            val marketIds = metaInfoCheckpoint.marketsList.map(::MarketId)
 
             marketIds.forEach { marketId ->
                 val marketCheckpointFileName = "market_${marketId.baseAsset()}_${marketId.quoteAsset()}"
@@ -81,9 +100,13 @@ data class SequencerState(
 
         // we are writing a list of markets into a separate file first so that
         // when loading we could be sure that checkpoint files for all markets are present
-        FileOutputStream(Path.of(destinationDir.toString(), "markets").toFile()).use { outputStream ->
-            val marketIds = this.markets.keys.map { it.value }.sorted().joinToString(",")
-            outputStream.write(marketIds.toByteArray())
+        FileOutputStream(Path.of(destinationDir.toString(), "metainfo").toFile()).use { outputStream ->
+            val marketIds = this.markets.keys.map { it.value }.sorted()
+            metaInfoCheckpoint {
+                this.markets.addAll(marketIds)
+                this.makerFeeRate = feeRates.maker.value
+                this.takerFeeRate = feeRates.taker.value
+            }.writeTo(outputStream)
         }
 
         measureNanoTime {
@@ -113,6 +136,10 @@ data class SequencerState(
             this.balances.addAll(getBalancesCheckpoint().balancesList)
             marketsMap.forEach { (_, market) ->
                 this.markets.add(market.toCheckpoint())
+            }
+            this.feeRates = feeRates {
+                this.maker = this@SequencerState.feeRates.maker.value
+                this.taker = this@SequencerState.feeRates.taker.value
             }
         }
     }

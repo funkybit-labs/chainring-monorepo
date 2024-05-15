@@ -2,7 +2,9 @@ package co.chainring.apps.api
 
 import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.apps.api.model.BigIntegerJson
+import co.chainring.core.model.FeeRate
 import co.chainring.core.model.SequencerWalletId
+import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.sequencer.core.toBigDecimal
@@ -38,7 +40,15 @@ class TestRoutes(
         )
 
         @Serializable
+        data class SetFeeRatesInSequencer(
+            val maker: FeeRate,
+            val taker: FeeRate,
+        )
+
+        @Serializable
         data class StateDump(
+            val makerFeeRate: FeeRate,
+            val takerFeeRate: FeeRate,
             val balances: List<Balance>,
             val markets: List<Market>,
         ) {
@@ -121,6 +131,8 @@ class TestRoutes(
             returning(
                 Status.OK,
                 responseBody to StateDump(
+                    takerFeeRate = FeeRate.fromPercents(1.0),
+                    makerFeeRate = FeeRate.fromPercents(2.0),
                     balances = listOf(
                         StateDump.Balance(
                             wallet = "wallet",
@@ -188,6 +200,8 @@ class TestRoutes(
 
                 Response(Status.OK).with(
                     responseBody of StateDump(
+                        makerFeeRate = FeeRate(sequencerResponse.stateDump.feeRates.maker),
+                        takerFeeRate = FeeRate(sequencerResponse.stateDump.feeRates.taker),
                         balances = sequencerResponse.stateDump.balancesList.map { b ->
                             StateDump.Balance(
                                 wallet = walletAddresses[b.wallet] ?: b.wallet.toString(),
@@ -277,8 +291,39 @@ class TestRoutes(
         }
     }
 
+    private val setFeeRatesInSequencer: ContractRoute = run {
+        val requestBody = Body.auto<SetFeeRatesInSequencer>().toLens()
+
+        "sequencer-fee-rates" meta {
+            operationId = "sequencer-fee-rates"
+            summary = "Set fee rates in Sequencer"
+            tags += listOf(Tag("test"))
+            receiving(
+                requestBody to SetFeeRatesInSequencer(
+                    maker = FeeRate.fromPercents(1.0),
+                    taker = FeeRate.fromPercents(2.0),
+                ),
+            )
+            returning(
+                Status.CREATED,
+            )
+        } bindContract Method.PUT to { request ->
+            val payload = requestBody(request)
+            runBlocking {
+                val sequencerResponse = sequencerClient.setFeeRates(
+                    FeeRates(maker = payload.maker, taker = payload.taker),
+                )
+                if (sequencerResponse.hasError()) {
+                    throw RuntimeException("Failed to set fee rates in sequencer, error: ${sequencerResponse.error}")
+                }
+            }
+            Response(Status.OK)
+        }
+    }
+
     val routes = listOf(
         createMarketInSequencer,
+        setFeeRatesInSequencer,
         resetSequencer,
         getSequencerState,
     )

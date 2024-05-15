@@ -38,6 +38,11 @@ message MarketCreated {
   DecimalValue tickSize = 2;
 }
 
+message FeeRates {
+  uint64 maker = 1;
+  uint64 taker = 2;
+}
+
 message SequencerRequest {
   enum Type {
     AddMarket = 0;
@@ -45,12 +50,14 @@ message SequencerRequest {
     ApplyBalanceBatch = 2;
     Reset = 3;
     GetState = 4;
+    SetFeeRates = 5;
   }
   string guid = 1;
   Type type = 2;
   optional Market addMarket = 3;
   optional OrderBatch orderBatch = 4;
   optional BalanceBatch balanceBatch = 5;
+  optional FeeRates feeRates = 6;
 }
 
 enum SequencerError {
@@ -59,11 +66,13 @@ enum SequencerError {
   MarketExists = 2;
   UnknownMarket = 3;
   ExceedsLimit = 4;
+  InvalidFeeRate = 5;
 }
 
 message StateDump {
   repeated BalancesCheckpoint.Balance balances = 1;
   repeated MarketCheckpoint markets = 2;
+  FeeRates feeRates = 3;
 }
 
 message SequencerResponse {
@@ -77,6 +86,7 @@ message SequencerResponse {
   repeated MarketCreated marketsCreated = 8;
   repeated OrderChangeRejected ordersChangeRejected = 9;
   optional StateDump stateDump = 10;
+  optional FeeRates feeRatesSet = 11;
 }
 
 message Sequenced {

@@ -6,10 +6,12 @@ import co.chainring.apps.api.model.DeployedContract
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.core.model.Address
+import co.chainring.core.model.FeeRate
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainEntity
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
+import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.SymbolEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -73,6 +75,10 @@ object ConfigRoutes {
                                 tickSize = "0.01".toBigDecimal(),
                             ),
                         ),
+                        feeRates = FeeRates(
+                            maker = FeeRate.fromPercents(1.0),
+                            taker = FeeRate.fromPercents(2.0),
+                        ),
                     ),
             )
         } bindContract Method.GET to { _ ->
@@ -109,6 +115,7 @@ object ConfigRoutes {
                                     tickSize = market.tickSize,
                                 )
                             },
+                            feeRates = FeeRates.fetch(),
                         ),
                 )
             }

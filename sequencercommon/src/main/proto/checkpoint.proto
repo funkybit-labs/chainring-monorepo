@@ -7,6 +7,12 @@ option java_multiple_files = true;
 option java_package = "co.chainring.sequencer.proto";
 option java_outer_classname = "CheckpointSchema";
 
+message MetaInfoCheckpoint {
+  repeated string markets = 1;
+  uint64 makerFeeRate = 2;
+  uint64 takerFeeRate = 3;
+}
+
 message BalancesCheckpoint {
   repeated Balance balances = 1;
 
@@ -59,5 +65,6 @@ message MarketCheckpoint {
     IntegerValue quantity = 3;
     uint32 levelIx = 4;
     IntegerValue originalQuantity = 5;
+    uint64 feeRate = 6;
   }
 }

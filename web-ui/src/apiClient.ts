@@ -59,9 +59,16 @@ const MarketSchema = z.object({
 })
 export type Market = z.infer<typeof MarketSchema>
 
+const FeeRatesSchema = z.object({
+  maker: z.coerce.bigint(),
+  taker: z.coerce.bigint()
+})
+export type FeeRates = z.infer<typeof FeeRatesSchema>
+
 const ConfigurationApiResponseSchema = z.object({
   chains: z.array(ChainSchema),
-  markets: z.array(MarketSchema)
+  markets: z.array(MarketSchema),
+  feeRates: FeeRatesSchema
 })
 export type ConfigurationApiResponse = z.infer<
   typeof ConfigurationApiResponseSchema

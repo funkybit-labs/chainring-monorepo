@@ -1,5 +1,5 @@
-import { apiClient, OrderSide } from 'apiClient'
-import { classNames } from 'utils'
+import { apiClient, FeeRates, OrderSide } from 'apiClient'
+import { calculateFee, calculateNotional, classNames } from 'utils'
 import React, {
   ChangeEvent,
   useCallback,
@@ -33,11 +33,13 @@ import { useWeb3Modal } from '@web3modal/wagmi/react'
 export default function OrderTicketWidget({
   market,
   exchangeContractAddress,
-  walletAddress
+  walletAddress,
+  feeRates
 }: {
   market: Market
   exchangeContractAddress?: Address
   walletAddress?: Address
+  feeRates: FeeRates
 }) {
   const config = useConfig()
   const { signTypedDataAsync } = useSignTypedData()
@@ -105,15 +107,21 @@ export default function OrderTicketWidget({
     return getMarketPrice(side, baseAmount, market, orderBook)
   }, [side, baseAmount, orderBook, market])
 
-  const notional = useMemo(() => {
+  const { notional, fee } = useMemo(() => {
     if (isLimitOrder) {
-      return (price * baseAmount) / BigInt(Math.pow(10, baseSymbol.decimals))
+      const notional = calculateNotional(price, baseAmount, baseSymbol)
+      return {
+        notional,
+        fee: calculateFee(notional, feeRates.maker)
+      }
     } else {
-      return (
-        (marketPrice * baseAmount) / BigInt(Math.pow(10, baseSymbol.decimals))
-      )
+      const notional = calculateNotional(marketPrice, baseAmount, baseSymbol)
+      return {
+        notional,
+        fee: calculateFee(notional, feeRates.taker)
+      }
     }
-  }, [price, marketPrice, baseAmount, isLimitOrder, baseSymbol.decimals])
+  }, [price, marketPrice, baseAmount, isLimitOrder, baseSymbol, feeRates])
 
   function changeSide(newValue: OrderSide) {
     if (!mutation.isPending && side != newValue) {
@@ -473,7 +481,14 @@ export default function OrderTicketWidget({
                       />
                     </>
                   )}
-                  <div>FEE: 0.05 {quoteSymbol.name}</div>
+                  <div>
+                    FEE:{' '}
+                    <AmountWithSymbol
+                      amount={fee}
+                      symbol={quoteSymbol}
+                      approximate={true}
+                    />
+                  </div>
                 </div>
               </>
             )}

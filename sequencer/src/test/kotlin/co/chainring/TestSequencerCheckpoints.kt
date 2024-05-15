@@ -4,6 +4,8 @@ import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.Asset
+import co.chainring.sequencer.core.FeeRate
+import co.chainring.sequencer.core.FeeRates
 import co.chainring.sequencer.core.LevelOrder
 import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
@@ -19,14 +21,17 @@ import co.chainring.sequencer.core.toMarketId
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.GatewayGrpcKt
 import co.chainring.sequencer.proto.MarketCheckpoint
+import co.chainring.sequencer.proto.MetaInfoCheckpoint
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.balanceBatch
 import co.chainring.sequencer.proto.deposit
+import co.chainring.sequencer.proto.feeRates
 import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderBatch
+import co.chainring.sequencer.proto.setFeeRatesRequest
 import co.chainring.testutils.inSats
 import co.chainring.testutils.inWei
 import io.grpc.ManagedChannelBuilder
@@ -42,6 +47,7 @@ import org.junit.jupiter.api.Test
 import java.io.FileInputStream
 import java.lang.System.getenv
 import java.math.BigDecimal
+import java.math.BigInteger
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
@@ -116,6 +122,18 @@ class TestSequencerCheckpoints {
                         this.marketPrice = "17.525".toBigDecimal().toDecimalValue()
                         this.baseDecimals = 18
                         this.quoteDecimals = 18
+                    },
+                ).success,
+            )
+
+            assertTrue(
+                gateway.setFeeRates(
+                    setFeeRatesRequest {
+                        this.guid = UUID.randomUUID().toString()
+                        this.feeRates = feeRates {
+                            this.maker = 100
+                            this.taker = 200
+                        }
                     },
                 ).success,
             )
@@ -248,11 +266,17 @@ class TestSequencerCheckpoints {
                 it.sequencerResponse.ordersChangedList[3].also { limitSellOrder3 ->
                     assertEquals(OrderDisposition.PartiallyFilled, limitSellOrder3.disposition)
                 }
+
+                assertEquals(3, it.sequencerResponse.tradesCreatedCount)
+                it.sequencerResponse.tradesCreatedList.forEach { trade ->
+                    assertTrue(trade.buyerFee.toBigInteger() > BigInteger.ZERO)
+                    assertTrue(trade.sellerFee.toBigInteger() > BigInteger.ZERO)
+                }
             }
 
             assertQueueFilesCount(inputQueue, 2)
             assertCheckpointsCount(checkpointsPath, 1)
-            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 6)
+            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 7)
 
             currentTime.addAndGet(60.seconds.inWholeMilliseconds)
 
@@ -302,7 +326,7 @@ class TestSequencerCheckpoints {
             }
 
             assertCheckpointsCount(checkpointsPath, 2)
-            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 8)
+            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 9)
         } finally {
             gatewayApp.stop()
             sequencerApp.stop()
@@ -386,6 +410,7 @@ class TestSequencerCheckpoints {
     fun `test state storing and loading - single empty market`() {
         verifySerialization(
             SequencerState(
+                feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                 balances = mutableMapOf(
                     wallet1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
@@ -414,6 +439,7 @@ class TestSequencerCheckpoints {
     fun `test state storing and loading - market with no buy orders`() {
         verifySerialization(
             SequencerState(
+                feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                 balances = mutableMapOf(
                     wallet1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
@@ -452,8 +478,12 @@ class TestSequencerCheckpoints {
                                 this.price = BigDecimal("17.600").toDecimalValue()
                                 this.type = Order.Type.LimitSell
                             },
-                        ).forEach {
-                            market.addOrder(wallet1.value, it)
+                        ).forEach { order ->
+                            market.addOrder(
+                                wallet1.value,
+                                order,
+                                FeeRates.fromPercents(maker = 1.0, taker = 2.0),
+                            )
                         }
                     },
                 ),
@@ -465,6 +495,7 @@ class TestSequencerCheckpoints {
     fun `test state storing and loading - market with no sell orders`() {
         verifySerialization(
             SequencerState(
+                feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                 balances = mutableMapOf(
                     wallet1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
@@ -503,8 +534,12 @@ class TestSequencerCheckpoints {
                                 this.price = BigDecimal("17.5").toDecimalValue()
                                 this.type = Order.Type.LimitBuy
                             },
-                        ).forEach {
-                            market.addOrder(wallet1.value, it)
+                        ).forEach { order ->
+                            market.addOrder(
+                                wallet1.value,
+                                order,
+                                FeeRates.fromPercents(maker = 1.0, taker = 2.0),
+                            )
                         }
                     },
                 ),
@@ -516,6 +551,7 @@ class TestSequencerCheckpoints {
     fun `test state storing and loading - markets buy and sell orders`() {
         verifySerialization(
             SequencerState(
+                feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                 balances = mutableMapOf(
                     wallet1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
@@ -574,8 +610,12 @@ class TestSequencerCheckpoints {
                                 this.price = BigDecimal("17.600").toDecimalValue()
                                 this.type = Order.Type.LimitSell
                             },
-                        ).forEach {
-                            market.addOrder(wallet1.value, it)
+                        ).forEach { order ->
+                            market.addOrder(
+                                wallet1.value,
+                                order,
+                                FeeRates.fromPercents(maker = 1.0, taker = 2.0),
+                            )
                         }
                     },
                     btcUsdcMarketId to Market(
@@ -624,8 +664,12 @@ class TestSequencerCheckpoints {
                                 this.price = BigDecimal("70003").toDecimalValue()
                                 this.type = Order.Type.LimitSell
                             },
-                        ).forEach {
-                            market.addOrder(wallet1.value, it)
+                        ).forEach { order ->
+                            market.addOrder(
+                                wallet1.value,
+                                order,
+                                FeeRates.fromPercents(maker = 1.0, taker = 2.0),
+                            )
                         }
                     },
                 ),
@@ -668,14 +712,8 @@ class TestSequencerCheckpoints {
     }
 
     private fun verifySerializedOrdersContent(initialState: SequencerState, checkpointPath: Path) {
-        val marketIds = FileInputStream(Path.of(checkpointPath.toString(), "markets").toFile()).use { inputStream ->
-            String(inputStream.readAllBytes()).let {
-                if (it.isEmpty()) {
-                    emptyList()
-                } else {
-                    it.split(",").map(::MarketId)
-                }
-            }
+        val marketIds = FileInputStream(Path.of(checkpointPath.toString(), "metainfo").toFile()).use { inputStream ->
+            MetaInfoCheckpoint.parseFrom(inputStream).marketsList.map(::MarketId)
         }
         assertEquals(initialState.markets.keys, marketIds.toSet())
 
@@ -701,6 +739,7 @@ class TestSequencerCheckpoints {
                                 OrderGuid(it.guid),
                                 WalletAddress(it.wallet),
                                 it.quantity.toBigInteger(),
+                                FeeRate(it.feeRate),
                                 it.levelIx,
                                 it.originalQuantity.toBigInteger(),
                             )

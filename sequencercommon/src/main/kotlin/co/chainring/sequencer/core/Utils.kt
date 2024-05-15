@@ -30,8 +30,18 @@ fun IntegerValue.toBigInteger(): BigInteger = BigInteger(
 
 fun sumBigIntegers(a: BigInteger, b: BigInteger): BigInteger = a + b
 
+fun Iterable<BigInteger>.sum(): BigInteger = reduce(::sumBigIntegers)
+
 fun notional(amount: BigInteger, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int): BigInteger =
     (amount.toBigDecimal() * price).movePointRight(quoteDecimals - baseDecimals).toBigInteger()
 
-fun notional(amount: IntegerValue, price: DecimalValue, baseDecimals: Int, quoteDecimals: Int): BigInteger =
-    notional(amount.toBigInteger(), price.toBigDecimal(), baseDecimals, quoteDecimals)
+fun notionalFee(notional: BigInteger, feeRate: FeeRate): BigInteger =
+    notional * feeRate.value.toBigInteger() / FeeRate.MAX_VALUE.toBigInteger()
+
+fun notionalPlusFee(amount: BigInteger, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int, feeRate: FeeRate): BigInteger =
+    (amount.toBigDecimal() * price).movePointRight(quoteDecimals - baseDecimals).toBigInteger().let { notional ->
+        notional + notionalFee(notional, feeRate)
+    }
+
+fun notionalPlusFee(amount: IntegerValue, price: DecimalValue, baseDecimals: Int, quoteDecimals: Int, feeRate: FeeRate): BigInteger =
+    notionalPlusFee(amount.toBigInteger(), price.toBigDecimal(), baseDecimals, quoteDecimals, feeRate)

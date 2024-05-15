@@ -1,12 +1,15 @@
 package co.chainring.sequencer.apps
 
 import co.chainring.sequencer.core.Asset
+import co.chainring.sequencer.core.FeeRate
+import co.chainring.sequencer.core.FeeRates
 import co.chainring.sequencer.core.LevelOrder
 import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.SequencerState
 import co.chainring.sequencer.core.WalletAddress
 import co.chainring.sequencer.core.notional
+import co.chainring.sequencer.core.notionalPlusFee
 import co.chainring.sequencer.core.sumBigIntegers
 import co.chainring.sequencer.core.toAsset
 import co.chainring.sequencer.core.toBigDecimal
@@ -84,6 +87,28 @@ class SequencerApp(
                     }
                 }
             }
+            SequencerRequest.Type.SetFeeRates -> {
+                var error: SequencerError? = null
+
+                val feeRates = request.feeRates
+                if (feeRates == null || !FeeRate.isValid(feeRates.maker) || !FeeRate.isValid(feeRates.taker)) {
+                    error = SequencerError.InvalidFeeRate
+                } else {
+                    state.feeRates = FeeRates(
+                        maker = FeeRate(feeRates.maker),
+                        taker = FeeRate(feeRates.taker),
+                    )
+                }
+
+                sequencerResponse {
+                    this.guid = request.guid
+                    this.sequence = sequence
+                    this.processingTime = System.nanoTime() - startTime
+                    error?.let { this.error = it } ?: run {
+                        this.feeRatesSet = feeRates
+                    }
+                }
+            }
             SequencerRequest.Type.ApplyOrderBatch -> {
                 var ordersChanged: List<OrderChanged> = emptyList()
                 var ordersChangeRejected: List<OrderChangeRejected> = emptyList()
@@ -99,7 +124,7 @@ class SequencerApp(
                 } else {
                     error = checkLimits(market, orderBatch)
                     if (error == null) {
-                        val result = market.applyOrderBatch(orderBatch)
+                        val result = market.applyOrderBatch(orderBatch, state.feeRates)
                         ordersChanged = result.ordersChanged
                         ordersChangeRejected = result.ordersChangeRejected
                         trades = result.createdTrades
@@ -180,20 +205,28 @@ class SequencerApp(
                         val baseAsset = market.id.baseAsset()
                         val quoteAsset = market.id.quoteAsset()
                         val baseAmount = failedSettlement.trade.amount.toBigInteger()
-                        val negatedBaseAmount = baseAmount.negate()
                         val price = failedSettlement.trade.price.toBigDecimal()
                         val notional = notional(baseAmount, price, market.baseDecimals, market.quoteDecimals)
-                        val negatedNotional = notional.negate()
-                        val buyWallet = failedSettlement.buyWallet.toWalletAddress()
+
                         val sellWallet = failedSettlement.sellWallet.toWalletAddress()
-                        state.balances.getOrPut(sellWallet) { mutableMapOf() }.merge(baseAsset, baseAmount, ::sumBigIntegers)
-                        balancesChanged.merge(Pair(sellWallet, baseAsset), baseAmount, ::sumBigIntegers)
-                        state.balances.getOrPut(sellWallet) { mutableMapOf() }.merge(quoteAsset, negatedNotional, ::sumBigIntegers)
-                        balancesChanged.merge(Pair(sellWallet, quoteAsset), negatedNotional, ::sumBigIntegers)
-                        state.balances.getOrPut(buyWallet) { mutableMapOf() }.merge(baseAsset, negatedBaseAmount, ::sumBigIntegers)
-                        balancesChanged.merge(Pair(buyWallet, baseAsset), negatedBaseAmount, ::sumBigIntegers)
-                        state.balances.getOrPut(buyWallet) { mutableMapOf() }.merge(quoteAsset, notional, ::sumBigIntegers)
-                        balancesChanged.merge(Pair(buyWallet, quoteAsset), notional, ::sumBigIntegers)
+                        val sellerBaseRefund = baseAmount
+                        val sellerQuoteRefund = (notional - failedSettlement.trade.sellerFee.toBigInteger()).negate()
+
+                        val buyWallet = failedSettlement.buyWallet.toWalletAddress()
+                        val buyerBaseRefund = baseAmount.negate()
+                        val buyerQuoteRefund = notional + failedSettlement.trade.buyerFee.toBigInteger()
+
+                        state.balances.getOrPut(sellWallet) { mutableMapOf() }.merge(baseAsset, sellerBaseRefund, ::sumBigIntegers)
+                        balancesChanged.merge(Pair(sellWallet, baseAsset), sellerBaseRefund, ::sumBigIntegers)
+
+                        state.balances.getOrPut(sellWallet) { mutableMapOf() }.merge(quoteAsset, sellerQuoteRefund, ::sumBigIntegers)
+                        balancesChanged.merge(Pair(sellWallet, quoteAsset), sellerQuoteRefund, ::sumBigIntegers)
+
+                        state.balances.getOrPut(buyWallet) { mutableMapOf() }.merge(baseAsset, buyerBaseRefund, ::sumBigIntegers)
+                        balancesChanged.merge(Pair(buyWallet, baseAsset), buyerBaseRefund, ::sumBigIntegers)
+
+                        state.balances.getOrPut(buyWallet) { mutableMapOf() }.merge(quoteAsset, buyerQuoteRefund, ::sumBigIntegers)
+                        balancesChanged.merge(Pair(buyWallet, quoteAsset), buyerQuoteRefund, ::sumBigIntegers)
                     }
                 }
 
@@ -286,14 +319,17 @@ class SequencerApp(
                     baseAssetsRequired.merge(orderBatch.wallet.toWalletAddress(), order.amount.toBigInteger(), ::sumBigIntegers)
                 }
                 Order.Type.LimitBuy -> {
-                    val notional = calculateLimitBuyOrderNotional(order, market)
-
-                    quoteAssetsRequired.merge(orderBatch.wallet.toWalletAddress(), notional, ::sumBigIntegers)
+                    val notionalAndFee = calculateLimitBuyOrderNotionalPlusFee(order, market)
+                    quoteAssetsRequired.merge(orderBatch.wallet.toWalletAddress(), notionalAndFee, ::sumBigIntegers)
                 }
                 Order.Type.MarketBuy -> {
                     // the quote assets required for a market buy depends on what the clearing price would be
-                    val(clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger())
-                    quoteAssetsRequired.merge(orderBatch.wallet.toWalletAddress(), notional(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals), ::sumBigIntegers)
+                    val (clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger())
+                    quoteAssetsRequired.merge(
+                        orderBatch.wallet.toWalletAddress(),
+                        notionalPlusFee(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals, state.feeRates.taker),
+                        ::sumBigIntegers,
+                    )
                 }
                 else -> {}
             }
@@ -309,10 +345,9 @@ class SequencerApp(
                     )
                 }
                 if (oldQuoteAssets > BigInteger.ZERO) { // LimitBuy
-                    val previousNotional = notional(order.quantity, market.levels[order.levelIx].price, market.baseDecimals, market.quoteDecimals)
-                    val notional = calculateLimitBuyOrderNotional(orderChange, market)
-
-                    quoteAssetsRequired.merge(order.wallet, notional - previousNotional, ::sumBigIntegers)
+                    val previousNotionalAndFee = notionalPlusFee(order.quantity, market.levels[order.levelIx].price, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
+                    val notionalAndFee = calculateLimitBuyOrderNotionalPlusFee(orderChange, market)
+                    quoteAssetsRequired.merge(order.wallet, notionalAndFee - previousNotionalAndFee, ::sumBigIntegers)
                 }
             }
         }
@@ -329,23 +364,19 @@ class SequencerApp(
         }
 
         baseAssetsRequired.forEach { (wallet, required) ->
-            if (required + market.baseAssetsRequired(wallet) > (
-                    state.balances[wallet]?.get(market.id.baseAsset())
-                        ?: BigInteger.ZERO
-                    )
-            ) {
-                logger.debug { "Wallet $wallet requires $required + ${market.baseAssetsRequired(wallet)} = ${required + market.baseAssetsRequired(wallet)} but only has ${state.balances[wallet]?.get(market.id.baseAsset())}" }
+            val baseRequired = market.baseAssetsRequired(wallet)
+            val baseBalance = state.balances[wallet]?.get(market.id.baseAsset()) ?: BigInteger.ZERO
+            if (required + baseRequired > baseBalance) {
+                logger.debug { "Wallet $wallet requires $required + $baseRequired = ${required + baseRequired} but only has $baseBalance" }
                 return SequencerError.ExceedsLimit
             }
         }
 
         quoteAssetsRequired.forEach { (wallet, required) ->
-            if (required + market.quoteAssetsRequired(wallet) > (
-                    state.balances[wallet]?.get(market.id.quoteAsset())
-                        ?: BigInteger.ZERO
-                    )
-            ) {
-                logger.debug { "Wallet $wallet requires $required + ${market.quoteAssetsRequired(wallet)} = ${required + market.quoteAssetsRequired(wallet)} but only has ${state.balances[wallet]?.get(market.id.quoteAsset())}" }
+            val quoteRequired = market.quoteAssetsRequired(wallet)
+            val quoteBalance = state.balances[wallet]?.get(market.id.quoteAsset()) ?: BigInteger.ZERO
+            if (required + quoteRequired > quoteBalance) {
+                logger.debug { "Wallet $wallet requires $required + $quoteRequired = ${required + quoteRequired} but only has $quoteBalance" }
                 return SequencerError.ExceedsLimit
             }
         }
@@ -353,7 +384,7 @@ class SequencerApp(
         return null
     }
 
-    private fun calculateLimitBuyOrderNotional(order: Order, market: Market): BigInteger {
+    private fun calculateLimitBuyOrderNotionalPlusFee(order: Order, market: Market): BigInteger {
         return if (order.price.toBigDecimal() >= market.bestOffer) {
             // limit order crosses the market
             val orderPrice = order.price.toBigDecimal()
@@ -362,12 +393,12 @@ class SequencerApp(
             val (clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger(), stopAtLevelIx = levelIx)
             val remainingQuantity = order.amount.toBigInteger() - availableQuantity
 
-            val marketChunkNotional = notional(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals)
-            val limitChunkNotional = notional(remainingQuantity, orderPrice, market.baseDecimals, market.quoteDecimals)
+            val marketChunkNotional = notionalPlusFee(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals, state.feeRates.taker)
+            val limitChunkNotional = notionalPlusFee(remainingQuantity, orderPrice, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
 
             marketChunkNotional + limitChunkNotional
         } else {
-            notional(order.amount, order.price, market.baseDecimals, market.quoteDecimals)
+            notionalPlusFee(order.amount, order.price, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
         }
     }
 

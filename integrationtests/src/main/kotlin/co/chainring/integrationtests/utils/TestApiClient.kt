@@ -28,6 +28,7 @@ import co.chainring.core.client.rest.applicationJson
 import co.chainring.core.client.rest.httpClient
 import co.chainring.core.client.rest.json
 import co.chainring.core.model.db.DepositId
+import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.utils.TraceRecorder
@@ -97,6 +98,36 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
                 if (httpResponse.code != HttpURLConnection.HTTP_CREATED) {
                     throw AbnormalApiResponseException(httpResponse)
                 }
+            }
+        }
+
+        fun setFeeRatesInSequencer(feeRates: FeeRates) =
+            setFeeRatesInSequencer(TestRoutes.Companion.SetFeeRatesInSequencer(maker = feeRates.maker, taker = feeRates.taker))
+
+        fun setFeeRatesInSequencer(apiRequest: TestRoutes.Companion.SetFeeRatesInSequencer) {
+            execute(
+                Request.Builder()
+                    .url("$apiServerRootUrl/v1/sequencer-fee-rates")
+                    .put(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
+                    .build(),
+            ).also { httpResponse ->
+                if (httpResponse.code != HttpURLConnection.HTTP_OK) {
+                    throw AbnormalApiResponseException(httpResponse)
+                }
+            }
+        }
+
+        fun getConfiguration(): ConfigurationApiResponse {
+            val httpResponse = execute(
+                Request.Builder()
+                    .url("$apiServerRootUrl/v1/config")
+                    .get()
+                    .build(),
+            )
+
+            return when (httpResponse.code) {
+                HttpURLConnection.HTTP_OK -> json.decodeFromString<ConfigurationApiResponse>(httpResponse.body?.string()!!)
+                else -> throw AbnormalApiResponseException(httpResponse)
             }
         }
 

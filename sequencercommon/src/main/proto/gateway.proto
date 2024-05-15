@@ -23,8 +23,14 @@ message GetStateRequest {
   string guid = 1;
 }
 
+message SetFeeRatesRequest {
+  string guid = 1;
+  FeeRates feeRates = 2;
+}
+
 service Gateway {
   rpc AddMarket (Market) returns (GatewayResponse);
+  rpc SetFeeRates (SetFeeRatesRequest) returns (GatewayResponse);
   rpc ApplyBalanceBatch (BalanceBatch) returns (GatewayResponse);
   rpc ApplyOrderBatch (OrderBatch) returns (GatewayResponse);
   rpc Reset (ResetRequest) returns (GatewayResponse);

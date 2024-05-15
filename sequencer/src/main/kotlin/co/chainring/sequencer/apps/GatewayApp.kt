@@ -10,6 +10,7 @@ import co.chainring.sequencer.proto.ResetRequest
 import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerRequestKt
 import co.chainring.sequencer.proto.SequencerResponse
+import co.chainring.sequencer.proto.SetFeeRatesRequest
 import co.chainring.sequencer.proto.gatewayResponse
 import co.chainring.sequencer.proto.sequenced
 import co.chainring.sequencer.proto.sequencerRequest
@@ -72,18 +73,19 @@ class GatewayApp(
         private val outputTailer = ThreadLocal<ExcerptTailer>()
         private val logger = KotlinLogging.logger {}
 
-        private fun toSequencer(requestGuid: String, requestBuilder: SequencerRequestKt.Dsl.() -> Unit): GatewayResponse {
+        private fun toSequencer(requestBuilder: SequencerRequestKt.Dsl.() -> Unit): GatewayResponse {
             var index: Long
             val inputAppender = inputQueue.acquireAppender()
             val sequencedAppender = sequencedQueue.acquireAppender()
             val localTailer = outputTailer.getOrSet { outputQueue.createTailer().toEnd() }
+            val sequencerRequest = sequencerRequest(requestBuilder)
             var sequencerResponse: SequencerResponse? = null
             val processingTime = measureNanoTime {
                 val guid = UUID.randomUUID().toString()
                 try {
                     inputAppender.writingDocument().use {
                         it.wire()?.write()?.bytes(
-                            sequencerRequest(requestBuilder).toByteArray(),
+                            sequencerRequest.toByteArray(),
                         )
                         it.close()
                         index = inputAppender.lastIndexAppended()
@@ -101,7 +103,7 @@ class GatewayApp(
                             if (it.isPresent) {
                                 it.wire()?.read()?.bytes { bytes ->
                                     val response = SequencerResponse.parseFrom(bytes.toByteArray())
-                                    if (response.guid == requestGuid) {
+                                    if (response.guid == sequencerRequest.guid) {
                                         sequencerResponse = response
                                     }
                                 }
@@ -124,35 +126,48 @@ class GatewayApp(
         }
 
         override suspend fun addMarket(request: Market): GatewayResponse {
-            return toSequencer(request.guid) {
+            return toSequencer {
+                this.guid = request.guid
                 this.type = SequencerRequest.Type.AddMarket
                 this.addMarket = request
             }
         }
 
         override suspend fun applyOrderBatch(request: OrderBatch): GatewayResponse {
-            return toSequencer(request.guid) {
+            return toSequencer {
+                this.guid = request.guid
                 this.type = SequencerRequest.Type.ApplyOrderBatch
                 this.orderBatch = request
             }
         }
 
         override suspend fun applyBalanceBatch(request: BalanceBatch): GatewayResponse {
-            return toSequencer(request.guid) {
+            return toSequencer {
+                this.guid = request.guid
                 this.type = SequencerRequest.Type.ApplyBalanceBatch
                 this.balanceBatch = request
             }
         }
 
         override suspend fun reset(request: ResetRequest): GatewayResponse {
-            return toSequencer(request.guid) {
+            return toSequencer {
+                this.guid = request.guid
                 this.type = SequencerRequest.Type.Reset
             }
         }
 
         override suspend fun getState(request: GetStateRequest): GatewayResponse {
-            return toSequencer(request.guid) {
+            return toSequencer {
+                this.guid = request.guid
                 this.type = SequencerRequest.Type.GetState
+            }
+        }
+
+        override suspend fun setFeeRates(request: SetFeeRatesRequest): GatewayResponse {
+            return toSequencer {
+                this.guid = request.guid
+                this.type = SequencerRequest.Type.SetFeeRates
+                this.feeRates = request.feeRates
             }
         }
     }

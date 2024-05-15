@@ -14,7 +14,6 @@ import org.web3j.abi.DefaultFunctionEncoder
 import org.web3j.abi.datatypes.DynamicStruct
 import org.web3j.crypto.StructuredData
 import org.web3j.crypto.transaction.type.TransactionType
-import java.math.BigInteger
 
 fun serializeTx(txType: ExchangeTransactions.TransactionType, struct: DynamicStruct): ByteArray {
     return listOf(txType.ordinal.toByte()).toByteArray() + Hex.decode(DefaultFunctionEncoder().encodeParameters(listOf(struct)))
@@ -168,6 +167,8 @@ sealed class EIP712Transaction {
         val takerOrder: Order,
         val makerOrder: Order,
         val tradeId: TradeId,
+        val takerFee: BigIntegerJson,
+        val makerFee: BigIntegerJson,
         override val signature: EvmSignature = EvmSignature.emptySignature(),
     ) : EIP712Transaction() {
 
@@ -187,14 +188,14 @@ sealed class EIP712Transaction {
             return serializeTx(
                 ExchangeTransactions.TransactionType.SettleTrade,
                 ExchangeTransactions.SettleTrade(
-                    sequence,
-                    baseToken.value,
-                    quoteToken.value,
-                    amount,
-                    price,
-                    BigInteger.ZERO,
-                    BigInteger.ZERO,
-                    ExchangeTransactions.OrderWithSignature(
+                    sequence = sequence,
+                    baseToken = baseToken.value,
+                    quoteToken = quoteToken.value,
+                    amount = amount,
+                    price = price,
+                    takerFee = takerFee,
+                    makerFee = makerFee,
+                    takerOrder = ExchangeTransactions.OrderWithSignature(
                         ExchangeTransactions.Order(
                             takerOrder.sender.value,
                             takerOrder.amount,
@@ -203,7 +204,7 @@ sealed class EIP712Transaction {
                         ),
                         takerOrder.signature.toByteArray(),
                     ),
-                    ExchangeTransactions.OrderWithSignature(
+                    makerOrder = ExchangeTransactions.OrderWithSignature(
                         ExchangeTransactions.Order(
                             makerOrder.sender.value,
                             makerOrder.amount,
