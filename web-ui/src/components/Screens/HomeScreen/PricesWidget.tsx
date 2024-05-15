@@ -212,13 +212,13 @@ function OHLCChart({
     .tickFormat((d) => {
       const date = d instanceof Date ? d : new Date(d.valueOf())
       if (d3.timeHour(date) < date) {
-        return d3.timeFormat('%H:%M')(date) // 24-hour clock [00,23] + month [01,12]
+        return d3.timeFormat('%H:%M')(date) // 24-hour clock [00,23] + minute [00,59]
       }
       if (d3.timeDay(date) < date) {
-        return d3.timeFormat('%H:%M')(date) // 24-hour clock [00,23] + month [01,12]
+        return d3.timeFormat('%H:%M')(date) // 24-hour clock [00,23] + minute [00,59]
       }
       if (d3.timeMonth(date) < date) {
-        return d3.timeFormat('%b %d')(date) // abbreviated month name + zero-padded day of the month
+        return d3.timeFormat('%b %-d')(date) // abbreviated month name + day of the month without padding
       }
       if (d3.timeYear(date) < date) {
         return d3.timeFormat('%B')(date) // full month name
@@ -239,11 +239,11 @@ function OHLCChart({
   function updateMouseProjections(mouseX: number, mouseY: number) {
     svg
       .select('.x-axis-mouse-projection')
-      .classed('hidden', false)
+      .classed('hidden', mouseX > innerWidth)
       .attr('transform', `translate(${mouseX},0)`)
       .select('text')
       .text(
-        d3.timeFormat('%d %b %y %H:%M')(
+        d3.timeFormat(`%_d %b %y %H:%M`)(
           zoomRef.current.rescaleX(xScale).invert(mouseX)
         )
       )
@@ -463,7 +463,10 @@ function OHLCChart({
         <g className="x-axis-mouse-projection hidden text-xs">
           <line x1="0" x2="0" y1="0" y2={innerHeight} />
           <rect x="-50" y={innerHeight - 2} width="100" height="18" rx="3" />
-          <text transform={`translate(-45,${innerHeight + 11})`} />
+          <text
+            className="whitespace-pre"
+            transform={`translate(-45,${innerHeight + 11})`}
+          />
         </g>
       </g>
       <g className="svg-disabled-overlay">
