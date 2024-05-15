@@ -88,7 +88,7 @@ export function ChangeOrderModal({
     }
   }, [price, amount, order, baseLimit, quoteLimit, quoteSymbol.decimals])
 
-  const mutation = useMutation({
+  const changeOrderMutation = useMutation({
     mutationFn: async () => {
       try {
         const nonce = generateOrderNonce()
@@ -148,13 +148,15 @@ export function ChangeOrderModal({
   })
 
   const canSubmit = useMemo(() => {
-    if (mutation.isPending) return false
+    if (changeOrderMutation.isPending) return false
     if (amount <= 0n) return false
     if (price <= 0n && order.type === 'market') return false
     return !exceedsLimit
-  }, [amount, price, order.type, mutation.isPending, exceedsLimit])
+  }, [amount, price, order.type, changeOrderMutation.isPending, exceedsLimit])
 
-  async function onSubmit() {}
+  async function onSubmit() {
+    changeOrderMutation.mutate()
+  }
 
   return (
     <Modal
@@ -172,7 +174,7 @@ export function ChangeOrderModal({
             <AmountInput
               value={amountInputValue}
               symbol={baseSymbol.name}
-              disabled={mutation.isPending}
+              disabled={changeOrderMutation.isPending}
               onChange={(e) => setAmountInputValue(e.target.value)}
             />
           </div>
@@ -183,7 +185,7 @@ export function ChangeOrderModal({
               <AmountInput
                 value={priceInputValue}
                 symbol={quoteSymbol.name}
-                disabled={mutation.isPending}
+                disabled={changeOrderMutation.isPending}
                 onChange={(e) => setPriceInputValue(e.target.value)}
               />
             </div>
@@ -214,9 +216,9 @@ export function ChangeOrderModal({
         <SubmitButton
           disabled={!canSubmit}
           onClick={onSubmit}
-          error={mutation.error?.message}
+          error={changeOrderMutation.error?.message}
           caption={() => {
-            if (mutation.isPending) {
+            if (changeOrderMutation.isPending) {
               return 'Submitting...'
             } else {
               return 'Submit'
