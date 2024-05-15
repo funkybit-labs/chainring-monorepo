@@ -71,7 +71,7 @@ class BlockchainDepositHandler(
 
         val startFromBlock = maxSeenBlockNumber()
             ?: System.getenv("EVM_NETWORK_EARLIEST_BLOCK")?.let { DefaultBlockParameter.valueOf(it.toBigInteger()) }
-            ?: DefaultBlockParameterName.EARLIEST
+            ?: DefaultBlockParameterName.LATEST
 
         logger.debug { "registerDepositEventsConsumer starting from block $startFromBlock" }
 
