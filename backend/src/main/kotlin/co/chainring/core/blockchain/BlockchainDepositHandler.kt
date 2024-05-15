@@ -49,20 +49,19 @@ class BlockchainDepositHandler(
         registerDepositEventsConsumer()
 
         workerThread = thread(start = true, name = "deposit-confirmation-handler", isDaemon = true) {
-            try {
-                logger.debug { "Deposit confirmation handler thread starting" }
-
-                while (true) {
+            logger.debug { "Deposit confirmation handler thread starting" }
+            while (true) {
+                try {
                     Thread.sleep(pollingIntervalInMs)
                     transaction {
                         refreshPendingDeposits()
                     }
+                } catch (ie: InterruptedException) {
+                    logger.warn { "Exiting deposit confirmation handler thread" }
+                    return@thread
+                } catch (e: Exception) {
+                    logger.error(e) { "Unhandled exception handling pending deposits" }
                 }
-            } catch (ie: InterruptedException) {
-                logger.warn { "Exiting deposit confirmation handler thread" }
-                return@thread
-            } catch (e: Exception) {
-                logger.error(e) { "Unhandled exception handling pending deposits" }
             }
         }
     }
