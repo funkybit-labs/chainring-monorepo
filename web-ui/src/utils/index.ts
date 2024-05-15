@@ -1,3 +1,5 @@
+import { TradingSymbol } from 'apiClient'
+
 export function classNames(...classes: unknown[]): string {
   return classes.filter(Boolean).join(' ')
 }
@@ -37,4 +39,16 @@ export function cleanAndFormatNumberInput(
       : '')
 
   return cleanedValue
+}
+
+export function calculateNotional(
+  price: bigint,
+  baseAmount: bigint,
+  baseSymbol: TradingSymbol
+): bigint {
+  return (price * baseAmount) / BigInt(Math.pow(10, baseSymbol.decimals))
+}
+
+export function calculateFee(notional: bigint, feeRate: bigint): bigint {
+  return (notional * feeRate) / 1000000n
 }

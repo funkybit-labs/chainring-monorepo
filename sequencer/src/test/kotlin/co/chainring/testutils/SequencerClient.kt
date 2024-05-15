@@ -1,5 +1,6 @@
 package co.chainring.testutils
 
+import co.chainring.core.model.db.FeeRates
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.core.MarketId
@@ -15,7 +16,7 @@ import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.TradeCreated
 import co.chainring.sequencer.proto.balanceBatch
-import co.chainring.sequencer.proto.feeRatesInBps
+import co.chainring.sequencer.proto.feeRates
 import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderBatch
@@ -121,21 +122,21 @@ class SequencerClient {
         assertEquals(tickSize, createdMarket.tickSize.toBigDecimal())
     }
 
-    fun setFeeRates(makerFeeRatInBps: Int, takerFeeRateInBps: Int) {
+    fun setFeeRates(feeRates: FeeRates) {
         val response = sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
                 this.type = SequencerRequest.Type.SetFeeRates
-                this.feeRates = feeRatesInBps {
-                    this.maker = makerFeeRatInBps
-                    this.taker = takerFeeRateInBps
+                this.feeRates = feeRates {
+                    this.maker = feeRates.maker.value
+                    this.taker = feeRates.taker.value
                 }
             },
         )
         val feeRatesSet = response.feeRatesSet
         assertNotNull(feeRatesSet)
-        assertEquals(makerFeeRatInBps, feeRatesSet.maker)
-        assertEquals(takerFeeRateInBps, feeRatesSet.taker)
+        assertEquals(feeRates.maker.value, feeRatesSet.maker)
+        assertEquals(feeRates.taker.value, feeRatesSet.taker)
     }
 
     private fun List<BigInteger>.sum() = this.reduce { a, b -> a + b }

@@ -4,6 +4,8 @@ import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.Asset
+import co.chainring.sequencer.core.FeeRate
+import co.chainring.sequencer.core.FeeRates
 import co.chainring.sequencer.core.LevelOrder
 import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
@@ -25,7 +27,7 @@ import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.balanceBatch
 import co.chainring.sequencer.proto.deposit
-import co.chainring.sequencer.proto.feeRatesInBps
+import co.chainring.sequencer.proto.feeRates
 import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderBatch
@@ -128,7 +130,7 @@ class TestSequencerCheckpoints {
                 gateway.setFeeRates(
                     setFeeRatesRequest {
                         this.guid = UUID.randomUUID().toString()
-                        this.feeRates = feeRatesInBps {
+                        this.feeRates = feeRates {
                             this.maker = 100
                             this.taker = 200
                         }
@@ -408,10 +410,7 @@ class TestSequencerCheckpoints {
     fun `test state storing and loading - single empty market`() {
         verifySerialization(
             SequencerState(
-                feeRatesInBps = feeRatesInBps {
-                    this.maker = 100
-                    this.taker = 200
-                },
+                feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                 balances = mutableMapOf(
                     wallet1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
@@ -440,10 +439,7 @@ class TestSequencerCheckpoints {
     fun `test state storing and loading - market with no buy orders`() {
         verifySerialization(
             SequencerState(
-                feeRatesInBps = feeRatesInBps {
-                    this.maker = 100
-                    this.taker = 200
-                },
+                feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                 balances = mutableMapOf(
                     wallet1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
@@ -486,10 +482,7 @@ class TestSequencerCheckpoints {
                             market.addOrder(
                                 wallet1.value,
                                 order,
-                                feeRatesInBps {
-                                    this.maker = 10
-                                    this.taker = 20
-                                },
+                                FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                             )
                         }
                     },
@@ -502,10 +495,7 @@ class TestSequencerCheckpoints {
     fun `test state storing and loading - market with no sell orders`() {
         verifySerialization(
             SequencerState(
-                feeRatesInBps = feeRatesInBps {
-                    this.maker = 100
-                    this.taker = 200
-                },
+                feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                 balances = mutableMapOf(
                     wallet1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
@@ -548,10 +538,7 @@ class TestSequencerCheckpoints {
                             market.addOrder(
                                 wallet1.value,
                                 order,
-                                feeRatesInBps {
-                                    this.maker = 10
-                                    this.taker = 20
-                                },
+                                FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                             )
                         }
                     },
@@ -564,10 +551,7 @@ class TestSequencerCheckpoints {
     fun `test state storing and loading - markets buy and sell orders`() {
         verifySerialization(
             SequencerState(
-                feeRatesInBps = feeRatesInBps {
-                    this.maker = 100
-                    this.taker = 200
-                },
+                feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                 balances = mutableMapOf(
                     wallet1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
@@ -630,10 +614,7 @@ class TestSequencerCheckpoints {
                             market.addOrder(
                                 wallet1.value,
                                 order,
-                                feeRatesInBps {
-                                    this.maker = 10
-                                    this.taker = 20
-                                },
+                                FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                             )
                         }
                     },
@@ -687,10 +668,7 @@ class TestSequencerCheckpoints {
                             market.addOrder(
                                 wallet1.value,
                                 order,
-                                feeRatesInBps {
-                                    this.maker = 10
-                                    this.taker = 20
-                                },
+                                FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                             )
                         }
                     },
@@ -761,7 +739,7 @@ class TestSequencerCheckpoints {
                                 OrderGuid(it.guid),
                                 WalletAddress(it.wallet),
                                 it.quantity.toBigInteger(),
-                                it.feeRateInBps,
+                                FeeRate(it.feeRate),
                                 it.levelIx,
                                 it.originalQuantity.toBigInteger(),
                             )

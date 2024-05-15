@@ -8,7 +8,7 @@ import kotlinx.coroutines.runBlocking
 import org.web3j.crypto.Keys
 import java.math.BigInteger
 
-class ExchangeClient {
+class ExchangeContractManager {
     private val blockchainClient = TestBlockchainClient(BlockchainClientConfig())
 
     private val symbols: Map<String, SymbolInfo>

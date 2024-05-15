@@ -23,8 +23,7 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
     TransactionManager.defaultDatabase = db
 
     transaction {
-        KeyValueStore.setInt("MakerFeeRateInBps", fixtures.makerFeeRateInBps)
-        KeyValueStore.setInt("TakerFeeRateInBps", fixtures.takerFeeRateInBps)
+        fixtures.feeRates.persist()
 
         fixtures.chains.forEach { chain ->
             if (ChainEntity.findById(chain.id) == null) {

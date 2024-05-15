@@ -8,10 +8,7 @@ val sequencerClient = SequencerClient()
 
 fun seedSequencer(fixtures: Fixtures) {
     runBlocking {
-        sequencerClient.setFeeRates(
-            maker = fixtures.makerFeeRateInBps,
-            taker = fixtures.takerFeeRateInBps
-        ).also { response ->
+        sequencerClient.setFeeRates(fixtures.feeRates).also { response ->
             if (response.hasError()) {
                 throw RuntimeException("Failed to set fee rates in sequencer: ${response.error}")
             }

@@ -137,10 +137,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             .getStore(ExtensionContext.Namespace.GLOBAL)
             .get("fixtures", Fixtures::class.java)
 
-        TestApiClient.setFeeRatesInSequencer(
-            maker = fixtures.makerFeeRateInBps,
-            taker = fixtures.takerFeeRateInBps,
-        )
+        TestApiClient.setFeeRatesInSequencer(fixtures.feeRates)
 
         fixtures.markets.forEach { market ->
             val baseSymbol = fixtures.symbols.first { it.id == market.baseSymbol }

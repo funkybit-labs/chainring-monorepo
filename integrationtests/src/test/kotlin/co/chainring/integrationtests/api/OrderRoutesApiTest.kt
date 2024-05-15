@@ -45,7 +45,7 @@ import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.waitForBalance
 import co.chainring.integrationtests.testutils.waitForFinalizedWithdrawal
-import co.chainring.integrationtests.utils.ExchangeClient
+import co.chainring.integrationtests.utils.ExchangeContractManager
 import co.chainring.integrationtests.utils.ExpectedBalance
 import co.chainring.integrationtests.utils.Faucet
 import co.chainring.integrationtests.utils.TestApiClient
@@ -471,9 +471,9 @@ class OrderRoutesApiTest {
 
     @Test
     fun `order execution`() {
-        val exchangeClient = ExchangeClient()
+        val exchangeContractManager = ExchangeContractManager()
 
-        val initialFeeAccountEthBalance = exchangeClient.getFeeBalance("ETH")
+        val initialFeeAccountEthBalance = exchangeContractManager.getFeeBalance("ETH")
 
         val (takerApiClient, takerWallet, takerWsClient) =
             setupTrader(btcEthMarketId, "0.5", null, "ETH", "2")
@@ -1085,7 +1085,7 @@ class OrderRoutesApiTest {
         // verify that fees have settled correctly on chain
         assertEquals(
             makerFee + takerFee + makerFee2 + takerFee2,
-            exchangeClient.getFeeBalance("ETH") - initialFeeAccountEthBalance,
+            exchangeContractManager.getFeeBalance("ETH") - initialFeeAccountEthBalance,
         )
     }
 

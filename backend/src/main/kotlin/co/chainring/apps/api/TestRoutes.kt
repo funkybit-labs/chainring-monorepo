@@ -2,7 +2,9 @@ package co.chainring.apps.api
 
 import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.apps.api.model.BigIntegerJson
+import co.chainring.core.model.FeeRate
 import co.chainring.core.model.SequencerWalletId
+import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.sequencer.core.toBigDecimal
@@ -39,14 +41,14 @@ class TestRoutes(
 
         @Serializable
         data class SetFeeRatesInSequencer(
-            val maker: Int,
-            val taker: Int,
+            val maker: FeeRate,
+            val taker: FeeRate,
         )
 
         @Serializable
         data class StateDump(
-            val makerFeeRate: Int,
-            val takerFeeRate: Int,
+            val makerFeeRate: FeeRate,
+            val takerFeeRate: FeeRate,
             val balances: List<Balance>,
             val markets: List<Market>,
         ) {
@@ -129,8 +131,8 @@ class TestRoutes(
             returning(
                 Status.OK,
                 responseBody to StateDump(
-                    takerFeeRate = 100,
-                    makerFeeRate = 100,
+                    takerFeeRate = FeeRate.fromPercents(1.0),
+                    makerFeeRate = FeeRate.fromPercents(2.0),
                     balances = listOf(
                         StateDump.Balance(
                             wallet = "wallet",
@@ -198,8 +200,8 @@ class TestRoutes(
 
                 Response(Status.OK).with(
                     responseBody of StateDump(
-                        makerFeeRate = sequencerResponse.stateDump.feeRates.maker,
-                        takerFeeRate = sequencerResponse.stateDump.feeRates.taker,
+                        makerFeeRate = FeeRate(sequencerResponse.stateDump.feeRates.maker),
+                        takerFeeRate = FeeRate(sequencerResponse.stateDump.feeRates.taker),
                         balances = sequencerResponse.stateDump.balancesList.map { b ->
                             StateDump.Balance(
                                 wallet = walletAddresses[b.wallet] ?: b.wallet.toString(),
@@ -298,8 +300,8 @@ class TestRoutes(
             tags += listOf(Tag("test"))
             receiving(
                 requestBody to SetFeeRatesInSequencer(
-                    maker = 100,
-                    taker = 200,
+                    maker = FeeRate.fromPercents(1.0),
+                    taker = FeeRate.fromPercents(2.0),
                 ),
             )
             returning(
@@ -309,8 +311,7 @@ class TestRoutes(
             val payload = requestBody(request)
             runBlocking {
                 val sequencerResponse = sequencerClient.setFeeRates(
-                    maker = payload.maker,
-                    taker = payload.taker,
+                    FeeRates(maker = payload.maker, taker = payload.taker),
                 )
                 if (sequencerResponse.hasError()) {
                     throw RuntimeException("Failed to set fee rates in sequencer, error: ${sequencerResponse.error}")

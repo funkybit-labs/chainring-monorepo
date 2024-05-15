@@ -25,7 +25,7 @@ message GetStateRequest {
 
 message SetFeeRatesRequest {
   string guid = 1;
-  FeeRatesInBps feeRates = 2;
+  FeeRates feeRates = 2;
 }
 
 service Gateway {

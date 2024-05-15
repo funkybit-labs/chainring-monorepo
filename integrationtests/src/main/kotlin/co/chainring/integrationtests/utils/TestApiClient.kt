@@ -28,6 +28,7 @@ import co.chainring.core.client.rest.applicationJson
 import co.chainring.core.client.rest.httpClient
 import co.chainring.core.client.rest.json
 import co.chainring.core.model.db.DepositId
+import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.utils.TraceRecorder
@@ -100,8 +101,8 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             }
         }
 
-        fun setFeeRatesInSequencer(maker: Int, taker: Int) =
-            setFeeRatesInSequencer(TestRoutes.Companion.SetFeeRatesInSequencer(maker = maker, taker = taker))
+        fun setFeeRatesInSequencer(feeRates: FeeRates) =
+            setFeeRatesInSequencer(TestRoutes.Companion.SetFeeRatesInSequencer(maker = feeRates.maker, taker = feeRates.taker))
 
         fun setFeeRatesInSequencer(apiRequest: TestRoutes.Companion.SetFeeRatesInSequencer) {
             execute(

@@ -1,6 +1,8 @@
 package co.chainring.sequencer.apps
 
 import co.chainring.sequencer.core.Asset
+import co.chainring.sequencer.core.FeeRate
+import co.chainring.sequencer.core.FeeRates
 import co.chainring.sequencer.core.LevelOrder
 import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
@@ -89,10 +91,13 @@ class SequencerApp(
                 var error: SequencerError? = null
 
                 val feeRates = request.feeRates
-                if (feeRates == null || feeRates.maker < 0 || feeRates.maker > 10000 || feeRates.taker < 0 || feeRates.taker > 10000) {
+                if (feeRates == null || !FeeRate.isValid(feeRates.maker) || !FeeRate.isValid(feeRates.taker)) {
                     error = SequencerError.InvalidFeeRate
                 } else {
-                    state.feeRatesInBps = feeRates
+                    state.feeRates = FeeRates(
+                        maker = FeeRate(feeRates.maker),
+                        taker = FeeRate(feeRates.taker),
+                    )
                 }
 
                 sequencerResponse {
@@ -119,7 +124,7 @@ class SequencerApp(
                 } else {
                     error = checkLimits(market, orderBatch)
                     if (error == null) {
-                        val result = market.applyOrderBatch(orderBatch, state.feeRatesInBps)
+                        val result = market.applyOrderBatch(orderBatch, state.feeRates)
                         ordersChanged = result.ordersChanged
                         ordersChangeRejected = result.ordersChangeRejected
                         trades = result.createdTrades
@@ -320,7 +325,11 @@ class SequencerApp(
                 Order.Type.MarketBuy -> {
                     // the quote assets required for a market buy depends on what the clearing price would be
                     val (clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger())
-                    quoteAssetsRequired.merge(orderBatch.wallet.toWalletAddress(), notionalPlusFee(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals, state.feeRatesInBps.taker), ::sumBigIntegers)
+                    quoteAssetsRequired.merge(
+                        orderBatch.wallet.toWalletAddress(),
+                        notionalPlusFee(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals, state.feeRates.taker),
+                        ::sumBigIntegers,
+                    )
                 }
                 else -> {}
             }
@@ -336,7 +345,7 @@ class SequencerApp(
                     )
                 }
                 if (oldQuoteAssets > BigInteger.ZERO) { // LimitBuy
-                    val previousNotionalAndFee = notionalPlusFee(order.quantity, market.levels[order.levelIx].price, market.baseDecimals, market.quoteDecimals, state.feeRatesInBps.maker)
+                    val previousNotionalAndFee = notionalPlusFee(order.quantity, market.levels[order.levelIx].price, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
                     val notionalAndFee = calculateLimitBuyOrderNotionalPlusFee(orderChange, market)
                     quoteAssetsRequired.merge(order.wallet, notionalAndFee - previousNotionalAndFee, ::sumBigIntegers)
                 }
@@ -384,12 +393,12 @@ class SequencerApp(
             val (clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger(), stopAtLevelIx = levelIx)
             val remainingQuantity = order.amount.toBigInteger() - availableQuantity
 
-            val marketChunkNotional = notionalPlusFee(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals, state.feeRatesInBps.taker)
-            val limitChunkNotional = notionalPlusFee(remainingQuantity, orderPrice, market.baseDecimals, market.quoteDecimals, state.feeRatesInBps.maker)
+            val marketChunkNotional = notionalPlusFee(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals, state.feeRates.taker)
+            val limitChunkNotional = notionalPlusFee(remainingQuantity, orderPrice, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
 
             marketChunkNotional + limitChunkNotional
         } else {
-            notionalPlusFee(order.amount, order.price, market.baseDecimals, market.quoteDecimals, state.feeRatesInBps.maker)
+            notionalPlusFee(order.amount, order.price, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
         }
     }
 

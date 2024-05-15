@@ -1,8 +1,9 @@
 package co.chainring.integrationtests.api
 
-import co.chainring.apps.api.model.FeeRatesInBps
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.ContractType
+import co.chainring.core.model.FeeRate
+import co.chainring.core.model.db.FeeRates
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.utils.TestApiClient
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -30,6 +31,9 @@ class ConfigRouteTest {
         assertEquals("BTC", nativeToken.name)
         assertEquals(18.toUByte(), nativeToken.decimals)
 
-        assertEquals(FeeRatesInBps(maker = 100, taker = 200), config.feeRatesInBps)
+        assertEquals(
+            FeeRates(maker = FeeRate.fromPercents(1.0), taker = FeeRate.fromPercents(2.0)),
+            config.feeRates,
+        )
     }
 }

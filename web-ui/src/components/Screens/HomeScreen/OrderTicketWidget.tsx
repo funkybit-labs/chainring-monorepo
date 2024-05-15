@@ -1,5 +1,5 @@
-import { apiClient, FeeRatesInBps, OrderSide } from 'apiClient'
-import { classNames } from 'utils'
+import { apiClient, FeeRates, OrderSide } from 'apiClient'
+import { calculateFee, calculateNotional, classNames } from 'utils'
 import React, {
   ChangeEvent,
   useCallback,
@@ -34,12 +34,12 @@ export default function OrderTicketWidget({
   market,
   exchangeContractAddress,
   walletAddress,
-  feeRatesInBps
+  feeRates
 }: {
   market: Market
   exchangeContractAddress?: Address
   walletAddress?: Address
-  feeRatesInBps: FeeRatesInBps
+  feeRates: FeeRates
 }) {
   const config = useConfig()
   const { signTypedDataAsync } = useSignTypedData()
@@ -109,22 +109,19 @@ export default function OrderTicketWidget({
 
   const { notional, fee } = useMemo(() => {
     if (isLimitOrder) {
-      const notional =
-        (price * baseAmount) / BigInt(Math.pow(10, baseSymbol.decimals))
+      const notional = calculateNotional(price, baseAmount, baseSymbol)
       return {
         notional,
-        fee: (notional * feeRatesInBps.maker) / 10000n
+        fee: calculateFee(notional, feeRates.maker)
       }
     } else {
-      const notional =
-        (marketPrice * baseAmount) / BigInt(Math.pow(10, baseSymbol.decimals))
-
+      const notional = calculateNotional(marketPrice, baseAmount, baseSymbol)
       return {
         notional,
-        fee: (notional * feeRatesInBps.taker) / 10000n
+        fee: calculateFee(notional, feeRates.taker)
       }
     }
-  }, [price, marketPrice, baseAmount, isLimitOrder, baseSymbol, feeRatesInBps])
+  }, [price, marketPrice, baseAmount, isLimitOrder, baseSymbol, feeRates])
 
   function changeSide(newValue: OrderSide) {
     if (!mutation.isPending && side != newValue) {
@@ -485,6 +482,7 @@ export default function OrderTicketWidget({
                     </>
                   )}
                   <div>
+                    FEE:{' '}
                     <AmountWithSymbol
                       amount={fee}
                       symbol={quoteSymbol}

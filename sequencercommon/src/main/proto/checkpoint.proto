@@ -9,8 +9,8 @@ option java_outer_classname = "CheckpointSchema";
 
 message MetaInfoCheckpoint {
   repeated string markets = 1;
-  uint32 makerFeeRate = 2;
-  uint32 takerFeeRate = 3;
+  uint64 makerFeeRate = 2;
+  uint64 takerFeeRate = 3;
 }
 
 message BalancesCheckpoint {
@@ -65,6 +65,6 @@ message MarketCheckpoint {
     IntegerValue quantity = 3;
     uint32 levelIx = 4;
     IntegerValue originalQuantity = 5;
-    uint32 feeRateInBps = 6;
+    uint64 feeRate = 6;
   }
 }

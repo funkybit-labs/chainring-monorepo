@@ -1,5 +1,6 @@
 package co.chainring
 
+import co.chainring.core.model.db.FeeRates
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.WalletAddress
 import co.chainring.sequencer.core.toAsset
@@ -33,7 +34,7 @@ class TestSequencer {
         val sequencer = SequencerClient()
         val marketId = MarketId("BTC1/ETH1")
         sequencer.createMarket(marketId)
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
         val maker = 123456789L.toWalletAddress()
         val taker = 555111555L.toWalletAddress()
@@ -121,7 +122,7 @@ class TestSequencer {
         val sequencer = SequencerClient()
         val marketId = MarketId("BTC2/ETH2")
         sequencer.createMarket(marketId)
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
         val lp1 = 123457689L.toWalletAddress()
         val lp2 = 987654321L.toWalletAddress()
@@ -240,7 +241,7 @@ class TestSequencer {
     @Test
     fun `test limit checking on orders`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val marketId1 = MarketId("BTC3/ETH3")
         sequencer.createMarket(marketId1)
 
@@ -296,7 +297,7 @@ class TestSequencer {
     @Test
     fun `test LimitBuy order can cross the market`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val marketId = MarketId("BTC8/ETH8")
         sequencer.createMarket(marketId)
 
@@ -366,7 +367,7 @@ class TestSequencer {
     @Test
     fun `test LimitBuy order can cross the market filling LimitSell orders at multiple levels until limit price`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val marketId = MarketId("BTC9/ETH9")
         sequencer.createMarket(marketId)
 
@@ -445,7 +446,7 @@ class TestSequencer {
     @Test
     fun `test LimitSell order can cross the market`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val marketId = MarketId("BTC10/ETH10")
         sequencer.createMarket(marketId)
 
@@ -517,7 +518,7 @@ class TestSequencer {
     @Test
     fun `test LimitSell order can cross the market filling LimitBuy orders at multiple levels until limit price`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val marketId = MarketId("BTC11/ETH11")
         sequencer.createMarket(marketId)
 
@@ -585,7 +586,7 @@ class TestSequencer {
     @Test
     fun `test order cancel`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val marketId = MarketId("BTC4/ETH4")
         sequencer.createMarket(marketId)
 
@@ -625,7 +626,7 @@ class TestSequencer {
     @Test
     fun `test order change`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val marketId = MarketId("BTC5/ETH5")
         sequencer.createMarket(marketId)
 
@@ -708,7 +709,7 @@ class TestSequencer {
     @Test
     fun `test order change when new price crosses the market`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val marketId = MarketId("BTC12/ETH12")
         sequencer.createMarket(marketId)
 
@@ -798,7 +799,7 @@ class TestSequencer {
     @Test
     fun `test auto-reduce from trades`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
         val marketId1 = MarketId("BTC6/ETH6")
         sequencer.createMarket(marketId1, tickSize = BigDecimal.ONE, marketPrice = BigDecimal.valueOf(10.5), baseDecimals = 8, quoteDecimals = 18)
@@ -848,7 +849,7 @@ class TestSequencer {
     @Test
     fun `test auto-reduce from withdrawals`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val marketId = MarketId("BTC7/ETH7")
         sequencer.createMarket(marketId)
 
@@ -877,7 +878,7 @@ class TestSequencer {
     fun `fee rate change does not affect existing orders in the book`() {
         val sequencer = SequencerClient()
         // set maker fee rate to 1% and taker fee rate to 2%
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val marketId = MarketId("BTC8/ETH8")
         sequencer.createMarket(marketId)
 
@@ -894,8 +895,8 @@ class TestSequencer {
             response.ordersChangedList.first().guid
         }
 
-        // increase maker fee rate to 2% and taker fee rate to 4%
-        sequencer.setFeeRates(makerFeeRatInBps = 200, takerFeeRateInBps = 400)
+        // increase fee rates
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 2.0, taker = 4.0))
 
         val sellOrder2Guid = sequencer.addOrder(marketId, BigDecimal(5).inSats(), "10.00", maker, Order.Type.LimitSell).let { response ->
             assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
@@ -933,7 +934,7 @@ class TestSequencer {
     @Test
     fun `test failed withdrawals`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
         val rnd = Random(0)
         val walletAddress = rnd.nextLong().toWalletAddress()
@@ -959,7 +960,7 @@ class TestSequencer {
     @Test
     fun `Test failed settlements`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
         val marketId = MarketId("BTC8/ETH8")
         sequencer.createMarket(marketId)
@@ -1032,7 +1033,7 @@ class TestSequencer {
     @Test
     fun `Test autoreduce on failed settlements`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
         val marketId = MarketId("BTC9/ETH9")
         sequencer.createMarket(marketId)
@@ -1110,7 +1111,7 @@ class TestSequencer {
     @Test
     fun `Test failed settlements - balances can go negative`() {
         val sequencer = SequencerClient()
-        sequencer.setFeeRates(makerFeeRatInBps = 100, takerFeeRateInBps = 200)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
         val marketId = MarketId("BTC10/ETH10")
         sequencer.createMarket(marketId)

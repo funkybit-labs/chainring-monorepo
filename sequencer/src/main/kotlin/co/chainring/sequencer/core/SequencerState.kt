@@ -3,12 +3,11 @@ package co.chainring.sequencer.core
 import co.chainring.sequencer.proto.BalancesCheckpoint
 import co.chainring.sequencer.proto.BalancesCheckpointKt.BalanceKt.consumption
 import co.chainring.sequencer.proto.BalancesCheckpointKt.balance
-import co.chainring.sequencer.proto.FeeRatesInBps
 import co.chainring.sequencer.proto.MarketCheckpoint
 import co.chainring.sequencer.proto.MetaInfoCheckpoint
 import co.chainring.sequencer.proto.StateDump
 import co.chainring.sequencer.proto.balancesCheckpoint
-import co.chainring.sequencer.proto.feeRatesInBps
+import co.chainring.sequencer.proto.feeRates
 import co.chainring.sequencer.proto.metaInfoCheckpoint
 import co.chainring.sequencer.proto.stateDump
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -22,11 +21,24 @@ import kotlin.system.measureNanoTime
 typealias BalanceByAsset = MutableMap<Asset, BigInteger>
 typealias ConsumedByAsset = MutableMap<Asset, MutableMap<MarketId, BigInteger>>
 
+data class FeeRates(
+    val maker: FeeRate,
+    val taker: FeeRate,
+) {
+    companion object {
+        fun fromPercents(maker: Double, taker: Double): FeeRates =
+            FeeRates(
+                maker = FeeRate.fromPercents(maker),
+                taker = FeeRate.fromPercents(taker),
+            )
+    }
+}
+
 data class SequencerState(
     val markets: MutableMap<MarketId, Market> = mutableMapOf(),
     val balances: MutableMap<WalletAddress, BalanceByAsset> = mutableMapOf(),
     val consumed: MutableMap<WalletAddress, ConsumedByAsset> = mutableMapOf(),
-    var feeRatesInBps: FeeRatesInBps = FeeRatesInBps.getDefaultInstance(),
+    var feeRates: FeeRates = FeeRates(maker = FeeRate.zero, taker = FeeRate.zero),
 ) {
     private val logger = KotlinLogging.logger {}
 
@@ -34,7 +46,7 @@ data class SequencerState(
         balances.clear()
         markets.clear()
         consumed.clear()
-        feeRatesInBps = FeeRatesInBps.getDefaultInstance()
+        feeRates = FeeRates(maker = FeeRate.zero, taker = FeeRate.zero)
     }
 
     fun load(sourceDir: Path) {
@@ -63,10 +75,10 @@ data class SequencerState(
                 MetaInfoCheckpoint.parseFrom(inputStream)
             }
 
-            this.feeRatesInBps = feeRatesInBps {
-                this.maker = metaInfoCheckpoint.makerFeeRate
-                this.taker = metaInfoCheckpoint.takerFeeRate
-            }
+            feeRates = FeeRates(
+                maker = FeeRate(metaInfoCheckpoint.makerFeeRate),
+                taker = FeeRate(metaInfoCheckpoint.takerFeeRate),
+            )
 
             val marketIds = metaInfoCheckpoint.marketsList.map(::MarketId)
 
@@ -92,8 +104,8 @@ data class SequencerState(
             val marketIds = this.markets.keys.map { it.value }.sorted()
             metaInfoCheckpoint {
                 this.markets.addAll(marketIds)
-                this.makerFeeRate = feeRatesInBps.maker
-                this.takerFeeRate = feeRatesInBps.taker
+                this.makerFeeRate = feeRates.maker.value
+                this.takerFeeRate = feeRates.taker.value
             }.writeTo(outputStream)
         }
 
@@ -125,7 +137,10 @@ data class SequencerState(
             marketsMap.forEach { (_, market) ->
                 this.markets.add(market.toCheckpoint())
             }
-            this.feeRates = feeRatesInBps
+            this.feeRates = feeRates {
+                this.maker = this@SequencerState.feeRates.maker.value
+                this.taker = this@SequencerState.feeRates.taker.value
+            }
         }
     }
 

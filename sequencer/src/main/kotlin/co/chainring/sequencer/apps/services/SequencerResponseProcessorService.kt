@@ -5,6 +5,7 @@ import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.core.evm.EIP712Transaction
+import co.chainring.core.model.FeeRate
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.BalanceChange
@@ -17,7 +18,7 @@ import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
 import co.chainring.core.model.db.ExchangeTransactionEntity
 import co.chainring.core.model.db.ExecutionRole
-import co.chainring.core.model.db.KeyValueStore
+import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
@@ -111,8 +112,10 @@ object SequencerResponseProcessorService {
 
             SequencerRequest.Type.SetFeeRates -> {
                 if (response.error == SequencerError.None) {
-                    KeyValueStore.setInt("MakerFeeRateInBps", response.feeRatesSet.maker)
-                    KeyValueStore.setInt("TakerFeeRateInBps", response.feeRatesSet.taker)
+                    FeeRates(
+                        maker = FeeRate(response.feeRatesSet.maker),
+                        taker = FeeRate(response.feeRatesSet.taker),
+                    ).persist()
                 }
             }
 

@@ -1,14 +1,15 @@
 package co.chainring.tasks.fixtures
 
 import co.chainring.core.model.Address
+import co.chainring.core.model.FeeRate
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.SymbolId
 import java.math.BigDecimal
 import java.math.BigInteger
 
 data class Fixtures(
-    val makerFeeRateInBps: Int,
-    val takerFeeRateInBps: Int,
+    val feeRates: FeeRates,
     val chains: List<Chain>,
     val symbols: List<Symbol>,
     val markets: List<Market>,
@@ -44,8 +45,7 @@ data class Fixtures(
 }
 
 fun getFixtures(chainringChainId: ChainId) = Fixtures(
-    makerFeeRateInBps = 100,
-    takerFeeRateInBps = 200,
+    feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
     chains = listOf(
         Fixtures.Chain(chainringChainId, "chainring-dev", Address("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"))
     ),

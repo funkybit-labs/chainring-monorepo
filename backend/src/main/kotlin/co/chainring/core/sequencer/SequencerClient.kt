@@ -8,6 +8,7 @@ import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.SequencerOrderId
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.db.DepositId
+import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.WithdrawalId
@@ -21,7 +22,7 @@ import co.chainring.sequencer.proto.balanceBatch
 import co.chainring.sequencer.proto.cancelOrder
 import co.chainring.sequencer.proto.deposit
 import co.chainring.sequencer.proto.failedWithdrawal
-import co.chainring.sequencer.proto.feeRatesInBps
+import co.chainring.sequencer.proto.feeRates
 import co.chainring.sequencer.proto.getStateRequest
 import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.order
@@ -139,14 +140,14 @@ open class SequencerClient {
         }.sequencerResponse
     }
 
-    suspend fun setFeeRates(maker: Int, taker: Int): SequencerResponse {
+    suspend fun setFeeRates(feeRates: FeeRates): SequencerResponse {
         return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
             stub.setFeeRates(
                 setFeeRatesRequest {
                     this.guid = UUID.randomUUID().toString()
-                    this.feeRates = feeRatesInBps {
-                        this.maker = maker
-                        this.taker = taker
+                    this.feeRates = feeRates {
+                        this.maker = feeRates.maker.value
+                        this.taker = feeRates.taker.value
                     }
                 },
             )

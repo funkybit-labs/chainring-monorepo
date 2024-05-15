@@ -1,5 +1,7 @@
 package co.chainring.sequencer.core
 
+import java.math.BigDecimal
+
 @JvmInline
 value class WalletAddress(val value: Long) {
     override fun toString(): String = value.toString()
@@ -42,3 +44,23 @@ value class Asset(val value: String) {
 }
 
 fun String.toAsset() = Asset(this)
+
+@JvmInline
+value class FeeRate(val value: Long) {
+    init {
+        require(isValid(value)) { "Invalid fee rate" }
+    }
+
+    companion object {
+        const val MIN_VALUE = 0L
+        const val MAX_VALUE = 1000000L
+
+        fun isValid(value: Long): Boolean =
+            value in MIN_VALUE..MAX_VALUE
+
+        val zero = FeeRate(0)
+
+        fun fromPercents(percents: Double): FeeRate =
+            FeeRate((BigDecimal(percents) * BigDecimal(MAX_VALUE) / BigDecimal(100)).toLong())
+    }
+}
