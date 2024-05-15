@@ -7,7 +7,7 @@ import java.math.BigDecimal
 @JvmInline
 value class FeeRate(val value: Long) {
     init {
-        require(value in 1..MAX_VALUE) { "Invalid fee rate" }
+        require(value in 0..MAX_VALUE) { "Invalid fee rate $value" }
     }
 
     companion object {
