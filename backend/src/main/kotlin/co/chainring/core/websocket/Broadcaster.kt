@@ -169,7 +169,8 @@ class Broadcaster(val db: Database) {
             null -> Prices(
                 market = topic.marketId,
                 duration = topic.duration,
-                ohlc = pricesByMarketAndPeriod[topic] ?: listOf(),
+                // 3360 is equivalent to 7 days of 5 minutes sticks
+                ohlc = pricesByMarketAndPeriod[topic]?.takeLast(3360) ?: listOf(),
                 full = true,
                 dailyChange = pricesDailyChangeByMarket[topic.marketId] ?: 0.0,
             )
