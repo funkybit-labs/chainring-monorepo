@@ -5,11 +5,9 @@ export default {
   content: ['./src/**/*.{mjs,js,ts,jsx,tsx}'],
   theme: {
     screens: {
-      'sm': '750px',
-      'md': '1000px',
-      'lg': '1500px',
-      'xl': '1750px',
-      '2xl': '2250px',
+      'mobile': '400px',
+      'narrow': '600px',
+      'laptop': '1100px',
     },
     extend: {
       fontFamily: {
@@ -57,13 +55,6 @@ export default {
     require('@tailwindcss/forms')
   ],
   safelist: [
-    {
-      pattern: /grid-cols-/,
-      variants: ['sm', 'md', 'lg', 'xl', '2xl']
-    },
-    {
-      pattern: /col-span-/,
-    },
     {
       pattern: /text-status/,
     }

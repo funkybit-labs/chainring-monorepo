@@ -1,18 +1,13 @@
-import { classNames } from 'utils'
-
 type Props = {
+  id: string
   contents: JSX.Element
-  span?: number
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   wrapperRef?: any
 }
 
-export function Widget({ contents, span, wrapperRef }: Props) {
+export function Widget({ id, contents, wrapperRef }: Props) {
   return (
-    <div
-      ref={wrapperRef}
-      className={classNames(span ? `col-span-${span}` : '')}
-    >
+    <div id={id} ref={wrapperRef}>
       <div className="rounded-lg bg-darkBluishGray9 p-4 text-white shadow-lg">
         {contents}
       </div>

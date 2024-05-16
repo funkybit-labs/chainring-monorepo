@@ -3,6 +3,7 @@ import { Listbox, Transition } from '@headlessui/react'
 import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import SymbolIcon from 'components/common/SymbolIcon'
 import Markets, { Market } from 'markets'
+import { classNames } from 'utils'
 
 export function MarketSelector({
   markets,
@@ -18,7 +19,7 @@ export function MarketSelector({
       <Listbox value={selected} onChange={onChange}>
         <div className="relative">
           <Listbox.Button className="relative w-full cursor-default rounded-md bg-darkBluishGray7 py-2 pl-3 pr-10 text-left transition-colors duration-300 ease-in-out hover:bg-darkBluishGray6 hover:text-white">
-            <MarketTitle market={selected} />
+            <MarketTitle market={selected} alwaysShowLabel={true} />
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <ChevronDownIcon
                 className="size-5 text-darkBluishGray1"
@@ -48,7 +49,7 @@ export function MarketSelector({
                           selected ? 'font-bold text-white' : 'font-normal'
                         }`}
                       >
-                        <MarketTitle market={market} />
+                        <MarketTitle market={market} alwaysShowLabel={true} />
                       </div>
                     </>
                   )}
@@ -62,9 +63,20 @@ export function MarketSelector({
   )
 }
 
-export function MarketTitle({ market }: { market: Market }) {
+export function MarketTitle({
+  market,
+  alwaysShowLabel
+}: {
+  market: Market
+  alwaysShowLabel: boolean
+}) {
   return (
-    <div className="flex place-items-center truncate">
+    <div
+      className={classNames(
+        'flex place-items-center truncate',
+        alwaysShowLabel || 'justify-center narrow:justify-normal'
+      )}
+    >
       <SymbolIcon
         symbol={market.baseSymbol.name}
         className="relative left-1 inline-block size-4"
@@ -73,9 +85,11 @@ export function MarketTitle({ market }: { market: Market }) {
         symbol={market.quoteSymbol.name}
         className="mr-2 inline-block size-4"
       />
-      {market.baseSymbol.name}
-      <span className="">/</span>
-      {market.quoteSymbol.name}
+      <span className={classNames(alwaysShowLabel || 'hidden narrow:inline')}>
+        {market.baseSymbol.name}
+        <span className="">/</span>
+        {market.quoteSymbol.name}
+      </span>
     </div>
   )
 }

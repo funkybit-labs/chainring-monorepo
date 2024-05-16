@@ -332,6 +332,7 @@ export default function OrderTicketWidget({
 
   return (
     <Widget
+      id="order-ticket"
       contents={
         <>
           <div className="flex w-full items-center justify-between">

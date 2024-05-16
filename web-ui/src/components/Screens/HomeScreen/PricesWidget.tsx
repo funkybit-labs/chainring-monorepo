@@ -96,6 +96,7 @@ export function PricesWidget({ market }: { market: Market }) {
 
   return (
     <Widget
+      id="prices"
       wrapperRef={ref}
       contents={
         <div className="min-h-[600px]">
@@ -120,9 +121,12 @@ export function PricesWidget({ market }: { market: Market }) {
                 }}
               />
             </div>
-            <div className="text-right text-xs text-darkBluishGray2">
+            <div className="hidden text-right text-xs text-darkBluishGray2 narrow:block">
               <LastUpdated lastUpdated={lastUpdated} />
             </div>
+          </div>
+          <div className="block text-xs text-darkBluishGray2 narrow:hidden">
+            <LastUpdated lastUpdated={lastUpdated} />
           </div>
           <div className="size-full min-h-[500px] pl-2 pt-4">
             <OHLCChart

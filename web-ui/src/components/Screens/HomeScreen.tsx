@@ -5,13 +5,14 @@ import BalancesWidget from 'components/Screens/HomeScreen/balances/BalancesWidge
 import { Header } from 'components/Screens/Header'
 import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
 import OrderTicketWidget from 'components/Screens/HomeScreen/OrderTicketWidget'
-import { useEffect, useMemo, useState } from 'react'
+import { LegacyRef, useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
 import OrdersAndTradesWidget from 'components/Screens/HomeScreen/OrdersAndTradesWidget'
 import TradingSymbols from 'tradingSymbols'
 import Markets, { Market } from 'markets'
 import { WebsocketProvider } from 'contexts/websocket'
 import { PricesWidget } from 'components/Screens/HomeScreen/PricesWidget'
+import { useMeasure } from 'react-use'
 
 export default function HomeScreen() {
   const configQuery = useQuery({
@@ -53,6 +54,8 @@ export default function HomeScreen() {
     }
   }, [markets, selectedMarket])
 
+  const [ref, { width }] = useMeasure()
+
   return (
     <WebsocketProvider wallet={wallet}>
       {markets && feeRates && selectedMarket ? (
@@ -63,12 +66,15 @@ export default function HomeScreen() {
             onMarketChange={setSelectedMarket}
           />
 
-          <div className="flex justify-center py-24">
-            <div className="w-3/4 min-w-[1200px]">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2 space-y-4">
+          <div className="mx-4 flex justify-center py-24">
+            <div
+              className="min-w-[400px] laptop:max-w-[1800px]"
+              ref={ref as LegacyRef<HTMLDivElement>}
+            >
+              <div className="grid grid-cols-1 gap-4 laptop:grid-cols-3">
+                <div className="col-span-1 space-y-4 laptop:col-span-2">
                   <PricesWidget market={selectedMarket} />
-                  {symbols && (
+                  {symbols && width >= 1100 && (
                     <BalancesWidget
                       walletAddress={wallet.address}
                       exchangeContractAddress={exchangeContract?.address}
@@ -83,9 +89,21 @@ export default function HomeScreen() {
                     exchangeContractAddress={exchangeContract?.address}
                     feeRates={feeRates}
                   />
-                  <OrderBookWidget marketId={selectedMarket.id} />
+                  {width >= 1100 && (
+                    <OrderBookWidget marketId={selectedMarket.id} />
+                  )}
                 </div>
-                <div className="col-span-3  space-y-4">
+                {symbols && width < 1100 && (
+                  <div className="col-span-1 space-y-4">
+                    <OrderBookWidget marketId={selectedMarket.id} />
+                    <BalancesWidget
+                      walletAddress={wallet.address}
+                      exchangeContractAddress={exchangeContract?.address}
+                      symbols={symbols}
+                    />
+                  </div>
+                )}
+                <div className="col-span-1 space-y-4 laptop:col-span-3">
                   <OrdersAndTradesWidget
                     markets={markets}
                     walletAddress={wallet.address}
