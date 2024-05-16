@@ -5,11 +5,3 @@ export function maxDate(a: Date, b: Date): Date {
     return b
   }
 }
-
-export function addDuration(date: Date, millis: number): Date {
-  return new Date(date.getTime() + millis)
-}
-
-export function subtractDuration(date: Date, millis: number): Date {
-  return new Date(date.getTime() - millis)
-}

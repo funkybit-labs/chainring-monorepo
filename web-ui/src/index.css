@@ -78,6 +78,15 @@
   stroke-dasharray: 2 2;
 }
 
+svg text {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  pointer-events: none;
+}
+
 @layer utilities {
   .bg-switch {
     background: url("assets/Switch.svg") no-repeat center;
