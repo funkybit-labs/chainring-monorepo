@@ -1,6 +1,12 @@
 import { Widget } from 'components/common/Widget'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { OHLC, OHLCDuration, pricesTopic, Publishable } from 'websocketMessages'
+import {
+  OHLC,
+  OHLCDuration,
+  OHLCDurationSchema,
+  pricesTopic,
+  Publishable
+} from 'websocketMessages'
 import { mergeOHLC, ohlcDurationsMs } from 'utils/pricesUtils'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { produce } from 'immer'
@@ -71,6 +77,20 @@ function halfOhlcDurationMs(ohlcDuration: OHLCDuration): number {
   return ohlcDurationsMs[ohlcDuration] / 2
 }
 
+function shorterDurationOrNull(duration: OHLCDuration): OHLCDuration | null {
+  const durations: OHLCDuration[] = OHLCDurationSchema.options
+  const currentIndex = durations.indexOf(duration)
+  return currentIndex > 0 ? durations[currentIndex - 1] : null
+}
+
+function longerDurationOrNull(duration: OHLCDuration): OHLCDuration | null {
+  const durations: OHLCDuration[] = OHLCDurationSchema.options
+  const currentIndex = durations.indexOf(duration)
+  return currentIndex < durations.length - 1
+    ? durations[currentIndex + 1]
+    : null
+}
+
 export function PricesWidget({ market }: { market: Market }) {
   const [ref, { width }] = useMeasure()
 
@@ -79,7 +99,7 @@ export function PricesWidget({ market }: { market: Market }) {
   )
   const [duration, setDuration] = useState<OHLCDuration>('P5M')
   const [ohlc, setOhlc] = useState<OHLC[]>([])
-  const [ohlcLoaded, setOhlcLoaded] = useState<boolean>(false)
+  const [ohlcLoading, setOhlcLoading] = useState<boolean>(true)
   const [dailyChange, setDailyChange] = useState<number | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
@@ -102,7 +122,7 @@ export function PricesWidget({ market }: { market: Market }) {
             setDailyChange(message.dailyChange)
           }
           setLastUpdated(new Date())
-          setOhlcLoaded(true)
+          setOhlcLoading(false)
         }
       },
       [duration]
@@ -137,7 +157,7 @@ export function PricesWidget({ market }: { market: Market }) {
                   const newDuration = intervalToOHLCDuration[int]
                   if (duration != newDuration) {
                     setDuration(newDuration)
-                    setOhlcLoaded(false)
+                    setOhlcLoading(true)
                   }
                   setInterval(int)
                 }}
@@ -149,15 +169,23 @@ export function PricesWidget({ market }: { market: Market }) {
           </div>
           <div className="size-full min-h-[500px] pl-2 pt-4">
             <OHLCChart
-              disabled={!ohlcLoaded}
+              disabled={ohlcLoading}
               ohlc={ohlc}
               lastPrice={lastPrice()}
               params={{
                 width: Math.max(width - 40, 0), // paddings
                 height: 500,
                 interval: interval,
+                resetInterval: () => setInterval(null),
                 duration: duration,
-                onIntervalReset: () => setInterval(null)
+                shorterDuration: shorterDurationOrNull(duration),
+                longerDuration: longerDurationOrNull(duration),
+                requestDurationChange: (newDuration) => {
+                  if (duration != newDuration) {
+                    setDuration(newDuration)
+                    setOhlcLoading(true)
+                  }
+                }
               }}
             />
           </div>
@@ -171,8 +199,11 @@ type PricesParameters = {
   width: number
   height: number
   interval: PricesInterval | null
+  resetInterval: () => void
   duration: OHLCDuration
-  onIntervalReset: () => void
+  shorterDuration: OHLCDuration | null
+  longerDuration: OHLCDuration | null
+  requestDurationChange: (duration: OHLCDuration) => void
 }
 
 function OHLCChart({
@@ -238,10 +269,14 @@ function OHLCChart({
   const dragRef = useRef<{
     startY: number
     startX: number
+    maxZoomLockedAt: number | null
+    minZoomLockedAt: number | null
     scale: d3.ScaleTime<number, number, never> | null
   }>({
     startY: 0,
     startX: 0,
+    maxZoomLockedAt: null,
+    minZoomLockedAt: null,
     scale: null
   })
 
@@ -321,13 +356,12 @@ function OHLCChart({
     updateMouseProjections(mouseX, mouseY)
 
     if (dragRef.current.scale) {
-      const deltaY = event.clientY - dragRef.current.startY
-      const zoomXFactor = (1.5 * deltaY) / params.height
+      // domain data before drag initiated
+      const domainXStartTime = dragRef.current.scale.domain()[0].getTime()
+      const domainXEndTime = dragRef.current.scale.domain()[1].getTime()
+      const domainXIntervalTime = domainXEndTime - domainXStartTime
 
-      const scaleStartTime = dragRef.current.scale.domain()[0].getTime()
-      const scaleEndTime = dragRef.current.scale.domain()[1].getTime()
-      const scaleIntervalTime = scaleEndTime - scaleStartTime
-
+      // pan duration
       const dragStartXTime = dragRef.current.scale
         .invert(event.clientX)
         .getTime()
@@ -336,43 +370,74 @@ function OHLCChart({
         .getTime()
       const draggedXTime = dragStartXTime - dragEndXTime
 
-      const newDomainStartTime =
-        scaleStartTime + scaleIntervalTime * zoomXFactor - draggedXTime
-      const newDomainEndTime = scaleEndTime - draggedXTime
+      // calculate zoom level. Min and max zoom levels can be locked when on ohlc duration borders
+      const deltaY = event.clientY - dragRef.current.startY
+      const originalZoomFactor = (1.5 * deltaY) / params.height
+      const zoomXFactor =
+        dragRef.current.maxZoomLockedAt &&
+        originalZoomFactor > dragRef.current.maxZoomLockedAt
+          ? dragRef.current.maxZoomLockedAt
+          : dragRef.current.minZoomLockedAt &&
+              originalZoomFactor < dragRef.current.minZoomLockedAt
+            ? dragRef.current.minZoomLockedAt
+            : originalZoomFactor
 
+      // domain data with applied pan & zoom
+      const newDomainXStartTime =
+        domainXStartTime + domainXIntervalTime * zoomXFactor - draggedXTime
+      const newDomainXEndTime = domainXEndTime - draggedXTime
+      const newDomainXIntervalTime = newDomainXEndTime - newDomainXStartTime
+
+      // check if more/less granular OHLC sticks should be requested, limit zoom
+      const candlestickSlotsVisible =
+        newDomainXIntervalTime / ohlcDurationsMs[params.duration]
+      if (candlestickSlotsVisible >= 200) {
+        if (params.longerDuration) {
+          params.requestDurationChange(params.longerDuration)
+          dragRef.current.minZoomLockedAt = null
+        } else if (!dragRef.current.minZoomLockedAt) {
+          dragRef.current.minZoomLockedAt = zoomXFactor
+        }
+      } else if (candlestickSlotsVisible <= 20) {
+        if (params.shorterDuration) {
+          params.requestDurationChange(params.shorterDuration)
+          dragRef.current.maxZoomLockedAt = null
+        } else if (!dragRef.current.maxZoomLockedAt) {
+          dragRef.current.maxZoomLockedAt = zoomXFactor
+        }
+      } else {
+        dragRef.current.maxZoomLockedAt = null
+        dragRef.current.minZoomLockedAt = null
+      }
+
+      // limit panning by calculating offset to last visible ohlc stick
       const endOfTheWorldTime =
         ohlc.length > 0
           ? ohlc[ohlc.length - 1].start.getTime() +
             halfOhlcDurationMs(params.duration)
           : 0
       const limitPanOffset =
-        newDomainEndTime > endOfTheWorldTime
-          ? newDomainEndTime - endOfTheWorldTime
+        newDomainXEndTime > endOfTheWorldTime
+          ? newDomainXEndTime - endOfTheWorldTime
           : 0
 
+      // apply domain changes and redraw chart
       const newDomain: [Date, Date] = [
-        new Date(newDomainStartTime - limitPanOffset),
-        new Date(newDomainEndTime - limitPanOffset)
+        new Date(newDomainXStartTime - limitPanOffset),
+        new Date(newDomainXEndTime - limitPanOffset)
       ]
-
       domainXRef.current = newDomain
       drawChart(xScale.domain(newDomain))
 
-      // auto-pan right in the rightmost point
+      // set auto-pan moe in the rightmost point
       setAutoPanRight(
-        endOfTheWorldTime - newDomainEndTime <=
-          halfOhlcDurationMs(params.duration) // leeway for automan enabled
-      )
-      console.log(
-        'autoPanRight',
-        autoPanRight,
-        newDomainEndTime,
-        endOfTheWorldTime,
-        endOfTheWorldTime - newDomainEndTime
+        endOfTheWorldTime - newDomainXEndTime <=
+          halfOhlcDurationMs(params.duration) // leeway for disabling auto-pan
       )
 
+      // reset selected interval on update of zoom level
       if (zoomXFactor != 1) {
-        params.onIntervalReset()
+        params.resetInterval()
       }
     }
   }
@@ -394,12 +459,17 @@ function OHLCChart({
   }
 
   const handleMouseUp = () => {
-    dragRef.current.startX = 0 // FIXME introduce object
+    // reset drag mode
+    dragRef.current.startX = 0
     dragRef.current.startY = 0
     dragRef.current.scale = null
+    // if outer zoom boundaries were reached then reset to 0 to keep limit in place for next drag round
+    dragRef.current.minZoomLockedAt = dragRef.current.minZoomLockedAt ? 0 : null
+    dragRef.current.maxZoomLockedAt = dragRef.current.maxZoomLockedAt ? 0 : null
   }
 
   svg
+    .select('.svg-main')
     .on('mousedown', handleMouseDown)
     .on('mousemove', handleMouseMove)
     .on('mouseup', handleMouseUp)
