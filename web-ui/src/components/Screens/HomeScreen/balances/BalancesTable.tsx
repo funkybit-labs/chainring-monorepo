@@ -62,7 +62,7 @@ export function BalancesTable({
 
   return (
     <>
-      <div className="grid max-h-72 auto-rows-max grid-cols-[max-content_3fr_1fr_1fr] overflow-scroll">
+      <div className="grid max-h-72 auto-rows-max grid-cols-[max-content_1fr_max-content] overflow-y-scroll">
         {[symbols.native].concat(symbols.erc20).map((symbol) => {
           const balance = balances.find(
             (balance) => balance.symbol == symbol.name
@@ -79,25 +79,25 @@ export function BalancesTable({
               <div className="mb-4 inline-block w-full text-center align-text-top">
                 {formatUnits(balance.available, symbol.decimals)}
               </div>
-              <div className="mb-4 mr-4 inline-block text-xs">
+              <div className="mb-4 inline-block space-x-4 justify-self-end text-xs">
                 <Button
                   style={'normal'}
                   caption={() => (
                     <span className="whitespace-nowrap">
-                      Deposit{' '}
+                      <span className="mr-4 hidden narrow:inline">Deposit</span>
                       <img className="inline" src={Deposit} alt={'Deposit'} />
                     </span>
                   )}
                   onClick={() => openDepositModal(symbol)}
                   disabled={false}
                 />
-              </div>
-              <div className="mb-4 inline-block text-xs">
                 <Button
                   style={'normal'}
                   caption={() => (
                     <span className="whitespace-nowrap">
-                      Withdraw{' '}
+                      <span className="mr-4 hidden narrow:inline">
+                        Withdraw
+                      </span>
                       <img
                         className="inline"
                         src={Withdrawal}

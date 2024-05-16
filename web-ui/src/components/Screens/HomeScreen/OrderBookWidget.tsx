@@ -105,6 +105,7 @@ export function OrderBookWidget({ marketId }: { marketId: string }) {
 
   return (
     <Widget
+      id="order-book"
       wrapperRef={ref}
       contents={<OrderBook params={params} orderBook={orderBook} />}
     />
@@ -144,6 +145,15 @@ export function OrderBook({
   // complicated
   const labelWidth = (params.sellLevels[0] ?? params.buyLevels[0])?.price.length
   const minimumTickX = labelWidth * 12
+
+  function formatTick(tick: number, gridSpacing: number): string {
+    const spacingAsString = gridSpacing.toString()
+    if (spacingAsString.includes('.')) {
+      return tick.toFixed(spacingAsString.split('.')[1].length)
+    } else {
+      return tick.toFixed(0)
+    }
+  }
 
   return (
     <svg width={params.graphWidth} height={params.graphHeight}>
@@ -218,7 +228,7 @@ export function OrderBook({
                 fill="white"
                 textAnchor="middle"
               >
-                {tick}
+                {formatTick(tick, params.gridSpacing)}
               </text>
               <line
                 x1={xPos}

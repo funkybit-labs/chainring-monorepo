@@ -55,6 +55,7 @@ export default function BalancesWidget({
 
   return (
     <Widget
+      id="balances"
       contents={
         <>
           <div className="flex w-full text-center font-medium">

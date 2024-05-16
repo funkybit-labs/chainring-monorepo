@@ -10,7 +10,6 @@ import { classNames } from 'utils'
 import Markets from 'markets'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { ordersTopic, Publishable, tradesTopic } from 'websocketMessages'
-import { getColumnsForWidth, useWindowDimensions } from 'utils/layout'
 import { generateOrderNonce, getDomain } from 'utils/eip712'
 import { useConfig, useSignTypedData } from 'wagmi'
 import { ChangeOrderModal } from 'components/Screens/HomeScreen/ChangeOrderModal'
@@ -34,7 +33,6 @@ export default function OrdersAndTradesWidget({
   const [changedOrder, setChangedOrder] = useState<Order | null>(null)
   const [showChangeModal, setShowChangeModal] = useState<boolean>(false)
   const [trades, setTrades] = useState<Trade[]>(() => [])
-  const windowDimensions = useWindowDimensions()
   const config = useConfig()
   const { signTypedDataAsync } = useSignTypedData()
   const [selectedTab, setSelectedTab] = useState<'orders' | 'trade-history'>(
@@ -153,8 +151,13 @@ export default function OrdersAndTradesWidget({
               <tr key="header">
                 <td className="pl-4">Date</td>
                 <td className="pl-4">Side</td>
-                <td className="pl-4">Amount</td>
-                <td className="pl-4">Price</td>
+                <td className="hidden pl-4 narrow:table-cell">Amount</td>
+                <td className="hidden pl-4 narrow:table-cell">Price</td>
+                <td className="table-cell pl-4 narrow:hidden">
+                  Amount
+                  <br />
+                  Price
+                </td>
                 <td className="pl-4">Market</td>
                 <td className="pl-4 text-center">Status</td>
                 <td className="px-4">Edit</td>
@@ -172,40 +175,47 @@ export default function OrdersAndTradesWidget({
                     )}
                   >
                     <td className="h-12 rounded-l pl-4">
-                      <span className="mr-2 text-lightBluishGray5">
+                      <span className="mr-2 inline-block text-lightBluishGray5">
                         {format(order.timing.createdAt, 'MM/dd')}
                       </span>
-                      <span className="text-white">
+                      <span className="inline-block whitespace-nowrap text-white">
                         {format(order.timing.createdAt, 'HH:mm:ss a')}
                       </span>
                     </td>
                     <td className="pl-4">{order.side}</td>
-                    <td className="pl-4">
+                    <td className="hidden pl-4 narrow:table-cell">
                       {formatUnits(order.amount, market.baseSymbol.decimals)}
                     </td>
-                    <td className="pl-4">
+                    <td className="hidden pl-4 narrow:table-cell">
+                      {order.type == 'limit'
+                        ? order.price.toFixed(market.quoteDecimalPlaces)
+                        : 'MKT'}
+                    </td>
+                    <td className="table-cell pl-4 narrow:hidden">
+                      {formatUnits(order.amount, market.baseSymbol.decimals)}
+                      <br />
                       {order.type == 'limit'
                         ? order.price.toFixed(market.quoteDecimalPlaces)
                         : 'MKT'}
                     </td>
                     <td className="pl-4">
-                      <MarketTitle market={market} />
+                      <MarketTitle market={market} alwaysShowLabel={false} />
                     </td>
                     <td className="pl-4 text-center">
                       <Status status={order.status} />
                     </td>
-                    <td className="rounded-r py-1 pl-4">
+                    <td className="rounded-r px-4 py-1">
                       {!order.isFinal() && (
                         <div className="flex items-center gap-2">
                           <button
-                            className="rounded bg-darkBluishGray7 p-2 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray"
+                            className="shrink-0 rounded bg-darkBluishGray7 p-2 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray"
                             onClick={() => openEditModal(order)}
                             disabled={!cancelOrderMutation.isIdle}
                           >
                             <img src={Edit} alt={'Change'} />
                           </button>
                           <button
-                            className="rounded bg-darkBluishGray7 p-2 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray"
+                            className="shrink-0 rounded bg-darkBluishGray7 p-2 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray"
                             onClick={() => cancelOrder(order)}
                             disabled={!cancelOrderMutation.isIdle}
                           >
@@ -245,8 +255,13 @@ export default function OrdersAndTradesWidget({
               <tr key="header">
                 <td className="pl-4">Date</td>
                 <td className="pl-4">Side</td>
-                <td className="pl-4">Amount</td>
-                <td className="pl-4">Price</td>
+                <td className="hidden pl-4 narrow:table-cell">Amount</td>
+                <td className="hidden pl-4 narrow:table-cell">Price</td>
+                <td className="table-cell pl-4 narrow:hidden">
+                  Amount
+                  <br />
+                  Price
+                </td>
                 <td className="pl-4">Fee</td>
                 <td className="pl-4">Market</td>
                 <td className="pl-4 text-center">Status</td>
@@ -262,18 +277,24 @@ export default function OrdersAndTradesWidget({
                     className="duration-200 ease-in-out hover:cursor-default hover:bg-darkBluishGray6"
                   >
                     <td className="h-12 rounded-l pl-4">
-                      <span className="mr-2 text-lightBluishGray5">
+                      <span className="mr-2 inline-block text-lightBluishGray5">
                         {format(trade.timestamp, 'MM/dd')}
                       </span>
-                      <span className="text-white">
+                      <br className="narrow:hidden" />
+                      <span className="whitespace-nowrap text-white">
                         {format(trade.timestamp, 'HH:mm:ss a')}
                       </span>
                     </td>
                     <td className="pl-4">{trade.side}</td>
-                    <td className="pl-4">
+                    <td className="hidden pl-4 narrow:table-cell">
                       {formatUnits(trade.amount, market.baseSymbol.decimals)}
                     </td>
-                    <td className="pl-4">
+                    <td className="hidden pl-4 narrow:table-cell">
+                      {trade.price.toFixed(market.quoteDecimalPlaces)}
+                    </td>
+                    <td className="table-cell pl-4 narrow:hidden">
+                      {formatUnits(trade.amount, market.baseSymbol.decimals)}
+                      <br />
                       {trade.price.toFixed(market.quoteDecimalPlaces)}
                     </td>
                     <td className="pl-4">
@@ -283,9 +304,9 @@ export default function OrdersAndTradesWidget({
                       )}
                     </td>
                     <td className="pl-4">
-                      <MarketTitle market={market} />
+                      <MarketTitle market={market} alwaysShowLabel={false} />
                     </td>
-                    <td className="rounded-r pl-4 text-center">
+                    <td className="rounded-r px-4 text-center">
                       <Status status={trade.settlementStatus} />
                     </td>
                   </tr>
@@ -300,7 +321,7 @@ export default function OrdersAndTradesWidget({
 
   return (
     <Widget
-      span={Math.min(2, getColumnsForWidth(windowDimensions.width))}
+      id="orders-and-trades"
       contents={
         <>
           <div className="flex w-full text-center font-medium">

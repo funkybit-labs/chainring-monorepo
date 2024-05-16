@@ -92,11 +92,15 @@ export function Status({
         className={classNames(
           textColor(),
           'font-medium',
-          'bg-darkBluishGray8 px-4 py-2 rounded min-w-16'
+          'bg-darkBluishGray8 px-2 narrow:px-4 py-2 rounded whitespace-nowrap'
         )}
       >
-        <img className="mr-2 inline" src={icon()} alt={universalStatus} />
-        {universalStatus}
+        <img
+          className="inline align-text-top"
+          src={icon()}
+          alt={universalStatus}
+        />
+        <span className="ml-2 hidden narrow:inline">{universalStatus}</span>
       </span>
     </>
   )
