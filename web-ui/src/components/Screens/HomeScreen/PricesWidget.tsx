@@ -218,6 +218,18 @@ function OHLCChart({
   lastPrice: number | null
 }) {
   const ref = useRef<SVGSVGElement>(null)
+  const margin = {
+    top: 0,
+    bottom: 18,
+    left: 0,
+    // calculate 8 pixels for every price digit
+    right: lastPrice ? lastPrice.toFixed(2).length * 8 : 30
+  }
+  const innerWidth = params.width - margin.left - margin.right
+  const innerHeight = params.height - margin.top - margin.bottom
+
+  const svg = d3.select(ref.current)
+
   const domainXRef = useRef<[Date, Date]>([
     offsetInterval(new Date(), PricesInterval.PT6H),
     d3.timeMillisecond.offset(
@@ -225,7 +237,164 @@ function OHLCChart({
       halfOhlcDurationMs(params.duration)
     )
   ])
+  const xScale = useMemo(
+    () => d3.scaleTime().domain(domainXRef.current).range([0, innerWidth]),
+    [domainXRef, innerWidth]
+  )
+  const xAxis = useMemo(
+    () =>
+      d3
+        .axisBottom(xScale)
+        .tickSizeOuter(0)
+        .tickSizeInner(-innerHeight)
+        .ticks(5)
+        .tickFormat((d) => {
+          const date = d instanceof Date ? d : new Date(d.valueOf())
+          if (d3.timeHour(date) < date) {
+            return d3.timeFormat('%H:%M')(date) // 24-hour clock [00,23] + minute [00,59]
+          }
+          if (d3.timeDay(date) < date) {
+            return d3.timeFormat('%H:%M')(date) // 24-hour clock [00,23] + minute [00,59]
+          }
+          if (d3.timeMonth(date) < date) {
+            return d3.timeFormat('%b %-d')(date) // abbreviated month name + day of the month without padding
+          }
+          if (d3.timeYear(date) < date) {
+            return d3.timeFormat('%B')(date) // full month name
+          }
+          return d3.timeFormat('%Y')(date) // year with century
+        }),
+    [innerHeight, xScale]
+  )
+
+  const yScale = useMemo(
+    () => d3.scaleLinear().range([innerHeight, 0]),
+    [innerHeight]
+  )
+  const yAxis = useMemo(
+    () =>
+      d3
+        .axisRight(yScale)
+        .tickSize(0)
+        .tickFormat((x: d3.NumberValue) => x.valueOf().toFixed(2))
+        .tickPadding(5),
+    [yScale]
+  )
+  // grid is separated from the axis to let ohlc candles be rendered above the grid, but below the axis to slide under ticks
+  const yAxisGrid = useMemo(
+    () => d3.axisRight(yScale).tickSizeOuter(0).tickSizeInner(-innerWidth),
+    [yScale, innerWidth]
+  )
+
   const [autoPanRight, setAutoPanRight] = useState(true)
+
+  const drawChart = useCallback(
+    (newXScale: d3.ScaleTime<number, number, never>) => {
+      // calculate visible range
+      const visibleData: OHLC[] = ohlc.filter((d) => {
+        return (
+          // add some pixels to let bars slide outside of viewport before disappearing
+          newXScale(d.start) >= -50 && newXScale(d.start) <= innerWidth + 50
+        )
+      })
+
+      // scale x-axis
+      // @ts-expect-error @definitelytyped/no-unnecessary-generics
+      svg.select('.x-axis').call(xAxis.scale(newXScale))
+
+      // scale y-axis
+      const yMin = d3.min(visibleData, (d) => d.low)
+      const yMax = d3.max(visibleData, (d) => d.high)
+      if (yMin && yMax) {
+        yScale.domain([yMin * 0.995, yMax * 1.005])
+      }
+      // @ts-expect-error @definitelytyped/no-unnecessary-generics
+      svg.select('.y-axis').call(yAxis.scale(yScale))
+      // @ts-expect-error @definitelytyped/no-unnecessary-generics
+      svg.select('.y-axis-grid').call(yAxisGrid.scale(yScale))
+
+      // update current price tracker
+      svg
+        .select('.y-axis-current-price')
+        .classed('hidden', !lastPrice)
+        .transition()
+        .duration(150)
+        .attr('transform', `translate(0,${lastPrice ? yScale(lastPrice) : 0})`)
+        .select('text')
+        .text(lastPrice ? lastPrice.toFixed(2) : '')
+
+      // calculate candle width
+      const candleWidth =
+        ohlc.length >= 2
+          ? Math.abs(newXScale(ohlc[1].start) - newXScale(ohlc[0].start)) * 0.6
+          : 1
+      const lineWidth = candleWidth * 0.2
+
+      // select ohlc candles
+      const candles = svg
+        .selectAll('.y-axis-ohlc')
+        .selectAll('.ohlc')
+        .data(visibleData, (d) => (d as OHLC).start.toString())
+
+      // remove all candles that are not in visible data
+      candles.exit().remove()
+
+      // add groups for new elements
+      const candlesEnter = candles.enter().append('g').attr('class', 'ohlc')
+
+      // update positions
+      candlesEnter
+        .append('rect')
+        .attr('class', 'range')
+        .merge(candles.select('.range'))
+        .attr('x', (d) => newXScale(d.start) - lineWidth / 2)
+        .attr('width', lineWidth)
+        .attr('y', (d) => Math.min(yScale(d.low), yScale(d.high)))
+        .attr(
+          'height',
+          (d) =>
+            Math.max(yScale(d.low), yScale(d.high)) -
+            Math.min(yScale(d.low), yScale(d.high))
+        )
+        .attr('rx', candleWidth / 10)
+        .attr('fill', (d) => (d.close >= d.open ? '#39CF63' : '#FF5A50'))
+
+      candlesEnter
+        .append('rect')
+        .attr('class', 'open-close')
+        .merge(candles.select('.open-close'))
+        .attr('x', (d) => newXScale(d.start) - candleWidth / 2)
+        .attr('width', candleWidth)
+        .attr('y', (d) => {
+          const height =
+            Math.max(yScale(d.open), yScale(d.close)) -
+            Math.min(yScale(d.open), yScale(d.close))
+
+          const y = Math.min(yScale(d.open), yScale(d.close))
+          if (height < lineWidth) {
+            // place exactly in the middle
+            return y - (lineWidth - height) / 2
+          } else {
+            return y
+          }
+        })
+        .attr('height', (d) => {
+          const height =
+            Math.max(yScale(d.open), yScale(d.close)) -
+            Math.min(yScale(d.open), yScale(d.close))
+
+          if (height < lineWidth) {
+            return lineWidth
+          } else {
+            return height
+          }
+        })
+        .attr('rx', candleWidth / 10)
+        .attr('fill', (d) => (d.close >= d.open ? '#39CF63' : '#FF5A50'))
+    },
+    [innerWidth, lastPrice, ohlc, svg, xAxis, yAxis, yAxisGrid, yScale]
+  )
+
   useEffect(() => {
     if (params.interval) {
       // calculate new domain for the selected interval
@@ -240,8 +409,8 @@ function OHLCChart({
       drawChart(xScale)
       setAutoPanRight(true)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.interval])
+  }, [params.interval, params.duration, xScale, drawChart])
+
   useEffect(() => {
     // roll domain forward on new candle
     if (autoPanRight && ohlc && ohlc.length > 0) {
@@ -263,8 +432,7 @@ function OHLCChart({
       domainXRef.current = newDomain
       drawChart(xScale.domain(newDomain))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ohlc])
+  }, [ohlc, autoPanRight, params.duration, xScale, drawChart])
 
   const dragRef = useRef<{
     startY: number
@@ -279,61 +447,6 @@ function OHLCChart({
     minZoomLockedAt: null,
     scale: null
   })
-
-  const margin = {
-    top: 0,
-    bottom: 18,
-    left: 0,
-    // calculate 8 pixels for every price digit
-    right: lastPrice ? lastPrice.toFixed(2).length * 8 : 30
-  }
-  const innerWidth = params.width - margin.left - margin.right
-  const innerHeight = params.height - margin.top - margin.bottom
-
-  const svg = d3.select(ref.current)
-  const xScale = d3
-    .scaleTime()
-    .domain(domainXRef.current)
-    .range([0, innerWidth])
-  const xAxis = d3
-    .axisBottom(xScale)
-    .tickSizeOuter(0)
-    .tickSizeInner(-innerHeight)
-    .ticks(5)
-    .tickFormat((d) => {
-      const date = d instanceof Date ? d : new Date(d.valueOf())
-      if (d3.timeHour(date) < date) {
-        return d3.timeFormat('%H:%M')(date) // 24-hour clock [00,23] + minute [00,59]
-      }
-      if (d3.timeDay(date) < date) {
-        return d3.timeFormat('%H:%M')(date) // 24-hour clock [00,23] + minute [00,59]
-      }
-      if (d3.timeMonth(date) < date) {
-        return d3.timeFormat('%b %-d')(date) // abbreviated month name + day of the month without padding
-      }
-      if (d3.timeYear(date) < date) {
-        return d3.timeFormat('%B')(date) // full month name
-      }
-      return d3.timeFormat('%Y')(date) // year with century
-    })
-
-  const yScale = useMemo(
-    // do not reconstruct axis because domain will reset to defaul [0, 1]
-    // just in case when no visible OHLC left for some reason on the screen
-    // y-axis won't be reset
-    () => d3.scaleLinear().range([innerHeight, 0]),
-    [innerHeight]
-  )
-  const yAxis = d3
-    .axisRight(yScale)
-    .tickSize(0)
-    .tickFormat((x: d3.NumberValue) => x.valueOf().toFixed(2))
-    .tickPadding(5)
-  // grid is separated from the axis to let ohlc candles be rendered above the grid, but below the axis to slide under ticks
-  const yAxisGrid = d3
-    .axisRight(yScale)
-    .tickSizeOuter(0)
-    .tickSizeInner(-innerWidth)
 
   function updateMouseProjections(mouseX: number, mouseY: number) {
     svg
@@ -477,110 +590,6 @@ function OHLCChart({
     .on('mousemove', handleMouseMove)
     .on('mouseup', handleMouseUp)
     .on('mouseleave', handleMouseLeave)
-
-  function drawChart(newXScale: d3.ScaleTime<number, number, never>) {
-    // calculate visible range
-    const visibleData: OHLC[] = ohlc.filter((d) => {
-      return (
-        // add some pixels to let bars slide outside of viewport before disappearing
-        newXScale(d.start) >= -50 && newXScale(d.start) <= innerWidth + 50
-      )
-    })
-
-    // scale x-axis
-    // @ts-expect-error @definitelytyped/no-unnecessary-generics
-    svg.select('.x-axis').call(xAxis.scale(newXScale))
-
-    // scale y-axis
-    const yMin = d3.min(visibleData, (d) => d.low)
-    const yMax = d3.max(visibleData, (d) => d.high)
-    if (yMin && yMax) {
-      yScale.domain([yMin * 0.995, yMax * 1.005])
-    }
-    // @ts-expect-error @definitelytyped/no-unnecessary-generics
-    svg.select('.y-axis').call(yAxis.scale(yScale))
-    // @ts-expect-error @definitelytyped/no-unnecessary-generics
-    svg.select('.y-axis-grid').call(yAxisGrid.scale(yScale))
-
-    // update current price tracker
-    svg
-      .select('.y-axis-current-price')
-      .classed('hidden', !lastPrice)
-      .transition()
-      .duration(150)
-      .attr('transform', `translate(0,${lastPrice ? yScale(lastPrice) : 0})`)
-      .select('text')
-      .text(lastPrice ? lastPrice.toFixed(2) : '')
-
-    // calculate candle width
-    const candleWidth =
-      ohlc.length >= 2
-        ? Math.abs(newXScale(ohlc[1].start) - newXScale(ohlc[0].start)) * 0.6
-        : 1
-    const lineWidth = candleWidth * 0.2
-
-    // select ohlc candles
-    const candles = svg
-      .selectAll('.y-axis-ohlc')
-      .selectAll('.ohlc')
-      .data(visibleData, (d) => (d as OHLC).start.toString())
-
-    // remove all candles that are not in visible data
-    candles.exit().remove()
-
-    // add groups for new elements
-    const candlesEnter = candles.enter().append('g').attr('class', 'ohlc')
-
-    // update positions
-    candlesEnter
-      .append('rect')
-      .attr('class', 'range')
-      .merge(candles.select('.range'))
-      .attr('x', (d) => newXScale(d.start) - lineWidth / 2)
-      .attr('width', lineWidth)
-      .attr('y', (d) => Math.min(yScale(d.low), yScale(d.high)))
-      .attr(
-        'height',
-        (d) =>
-          Math.max(yScale(d.low), yScale(d.high)) -
-          Math.min(yScale(d.low), yScale(d.high))
-      )
-      .attr('rx', candleWidth / 10)
-      .attr('fill', (d) => (d.close >= d.open ? '#39CF63' : '#FF5A50'))
-
-    candlesEnter
-      .append('rect')
-      .attr('class', 'open-close')
-      .merge(candles.select('.open-close'))
-      .attr('x', (d) => newXScale(d.start) - candleWidth / 2)
-      .attr('width', candleWidth)
-      .attr('y', (d) => {
-        const height =
-          Math.max(yScale(d.open), yScale(d.close)) -
-          Math.min(yScale(d.open), yScale(d.close))
-
-        const y = Math.min(yScale(d.open), yScale(d.close))
-        if (height < lineWidth) {
-          // place exactly in the middle
-          return y - (lineWidth - height) / 2
-        } else {
-          return y
-        }
-      })
-      .attr('height', (d) => {
-        const height =
-          Math.max(yScale(d.open), yScale(d.close)) -
-          Math.min(yScale(d.open), yScale(d.close))
-
-        if (height < lineWidth) {
-          return lineWidth
-        } else {
-          return height
-        }
-      })
-      .attr('rx', candleWidth / 10)
-      .attr('fill', (d) => (d.close >= d.open ? '#39CF63' : '#FF5A50'))
-  }
 
   // blocking overlay area
   svg
