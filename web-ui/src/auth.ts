@@ -5,6 +5,8 @@ export type LoadAuthTokenOptions = {
   forceRefresh: boolean
 }
 
+let signingPromise: Promise<string> | null = null
+
 export async function loadAuthToken(
   options: LoadAuthTokenOptions = { forceRefresh: false }
 ): Promise<string> {
@@ -13,10 +15,25 @@ export async function loadAuthToken(
     const existingToken = localStorage.getItem(`did-${account.address}`)
     if (existingToken && !options.forceRefresh) return existingToken
 
+    if (!signingPromise) {
+      signingPromise = signAuthToken(account.address, account.chainId)
+    }
+
+    return signingPromise
+  }
+
+  return ''
+}
+
+async function signAuthToken(
+  address: `0x${string}`,
+  chainId: number
+): Promise<string> {
+  try {
     const message = {
       message: `[ChainRing Labs] Please sign this message to verify your ownership of this wallet address. This action will not cost any gas fees.`,
-      address: `${account.address.toLowerCase()}`,
-      chainId: account.chainId,
+      address: address.toLowerCase(),
+      chainId: chainId,
       timestamp: new Date().toISOString()
     }
 
@@ -41,16 +58,17 @@ export async function loadAuthToken(
       primaryType: 'Sign In'
     })
 
-    const singInMessageBody = base64urlEncode(
+    const signInMessageBody = base64urlEncode(
       new TextEncoder().encode(JSON.stringify(message))
     )
-    const authToken = `${singInMessageBody}.${signature}`
-    localStorage.setItem(`did-${account.address}`, authToken)
-
+    const authToken = `${signInMessageBody}.${signature}`
+    localStorage.setItem(`did-${address}`, authToken)
+    signingPromise = null
     return authToken
+  } catch (error) {
+    signingPromise = null
+    throw error
   }
-
-  return ''
 }
 
 function base64urlEncode(input: Uint8Array): string {
