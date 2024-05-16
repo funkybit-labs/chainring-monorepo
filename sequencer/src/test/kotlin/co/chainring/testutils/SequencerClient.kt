@@ -12,6 +12,8 @@ import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.core.toMarketId
 import co.chainring.sequencer.proto.Order
+import co.chainring.sequencer.proto.OrderChanged
+import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.TradeCreated
@@ -31,10 +33,31 @@ import kotlin.test.assertNotNull
 class SequencerClient {
     private val sequencer = SequencerApp(checkpointsPath = null)
 
+    data class Asset(
+        val name: String,
+        val decimals: Int,
+    )
+
+    data class Market(
+        val id: MarketId,
+        val baseDecimals: Int,
+        val quoteDecimals: Int,
+    ) {
+        val baseAsset: Asset = Asset(id.baseAsset().value, baseDecimals)
+        val quoteAsset: Asset = Asset(id.quoteAsset().value, quoteDecimals)
+
+        fun getAsset(name: String): Asset =
+            when (name) {
+                baseAsset.name -> baseAsset
+                quoteAsset.name -> quoteAsset
+                else -> throw RuntimeException("Unexpected asset $name for market $this")
+            }
+    }
+
     fun addOrder(
-        marketId: MarketId,
-        amount: BigInteger,
-        price: String?,
+        market: Market,
+        amount: BigDecimal,
+        price: BigDecimal?,
         wallet: WalletAddress,
         orderType: Order.Type,
     ) =
@@ -43,13 +66,13 @@ class SequencerClient {
                 this.guid = UUID.randomUUID().toString()
                 this.type = SequencerRequest.Type.ApplyOrderBatch
                 this.orderBatch = orderBatch {
-                    this.marketId = marketId.value
+                    this.marketId = market.id.value
                     this.wallet = wallet.value
                     this.ordersToAdd.add(
                         order {
                             this.guid = Random.nextLong()
-                            this.amount = amount.toIntegerValue()
-                            this.price = price?.toBigDecimal()?.toDecimalValue() ?: BigDecimal.ZERO.toDecimalValue()
+                            this.amount = amount.toFundamentalUnits(market.baseDecimals).toIntegerValue()
+                            this.price = price?.toDecimalValue() ?: BigDecimal.ZERO.toDecimalValue()
                             this.type = orderType
                         },
                     )
@@ -57,37 +80,48 @@ class SequencerClient {
             },
         )
 
+    fun addOrderAndVerifyAccepted(
+        market: Market,
+        amount: BigDecimal,
+        price: BigDecimal?,
+        wallet: WalletAddress,
+        orderType: Order.Type,
+    ): OrderChanged =
+        addOrder(market, amount, price, wallet, orderType).also {
+            assertEquals(OrderDisposition.Accepted, it.ordersChangedList.first().disposition)
+        }.ordersChangedList.first()
+
     fun changeOrder(
-        marketId: MarketId,
+        market: Market,
         guid: OrderGuid,
-        amount: Long,
-        price: String,
+        amount: BigDecimal,
+        price: BigDecimal,
         wallet: WalletAddress,
     ) = sequencer.processRequest(
         sequencerRequest {
             this.guid = UUID.randomUUID().toString()
             this.type = SequencerRequest.Type.ApplyOrderBatch
             this.orderBatch = orderBatch {
-                this.marketId = marketId.value
+                this.marketId = market.id.value
                 this.wallet = wallet.value
                 this.ordersToChange.add(
                     order {
                         this.guid = guid.value
-                        this.amount = amount.toBigInteger().toIntegerValue()
-                        this.price = price.toBigDecimal().toDecimalValue()
+                        this.amount = amount.toFundamentalUnits(market.baseDecimals).toIntegerValue()
+                        this.price = price.toDecimalValue()
                     },
                 )
             }
         },
     )
 
-    fun cancelOrder(marketId: MarketId, guid: Long, wallet: WalletAddress) =
+    fun cancelOrder(market: Market, guid: Long, wallet: WalletAddress) =
         sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
                 this.type = SequencerRequest.Type.ApplyOrderBatch
                 this.orderBatch = orderBatch {
-                    this.marketId = marketId.value
+                    this.marketId = market.id.value
                     this.wallet = wallet.value
                     this.ordersToCancel.add(
                         co.chainring.sequencer.proto.cancelOrder {
@@ -99,7 +133,7 @@ class SequencerClient {
             },
         )
 
-    fun createMarket(marketId: MarketId, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal = "17.525".toBigDecimal(), baseDecimals: Int = 8, quoteDecimals: Int = 18) {
+    fun createMarket(marketId: MarketId, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal = "17.525".toBigDecimal(), baseDecimals: Int = 8, quoteDecimals: Int = 18): Market {
         val createMarketResponse = sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
@@ -120,6 +154,10 @@ class SequencerClient {
         val createdMarket = createMarketResponse.marketsCreatedList.first()
         assertEquals(marketId, createdMarket.marketId.toMarketId())
         assertEquals(tickSize, createdMarket.tickSize.toBigDecimal())
+        assertEquals(baseDecimals, createdMarket.baseDecimals)
+        assertEquals(quoteDecimals, createdMarket.quoteDecimals)
+
+        return Market(marketId, baseDecimals = createdMarket.baseDecimals, quoteDecimals = createdMarket.quoteDecimals)
     }
 
     fun setFeeRates(feeRates: FeeRates) {
@@ -140,32 +178,33 @@ class SequencerClient {
     }
 
     private fun List<BigInteger>.sum() = this.reduce { a, b -> a + b }
+    private fun List<BigDecimal>.sum() = this.reduce { a, b -> a + b }
 
-    fun depositsAndWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigInteger>, expectedAmount: BigInteger? = amounts.sum()): SequencerResponse {
+    fun depositsAndWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigDecimal>, expectedAmount: BigDecimal? = amounts.sum()): SequencerResponse {
         val depositsAndWithdrawalsResponse = sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
                 this.type = SequencerRequest.Type.ApplyBalanceBatch
                 this.balanceBatch = balanceBatch {
                     this.guid = UUID.randomUUID().toString()
-                    amounts.filter { a -> a > BigInteger.ZERO }.let { deposits ->
+                    amounts.filter { a -> a > BigDecimal.ZERO }.let { deposits ->
                         this.deposits.addAll(
                             deposits.map {
                                 co.chainring.sequencer.proto.deposit {
-                                    this.asset = asset.value
+                                    this.asset = asset.name
                                     this.wallet = walletAddress.value
-                                    this.amount = it.toIntegerValue()
+                                    this.amount = it.toFundamentalUnits(asset.decimals).toIntegerValue()
                                 }
                             },
                         )
                     }
-                    amounts.filter { a -> a < BigInteger.ZERO }.let { withdrawals ->
+                    amounts.filter { a -> a < BigDecimal.ZERO }.let { withdrawals ->
                         this.withdrawals.addAll(
                             withdrawals.map {
                                 co.chainring.sequencer.proto.withdrawal {
-                                    this.asset = asset.value
+                                    this.asset = asset.name
                                     this.wallet = walletAddress.value
-                                    this.amount = (-it).toIntegerValue()
+                                    this.amount = (-it).toFundamentalUnits(asset.decimals).toIntegerValue()
                                 }
                             },
                         )
@@ -176,19 +215,25 @@ class SequencerClient {
         if (expectedAmount != null) {
             assertEquals(1, depositsAndWithdrawalsResponse.balancesChangedCount)
             val withdrawal = depositsAndWithdrawalsResponse.balancesChangedList.first()
-            assertEquals(asset.value, withdrawal.asset)
+            assertEquals(asset.name, withdrawal.asset)
             assertEquals(walletAddress.value, withdrawal.wallet)
-            assertEquals(expectedAmount, withdrawal.delta.toBigInteger())
+            assertEquals(
+                expectedAmount.setScale(asset.decimals),
+                withdrawal.delta.toBigInteger().fromFundamentalUnits(asset.decimals),
+            )
         } else {
             assertEquals(0, depositsAndWithdrawalsResponse.balancesChangedCount)
         }
         return depositsAndWithdrawalsResponse
     }
 
-    fun deposit(walletAddress: WalletAddress, asset: Asset, amount: BigInteger) = depositsAndWithdrawals(walletAddress, asset, listOf(amount))
-    fun withdrawal(walletAddress: WalletAddress, asset: Asset, amount: BigInteger, expectedAmount: BigInteger? = amount) = depositsAndWithdrawals(walletAddress, asset, listOf(-amount), expectedAmount?.negate())
+    fun deposit(walletAddress: WalletAddress, asset: Asset, amount: BigDecimal) =
+        depositsAndWithdrawals(walletAddress, asset, listOf(amount))
 
-    fun failedWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigInteger>, expectedAmount: BigInteger? = amounts.sum()): SequencerResponse {
+    fun withdrawal(walletAddress: WalletAddress, asset: Asset, amount: BigDecimal, expectedAmount: BigDecimal? = amount) =
+        depositsAndWithdrawals(walletAddress, asset, listOf(-amount), expectedAmount?.negate())
+
+    fun failedWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigDecimal>, expectedAmount: BigDecimal? = amounts.sum()): SequencerResponse {
         val failedWithdrawalsResponse = sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
@@ -198,9 +243,9 @@ class SequencerClient {
                     this.failedWithdrawals.addAll(
                         amounts.map {
                             co.chainring.sequencer.proto.failedWithdrawal {
-                                this.asset = asset.value
+                                this.asset = asset.name
                                 this.wallet = walletAddress.value
-                                this.amount = it.toIntegerValue()
+                                this.amount = it.toFundamentalUnits(asset.decimals).toIntegerValue()
                             }
                         },
                     )
@@ -210,16 +255,16 @@ class SequencerClient {
         if (expectedAmount != null) {
             assertEquals(1, failedWithdrawalsResponse.balancesChangedCount)
             val withdrawal = failedWithdrawalsResponse.balancesChangedList.first()
-            assertEquals(asset.value, withdrawal.asset)
+            assertEquals(asset.name, withdrawal.asset)
             assertEquals(walletAddress.value, withdrawal.wallet)
-            assertEquals(expectedAmount, withdrawal.delta.toBigInteger())
+            assertEquals(expectedAmount.setScale(asset.decimals), withdrawal.delta.toBigInteger().fromFundamentalUnits(asset.decimals))
         } else {
             assertEquals(0, failedWithdrawalsResponse.balancesChangedCount)
         }
         return failedWithdrawalsResponse
     }
 
-    fun failedSettlement(buyWalletAddress: WalletAddress, sellWalletAddress: WalletAddress, marketId: MarketId, trade: TradeCreated): SequencerResponse {
+    fun failedSettlement(buyWalletAddress: WalletAddress, sellWalletAddress: WalletAddress, market: Market, trade: TradeCreated): SequencerResponse {
         val failedSettlementsResponse = sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
@@ -230,7 +275,7 @@ class SequencerClient {
                         co.chainring.sequencer.proto.failedSettlement {
                             this.buyWallet = buyWalletAddress.value
                             this.sellWallet = sellWalletAddress.value
-                            this.marketId = marketId.value
+                            this.marketId = market.id.value
                             this.trade = trade
                         },
                     )

@@ -82,6 +82,8 @@ class SequencerApp(
                             marketCreated {
                                 this.marketId = marketId.value
                                 this.tickSize = market.tickSize
+                                this.baseDecimals = market.baseDecimals
+                                this.quoteDecimals = market.quoteDecimals
                             },
                         )
                     }
