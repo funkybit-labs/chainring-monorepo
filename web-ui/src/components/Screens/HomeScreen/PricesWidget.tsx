@@ -351,10 +351,7 @@ function OHLCChart({
       .text(yScale.invert(mouseY).toFixed(2))
   }
 
-  const handleMouseMove = (event: MouseEvent) => {
-    const [mouseX, mouseY] = d3.pointer(event)
-    updateMouseProjections(mouseX, mouseY)
-
+  function processPanAndZoom(mouseX: number, mouseY: number) {
     if (dragRef.current.scale) {
       // domain data before drag initiated
       const domainXStartTime = dragRef.current.scale.domain()[0].getTime()
@@ -362,16 +359,14 @@ function OHLCChart({
       const domainXIntervalTime = domainXEndTime - domainXStartTime
 
       // pan duration
-      const dragStartXTime = dragRef.current.scale
-        .invert(event.clientX)
-        .getTime()
+      const dragStartXTime = dragRef.current.scale.invert(mouseX).getTime()
       const dragEndXTime = dragRef.current.scale
         .invert(dragRef.current.startX)
         .getTime()
       const draggedXTime = dragStartXTime - dragEndXTime
 
       // calculate zoom level. Min and max zoom levels can be locked when on ohlc duration borders
-      const deltaY = event.clientY - dragRef.current.startY
+      const deltaY = mouseY - dragRef.current.startY
       const originalZoomFactor = (1.5 * deltaY) / params.height
       const zoomXFactor =
         dragRef.current.maxZoomLockedAt &&
@@ -441,6 +436,12 @@ function OHLCChart({
       }
     }
   }
+
+  const handleMouseMove = (event: MouseEvent) => {
+    const [mouseX, mouseY] = d3.pointer(event)
+    updateMouseProjections(mouseX, mouseY)
+    processPanAndZoom(mouseX, mouseY)
+  }
   const handleMouseLeave = () => {
     svg.select('.x-axis-mouse-projection').classed('hidden', true)
     svg.select('.y-axis-mouse-projection').classed('hidden', true)
@@ -449,8 +450,10 @@ function OHLCChart({
   }
 
   const handleMouseDown = (event: MouseEvent) => {
-    dragRef.current.startX = event.clientX
-    dragRef.current.startY = event.clientY
+    const [mouseX, mouseY] = d3.pointer(event)
+
+    dragRef.current.startX = mouseX
+    dragRef.current.startY = mouseY
     // create copy of current scale for ongoing calculations when starting grad behavior
     dragRef.current.scale = d3
       .scaleTime()
