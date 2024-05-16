@@ -10,7 +10,6 @@ import { Market } from 'markets'
 import SymbolIcon from 'components/common/SymbolIcon'
 import { classNames } from 'utils'
 import { useMeasure } from 'react-use'
-import { addDuration, maxDate, subtractDuration } from 'utils/dateUtils'
 
 enum PricesInterval {
   PT1H = '1h',
@@ -32,20 +31,44 @@ const intervalToOHLCDuration: { [key in PricesInterval]: OHLCDuration } = {
   [PricesInterval.YTD]: 'P1D'
 }
 
-function subtractInterval(date: Date, interval: PricesInterval): Date {
-  if (interval === PricesInterval.YTD) {
-    return new Date(date.getFullYear(), 0, 1)
-  } else {
-    const number = {
-      [PricesInterval.PT1H]: 60 * 60 * 1000,
-      [PricesInterval.PT6H]: 6 * 60 * 60 * 1000,
-      [PricesInterval.P1D]: 24 * 60 * 60 * 1000,
-      [PricesInterval.P7D]: 7 * 24 * 60 * 60 * 1000,
-      [PricesInterval.P1M]: 30 * 24 * 60 * 60 * 1000,
-      [PricesInterval.P6M]: 182 * 24 * 60 * 60 * 1000
-    }[interval]
-    return new Date(date.getTime() - number)
+function offsetInterval(date: Date, interval: PricesInterval): Date {
+  switch (interval) {
+    case PricesInterval.YTD:
+      return d3.timeYear.floor(new Date())
+    case PricesInterval.PT1H:
+      return d3.timeHour.offset(date, -1)
+    case PricesInterval.PT6H:
+      return d3.timeHour.offset(date, -6)
+    case PricesInterval.P1D:
+      return d3.timeDay.offset(date, -1)
+    case PricesInterval.P7D:
+      return d3.timeDay.offset(date, -7)
+    case PricesInterval.P1M:
+      return d3.timeMonth.offset(date, -1)
+    case PricesInterval.P6M:
+      return d3.timeMonth.offset(date, -6)
   }
+}
+
+function floorToDurationStart(date: Date, duration: OHLCDuration): Date {
+  switch (duration) {
+    case 'P1M':
+      return d3.timeMinute.every(1)!.floor(date)
+    case 'P5M':
+      return d3.timeMinute.every(5)!.floor(date)
+    case 'P15M':
+      return d3.timeMinute.every(15)!.floor(date)
+    case 'P1H':
+      return d3.timeHour.every(1)!.floor(date)
+    case 'P4H':
+      return d3.timeHour.every(4)!.floor(date)
+    case 'P1D':
+      return d3.timeDay.every(1)!.floor(date)
+  }
+}
+
+function halfOhlcDurationMs(ohlcDuration: OHLCDuration): number {
+  return ohlcDurationsMs[ohlcDuration] / 2
 }
 
 export function PricesWidget({ market }: { market: Market }) {
@@ -164,17 +187,63 @@ function OHLCChart({
   lastPrice: number | null
 }) {
   const ref = useRef<SVGSVGElement>(null)
-  const zoomRef = useRef(d3.zoomIdentity)
-  const intervalRef = useRef<PricesInterval>(
-    params.interval ? params.interval : PricesInterval.PT6H
-  )
+  const domainXRef = useRef<[Date, Date]>([
+    offsetInterval(new Date(), PricesInterval.PT6H),
+    d3.timeMillisecond.offset(
+      floorToDurationStart(new Date(), params.duration),
+      halfOhlcDurationMs(params.duration)
+    )
+  ])
+  const [autoPanRight, setAutoPanRight] = useState(true)
   useEffect(() => {
     if (params.interval) {
-      // store new interval and reset zoom
-      intervalRef.current = params.interval
-      zoomRef.current = d3.zoomIdentity
+      // calculate new domain for the selected interval
+      domainXRef.current = [
+        offsetInterval(new Date(), params.interval),
+        d3.timeMillisecond.offset(
+          floorToDurationStart(new Date(), params.duration),
+          halfOhlcDurationMs(params.duration)
+        )
+      ]
+      xScale.domain(domainXRef.current)
+      drawChart(xScale)
+      setAutoPanRight(true)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.interval])
+  useEffect(() => {
+    // roll domain forward on new candle
+    if (autoPanRight && ohlc && ohlc.length > 0) {
+      const currentBeginOfTheWorldTime = domainXRef.current[0].getTime()
+      const currentEndOfTheWorldTime = domainXRef.current[1].getTime()
+      const newEndOfTheWorldTime = d3.timeMillisecond
+        .offset(
+          floorToDurationStart(new Date(), params.duration),
+          halfOhlcDurationMs(params.duration)
+        )
+        .getTime()
+      const autoPanTime = newEndOfTheWorldTime - currentEndOfTheWorldTime
+
+      const newDomain: [Date, Date] = [
+        new Date(currentBeginOfTheWorldTime + autoPanTime),
+        new Date(currentEndOfTheWorldTime + autoPanTime)
+      ]
+
+      domainXRef.current = newDomain
+      drawChart(xScale.domain(newDomain))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ohlc])
+
+  const dragRef = useRef<{
+    startY: number
+    startX: number
+    scale: d3.ScaleTime<number, number, never> | null
+  }>({
+    startY: 0,
+    startX: 0,
+    scale: null
+  })
 
   const margin = {
     top: 0,
@@ -187,23 +256,10 @@ function OHLCChart({
   const innerHeight = params.height - margin.top - margin.bottom
 
   const svg = d3.select(ref.current)
-  const domainStart = subtractInterval(new Date(), intervalRef.current)
-  const adjustedDomainStart =
-    ohlc.length > 0
-      ? maxDate(
-          subtractDuration(ohlc[0].start, ohlcDurationsMs[params.duration] * 2),
-          domainStart
-        )
-      : domainStart
-  // setup and position scales
   const xScale = d3
     .scaleTime()
-    .domain([
-      adjustedDomainStart,
-      addDuration(new Date(), ohlcDurationsMs[params.duration] * 2)
-    ])
+    .domain(domainXRef.current)
     .range([0, innerWidth])
-
   const xAxis = d3
     .axisBottom(xScale)
     .tickSizeOuter(0)
@@ -226,11 +282,19 @@ function OHLCChart({
       return d3.timeFormat('%Y')(date) // year with century
     })
 
-  const yScale = d3.scaleLinear().range([innerHeight, 0])
+  const yScale = useMemo(
+    // do not reconstruct axis because domain will reset to defaul [0, 1]
+    // just in case when no visible OHLC left for some reason on the screen
+    // y-axis won't be reset
+    () => d3.scaleLinear().range([innerHeight, 0]),
+    [innerHeight]
+  )
   const yAxis = d3
     .axisRight(yScale)
     .tickSize(0)
     .tickFormat((x: d3.NumberValue) => x.valueOf().toFixed(2))
+    .tickPadding(5)
+  // grid is separated from the axis to let ohlc candles be rendered above the grid, but below the axis to slide under ticks
   const yAxisGrid = d3
     .axisRight(yScale)
     .tickSizeOuter(0)
@@ -242,15 +306,11 @@ function OHLCChart({
       .classed('hidden', mouseX > innerWidth)
       .attr('transform', `translate(${mouseX},0)`)
       .select('text')
-      .text(
-        d3.timeFormat(`%_d %b %y %H:%M`)(
-          zoomRef.current.rescaleX(xScale).invert(mouseX)
-        )
-      )
+      .text(d3.timeFormat(`%_d %b %y %H:%M`)(xScale.invert(mouseX)))
 
     svg
       .select('.y-axis-mouse-projection')
-      .classed('hidden', false)
+      .classed('hidden', mouseY > innerHeight)
       .attr('transform', `translate(0,${mouseY})`)
       .select('text')
       .text(yScale.invert(mouseY).toFixed(2))
@@ -259,50 +319,106 @@ function OHLCChart({
   const handleMouseMove = (event: MouseEvent) => {
     const [mouseX, mouseY] = d3.pointer(event)
     updateMouseProjections(mouseX, mouseY)
+
+    if (dragRef.current.scale) {
+      const deltaY = event.clientY - dragRef.current.startY
+      const zoomXFactor = (1.5 * deltaY) / params.height
+
+      const scaleStartTime = dragRef.current.scale.domain()[0].getTime()
+      const scaleEndTime = dragRef.current.scale.domain()[1].getTime()
+      const scaleIntervalTime = scaleEndTime - scaleStartTime
+
+      const dragStartXTime = dragRef.current.scale
+        .invert(event.clientX)
+        .getTime()
+      const dragEndXTime = dragRef.current.scale
+        .invert(dragRef.current.startX)
+        .getTime()
+      const draggedXTime = dragStartXTime - dragEndXTime
+
+      const newDomainStartTime =
+        scaleStartTime + scaleIntervalTime * zoomXFactor - draggedXTime
+      const newDomainEndTime = scaleEndTime - draggedXTime
+
+      const endOfTheWorldTime =
+        ohlc.length > 0
+          ? ohlc[ohlc.length - 1].start.getTime() +
+            halfOhlcDurationMs(params.duration)
+          : 0
+      const limitPanOffset =
+        newDomainEndTime > endOfTheWorldTime
+          ? newDomainEndTime - endOfTheWorldTime
+          : 0
+
+      const newDomain: [Date, Date] = [
+        new Date(newDomainStartTime - limitPanOffset),
+        new Date(newDomainEndTime - limitPanOffset)
+      ]
+
+      domainXRef.current = newDomain
+      drawChart(xScale.domain(newDomain))
+
+      // auto-pan right in the rightmost point
+      setAutoPanRight(
+        endOfTheWorldTime - newDomainEndTime <=
+          halfOhlcDurationMs(params.duration) // leeway for automan enabled
+      )
+      console.log(
+        'autoPanRight',
+        autoPanRight,
+        newDomainEndTime,
+        endOfTheWorldTime,
+        endOfTheWorldTime - newDomainEndTime
+      )
+
+      if (zoomXFactor != 1) {
+        params.onIntervalReset()
+      }
+    }
   }
   const handleMouseLeave = () => {
     svg.select('.x-axis-mouse-projection').classed('hidden', true)
     svg.select('.y-axis-mouse-projection').classed('hidden', true)
+
+    handleMouseUp()
+  }
+
+  const handleMouseDown = (event: MouseEvent) => {
+    dragRef.current.startX = event.clientX
+    dragRef.current.startY = event.clientY
+    // create copy of current scale for ongoing calculations when starting grad behavior
+    dragRef.current.scale = d3
+      .scaleTime()
+      .domain([xScale.domain()[0], xScale.domain()[1]])
+      .range([0, innerWidth])
+  }
+
+  const handleMouseUp = () => {
+    dragRef.current.startX = 0 // FIXME introduce object
+    dragRef.current.startY = 0
+    dragRef.current.scale = null
   }
 
   svg
+    .on('mousedown', handleMouseDown)
     .on('mousemove', handleMouseMove)
-    .on('mouseup', handleMouseMove)
+    .on('mouseup', handleMouseUp)
     .on('mouseleave', handleMouseLeave)
-
-  // setup zoom and panning
-  const zoom = d3
-    .zoom()
-    // limit panning
-    .translateExtent([
-      [ohlc.length > 0 ? xScale(ohlc[0].start) - 1000 : -1000, innerHeight],
-      [innerWidth * 1.15 + (margin.left + margin.right), innerHeight]
-    ])
-    // limit zoom-in/out
-    .scaleExtent([0.2, 5])
-    .on('zoom', (event: d3.D3ZoomEvent<SVGGElement, OHLC>) => {
-      if (zoomRef.current.k != event.transform.k && event.transform.k != 1) {
-        params.onIntervalReset()
-      }
-      zoomRef.current = event.transform
-      drawChart(event.transform.rescaleX(xScale))
-    })
 
   function drawChart(newXScale: d3.ScaleTime<number, number, never>) {
     // calculate visible range
     const visibleData: OHLC[] = ohlc.filter((d) => {
       return (
         // add some pixels to let bars slide outside of viewport before disappearing
-        newXScale(d.start) >= -25 && newXScale(d.start) <= innerWidth + 25
+        newXScale(d.start) >= -50 && newXScale(d.start) <= innerWidth + 50
       )
     })
-    if (visibleData.length == 0) return
 
     // scale x-axis
     // @ts-expect-error @definitelytyped/no-unnecessary-generics
     svg.select('.x-axis').call(xAxis.scale(newXScale))
 
-    // scale y axis
+    // scale y-axis
     const yMin = d3.min(visibleData, (d) => d.low)
     const yMax = d3.max(visibleData, (d) => d.high)
     if (yMin && yMax) {
@@ -393,15 +509,13 @@ function OHLCChart({
       .attr('fill', (d) => (d.close >= d.open ? '#39CF63' : '#FF5A50'))
   }
 
-  // listen to zoom events, and then call transform first time to draw the graph
-  // @ts-expect-error @definitelytyped/no-unnecessary-generics
-  svg.select('.svg-main').call(zoom).call(zoom.transform, zoomRef.current)
-
   // blocking overlay area
   svg
     .select('.svg-disabled-overlay')
     .classed('hidden', !disabled)
     .classed('block', disabled)
+
+  drawChart(xScale)
 
   return (
     <svg
@@ -430,7 +544,7 @@ function OHLCChart({
           <rect
             x={innerWidth}
             y="0"
-            width={margin.right}
+            width={margin.right + 5}
             height={innerHeight}
           />
         </g>
@@ -441,24 +555,24 @@ function OHLCChart({
         <g className="y-axis-current-price hidden text-xs">
           <line x1="0" x2={innerWidth} y1="0" y2="0" />
           <rect
-            x={innerWidth - 3}
+            x={innerWidth - 1}
             y="-9"
-            width={margin.right + 3}
+            width={margin.right}
             height="18"
             rx="3"
           />
-          <text transform={`translate(${innerWidth + 1},4)`} />
+          <text transform={`translate(${innerWidth + 3},4)`} />
         </g>
         <g className="y-axis-mouse-projection hidden text-xs">
           <line x1="0" x2={innerWidth} y1="0" y2="0" />
           <rect
-            x={innerWidth - 3}
+            x={innerWidth - 1}
             y="-10"
-            width={margin.right + 3}
+            width={margin.right}
             height="20"
             rx="3"
           />
-          <text transform={`translate(${innerWidth + 1},4)`} />
+          <text transform={`translate(${innerWidth + 3},4)`} />
         </g>
         <g className="x-axis-mouse-projection hidden text-xs">
           <line x1="0" x2="0" y1="0" y2={innerHeight} />
