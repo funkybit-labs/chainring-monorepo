@@ -520,7 +520,7 @@ function OHLCChart({
     domainXRef.current = newDomain
     drawChart(xScale.domain(newDomain))
 
-    // set auto-pan moe in the rightmost point
+    // set auto-pan mode enabled in the rightmost point
     setAutoPanRight(
       endOfTheWorldTime - newDomainXEndTime <=
         halfOhlcDurationMs(params.duration) // leeway for disabling auto-pan
