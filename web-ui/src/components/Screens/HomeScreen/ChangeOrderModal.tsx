@@ -14,6 +14,7 @@ import AmountInput from 'components/common/AmountInput'
 import { AmountWithSymbol } from 'components/common/AmountWithSymbol'
 import SubmitButton from 'components/common/SubmitButton'
 import { isErrorFromAlias } from '@zodios/core'
+import { MarketTitle } from 'components/Screens/HomeScreen/MarketSelector'
 
 export function ChangeOrderModal({
   order,
@@ -165,15 +166,18 @@ export function ChangeOrderModal({
       onClosed={onClosed}
       title={'Change order'}
     >
-      <div className="overflow-y-auto text-sm">
-        <div className="flex flex-col gap-2">
-          <div>Market: {order.marketId}</div>
-          <div>Side: {order.side}</div>
+      <div className="overflow-y-auto text-sm text-white">
+        <div className="mb-4 flex flex-col gap-2">
+          <div className="flex">
+            <span className="mr-2 text-darkBluishGray1">Market:</span>
+            <MarketTitle market={market} alwaysShowLabel={true} />
+            <span className="ml-8 mr-2 text-darkBluishGray1">Side:</span>
+            {order.side}
+          </div>
           <div>
-            <label className="block">Amount</label>
+            <label className="my-2 block text-darkBluishGray1">Amount</label>
             <AmountInput
               value={amountInputValue}
-              symbol={baseSymbol.name}
               disabled={changeOrderMutation.isPending}
               onChange={(e) => setAmountInputValue(e.target.value)}
             />
@@ -181,10 +185,9 @@ export function ChangeOrderModal({
 
           {order.type === 'limit' && (
             <div>
-              <label className="block">Price</label>
+              <label className="my-2 block text-darkBluishGray1">Price</label>
               <AmountInput
                 value={priceInputValue}
-                symbol={quoteSymbol.name}
                 disabled={changeOrderMutation.isPending}
                 onChange={(e) => setPriceInputValue(e.target.value)}
               />
