@@ -555,10 +555,12 @@ function OHLCChart({
         return [distance, ox]
       },
       onMove: ({ xy: [clientX, clientY] }) => {
-        const svgRect = ref.current!.getBoundingClientRect()
-        const mouseX = clientX - svgRect.left - 0.8
-        const mouseY = clientY - svgRect.top + 0.3
-        updateMouseProjections(mouseX, mouseY)
+        if (ref.current) {
+          const svgRect = ref.current.getBoundingClientRect()
+          const mouseX = clientX - svgRect.left - 0.8
+          const mouseY = clientY - svgRect.top + 0.3
+          updateMouseProjections(mouseX, mouseY)
+        }
       },
       onHover: ({ hovering }) => {
         if (!hovering) hideMouseProjections()
