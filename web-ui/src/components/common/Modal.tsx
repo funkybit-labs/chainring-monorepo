@@ -19,7 +19,7 @@ export function Modal({
     <>
       <div className="fixed left-0 top-0 h-screen w-screen bg-darkGray opacity-65"></div>
       <Transition appear show={isOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-10" onClose={close}>
+        <Dialog as="div" className="relative z-20" onClose={close}>
           <Transition.Child
             as={Fragment}
             enter="ease-out duration-300"
@@ -44,14 +44,13 @@ export function Modal({
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <Dialog.Panel className="min-h-96 w-full max-w-lg overflow-hidden rounded-lg bg-lightBackground text-left align-middle shadow-xl transition-all">
+                <Dialog.Panel className="w-full max-w-md overflow-hidden rounded-lg bg-darkBluishGray9 text-left align-middle transition-all">
                   <Dialog.Title
                     as="h3"
-                    className="p-2 text-center text-lg font-medium leading-6 text-darkGray"
+                    className="p-2 pt-4 text-center text-lg font-medium leading-6 text-white"
                   >
                     {title}
                   </Dialog.Title>
-                  <hr className="text-neutralGray" />
                   <div className="p-6">{children}</div>
                 </Dialog.Panel>
               </Transition.Child>

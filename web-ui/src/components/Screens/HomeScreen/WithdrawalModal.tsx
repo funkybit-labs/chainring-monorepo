@@ -165,20 +165,19 @@ export default function WithdrawalModal({
       onClosed={onClosed}
       title={`Withdraw ${symbol.name}`}
     >
-      <div className="h-52 overflow-y-auto">
+      <div className="max-h-52 overflow-y-auto">
         <ModalAsyncContent
           asyncData={availableBalanceQuery}
           success={(availableBalance) => {
             return (
-              <div className="mt-8">
+              <div className="mt-2">
                 <AmountInput
                   value={amountInputValue}
-                  symbol={symbol.name}
                   disabled={submitPhase !== null}
                   onChange={(e) => setAmountInputValue(e.target.value)}
                 />
 
-                <p className="mt-1 text-center text-sm text-darkGray">
+                <p className="mb-2 mt-4 text-center text-sm text-darkBluishGray2">
                   Available balance:{' '}
                   {formatUnits(availableBalance, symbol.decimals)}
                 </p>

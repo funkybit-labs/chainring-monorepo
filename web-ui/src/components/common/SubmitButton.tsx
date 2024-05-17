@@ -17,7 +17,7 @@ export default function SubmitButton({
         type="button"
         disabled={disabled}
         className={classNames(
-          'mt-4 w-full inline-flex justify-center rounded-md px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-1 focus:ring-inset',
+          'mt-4 w-full inline-flex justify-center rounded-md px-4 py-3 text-md text-white focus:outline-none focus:ring-1 focus:ring-inset',
           disabled
             ? 'bg-neutralGray focus:ring-mutedGray'
             : 'bg-primary4 hover:bg-primary4 focus:ring-lightBackground'
