@@ -16,6 +16,7 @@ import { Market } from 'markets'
 import SymbolIcon from 'components/common/SymbolIcon'
 import { classNames } from 'utils'
 import { useMeasure } from 'react-use'
+import { useGesture } from '@use-gesture/react'
 
 enum PricesInterval {
   PT1H = '1h',
@@ -438,20 +439,6 @@ function OHLCChart({
     }
   }, [ohlc, autoPanRight, params.duration, xScale, drawChart])
 
-  const dragRef = useRef<{
-    startY: number
-    startX: number
-    maxZoomLockedAt: number | null
-    minZoomLockedAt: number | null
-    scale: d3.ScaleTime<number, number, never> | null
-  }>({
-    startY: 0,
-    startX: 0,
-    maxZoomLockedAt: null,
-    minZoomLockedAt: null,
-    scale: null
-  })
-
   function updateMouseProjections(mouseX: number, mouseY: number) {
     svg
       .select('.x-axis-mouse-projection')
@@ -468,138 +455,126 @@ function OHLCChart({
       .text(yScale.invert(mouseY).toFixed(2))
   }
 
-  function processPanAndZoom(mouseX: number, mouseY: number) {
-    if (dragRef.current.scale) {
-      // domain data before drag initiated
-      const domainXStartTime = dragRef.current.scale.domain()[0].getTime()
-      const domainXEndTime = dragRef.current.scale.domain()[1].getTime()
-      const domainXIntervalTime = domainXEndTime - domainXStartTime
-
-      // pan duration
-      const dragStartXTime = dragRef.current.scale.invert(mouseX).getTime()
-      const dragEndXTime = dragRef.current.scale
-        .invert(dragRef.current.startX)
-        .getTime()
-      const draggedXTime = dragStartXTime - dragEndXTime
-
-      // calculate zoom level. Min and max zoom levels can be locked when on ohlc duration borders
-      const deltaY = mouseY - dragRef.current.startY
-      const originalZoomFactor = (1.5 * deltaY) / params.height
-      const zoomXFactor =
-        dragRef.current.maxZoomLockedAt &&
-        originalZoomFactor > dragRef.current.maxZoomLockedAt
-          ? dragRef.current.maxZoomLockedAt
-          : dragRef.current.minZoomLockedAt &&
-              originalZoomFactor < dragRef.current.minZoomLockedAt
-            ? dragRef.current.minZoomLockedAt
-            : originalZoomFactor
-
-      // domain data with applied pan & zoom
-      const newDomainXStartTime =
-        domainXStartTime + domainXIntervalTime * zoomXFactor - draggedXTime
-      const newDomainXEndTime = domainXEndTime - draggedXTime
-      const newDomainXIntervalTime = newDomainXEndTime - newDomainXStartTime
-
-      // check if more/less granular OHLC sticks should be requested, limit zoom
-      const candlestickSlotsVisible =
-        newDomainXIntervalTime / ohlcDurationsMs[params.duration]
-      if (candlestickSlotsVisible >= 200) {
-        if (params.longerDuration) {
-          params.requestDurationChange(params.longerDuration)
-          dragRef.current.minZoomLockedAt = null
-        } else if (!dragRef.current.minZoomLockedAt) {
-          dragRef.current.minZoomLockedAt = zoomXFactor
-        }
-      } else if (candlestickSlotsVisible <= 20) {
-        if (params.shorterDuration) {
-          params.requestDurationChange(params.shorterDuration)
-          dragRef.current.maxZoomLockedAt = null
-        } else if (!dragRef.current.maxZoomLockedAt) {
-          dragRef.current.maxZoomLockedAt = zoomXFactor
-        }
-      } else {
-        dragRef.current.maxZoomLockedAt = null
-        dragRef.current.minZoomLockedAt = null
-      }
-
-      // limit panning by calculating offset to last visible ohlc stick
-      const endOfTheWorldTime =
-        ohlc.length > 0
-          ? ohlc[ohlc.length - 1].start.getTime() +
-            halfOhlcDurationMs(params.duration)
-          : 0
-      const limitPanOffset =
-        newDomainXEndTime > endOfTheWorldTime
-          ? newDomainXEndTime - endOfTheWorldTime
-          : 0
-
-      // apply domain changes and redraw chart
-      const newDomain: [Date, Date] = [
-        new Date(newDomainXStartTime - limitPanOffset),
-        new Date(newDomainXEndTime - limitPanOffset)
-      ]
-      domainXRef.current = newDomain
-      drawChart(xScale.domain(newDomain))
-
-      // set auto-pan moe in the rightmost point
-      setAutoPanRight(
-        endOfTheWorldTime - newDomainXEndTime <=
-          halfOhlcDurationMs(params.duration) // leeway for disabling auto-pan
-      )
-
-      // reset selected interval on update of zoom level
-      if (zoomXFactor != 1) {
-        params.resetInterval()
-      }
-    }
-  }
-
-  const handleMouseMove = (event: MouseEvent) => {
-    const [mouseX, mouseY] = d3.pointer(event)
-    updateMouseProjections(mouseX, mouseY)
-    processPanAndZoom(mouseX, mouseY)
-  }
-  const handleMouseLeave = () => {
+  function hideMouseProjections() {
     svg.select('.x-axis-mouse-projection').classed('hidden', true)
     svg.select('.y-axis-mouse-projection').classed('hidden', true)
-
-    handleMouseUp()
   }
 
-  const handleMouseDown = (event: MouseEvent) => {
-    const [mouseX, mouseY] = d3.pointer(event)
+  function processPanAndZoom(deltaPan: number, deltaZoom: number) {
+    const maxVisibleOHLCSlots = 200
+    const minVisibleOHLCSlots = 20
 
-    dragRef.current.startX = mouseX
-    dragRef.current.startY = mouseY
-    // create copy of current scale for ongoing calculations when starting grad behavior
-    dragRef.current.scale = d3
-      .scaleTime()
-      .domain([xScale.domain()[0], xScale.domain()[1]])
-      .range([0, innerWidth])
+    // domain data before drag initiated
+    const domainXStartTime = domainXRef.current[0].getTime()
+    const domainXEndTime = domainXRef.current[1].getTime()
+    const domainXIntervalTime = domainXEndTime - domainXStartTime
+
+    // pan duration
+    const draggedXTime =
+      xScale.invert(deltaPan).getTime() - xScale.invert(0).getTime()
+
+    const candlestickSlotsVisible =
+      domainXIntervalTime / ohlcDurationsMs[params.duration]
+
+    // check if more/less granular OHLC sticks should be requested
+    if (
+      candlestickSlotsVisible <= minVisibleOHLCSlots &&
+      params.shorterDuration
+    ) {
+      params.requestDurationChange(params.shorterDuration)
+    } else if (
+      candlestickSlotsVisible >= maxVisibleOHLCSlots &&
+      params.longerDuration
+    ) {
+      params.requestDurationChange(params.longerDuration)
+    }
+
+    // calculate zoom level
+    const zoomXFactor =
+      (candlestickSlotsVisible < minVisibleOHLCSlots && deltaZoom > 0) ||
+      (candlestickSlotsVisible > maxVisibleOHLCSlots && deltaZoom < 0)
+        ? 0 // block zoom until shorter/longer candles are loaded (if available)
+        : (2 * deltaZoom) / params.height
+
+    // domain data with applied pan & zoom
+    const newDomainXStartTime =
+      domainXStartTime + domainXIntervalTime * zoomXFactor - draggedXTime
+    const newDomainXEndTime = domainXEndTime - draggedXTime
+
+    // limit panning by calculating offset to last visible ohlc stick
+    const endOfTheWorldTime =
+      ohlc.length > 0
+        ? ohlc[ohlc.length - 1].start.getTime() +
+          halfOhlcDurationMs(params.duration)
+        : 0
+    const limitPanOffset =
+      newDomainXEndTime > endOfTheWorldTime
+        ? newDomainXEndTime - endOfTheWorldTime
+        : 0
+
+    // apply domain changes and redraw chart
+    const newDomain: [Date, Date] = [
+      new Date(newDomainXStartTime - limitPanOffset),
+      new Date(newDomainXEndTime - limitPanOffset)
+    ]
+    domainXRef.current = newDomain
+    drawChart(xScale.domain(newDomain))
+
+    // set auto-pan mode enabled in the rightmost point
+    setAutoPanRight(
+      endOfTheWorldTime - newDomainXEndTime <=
+        halfOhlcDurationMs(params.duration) // leeway for disabling auto-pan
+    )
+
+    // reset selected interval on update of zoom level
+    if (zoomXFactor != 1) {
+      params.resetInterval()
+    }
   }
-
-  const handleMouseUp = () => {
-    // reset drag mode
-    dragRef.current.startX = 0
-    dragRef.current.startY = 0
-    dragRef.current.scale = null
-    // if outer zoom boundaries were reached then reset to 0 to keep limit in place for next drag round
-    dragRef.current.minZoomLockedAt = dragRef.current.minZoomLockedAt ? 0 : null
-    dragRef.current.maxZoomLockedAt = dragRef.current.maxZoomLockedAt ? 0 : null
-  }
-
-  svg
-    .select('.svg-main')
-    .on('mousedown', handleMouseDown)
-    .on('mousemove', handleMouseMove)
-    .on('mouseup', handleMouseUp)
-    .on('mouseleave', handleMouseLeave)
 
   // blocking overlay area
   svg
     .select('.svg-disabled-overlay')
     .classed('hidden', !disabled)
     .classed('block', disabled)
+
+  // Add gesture handling
+  const gestureBindings = useGesture(
+    {
+      onDrag: ({ delta: [dx, dy] }) => {
+        processPanAndZoom(dx, dy)
+      },
+      onPinch: ({ da: [distance], origin: [ox], memo = [distance, ox] }) => {
+        // distance change is zoom
+        const deltaZoom = distance - memo[0]
+        // pinch center x coordinate change is pan
+        const deltaPan = ox - memo[1]
+
+        processPanAndZoom(deltaPan, deltaZoom)
+
+        return [distance, ox]
+      },
+      onMove: ({ xy: [clientX, clientY] }) => {
+        if (ref.current) {
+          const svgRect = ref.current.getBoundingClientRect()
+          const mouseX = clientX - svgRect.left - 0.8
+          const mouseY = clientY - svgRect.top + 0.3
+          updateMouseProjections(mouseX, mouseY)
+        }
+      },
+      onHover: ({ hovering }) => {
+        if (!hovering) hideMouseProjections()
+      }
+    },
+    {
+      pinch: {
+        threshold: 0.1
+      },
+      drag: {
+        filterTaps: true
+      }
+    }
+  )
 
   drawChart(xScale)
 
@@ -611,6 +586,8 @@ function OHLCChart({
       style={{
         overflow: 'hidden'
       }}
+      className="touch-none"
+      {...gestureBindings()}
     >
       <g className="svg-main cursor-crosshair">
         <rect
@@ -756,7 +733,7 @@ function LastUpdated({ lastUpdated }: { lastUpdated: Date | null }) {
     const formattedHours = ((hours + 11) % 12) + 1 // Convert 24h to 12h
     const amPm = isPM ? 'PM' : 'AM'
 
-    return `Page Last updated ${year}/${month}/${day} ${formattedHours}:${minutes} ${amPm}`
+    return `Last updated ${year}/${month}/${day} ${formattedHours}:${minutes} ${amPm}`
   }
 
   return <div>{lastUpdated ? formatDate(lastUpdated) : ''}</div>
