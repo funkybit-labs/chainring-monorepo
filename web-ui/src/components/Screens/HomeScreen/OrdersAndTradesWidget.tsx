@@ -117,7 +117,8 @@ export default function OrdersAndTradesWidget({
         marketId: order.marketId,
         side: order.side,
         nonce: nonce,
-        signature: signature
+        signature: signature,
+        verifyingChainId: config.state.chainId
       })
     }
   }

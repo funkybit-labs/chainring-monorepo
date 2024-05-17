@@ -1,26 +1,42 @@
 package co.chainring.integrationtests.utils
 
 import co.chainring.apps.api.model.SymbolInfo
-import co.chainring.core.blockchain.BlockchainClientConfig
+import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.model.Address
+import co.chainring.core.model.db.ChainId
 import kotlinx.coroutines.runBlocking
 import org.web3j.crypto.Keys
 import java.math.BigInteger
 
 class ExchangeContractManager {
-    private val blockchainClient = TestBlockchainClient(BlockchainClientConfig())
+    private val blockchainClients = ChainManager.blockchainConfigs.associate {
+        val blockchainClient = TestBlockchainClient(it)
+        blockchainClient.chainId to blockchainClient
+    }
 
     private val symbols: Map<String, SymbolInfo>
+    private val symbolByChainId: Map<String, ChainId>
 
     init {
         val config = TestApiClient.getConfiguration()
-        val chain = config.chains.first()
-        symbols = chain.symbols.associateBy { it.name }
-        blockchainClient.setContractAddress(ContractType.Exchange, chain.contracts.first { it.name == "Exchange" }.address)
+        blockchainClients.forEach { (chainId, blockchainClient) ->
+            val chain = config.chains.first { it.id == chainId }
+            blockchainClient.setContractAddress(
+                ContractType.Exchange,
+                chain.contracts.first { it.name == "Exchange" }.address,
+            )
+        }
+        symbols = config.chains.map { chain ->
+            chain.symbols.associateBy { it.name }
+        }.flatMap { map -> map.entries }.associate(Map.Entry<String, SymbolInfo>::toPair)
+        symbolByChainId = config.chains.map { chain ->
+            chain.symbols.associate { it.name to chain.id }
+        }.flatMap { map -> map.entries }.associate(Map.Entry<String, ChainId>::toPair)
     }
 
     fun getFeeBalance(symbol: String): BigInteger {
+        val blockchainClient = blockchainClients.getValue(symbolByChainId.getValue(symbol))
         val feeAccountAddress = blockchainClient.exchangeContract.feeAccount().send().let {
             Address(Keys.toChecksumAddress(it))
         }

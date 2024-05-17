@@ -1,6 +1,7 @@
 package co.chainring.core.model.db
 
 import co.chainring.core.evm.EIP712Transaction
+import co.chainring.core.evm.TokenAddressAndChain
 import co.chainring.core.model.Address
 import co.chainring.core.utils.toFundamentalUnits
 import de.fxlae.typeid.TypeId
@@ -79,8 +80,8 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
         val quoteTokenAddress = this.market.quoteSymbol.contractAddress ?: Address.zero
         val quoteDecimals = this.market.quoteSymbol.decimals.toInt()
         return EIP712Transaction.Trade(
-            baseToken = baseTokenAddress,
-            quoteToken = quoteTokenAddress,
+            baseToken = TokenAddressAndChain(baseTokenAddress, this.market.baseSymbol.chainId.value),
+            quoteToken = TokenAddressAndChain(quoteTokenAddress, this.market.quoteSymbol.chainId.value),
             amount = if (takerOrder.side == OrderSide.Buy) this.amount else this.amount.negate(),
             price = this.price.toFundamentalUnits(quoteDecimals),
             takerOrder = takerOrder.toEip712Transaction(baseTokenAddress, quoteTokenAddress, quoteDecimals),

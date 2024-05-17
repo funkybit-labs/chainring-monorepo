@@ -2,6 +2,7 @@ package co.chainring.apps.api.model
 
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Symbol
+import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
@@ -22,6 +23,7 @@ sealed class CreateOrderApiRequest {
     abstract val side: OrderSide
     abstract val amount: BigIntegerJson
     abstract val signature: EvmSignature
+    abstract val verifyingChainId: ChainId
 
     @Serializable
     @SerialName("market")
@@ -31,6 +33,7 @@ sealed class CreateOrderApiRequest {
         override val side: OrderSide,
         override val amount: BigIntegerJson,
         override val signature: EvmSignature,
+        override val verifyingChainId: ChainId,
     ) : CreateOrderApiRequest()
 
     @Serializable
@@ -42,6 +45,7 @@ sealed class CreateOrderApiRequest {
         override val amount: BigIntegerJson,
         val price: BigDecimalJson,
         override val signature: EvmSignature,
+        override val verifyingChainId: ChainId,
     ) : CreateOrderApiRequest()
 }
 
@@ -62,6 +66,7 @@ data class UpdateOrderApiRequest(
     val price: BigDecimalJson,
     val nonce: String,
     val signature: EvmSignature,
+    val verifyingChainId: ChainId,
 )
 
 @Serializable
@@ -85,6 +90,7 @@ data class CancelOrderApiRequest(
     val amount: BigIntegerJson,
     val nonce: String,
     val signature: EvmSignature,
+    val verifyingChainId: ChainId,
 )
 
 @Serializable

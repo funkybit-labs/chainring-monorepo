@@ -3,7 +3,7 @@ package co.chainring.integrationtests.testutils
 import co.chainring.apps.api.ApiApp
 import co.chainring.apps.api.ApiAppConfig
 import co.chainring.apps.api.TestRoutes
-import co.chainring.core.blockchain.BlockchainClientConfig
+import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.db.DbConfig
 import co.chainring.core.model.db.BalanceLogTable
@@ -49,8 +49,10 @@ import java.time.Duration
 // This extension allows us to start the app under test only once
 class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
     override fun beforeAll(context: ExtensionContext) {
-        val blockchainClient = TestBlockchainClient(BlockchainClientConfig())
-        val fixtures = getFixtures(blockchainClient.chainId)
+        val blockchainClients = ChainManager.blockchainConfigs.map {
+            TestBlockchainClient(it)
+        }
+        val fixtures = getFixtures(blockchainClients.map { it.chainId })
 
         context
             .root
@@ -82,33 +84,47 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                         migrateDatabase()
 
                         // activate auto mining to speeding up blockchain seeding
-                        blockchainClient.setAutoMining(true)
+                        blockchainClients.forEach {
+                            it.setAutoMining(true)
+                        }
 
                         if (!isIntegrationRun) {
                             sequencerApp.start()
                             sequencerResponseProcessorApp.start()
                             gatewayApp.start()
                             transaction {
-                                DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, blockchainClient.chainId)?.deprecated = true
+                                blockchainClients.forEach { blockchainClient ->
+                                    DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(
+                                        ContractType.Exchange.name,
+                                        blockchainClient.chainId,
+                                    )?.deprecated = true
+                                }
                                 WithdrawalEntity.findPending().forEach { it.update(WithdrawalStatus.Failed, "restarting test") }
                             }
                             apiApp.start()
                         }
                         // wait for contracts to load
-                        await
-                            .pollInSameThread()
-                            .pollDelay(Duration.ofMillis(100))
-                            .pollInterval(Duration.ofMillis(100))
-                            .atMost(Duration.ofMillis(30000L))
-                            .until {
-                                transaction { DeployedSmartContractEntity.validContracts(blockchainClient.chainId).map { it.name } == listOf(ContractType.Exchange.name) }
-                            }
+                        blockchainClients.forEach { blockchainClient ->
+                            await
+                                .pollInSameThread()
+                                .pollDelay(Duration.ofMillis(100))
+                                .pollInterval(Duration.ofMillis(100))
+                                .atMost(Duration.ofMillis(30000L))
+                                .until {
+                                    transaction {
+                                        DeployedSmartContractEntity.validContracts(blockchainClient.chainId)
+                                            .map { it.name } == listOf(ContractType.Exchange.name)
+                                    }
+                                }
+                        }
 
                         val symbolContractAddresses = seedBlockchain(fixtures)
                         seedDatabase(fixtures, symbolContractAddresses)
 
                         // during tests block will be mined manually
-                        blockchainClient.setAutoMining(false)
+                        blockchainClients.forEach {
+                            it.setAutoMining(false)
+                        }
                     }
 
                     @Throws(Throwable::class)
@@ -120,7 +136,9 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                         }
 
                         // revert back to interval mining for `test` env to work normally
-                        blockchainClient.setIntervalMining()
+                        blockchainClients.forEach {
+                            it.setIntervalMining()
+                        }
                     }
                 }
             }

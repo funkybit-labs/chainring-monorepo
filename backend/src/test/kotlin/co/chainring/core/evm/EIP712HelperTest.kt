@@ -22,8 +22,8 @@ class EIP712HelperTest {
         val credentials = Credentials.create(privateKeyHex)
 
         val requests = listOf(
-            EIP712Transaction.WithdrawTx(sender, token, BigInteger("100000"), 1L, EvmSignature.emptySignature()),
-            EIP712Transaction.WithdrawTx(sender, null, BigInteger("100000"), 2L, EvmSignature.emptySignature()),
+            EIP712Transaction.WithdrawTx(sender, TokenAddressAndChain(token, chainId), BigInteger("100000"), 1L, EvmSignature.emptySignature()),
+            EIP712Transaction.WithdrawTx(sender, TokenAddressAndChain(Address.zero, chainId), BigInteger("100000"), 2L, EvmSignature.emptySignature()),
         )
         requests.forEach {
             val hash = EIP712Helper.computeHash(it, chainId, verifyingContract)

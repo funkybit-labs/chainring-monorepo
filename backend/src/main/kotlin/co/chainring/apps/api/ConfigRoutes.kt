@@ -10,6 +10,7 @@ import co.chainring.core.model.FeeRate
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainEntity
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.ChainTable
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketEntity
@@ -24,6 +25,7 @@ import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.core.with
 import org.http4k.format.KotlinxSerialization.auto
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object ConfigRoutes {
@@ -86,7 +88,7 @@ object ConfigRoutes {
                 Response(Status.OK).with(
                     responseBody of
                         ConfigurationApiResponse(
-                            chains = ChainEntity.all().map { chain ->
+                            chains = ChainEntity.all().orderBy(ChainTable.id to SortOrder.ASC).map { chain ->
                                 Chain(
                                     id = chain.id.value,
                                     contracts = DeployedSmartContractEntity.validContracts(chain.id.value).map {
@@ -114,7 +116,7 @@ object ConfigRoutes {
                                     quoteDecimals = market.quoteSymbol.decimals.toInt(),
                                     tickSize = market.tickSize,
                                 )
-                            },
+                            }.sortedWith(compareBy({ it.baseSymbol.value }, { it.quoteSymbol.value })),
                             feeRates = FeeRates.fetch(),
                         ),
                 )

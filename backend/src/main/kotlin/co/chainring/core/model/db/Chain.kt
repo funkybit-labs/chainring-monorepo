@@ -21,6 +21,10 @@ value class ChainId(val value: ULong) : Comparable<ChainId> {
     override fun toString(): String = value.toString()
     fun toLong(): Long = value.toLong()
     override fun compareTo(other: ChainId): Int = compareValuesBy(this, other) { it.value }
+
+    companion object {
+        val empty = ChainId(BigInteger.ZERO)
+    }
 }
 
 class ChainIdColumnType : ColumnType() {

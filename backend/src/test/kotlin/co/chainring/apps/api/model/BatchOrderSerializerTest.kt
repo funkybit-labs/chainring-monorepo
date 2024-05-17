@@ -1,6 +1,7 @@
 package co.chainring.apps.api.model
 
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
@@ -20,6 +21,7 @@ class BatchOrderSerializerTest {
         side = OrderSide.Buy,
         amount = BigInteger("100000"),
         signature = EvmSignature.emptySignature(),
+        verifyingChainId = ChainId.empty,
     )
 
     private val updateLimitOrderRequest = UpdateOrderApiRequest(
@@ -30,6 +32,7 @@ class BatchOrderSerializerTest {
         side = OrderSide.Buy,
         nonce = "123",
         signature = EvmSignature.emptySignature(),
+        verifyingChainId = ChainId.empty,
     )
 
     @Test

@@ -31,10 +31,30 @@ export const chain = defineChain({
   }
 })
 
+export const chain2 = defineChain({
+  id: parseInt(import.meta.env.ENV_CHAIN_ID_2),
+  name: import.meta.env.ENV_CHAIN_NAME_2,
+  nativeCurrency: {
+    decimals: 18,
+    name: import.meta.env.ENV_NATIVE_SYMBOL_NAME_2,
+    symbol: import.meta.env.ENV_NATIVE_SYMBOL_2
+  },
+  rpcUrls: {
+    default: { http: [import.meta.env.ENV_CHAIN_JSON_RPC_URL_2] }
+  },
+  blockExplorers: {
+    default: {
+      name: import.meta.env.ENV_CHAIN_BLOCK_EXPLORER_NAME_2,
+      url: import.meta.env.ENV_CHAIN_BLOCK_EXPLORER_URL_2
+    }
+  }
+})
+
 export const wagmiConfig = createConfig({
-  chains: [chain],
+  chains: [chain, chain2],
   transports: {
-    [chain.id]: http()
+    [chain.id]: http(),
+    [chain2.id]: http()
   },
   connectors: [
     walletConnect({

@@ -12,7 +12,6 @@ import co.chainring.core.model.db.BalanceChange
 import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BalanceType
 import co.chainring.core.model.db.BroadcasterNotification
-import co.chainring.core.model.db.ChainEntity
 import co.chainring.core.model.db.CreateOrderAssignment
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
@@ -61,7 +60,6 @@ object SequencerResponseProcessorService {
 
     private val symbolMap = mutableMapOf<String, SymbolEntity>()
     private val marketMap = mutableMapOf<MarketId, MarketEntity>()
-    private val chainId by lazy { ChainEntity.all().first().id.value }
 
     fun processResponse(response: SequencerResponse, request: SequencerRequest) {
         when (request.type) {
@@ -72,7 +70,7 @@ object SequencerResponseProcessorService {
                             withdrawalEntity.update(WithdrawalStatus.Failed, error(response))
                         } else {
                             handleSequencerResponse(request, response, withdrawalEntity.wallet, listOf())
-                            queueBlockchainTransactions(listOf(withdrawalEntity.toEip712Transaction()))
+                            queueExchangeTransactions(listOf(withdrawalEntity.toEip712Transaction()))
                         }
                     }
                 }
@@ -297,7 +295,7 @@ object SequencerResponseProcessorService {
         }
 
         // queue any blockchain txs for processing
-        queueBlockchainTransactions(tradesWithTakerOrder.map { it.first.toEip712Transaction() })
+        queueExchangeTransactions(tradesWithTakerOrder.map { it.first.toEip712Transaction() })
 
         val orderBookNotifications = BroadcasterNotification.orderBooksForMarkets(
             OrderEntity
@@ -349,13 +347,13 @@ object SequencerResponseProcessorService {
         publishBroadcasterNotifications(broadcasterNotifications + orderBookNotifications + ohlcNotifications + limitsNotifications)
     }
 
-    private fun queueBlockchainTransactions(txs: List<EIP712Transaction>) {
-        ExchangeTransactionEntity.createList(chainId, txs)
+    private fun queueExchangeTransactions(txs: List<EIP712Transaction>) {
+        ExchangeTransactionEntity.createList(txs)
     }
 
     private fun getSymbol(asset: String): SymbolEntity {
         return symbolMap.getOrPut(asset) {
-            SymbolEntity.forChainAndName(chainId, asset)
+            SymbolEntity.forName(asset)
         }
     }
 

@@ -34,7 +34,13 @@ export default function HomeScreen() {
       (c) => c.name == 'Exchange'
     )
 
-    const symbols = chainConfig ? new TradingSymbols(chainConfig.symbols) : null
+    const symbols = config
+      ? new TradingSymbols(
+          config?.chains
+            .map((chain) => chain.symbols)
+            .reduce((accumulator, value) => accumulator.concat(value), [])
+        )
+      : null
     const markets =
       config && symbols ? new Markets(config.markets, symbols) : null
 

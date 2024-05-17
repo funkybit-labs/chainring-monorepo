@@ -63,7 +63,7 @@ export function BalancesTable({
   return (
     <>
       <div className="grid max-h-72 auto-rows-max grid-cols-[max-content_1fr_max-content] overflow-y-scroll">
-        {[symbols.native].concat(symbols.erc20).map((symbol) => {
+        {symbols.native.concat(symbols.erc20).map((symbol) => {
           const balance = balances.find(
             (balance) => balance.symbol == symbol.name
           ) || { symbol: symbol.name, total: 0n, available: 0n }

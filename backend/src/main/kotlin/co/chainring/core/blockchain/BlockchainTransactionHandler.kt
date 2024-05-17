@@ -51,15 +51,14 @@ class BlockchainTransactionHandler(
     val logger = KotlinLogging.logger {}
 
     fun start() {
-        logger.debug { "Starting batch transaction handler" }
-        workerThread = thread(start = true, name = "batch-transaction-handler", isDaemon = true) {
-            try {
-                logger.debug { "Batch Transaction handler thread starting" }
-                dbTransaction {
-                    BlockchainNonceEntity.clearNonce(blockchainClient.submitterAddress, chainId)
-                }
-
-                while (true) {
+        logger.debug { "Starting batch transaction handler for $chainId" }
+        workerThread = thread(start = true, name = "batch-transaction-handler-$chainId", isDaemon = true) {
+            logger.debug { "Batch Transaction handler thread starting" }
+            dbTransaction {
+                BlockchainNonceEntity.clearNonce(blockchainClient.submitterAddress, chainId)
+            }
+            while (true) {
+                try {
                     val batchInProgress = dbTransaction {
                         processBatch()
                     }
@@ -67,12 +66,12 @@ class BlockchainTransactionHandler(
                     Thread.sleep(
                         if (batchInProgress) activePollingIntervalInMs else inactivePollingIntervalInMs,
                     )
+                } catch (ie: InterruptedException) {
+                    logger.warn { "Exiting blockchain handler" }
+                    return@thread
+                } catch (e: Exception) {
+                    logger.error(e) { "Unhandled exception submitting tx" }
                 }
-            } catch (ie: InterruptedException) {
-                logger.warn { "Exiting blockchain handler" }
-                return@thread
-            } catch (e: Exception) {
-                logger.error(e) { "Unhandled exception submitting tx" }
             }
         }
     }

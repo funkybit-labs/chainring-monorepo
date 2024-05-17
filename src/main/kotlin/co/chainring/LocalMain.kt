@@ -1,7 +1,7 @@
 package co.chainring
 
 import co.chainring.apps.api.ApiApp
-import co.chainring.tasks.blockchainClient
+import co.chainring.tasks.blockchainClients
 import co.chainring.tasks.fixtures.getFixtures
 import co.chainring.tasks.migrateDatabase
 import co.chainring.tasks.seedBlockchain
@@ -16,7 +16,7 @@ fun main(args: Array<String>) {
     when (args.firstOrNull()) {
         "db:migrate" -> migrateDatabase()
         "db:seed" -> {
-            val fixtures = getFixtures(blockchainClient.chainId)
+            val fixtures = getFixtures(blockchainClients.map { it.chainId })
             val symbolContractAddresses = seedBlockchain(fixtures)
             seedDatabase(fixtures, symbolContractAddresses)
             seedSequencer(fixtures)

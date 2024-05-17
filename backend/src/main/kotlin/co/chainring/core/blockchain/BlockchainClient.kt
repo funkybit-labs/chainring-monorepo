@@ -42,28 +42,6 @@ enum class ContractType {
     Exchange,
 }
 
-data class BlockchainClientConfig(
-    val url: String = System.getenv("EVM_NETWORK_URL") ?: "http://localhost:8545",
-    val privateKeyHex: String =
-        System.getenv(
-            "EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY",
-        ) ?: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-    val submitterPrivateKeyHex: String =
-        System.getenv(
-            "EVM_SUBMITTER_PRIVATE_KEY",
-        ) ?: "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba",
-    val feeAccountAddress: String =
-        System.getenv(
-            "EVM_FEE_ACCOUNT_ADDRESS",
-        ) ?: "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
-    val deploymentPollingIntervalInMs: Long = System.getenv("DEPLOYMENT_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 1000L,
-    val maxPollingAttempts: Long = System.getenv("MAX_POLLING_ATTEMPTS")?.toLongOrNull() ?: 120L,
-    val contractCreationLimit: BigInteger = System.getenv("CONTRACT_CREATION_LIMIT")?.toBigIntegerOrNull() ?: BigInteger.valueOf(5_000_000),
-    val contractInvocationLimit: BigInteger = System.getenv("CONTRACT_INVOCATION_LIMIT")?.toBigIntegerOrNull() ?: BigInteger.valueOf(3_000_000),
-    val defaultMaxPriorityFeePerGasInWei: BigInteger = System.getenv("DEFAULT_MAX_PRIORITY_FEE_PER_GAS_WEI")?.toBigIntegerOrNull() ?: BigInteger.valueOf(5_000_000_000),
-    val enableWeb3jLogging: Boolean = (System.getenv("ENABLE_WEB3J_LOGGING") ?: "true") == "true",
-)
-
 class BlockchainServerException(message: String) : Exception(message)
 class BlockchainClientException(message: String) : Exception(message)
 
@@ -80,18 +58,18 @@ fun Credentials.checksumAddress(): Address {
     return Address(Keys.toChecksumAddress(this.address))
 }
 
-open class BlockchainClient(private val config: BlockchainClientConfig = BlockchainClientConfig()) {
+open class BlockchainClient(val config: BlockchainClientConfig) {
     protected val web3jService: HttpService = httpService(config.url, config.enableWeb3jLogging)
     protected val web3j: Web3j = Web3j.build(
         web3jService,
-        System.getenv("EVM_NETWORK_POLLING_INTERVAL")?.toLong() ?: 1000L,
+        config.pollingIntervalInMs,
         Async.defaultExecutorService(),
     )
     protected val credentials = Credentials.create(config.privateKeyHex)
     val chainId = ChainId(web3j.ethChainId().send().chainId)
     private val receiptProcessor = PollingTransactionReceiptProcessor(
         web3j,
-        config.deploymentPollingIntervalInMs,
+        config.pollingIntervalInMs,
         config.maxPollingAttempts.toInt(),
     )
     protected val transactionManager = RawTransactionManager(
@@ -262,8 +240,8 @@ open class BlockchainClient(private val config: BlockchainClientConfig = Blockch
         }
     }
 
-    fun getContractAddress(contractType: ContractType): Address? =
-        contractMap[contractType]
+    fun getContractAddress(contractType: ContractType): Address =
+        contractMap.getValue(contractType)
 
     fun getTransactionReceipt(txHash: TxHash): TransactionReceipt? =
         getTransactionReceipt(txHash.value)

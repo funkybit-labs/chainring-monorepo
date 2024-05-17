@@ -11,12 +11,30 @@ services:
       - "8545:8545"
     volumes:
       - anvil-data:/root/.foundry
+  anvil-2:
+    image: anvil # custom image (./anvil/Dockerfile)
+    container_name: anvil2
+    restart: always
+    environment:
+      CHAIN_ID: 1338
+    ports:
+      - "8546:8545"
+    volumes:
+      - anvil-data:/root/.foundry
   otterscan:
     image: otterscan/otterscan
     container_name: otterscan
     restart: always
     ports:
       - "5100:80"
+  otterscan2:
+    image: otterscan/otterscan
+    container_name: otterscan2
+    restart: always
+    environment:
+      ERIGON_URL: "http://localhost:8546"
+    ports:
+      - "5101:80"
   db:
     image: postgres:15
     restart: always
