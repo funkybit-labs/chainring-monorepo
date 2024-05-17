@@ -36,6 +36,8 @@ message BalanceChange {
 message MarketCreated {
   string marketId = 1;
   DecimalValue tickSize = 2;
+  uint32 baseDecimals = 3;
+  uint32 quoteDecimals = 4;
 }
 
 message FeeRates {
