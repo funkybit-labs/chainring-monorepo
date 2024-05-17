@@ -186,13 +186,13 @@ class ChainringDeploymentManager:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ECS service management tool")
     parser.add_argument('action', choices={'stop', 'start', 'upgrade', 'switch-to-holding', 'switch-to-app'})
-    parser.add_argument('--env', required=True, choices={'test', 'testnet', 'prod'})
+    parser.add_argument('--env', required=True, choices={'test', 'demo', 'testnet', 'prod'})
     parser.add_argument('--services', required=False)
     parser.add_argument('--tag', default='latest')
     args = parser.parse_args()
 
     region = None
-    if args.env == 'test' or args.env == 'testnet':
+    if args.env == 'test' or args.env == 'testnet' or args.env == 'demo':
         region = 'us-east-2'
     elif args.env == 'prod':
         region = 'eu-central-2'

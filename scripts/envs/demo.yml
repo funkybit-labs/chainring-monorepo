@@ -1,0 +1,41 @@
+environment:
+  api:
+    DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
+    EVM_NETWORK_URL: http://demo-anvil.chainring.co:8545
+    AUTH_TOKEN_VALIDITY_INTERVAL: P1D
+    SEQUENCER_HOST_NAME: demo-sequencer.chainring.co
+    SEQUENCER_PORT: "5337"
+    JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
+    SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
+  sequencer:
+    QUEUE_HOME: "/data/queues/demo"
+    CHECKPOINTS_ENABLED: "false"
+    SANDBOX_MODE: "true"
+    DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
+    JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
+    SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
+  otterscan:
+    ERIGON_URL: https://demo-anvil.chainring.co
+services:
+  api:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
+    count: 1
+    environment: api
+    secrets:
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-aa47459e-c32f-4308-8f80-1af418a10602-L9i7qG
+      SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
+  anvil:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
+    count: 1
+  otterscan:
+    image: otterscan/otterscan
+    count: 1
+    environment: otterscan
+  sequencer:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer
+    count: 1
+    environment: sequencer
+    secrets:
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-aa47459e-c32f-4308-8f80-1af418a10602-L9i7qG
+      SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
+
