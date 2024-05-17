@@ -87,9 +87,10 @@ class SequencerClient {
         wallet: WalletAddress,
         orderType: Order.Type,
     ): OrderChanged =
-        addOrder(market, amount, price, wallet, orderType).also {
+        addOrder(market, amount, price, wallet, orderType).let {
             assertEquals(OrderDisposition.Accepted, it.ordersChangedList.first().disposition)
-        }.ordersChangedList.first()
+            it.ordersChangedList.first()
+        }
 
     fun changeOrder(
         market: Market,
