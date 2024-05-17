@@ -13,7 +13,7 @@ on:
         description: 'Environment'
         required: true
         type: choice
-        options: [ 'test', 'testnet', 'prod' ]
+        options: [ 'test', 'testnet', 'demo', 'prod' ]
       tag:
         description: 'Backend image tag'
         required: true

@@ -8,10 +8,7 @@ on:
         description: 'Environment'
         required: true
         type: choice
-        options:
-          - test
-          - testnet
-          - prod
+        options: [ 'test', 'testnet', 'demo', 'prod' ]
 
   # Call from another workflow (CI)
   workflow_call:
