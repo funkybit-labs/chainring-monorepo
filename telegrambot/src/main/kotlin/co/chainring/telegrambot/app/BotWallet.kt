@@ -6,6 +6,7 @@ import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.Deposit
 import co.chainring.apps.api.model.Order
+import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.apps.api.model.websocket.Balances
@@ -15,8 +16,7 @@ import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.apps.api.model.websocket.TradeUpdated
-import co.chainring.core.blockchain.BlockchainClient
-import co.chainring.core.blockchain.BlockchainClientConfig
+import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.client.rest.ApiCallFailure
 import co.chainring.core.client.rest.ApiClient
@@ -28,10 +28,12 @@ import co.chainring.core.client.ws.subscribeToTrades
 import co.chainring.core.client.ws.unsubscribe
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
+import co.chainring.core.evm.TokenAddressAndChain
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.TxHash
+import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OrderSide
@@ -70,9 +72,24 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
     private val apiClient = ApiClient(ecKeyPair)
     val config = apiClient.tryGetConfiguration().getOrNull()
         ?: throw Exception("Unable to retrieve config")
-    private val exchangeContractAddress = config.chains.first().contracts.find { it.name == ContractType.Exchange.name }!!.address
-    private val blockchainClient = BlockchainClient(BlockchainClientConfig().copy(privateKeyHex = ecKeyPair.privateKey.toByteArray().toHex())).also {
-        it.setContractAddress(ContractType.Exchange, exchangeContractAddress)
+
+    private val chainBySymbol = config.chains.map { chain ->
+        chain.symbols.associate { Symbol(it.name) to chain.id }
+    }.flatMap { map -> map.entries }.associate(Map.Entry<Symbol, ChainId>::toPair)
+    private val symbolInfoBySymbol = config.chains.map { chain ->
+        chain.symbols.associateBy { Symbol(it.name) }
+    }.flatMap { map -> map.entries }.associate(Map.Entry<Symbol, SymbolInfo>::toPair)
+    private val blockchainClientsByChainId = ChainManager.blockchainConfigs.associate { blockchainConfig ->
+        val blockchainClient = ChainManager.getBlockchainClient(
+            blockchainConfig,
+            privateKeyHex = ecKeyPair.privateKey.toByteArray().toHex(),
+        )
+        blockchainClient.chainId to blockchainClient.also { client ->
+            client.setContractAddress(
+                ContractType.Exchange,
+                config.chains.first { it.id == client.chainId }.contracts.first { it.name == ContractType.Exchange.name }.address,
+            )
+        }
     }
     private val marketPrices = mutableMapOf<MarketId, BigDecimal>()
     var currentMarket = config.markets.find { it.id == "BTC/ETH" } ?: config.markets.first()
@@ -221,6 +238,7 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
     }
 
     private fun getWalletBalance(symbol: Symbol): BigInteger {
+        val blockchainClient = blockchainClient(symbol)
         return contractAddress(symbol)?.let {
             blockchainClient.getERC20Balance(it, walletAddress)
         } ?: blockchainClient.getNativeBalance(walletAddress)
@@ -243,6 +261,8 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
     }
 
     private fun deposit(amount: String, symbol: Symbol) {
+        val blockchainClient = blockchainClient(symbol)
+        val exchangeContractAddress = blockchainClient.getContractAddress(ContractType.Exchange)
         val bigIntAmount = amountToBigInteger(symbol, amount)
         val tokenAddress = contractAddress(symbol)
         if (tokenAddress != null) {
@@ -276,9 +296,17 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
     }
 
     private fun withdraw(amount: String, symbol: Symbol): Either<ApiCallFailure, WithdrawalApiResponse> {
+        val blockchainClient = blockchainClient(symbol)
+        val exchangeContractAddress = blockchainClient.getContractAddress(ContractType.Exchange)
         val bigIntAmount = amountToBigInteger(symbol, amount)
         val nonce = System.currentTimeMillis()
-        val tx = EIP712Transaction.WithdrawTx(walletAddress, contractAddress(symbol), bigIntAmount, nonce, EvmSignature.emptySignature())
+        val tx = EIP712Transaction.WithdrawTx(
+            walletAddress,
+            TokenAddressAndChain(contractAddress(symbol) ?: Address.zero, chain(symbol)),
+            bigIntAmount,
+            nonce,
+            EvmSignature.emptySignature(),
+        )
         return apiClient.tryCreateWithdrawal(
             CreateWithdrawalApiRequest(
                 symbol,
@@ -290,6 +318,8 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
     }
 
     fun createOrder(amount: String, side: OrderSide): Either<ApiCallFailure, CreateOrderApiResponse> {
+        val blockchainClient = blockchainClient(currentMarket.baseSymbol)
+        val exchangeContractAddress = blockchainClient.getContractAddress(ContractType.Exchange)
         return apiClient.tryCreateOrder(
             CreateOrderApiRequest.Market(
                 nonce = generateOrderNonce(),
@@ -297,6 +327,7 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
                 side = side,
                 amount = amountToBigInteger(currentMarket.baseSymbol, amount),
                 signature = EvmSignature.emptySignature(),
+                verifyingChainId = ChainId.empty,
             ).let {
                 val tx = EIP712Transaction.Order(
                     walletAddress,
@@ -312,9 +343,13 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
         )
     }
 
-    private fun decimals(symbol: Symbol) = config.chains.first().symbols.find { it.name == symbol.value }!!.decimals.toInt()
+    private fun decimals(symbol: Symbol) = symbolInfoBySymbol.getValue(symbol).decimals.toInt()
 
-    private fun contractAddress(symbol: Symbol) = config.chains.first().symbols.find { it.name == symbol.value }?.contractAddress
+    private fun contractAddress(symbol: Symbol) = symbolInfoBySymbol.getValue(symbol).contractAddress
+
+    private fun chain(symbol: Symbol) = chainBySymbol.getValue(symbol)
+
+    private fun blockchainClient(symbol: Symbol) = blockchainClientsByChainId.getValue(chain(symbol))
 
     private fun amountToBigInteger(symbol: Symbol, amount: String) = BigDecimal(amount).toFundamentalUnits(decimals(symbol))
 

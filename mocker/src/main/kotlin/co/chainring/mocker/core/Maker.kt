@@ -29,6 +29,7 @@ import co.chainring.core.client.ws.subscribeToOrders
 import co.chainring.core.client.ws.subscribeToPrices
 import co.chainring.core.client.ws.subscribeToTrades
 import co.chainring.core.client.ws.unsubscribe
+import co.chainring.core.model.db.ChainId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.WsStatus
@@ -238,6 +239,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                             amount = offerAmounts[ix],
                             price = price,
                             signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
                         ).let {
                             wallet.signOrder(it)
                         }
@@ -249,6 +251,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                             amount = bidAmounts[ix],
                             price = price,
                             signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
                         ).let {
                             wallet.signOrder(it)
                         }
@@ -261,7 +264,8 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                         amount = it.amount,
                         side = it.side,
                         nonce = generateOrderNonce(),
-                        signature = EvmSignature.emptySignature()
+                        signature = EvmSignature.emptySignature(),
+                        verifyingChainId = ChainId.empty,
                     ).let { request ->
                         wallet.signCancelOrder(request)
                     }
@@ -272,7 +276,8 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                         amount = it.amount,
                         side = it.side,
                         nonce = generateOrderNonce(),
-                        signature = EvmSignature.emptySignature()
+                        signature = EvmSignature.emptySignature(),
+                        verifyingChainId = ChainId.empty,
                     ).let { request ->
                         wallet.signCancelOrder(request)
                     }
@@ -304,6 +309,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                         amount = amount,
                         price = price,
                         signature = EvmSignature.emptySignature(),
+                        verifyingChainId = ChainId.empty,
                     ).let {
                         wallet.signOrder(it)
                     },
@@ -319,6 +325,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                         amount = amount,
                         price = price,
                         signature = EvmSignature.emptySignature(),
+                        verifyingChainId = ChainId.empty,
                     ).let {
                         wallet.signOrder(it)
                     },

@@ -1,12 +1,12 @@
 import { TradingSymbol } from 'apiClient'
 
 export default class TradingSymbols {
-  native: TradingSymbol
+  native: TradingSymbol[]
   erc20: TradingSymbol[]
   private symbolByName: Map<string, TradingSymbol>
 
   constructor(symbols: TradingSymbol[]) {
-    this.native = symbols.find((s) => s.contractAddress === null)!
+    this.native = symbols.filter((s) => s.contractAddress === null)!
     this.erc20 = symbols.filter((s) => s.contractAddress !== null)
     this.symbolByName = new Map(symbols.map((s) => [s.name, s]))
   }

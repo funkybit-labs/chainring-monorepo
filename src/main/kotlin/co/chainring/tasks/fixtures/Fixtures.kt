@@ -1,7 +1,6 @@
 package co.chainring.tasks.fixtures
 
 import co.chainring.core.model.Address
-import co.chainring.core.model.FeeRate
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.SymbolId
@@ -44,69 +43,80 @@ data class Fixtures(
     )
 }
 
-fun getFixtures(chainringChainId: ChainId) = Fixtures(
+fun String.toChainSymbol(chainIndex: Int) = "$this${if (chainIndex == 0) "" else "${chainIndex + 1}"}"
+fun getFixtures(chainringChainIds: List<ChainId>) = Fixtures(
     feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
-    chains = listOf(
-        Fixtures.Chain(chainringChainId, "chainring-dev", Address("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"))
-    ),
-    symbols = listOf(
-        // BTC is the native token since we would be on Bitcoin L2
-        Fixtures.Symbol(name = "BTC", chainId = chainringChainId, isNative = true, 18),
-        // ETH is bridged and represented by an ERC20 token
-        Fixtures.Symbol(name = "ETH", chainId = chainringChainId, isNative = false, 18),
-        Fixtures.Symbol(name = "USDC", chainId = chainringChainId, isNative = false, 6),
-        Fixtures.Symbol(name = "DAI", chainId = chainringChainId, isNative = false, 18)
-    ),
-    markets = listOf(
-        Fixtures.Market(
-            baseSymbol = SymbolId(chainringChainId, "BTC"),
-            quoteSymbol = SymbolId(chainringChainId, "ETH"),
-            tickSize = "0.05".toBigDecimal(),
-            marketPrice = "17.525".toBigDecimal()
-        ),
-        Fixtures.Market(
-            baseSymbol = SymbolId(chainringChainId, "USDC"),
-            quoteSymbol = SymbolId(chainringChainId, "DAI"),
-            tickSize = "0.01".toBigDecimal(),
-            marketPrice = "2.05".toBigDecimal()
-        ),
-        Fixtures.Market(
-            baseSymbol = SymbolId(chainringChainId, "BTC"),
-            quoteSymbol = SymbolId(chainringChainId, "USDC"),
-            tickSize = "1.00".toBigDecimal(),
-            marketPrice = "68390.000".toBigDecimal()
-        ),
-    ),
+    chains = chainringChainIds.map {
+        Fixtures.Chain(it, "chainring-dev-$it", Address("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"))
+    },
+    symbols = chainringChainIds.mapIndexed { index, chainId ->
+        listOf(
+            // BTC is the native token since we would be on Bitcoin L2
+            Fixtures.Symbol(name = "BTC".toChainSymbol(index), chainId = chainId, isNative = true, 18),
+            // ETH is bridged and represented by an ERC20 token
+            Fixtures.Symbol(name = "ETH".toChainSymbol(index), chainId = chainId, isNative = false, 18),
+            Fixtures.Symbol(name = "USDC".toChainSymbol(index), chainId = chainId, isNative = false, 6),
+            Fixtures.Symbol(name = "DAI".toChainSymbol(index), chainId = chainId, isNative = false, 18)
+        )
+    }.flatten(),
+    markets = chainringChainIds.mapIndexed { index, chainId ->
+        listOf(
+            Fixtures.Market(
+                baseSymbol = SymbolId(chainId, "BTC".toChainSymbol(index)),
+                quoteSymbol = SymbolId(chainId, "ETH".toChainSymbol(index)),
+                tickSize = "0.05".toBigDecimal(),
+                marketPrice = "17.525".toBigDecimal()
+            ),
+            Fixtures.Market(
+                baseSymbol = SymbolId(chainId, "USDC".toChainSymbol(index)),
+                quoteSymbol = SymbolId(chainId, "DAI".toChainSymbol(index)),
+                tickSize = "0.01".toBigDecimal(),
+                marketPrice = "2.05".toBigDecimal()
+            ),
+            Fixtures.Market(
+                baseSymbol = SymbolId(chainId, "BTC".toChainSymbol(index)),
+                quoteSymbol = SymbolId(chainId, "USDC".toChainSymbol(index)),
+                tickSize = "1.00".toBigDecimal(),
+                marketPrice = "68390.000".toBigDecimal()
+            ),
+        )
+    }.flatten(),
     wallets = listOf(
         Fixtures.Wallet(
             privateKeyHex = "0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356",
             address = Address("0x14dC79964da2C08b23698B3D3cc7Ca32193d9955"),
-            balances = mapOf(
-                SymbolId(chainringChainId, "BTC") to BigDecimal("10").toFundamentalUnits(18),
-                SymbolId(chainringChainId, "ETH") to BigDecimal("100").toFundamentalUnits(18),
-                SymbolId(chainringChainId, "USDC") to BigDecimal("100000").toFundamentalUnits(6),
-                SymbolId(chainringChainId, "DAI") to BigDecimal("100000").toFundamentalUnits(18),
-            )
+            balances = chainringChainIds.mapIndexed { index, chainId ->
+                mapOf(
+                    SymbolId(chainId, "BTC".toChainSymbol(index)) to BigDecimal("1$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "ETH".toChainSymbol(index)) to BigDecimal("10$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "USDC".toChainSymbol(index)) to BigDecimal("10000$index").toFundamentalUnits(6),
+                    SymbolId(chainId, "DAI".toChainSymbol(index)) to BigDecimal("10000$index").toFundamentalUnits(18),
+                )
+            }.flatMap { map -> map.entries }.associate(Map.Entry<SymbolId, BigInteger>::toPair)
         ),
         Fixtures.Wallet(
             privateKeyHex = "0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97",
             address = Address("0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f"),
-            balances = mapOf(
-                SymbolId(chainringChainId, "BTC") to BigDecimal("10").toFundamentalUnits(18),
-                SymbolId(chainringChainId, "ETH") to BigDecimal("100").toFundamentalUnits(18),
-                SymbolId(chainringChainId, "USDC") to BigDecimal("100000").toFundamentalUnits(6),
-                SymbolId(chainringChainId, "DAI") to BigDecimal("100000").toFundamentalUnits(18),
-            )
+            balances = chainringChainIds.mapIndexed { index, chainId ->
+                mapOf(
+                    SymbolId(chainId, "BTC".toChainSymbol(index)) to BigDecimal("1$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "ETH".toChainSymbol(index)) to BigDecimal("10$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "USDC".toChainSymbol(index)) to BigDecimal("10000$index").toFundamentalUnits(6),
+                    SymbolId(chainId, "DAI".toChainSymbol(index)) to BigDecimal("10000$index").toFundamentalUnits(18),
+                )
+            }.flatMap { map -> map.entries }.associate(Map.Entry<SymbolId, BigInteger>::toPair)
         ),
         Fixtures.Wallet(
             privateKeyHex = "0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6",
             address = Address("0xa0Ee7A142d267C1f36714E4a8F75612F20a79720"),
-            balances = mapOf(
-                SymbolId(chainringChainId, "BTC") to BigDecimal("10").toFundamentalUnits(18),
-                SymbolId(chainringChainId, "ETH") to BigDecimal("100").toFundamentalUnits(18),
-                SymbolId(chainringChainId, "USDC") to BigDecimal("100000").toFundamentalUnits(6),
-                SymbolId(chainringChainId, "DAI") to BigDecimal("100000").toFundamentalUnits(18),
-            )
+            balances = chainringChainIds.mapIndexed { index, chainId ->
+                mapOf(
+                    SymbolId(chainId, "BTC".toChainSymbol(index)) to BigDecimal("1$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "ETH".toChainSymbol(index)) to BigDecimal("10$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "USDC".toChainSymbol(index)) to BigDecimal("10000$index").toFundamentalUnits(6),
+                    SymbolId(chainId, "DAI".toChainSymbol(index)) to BigDecimal("10000$index").toFundamentalUnits(18),
+                )
+            }.flatMap { map -> map.entries }.associate(Map.Entry<SymbolId, BigInteger>::toPair)
         )
     )
 )

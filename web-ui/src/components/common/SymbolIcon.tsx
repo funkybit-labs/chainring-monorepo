@@ -15,18 +15,16 @@ export default function SymbolIcon(props: Props) {
     typeof props.symbol === 'string' ? props.symbol : props.symbol.name
 
   const icon = (function () {
-    switch (symbolName) {
-      case 'BTC':
-        return btc
-      case 'ETH':
-        return eth
-      case 'USDC':
-        return usdc
-      case 'DAI':
-        return dai
-      default:
-        return generic
+    if (symbolName.includes('BTC')) {
+      return btc
+    } else if (symbolName.includes('ETH')) {
+      return eth
+    } else if (symbolName.includes('USDC')) {
+      return usdc
+    } else if (symbolName.includes('DAI')) {
+      return dai
     }
+    return generic
   })()
 
   return <img src={icon} className={props.className || ''} alt={symbolName} />

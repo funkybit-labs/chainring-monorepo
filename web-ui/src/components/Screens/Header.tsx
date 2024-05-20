@@ -1,13 +1,12 @@
 import logo from 'assets/logo-name.svg'
 import { useWeb3Modal } from '@web3modal/wagmi/react'
-import { useAccount, useSwitchChain } from 'wagmi'
+import { useAccount } from 'wagmi'
 import { addressDisplay } from 'utils'
 import { Button } from 'components/common/Button'
 import React, { useEffect, useState } from 'react'
 import { MarketSelector } from 'components/Screens/HomeScreen/MarketSelector'
 import Markets, { Market } from 'markets'
 import { useMaintenance } from 'apiClient'
-import { chain } from 'wagmiConfig'
 import Menu from 'assets/Menu.svg'
 
 export function Header({
@@ -24,25 +23,14 @@ export function Header({
   const [name, setName] = useState<string>()
   const [icon, setIcon] = useState<string>()
   const maintenance = useMaintenance()
-  const { switchChain } = useSwitchChain()
   const [showMenu, setShowMenu] = useState(false)
 
   useEffect(() => {
     if (account.isConnected && account.connector) {
       setIcon(account.connector.icon)
       setName(account.connector.name)
-
-      switchChain({
-        addEthereumChainParameter: {
-          chainName: chain.name,
-          nativeCurrency: chain.nativeCurrency,
-          rpcUrls: chain.rpcUrls.default.http,
-          blockExplorerUrls: [chain.blockExplorers.default.url]
-        },
-        chainId: chain.id
-      })
     }
-  }, [account.isConnected, account.connector, switchChain])
+  }, [account.isConnected, account.connector])
 
   useEffect(() => {
     function escapeHandler(ev: KeyboardEvent) {

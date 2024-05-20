@@ -70,6 +70,11 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
                 .find { SymbolTable.chainId.eq(chainId) and SymbolTable.name.eq(name) }
                 .single()
 
+        fun forName(name: String): SymbolEntity =
+            SymbolEntity
+                .find { SymbolTable.name.eq(name) }
+                .single()
+
         fun forChainAndContractAddress(chainId: ChainId, contractAddress: Address?) =
             SymbolEntity
                 .find { SymbolTable.chainId.eq(chainId).and(contractAddress?.let { SymbolTable.contractAddress.eq(it.value) } ?: SymbolTable.contractAddress.isNull()) }

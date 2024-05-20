@@ -12,6 +12,7 @@ import co.chainring.integrationtests.utils.Faucet
 import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.Wallet
 import co.chainring.integrationtests.utils.assertBalancesMessageReceived
+import co.chainring.tasks.fixtures.toChainSymbol
 import org.http4k.client.WebsocketClient
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -23,79 +24,89 @@ import kotlin.test.assertNotNull
 @ExtendWith(AppUnderTestRunner::class)
 class DepositTest {
     @Test
-    fun deposits() {
+    fun `deposits multiple chains`() {
         val apiClient = TestApiClient()
+        val wallet = Wallet(apiClient)
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()
 
-        val wallet = Wallet(apiClient)
-        Faucet.fund(wallet.address)
+        val config = apiClient.getConfiguration()
+        assertEquals(config.chains.size, 2)
 
-        // mint some USDC
-        val usdcMintAmount = wallet.formatAmount("20", "USDC")
-        wallet.mintERC20("USDC", usdcMintAmount)
+        (0 until config.chains.size).forEach { index ->
 
-        assertEquals(wallet.getWalletERC20Balance("USDC"), usdcMintAmount)
+            wallet.switchChain(config.chains[index].id)
+            Faucet.fund(wallet.address, chainId = wallet.currentChainId)
 
-        val walletStartingBtcBalance = wallet.getWalletNativeBalance()
+            val btcSymbol = "BTC".toChainSymbol(index)
+            val usdcSymbol = "USDC".toChainSymbol(index)
+            val symbolFilterList = listOf(btcSymbol, usdcSymbol)
 
-        // deposit some BTC
-        val btcDepositAmount = wallet.formatAmount("0.001", "BTC")
-        val btcDepositTxHash = wallet.asyncDepositNative(btcDepositAmount)
-        assertTrue(apiClient.listDeposits().deposits.isEmpty())
-        val pendingBtcDeposit = apiClient.createDeposit(CreateDepositApiRequest(Symbol("BTC"), btcDepositAmount, btcDepositTxHash)).deposit
-        assertEquals(Deposit.Status.Pending, pendingBtcDeposit.status)
+            // mint some USDC
+            val usdcMintAmount = wallet.formatAmount("20", usdcSymbol)
+            wallet.mintERC20(usdcSymbol, usdcMintAmount)
 
-        assertEquals(listOf(pendingBtcDeposit), apiClient.listDeposits().deposits)
+            assertEquals(wallet.getWalletERC20Balance(usdcSymbol), usdcMintAmount)
 
-        wallet.blockchainClient.mine()
+            val walletStartingBtcBalance = wallet.getWalletNativeBalance()
 
-        waitForBalance(
-            apiClient,
-            wsClient,
-            listOf(
-                ExpectedBalance("BTC", total = btcDepositAmount, available = btcDepositAmount),
-            ),
-        )
+            val btcDepositAmount = wallet.formatAmount("0.001", btcSymbol)
+            val usdcDepositAmount = wallet.formatAmount("15", usdcSymbol)
 
-        val btcDeposit = apiClient.getDeposit(pendingBtcDeposit.id).deposit
-        assertEquals(Deposit.Status.Complete, btcDeposit.status)
+            val btcDepositTxHash = wallet.asyncDepositNative(btcDepositAmount)
+            assertTrue(apiClient.listDeposits().deposits.none { it.symbol.value == btcSymbol })
+            val pendingBtcDeposit = apiClient.createDeposit(CreateDepositApiRequest(Symbol(btcSymbol), btcDepositAmount, btcDepositTxHash)).deposit
+            assertEquals(Deposit.Status.Pending, pendingBtcDeposit.status)
 
-        assertEquals(listOf(btcDeposit), apiClient.listDeposits().deposits)
+            assertEquals(listOf(pendingBtcDeposit), apiClient.listDeposits().deposits.filter { it.symbol.value == btcSymbol })
 
-        val depositGasCost = wallet.blockchainClient.getTransactionReceipt(btcDepositTxHash).let { receipt ->
-            assertNotNull(receipt)
-            receipt.gasUsed * Numeric.decodeQuantity(receipt.effectiveGasPrice)
+            wallet.currentBlockchainClient().mine()
+
+            waitForBalance(
+                apiClient,
+                wsClient,
+                listOf(
+                    ExpectedBalance(btcSymbol, total = btcDepositAmount, available = btcDepositAmount),
+                ),
+            )
+
+            val btcDeposit = apiClient.getDeposit(pendingBtcDeposit.id).deposit
+            assertEquals(Deposit.Status.Complete, btcDeposit.status)
+            assertEquals(listOf(btcDeposit), apiClient.listDeposits().deposits.filter { it.symbol.value == btcSymbol })
+
+            val depositGasCost = wallet.currentBlockchainClient().getTransactionReceipt(btcDepositTxHash).let { receipt ->
+                assertNotNull(receipt)
+                receipt.gasUsed * Numeric.decodeQuantity(receipt.effectiveGasPrice)
+            }
+            assertEquals(wallet.getWalletNativeBalance(), walletStartingBtcBalance - btcDepositAmount - depositGasCost)
+
+            // deposit some USDC
+            val usdcDepositTxHash = wallet.asyncDepositERC20(usdcSymbol, usdcDepositAmount)
+
+            assertTrue(apiClient.listDeposits().deposits.none { it.symbol.value == usdcSymbol })
+            val pendingUsdcDeposit = apiClient.createDeposit(CreateDepositApiRequest(Symbol(usdcSymbol), usdcDepositAmount, usdcDepositTxHash)).deposit
+            assertEquals(Deposit.Status.Pending, pendingBtcDeposit.status)
+
+            assertEquals(listOf(pendingUsdcDeposit, btcDeposit), apiClient.listDeposits().deposits.filter { symbolFilterList.contains(it.symbol.value) })
+
+            wallet.currentBlockchainClient().mine()
+
+            waitForBalance(
+                apiClient,
+                wsClient,
+                listOf(
+                    ExpectedBalance(btcSymbol, total = btcDepositAmount, available = btcDepositAmount),
+                    ExpectedBalance(usdcSymbol, total = usdcDepositAmount, available = usdcDepositAmount),
+                ),
+            )
+
+            val usdcDeposit = apiClient.getDeposit(pendingUsdcDeposit.id).deposit
+            assertEquals(Deposit.Status.Complete, usdcDeposit.status)
+
+            assertEquals(listOf(usdcDeposit, btcDeposit), apiClient.listDeposits().deposits.filter { symbolFilterList.contains(it.symbol.value) })
+
+            assertEquals(wallet.getWalletERC20Balance(usdcSymbol), usdcMintAmount - usdcDepositAmount)
         }
-        assertEquals(wallet.getWalletNativeBalance(), walletStartingBtcBalance - btcDepositAmount - depositGasCost)
-
-        // deposit some USDC
-        val usdcDepositAmount = wallet.formatAmount("15", "USDC")
-        val usdcDepositTxHash = wallet.asyncDepositERC20("USDC", usdcDepositAmount)
-
-        assertTrue(apiClient.listDeposits().deposits.none { it.symbol.value == "USDC" })
-        val pendingUsdcDeposit = apiClient.createDeposit(CreateDepositApiRequest(Symbol("USDC"), usdcDepositAmount, usdcDepositTxHash)).deposit
-        assertEquals(Deposit.Status.Pending, pendingBtcDeposit.status)
-
-        assertEquals(listOf(pendingUsdcDeposit, btcDeposit), apiClient.listDeposits().deposits)
-
-        wallet.blockchainClient.mine()
-
-        waitForBalance(
-            apiClient,
-            wsClient,
-            listOf(
-                ExpectedBalance("BTC", total = btcDepositAmount, available = btcDepositAmount),
-                ExpectedBalance("USDC", total = usdcDepositAmount, available = usdcDepositAmount),
-            ),
-        )
-
-        val usdcDeposit = apiClient.getDeposit(pendingUsdcDeposit.id).deposit
-        assertEquals(Deposit.Status.Complete, usdcDeposit.status)
-
-        assertEquals(listOf(usdcDeposit, btcDeposit), apiClient.listDeposits().deposits)
-
-        assertEquals(wallet.getWalletERC20Balance("USDC"), usdcMintAmount - usdcDepositAmount)
     }
 }

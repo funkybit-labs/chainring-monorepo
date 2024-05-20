@@ -5,10 +5,9 @@ import co.chainring.apps.api.middleware.HttpTransactionLogger
 import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
 import co.chainring.apps.api.middleware.Tracer
 import co.chainring.apps.api.services.ExchangeApiService
-import co.chainring.core.blockchain.BlockchainClient
-import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.blockchain.BlockchainDepositHandler
 import co.chainring.core.blockchain.BlockchainTransactionHandler
+import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractsPublisher
 import co.chainring.core.db.DbConfig
 import co.chainring.core.sequencer.SequencerClient
@@ -43,7 +42,6 @@ import java.time.Duration.ofSeconds
 data class ApiAppConfig(
     val httpPort: Int = System.getenv("HTTP_PORT")?.toIntOrNull() ?: 9000,
     val dbConfig: DbConfig = DbConfig(),
-    val blockchainClientConfig: BlockchainClientConfig = BlockchainClientConfig(),
 )
 
 val requestContexts = RequestContexts()
@@ -65,15 +63,14 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
 
     private val enableTestRoutes = (System.getenv("ENABLE_TEST_ROUTES") ?: "true") == "true"
 
-    private val blockchainClient = BlockchainClient(config.blockchainClientConfig)
-    private val contractsPublisher = ContractsPublisher(blockchainClient)
+    private val contractsPublishers = ChainManager.getBlockchainClients().map { ContractsPublisher(it) }
 
     private val sequencerClient = SequencerClient()
     private val broadcaster = Broadcaster(db)
 
-    private val exchangeApiService = ExchangeApiService(blockchainClient, sequencerClient)
-    private val blockchainTransactionHandler = BlockchainTransactionHandler(blockchainClient, sequencerClient)
-    private val blockchainDepositHandler = BlockchainDepositHandler(blockchainClient, sequencerClient)
+    private val exchangeApiService = ExchangeApiService(sequencerClient)
+    private val blockchainTransactionHandlers = ChainManager.getBlockchainClients().map { BlockchainTransactionHandler(it, sequencerClient) }
+    private val blockchainDepositHandlers = ChainManager.getBlockchainClients().map { BlockchainDepositHandler(it, sequencerClient) }
 
     private val depositRoutes = DepositRoutes(exchangeApiService)
     private val withdrawalRoutes = WithdrawalRoutes(exchangeApiService)
@@ -144,9 +141,15 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         super.start()
         server.start()
         broadcaster.start()
-        contractsPublisher.updateContracts()
-        blockchainTransactionHandler.start()
-        blockchainDepositHandler.start()
+        contractsPublishers.forEach {
+            it.updateContracts()
+        }
+        blockchainTransactionHandlers.forEach {
+            it.start()
+        }
+        blockchainDepositHandlers.forEach {
+            it.start()
+        }
         logger.info { "Started" }
     }
 
@@ -155,8 +158,12 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         super.stop()
         broadcaster.stop()
         server.stop()
-        blockchainTransactionHandler.stop()
-        blockchainDepositHandler.stop()
+        blockchainTransactionHandlers.forEach {
+            it.stop()
+        }
+        blockchainDepositHandlers.forEach {
+            it.stop()
+        }
         logger.info { "Stopped" }
     }
 }

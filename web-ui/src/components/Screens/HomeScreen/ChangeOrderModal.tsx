@@ -131,7 +131,8 @@ export function ChangeOrderModal({
             marketId: order.marketId,
             side: order.side,
             nonce: nonce,
-            signature: signature
+            signature: signature,
+            verifyingChainId: config.state.chainId
           },
           { params: { id: order.id } }
         )

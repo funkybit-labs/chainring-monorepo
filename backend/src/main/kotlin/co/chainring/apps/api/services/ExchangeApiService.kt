@@ -22,14 +22,16 @@ import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.apps.api.model.invalidEIP712SignatureError
 import co.chainring.apps.api.model.processingError
 import co.chainring.apps.api.model.websocket.Orders
-import co.chainring.core.blockchain.BlockchainClient
+import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
+import co.chainring.core.evm.TokenAddressAndChain
 import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.BroadcasterNotification
+import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
@@ -54,7 +56,6 @@ import java.math.BigDecimal
 import java.math.BigInteger
 
 class ExchangeApiService(
-    val blockchainClient: BlockchainClient,
     val sequencerClient: SequencerClient,
 ) {
     private val symbolMap = mutableMapOf<Symbol, SymbolEntity>()
@@ -127,6 +128,7 @@ class ExchangeApiService(
                     nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
                     signature = orderRequest.signature,
                 ),
+                verifyingChainId = orderRequest.verifyingChainId,
             )
 
             SequencerClient.Order(
@@ -156,6 +158,7 @@ class ExchangeApiService(
                     nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
                     signature = orderRequest.signature,
                 ),
+                verifyingChainId = orderRequest.verifyingChainId,
             )
 
             SequencerClient.Order(
@@ -182,6 +185,7 @@ class ExchangeApiService(
                     BigInteger(1, orderRequest.nonce.toHexBytes()),
                     orderRequest.signature,
                 ),
+                verifyingChainId = orderRequest.verifyingChainId,
             )
 
             orderRequest.orderId
@@ -242,11 +246,12 @@ class ExchangeApiService(
             walletAddress,
             EIP712Transaction.WithdrawTx(
                 walletAddress,
-                symbol.contractAddress,
+                TokenAddressAndChain(symbol.contractAddress ?: Address.zero, symbol.chainId.value),
                 apiRequest.amount,
                 apiRequest.nonce,
                 apiRequest.signature,
             ),
+            symbol.chainId.value,
         )
 
         val withdrawal = transaction {
@@ -338,7 +343,7 @@ class ExchangeApiService(
 
     private fun getSymbolEntity(asset: Symbol): SymbolEntity {
         return symbolMap.getOrPut(asset) {
-            transaction { SymbolEntity.forChainAndName(blockchainClient.chainId, asset.value) }
+            transaction { SymbolEntity.forName(asset.value) }
         }
     }
 
@@ -387,12 +392,12 @@ class ExchangeApiService(
         }
     }
 
-    private fun verifyEIP712Signature(walletAddress: Address, tx: EIP712Transaction) {
-        val verifyingContract = blockchainClient.getContractAddress(ContractType.Exchange)!!
+    private fun verifyEIP712Signature(walletAddress: Address, tx: EIP712Transaction, verifyingChainId: ChainId) {
+        val verifyingContract = ChainManager.getContractAddress(verifyingChainId, ContractType.Exchange)
 
         runCatching {
             ECHelper.isValidSignature(
-                EIP712Helper.computeHash(tx, blockchainClient.chainId, verifyingContract),
+                EIP712Helper.computeHash(tx, verifyingChainId, verifyingContract),
                 tx.signature,
                 walletAddress,
             )

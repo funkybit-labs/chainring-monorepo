@@ -48,8 +48,8 @@ class BlockchainDepositHandler(
 
         registerDepositEventsConsumer()
 
-        workerThread = thread(start = true, name = "deposit-confirmation-handler", isDaemon = true) {
-            logger.debug { "Deposit confirmation handler thread starting" }
+        workerThread = thread(start = true, name = "deposit-confirmation-handler-$chainId", isDaemon = true) {
+            logger.debug { "Deposit confirmation handler thread starting for $chainId" }
             while (true) {
                 try {
                     Thread.sleep(pollingIntervalInMs)
@@ -67,7 +67,7 @@ class BlockchainDepositHandler(
     }
 
     private fun registerDepositEventsConsumer() {
-        val exchangeContractAddress = blockchainClient.getContractAddress(ContractType.Exchange)!!.value
+        val exchangeContractAddress = blockchainClient.getContractAddress(ContractType.Exchange).value
 
         val startFromBlock = maxSeenBlockNumber()
             ?: System.getenv("EVM_NETWORK_EARLIEST_BLOCK")?.let { DefaultBlockParameter.valueOf(it.toBigInteger()) }

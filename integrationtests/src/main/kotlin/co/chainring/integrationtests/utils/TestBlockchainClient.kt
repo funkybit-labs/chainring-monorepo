@@ -11,7 +11,7 @@ import org.web3j.tx.Transfer
 import org.web3j.utils.Convert
 import java.math.BigInteger
 
-class TestBlockchainClient(val config: BlockchainClientConfig = BlockchainClientConfig()) : BlockchainClient(config) {
+class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : BlockchainClient(blockchainConfig) {
     fun loadERC20Mock(address: String) = MockERC20.load(address, web3j, transactionManager, gasProvider)
 
     fun depositNative(address: Address, amount: BigInteger): TransactionReceipt {

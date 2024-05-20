@@ -268,7 +268,8 @@ export default function OrderTicketWidget({
             side: side,
             amount: baseAmount,
             price: new Decimal(priceInputValue),
-            signature: signature
+            signature: signature,
+            verifyingChainId: config.state.chainId
           })
         } else {
           return await apiClient.createOrder({
@@ -277,7 +278,8 @@ export default function OrderTicketWidget({
             type: 'market',
             side: side,
             amount: baseAmount,
-            signature: signature
+            signature: signature,
+            verifyingChainId: config.state.chainId
           })
         }
       } catch (error) {

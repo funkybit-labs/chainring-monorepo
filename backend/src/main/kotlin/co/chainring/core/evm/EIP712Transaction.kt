@@ -3,6 +3,7 @@ package co.chainring.core.evm
 import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.TradeId
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -27,6 +28,12 @@ enum class EIP712TransactionType {
 }
 
 @Serializable
+data class TokenAddressAndChain(
+    val address: Address,
+    val chainId: ChainId,
+)
+
+@Serializable
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("type")
 sealed class EIP712Transaction {
@@ -36,7 +43,7 @@ sealed class EIP712Transaction {
     @SerialName("withdraw")
     data class WithdrawTx(
         val sender: Address,
-        val token: Address?,
+        val token: TokenAddressAndChain,
         val amount: BigIntegerJson,
         val nonce: Long,
         override val signature: EvmSignature,
@@ -48,8 +55,10 @@ sealed class EIP712Transaction {
 
         override fun getModel(): List<StructuredData.Entry> = listOfNotNull(
             StructuredData.Entry("sender", "address"),
-            token?.let {
+            if (token.address != Address.zero) {
                 StructuredData.Entry("token", "address")
+            } else {
+                null
             },
             StructuredData.Entry("amount", "uint256"),
             StructuredData.Entry("nonce", "uint64"),
@@ -58,8 +67,8 @@ sealed class EIP712Transaction {
         override fun getMessage(): Map<String, String> {
             val message = mutableMapOf<String, String>()
             message["sender"] = sender.value
-            token?.let {
-                message["token"] = token.value
+            if (token.address != Address.zero) {
+                message["token"] = token.address.value
             }
             message["amount"] = amount.toString()
             message["nonce"] = nonce.toString()
@@ -67,10 +76,10 @@ sealed class EIP712Transaction {
         }
 
         override fun getTxData(sequence: Long): ByteArray {
-            return if (token != null) {
+            return if (token.address != Address.zero) {
                 serializeTx(
                     ExchangeTransactions.TransactionType.Withdraw,
-                    ExchangeTransactions.WithdrawWithSignature(ExchangeTransactions.Withdraw(sequence, sender.value, token.value, amount, nonce.toBigInteger()), signature.toByteArray()),
+                    ExchangeTransactions.WithdrawWithSignature(ExchangeTransactions.Withdraw(sequence, sender.value, token.address.value, amount, nonce.toBigInteger()), signature.toByteArray()),
                 )
             } else {
                 serializeTx(
@@ -160,8 +169,8 @@ sealed class EIP712Transaction {
     @Serializable
     @SerialName("trade")
     data class Trade(
-        val baseToken: Address,
-        val quoteToken: Address,
+        val baseToken: TokenAddressAndChain,
+        val quoteToken: TokenAddressAndChain,
         val amount: BigIntegerJson,
         val price: BigIntegerJson,
         val takerOrder: Order,
@@ -189,8 +198,8 @@ sealed class EIP712Transaction {
                 ExchangeTransactions.TransactionType.SettleTrade,
                 ExchangeTransactions.SettleTrade(
                     sequence = sequence,
-                    baseToken = baseToken.value,
-                    quoteToken = quoteToken.value,
+                    baseToken = baseToken.address.value,
+                    quoteToken = quoteToken.address.value,
                     amount = amount,
                     price = price,
                     takerFee = takerFee,
@@ -215,6 +224,14 @@ sealed class EIP712Transaction {
                     ),
                 ),
             )
+        }
+    }
+
+    fun getChainId(): ChainId {
+        return when (this) {
+            is Trade -> this.baseToken.chainId
+            is WithdrawTx -> this.token.chainId
+            else -> throw Exception("Not valid for this tx type")
         }
     }
 

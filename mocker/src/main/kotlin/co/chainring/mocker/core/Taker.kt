@@ -29,6 +29,7 @@ import co.chainring.core.client.ws.subscribeToOrders
 import co.chainring.core.client.ws.subscribeToPrices
 import co.chainring.core.client.ws.subscribeToTrades
 import co.chainring.core.client.ws.unsubscribe
+import co.chainring.core.model.db.ChainId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.WsStatus
@@ -228,6 +229,7 @@ class Taker(
                                 side = side,
                                 amount = amount,
                                 signature = EvmSignature.emptySignature(),
+                                verifyingChainId = ChainId.empty,
                             ).let {
                                 wallet.signOrder(it)
                             },

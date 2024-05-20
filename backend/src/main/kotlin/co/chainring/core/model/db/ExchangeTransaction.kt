@@ -75,14 +75,14 @@ class ExchangeTransactionEntity(guid: EntityID<ExchangeTransactionId>) : GUIDEnt
             }
         }
 
-        fun createList(chainId: ChainId, transactions: List<EIP712Transaction>) {
+        fun createList(transactions: List<EIP712Transaction>) {
             val now = Clock.System.now()
             ExchangeTransactionTable.batchInsert(transactions) { transaction ->
                 this[ExchangeTransactionTable.guid] = ExchangeTransactionId.generate()
                 this[ExchangeTransactionTable.createdAt] = now
                 this[ExchangeTransactionTable.createdBy] = "system"
                 this[ExchangeTransactionTable.transactionData] = transaction
-                this[ExchangeTransactionTable.chainId] = chainId
+                this[ExchangeTransactionTable.chainId] = transaction.getChainId()
                 this[ExchangeTransactionTable.status] = ExchangeTransactionStatus.Pending
             }
         }

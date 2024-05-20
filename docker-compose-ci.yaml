@@ -11,6 +11,16 @@ services:
       - "8545:8545"
     volumes:
       - anvil-data:/root/.foundry
+  anvil-2:
+    image: anvil # custom image (./anvil/Dockerfile)
+    container_name: anvil2
+    restart: always
+    environment:
+      CHAIN_ID: 1338
+    ports:
+      - "8546:8545"
+    volumes:
+      - anvil-data:/root/.foundry
   db:
     image: postgres:15
     restart: always

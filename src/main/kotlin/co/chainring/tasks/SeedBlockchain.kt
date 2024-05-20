@@ -3,7 +3,7 @@ package co.chainring.tasks
 import co.chainring.contracts.generated.MockERC20
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
-import co.chainring.core.blockchain.GasProvider
+import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.db.DbConfig
 import co.chainring.core.db.connect
 import co.chainring.core.model.Address
@@ -12,19 +12,12 @@ import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.SymbolId
 import co.chainring.tasks.fixtures.Fixtures
 import java.math.BigInteger
-import okhttp3.OkHttpClient
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.web3j.crypto.Credentials
 import org.web3j.crypto.Keys
-import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.methods.response.VoidResponse
-import org.web3j.protocol.http.HttpService
-import org.web3j.tx.RawTransactionManager
-import org.web3j.tx.response.PollingTransactionReceiptProcessor
-import org.web3j.utils.Async
 import org.web3j.utils.Numeric
 
 data class SymbolContractAddress(
@@ -32,7 +25,12 @@ data class SymbolContractAddress(
     val address: Address
 )
 
-val blockchainClient = FixturesBlockchainClient()
+val blockchainClients = ChainManager.blockchainConfigs.map {
+    FixturesBlockchainClient(it.copy(enableWeb3jLogging = false))
+}
+val blockchainClientsByChainId = blockchainClients.associateBy { it.chainId }
+
+fun blockchainClient(chainId: ChainId) = blockchainClientsByChainId.getValue(chainId)
 
 fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
     val db = Database.connect(DbConfig())
@@ -45,7 +43,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
             null
         } else {
             val contractAddress = symbolEntities.firstOrNull { it.id.value == symbol.id }?.contractAddress ?: run {
-                val contractAddress = blockchainClient.deployMockERC20(
+                val contractAddress = blockchainClient(symbol.chainId).deployMockERC20(
                     symbol.name,
                     symbol.decimals.toBigInteger()
                 )
@@ -60,6 +58,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
     fixtures.wallets.forEach { wallet ->
         wallet.balances.forEach { (symbolId, balance) ->
             val symbol = fixtures.symbols.first { it.id == symbolId }
+            val blockchainClient = blockchainClient(symbol.chainId)
 
             println("Setting ${symbol.name} balance for ${wallet.address.value} to $balance")
 
@@ -88,7 +87,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
     return symbolContractAddresses
 }
 
-class FixturesBlockchainClient(config: BlockchainClientConfig = BlockchainClientConfig(enableWeb3jLogging = false)) : BlockchainClient(config) {
+class FixturesBlockchainClient(config: BlockchainClientConfig) : BlockchainClient(config) {
     fun deployMockERC20(tokenName: String, decimals: BigInteger): Address {
         val contract = MockERC20.deploy(
             web3j,

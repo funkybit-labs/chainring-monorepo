@@ -1,6 +1,8 @@
 package co.chainring.core.model.db
 
 import co.chainring.core.evm.EIP712Transaction
+import co.chainring.core.evm.TokenAddressAndChain
+import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.toEvmSignature
 import de.fxlae.typeid.TypeId
@@ -105,7 +107,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
 
     fun toEip712Transaction() = EIP712Transaction.WithdrawTx(
         this.wallet.address,
-        this.symbol.contractAddress,
+        TokenAddressAndChain(this.symbol.contractAddress ?: Address.zero, this.symbol.chainId.value),
         this.amount,
         this.nonce,
         this.signature,

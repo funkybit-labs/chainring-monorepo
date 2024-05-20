@@ -21,7 +21,7 @@ class DepositTest {
     fun testERC20Deposits() {
         val apiClient = TestApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
         val wallet = Wallet(apiClient)
-        val decimals = wallet.symbols.first { it.name == "USDC" }.decimals.toInt()
+        val decimals = wallet.chains.first { it.id == wallet.currentChainId }.symbols.first { it.name == "USDC" }.decimals.toInt()
 
         // mint some USDC
         val startingUsdcWalletBalance = wallet.getWalletERC20Balance("USDC")
@@ -41,7 +41,7 @@ class DepositTest {
     fun testNativeDeposits() {
         val apiClient = TestApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
         val wallet = Wallet(apiClient)
-        val decimals = wallet.symbols.first { it.contractAddress == null }.decimals.toInt()
+        val decimals = wallet.chains.first { it.id == wallet.currentChainId }.symbols.first { it.contractAddress == null }.decimals.toInt()
 
         val startingWalletBalance = wallet.getWalletNativeBalance()
         val startingExchangeBalance = wallet.getExchangeNativeBalance()

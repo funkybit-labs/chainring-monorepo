@@ -83,7 +83,8 @@ const CreateMarketOrderSchema = z.object({
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
-  signature: z.string()
+  signature: z.string(),
+  verifyingChainId: z.number()
 })
 export type CreateMarketOrder = z.infer<typeof CreateMarketOrderSchema>
 
@@ -94,7 +95,8 @@ const CreateLimitOrderSchema = z.object({
   side: OrderSideSchema,
   amount: z.bigint(),
   price: decimal(),
-  signature: z.string()
+  signature: z.string(),
+  verifyingChainId: z.number()
 })
 export type CreateLimitOrder = z.infer<typeof CreateLimitOrderSchema>
 
@@ -118,7 +120,8 @@ const UpdateOrderRequestSchema = z.object({
   marketId: z.string(),
   side: OrderSideSchema,
   nonce: z.string(),
-  signature: z.string()
+  signature: z.string(),
+  verifyingChainId: z.number()
 })
 export type UpdateOrderRequest = z.infer<typeof UpdateOrderRequestSchema>
 
@@ -132,7 +135,8 @@ const CancelOrderRequestSchema = z.object({
   marketId: z.string(),
   side: OrderSideSchema,
   nonce: z.string(),
-  signature: z.string()
+  signature: z.string(),
+  verifyingChainId: z.number()
 })
 export type CancelOrderRequest = z.infer<typeof CancelOrderRequestSchema>
 
