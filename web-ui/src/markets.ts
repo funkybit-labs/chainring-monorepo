@@ -1,6 +1,7 @@
-import { Market as ApiMarket, TradingSymbol } from 'apiClient'
+import { Market as ApiMarket } from 'apiClient'
 import TradingSymbols from 'tradingSymbols'
 import Decimal from 'decimal.js'
+import TradingSymbol from 'tradingSymbol'
 
 export class Market {
   id: string

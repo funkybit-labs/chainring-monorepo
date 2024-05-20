@@ -50,6 +50,8 @@ export const chain2 = defineChain({
   }
 })
 
+export const allChains = [chain, chain2]
+
 export const wagmiConfig = createConfig({
   chains: [chain, chain2],
   transports: {

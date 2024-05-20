@@ -27,6 +27,7 @@ const decimal = () =>
 const AddressSchema = z.custom<`0x${string}`>((val: unknown) =>
   /^0x/.test(val as string)
 )
+export type AddressType = z.infer<typeof AddressSchema>
 
 const DeployedContractSchema = z.object({
   name: z.string(),
@@ -42,7 +43,7 @@ const SymbolSchema = z.object({
   decimals: z.number()
 })
 
-export type TradingSymbol = z.infer<typeof SymbolSchema>
+export type SymbolType = z.infer<typeof SymbolSchema>
 
 const ChainSchema = z.object({
   id: z.number(),

@@ -1,4 +1,4 @@
-import { TradingSymbol } from 'apiClient'
+import TradingSymbol from 'tradingSymbol'
 
 export default class TradingSymbols {
   native: TradingSymbol[]

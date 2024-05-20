@@ -1,7 +1,13 @@
 import { Address, formatUnits } from 'viem'
 import TradingSymbols from 'tradingSymbols'
-import React, { Fragment, useCallback, useMemo, useState } from 'react'
-import { Balance, TradingSymbol } from 'apiClient'
+import React, {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState
+} from 'react'
+import { Balance } from 'apiClient'
 import { useQueryClient } from '@tanstack/react-query'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { balancesTopic, Publishable } from 'websocketMessages'
@@ -15,6 +21,9 @@ import {
 } from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import Deposit from 'assets/Deposit.svg'
 import Withdrawal from 'assets/Withdrawal.svg'
+import { useConfig, useSwitchChain } from 'wagmi'
+import { allChains } from 'wagmiConfig'
+import TradingSymbol from 'tradingSymbol'
 
 export function BalancesTable({
   walletAddress,
@@ -25,12 +34,17 @@ export function BalancesTable({
   exchangeContractAddress?: Address
   symbols: TradingSymbols
 }) {
+  const config = useConfig()
+  const { switchChain } = useSwitchChain()
+
   const [depositSymbol, setDepositSymbol] = useState<TradingSymbol | null>(null)
   const [showDepositModal, setShowDepositModal] = useState<boolean>(false)
 
   const [withdrawSymbol, setWithdrawSymbol] = useState<TradingSymbol | null>(
     null
   )
+
+  const [switchToChainId, setSwitchToChainId] = useState<number | null>(null)
   const [showWithdrawalModal, setShowWithdrawalModal] = useState<boolean>(false)
 
   const queryClient = useQueryClient()
@@ -50,14 +64,39 @@ export function BalancesTable({
     )
   })
 
+  useEffect(() => {
+    if (switchToChainId) {
+      const chain = allChains.find((c) => c.id == switchToChainId)
+      chain &&
+        switchChain({
+          addEthereumChainParameter: {
+            chainName: chain.name,
+            nativeCurrency: chain.nativeCurrency,
+            rpcUrls: chain.rpcUrls.default.http,
+            blockExplorerUrls: [chain.blockExplorers.default.url]
+          },
+          chainId: chain.id
+        })
+    }
+    setSwitchToChainId(null)
+  }, [switchToChainId, switchChain])
+
   function openDepositModal(symbol: TradingSymbol) {
+    setWithdrawSymbol(null)
     setDepositSymbol(symbol)
     setShowDepositModal(true)
+    if (symbol.chainId != config.state.chainId) {
+      setSwitchToChainId(symbol.chainId)
+    }
   }
 
   function openWithdrawModal(symbol: TradingSymbol) {
+    setDepositSymbol(null)
     setWithdrawSymbol(symbol)
     setShowWithdrawalModal(true)
+    if (symbol.chainId != config.state.chainId) {
+      setSwitchToChainId(symbol.chainId)
+    }
   }
 
   return (
@@ -114,7 +153,7 @@ export function BalancesTable({
         })}
       </div>
 
-      {depositSymbol && (
+      {depositSymbol && depositSymbol.chainId == config.state.chainId && (
         <DepositModal
           isOpen={showDepositModal}
           exchangeContractAddress={exchangeContractAddress!}
@@ -125,7 +164,7 @@ export function BalancesTable({
         />
       )}
 
-      {withdrawSymbol && (
+      {withdrawSymbol && withdrawSymbol.chainId == config.state.chainId && (
         <WithdrawalModal
           isOpen={showWithdrawalModal}
           exchangeContractAddress={exchangeContractAddress!}

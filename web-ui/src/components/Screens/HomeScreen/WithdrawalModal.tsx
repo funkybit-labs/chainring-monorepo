@@ -6,7 +6,7 @@ import { readContract } from 'wagmi/actions'
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import { apiClient, TradingSymbol } from 'apiClient'
+import { apiClient } from 'apiClient'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getDomain,
@@ -16,6 +16,7 @@ import {
 import useAmountInputState from 'hooks/useAmountInputState'
 import { withdrawalsQueryKey } from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import { isErrorFromAlias } from '@zodios/core'
+import TradingSymbol from 'tradingSymbol'
 
 export default function WithdrawalModal({
   exchangeContractAddress,

@@ -11,12 +11,13 @@ import {
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import { apiClient, TradingSymbol } from 'apiClient'
+import { apiClient } from 'apiClient'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import useAmountInputState from 'hooks/useAmountInputState'
 import { depositsQueryKey } from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import { encodeFunctionData, EncodeFunctionDataParameters } from 'viem'
 import { isErrorFromAlias } from '@zodios/core'
+import TradingSymbol from 'tradingSymbol'
 
 export default function DepositModal({
   exchangeContractAddress,
