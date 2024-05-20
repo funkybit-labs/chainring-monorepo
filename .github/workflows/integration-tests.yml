@@ -38,7 +38,9 @@ jobs:
              ./gradlew check
         env:
           DB_PORT: 5434
-          EVM_NETWORK_URL: https://test-anvil.chainring.co
+          EVM_CHAINS: anvil,anvil2
+          EVM_NETWORK_URL_anvil: https://test-anvil.chainring.co
+          EVM_NETWORK_URL_anvil2: https://test-anvil2.chainring.co
           INTEGRATION_RUN: 1
           API_URL: https://test-api.chainring.co
           CI_RUN: 1
