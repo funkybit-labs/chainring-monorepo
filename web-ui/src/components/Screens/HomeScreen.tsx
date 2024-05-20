@@ -13,6 +13,7 @@ import Markets, { Market } from 'markets'
 import { WebsocketProvider } from 'contexts/websocket'
 import { PricesWidget } from 'components/Screens/HomeScreen/PricesWidget'
 import { useMeasure } from 'react-use'
+import TradingSymbol from 'tradingSymbol'
 
 export default function HomeScreen() {
   const configQuery = useQuery({
@@ -37,7 +38,18 @@ export default function HomeScreen() {
     const symbols = config
       ? new TradingSymbols(
           config?.chains
-            .map((chain) => chain.symbols)
+            .map((chain) =>
+              chain.symbols.map(
+                (symbol) =>
+                  new TradingSymbol(
+                    symbol.name,
+                    symbol.description,
+                    symbol.contractAddress,
+                    symbol.decimals,
+                    chain.id
+                  )
+              )
+            )
             .reduce((accumulator, value) => accumulator.concat(value), [])
         )
       : null

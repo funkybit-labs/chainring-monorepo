@@ -1,6 +1,6 @@
-import { TradingSymbol } from 'apiClient'
 import { formatUnits } from 'viem'
 import React from 'react'
+import TradingSymbol from 'tradingSymbol'
 
 export function AmountWithSymbol({
   amount,

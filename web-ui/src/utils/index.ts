@@ -1,4 +1,4 @@
-import { TradingSymbol } from 'apiClient'
+import TradingSymbol from 'tradingSymbol'
 
 export function classNames(...classes: unknown[]): string {
   return classes.filter(Boolean).join(' ')
