@@ -6,14 +6,12 @@ environment:
     SEQUENCER_HOST_NAME: test-sequencer.chainring.co
     SEQUENCER_PORT: "5337"
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
-    SLACK_ERROR_REPORTING_CHANNEL_ID: C072KKXNN68
   sequencer:
     QUEUE_HOME: "/data/queues/test"
     CHECKPOINTS_ENABLED: "false"
     SANDBOX_MODE: "true"
     DB_HOST: test-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
-    SLACK_ERROR_REPORTING_CHANNEL_ID: C072KKXNN68
   otterscan:
     ERIGON_URL: https://test-anvil.chainring.co
 services:
@@ -23,7 +21,6 @@ services:
     environment: api
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
-      SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   anvil:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
     count: 1
@@ -37,5 +34,4 @@ services:
     environment: sequencer
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
-      SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
 
