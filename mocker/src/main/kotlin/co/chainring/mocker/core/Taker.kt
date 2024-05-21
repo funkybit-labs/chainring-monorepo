@@ -13,6 +13,7 @@ import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
+import co.chainring.core.client.rest.ApiCallFailure
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
@@ -213,18 +214,18 @@ class Taker(
                         val amount = when (side) {
                             OrderSide.Buy -> {
                                 quoteBalance.let { notional ->
-                                    ((notional.toBigDecimal() / Random.nextDouble(sizeFactor / 2, sizeFactor * 2).toBigDecimal()) / price).movePointLeft(
+                                    ((notional.toBigDecimal() / Random.nextDouble(0.0, sizeFactor).toBigDecimal()) / price).movePointLeft(
                                         market.quoteDecimals - market.baseDecimals
                                     ).toBigInteger()
                                 } ?: BigInteger.ZERO
                             }
 
                             OrderSide.Sell -> {
-                                (baseBalance.toBigDecimal() / Random.nextDouble(sizeFactor / 2, sizeFactor * 2).toBigDecimal()).toBigInteger()
+                                (baseBalance.toBigDecimal() / Random.nextDouble(0.0, sizeFactor).toBigDecimal()).toBigInteger()
                             }
                         }
                         logger.debug { "$id going to create a market $side order (amount: $amount, market price: $price" }
-                        apiClient.createOrder(
+                        apiClient.tryCreateOrder(
                             CreateOrderApiRequest.Market(
                                 nonce = generateHexString(32),
                                 marketId = marketId,
@@ -235,14 +236,17 @@ class Taker(
                             ).let {
                                 wallet.signOrder(it)
                             },
-                        ).also { response ->
-                            TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.orderCreated)
-                            TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.orderFilled)
-                            TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.tradeCreated)
-                            TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.tradeSettled)
+                        ).fold(
+                            { e: ApiCallFailure -> logger.error { "$id failed to create order with: $e" } },
+                            { response ->
+                                logger.debug { "$id back from creating an order" }
 
-                        }
-                        logger.debug { "$id back from creating an order" }
+                                TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.orderCreated)
+                                TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.orderFilled)
+                                TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.tradeCreated)
+                                TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.tradeSettled)
+                            }
+                        )
                     }
                 }
             }
