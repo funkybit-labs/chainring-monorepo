@@ -14,6 +14,7 @@ import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.waitForBalance
 import co.chainring.integrationtests.testutils.waitForFinalizedWithdrawal
+import co.chainring.integrationtests.utils.AssetAmount
 import co.chainring.integrationtests.utils.ExpectedBalance
 import co.chainring.integrationtests.utils.Faucet
 import co.chainring.integrationtests.utils.TestApiClient
@@ -27,6 +28,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.extension.ExtendWith
 import org.web3j.utils.Numeric
+import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.test.Test
 
@@ -48,77 +50,68 @@ class WithdrawalTest {
             wallet.switchChain(config.chains[index].id)
             Faucet.fund(wallet.address, chainId = wallet.currentChainId)
 
-            val btcSymbol = "BTC".toChainSymbol(index)
-            val usdcSymbol = "USDC".toChainSymbol(index)
-            val symbolFilterList = listOf(btcSymbol, usdcSymbol)
+            val btc = config.chains[index].symbols.first { it.name == "BTC".toChainSymbol(index) }
+            val usdc = config.chains[index].symbols.first { it.name == "USDC".toChainSymbol(index) }
+            val symbolFilterList = listOf(btc.name, usdc.name)
 
             // mint some USDC
-            val usdcMintAmount = wallet.formatAmount("20", usdcSymbol)
-            wallet.mintERC20(usdcSymbol, usdcMintAmount)
+            val usdcMintAmount = AssetAmount(usdc, "20")
+            wallet.mintERC20(usdcMintAmount)
 
-            assertEquals(wallet.getWalletERC20Balance(usdcSymbol), usdcMintAmount)
+            assertEquals(wallet.getWalletBalance(usdc), usdcMintAmount)
 
-            val walletStartingBtcBalance = wallet.getWalletNativeBalance()
+            val walletStartingBtcBalance = wallet.getWalletBalance(btc)
 
             // deposit some BTC
-            val btcDepositAmount = wallet.formatAmount("0.001", btcSymbol)
-            val depositTxReceipt = wallet.depositNative(btcDepositAmount)
+            val btcDepositAmount = AssetAmount(btc, "0.001")
+            val depositTxReceipt = wallet.deposit(btcDepositAmount)
             waitForBalance(
                 apiClient,
                 wsClient,
                 listOf(
-                    ExpectedBalance(btcSymbol, total = btcDepositAmount, available = btcDepositAmount),
+                    ExpectedBalance(btcDepositAmount),
                 ),
             )
 
-            val depositGasCost = depositTxReceipt.gasUsed * Numeric.decodeQuantity(depositTxReceipt.effectiveGasPrice)
-            assertEquals(wallet.getWalletNativeBalance(), walletStartingBtcBalance - btcDepositAmount - depositGasCost)
+            val depositGasCost = AssetAmount(btc, depositTxReceipt.gasUsed * Numeric.decodeQuantity(depositTxReceipt.effectiveGasPrice))
+            assertEquals(walletStartingBtcBalance - btcDepositAmount - depositGasCost, wallet.getWalletBalance(btc))
 
             // deposit more BTC
-            val depositTxReceipt2 = wallet.depositNative(btcDepositAmount)
+            val depositTxReceipt2 = wallet.deposit(btcDepositAmount)
             waitForBalance(
                 apiClient,
                 wsClient,
                 listOf(
-                    ExpectedBalance(
-                        btcSymbol,
-                        total = btcDepositAmount * BigInteger.TWO,
-                        available = btcDepositAmount * BigInteger.TWO,
-                    ),
+                    ExpectedBalance(btcDepositAmount * BigDecimal("2")),
                 ),
             )
 
-            val depositGasCost2 =
-                depositTxReceipt2.gasUsed * Numeric.decodeQuantity(depositTxReceipt2.effectiveGasPrice)
+            val depositGasCost2 = AssetAmount(btc, depositTxReceipt2.gasUsed * Numeric.decodeQuantity(depositTxReceipt2.effectiveGasPrice))
+
             assertEquals(
-                wallet.getWalletNativeBalance(),
-                walletStartingBtcBalance - (btcDepositAmount * BigInteger.TWO) - depositGasCost - depositGasCost2,
+                walletStartingBtcBalance - (btcDepositAmount * BigDecimal("2")) - depositGasCost - depositGasCost2,
+                wallet.getWalletBalance(btc),
             )
 
             // deposit some USDC
-            val usdcDepositAmount = wallet.formatAmount("15", usdcSymbol)
-            wallet.depositERC20(usdcSymbol, usdcDepositAmount)
+            val usdcDepositAmount = AssetAmount(usdc, "15")
+            wallet.deposit(usdcDepositAmount)
             waitForBalance(
                 apiClient,
                 wsClient,
                 listOf(
-                    ExpectedBalance(
-                        btcSymbol,
-                        total = btcDepositAmount * BigInteger.TWO,
-                        available = btcDepositAmount * BigInteger.TWO,
-                    ),
-                    ExpectedBalance(usdcSymbol, total = usdcDepositAmount, available = usdcDepositAmount),
+                    ExpectedBalance(btcDepositAmount * BigDecimal("2")),
+                    ExpectedBalance(usdcDepositAmount),
                 ),
             )
-            assertEquals(wallet.getWalletERC20Balance(usdcSymbol), usdcMintAmount - usdcDepositAmount)
+            assertEquals(usdcMintAmount - usdcDepositAmount, wallet.getWalletBalance(usdc))
 
-            val walletBtcBalanceBeforeWithdrawals = wallet.getWalletNativeBalance()
+            val walletBtcBalanceBeforeWithdrawals = wallet.getWalletBalance(btc)
 
             // withdraw some BTC
-            val btcWithdrawalAmount = wallet.formatAmount("0.001", btcSymbol)
+            val btcWithdrawalAmount = AssetAmount(btc, "0.001")
 
-            val pendingBtcWithdrawal =
-                apiClient.createWithdrawal(wallet.signWithdraw(btcSymbol, btcWithdrawalAmount)).withdrawal
+            val pendingBtcWithdrawal = apiClient.createWithdrawal(wallet.signWithdraw(btc.name, btcWithdrawalAmount.inFundamentalUnits)).withdrawal
             assertEquals(WithdrawalStatus.Pending, pendingBtcWithdrawal.status)
             assertEquals(listOf(pendingBtcWithdrawal), apiClient.listWithdrawals().withdrawals.filter { symbolFilterList.contains(it.symbol.value) })
 
@@ -127,11 +120,11 @@ class WithdrawalTest {
                 wsClient,
                 listOf(
                     ExpectedBalance(
-                        btcSymbol,
-                        total = btcDepositAmount * BigInteger.TWO,
-                        available = btcDepositAmount * BigInteger.TWO - btcWithdrawalAmount,
+                        btc,
+                        total = btcDepositAmount * BigDecimal("2"),
+                        available = btcDepositAmount * BigDecimal("2") - btcWithdrawalAmount,
                     ),
-                    ExpectedBalance(usdcSymbol, total = usdcDepositAmount, available = usdcDepositAmount),
+                    ExpectedBalance(usdcDepositAmount),
                 ),
             )
 
@@ -145,24 +138,20 @@ class WithdrawalTest {
                 apiClient,
                 wsClient,
                 listOf(
-                    ExpectedBalance(
-                        btcSymbol,
-                        total = btcDepositAmount * BigInteger.TWO - btcWithdrawalAmount,
-                        available = btcDepositAmount * BigInteger.TWO - btcWithdrawalAmount,
-                    ),
-                    ExpectedBalance(usdcSymbol, total = usdcDepositAmount, available = usdcDepositAmount),
+                    ExpectedBalance(btcDepositAmount * BigDecimal("2") - btcWithdrawalAmount),
+                    ExpectedBalance(usdcDepositAmount),
                 ),
             )
             assertEquals(
                 walletBtcBalanceBeforeWithdrawals + btcWithdrawalAmount,
-                wallet.getWalletNativeBalance(),
+                wallet.getWalletBalance(btc),
             )
 
             // withdraw some USDC
-            val usdcWithdrawalAmount = wallet.formatAmount("14", usdcSymbol)
+            val usdcWithdrawalAmount = AssetAmount(usdc, "14")
 
             val pendingUsdcWithdrawal =
-                apiClient.createWithdrawal(wallet.signWithdraw(usdcSymbol, usdcWithdrawalAmount)).withdrawal
+                apiClient.createWithdrawal(wallet.signWithdraw(usdc.name, usdcWithdrawalAmount.inFundamentalUnits)).withdrawal
             assertEquals(WithdrawalStatus.Pending, pendingUsdcWithdrawal.status)
             assertEquals(
                 listOf(pendingUsdcWithdrawal, btcWithdrawal),
@@ -173,13 +162,9 @@ class WithdrawalTest {
                 apiClient,
                 wsClient,
                 listOf(
+                    ExpectedBalance(btcDepositAmount * BigDecimal("2") - btcWithdrawalAmount),
                     ExpectedBalance(
-                        btcSymbol,
-                        total = btcDepositAmount * BigInteger.TWO - btcWithdrawalAmount,
-                        available = btcDepositAmount * BigInteger.TWO - btcWithdrawalAmount,
-                    ),
-                    ExpectedBalance(
-                        usdcSymbol,
+                        usdc,
                         total = usdcDepositAmount,
                         available = usdcDepositAmount - usdcWithdrawalAmount,
                     ),
@@ -196,28 +181,20 @@ class WithdrawalTest {
                 apiClient,
                 wsClient,
                 listOf(
-                    ExpectedBalance(
-                        btcSymbol,
-                        total = btcDepositAmount * BigInteger.TWO - btcWithdrawalAmount,
-                        available = btcDepositAmount * BigInteger.TWO - btcWithdrawalAmount,
-                    ),
-                    ExpectedBalance(
-                        usdcSymbol,
-                        total = usdcDepositAmount - usdcWithdrawalAmount,
-                        available = usdcDepositAmount - usdcWithdrawalAmount,
-                    ),
+                    ExpectedBalance(btcDepositAmount * BigDecimal("2") - btcWithdrawalAmount),
+                    ExpectedBalance(usdcDepositAmount - usdcWithdrawalAmount),
                 ),
             )
             assertEquals(
-                wallet.getWalletERC20Balance(usdcSymbol),
                 usdcMintAmount - usdcDepositAmount + usdcWithdrawalAmount,
+                wallet.getWalletBalance(usdc),
             )
 
             // when requested withdrawal amount > remaining amount, whatever is remaining is withdrawn
             val pendingUsdcWithdrawal2 = apiClient.createWithdrawal(
                 wallet.signWithdraw(
-                    usdcSymbol,
-                    usdcDepositAmount - usdcWithdrawalAmount + BigInteger.ONE,
+                    usdc.name,
+                    (usdcDepositAmount - usdcWithdrawalAmount).inFundamentalUnits + BigInteger.ONE,
                 ),
             ).withdrawal
             assertEquals(WithdrawalStatus.Pending, pendingUsdcWithdrawal2.status)
@@ -226,15 +203,11 @@ class WithdrawalTest {
                 apiClient,
                 wsClient,
                 listOf(
+                    ExpectedBalance(btcDepositAmount * BigDecimal("2") - btcWithdrawalAmount),
                     ExpectedBalance(
-                        btcSymbol,
-                        total = btcDepositAmount * BigInteger.TWO - btcWithdrawalAmount,
-                        available = btcDepositAmount * BigInteger.TWO - btcWithdrawalAmount,
-                    ),
-                    ExpectedBalance(
-                        usdcSymbol,
+                        usdc,
                         total = usdcDepositAmount - usdcWithdrawalAmount,
-                        available = BigInteger.ZERO,
+                        available = AssetAmount(usdc, "0"),
                     ),
                 ),
             )
@@ -248,12 +221,8 @@ class WithdrawalTest {
                 apiClient,
                 wsClient,
                 listOf(
-                    ExpectedBalance(
-                        btcSymbol,
-                        total = btcDepositAmount * BigInteger.TWO - btcWithdrawalAmount,
-                        available = btcDepositAmount * BigInteger.TWO - btcWithdrawalAmount,
-                    ),
-                    ExpectedBalance(usdcSymbol, total = BigInteger.ZERO, available = BigInteger.ZERO),
+                    ExpectedBalance(btcDepositAmount * BigDecimal("2") - btcWithdrawalAmount),
+                    ExpectedBalance(AssetAmount(usdc, "0")),
                 ),
             )
         }
@@ -262,6 +231,8 @@ class WithdrawalTest {
     @Test
     fun `withdrawal errors`() {
         val apiClient = TestApiClient()
+        val usdc = apiClient.getConfiguration().chains.flatMap { it.symbols }.first { it.name == "USDC" }
+
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()
@@ -269,21 +240,21 @@ class WithdrawalTest {
         val wallet = Wallet(apiClient)
         Faucet.fund(wallet.address)
 
-        val amount = BigInteger("1000")
-        wallet.mintERC20("USDC", amount * BigInteger.TWO)
+        val amount = AssetAmount(usdc, "1000")
+        wallet.mintERC20(amount * BigDecimal("2"))
 
-        wallet.depositERC20("USDC", amount)
+        wallet.deposit(amount)
         waitForBalance(
             apiClient,
             wsClient,
             listOf(
-                ExpectedBalance("USDC", total = amount, available = amount),
+                ExpectedBalance(amount),
             ),
         )
 
         // invalid signature
         apiClient.tryCreateWithdrawal(
-            wallet.signWithdraw("USDC", amount).copy(amount = BigInteger.TWO),
+            wallet.signWithdraw(usdc.name, amount.inFundamentalUnits).copy(amount = BigInteger.TWO),
         ).assertError(
             ApiError(ReasonCode.SignatureNotValid, "Invalid signature"),
         )
@@ -292,6 +263,8 @@ class WithdrawalTest {
     @Test
     fun `withdrawal blockchain failure`() {
         val apiClient = TestApiClient()
+        val btc = apiClient.getConfiguration().chains.flatMap { it.symbols }.first { it.name == "BTC" }
+
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()
@@ -300,20 +273,20 @@ class WithdrawalTest {
         Faucet.fund(wallet.address)
 
         // deposit some BTC
-        val btcDepositAmount = wallet.formatAmount("0.002", "BTC")
-        wallet.depositNative(btcDepositAmount)
+        val btcDepositAmount = AssetAmount(btc, "0.002")
+        wallet.deposit(btcDepositAmount)
         waitForBalance(
             apiClient,
             wsClient,
             listOf(
-                ExpectedBalance("BTC", total = btcDepositAmount, available = btcDepositAmount),
+                ExpectedBalance(btcDepositAmount),
             ),
         )
 
         // withdraw some BTC
-        val btcWithdrawalAmount = wallet.formatAmount("0.001", "BTC")
+        val btcWithdrawalAmount = AssetAmount(btc, "0.001")
 
-        val pendingBtcWithdrawal = apiClient.createWithdrawal(wallet.signWithdraw("BTC", btcWithdrawalAmount)).withdrawal
+        val pendingBtcWithdrawal = apiClient.createWithdrawal(wallet.signWithdraw(btc.name, btcWithdrawalAmount.inFundamentalUnits)).withdrawal
         assertEquals(WithdrawalStatus.Pending, pendingBtcWithdrawal.status)
         assertEquals(ListWithdrawalsApiResponse(listOf(pendingBtcWithdrawal)), apiClient.listWithdrawals())
 
@@ -321,7 +294,7 @@ class WithdrawalTest {
             apiClient,
             wsClient,
             listOf(
-                ExpectedBalance("BTC", total = btcDepositAmount, available = btcDepositAmount - btcWithdrawalAmount),
+                ExpectedBalance(btc, total = btcDepositAmount, available = btcDepositAmount - btcWithdrawalAmount),
             ),
         )
 
@@ -335,7 +308,7 @@ class WithdrawalTest {
             apiClient,
             wsClient,
             listOf(
-                ExpectedBalance("BTC", total = btcDepositAmount - btcWithdrawalAmount, available = btcDepositAmount - btcWithdrawalAmount),
+                ExpectedBalance(btcDepositAmount - btcWithdrawalAmount),
             ),
         )
 
@@ -350,7 +323,7 @@ class WithdrawalTest {
                 .orderBy(ExchangeTransactionTable.sequenceId to SortOrder.DESC)
                 .limit(1).first()
             // resign with a different nonce so signature should fail
-            val signature = wallet.signWithdraw("BTC", btcWithdrawalAmount).signature
+            val signature = wallet.signWithdraw(btc.name, btcWithdrawalAmount.inFundamentalUnits).signature
             withdrawalExchangeTransaction.transactionData = (withdrawalExchangeTransaction.transactionData as EIP712Transaction.WithdrawTx).copy(
                 signature = signature,
             )
@@ -367,7 +340,7 @@ class WithdrawalTest {
             apiClient,
             wsClient,
             listOf(
-                ExpectedBalance("BTC", total = btcDepositAmount - btcWithdrawalAmount, available = btcDepositAmount),
+                ExpectedBalance(btc, total = btcDepositAmount - btcWithdrawalAmount, available = btcDepositAmount),
             ),
         )
     }

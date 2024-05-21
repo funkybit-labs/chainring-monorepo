@@ -236,7 +236,7 @@ class BotSession(private val botUserEntity: TelegramBotUserEntity, val bot: Bot)
     fun getMarkets(): List<BotMarket> {
         return userWallet.config.markets.map {
             BotMarket(
-                MarketId(it.id),
+                it.id,
                 it.id == userWallet.currentMarket.id,
             )
         }

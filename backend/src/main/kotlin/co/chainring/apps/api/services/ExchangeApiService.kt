@@ -192,7 +192,7 @@ class ExchangeApiService(
         }
 
         val response = runBlocking {
-            sequencerClient.orderBatch(MarketId(market.id), walletAddress.toSequencerId().value, ordersToAdd, ordersToUpdate, ordersToCancel)
+            sequencerClient.orderBatch(market.id, walletAddress.toSequencerId().value, ordersToAdd, ordersToUpdate, ordersToCancel)
         }
 
         when (response.error) {
@@ -352,7 +352,7 @@ class ExchangeApiService(
             transaction {
                 MarketEntity[marketId].let {
                     Market(
-                        it.id.value.value,
+                        it.id.value,
                         baseSymbol = Symbol(it.baseSymbol.name),
                         baseDecimals = it.baseSymbol.decimals.toInt(),
                         quoteSymbol = Symbol(it.quoteSymbol.name),

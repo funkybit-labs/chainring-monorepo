@@ -20,6 +20,7 @@ import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderSide
+import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHex
 import co.chainring.core.utils.toHexBytes
@@ -69,9 +70,33 @@ class Wallet(
         loadErc20Contract(symbol).mint(address.value, amount).sendAndWaitForConfirmation()
     }
 
+    fun mintERC20(assetAmount: AssetAmount) {
+        mintERC20(assetAmount.symbol.name, assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
+    }
+
     fun getWalletNativeBalance(): BigInteger {
         return blockchainClientsByChainId.getValue(currentChainId).getNativeBalance(address)
     }
+
+    fun getWalletBalance(symbol: SymbolInfo): AssetAmount =
+        AssetAmount(
+            symbol,
+            if (symbol.contractAddress == null) {
+                getWalletNativeBalance()
+            } else {
+                getWalletERC20Balance(symbol.name)
+            }.fromFundamentalUnits(symbol.decimals),
+        )
+
+    fun getExchangeBalance(symbol: SymbolInfo): AssetAmount =
+        AssetAmount(
+            symbol,
+            if (symbol.contractAddress == null) {
+                getExchangeNativeBalance()
+            } else {
+                getExchangeERC20Balance(symbol.name)
+            }.fromFundamentalUnits(symbol.decimals),
+        )
 
     fun getExchangeERC20Balance(symbol: String): BigInteger {
         return exchangeContractByChainId.getValue(currentChainId).balances(address.value, erc20TokenAddress(symbol)).sendAndWaitForConfirmation()
@@ -79,6 +104,15 @@ class Wallet(
 
     fun getExchangeNativeBalance(): BigInteger {
         return exchangeContractByChainId.getValue(currentChainId).balances(address.value, Address.zero.value).sendAndWaitForConfirmation()
+    }
+
+    fun deposit(assetAmount: AssetAmount): TransactionReceipt {
+        // deposit onchain and update sequencer
+        return if (assetAmount.symbol.contractAddress == null) {
+            depositNative(assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
+        } else {
+            depositERC20(assetAmount.symbol.name, assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
+        }
     }
 
     fun asyncDepositNative(amount: BigInteger): TxHash =
@@ -102,6 +136,14 @@ class Wallet(
             exchangeContractByChainId.getValue(currentChainId).deposit(erc20TokenAddress(symbol), amount).encodeFunctionCall(),
             BigInteger.ZERO,
         )
+    }
+
+    fun asyncDeposit(assetAmount: AssetAmount): TxHash {
+        return if (assetAmount.symbol.contractAddress == null) {
+            asyncDepositNative(assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
+        } else {
+            asyncDepositERC20(assetAmount.symbol.name, assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
+        }
     }
 
     fun depositERC20(symbol: String, amount: BigInteger): TransactionReceipt {
@@ -186,10 +228,6 @@ class Wallet(
 
     private fun getWithdrawalNonce(): Long {
         return System.currentTimeMillis()
-    }
-
-    fun formatAmount(amount: String, symbol: String): BigInteger {
-        return BigDecimal(amount).toFundamentalUnits(decimals(symbol))
     }
 
     fun decimals(symbol: String): Int = chains.first { it.id == currentChainId }.symbols.first { it.name == symbol }.decimals.toInt()

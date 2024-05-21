@@ -15,6 +15,7 @@ import co.chainring.core.model.db.DepositTable
 import co.chainring.core.model.db.ExchangeTransactionBatchTable
 import co.chainring.core.model.db.ExchangeTransactionTable
 import co.chainring.core.model.db.KeyValueStore
+import co.chainring.core.model.db.OHLCTable
 import co.chainring.core.model.db.OrderExecutionTable
 import co.chainring.core.model.db.OrderTable
 import co.chainring.core.model.db.TelegramBotUserTable
@@ -187,6 +188,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             BalanceLogTable.deleteAll()
             BalanceTable.deleteAll()
             WalletTable.deleteAll()
+            OHLCTable.deleteAll()
         }
     }
 }

@@ -44,6 +44,7 @@ data class Fixtures(
 }
 
 fun String.toChainSymbol(chainIndex: Int) = "$this${if (chainIndex == 0) "" else "${chainIndex + 1}"}"
+
 fun getFixtures(chainringChainIds: List<ChainId>) = Fixtures(
     feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
     chains = chainringChainIds.map {
