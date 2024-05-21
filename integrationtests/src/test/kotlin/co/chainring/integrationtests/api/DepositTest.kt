@@ -122,16 +122,16 @@ class DepositTest {
         Faucet.fund(wallet1.address, chainId = wallet1.currentChainId)
         Faucet.fund(wallet2.address, chainId = wallet2.currentChainId)
 
-        val btcSymbol = "BTC".toChainSymbol(0)
+        val btc = apiClient1.getConfiguration().chains[0].symbols.first { it.name == "BTC" }
 
-        val btcDeposit1Amount = wallet1.formatAmount("0.01", btcSymbol)
-        val btcDeposit2Amount = wallet2.formatAmount("0.02", btcSymbol)
+        val btcDeposit1Amount = AssetAmount(btc, "0.01")
+        val btcDeposit2Amount = AssetAmount(btc, "0.02")
 
-        val btcDeposit1TxHash = wallet1.asyncDepositNative(btcDeposit1Amount)
-        val pendingBtcDeposit1 = apiClient1.createDeposit(CreateDepositApiRequest(Symbol(btcSymbol), btcDeposit1Amount, btcDeposit1TxHash)).deposit
-        val btcDeposit2TxHash = wallet2.asyncDepositNative(btcDeposit2Amount)
-        val pendingBtcDeposit2 = apiClient2.createDeposit(CreateDepositApiRequest(Symbol(btcSymbol), btcDeposit1Amount, btcDeposit2TxHash)).deposit
-        assertEquals(listOf(pendingBtcDeposit1), apiClient1.listDeposits().deposits.filter { it.symbol.value == btcSymbol })
-        assertEquals(listOf(pendingBtcDeposit2), apiClient2.listDeposits().deposits.filter { it.symbol.value == btcSymbol })
+        val btcDeposit1TxHash = wallet1.asyncDepositNative(btcDeposit1Amount.inFundamentalUnits)
+        val pendingBtcDeposit1 = apiClient1.createDeposit(CreateDepositApiRequest(Symbol(btc.name), btcDeposit1Amount.inFundamentalUnits, btcDeposit1TxHash)).deposit
+        val btcDeposit2TxHash = wallet2.asyncDepositNative(btcDeposit2Amount.inFundamentalUnits)
+        val pendingBtcDeposit2 = apiClient2.createDeposit(CreateDepositApiRequest(Symbol(btc.name), btcDeposit1Amount.inFundamentalUnits, btcDeposit2TxHash)).deposit
+        assertEquals(listOf(pendingBtcDeposit1), apiClient1.listDeposits().deposits.filter { it.symbol.value == btc.name })
+        assertEquals(listOf(pendingBtcDeposit2), apiClient2.listDeposits().deposits.filter { it.symbol.value == btc.name })
     }
 }
