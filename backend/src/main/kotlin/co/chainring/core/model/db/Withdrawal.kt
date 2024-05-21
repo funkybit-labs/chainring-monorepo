@@ -14,7 +14,6 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.dao.with
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
@@ -141,18 +140,21 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 .join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid)
                 .selectAll()
                 .where { WithdrawalTable.status.eq(WithdrawalStatus.Sequenced).and(SymbolTable.chainId.eq(chainId)) }
-                .orderBy(Pair(WithdrawalTable.createdAt, SortOrder.ASC))
+                .orderBy(Pair(WithdrawalTable.sequenceId, SortOrder.ASC))
                 .limit(limit)
                 .map { WithdrawalEntity.wrapRow(it) }
                 .toList()
         }
 
-        fun updateToSettling(withdrawals: List<WithdrawalEntity>, blockchainTransactionEntity: BlockchainTransactionEntity) {
+        fun updateToSettling(withdrawals: List<WithdrawalEntity>, blockchainTransactionEntity: BlockchainTransactionEntity, transactionDataByWithdrawalId: Map<WithdrawalId, EIP712Transaction>) {
             BatchUpdateStatement(WithdrawalTable).apply {
                 withdrawals.forEach {
                     addBatch(it.id)
                     this[WithdrawalTable.status] = WithdrawalStatus.Settling
                     this[WithdrawalTable.blockchainTransactionGuid] = blockchainTransactionEntity.guid.value
+                    transactionDataByWithdrawalId[it.id.value]?.let { txData ->
+                        this[WithdrawalTable.transactionData] = txData
+                    }
                 }
                 execute(TransactionManager.current())
             }

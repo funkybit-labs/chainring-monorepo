@@ -22,6 +22,7 @@ import co.chainring.core.model.db.TradeEntity
 import co.chainring.core.model.db.TxHash
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.WithdrawalEntity
+import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.model.db.publishBroadcasterNotifications
 import co.chainring.core.sequencer.SequencerClient
@@ -443,13 +444,14 @@ class BlockchainTransactionHandler(
     private fun createNextWithdrawalBatch(): Boolean {
         val sequencedWithdrawals = WithdrawalEntity.findSequenced(blockchainClient.chainId, 50)
         return if (sequencedWithdrawals.isNotEmpty()) {
+            val transactionDataByWithdrawal = mutableMapOf<WithdrawalId, EIP712Transaction>()
             val transactionData = BlockchainTransactionData(
                 data = blockchainClient.exchangeContract.submitWithdrawals(
                     sequencedWithdrawals.map { withdrawal ->
                         (
                             withdrawal.transactionData ?: run {
                                 withdrawal.toEip712Transaction().also {
-                                    withdrawal.transactionData = it
+                                    transactionDataByWithdrawal[withdrawal.guid.value] = it
                                 }
                             }
                             ).getTxData(withdrawal.sequenceId.toLong())
@@ -462,7 +464,8 @@ class BlockchainTransactionHandler(
                 chainId = chainId,
                 transactionData = transactionData,
             )
-            WithdrawalEntity.updateToSettling(sequencedWithdrawals, transaction)
+            transaction.flush()
+            WithdrawalEntity.updateToSettling(sequencedWithdrawals, transaction, transactionDataByWithdrawal)
             submitToBlockchain(transaction)
             true
         } else {
