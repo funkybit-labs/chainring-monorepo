@@ -5,6 +5,7 @@ import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
 import co.chainring.core.client.rest.ApiClient
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.utils.TraceRecorder
+import co.chainring.mocker.core.BrownianMotionWithReversionToMean
 import co.chainring.mocker.core.Maker
 import co.chainring.mocker.core.Taker
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -24,6 +25,9 @@ import org.http4k.server.Netty
 import org.http4k.server.PolyHandler
 import org.http4k.server.ServerConfig
 import org.http4k.server.asServer
+import org.web3j.crypto.ECKeyPair
+import org.web3j.crypto.Keys
+import org.web3j.utils.Numeric
 
 fun main() {
     val logger = KotlinLogging.logger {}
@@ -38,10 +42,10 @@ fun main() {
 }
 
 data class MarketParams(
-    var desiredMakersCount: Int,
     var desiredTakersCount: Int,
-    var initialTakerBaseBalance: BigDecimal,
-    var initialTakerQuoteBalance: BigDecimal,
+    var priceBaseline: BigDecimal,
+    var initialBaseBalance: BigDecimal,
+    var makerPrivateKeyHex: String,
     val makers: MutableList<Maker> = mutableListOf(),
     val takers: MutableList<Taker> = mutableListOf()
 )
@@ -52,15 +56,16 @@ class MockerApp(
 ) {
     private val logger = KotlinLogging.logger {}
     private val marketsConfig = mutableMapOf<MarketId, MarketParams>()
+    private val marketsPriceFunctions = mutableMapOf<MarketId, BrownianMotionWithReversionToMean>()
 
     init {
         config.forEach {
             marketsConfig[MarketId(it)] = MarketParams(
-                desiredMakersCount = System.getenv(it.replace("/", "_") + "_MAKERS")?.toIntOrNull() ?: 1,
-                desiredTakersCount = System.getenv(it.replace("/", "_") + "_TAKERS")?.toIntOrNull() ?: 4,
-                initialTakerBaseBalance = System.getenv(it.replace("/", "_") + "_INITIAL_TAKER_BASE_BALANCE")?.toBigDecimalOrNull() ?: BigDecimal.TEN,
-                initialTakerQuoteBalance = System.getenv(it.replace("/", "_") + "_INITIAL_TAKER_QUOTE_BALANCE")?.toBigDecimalOrNull()
-                    ?: BigDecimal.TEN
+                desiredTakersCount = System.getenv(it.replace("/", "_") + "_TAKERS")?.toIntOrNull() ?: 5,
+                priceBaseline = System.getenv(it.replace("/", "_") + "_PRICE_BASELINE")?.toBigDecimalOrNull() ?: BigDecimal.TEN,
+                initialBaseBalance = System.getenv(it.replace("/", "_") + "_INITIAL_BASE_BALANCE")?.toBigDecimalOrNull() ?: BigDecimal.TEN,
+                makerPrivateKeyHex = System.getenv(it.replace("/", "_") + "_MAKER_PRIVATE_KEY_HEX")
+                    ?: ("0x" + Keys.createEcKeyPair().privateKey.toString(16)),
             )
         }
     }
@@ -78,7 +83,6 @@ class MockerApp(
                 "/v1/config" bind Method.GET to { _: Request ->
                     val configResponse = marketsConfig.mapValues { (_, params) ->
                         mapOf(
-                            "desiredMakersCount" to params.desiredMakersCount,
                             "desiredTakersCount" to params.desiredTakersCount
                         )
                     }
@@ -90,7 +94,6 @@ class MockerApp(
                     val currentParams = marketsConfig[marketId]
 
                     if (currentParams != null) {
-                        newConfig["desiredMakersCount"]?.let { currentParams.desiredMakersCount = it }
                         newConfig["desiredTakersCount"]?.let { currentParams.desiredTakersCount = it }
 
                         updateMarketActors()
@@ -107,29 +110,34 @@ class MockerApp(
         val currentMarkets = ApiClient().getConfiguration().markets.associateBy { it.id }
 
         marketsConfig.forEach { (marketId, params) ->
-            logger.info { "Updating configuration for $marketId: (desired makers ${params.desiredMakersCount}, desired takers: ${params.desiredTakersCount})" }
+            logger.info { "Updating configuration for $marketId: (makers 1, desired takers: ${params.desiredTakersCount})" }
             val market = currentMarkets[marketId.value] ?: run {
                 logger.info { "Market $marketId not found. Skipping." }
                 return@forEach
             }
 
-            // Adjust makers count
-            while (params.makers.size < params.desiredMakersCount) {
+            val priceFunction = marketsPriceFunctions.getOrPut(marketId) {
+                BrownianMotionWithReversionToMean.generateRandom(
+                    initialValue = params.priceBaseline.toDouble(),
+                    maxSpread = params.priceBaseline.toDouble() * 0.1
+                )
+            }
+
+            // Start maker
+            if (params.makers.size == 0) {
                 params.makers.add(
                     startMaker(
                         market,
-                        params.initialTakerBaseBalance * BigDecimal(100),
-                        params.initialTakerQuoteBalance * BigDecimal(100)
+                        params.initialBaseBalance * BigDecimal(100),
+                        params.initialBaseBalance * params.priceBaseline * BigDecimal(100),
+                        keyPair = ECKeyPair.create(Numeric.toBigInt(params.makerPrivateKeyHex))
                     )
                 )
-            }
-            while (params.makers.size > params.desiredMakersCount) {
-                params.makers.removeAt(params.makers.size - 1).stop()
             }
 
             // Adjust takers count
             while (params.takers.size < params.desiredTakersCount) {
-                params.takers.add(startTaker(market, params.initialTakerBaseBalance, params.initialTakerQuoteBalance))
+                params.takers.add(startTaker(market, params.initialBaseBalance, params.initialBaseBalance * params.priceBaseline, priceFunction))
             }
             while (params.takers.size > params.desiredTakersCount) {
                 params.takers.removeAt(params.takers.size - 1).stop()
@@ -149,8 +157,8 @@ class MockerApp(
         // schedule printings stats
         Timer().also {
             val metricsTask = timerTask {
-                val totalMakers = marketsConfig.map { it.value.desiredMakersCount }.sum()
-                val totalTakers = marketsConfig.map { it.value.desiredTakersCount }.sum()
+                val totalMakers = marketsConfig.map { it.value.makers.size }.sum()
+                val totalTakers = marketsConfig.map { it.value.takers.size }.sum()
                 logger.debug {
                     TraceRecorder.full.generateStatsAndFlush(
                         header = "Running $totalMakers makers and $totalTakers takers in ${marketsConfig.size} markets"

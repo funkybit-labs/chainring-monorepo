@@ -37,12 +37,14 @@ import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.concurrent.thread
 import kotlin.random.Random
+import kotlinx.datetime.Clock
 
 class Taker(
     private val rate: Long,
     private val sizeFactor: Double,
     native: BigInteger?,
-    assets: Map<String, BigInteger>
+    assets: Map<String, BigInteger>,
+    private val priceCorrectionFunction: BrownianMotionWithReversionToMean
 ) : Actor(native, assets) {
     private var currentOrder: Order.Market? = null
     private var markets = setOf<Market>()
@@ -202,26 +204,26 @@ class Taker(
                     val market = markets.find { it.id == marketId.value }!!
                     logger.debug { "$id: baseBalance $baseBalance, quoteBalance: $quoteBalance" }
                     marketPrices[marketId]?.let { price ->
-                        val side =
-                            if (baseBalance.toBigDecimal() < (quoteBalance.toBigDecimal() / price).movePointLeft(market.quoteDecimals - market.baseDecimals)) {
-                                OrderSide.Buy
-                            } else {
-                                OrderSide.Sell
-                            }
+                        val expectedMarketPrice = priceCorrectionFunction.nextValue(Clock.System.now())
+                        val side = if (expectedMarketPrice > price.toDouble()) {
+                            OrderSide.Buy
+                        } else {
+                            OrderSide.Sell
+                        }
                         val amount = when (side) {
                             OrderSide.Buy -> {
                                 quoteBalance.let { notional ->
-                                    ((notional.toBigDecimal() / sizeFactor.toBigDecimal()) / price).movePointLeft(
+                                    ((notional.toBigDecimal() / Random.nextDouble(sizeFactor / 2, sizeFactor * 2).toBigDecimal()) / price).movePointLeft(
                                         market.quoteDecimals - market.baseDecimals
                                     ).toBigInteger()
                                 } ?: BigInteger.ZERO
                             }
 
                             OrderSide.Sell -> {
-                                (baseBalance.toBigDecimal() / sizeFactor.toBigDecimal()).toBigInteger()
+                                (baseBalance.toBigDecimal() / Random.nextDouble(sizeFactor / 2, sizeFactor * 2).toBigDecimal()).toBigInteger()
                             }
                         }
-                        logger.debug { "$id going to create a $side order" }
+                        logger.debug { "$id going to create a market $side order (amount: $amount, market price: $price" }
                         apiClient.createOrder(
                             CreateOrderApiRequest.Market(
                                 nonce = generateHexString(32),

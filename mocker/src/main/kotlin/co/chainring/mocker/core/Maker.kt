@@ -38,8 +38,17 @@ import java.math.BigInteger
 import kotlin.concurrent.thread
 import kotlin.math.max
 import kotlin.math.pow
+import org.web3j.crypto.ECKeyPair
+import org.web3j.crypto.Keys
 
-class Maker(private val tightness: Int, private val skew: Int, private val levels: Int, native: BigInteger, assets: Map<String, BigInteger>): Actor(native, assets) {
+class Maker(
+    private val tightness: Int,
+    private val skew: Int,
+    private val levels: Int,
+    native: BigInteger,
+    assets: Map<String, BigInteger>,
+    keyPair: ECKeyPair = Keys.createEcKeyPair()
+) : Actor(native, assets, keyPair) {
     private var currentOrders = mutableMapOf<MarketId,MutableList<Order.Limit>>()
     private var markets = setOf<Market>()
     private val logger = KotlinLogging.logger {}
@@ -205,7 +214,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
     private fun offerAndBidAmounts(market: Market, offerPrices: List<BigDecimal>, bidPrices: List<BigDecimal>): Pair<List<BigInteger>, List<BigInteger>> {
         val marketId = MarketId(market.id)
         // don't try to use all of available inventory
-        val useFraction = 0.80.toBigDecimal()
+        val useFraction = 0.70.toBigDecimal()
         val baseInventory = (balances.getOrDefault(marketId.baseSymbol(), BigInteger.ZERO).toBigDecimal() * useFraction).toBigInteger()
         val quoteInventory = (balances.getOrDefault(marketId.quoteSymbol(), BigInteger.ZERO).toBigDecimal() * useFraction).toBigInteger()
         val levels = max(offerPrices.size, bidPrices.size)
@@ -298,6 +307,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
 
     private fun createQuotes(marketId: MarketId, levels: Int, curPrice: BigDecimal) {
         markets.find { it.id == marketId.value }?.let { market ->
+            apiClient.cancelOpenOrders()
             val(offerPrices, bidPrices) = offerAndBidPrices(market, levels, curPrice)
             val(offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
             offerPrices.forEachIndexed { ix, price ->

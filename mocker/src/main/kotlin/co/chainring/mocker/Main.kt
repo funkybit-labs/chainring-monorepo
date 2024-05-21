@@ -5,6 +5,7 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.utils.TraceRecorder
 import co.chainring.core.utils.humanReadable
+import co.chainring.mocker.core.BrownianMotionWithReversionToMean
 import co.chainring.mocker.core.Maker
 import co.chainring.mocker.core.Taker
 import co.chainring.mocker.core.toFundamentalUnits
@@ -18,6 +19,8 @@ import kotlin.time.Duration.Companion.minutes
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import org.web3j.crypto.ECKeyPair
+import org.web3j.crypto.Keys
 
 
 val start = Clock.System.now()
@@ -46,7 +49,8 @@ fun main() {
     val makers = mutableListOf<Maker>()
     val takers = mutableListOf<Taker>()
 
-    val usdcDai = Market("USDC/DAI", Symbol("USDC"), 6, Symbol("DAI") , 18, 0.05.toBigDecimal())
+    val usdcDai = Market("USDC/DAI", Symbol("USDC"), 6, Symbol("DAI"), 18, 0.05.toBigDecimal())
+    val priceFunction = BrownianMotionWithReversionToMean.generateRandom(initialValue = 17.0, maxSpread = 1.5)
 
     // schedule metrics
     val statsTask = timerTask {
@@ -68,7 +72,7 @@ fun main() {
         makers.add(startMaker(usdcDai, 10000.0.toBigDecimal(), 5000.0.toBigDecimal()))
     }
     (1..initialTakers).map {
-        takers.add(startTaker(usdcDai, 100.0.toBigDecimal(), 50.0.toBigDecimal()))
+        takers.add(startTaker(usdcDai, 100.0.toBigDecimal(), 50.0.toBigDecimal(), priceFunction))
     }
     // wait for system to warm caches
     Thread.sleep(warmupInterval.inWholeMilliseconds)
@@ -90,7 +94,7 @@ fun main() {
             this.cancel()
         } else {
             logger.debug { "Starting taker #${takers.size + 1}" }
-            takers.add(startTaker(usdcDai, 100.0.toBigDecimal(), 50.0.toBigDecimal()))
+            takers.add(startTaker(usdcDai, 100.0.toBigDecimal(), 50.0.toBigDecimal(), priceFunction))
         }
     }, 0, newTakerInterval.inWholeMilliseconds)
 
@@ -108,7 +112,7 @@ fun main() {
     timer.cancel()
 }
 
-fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal): Maker {
+fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, keyPair: ECKeyPair = Keys.createEcKeyPair()): Maker {
     val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
     val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)
     val quoteAsset = market.quoteSymbol.value to quoteAssetAmount.toFundamentalUnits(market.quoteDecimals)
@@ -119,25 +123,27 @@ fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: Bi
         assets = when {
             baseAssetBtc -> mapOf(quoteAsset)
             else -> mapOf(baseAsset, quoteAsset)
-        }
+        },
+        keyPair = keyPair
     )
     maker.start(listOf(MarketId(market.id)))
     return maker
 }
 
-fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal): Taker {
+fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, priceFunction: BrownianMotionWithReversionToMean): Taker {
     val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
     val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)
     val quoteAsset = market.quoteSymbol.value to quoteAssetAmount.toFundamentalUnits(market.quoteDecimals)
 
     val taker = Taker(
-        rate = Random.nextLong(5000, 15000),
+        rate = Random.nextLong(10000, 30000),
         sizeFactor = Random.nextDouble(5.0, 20.0),
         native = if (baseAssetBtc) baseAsset.second else BigDecimal.ONE.movePointRight(18).toBigInteger(),
         assets = when {
             baseAssetBtc -> mapOf(quoteAsset)
             else -> mapOf(baseAsset, quoteAsset)
-        }
+        },
+        priceCorrectionFunction = priceFunction,
     )
     taker.start(listOf(MarketId(market.id)))
     return taker

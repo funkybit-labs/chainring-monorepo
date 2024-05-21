@@ -8,10 +8,10 @@ import co.chainring.integrationtests.utils.Wallet
 import org.web3j.crypto.Keys
 import java.math.BigInteger
 import java.util.UUID
+import org.web3j.crypto.ECKeyPair
 
-open class Actor(val native: BigInteger?, val assets: Map<String, BigInteger>) {
+open class Actor(val native: BigInteger?, val assets: Map<String, BigInteger>, keyPair: ECKeyPair = Keys.createEcKeyPair()) {
     protected val id = UUID.randomUUID().toString()
-    protected val keyPair = Keys.createEcKeyPair()
     protected val apiClient = ApiClient(keyPair, traceRecorder = TraceRecorder.full)
     protected val wallet = Wallet(apiClient)
     protected var balances = mutableMapOf<String, BigInteger>()

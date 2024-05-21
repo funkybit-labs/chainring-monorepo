@@ -311,7 +311,8 @@ function OHLCChart({
       const yMin = d3.min(visibleData, (d) => d.low)
       const yMax = d3.max(visibleData, (d) => d.high)
       if (yMin && yMax) {
-        yScale.domain([yMin * 0.995, yMax * 1.005])
+        const bufferArea = (yMax - yMin) * 0.05
+        yScale.domain([yMin - bufferArea, yMax + bufferArea])
       }
       // @ts-expect-error @definitelytyped/no-unnecessary-generics
       svg.select('.y-axis').call(yAxis.scale(yScale))

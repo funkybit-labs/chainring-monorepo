@@ -87,10 +87,10 @@ fun getFixtures(chainringChainIds: List<ChainId>) = Fixtures(
             address = Address("0x14dC79964da2C08b23698B3D3cc7Ca32193d9955"),
             balances = chainringChainIds.mapIndexed { index, chainId ->
                 mapOf(
-                    SymbolId(chainId, "BTC".toChainSymbol(index)) to BigDecimal("1$index").toFundamentalUnits(18),
-                    SymbolId(chainId, "ETH".toChainSymbol(index)) to BigDecimal("10$index").toFundamentalUnits(18),
-                    SymbolId(chainId, "USDC".toChainSymbol(index)) to BigDecimal("10000$index").toFundamentalUnits(6),
-                    SymbolId(chainId, "DAI".toChainSymbol(index)) to BigDecimal("10000$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "BTC".toChainSymbol(index)) to BigDecimal("10$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "ETH".toChainSymbol(index)) to BigDecimal("100$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "USDC".toChainSymbol(index)) to BigDecimal("100000$index").toFundamentalUnits(6),
+                    SymbolId(chainId, "DAI".toChainSymbol(index)) to BigDecimal("100000$index").toFundamentalUnits(18),
                 )
             }.flatMap { map -> map.entries }.associate(Map.Entry<SymbolId, BigInteger>::toPair)
         ),
@@ -99,10 +99,10 @@ fun getFixtures(chainringChainIds: List<ChainId>) = Fixtures(
             address = Address("0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f"),
             balances = chainringChainIds.mapIndexed { index, chainId ->
                 mapOf(
-                    SymbolId(chainId, "BTC".toChainSymbol(index)) to BigDecimal("1$index").toFundamentalUnits(18),
-                    SymbolId(chainId, "ETH".toChainSymbol(index)) to BigDecimal("10$index").toFundamentalUnits(18),
-                    SymbolId(chainId, "USDC".toChainSymbol(index)) to BigDecimal("10000$index").toFundamentalUnits(6),
-                    SymbolId(chainId, "DAI".toChainSymbol(index)) to BigDecimal("10000$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "BTC".toChainSymbol(index)) to BigDecimal("10$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "ETH".toChainSymbol(index)) to BigDecimal("100$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "USDC".toChainSymbol(index)) to BigDecimal("100000$index").toFundamentalUnits(6),
+                    SymbolId(chainId, "DAI".toChainSymbol(index)) to BigDecimal("100000$index").toFundamentalUnits(18),
                 )
             }.flatMap { map -> map.entries }.associate(Map.Entry<SymbolId, BigInteger>::toPair)
         ),
@@ -111,10 +111,10 @@ fun getFixtures(chainringChainIds: List<ChainId>) = Fixtures(
             address = Address("0xa0Ee7A142d267C1f36714E4a8F75612F20a79720"),
             balances = chainringChainIds.mapIndexed { index, chainId ->
                 mapOf(
-                    SymbolId(chainId, "BTC".toChainSymbol(index)) to BigDecimal("1$index").toFundamentalUnits(18),
-                    SymbolId(chainId, "ETH".toChainSymbol(index)) to BigDecimal("10$index").toFundamentalUnits(18),
-                    SymbolId(chainId, "USDC".toChainSymbol(index)) to BigDecimal("10000$index").toFundamentalUnits(6),
-                    SymbolId(chainId, "DAI".toChainSymbol(index)) to BigDecimal("10000$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "BTC".toChainSymbol(index)) to BigDecimal("10$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "ETH".toChainSymbol(index)) to BigDecimal("100$index").toFundamentalUnits(18),
+                    SymbolId(chainId, "USDC".toChainSymbol(index)) to BigDecimal("100000$index").toFundamentalUnits(6),
+                    SymbolId(chainId, "DAI".toChainSymbol(index)) to BigDecimal("100000$index").toFundamentalUnits(18),
                 )
             }.flatMap { map -> map.entries }.associate(Map.Entry<SymbolId, BigInteger>::toPair)
         )
