@@ -182,6 +182,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
     }
 
     fun stop() {
+        logger.info { "Market maker $id stopping" }
         listenerThread?.let {
             stopping = true
             it.interrupt()

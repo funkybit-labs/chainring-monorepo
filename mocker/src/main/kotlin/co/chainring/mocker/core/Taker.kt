@@ -248,6 +248,7 @@ class Taker(
     }
 
     fun stop() {
+        logger.info { "Taker $id stopping" }
         actorThread?.let {
             stopping = true
             it.interrupt()
