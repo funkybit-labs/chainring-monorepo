@@ -685,30 +685,23 @@ function Title({
       <div className="flex place-items-center gap-4 text-right">
         {formatPrice(market, price)}
         <div className="text-sm text-darkBluishGray2">
-          <DailyChangeDisplay price={price} dailyChange={dailyChange} />
+          <DailyChangeDisplay dailyChange={dailyChange} />
         </div>
       </div>
     </div>
   )
 }
 
-function DailyChangeDisplay({
-  price,
-  dailyChange
-}: {
-  price: number | null
-  dailyChange: number | null
-}) {
+function DailyChangeDisplay({ dailyChange }: { dailyChange: number | null }) {
   const getColor = (dailyChange: number) => {
     if (dailyChange > 0) return 'text-olhcGreen'
     if (dailyChange < 0) return 'text-olhcRed'
     return 'text-darkBluishGray3'
   }
 
-  if (price && dailyChange) {
+  if (dailyChange) {
     const formattedDailyChange = `${dailyChange >= 0 ? '+' : ''}${(
-      (dailyChange / price) *
-      100
+      dailyChange * 100
     ).toFixed(2)}%`
     return (
       <div className="flex place-items-center gap-2">
