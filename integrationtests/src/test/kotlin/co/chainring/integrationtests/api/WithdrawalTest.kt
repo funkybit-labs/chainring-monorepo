@@ -257,6 +257,56 @@ class WithdrawalTest {
     }
 
     @Test
+    fun `test withdrawals are scoped to wallet`() {
+        val apiClient1 = TestApiClient()
+        val wallet1 = Wallet(apiClient1)
+        val wsClient1 = WebsocketClient.blocking(apiClient1.authToken)
+        wsClient1.subscribeToBalances()
+        wsClient1.assertBalancesMessageReceived()
+
+        val apiClient2 = TestApiClient()
+        val wallet2 = Wallet(apiClient2)
+        val wsClient2 = WebsocketClient.blocking(apiClient2.authToken)
+        wsClient2.subscribeToBalances()
+        wsClient2.assertBalancesMessageReceived()
+
+        Faucet.fund(wallet1.address, chainId = wallet1.currentChainId)
+        Faucet.fund(wallet2.address, chainId = wallet2.currentChainId)
+
+        val btcSymbol = "BTC".toChainSymbol(0)
+
+        val btcDeposit1Amount = wallet1.formatAmount("0.01", btcSymbol)
+        val btcDeposit2Amount = wallet2.formatAmount("0.02", btcSymbol)
+
+        wallet1.depositNative(btcDeposit1Amount)
+        wallet2.depositNative(btcDeposit2Amount)
+
+        waitForBalance(
+            apiClient1,
+            wsClient1,
+            listOf(
+                ExpectedBalance(btcSymbol, total = btcDeposit1Amount, available = btcDeposit1Amount),
+            ),
+        )
+        waitForBalance(
+            apiClient2,
+            wsClient2,
+            listOf(
+                ExpectedBalance(btcSymbol, total = btcDeposit2Amount, available = btcDeposit2Amount),
+            ),
+        )
+        val btcWithdrawal1Amount = wallet1.formatAmount("0.001", btcSymbol)
+        val btcWithdrawal2Amount = wallet1.formatAmount("0.002", btcSymbol)
+
+        val pendingBtcWithdrawal1 =
+            apiClient1.createWithdrawal(wallet1.signWithdraw(btcSymbol, btcWithdrawal1Amount)).withdrawal
+        val pendingBtcWithdrawal2 =
+            apiClient2.createWithdrawal(wallet2.signWithdraw(btcSymbol, btcWithdrawal2Amount)).withdrawal
+        assertEquals(listOf(pendingBtcWithdrawal1), apiClient1.listWithdrawals().withdrawals.filter { it.symbol.value == btcSymbol })
+        assertEquals(listOf(pendingBtcWithdrawal2), apiClient2.listWithdrawals().withdrawals.filter { it.symbol.value == btcSymbol })
+    }
+
+    @Test
     fun `withdrawal blockchain failure`() {
         val apiClient = TestApiClient()
         val btc = apiClient.getConfiguration().chains.flatMap { it.symbols }.first { it.name == "BTC" }

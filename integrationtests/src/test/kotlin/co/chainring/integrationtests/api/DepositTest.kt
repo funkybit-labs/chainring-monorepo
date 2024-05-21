@@ -110,4 +110,28 @@ class DepositTest {
             assertEquals(wallet.getWalletBalance(usdc), usdcMintAmount - usdcDepositAmount)
         }
     }
+
+    @Test
+    fun `test deposits are scoped to wallet`() {
+        val apiClient1 = TestApiClient()
+        val wallet1 = Wallet(apiClient1)
+
+        val apiClient2 = TestApiClient()
+        val wallet2 = Wallet(apiClient2)
+
+        Faucet.fund(wallet1.address, chainId = wallet1.currentChainId)
+        Faucet.fund(wallet2.address, chainId = wallet2.currentChainId)
+
+        val btcSymbol = "BTC".toChainSymbol(0)
+
+        val btcDeposit1Amount = wallet1.formatAmount("0.01", btcSymbol)
+        val btcDeposit2Amount = wallet2.formatAmount("0.02", btcSymbol)
+
+        val btcDeposit1TxHash = wallet1.asyncDepositNative(btcDeposit1Amount)
+        val pendingBtcDeposit1 = apiClient1.createDeposit(CreateDepositApiRequest(Symbol(btcSymbol), btcDeposit1Amount, btcDeposit1TxHash)).deposit
+        val btcDeposit2TxHash = wallet2.asyncDepositNative(btcDeposit2Amount)
+        val pendingBtcDeposit2 = apiClient2.createDeposit(CreateDepositApiRequest(Symbol(btcSymbol), btcDeposit1Amount, btcDeposit2TxHash)).deposit
+        assertEquals(listOf(pendingBtcDeposit1), apiClient1.listDeposits().deposits.filter { it.symbol.value == btcSymbol })
+        assertEquals(listOf(pendingBtcDeposit2), apiClient2.listDeposits().deposits.filter { it.symbol.value == btcSymbol })
+    }
 }

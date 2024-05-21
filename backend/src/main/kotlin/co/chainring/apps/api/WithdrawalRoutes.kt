@@ -107,11 +107,11 @@ class WithdrawalRoutes(private val exchangeApiService: ExchangeApiService) {
                     ),
                 ),
             )
-        } bindContract Method.GET to { _ ->
+        } bindContract Method.GET to { request ->
             transaction {
                 Response(Status.OK).with(
                     responseBody of ListWithdrawalsApiResponse(
-                        WithdrawalEntity.history().map(Withdrawal::fromEntity),
+                        WithdrawalEntity.history(request.principal).map(Withdrawal::fromEntity),
                     ),
                 )
             }

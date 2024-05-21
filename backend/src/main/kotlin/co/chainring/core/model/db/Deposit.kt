@@ -1,17 +1,18 @@
 package co.chainring.core.model.db
 
+import co.chainring.core.model.Address
 import co.chainring.core.model.TxHash
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.dao.with
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.max
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.vendors.ForUpdateOption
 import java.math.BigInteger
 
@@ -105,12 +106,17 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
                 .let { DepositEntity.wrapRows(it) }
                 .toList()
 
-        fun history(): List<DepositEntity> {
-            return DepositEntity
-                .all()
-                .with(DepositEntity::symbol)
-                .orderBy(Pair(DepositTable.createdAt, SortOrder.DESC))
-                .toList()
+        fun history(address: Address): List<DepositEntity> {
+            return DepositEntity.wrapRows(
+                DepositTable.join(
+                    WalletTable,
+                    JoinType.INNER,
+                    DepositTable.walletGuid,
+                    WalletTable.guid,
+                ).join(SymbolTable, JoinType.INNER, DepositTable.symbolGuid, SymbolTable.guid).selectAll().where {
+                    WalletTable.address.eq(address.value)
+                }.orderBy(Pair(DepositTable.createdAt, SortOrder.DESC)),
+            ).toList()
         }
     }
 
