@@ -18,8 +18,6 @@ val kotlinxSerializationVersion = "1.6.3"
 dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test")
 
-    // for REST services
-
     // Blockchain client
     implementation("org.web3j:core:4.10.3") // 4.11 introduces dependency (tech.pegasys:jc-kzg-4844) that is published to cloudsmith repository (https://github.com/web3j/web3j/issues/2013)
 

@@ -108,10 +108,10 @@ fun main() {
     timer.cancel()
 }
 
-fun startMaker(market: Market, baseAmount: BigDecimal, quoteAmount: BigDecimal): Maker {
+fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal): Maker {
     val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
-    val baseAsset = market.baseSymbol.value to baseAmount.toFundamentalUnits(market.baseDecimals)
-    val quoteAsset = market.quoteSymbol.value to quoteAmount.toFundamentalUnits(market.quoteDecimals)
+    val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)
+    val quoteAsset = market.quoteSymbol.value to quoteAssetAmount.toFundamentalUnits(market.quoteDecimals)
 
     val maker = Maker(
         tightness = 5, skew = 0, levels = 10,
@@ -125,10 +125,10 @@ fun startMaker(market: Market, baseAmount: BigDecimal, quoteAmount: BigDecimal):
     return maker
 }
 
-fun startTaker(market: Market, baseAmount: BigDecimal, quoteAmount: BigDecimal): Taker {
+fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal): Taker {
     val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
-    val baseAsset = market.baseSymbol.value to baseAmount.toFundamentalUnits(market.baseDecimals)
-    val quoteAsset = market.quoteSymbol.value to quoteAmount.toFundamentalUnits(market.quoteDecimals)
+    val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)
+    val quoteAsset = market.quoteSymbol.value to quoteAssetAmount.toFundamentalUnits(market.quoteDecimals)
 
     val taker = Taker(
         rate = Random.nextLong(5000, 15000),
