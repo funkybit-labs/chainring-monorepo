@@ -29,6 +29,8 @@ export function Status({
   function toUniversalStatus(): UniversalStatus {
     switch (status) {
       case 'Pending':
+      case 'Sequenced':
+      case 'Settling':
         return 'Pending'
       case 'Complete':
       case 'Completed':

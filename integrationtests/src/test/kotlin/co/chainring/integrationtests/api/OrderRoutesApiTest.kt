@@ -24,9 +24,6 @@ import co.chainring.core.client.ws.subscribeToPrices
 import co.chainring.core.client.ws.subscribeToTrades
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
-import co.chainring.core.model.db.ExchangeTransactionEntity
-import co.chainring.core.model.db.ExchangeTransactionStatus
-import co.chainring.core.model.db.ExchangeTransactionTable
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
@@ -80,7 +77,6 @@ import org.awaitility.kotlin.await
 import org.awaitility.kotlin.withAlias
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.WsClient
-import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.and
@@ -1291,11 +1287,7 @@ class OrderRoutesApiTest {
         // hack to resubmit the same transaction again bypassing the sequencer. This way taker will not have a
         // sufficient on chain balance for the order so settlement will fail.
         transaction {
-            WithdrawalEntity[pendingBaseWithdrawal.id].status = WithdrawalStatus.Pending
-            val withdrawalExchangeTransaction = ExchangeTransactionEntity.all()
-                .orderBy(ExchangeTransactionTable.sequenceId to SortOrder.DESC)
-                .limit(1).first()
-            withdrawalExchangeTransaction.status = ExchangeTransactionStatus.Pending
+            WithdrawalEntity[pendingBaseWithdrawal.id].status = WithdrawalStatus.Sequenced
         }
 
         waitForFinalizedWithdrawal(pendingBaseWithdrawal.id)

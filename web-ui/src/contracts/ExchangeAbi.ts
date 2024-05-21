@@ -306,6 +306,21 @@ export default [
     },
     {
         "type": "function",
+        "name": "submitWithdrawals",
+        "inputs": [
+            {
+                "name": "withdrawals",
+                "type": "bytes[]",
+                "internalType": "bytes[]"
+            }
+        ],
+        "outputs": [
+            
+        ],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
         "name": "submitter",
         "inputs": [
             
