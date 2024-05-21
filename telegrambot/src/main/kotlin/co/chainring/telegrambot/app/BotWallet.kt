@@ -92,7 +92,7 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
         }
     }
     private val marketPrices = mutableMapOf<MarketId, BigDecimal>()
-    var currentMarket = config.markets.find { it.id == "BTC/ETH" } ?: config.markets.first()
+    var currentMarket = config.markets.find { it.id.value == "BTC/ETH" } ?: config.markets.first()
     val walletAddress = Address(Keys.toChecksumAddress("0x" + Keys.getAddress(ecKeyPair)))
     private val balances = mutableMapOf<Symbol, BigInteger>()
     private val pendingDeposits = mutableSetOf<TxHash>()
@@ -103,7 +103,7 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
         WebsocketClient.nonBlocking(apiClient.authToken) { ws ->
             logger.debug { "websocket connected" }
             websocket = ws
-            config.markets.map { MarketId(it.id) }.forEach {
+            config.markets.map { it.id }.forEach {
                 ws.subscribeToPrices(it)
             }
             ws.subscribeToOrders()
@@ -194,7 +194,7 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
     }
 
     fun switchCurrentMarket(marketId: MarketId) {
-        config.markets.find { it.id == marketId.value }?.let {
+        config.markets.find { it.id == marketId }?.let {
             currentMarket = it
         }
     }
@@ -202,7 +202,7 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
     fun stop() {
         try {
             websocket?.let { ws ->
-                config.markets.map { MarketId(it.id) }.forEach {
+                config.markets.map { it.id }.forEach {
                     ws.unsubscribe(SubscriptionTopic.Prices(it, OHLCDuration.P5M))
                 }
                 ws.unsubscribe(SubscriptionTopic.Trades)
@@ -245,7 +245,7 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
     }
 
     fun getMarketPrice(): String {
-        return marketPrices[MarketId(currentMarket.id)]?.toPlainString() ?: "Unknown"
+        return marketPrices[currentMarket.id]?.toPlainString() ?: "Unknown"
     }
 
     fun getFormattedWalletBalance(symbol: Symbol): String {
@@ -323,7 +323,7 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
         return apiClient.tryCreateOrder(
             CreateOrderApiRequest.Market(
                 nonce = generateOrderNonce(),
-                marketId = MarketId(currentMarket.id),
+                marketId = currentMarket.id,
                 side = side,
                 amount = amountToBigInteger(currentMarket.baseSymbol, amount),
                 signature = EvmSignature.emptySignature(),
@@ -358,7 +358,7 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
     }
 
     private fun formatOrder(order: Order, isCreated: Boolean = false): String {
-        val market = config.markets.first { it.id == order.marketId.value }
+        val market = config.markets.first { it.id == order.marketId }
         val status = when (order.status) {
             OrderStatus.Filled -> "filled"
             OrderStatus.Partial -> "partially filled (${formatAmountWithSymbol(market.baseSymbol, order.executions.first().amount)})"
@@ -379,7 +379,7 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
     }
 
     private fun formatTrade(trade: Trade): String {
-        val market = config.markets.first { it.id == trade.marketId.value }
+        val market = config.markets.first { it.id == trade.marketId }
         return "✅ Trade to ${trade.side} ${formatAmountWithSymbol(market.baseSymbol, trade.amount)} has settled"
     }
 }

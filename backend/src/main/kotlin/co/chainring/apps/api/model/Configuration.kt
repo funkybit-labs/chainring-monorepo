@@ -4,6 +4,7 @@ import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.FeeRates
+import co.chainring.core.model.db.MarketId
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -36,7 +37,7 @@ data class SymbolInfo(
 
 @Serializable
 data class Market(
-    val id: String,
+    val id: MarketId,
     val baseSymbol: Symbol,
     val baseDecimals: Int,
     val quoteSymbol: Symbol,

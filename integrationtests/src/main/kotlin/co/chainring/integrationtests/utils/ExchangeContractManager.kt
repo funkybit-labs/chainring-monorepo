@@ -5,6 +5,7 @@ import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.model.Address
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.utils.fromFundamentalUnits
 import kotlinx.coroutines.runBlocking
 import org.web3j.crypto.Keys
 import java.math.BigInteger
@@ -34,6 +35,12 @@ class ExchangeContractManager {
             chain.symbols.associate { it.name to chain.id }
         }.flatMap { map -> map.entries }.associate(Map.Entry<String, ChainId>::toPair)
     }
+
+    fun getFeeBalance(symbol: SymbolInfo): AssetAmount =
+        AssetAmount(
+            symbol,
+            getFeeBalance(symbol.name).fromFundamentalUnits(symbol.decimals),
+        )
 
     fun getFeeBalance(symbol: String): BigInteger {
         val blockchainClient = blockchainClients.getValue(symbolByChainId.getValue(symbol))

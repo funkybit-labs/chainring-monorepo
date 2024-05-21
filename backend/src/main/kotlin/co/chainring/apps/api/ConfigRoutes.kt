@@ -14,6 +14,7 @@ import co.chainring.core.model.db.ChainTable
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketEntity
+import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.SymbolEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.ContractRoute
@@ -69,7 +70,7 @@ object ConfigRoutes {
                         ),
                         markets = listOf(
                             Market(
-                                id = "USDC/DAI",
+                                id = MarketId("USDC/DAI"),
                                 baseSymbol = Symbol("USDC"),
                                 baseDecimals = 18,
                                 quoteSymbol = Symbol("DAI"),
@@ -109,7 +110,7 @@ object ConfigRoutes {
                             },
                             markets = MarketEntity.all().map { market ->
                                 Market(
-                                    id = market.id.value.toString(),
+                                    id = market.id.value,
                                     baseSymbol = Symbol(market.baseSymbol.name),
                                     baseDecimals = market.baseSymbol.decimals.toInt(),
                                     quoteSymbol = Symbol(market.quoteSymbol.name),

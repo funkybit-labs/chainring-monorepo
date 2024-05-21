@@ -161,7 +161,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                             } else {
                                 if (prices.ohlc.isNotEmpty()) {
                                     logger.info { "Incremental price update: $prices" }
-                                    markets.find { it.id == prices.market.value }?.let {
+                                    markets.find { it.id == prices.market }?.let {
                                         adjustQuotes(it, prices.ohlc.last().close.toBigDecimal())
                                     }
                                 }
@@ -202,7 +202,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
     }
 
     private fun offerAndBidAmounts(market: Market, offerPrices: List<BigDecimal>, bidPrices: List<BigDecimal>): Pair<List<BigInteger>, List<BigInteger>> {
-        val marketId = MarketId(market.id)
+        val marketId = market.id
         // don't try to use all of available inventory
         val useFraction = 0.80.toBigDecimal()
         val baseInventory = (balances.getOrDefault(marketId.baseSymbol(), BigInteger.ZERO).toBigDecimal() * useFraction).toBigInteger()
@@ -222,7 +222,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
     }
 
     private fun adjustQuotes(market: Market, curPrice: BigDecimal) {
-        val marketId = MarketId(market.id)
+        val marketId = market.id
         val currentOffers = currentOrders[marketId]?.filter { it.side == OrderSide.Sell } ?: emptyList()
         val currentBids = currentOrders[marketId]?.filter { it.side == OrderSide.Buy } ?: emptyList()
         val(offerPrices, bidPrices) = offerAndBidPrices(market, levels, curPrice)
@@ -296,7 +296,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
     }
 
     private fun createQuotes(marketId: MarketId, levels: Int, curPrice: BigDecimal) {
-        markets.find { it.id == marketId.value }?.let { market ->
+        markets.find { it.id == marketId }?.let { market ->
             val(offerPrices, bidPrices) = offerAndBidPrices(market, levels, curPrice)
             val(offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
             offerPrices.forEachIndexed { ix, price ->
