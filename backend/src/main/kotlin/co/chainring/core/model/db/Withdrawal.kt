@@ -11,7 +11,6 @@ import kotlinx.serialization.Serializable
 import org.http4k.format.KotlinxSerialization
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.dao.with
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
@@ -127,12 +126,17 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 .toList()
         }
 
-        fun history(): List<WithdrawalEntity> {
-            return WithdrawalEntity
-                .all()
-                .with(WithdrawalEntity::symbol)
-                .orderBy(Pair(WithdrawalTable.createdAt, SortOrder.DESC))
-                .toList()
+        fun history(address: Address): List<WithdrawalEntity> {
+            return WithdrawalEntity.wrapRows(
+                WithdrawalTable.join(
+                    WalletTable,
+                    JoinType.INNER,
+                    WithdrawalTable.walletGuid,
+                    WalletTable.guid,
+                ).join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid).selectAll().where {
+                    WalletTable.address.eq(address.value)
+                }.orderBy(Pair(WithdrawalTable.createdAt, SortOrder.DESC)),
+            ).toList()
         }
 
         fun findSequenced(chainId: ChainId, limit: Int): List<WithdrawalEntity> {

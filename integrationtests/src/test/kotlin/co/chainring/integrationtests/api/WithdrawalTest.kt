@@ -1,7 +1,6 @@
 package co.chainring.integrationtests.api
 
 import co.chainring.apps.api.model.ApiError
-import co.chainring.apps.api.model.ListWithdrawalsApiResponse
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.core.client.ws.blocking
 import co.chainring.core.client.ws.subscribeToBalances
@@ -109,7 +108,10 @@ class WithdrawalTest {
 
             val pendingBtcWithdrawal = apiClient.createWithdrawal(wallet.signWithdraw(btc.name, btcWithdrawalAmount.inFundamentalUnits)).withdrawal
             assertEquals(WithdrawalStatus.Pending, pendingBtcWithdrawal.status)
-            assertEquals(listOf(pendingBtcWithdrawal), apiClient.listWithdrawals().withdrawals.filter { symbolFilterList.contains(it.symbol.value) })
+            assertEquals(
+                listOf(pendingBtcWithdrawal.id),
+                apiClient.listWithdrawals().withdrawals.filter { symbolFilterList.contains(it.symbol.value) }.map { it.id },
+            )
 
             waitForBalance(
                 apiClient,
@@ -128,7 +130,10 @@ class WithdrawalTest {
 
             val btcWithdrawal = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
             assertEquals(WithdrawalStatus.Complete, btcWithdrawal.status)
-            assertEquals(listOf(btcWithdrawal), apiClient.listWithdrawals().withdrawals.filter { symbolFilterList.contains(it.symbol.value) })
+            assertEquals(
+                listOf(btcWithdrawal.id),
+                apiClient.listWithdrawals().withdrawals.filter { symbolFilterList.contains(it.symbol.value) }.map { it.id },
+            )
 
             waitForBalance(
                 apiClient,
@@ -150,8 +155,8 @@ class WithdrawalTest {
                 apiClient.createWithdrawal(wallet.signWithdraw(usdc.name, usdcWithdrawalAmount.inFundamentalUnits)).withdrawal
             assertEquals(WithdrawalStatus.Pending, pendingUsdcWithdrawal.status)
             assertEquals(
-                listOf(pendingUsdcWithdrawal, btcWithdrawal),
-                apiClient.listWithdrawals().withdrawals.filter { symbolFilterList.contains(it.symbol.value) },
+                listOf(pendingUsdcWithdrawal.id, btcWithdrawal.id),
+                apiClient.listWithdrawals().withdrawals.filter { symbolFilterList.contains(it.symbol.value) }.map { it.id },
             )
 
             waitForBalance(
@@ -171,7 +176,7 @@ class WithdrawalTest {
 
             val usdcWithdrawal = apiClient.getWithdrawal(pendingUsdcWithdrawal.id).withdrawal
             assertEquals(WithdrawalStatus.Complete, usdcWithdrawal.status)
-            assertEquals(listOf(usdcWithdrawal, btcWithdrawal), apiClient.listWithdrawals().withdrawals.filter { symbolFilterList.contains(it.symbol.value) })
+            assertEquals(listOf(usdcWithdrawal.id, btcWithdrawal.id), apiClient.listWithdrawals().withdrawals.filter { symbolFilterList.contains(it.symbol.value) }.map { it.id })
 
             waitForBalance(
                 apiClient,
@@ -257,6 +262,55 @@ class WithdrawalTest {
     }
 
     @Test
+    fun `test withdrawals are scoped to wallet`() {
+        val apiClient1 = TestApiClient()
+        val wallet1 = Wallet(apiClient1)
+        val wsClient1 = WebsocketClient.blocking(apiClient1.authToken)
+        wsClient1.subscribeToBalances()
+        wsClient1.assertBalancesMessageReceived()
+
+        val apiClient2 = TestApiClient()
+        val wallet2 = Wallet(apiClient2)
+        val wsClient2 = WebsocketClient.blocking(apiClient2.authToken)
+        wsClient2.subscribeToBalances()
+        wsClient2.assertBalancesMessageReceived()
+
+        Faucet.fund(wallet1.address, chainId = wallet1.currentChainId)
+        Faucet.fund(wallet2.address, chainId = wallet2.currentChainId)
+        val btc = apiClient1.getConfiguration().chains.flatMap { it.symbols }.first { it.name == "BTC" }
+
+        val btcDeposit1Amount = AssetAmount(btc, "0.01")
+        val btcDeposit2Amount = AssetAmount(btc, "0.02")
+
+        wallet1.depositNative(btcDeposit1Amount.inFundamentalUnits)
+        wallet2.depositNative(btcDeposit2Amount.inFundamentalUnits)
+
+        waitForBalance(
+            apiClient1,
+            wsClient1,
+            listOf(
+                ExpectedBalance(btc, total = btcDeposit1Amount, available = btcDeposit1Amount),
+            ),
+        )
+        waitForBalance(
+            apiClient2,
+            wsClient2,
+            listOf(
+                ExpectedBalance(btc, total = btcDeposit2Amount, available = btcDeposit2Amount),
+            ),
+        )
+        val btcWithdrawal1Amount = AssetAmount(btc, "0.001")
+        val btcWithdrawal2Amount = AssetAmount(btc, "0.002")
+
+        val pendingBtcWithdrawal1 =
+            apiClient1.createWithdrawal(wallet1.signWithdraw(btc.name, btcWithdrawal1Amount.inFundamentalUnits)).withdrawal
+        val pendingBtcWithdrawal2 =
+            apiClient2.createWithdrawal(wallet2.signWithdraw(btc.name, btcWithdrawal2Amount.inFundamentalUnits)).withdrawal
+        assertEquals(listOf(pendingBtcWithdrawal1.id), apiClient1.listWithdrawals().withdrawals.filter { it.symbol.value == btc.name }.map { it.id })
+        assertEquals(listOf(pendingBtcWithdrawal2.id), apiClient2.listWithdrawals().withdrawals.filter { it.symbol.value == btc.name }.map { it.id })
+    }
+
+    @Test
     fun `withdrawal blockchain failure`() {
         val apiClient = TestApiClient()
         val btc = apiClient.getConfiguration().chains.flatMap { it.symbols }.first { it.name == "BTC" }
@@ -284,7 +338,7 @@ class WithdrawalTest {
 
         val pendingBtcWithdrawal = apiClient.createWithdrawal(wallet.signWithdraw(btc.name, btcWithdrawalAmount.inFundamentalUnits)).withdrawal
         assertEquals(WithdrawalStatus.Pending, pendingBtcWithdrawal.status)
-        assertEquals(ListWithdrawalsApiResponse(listOf(pendingBtcWithdrawal)), apiClient.listWithdrawals())
+        assertEquals(listOf(pendingBtcWithdrawal.id), apiClient.listWithdrawals().withdrawals.map { it.id })
 
         waitForBalance(
             apiClient,
@@ -298,7 +352,7 @@ class WithdrawalTest {
 
         val btcWithdrawal = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
         assertEquals(WithdrawalStatus.Complete, btcWithdrawal.status)
-        assertEquals(ListWithdrawalsApiResponse(listOf(btcWithdrawal)), apiClient.listWithdrawals())
+        assertEquals(listOf(btcWithdrawal.id), apiClient.listWithdrawals().withdrawals.map { it.id })
 
         waitForBalance(
             apiClient,
