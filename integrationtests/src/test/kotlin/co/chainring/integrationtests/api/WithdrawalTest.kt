@@ -6,9 +6,6 @@ import co.chainring.apps.api.model.ReasonCode
 import co.chainring.core.client.ws.blocking
 import co.chainring.core.client.ws.subscribeToBalances
 import co.chainring.core.evm.EIP712Transaction
-import co.chainring.core.model.db.ExchangeTransactionEntity
-import co.chainring.core.model.db.ExchangeTransactionStatus
-import co.chainring.core.model.db.ExchangeTransactionTable
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
@@ -23,7 +20,6 @@ import co.chainring.integrationtests.utils.assertBalancesMessageReceived
 import co.chainring.integrationtests.utils.assertError
 import co.chainring.tasks.fixtures.toChainSymbol
 import org.http4k.client.WebsocketClient
-import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.extension.ExtendWith
@@ -318,16 +314,13 @@ class WithdrawalTest {
         // resubmit it on chain - this should fail and trigger the rollback in the sequencer and
         // available balance should go back to what it was before.
         transaction {
-            WithdrawalEntity[pendingBtcWithdrawal.id].status = WithdrawalStatus.Pending
-            val withdrawalExchangeTransaction = ExchangeTransactionEntity.all()
-                .orderBy(ExchangeTransactionTable.sequenceId to SortOrder.DESC)
-                .limit(1).first()
+            val withdrawal = WithdrawalEntity[pendingBtcWithdrawal.id]
+            withdrawal.status = WithdrawalStatus.Sequenced
             // resign with a different nonce so signature should fail
             val signature = wallet.signWithdraw(btc.name, btcWithdrawalAmount.inFundamentalUnits).signature
-            withdrawalExchangeTransaction.transactionData = (withdrawalExchangeTransaction.transactionData as EIP712Transaction.WithdrawTx).copy(
+            withdrawal.transactionData = (withdrawal.transactionData!! as EIP712Transaction.WithdrawTx).copy(
                 signature = signature,
             )
-            withdrawalExchangeTransaction.status = ExchangeTransactionStatus.Pending
         }
 
         waitForFinalizedWithdrawal(pendingBtcWithdrawal.id)

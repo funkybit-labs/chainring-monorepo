@@ -70,7 +70,7 @@ object SequencerResponseProcessorService {
                             withdrawalEntity.update(WithdrawalStatus.Failed, error(response))
                         } else {
                             handleSequencerResponse(request, response, withdrawalEntity.wallet, listOf())
-                            queueExchangeTransactions(listOf(withdrawalEntity.toEip712Transaction()))
+                            withdrawalEntity.update(WithdrawalStatus.Sequenced, null)
                         }
                     }
                 }
