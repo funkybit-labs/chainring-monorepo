@@ -5,8 +5,7 @@ import co.chainring.core.db.updateEnum
 import co.chainring.core.model.db.BlockchainTransactionId
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.ChainIdColumnType
-import co.chainring.core.model.db.ExchangeTransactionBatchId
-import co.chainring.core.model.db.ExchangeTransactionId
+import co.chainring.core.model.db.EntityId
 import co.chainring.core.model.db.GUIDTable
 import co.chainring.core.model.db.PGEnum
 import co.chainring.core.model.db.enumDeclaration
@@ -19,6 +18,12 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 @Suppress("ClassName")
 class V29_ExchangeTransactionBatch : Migration() {
+
+    @JvmInline
+    value class V29_ExchangeTransactionId(override val value: String) : EntityId
+
+    @JvmInline
+    value class V29_ExchangeTransactionBatchId(override val value: String) : EntityId
 
     object V29_BlockchainTransactionTable : GUIDTable<BlockchainTransactionId>(
         "blockchain_transaction",
@@ -38,9 +43,9 @@ class V29_ExchangeTransactionBatch : Migration() {
         Failed,
     }
 
-    object V29_ExchangeTransactionBatchTable : GUIDTable<ExchangeTransactionBatchId>(
+    object V29_ExchangeTransactionBatchTable : GUIDTable<V29_ExchangeTransactionBatchId>(
         "exchange_transaction_batch",
-        ::ExchangeTransactionBatchId,
+        ::V29_ExchangeTransactionBatchId,
     ) {
         val createdAt = timestamp("created_at")
         val createdBy = varchar("created_by", 10485760)
@@ -72,9 +77,9 @@ class V29_ExchangeTransactionBatch : Migration() {
         Completed,
     }
 
-    object V29_ExchangeTransactionTable : GUIDTable<ExchangeTransactionId>(
+    object V29_ExchangeTransactionTable : GUIDTable<V29_ExchangeTransactionId>(
         "exchange_transaction",
-        ::ExchangeTransactionId,
+        ::V29_ExchangeTransactionId,
     ) {
         val status = customEnumeration(
             "status",

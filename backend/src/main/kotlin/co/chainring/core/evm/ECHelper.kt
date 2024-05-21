@@ -15,6 +15,10 @@ import java.math.BigInteger
 object ECHelper {
     val logger = KotlinLogging.logger {}
 
+    fun tradeHash(buyOrderId: Long, sellOrderId: Long): String {
+        return sha3((buyOrderId.toString() + sellOrderId.toString()).toByteArray()).toHex()
+    }
+
     fun sha3(messageBytes: ByteArray): ByteArray {
         return Hash.sha3(messageBytes)
     }

@@ -92,18 +92,24 @@ class Wallet(
         AssetAmount(
             symbol,
             if (symbol.contractAddress == null) {
-                getExchangeNativeBalance()
+                getExchangeNativeBalance(symbol.name)
             } else {
                 getExchangeERC20Balance(symbol.name)
             }.fromFundamentalUnits(symbol.decimals),
         )
 
     fun getExchangeERC20Balance(symbol: String): BigInteger {
-        return exchangeContractByChainId.getValue(currentChainId).balances(address.value, erc20TokenAddress(symbol)).sendAndWaitForConfirmation()
+        val chainId = chains.first { c -> c.symbols.any { it.name == symbol } }.id
+        return exchangeContractByChainId.getValue(chainId).balances(address.value, erc20TokenAddress(symbol)).sendAndWaitForConfirmation()
     }
 
     fun getExchangeNativeBalance(): BigInteger {
         return exchangeContractByChainId.getValue(currentChainId).balances(address.value, Address.zero.value).sendAndWaitForConfirmation()
+    }
+
+    private fun getExchangeNativeBalance(symbol: String): BigInteger {
+        val chainId = chains.first { c -> c.symbols.any { it.name == symbol } }.id
+        return exchangeContractByChainId.getValue(chainId).balances(address.value, Address.zero.value).sendAndWaitForConfirmation()
     }
 
     fun deposit(assetAmount: AssetAmount): TransactionReceipt {
@@ -230,8 +236,6 @@ class Wallet(
         return System.currentTimeMillis()
     }
 
-    fun decimals(symbol: String): Int = chains.first { it.id == currentChainId }.symbols.first { it.name == symbol }.decimals.toInt()
-
     private fun loadErc20Contract(symbol: String) = blockchainClientsByChainId.getValue(currentChainId).loadERC20Mock(erc20TokenAddress(symbol)!!)
 
     private fun erc20TokenAddress(symbol: String) =
@@ -242,8 +246,8 @@ class Wallet(
             .baseAndQuoteSymbols()
             .let { (base, quote) ->
                 Pair(
-                    chains.first { it.id == currentChainId }.symbols.first { it.name == base },
-                    chains.first { it.id == currentChainId }.symbols.first { it.name == quote },
+                    chains.map { it.symbols.filter { s -> s.name == base } }.flatten().first(),
+                    chains.map { it.symbols.filter { s -> s.name == quote } }.flatten().first(),
                 )
             }
 }

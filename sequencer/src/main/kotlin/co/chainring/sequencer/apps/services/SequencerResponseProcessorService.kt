@@ -3,7 +3,7 @@ package co.chainring.sequencer.apps.services
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.TradeCreated
-import co.chainring.core.evm.EIP712Transaction
+import co.chainring.core.evm.ECHelper
 import co.chainring.core.model.FeeRate
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.Symbol
@@ -14,7 +14,6 @@ import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.CreateOrderAssignment
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
-import co.chainring.core.model.db.ExchangeTransactionEntity
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketEntity
@@ -184,6 +183,7 @@ object SequencerResponseProcessorService {
                     market = buyOrder.market,
                     amount = trade.amount.toBigInteger(),
                     price = trade.price.toBigDecimal(),
+                    tradeHash = ECHelper.tradeHash(trade.buyOrderGuid, trade.sellOrderGuid),
                 )
 
                 // create executions for both
@@ -277,9 +277,6 @@ object SequencerResponseProcessorService {
             }
         }
 
-        // queue any blockchain txs for processing
-        queueExchangeTransactions(tradesWithTakerOrder.map { it.first.toEip712Transaction() })
-
         val orderBookNotifications = BroadcasterNotification.orderBooksForMarkets(
             OrderEntity
                 .getOrdersMarkets(response.ordersChangedList.map { it.guid })
@@ -328,10 +325,6 @@ object SequencerResponseProcessorService {
             }
 
         publishBroadcasterNotifications(broadcasterNotifications + orderBookNotifications + ohlcNotifications + limitsNotifications)
-    }
-
-    private fun queueExchangeTransactions(txs: List<EIP712Transaction>) {
-        ExchangeTransactionEntity.createList(txs)
     }
 
     private fun getSymbol(asset: String): SymbolEntity {

@@ -4,7 +4,7 @@ import co.chainring.core.db.Migration
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.db.BlockchainTransactionId
 import co.chainring.core.model.db.ChainTable
-import co.chainring.core.model.db.ExchangeTransactionId
+import co.chainring.core.model.db.EntityId
 import co.chainring.core.model.db.GUIDTable
 import co.chainring.core.model.db.PGEnum
 import co.chainring.core.model.db.enumDeclaration
@@ -17,6 +17,9 @@ import org.jetbrains.exposed.sql.transactions.transaction
 @Suppress("ClassName")
 class V20_ExchangeTransaction : Migration() {
 
+    @JvmInline
+    value class V20_ExchangeTransactionId(override val value: String) : EntityId
+
     object V20_BlockchainTransactionTable : GUIDTable<BlockchainTransactionId>(
         "blockchain_transaction",
         ::BlockchainTransactionId,
@@ -27,9 +30,9 @@ class V20_ExchangeTransaction : Migration() {
         Assigned,
     }
 
-    object V20_ExchangeTransactionTable : GUIDTable<ExchangeTransactionId>(
+    object V20_ExchangeTransactionTable : GUIDTable<V20_ExchangeTransactionId>(
         "exchange_transaction",
-        ::ExchangeTransactionId,
+        ::V20_ExchangeTransactionId,
     ) {
         val createdAt = timestamp("created_at")
         val createdBy = varchar("created_by", 10485760)

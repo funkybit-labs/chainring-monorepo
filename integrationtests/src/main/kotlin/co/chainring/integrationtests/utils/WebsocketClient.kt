@@ -121,7 +121,7 @@ fun WsClient.assertTradeCreatedMessageReceived(order: CreateOrderApiResponse, pr
         assertEquals(order.orderId, msg.trade.orderId)
         assertEquals(order.order.marketId, msg.trade.marketId)
         assertEquals(order.order.side, msg.trade.side)
-        assertEquals(0, price.compareTo(msg.trade.price), "Price does not match")
+        assertEquals(0, price.compareTo(msg.trade.price), "Price does not match Expected: $price Actual: ${msg.trade.price}")
         assertEquals(amount.amount, msg.trade.amount.fromFundamentalUnits(amount.symbol.decimals), "Amount does not match")
         assertEquals(fee.amount, msg.trade.feeAmount.fromFundamentalUnits(fee.symbol.decimals), "Fee does not match")
         assertEquals(fee.symbol.name, msg.trade.feeSymbol.value)
