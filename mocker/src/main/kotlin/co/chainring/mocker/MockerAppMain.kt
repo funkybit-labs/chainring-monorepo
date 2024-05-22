@@ -61,11 +61,10 @@ class MockerApp(
     init {
         config.forEach {
             marketsConfig[MarketId(it)] = MarketParams(
-                desiredTakersCount = System.getenv(it.replace("/", "_") + "_TAKERS")?.toIntOrNull() ?: 5,
-                priceBaseline = System.getenv(it.replace("/", "_") + "_PRICE_BASELINE")?.toBigDecimalOrNull() ?: BigDecimal.TEN,
-                initialBaseBalance = System.getenv(it.replace("/", "_") + "_INITIAL_BASE_BALANCE")?.toBigDecimalOrNull() ?: BigDecimal.TEN,
-                makerPrivateKeyHex = System.getenv(it.replace("/", "_") + "_MAKER_PRIVATE_KEY_HEX")
-                    ?: ("0x" + Keys.createEcKeyPair().privateKey.toString(16)),
+                desiredTakersCount = System.getenv("${it}_TAKERS")?.toIntOrNull() ?: 5,
+                priceBaseline = System.getenv("${it}_PRICE_BASELINE")?.toBigDecimalOrNull() ?: BigDecimal.TEN,
+                initialBaseBalance = System.getenv("${it}_INITIAL_BASE_BALANCE")?.toBigDecimalOrNull() ?: BigDecimal.ONE,
+                makerPrivateKeyHex = System.getenv("${it}_MAKER_PRIVATE_KEY_HEX") ?: ("0x" + Keys.createEcKeyPair().privateKey.toString(16)),
             )
         }
     }
