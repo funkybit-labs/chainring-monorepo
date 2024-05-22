@@ -13,6 +13,7 @@ import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
+import co.chainring.core.client.rest.ApiCallFailure
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
@@ -37,12 +38,14 @@ import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.concurrent.thread
 import kotlin.random.Random
+import kotlinx.datetime.Clock
 
 class Taker(
     private val rate: Long,
     private val sizeFactor: Double,
     native: BigInteger?,
-    assets: Map<String, BigInteger>
+    assets: Map<String, BigInteger>,
+    private val priceCorrectionFunction: DeterministicHarmonicPriceMovement
 ) : Actor(native, assets) {
     private var currentOrder: Order.Market? = null
     private var markets = setOf<Market>()
@@ -179,7 +182,8 @@ class Taker(
 
                         else -> {}
                     }
-                } catch (_: InterruptedException) {
+                } catch (e: Exception) {
+                    logger.warn(e) { "Error occurred while running taker in market $markets" }
                 }
             }
             marketIds.forEach {
@@ -202,27 +206,27 @@ class Taker(
                     val market = markets.find { it.id == marketId }!!
                     logger.debug { "$id: baseBalance $baseBalance, quoteBalance: $quoteBalance" }
                     marketPrices[marketId]?.let { price ->
-                        val side =
-                            if (baseBalance.toBigDecimal() < (quoteBalance.toBigDecimal() / price).movePointLeft(market.quoteDecimals - market.baseDecimals)) {
-                                OrderSide.Buy
-                            } else {
-                                OrderSide.Sell
-                            }
+                        val expectedMarketPrice = priceCorrectionFunction.nextValue(Clock.System.now())
+                        val side = if (expectedMarketPrice > price.toDouble()) {
+                            OrderSide.Buy
+                        } else {
+                            OrderSide.Sell
+                        }
                         val amount = when (side) {
                             OrderSide.Buy -> {
                                 quoteBalance.let { notional ->
-                                    ((notional.toBigDecimal() / sizeFactor.toBigDecimal()) / price).movePointLeft(
+                                    ((notional.toBigDecimal() / Random.nextDouble(0.0, sizeFactor).toBigDecimal()) / price).movePointLeft(
                                         market.quoteDecimals - market.baseDecimals
                                     ).toBigInteger()
                                 } ?: BigInteger.ZERO
                             }
 
                             OrderSide.Sell -> {
-                                (baseBalance.toBigDecimal() / sizeFactor.toBigDecimal()).toBigInteger()
+                                (baseBalance.toBigDecimal() / Random.nextDouble(0.0, sizeFactor).toBigDecimal()).toBigInteger()
                             }
                         }
-                        logger.debug { "$id going to create a $side order" }
-                        apiClient.createOrder(
+                        logger.debug { "$id going to create a market $side order in $marketId market (amount: $amount, market price: $price" }
+                        apiClient.tryCreateOrder(
                             CreateOrderApiRequest.Market(
                                 nonce = generateHexString(32),
                                 marketId = marketId,
@@ -233,14 +237,17 @@ class Taker(
                             ).let {
                                 wallet.signOrder(it)
                             },
-                        ).also { response ->
-                            TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.orderCreated)
-                            TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.orderFilled)
-                            TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.tradeCreated)
-                            TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.tradeSettled)
+                        ).fold(
+                            { e: ApiCallFailure -> logger.error { "$id failed to create $side order in $marketId market with: $e" } },
+                            { response ->
+                                logger.debug { "$id back from creating a $side order in $marketId market" }
 
-                        }
-                        logger.debug { "$id back from creating an order" }
+                                TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.orderCreated)
+                                TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.orderFilled)
+                                TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.tradeCreated)
+                                TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.tradeSettled)
+                            }
+                        )
                     }
                 }
             }
@@ -248,6 +255,7 @@ class Taker(
     }
 
     fun stop() {
+        logger.info { "Taker $id stopping" }
         actorThread?.let {
             stopping = true
             it.interrupt()

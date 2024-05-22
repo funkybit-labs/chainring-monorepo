@@ -15,6 +15,7 @@ import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
+import co.chainring.core.client.rest.ApiCallFailure
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
@@ -38,8 +39,17 @@ import java.math.BigInteger
 import kotlin.concurrent.thread
 import kotlin.math.max
 import kotlin.math.pow
+import org.web3j.crypto.ECKeyPair
+import org.web3j.crypto.Keys
 
-class Maker(private val tightness: Int, private val skew: Int, private val levels: Int, native: BigInteger, assets: Map<String, BigInteger>): Actor(native, assets) {
+class Maker(
+    private val tightness: Int,
+    private val skew: Int,
+    private val levels: Int,
+    native: BigInteger,
+    assets: Map<String, BigInteger>,
+    keyPair: ECKeyPair = Keys.createEcKeyPair()
+) : Actor(native, assets, keyPair) {
     private var currentOrders = mutableMapOf<MarketId,MutableList<Order.Limit>>()
     private var markets = setOf<Market>()
     private val logger = KotlinLogging.logger {}
@@ -169,7 +179,9 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                         }
                         else -> {}
                     }
-                } catch (_: InterruptedException) {}
+                } catch (e: Exception) {
+                    logger.warn(e) { "Error occurred while running maker in market $markets" }
+                }
             }
             marketIds.forEach {
                 wsClient.unsubscribe(SubscriptionTopic.Prices(it, OHLCDuration.P5M))
@@ -182,6 +194,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
     }
 
     fun stop() {
+        logger.info { "Market maker $id stopping" }
         listenerThread?.let {
             stopping = true
             it.interrupt()
@@ -204,7 +217,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
     private fun offerAndBidAmounts(market: Market, offerPrices: List<BigDecimal>, bidPrices: List<BigDecimal>): Pair<List<BigInteger>, List<BigInteger>> {
         val marketId = market.id
         // don't try to use all of available inventory
-        val useFraction = 0.80.toBigDecimal()
+        val useFraction = 0.70.toBigDecimal()
         val baseInventory = (balances.getOrDefault(marketId.baseSymbol(), BigInteger.ZERO).toBigDecimal() * useFraction).toBigInteger()
         val quoteInventory = (balances.getOrDefault(marketId.quoteSymbol(), BigInteger.ZERO).toBigDecimal() * useFraction).toBigInteger()
         val levels = max(offerPrices.size, bidPrices.size)
@@ -297,11 +310,12 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
 
     private fun createQuotes(marketId: MarketId, levels: Int, curPrice: BigDecimal) {
         markets.find { it.id == marketId }?.let { market ->
+            apiClient.cancelOpenOrders()
             val(offerPrices, bidPrices) = offerAndBidPrices(market, levels, curPrice)
             val(offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
             offerPrices.forEachIndexed { ix, price ->
                 val amount = offerAmounts[ix]
-                apiClient.createOrder(
+                apiClient.tryCreateOrder(
                     CreateOrderApiRequest.Limit(
                         nonce = generateOrderNonce(),
                         marketId = marketId,
@@ -313,11 +327,11 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                     ).let {
                         wallet.signOrder(it)
                     },
-                )
+                ).onLeft { e: ApiCallFailure -> logger.warn { "$id failed to create Sell order in $marketId market with: $e" } }
             }
             bidPrices.forEachIndexed { ix, price ->
                 val amount = bidAmounts[ix]
-                apiClient.createOrder(
+                apiClient.tryCreateOrder(
                     CreateOrderApiRequest.Limit(
                         nonce = generateOrderNonce(),
                         marketId = marketId,
@@ -329,8 +343,7 @@ class Maker(private val tightness: Int, private val skew: Int, private val level
                     ).let {
                         wallet.signOrder(it)
                     },
-                )
-
+                ).onLeft { e: ApiCallFailure -> logger.warn { "$id failed to create Buy order in $marketId market with: $e" } }
             }
             currentOrders[marketId] = apiClient.listOrders().orders.filter {
                 it.status == OrderStatus.Open && it.marketId == marketId

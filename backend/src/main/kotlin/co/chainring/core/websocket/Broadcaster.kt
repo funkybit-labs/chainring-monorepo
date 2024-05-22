@@ -149,7 +149,7 @@ class Broadcaster(val db: Database) {
                     ohlcs.lastOrNull()?.let { lastOhlc ->
                         val nowMinus24h = OHLCDuration.P1M.durationStart(Clock.System.now() - 24.hours)
                         OHLCEntity.findSingleByClosestStartTime(market, OHLCDuration.P1M, nowMinus24h)?.let { h24Ohlc ->
-                            pricesDailyChangeByMarket[market] = lastOhlc.close - h24Ohlc.close.toDouble()
+                            pricesDailyChangeByMarket[market] = (lastOhlc.close - h24Ohlc.close.toDouble()) / h24Ohlc.close.toDouble()
                         }
                     }
                 }

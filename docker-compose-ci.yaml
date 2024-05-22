@@ -20,7 +20,7 @@ services:
     ports:
       - "8546:8545"
     volumes:
-      - anvil-data:/root/.foundry
+      - anvil2-data:/root/.foundry
   db:
     image: postgres:15
     restart: always
@@ -44,3 +44,4 @@ services:
 
 volumes:
   anvil-data:
+  anvil2-data:

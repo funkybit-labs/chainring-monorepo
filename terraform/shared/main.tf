@@ -164,6 +164,44 @@ resource "aws_ecr_repository_policy" "sequencer" {
 EOF
 }
 
+resource "aws_ecr_repository" "mocker" {
+  name                 = "mocker"
+  image_tag_mutability = "MUTABLE"
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
+}
+
+resource "aws_ecr_repository_policy" "mocker" {
+  repository = aws_ecr_repository.sequencer.name
+  policy     = <<EOF
+{
+    "Version": "2008-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowPushPull",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "${module.github_oidc.role.arn}"
+            },
+            "Action": [
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:PutImage",
+                "ecr:InitiateLayerUpload",
+                "ecr:UploadLayerPart",
+                "ecr:CompleteLayerUpload"
+            ]
+        }
+    ]
+}
+EOF
+}
+
 moved {
   from = aws_ecr_repository.ecr
   to   = aws_ecr_repository.backend

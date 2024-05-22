@@ -1,8 +1,11 @@
 package co.chainring.mocker
 
+import co.chainring.apps.api.model.Market
+import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.utils.TraceRecorder
 import co.chainring.core.utils.humanReadable
+import co.chainring.mocker.core.DeterministicHarmonicPriceMovement
 import co.chainring.mocker.core.Maker
 import co.chainring.mocker.core.Taker
 import co.chainring.mocker.core.toFundamentalUnits
@@ -16,6 +19,8 @@ import kotlin.time.Duration.Companion.minutes
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import org.web3j.crypto.ECKeyPair
+import org.web3j.crypto.Keys
 
 
 val start = Clock.System.now()
@@ -44,7 +49,8 @@ fun main() {
     val makers = mutableListOf<Maker>()
     val takers = mutableListOf<Taker>()
 
-    val usdcDai = MarketId("USDC/DAI")
+    val usdcDai = Market(MarketId("USDC/DAI"), Symbol("USDC"), 6, Symbol("DAI"), 18, 0.05.toBigDecimal())
+    val priceFunction = DeterministicHarmonicPriceMovement.generateRandom(initialValue = 17.0, maxFluctuation = 1.5)
 
     // schedule metrics
     val statsTask = timerTask {
@@ -63,10 +69,10 @@ fun main() {
 
     // initial load
     (1..initialMakers).map {
-        makers.add(startMaker(usdcDai))
+        makers.add(startMaker(usdcDai, 10000.0.toBigDecimal(), 5000.0.toBigDecimal()))
     }
     (1..initialTakers).map {
-        takers.add(startTaker(usdcDai))
+        takers.add(startTaker(usdcDai, 100.0.toBigDecimal(), 50.0.toBigDecimal(), priceFunction))
     }
     // wait for system to warm caches
     Thread.sleep(warmupInterval.inWholeMilliseconds)
@@ -79,7 +85,7 @@ fun main() {
             this.cancel()
         } else {
             logger.debug { "Starting maker #${makers.size + 1}" }
-            makers.add(startMaker(usdcDai))
+            makers.add(startMaker(usdcDai, 10000.0.toBigDecimal(), 5000.0.toBigDecimal()))
         }
     }, 0, newMakerInterval.inWholeMilliseconds)
     timer.scheduleAtFixedRate(timerTask {
@@ -88,7 +94,7 @@ fun main() {
             this.cancel()
         } else {
             logger.debug { "Starting taker #${takers.size + 1}" }
-            takers.add(startTaker(usdcDai))
+            takers.add(startTaker(usdcDai, 100.0.toBigDecimal(), 50.0.toBigDecimal(), priceFunction))
         }
     }, 0, newTakerInterval.inWholeMilliseconds)
 
@@ -106,31 +112,40 @@ fun main() {
     timer.cancel()
 }
 
-private fun startMaker(market: MarketId): Maker {
+fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, keyPair: ECKeyPair = Keys.createEcKeyPair()): Maker {
+    val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
+    val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)
+    val quoteAsset = market.quoteSymbol.value to quoteAssetAmount.toFundamentalUnits(market.quoteDecimals)
+
     val maker = Maker(
         tightness = 5, skew = 0, levels = 10,
-        native = BigDecimal.TEN.movePointRight(18).toBigInteger(),
-        assets = mapOf(
-            //"ETH" to 200.toFundamentalUnits(18),
-            "USDC" to 10000.toFundamentalUnits(6),
-            "DAI" to 5000.toFundamentalUnits(18)
-        )
+        native = if (baseAssetBtc) baseAsset.second else BigDecimal.TEN.movePointRight(18).toBigInteger(),
+        assets = when {
+            baseAssetBtc -> mapOf(quoteAsset)
+            else -> mapOf(baseAsset, quoteAsset)
+        },
+        keyPair = keyPair
     )
-    maker.start(listOf(market))
+    maker.start(listOf(market.id))
     return maker
 }
 
-private fun startTaker(market: MarketId): Taker {
+fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, priceFunction: DeterministicHarmonicPriceMovement): Taker {
+    val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
+    val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)
+    val quoteAsset = market.quoteSymbol.value to quoteAssetAmount.toFundamentalUnits(market.quoteDecimals)
+
     val taker = Taker(
-        rate = Random.nextLong(5000, 15000),
+        rate = Random.nextLong(10000, 30000),
         sizeFactor = Random.nextDouble(5.0, 20.0),
-        native = null,
-        assets = mapOf(
-            "USDC" to 100.toFundamentalUnits(6),
-            "DAI" to 50.toFundamentalUnits(18)
-        )
+        native = if (baseAssetBtc) baseAsset.second else BigDecimal.ONE.movePointRight(18).toBigInteger(),
+        assets = when {
+            baseAssetBtc -> mapOf(quoteAsset)
+            else -> mapOf(baseAsset, quoteAsset)
+        },
+        priceCorrectionFunction = priceFunction,
     )
-    taker.start(listOf(market))
+    taker.start(listOf(market.id))
     return taker
 }
 

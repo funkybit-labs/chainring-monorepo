@@ -1,21 +1,41 @@
 environment:
   api:
     DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
-    EVM_NETWORK_URL: http://demo-anvil.chainring.co:8545
-    AUTH_TOKEN_VALIDITY_INTERVAL: P1D
+    EVM_CHAINS: anvil,anvil2
+    EVM_NETWORK_URL_anvil: http://demo-anvil.chainring.co:8545
+    EVM_NETWORK_URL_anvil2: http://demo-anvil2.chainring.co:8545
+    AUTH_TOKEN_VALIDITY_INTERVAL: P30D
     SEQUENCER_HOST_NAME: demo-sequencer.chainring.co
     SEQUENCER_PORT: "5337"
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
   sequencer:
     QUEUE_HOME: "/data/queues/demo"
-    CHECKPOINTS_ENABLED: "false"
-    SANDBOX_MODE: "true"
+    CHECKPOINTS_ENABLED: "true"
     DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
+  anvil2:
+    CHAIN_ID: "31338"
   otterscan:
     ERIGON_URL: https://demo-anvil.chainring.co
+  otterscan2:
+    ERIGON_URL: https://demo-anvil2.chainring.co
+  mocker:
+    API_URL: http://demo-api.chainring.co:9000
+    EVM_CHAINS: anvil,anvil2
+    EVM_NETWORK_URL_anvil: http://demo-anvil.chainring.co:8545
+    EVM_NETWORK_URL_anvil2: http://demo-anvil2.chainring.co:8545
+    MARKETS: "BTC/ETH,BTC/USDC,USDC/DAI"
+    BTC/ETH_PRICE_BASELINE: "17.5"
+    BTC/ETH_INITIAL_BASE_BALANCE: "1"
+    BTC/ETH_MAKER_PRIVATE_KEY_HEX: "0xde92c413268a6dba35bec3cd76639c7a3568de2ff3ff8c9d0b78efc9aa3e67c5"
+    USDC/DAI_PRICE_BASELINE: "2.05"
+    USDC/DAI_INITIAL_BASE_BALANCE: "50"
+    USDC/DAI_MAKER_PRIVATE_KEY_HEX: "0xa9b39ccc651291ae7191b5edf1f47d551335562467eb8a6570397eed8c5c0826"
+    BTC/USDC_PRICE_BASELINE: "68390"
+    BTC/USDC_INITIAL_BASE_BALANCE: "0.1"
+    BTC/USDC_MAKER_PRIVATE_KEY_HEX: "0x566a0b2ef8642058d96b44cfa8c90b260a56065a60d44bf5d916c125e64d6967"
 services:
   api:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
@@ -31,6 +51,14 @@ services:
     image: otterscan/otterscan
     count: 1
     environment: otterscan
+  anvil2:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
+    count: 1
+    environment: anvil2
+  otterscan2:
+    image: otterscan/otterscan
+    count: 1
+    environment: otterscan2
   sequencer:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer
     count: 1
@@ -38,4 +66,7 @@ services:
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-aa47459e-c32f-4308-8f80-1af418a10602-L9i7qG
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
-
+  mocker:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/mocker
+    count: 1
+    environment: mocker
