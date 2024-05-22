@@ -25,6 +25,8 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
 
+    implementation("org.knowm.xchart:xchart:3.8.8")
+
     implementation("org.http4k:http4k-core:$http4kVersion")
     implementation("org.http4k:http4k-realtime-core:$http4kVersion")
     implementation("org.http4k:http4k-contract:$http4kVersion")
