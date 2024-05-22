@@ -119,7 +119,7 @@ class MockerApp(
             val priceFunction = marketsPriceFunctions.getOrPut(marketId) {
                 DeterministicHarmonicPriceMovement.generateRandom(
                     initialValue = params.priceBaseline.toDouble(),
-                    maxSpread = params.priceBaseline.toDouble() * 0.1
+                    maxFluctuation = market.tickSize.toDouble() * 25
                 )
             }
 

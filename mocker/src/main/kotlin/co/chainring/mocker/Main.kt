@@ -50,7 +50,7 @@ fun main() {
     val takers = mutableListOf<Taker>()
 
     val usdcDai = Market(MarketId("USDC/DAI"), Symbol("USDC"), 6, Symbol("DAI"), 18, 0.05.toBigDecimal())
-    val priceFunction = DeterministicHarmonicPriceMovement.generateRandom(initialValue = 17.0, maxSpread = 1.5)
+    val priceFunction = DeterministicHarmonicPriceMovement.generateRandom(initialValue = 17.0, maxFluctuation = 1.5)
 
     // schedule metrics
     val statsTask = timerTask {

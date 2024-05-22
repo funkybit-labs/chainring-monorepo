@@ -13,7 +13,7 @@ import org.knowm.xchart.XYChartBuilder
 
 class DeterministicHarmonicPriceMovement(
     private val initialValue: Double,
-    private val maxDeviation: Double,
+    private val maxFluctuation: Double,
 ) {
     private val startTime: Instant = Clock.System.now()
     private val random = Random()
@@ -24,29 +24,34 @@ class DeterministicHarmonicPriceMovement(
         Harmonic(frequency = 1.0 / 1800, amplitude = 0.01 * initialValue, phase = random.nextDouble(0.0, 2 * PI)),   // 30 minutes
         Harmonic(frequency = 1.0 / 900, amplitude = 0.005 * initialValue, phase = random.nextDouble(0.0, 2 * PI))    // 15 minutes
     )
+    private var nextPhaseChangeTime: Instant = startTime + random.nextLong(600, 1200).seconds
 
     fun nextValue(timestamp: Instant): Double {
         val duration = (timestamp - startTime).inWholeSeconds.toDouble()
         var fluctuation = 0.0
         harmonics.forEach { harmonic ->
-            if (random.nextDouble() < 0.01) {
-                harmonic.phase = random.nextDouble(0.0, 2 * PI)
+            if (timestamp > nextPhaseChangeTime) {
+                // random shock by updating phase of some harmonics
+                if (random.nextBoolean()) {
+                    harmonic.phase = random.nextDouble(0.0, 2 * PI)
+                }
+                nextPhaseChangeTime += random.nextLong(600, 1200).seconds
             }
             fluctuation += harmonic.amplitude * sin(2 * PI * harmonic.frequency * duration + harmonic.phase)
         }
-        val normalizedFluctuation = maxDeviation * (fluctuation / harmonics.sumOf { it.amplitude })
+        val normalizedFluctuation = maxFluctuation * (fluctuation / harmonics.sumOf { it.amplitude })
         return initialValue + normalizedFluctuation
     }
 
     private data class Harmonic(
+        val frequency: Double,
         val amplitude: Double,
         var phase: Double,
-        val frequency: Double
     )
 
     companion object {
-        fun generateRandom(initialValue: Double, maxSpread: Double): DeterministicHarmonicPriceMovement {
-            return DeterministicHarmonicPriceMovement(initialValue = initialValue, maxDeviation = maxSpread)
+        fun generateRandom(initialValue: Double, maxFluctuation: Double): DeterministicHarmonicPriceMovement {
+            return DeterministicHarmonicPriceMovement(initialValue = initialValue, maxFluctuation = maxFluctuation)
         }
     }
 }
