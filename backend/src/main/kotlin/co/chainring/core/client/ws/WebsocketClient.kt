@@ -18,7 +18,7 @@ import org.http4k.websocket.WsMessage
 fun WebsocketClient.blocking(auth: String?): WsClient =
     blocking(
         uri = Uri.of(apiServerRootUrl.replace("http:", "ws:").replace("https:", "wss:") + "/connect" + (auth?.let { "?auth=$auth" } ?: "")),
-        autoReconnection = true
+        autoReconnection = true,
     )
 
 fun WsClient.send(message: IncomingWSMessage) {

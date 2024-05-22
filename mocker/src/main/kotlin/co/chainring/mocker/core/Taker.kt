@@ -206,7 +206,7 @@ class Taker(
                     val market = markets.find { it.id == marketId }!!
                     logger.debug { "$id: baseBalance $baseBalance, quoteBalance: $quoteBalance" }
                     marketPrices[marketId]?.let { price ->
-                        val expectedMarketPrice = priceCorrectionFunction.nextValue(Clock.System.now().toEpochMilliseconds())
+                        val expectedMarketPrice = priceCorrectionFunction.nextValue(Clock.System.now())
                         val side = if (expectedMarketPrice > price.toDouble()) {
                             OrderSide.Buy
                         } else {

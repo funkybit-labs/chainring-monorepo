@@ -6,60 +6,47 @@ import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.datetime.toJavaInstant
 import org.knowm.xchart.SwingWrapper
 import org.knowm.xchart.XYChartBuilder
 
 class DeterministicHarmonicPriceMovement(
     private val initialValue: Double,
-    private val maxSpread: Double,
-    private val numHarmonics: Int = 3,
-    private val meanReversionSpeed: Double = 0.5,
+    private val maxDeviation: Double,
 ) {
-    private val period: Long = 4 * 3600 * 1000
-    private val harmonics: List<Harmonic>
+    private val startTime: Instant = Clock.System.now()
     private val random = Random()
+    private val harmonics: List<Harmonic> = listOf(
+        Harmonic(frequency = 1.0 / 14400, amplitude = 0.03 * initialValue, phase = random.nextDouble(0.0, 2 * PI)),  // 4 hours
+        Harmonic(frequency = 1.0 / 7200, amplitude = 0.02 * initialValue, phase = random.nextDouble(0.0, 2 * PI)),   // 2 hours
+        Harmonic(frequency = 1.0 / 3600, amplitude = 0.015 * initialValue, phase = random.nextDouble(0.0, 2 * PI)),  // 1 hour
+        Harmonic(frequency = 1.0 / 1800, amplitude = 0.01 * initialValue, phase = random.nextDouble(0.0, 2 * PI)),   // 30 minutes
+        Harmonic(frequency = 1.0 / 900, amplitude = 0.005 * initialValue, phase = random.nextDouble(0.0, 2 * PI))    // 15 minutes
+    )
 
-    init {
-        harmonics = List(numHarmonics) { index ->
-            Harmonic(
-                amplitude = 0.5 + random.nextDouble() * 0.5,
-                phase = random.nextDouble() * 2 * PI,
-                frequency = 0.5 + random.nextDouble()
-            )
+    fun nextValue(timestamp: Instant): Double {
+        val duration = (timestamp - startTime).inWholeSeconds.toDouble()
+        var fluctuation = 0.0
+        harmonics.forEach { harmonic ->
+            if (random.nextDouble() < 0.01) {
+                harmonic.phase = random.nextDouble(0.0, 2 * PI)
+            }
+            fluctuation += harmonic.amplitude * sin(2 * PI * harmonic.frequency * duration + harmonic.phase)
         }
-    }
-
-    fun nextValue(timestamp: Long): Double {
-        val t = timestamp % period
-        var price = initialValue
-
-        for (harmonic in harmonics) {
-            val d = maxSpread * harmonic.amplitude * sin(2 * PI * harmonic.frequency * t / period + harmonic.phase)
-            println(d)
-            price += d
-        }
-
-        // Add deterministic noise based on timestamp
-        val deterministicNoise = maxSpread * 0.05 * sin(2 * PI * t / period)
-        price += deterministicNoise
-
-        // Add mean reversion to the initial price
-        val deviationFromMean = price - initialValue
-        price -= meanReversionSpeed * deviationFromMean
-
-        return price
+        val normalizedFluctuation = maxDeviation * (fluctuation / harmonics.sumOf { it.amplitude })
+        return initialValue + normalizedFluctuation
     }
 
     private data class Harmonic(
         val amplitude: Double,
-        val phase: Double,
+        var phase: Double,
         val frequency: Double
     )
 
     companion object {
         fun generateRandom(initialValue: Double, maxSpread: Double): DeterministicHarmonicPriceMovement {
-            return DeterministicHarmonicPriceMovement(initialValue = initialValue, maxSpread = maxSpread)
+            return DeterministicHarmonicPriceMovement(initialValue = initialValue, maxDeviation = maxSpread)
         }
     }
 }
@@ -67,14 +54,14 @@ class DeterministicHarmonicPriceMovement(
 
 fun main() {
     val initialPrice = 17.0
-    val maxSpread = initialPrice * 0.1
-    val priceFunction = DeterministicHarmonicPriceMovement(initialPrice, maxSpread)
+    val maxDeviation = initialPrice * 0.01
+    val priceFunction = DeterministicHarmonicPriceMovement(initialPrice, maxDeviation)
 
     val now = Clock.System.now()
-    val timestamps = (1..6 * 60 * 60 ).map { (now + it.seconds) }
-    val prices = timestamps.map { priceFunction.nextValue(it.toEpochMilliseconds()) }
+    val timestamps = (1..20 * 60).map { (now + it.seconds * 30) }
+    val prices = timestamps.map { priceFunction.nextValue(it) }
 
-    val chart = XYChartBuilder().width(800).height(600).title("Price Movement with Multiple Harmonics").xAxisTitle("Timestamp (seconds)")
+    val chart = XYChartBuilder().width(1200).height(600).title("Price Movement with Multiple Harmonics").xAxisTitle("Timestamp (seconds)")
         .yAxisTitle("Price").build()
 
     chart.addSeries("Price", timestamps.toList().map { Date.from(it.toJavaInstant()) }, prices)
