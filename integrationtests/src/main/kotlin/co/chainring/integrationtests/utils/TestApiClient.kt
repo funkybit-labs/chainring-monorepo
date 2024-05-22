@@ -15,8 +15,10 @@ import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.DepositApiResponse
 import co.chainring.apps.api.model.ListDepositsApiResponse
 import co.chainring.apps.api.model.ListWithdrawalsApiResponse
+import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
+import co.chainring.apps.api.model.RequestStatus
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.WithdrawalApiResponse
@@ -27,11 +29,16 @@ import co.chainring.core.client.rest.apiServerRootUrl
 import co.chainring.core.client.rest.applicationJson
 import co.chainring.core.client.rest.httpClient
 import co.chainring.core.client.rest.json
+import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.OrderId
+import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.utils.TraceRecorder
+import co.chainring.core.utils.generateOrderNonce
+import co.chainring.core.utils.toFundamentalUnits
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.Request
@@ -40,8 +47,11 @@ import okhttp3.Response
 import org.junit.jupiter.api.Assertions
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
+import java.math.BigDecimal
 import java.net.HttpURLConnection
 import kotlin.test.DefaultAsserter.fail
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
 
 class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder: TraceRecorder = TraceRecorder.noOp) : ApiClient(ecKeyPair, traceRecorder) {
 
@@ -141,6 +151,43 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
     override fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
         tryCreateOrder(apiRequest).assertSuccess()
 
+    fun createLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: Wallet): CreateOrderApiResponse {
+        val request = CreateOrderApiRequest.Limit(
+            nonce = generateOrderNonce(),
+            marketId = market.id,
+            side = side,
+            amount = amount.toFundamentalUnits(market.baseDecimals),
+            price = price,
+            signature = EvmSignature.emptySignature(),
+            verifyingChainId = ChainId.empty,
+        ).let { wallet.signOrder(it) }
+
+        val response = createOrder(request)
+
+        assertIs<CreateOrderApiRequest.Limit>(response.order)
+        assertEquals(request, response.order)
+
+        return response
+    }
+
+    fun createMarketOrder(market: Market, side: OrderSide, amount: BigDecimal, wallet: Wallet): CreateOrderApiResponse {
+        val request = CreateOrderApiRequest.Market(
+            nonce = generateOrderNonce(),
+            marketId = market.id,
+            side = side,
+            amount = amount.toFundamentalUnits(market.baseDecimals),
+            signature = EvmSignature.emptySignature(),
+            verifyingChainId = ChainId.empty,
+        ).let { wallet.signOrder(it) }
+
+        val response = createOrder(request)
+
+        assertIs<CreateOrderApiRequest.Market>(response.order)
+        assertEquals(request, response.order)
+
+        return response
+    }
+
     override fun batchOrders(apiRequest: BatchOrdersApiRequest): BatchOrdersApiResponse =
         tryBatchOrders(apiRequest).assertSuccess()
 
@@ -148,8 +195,41 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
         return tryUpdateOrder(apiRequest).assertSuccess()
     }
 
+    fun updateOrder(market: Market, createOrderApiResponse: CreateOrderApiResponse, amount: BigDecimal, price: BigDecimal, wallet: Wallet): UpdateOrderApiResponse {
+        val request = UpdateOrderApiRequest(
+            orderId = createOrderApiResponse.orderId,
+            marketId = createOrderApiResponse.order.marketId,
+            side = createOrderApiResponse.order.side,
+            amount = amount.toFundamentalUnits(market.baseDecimals),
+            price = price,
+            nonce = generateOrderNonce(),
+            signature = EvmSignature.emptySignature(),
+            verifyingChainId = ChainId.empty,
+        ).let {
+            wallet.signOrder(it)
+        }
+
+        val response = updateOrder(request)
+
+        assertEquals(response.requestStatus, RequestStatus.Accepted)
+        assertIs<UpdateOrderApiRequest>(response.order)
+        assertEquals(request.amount, response.order.amount)
+        assertEquals(request.price, response.order.price)
+        return response
+    }
+
     override fun cancelOrder(apiRequest: CancelOrderApiRequest) =
         tryCancelOrder(apiRequest).assertSuccess()
+
+    fun cancelOrder(createOrderApiResponse: CreateOrderApiResponse, wallet: Wallet) =
+        cancelOrder(
+            createOrderApiResponse.toCancelOrderRequest(wallet),
+        )
+
+    fun tryCancelOrder(createOrderApiResponse: CreateOrderApiResponse, wallet: Wallet) =
+        tryCancelOrder(
+            createOrderApiResponse.toCancelOrderRequest(wallet),
+        )
 
     override fun getOrder(id: OrderId): Order =
         tryGetOrder(id).assertSuccess()
@@ -213,3 +293,16 @@ fun Either<ApiCallFailure, Any>.assertError(expectedError: ApiError) {
 val prettyJsonFormatter = Json {
     this.prettyPrint = true
 }
+
+fun CreateOrderApiResponse.toCancelOrderRequest(wallet: Wallet): CancelOrderApiRequest =
+    CancelOrderApiRequest(
+        orderId = this.orderId,
+        marketId = this.order.marketId,
+        amount = this.order.amount,
+        side = this.order.side,
+        nonce = generateOrderNonce(),
+        signature = EvmSignature.emptySignature(),
+        verifyingChainId = ChainId.empty,
+    ).let {
+        wallet.signCancelOrder(it)
+    }

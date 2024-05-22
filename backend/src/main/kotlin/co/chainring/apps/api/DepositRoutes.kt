@@ -106,11 +106,11 @@ class DepositRoutes(val exchangeApiService: ExchangeApiService) {
                     ),
                 ),
             )
-        } bindContract Method.GET to { _ ->
+        } bindContract Method.GET to { request ->
             transaction {
                 Response(Status.OK).with(
                     responseBody of ListDepositsApiResponse(
-                        DepositEntity.history().map(Deposit::fromEntity),
+                        DepositEntity.history(request.principal).map(Deposit::fromEntity),
                     ),
                 )
             }

@@ -274,7 +274,13 @@ const CreateWithdrawalApiRequestSchema = z.object({
   signature: z.string()
 })
 
-const WithdrawalStatusSchema = z.enum(['Pending', 'Complete', 'Failed'])
+const WithdrawalStatusSchema = z.enum([
+  'Pending',
+  'Sequenced',
+  'Settling',
+  'Complete',
+  'Failed'
+])
 export type WithdrawalStatus = z.infer<typeof WithdrawalStatusSchema>
 const WithdrawalSchema = z.object({
   id: z.string(),

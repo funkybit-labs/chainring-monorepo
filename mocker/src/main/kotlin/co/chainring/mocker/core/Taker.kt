@@ -203,7 +203,7 @@ class Taker(
                 marketIds.random().let { marketId ->
                     val baseBalance = balances[marketId.baseSymbol()] ?: BigInteger.ZERO
                     val quoteBalance = balances[marketId.quoteSymbol()] ?: BigInteger.ZERO
-                    val market = markets.find { it.id == marketId.value }!!
+                    val market = markets.find { it.id == marketId }!!
                     logger.debug { "$id: baseBalance $baseBalance, quoteBalance: $quoteBalance" }
                     marketPrices[marketId]?.let { price ->
                         val expectedMarketPrice = priceCorrectionFunction.nextValue(Clock.System.now().toEpochMilliseconds())
