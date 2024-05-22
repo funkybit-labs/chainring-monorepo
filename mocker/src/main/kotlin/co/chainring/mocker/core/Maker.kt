@@ -31,8 +31,6 @@ import co.chainring.core.client.ws.subscribeToPrices
 import co.chainring.core.client.ws.subscribeToTrades
 import co.chainring.core.client.ws.unsubscribe
 import co.chainring.core.model.db.ChainId
-import co.chainring.core.utils.TraceRecorder
-import co.chainring.core.utils.WSSpans
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.WsStatus
@@ -181,7 +179,9 @@ class Maker(
                         }
                         else -> {}
                     }
-                } catch (_: InterruptedException) {}
+                } catch (e: Exception) {
+                    logger.warn(e) { "Error occurred while running maker in market $markets" }
+                }
             }
             marketIds.forEach {
                 wsClient.unsubscribe(SubscriptionTopic.Prices(it, OHLCDuration.P5M))

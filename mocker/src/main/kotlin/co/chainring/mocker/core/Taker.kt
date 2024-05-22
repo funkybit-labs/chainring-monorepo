@@ -182,7 +182,8 @@ class Taker(
 
                         else -> {}
                     }
-                } catch (_: InterruptedException) {
+                } catch (e: Exception) {
+                    logger.warn(e) { "Error occurred while running taker in market $markets" }
                 }
             }
             marketIds.forEach {
