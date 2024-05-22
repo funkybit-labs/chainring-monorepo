@@ -100,6 +100,7 @@ open class SequencerClient {
         return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
             stub.applyOrderBatch(
                 orderBatch {
+                    this.guid = UUID.randomUUID().toString()
                     this.marketId = marketId.value
                     this.wallet = wallet
                     this.ordersToAdd.addAll(
