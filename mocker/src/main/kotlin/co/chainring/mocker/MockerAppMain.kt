@@ -111,7 +111,7 @@ class MockerApp(
 
         marketsConfig.forEach { (marketId, params) ->
             logger.info { "Updating configuration for $marketId: (makers 1, desired takers: ${params.desiredTakersCount})" }
-            val market = currentMarkets[marketId.value] ?: run {
+            val market = currentMarkets[marketId] ?: run {
                 logger.info { "Market $marketId not found. Skipping." }
                 return@forEach
             }

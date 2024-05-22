@@ -49,7 +49,7 @@ fun main() {
     val makers = mutableListOf<Maker>()
     val takers = mutableListOf<Taker>()
 
-    val usdcDai = Market("USDC/DAI", Symbol("USDC"), 6, Symbol("DAI"), 18, 0.05.toBigDecimal())
+    val usdcDai = Market(MarketId("USDC/DAI"), Symbol("USDC"), 6, Symbol("DAI"), 18, 0.05.toBigDecimal())
     val priceFunction = DeterministicHarmonicPriceMovement.generateRandom(initialValue = 17.0, maxSpread = 1.5)
 
     // schedule metrics
@@ -126,7 +126,7 @@ fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: Bi
         },
         keyPair = keyPair
     )
-    maker.start(listOf(MarketId(market.id)))
+    maker.start(listOf(market.id))
     return maker
 }
 
@@ -145,7 +145,7 @@ fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: Bi
         },
         priceCorrectionFunction = priceFunction,
     )
-    taker.start(listOf(MarketId(market.id)))
+    taker.start(listOf(market.id))
     return taker
 }
 
