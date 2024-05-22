@@ -225,7 +225,7 @@ class Taker(
                                 (baseBalance.toBigDecimal() / Random.nextDouble(0.0, sizeFactor).toBigDecimal()).toBigInteger()
                             }
                         }
-                        logger.debug { "$id going to create a market $side order (amount: $amount, market price: $price" }
+                        logger.debug { "$id going to create a market $side order in $marketId market (amount: $amount, market price: $price" }
                         apiClient.tryCreateOrder(
                             CreateOrderApiRequest.Market(
                                 nonce = generateHexString(32),
@@ -238,9 +238,9 @@ class Taker(
                                 wallet.signOrder(it)
                             },
                         ).fold(
-                            { e: ApiCallFailure -> logger.error { "$id failed to create order with: $e" } },
+                            { e: ApiCallFailure -> logger.error { "$id failed to create $side order in $marketId market with: $e" } },
                             { response ->
-                                logger.debug { "$id back from creating an order" }
+                                logger.debug { "$id back from creating a $side order in $marketId market" }
 
                                 TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.orderCreated)
                                 TraceRecorder.full.startWSRecording(response.orderId.value, WSSpans.orderFilled)

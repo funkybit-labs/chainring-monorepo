@@ -327,7 +327,7 @@ class Maker(
                     ).let {
                         wallet.signOrder(it)
                     },
-                ).onLeft { e: ApiCallFailure -> logger.warn { "$id failed to create order with: $e" } }
+                ).onLeft { e: ApiCallFailure -> logger.warn { "$id failed to create Sell order in $marketId market with: $e" } }
             }
             bidPrices.forEachIndexed { ix, price ->
                 val amount = bidAmounts[ix]
@@ -343,7 +343,7 @@ class Maker(
                     ).let {
                         wallet.signOrder(it)
                     },
-                ).onLeft { e: ApiCallFailure -> logger.warn { "$id failed to create order with: $e" } }
+                ).onLeft { e: ApiCallFailure -> logger.warn { "$id failed to create Buy order in $marketId market with: $e" } }
             }
             currentOrders[marketId] = apiClient.listOrders().orders.filter {
                 it.status == OrderStatus.Open && it.marketId == marketId
