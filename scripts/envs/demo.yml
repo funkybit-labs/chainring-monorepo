@@ -11,8 +11,7 @@ environment:
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
   sequencer:
     QUEUE_HOME: "/data/queues/demo"
-    CHECKPOINTS_ENABLED: "false"
-    SANDBOX_MODE: "true"
+    CHECKPOINTS_ENABLED: "true"
     DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
