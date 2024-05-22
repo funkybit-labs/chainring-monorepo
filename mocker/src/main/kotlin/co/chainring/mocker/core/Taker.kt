@@ -45,7 +45,7 @@ class Taker(
     private val sizeFactor: Double,
     native: BigInteger?,
     assets: Map<String, BigInteger>,
-    private val priceCorrectionFunction: BrownianMotionWithReversionToMean
+    private val priceCorrectionFunction: DeterministicHarmonicPriceMovement
 ) : Actor(native, assets) {
     private var currentOrder: Order.Market? = null
     private var markets = setOf<Market>()
@@ -205,7 +205,7 @@ class Taker(
                     val market = markets.find { it.id == marketId.value }!!
                     logger.debug { "$id: baseBalance $baseBalance, quoteBalance: $quoteBalance" }
                     marketPrices[marketId]?.let { price ->
-                        val expectedMarketPrice = priceCorrectionFunction.nextValue(Clock.System.now())
+                        val expectedMarketPrice = priceCorrectionFunction.nextValue(Clock.System.now().toEpochMilliseconds())
                         val side = if (expectedMarketPrice > price.toDouble()) {
                             OrderSide.Buy
                         } else {

@@ -15,6 +15,7 @@ import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
+import co.chainring.core.client.rest.ApiCallFailure
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
@@ -30,6 +31,8 @@ import co.chainring.core.client.ws.subscribeToPrices
 import co.chainring.core.client.ws.subscribeToTrades
 import co.chainring.core.client.ws.unsubscribe
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.utils.TraceRecorder
+import co.chainring.core.utils.WSSpans
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.WsStatus
@@ -312,7 +315,7 @@ class Maker(
             val(offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
             offerPrices.forEachIndexed { ix, price ->
                 val amount = offerAmounts[ix]
-                apiClient.createOrder(
+                apiClient.tryCreateOrder(
                     CreateOrderApiRequest.Limit(
                         nonce = generateOrderNonce(),
                         marketId = marketId,
@@ -324,11 +327,11 @@ class Maker(
                     ).let {
                         wallet.signOrder(it)
                     },
-                )
+                ).onLeft { e: ApiCallFailure -> logger.warn { "$id failed to create order with: $e" } }
             }
             bidPrices.forEachIndexed { ix, price ->
                 val amount = bidAmounts[ix]
-                apiClient.createOrder(
+                apiClient.tryCreateOrder(
                     CreateOrderApiRequest.Limit(
                         nonce = generateOrderNonce(),
                         marketId = marketId,
@@ -340,8 +343,7 @@ class Maker(
                     ).let {
                         wallet.signOrder(it)
                     },
-                )
-
+                ).onLeft { e: ApiCallFailure -> logger.warn { "$id failed to create order with: $e" } }
             }
             currentOrders[marketId] = apiClient.listOrders().orders.filter {
                 it.status == OrderStatus.Open && it.marketId == marketId

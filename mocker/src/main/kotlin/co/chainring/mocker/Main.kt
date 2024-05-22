@@ -5,7 +5,7 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.utils.TraceRecorder
 import co.chainring.core.utils.humanReadable
-import co.chainring.mocker.core.BrownianMotionWithReversionToMean
+import co.chainring.mocker.core.DeterministicHarmonicPriceMovement
 import co.chainring.mocker.core.Maker
 import co.chainring.mocker.core.Taker
 import co.chainring.mocker.core.toFundamentalUnits
@@ -50,7 +50,7 @@ fun main() {
     val takers = mutableListOf<Taker>()
 
     val usdcDai = Market("USDC/DAI", Symbol("USDC"), 6, Symbol("DAI"), 18, 0.05.toBigDecimal())
-    val priceFunction = BrownianMotionWithReversionToMean.generateRandom(initialValue = 17.0, maxSpread = 1.5)
+    val priceFunction = DeterministicHarmonicPriceMovement.generateRandom(initialValue = 17.0, maxSpread = 1.5)
 
     // schedule metrics
     val statsTask = timerTask {
@@ -130,7 +130,7 @@ fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: Bi
     return maker
 }
 
-fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, priceFunction: BrownianMotionWithReversionToMean): Taker {
+fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, priceFunction: DeterministicHarmonicPriceMovement): Taker {
     val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
     val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)
     val quoteAsset = market.quoteSymbol.value to quoteAssetAmount.toFundamentalUnits(market.quoteDecimals)

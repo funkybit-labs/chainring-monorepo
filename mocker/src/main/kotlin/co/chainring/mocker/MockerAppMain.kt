@@ -5,7 +5,7 @@ import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
 import co.chainring.core.client.rest.ApiClient
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.utils.TraceRecorder
-import co.chainring.mocker.core.BrownianMotionWithReversionToMean
+import co.chainring.mocker.core.DeterministicHarmonicPriceMovement
 import co.chainring.mocker.core.Maker
 import co.chainring.mocker.core.Taker
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -56,12 +56,12 @@ class MockerApp(
 ) {
     private val logger = KotlinLogging.logger {}
     private val marketsConfig = mutableMapOf<MarketId, MarketParams>()
-    private val marketsPriceFunctions = mutableMapOf<MarketId, BrownianMotionWithReversionToMean>()
+    private val marketsPriceFunctions = mutableMapOf<MarketId, DeterministicHarmonicPriceMovement>()
 
     init {
         config.forEach {
             marketsConfig[MarketId(it)] = MarketParams(
-                desiredTakersCount = System.getenv(it.replace("/", "_") + "_TAKERS")?.toIntOrNull() ?: 5,
+                desiredTakersCount = System.getenv(it.replace("/", "_") + "_TAKERS")?.toIntOrNull() ?: 0,
                 priceBaseline = System.getenv(it.replace("/", "_") + "_PRICE_BASELINE")?.toBigDecimalOrNull() ?: BigDecimal.TEN,
                 initialBaseBalance = System.getenv(it.replace("/", "_") + "_INITIAL_BASE_BALANCE")?.toBigDecimalOrNull() ?: BigDecimal.TEN,
                 makerPrivateKeyHex = System.getenv(it.replace("/", "_") + "_MAKER_PRIVATE_KEY_HEX")
@@ -117,7 +117,7 @@ class MockerApp(
             }
 
             val priceFunction = marketsPriceFunctions.getOrPut(marketId) {
-                BrownianMotionWithReversionToMean.generateRandom(
+                DeterministicHarmonicPriceMovement.generateRandom(
                     initialValue = params.priceBaseline.toDouble(),
                     maxSpread = params.priceBaseline.toDouble() * 0.1
                 )
