@@ -22,12 +22,13 @@ message Order {
   optional IntegerValue nonce = 6; // required for add order
   optional string signature = 7; // required for add order (created CHAIN-123 as order updates should require a new signature)
   string externalGuid = 8;
-}
-message CancelOrder {
-  uint64 guid  = 1;
-  string externalGuid = 2;
+  uint32 chainId = 9; // the chain id used when creating the signature - does not need to be related to the chain(s) of the market
 }
 
+message CancelOrder {
+  uint64 guid = 1;
+  string externalGuid = 2;
+}
 
 message OrderBatch {
   string guid = 1;
