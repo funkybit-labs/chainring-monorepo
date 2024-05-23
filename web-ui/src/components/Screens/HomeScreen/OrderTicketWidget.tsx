@@ -284,9 +284,9 @@ export default function OrderTicketWidget({
           })
           setQuoteAmountManuallyChanged(false)
           setBaseAmountManuallyChanged(false)
-          setBaseAmountInputValue("")
-          setQuoteAmountInputValue("")
-          setPriceInputValue("")
+          setBaseAmountInputValue('')
+          setQuoteAmountInputValue('')
+          setPriceInputValue('')
           return response
         }
       } catch (error) {
