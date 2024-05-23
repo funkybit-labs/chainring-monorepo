@@ -29,6 +29,7 @@ import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
+import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.model.db.TradeId
 import co.chainring.core.model.db.WalletEntity
@@ -197,6 +198,8 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             summary = "List orders"
             security = signedTokenSecurity
             tags += listOf(Tag("order"))
+            queries += Query.string().optional("statuses", "Comma-separated list of order statuses to filter on")
+            queries += Query.string().optional("marketId", "Market id to filter on")
             returning(
                 Status.OK,
                 responseBody to OrdersApiResponse(
@@ -205,7 +208,21 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.GET to { request: Request ->
             val orders = transaction {
-                OrderEntity.listForWallet(WalletEntity.getOrCreate(request.principal)).map { it.toOrderResponse() }
+                OrderEntity.listForWallet(
+                    WalletEntity.getOrCreate(request.principal),
+                    request.query("statuses")?.let { statuses ->
+                        statuses.split(",").mapNotNull {
+                            try {
+                                OrderStatus.valueOf(it)
+                            } catch (_: IllegalArgumentException) {
+                                null
+                            }
+                        }
+                    } ?: emptyList(),
+                    request.query("marketId")?.let {
+                        MarketId(it)
+                    },
+                ).map { it.toOrderResponse() }
             }
             Response(Status.OK).with(
                 responseBody of OrdersApiResponse(

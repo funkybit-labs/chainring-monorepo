@@ -410,7 +410,7 @@ class OrderRoutesApiTest {
             wsClient.assertOrderCreatedMessageReceived()
             wsClient.assertLimitsMessageReceived(usdcDaiMarket.id)
         }
-        assertEquals(10, apiClient.listOrders().orders.count { it.status != OrderStatus.Cancelled })
+        assertEquals(10, apiClient.listOrders(listOf(OrderStatus.Open, OrderStatus.Partial, OrderStatus.Filled), usdcDaiMarket.id).orders.size)
 
         apiClient.cancelOpenOrders()
 
@@ -420,7 +420,7 @@ class OrderRoutesApiTest {
         }
         wsClient.assertLimitsMessageReceived(usdcDaiMarket.id)
 
-        assertTrue(apiClient.listOrders().orders.all { it.status == OrderStatus.Cancelled })
+        assertTrue(apiClient.listOrders(emptyList(), usdcDaiMarket.id).orders.all { it.status == OrderStatus.Cancelled })
 
         wsClient.close()
     }
@@ -1119,7 +1119,7 @@ class OrderRoutesApiTest {
         repeat(3) { makerWsClient.assertOrderUpdatedMessageReceived() }
         makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.1982"), quote = BigDecimal("500"))
 
-        assertEquals(5, makerApiClient.listOrders().orders.count { it.status == OrderStatus.Open })
+        assertEquals(5, makerApiClient.listOrders(listOf(OrderStatus.Open), null).orders.size)
 
         // total BTC available is 0.0001 + 0.0002 + 0.0004 + 0.0005 + 0.0006 = 0.0018
         val takerOrderAmount = AssetAmount(baseSymbol, "0.0018")
@@ -1174,10 +1174,10 @@ class OrderRoutesApiTest {
             assertLimitsMessageReceived(market, base = BigDecimal("0.1982"), quote = BigDecimal("621.889395"))
         }
 
-        // should be 8 filled orders
-        val takerOrders = takerApiClient.listOrders().orders
+        val takerOrders = takerApiClient.listOrders(emptyList(), market.id).orders
         assertEquals(1, takerOrders.count { it.status == OrderStatus.Filled })
-        assertEquals(5, makerApiClient.listOrders().orders.count { it.status == OrderStatus.Filled })
+        // should be 5 filled maker orders
+        assertEquals(5, makerApiClient.listOrders(listOf(OrderStatus.Filled), market.id).orders.size)
 
         // now verify the trades
 

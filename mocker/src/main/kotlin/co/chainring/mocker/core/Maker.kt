@@ -303,9 +303,11 @@ class Maker(
         .map {
             logger.info { "Applied update batch" }
         }
-        currentOrders[marketId] = apiClient.listOrders().orders.filter {
-            (it.status == OrderStatus.Open || it.status == OrderStatus.Partial) && it.marketId == marketId
-        }.map { it as Order.Limit }.toMutableList()
+        currentOrders[marketId] = apiClient
+            .listOrders(listOf(OrderStatus.Open, OrderStatus.Partial), marketId)
+            .orders
+            .map { it as Order.Limit }
+            .toMutableList()
     }
 
     private fun createQuotes(marketId: MarketId, levels: Int, curPrice: BigDecimal) {
@@ -345,11 +347,13 @@ class Maker(
                     },
                 ).onLeft { e: ApiCallFailure -> logger.warn { "$id failed to create Buy order in $marketId market with: $e" } }
             }
-            currentOrders[marketId] = apiClient.listOrders().orders.filter {
-                it.status == OrderStatus.Open && it.marketId == marketId
-            }.map { it as Order.Limit }.toMutableList()
+            currentOrders[marketId] = apiClient
+                .listOrders(listOf(OrderStatus.Open, OrderStatus.Partial), marketId)
+                .orders
+                .map { it as Order.Limit }
+                .toMutableList()
             if (currentOrders[marketId]!!.size != levels * 2) {
-                logger.warn { "Not all quotes accepted: ${apiClient.listOrders()}" }
+                logger.warn { "Not all quotes accepted: ${currentOrders[marketId]}" }
             }
         } ?: throw RuntimeException("Market $marketId not found")
     }

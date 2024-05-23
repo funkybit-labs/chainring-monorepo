@@ -33,8 +33,10 @@ import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.FeeRates
+import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
+import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.utils.TraceRecorder
 import co.chainring.core.utils.generateOrderNonce
@@ -234,8 +236,8 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
     override fun getOrder(id: OrderId): Order =
         tryGetOrder(id).assertSuccess()
 
-    override fun listOrders(): OrdersApiResponse =
-        tryListOrders().assertSuccess()
+    override fun listOrders(statuses: List<OrderStatus>, marketId: MarketId?): OrdersApiResponse =
+        tryListOrders(statuses, marketId).assertSuccess()
 
     override fun cancelOpenOrders() =
         tryCancelOpenOrders().assertSuccess()

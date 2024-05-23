@@ -25,6 +25,8 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.coalesce
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.div
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.times
 import org.jetbrains.exposed.sql.alias
 import org.jetbrains.exposed.sql.and
@@ -277,9 +279,16 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             }
         }
 
-        fun listForWallet(wallet: WalletEntity): List<OrderEntity> {
+        fun listForWallet(wallet: WalletEntity, statuses: List<OrderStatus> = emptyList(), marketId: MarketId? = null): List<OrderEntity> {
+            var query = OrderTable.walletGuid.eq(wallet.guid)
+            marketId?.let {
+                query = query.and(OrderTable.marketGuid.eq(it))
+            }
+            if (statuses.isNotEmpty()) {
+                query = query.and(OrderTable.status.inList(statuses))
+            }
             return OrderEntity
-                .find { OrderTable.walletGuid.eq(wallet.guid) }
+                .find(query)
                 .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
                 .toList()
         }

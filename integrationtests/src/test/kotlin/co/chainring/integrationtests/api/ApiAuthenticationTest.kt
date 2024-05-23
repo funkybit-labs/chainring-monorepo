@@ -25,21 +25,21 @@ class ApiAuthenticationTest {
     @Test
     fun `test missing authorization header`() {
         verifyFailure("Authorization header is missing") {
-            ApiClient.tryListOrders { Headers.empty }
+            ApiClient.tryListOrders(emptyList(), null) { Headers.empty }
         }
     }
 
     @Test
     fun `test invalid authorization scheme`() {
         verifyFailure("Invalid authentication scheme") {
-            ApiClient.tryListOrders { mapOf("Authorization" to "signature token").toHeaders() }
+            ApiClient.tryListOrders(emptyList(), null) { mapOf("Authorization" to "signature token").toHeaders() }
         }
     }
 
     @Test
     fun `test invalid token format`() {
         verifyFailure("Invalid token format") {
-            ApiClient.tryListOrders { mapOf("Authorization" to "Bearer token").toHeaders() }
+            ApiClient.tryListOrders(emptyList(), null) { mapOf("Authorization" to "Bearer token").toHeaders() }
         }
     }
 
@@ -47,7 +47,7 @@ class ApiAuthenticationTest {
     fun `test token issue and expiry dates`() {
         // timestamp is far in future
         verifyFailure("Token is expired or not valid yet") {
-            ApiClient.tryListOrders {
+            ApiClient.tryListOrders(emptyList(), null) {
                 mapOf(
                     "Authorization" to "Bearer ${
                         ApiClient.issueAuthToken(
@@ -60,7 +60,7 @@ class ApiAuthenticationTest {
 
         // validity exceed maximum allowed interval
         verifyFailure("Token is expired or not valid yet") {
-            ApiClient.tryListOrders {
+            ApiClient.tryListOrders(emptyList(), null) {
                 mapOf(
                     "Authorization" to "Bearer ${
                         ApiClient.issueAuthToken(
@@ -75,7 +75,7 @@ class ApiAuthenticationTest {
     @Test
     fun `test recovered from signature address does not match address on message`() {
         verifyFailure("Invalid signature") {
-            ApiClient.tryListOrders {
+            ApiClient.tryListOrders(emptyList(), null) {
                 mapOf(
                     "Authorization" to "Bearer ${
                         ApiClient.issueAuthToken(
@@ -88,7 +88,7 @@ class ApiAuthenticationTest {
         }
 
         verifyFailure("Invalid signature") {
-            ApiClient.tryListOrders {
+            ApiClient.tryListOrders(emptyList(), null) {
                 mapOf(
                     "Authorization" to "Bearer ${ApiClient.issueAuthToken()}abcdef",
                 ).toHeaders()
@@ -99,7 +99,7 @@ class ApiAuthenticationTest {
     @Test
     fun `test success`() {
         val apiClient = ApiClient()
-        apiClient.tryListOrders().assertSuccess()
+        apiClient.tryListOrders(emptyList(), null).assertSuccess()
     }
 
     private fun verifyFailure(expectedError: String, call: () -> Either<ApiCallFailure, Any>) {
