@@ -29,8 +29,7 @@ describe('PricesUtils', () => {
     open: number,
     high: number,
     low: number,
-    close: number,
-    incomplete: boolean = false
+    close: number
   ) {
     return {
       start: new Date(startMs),
@@ -38,8 +37,7 @@ describe('PricesUtils', () => {
       high,
       low,
       close,
-      duration,
-      incomplete
+      duration
     }
   }
 
