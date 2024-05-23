@@ -42,7 +42,7 @@ services:
     count: 1
     environment: api
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-aa47459e-c32f-4308-8f80-1af418a10602-L9i7qG
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-d567d2ec-6ebb-4c6d-b48a-529eb09febfb-KMOVrv
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   anvil:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
@@ -64,7 +64,7 @@ services:
     count: 1
     environment: sequencer
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-aa47459e-c32f-4308-8f80-1af418a10602-L9i7qG
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-d567d2ec-6ebb-4c6d-b48a-529eb09febfb-KMOVrv
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   mocker:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/mocker
