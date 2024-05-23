@@ -176,7 +176,7 @@ resource "aws_ecr_repository" "mocker" {
 }
 
 resource "aws_ecr_repository_policy" "mocker" {
-  repository = aws_ecr_repository.sequencer.name
+  repository = aws_ecr_repository.mocker.name
   policy     = <<EOF
 {
     "Version": "2008-10-17",
