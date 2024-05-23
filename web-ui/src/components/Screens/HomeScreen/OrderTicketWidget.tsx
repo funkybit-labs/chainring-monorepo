@@ -260,8 +260,9 @@ export default function OrderTicketWidget({
           }
         })
 
+        let response
         if (isLimitOrder) {
-          return await apiClient.createOrder({
+          response = await apiClient.createOrder({
             nonce: nonce,
             marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
             type: 'limit',
@@ -272,7 +273,7 @@ export default function OrderTicketWidget({
             verifyingChainId: config.state.chainId
           })
         } else {
-          return await apiClient.createOrder({
+          response = await apiClient.createOrder({
             nonce: nonce,
             marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
             type: 'market',
@@ -281,6 +282,12 @@ export default function OrderTicketWidget({
             signature: signature,
             verifyingChainId: config.state.chainId
           })
+          setQuoteAmountManuallyChanged(false)
+          setBaseAmountManuallyChanged(false)
+          setBaseAmountInputValue('')
+          setQuoteAmountInputValue('')
+          setPriceInputValue('')
+          return response
         }
       } catch (error) {
         throw Error(
