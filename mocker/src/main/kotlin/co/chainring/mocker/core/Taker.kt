@@ -215,14 +215,14 @@ class Taker(
                         val amount = when (side) {
                             OrderSide.Buy -> {
                                 quoteBalance.let { notional ->
-                                    ((notional.toBigDecimal() / Random.nextDouble(0.0, sizeFactor).toBigDecimal()) / price).movePointLeft(
+                                    ((notional.toBigDecimal() / sizeFactor.toBigDecimal()) / price).movePointLeft(
                                         market.quoteDecimals - market.baseDecimals
                                     ).toBigInteger()
                                 } ?: BigInteger.ZERO
                             }
 
                             OrderSide.Sell -> {
-                                (baseBalance.toBigDecimal() / Random.nextDouble(0.0, sizeFactor).toBigDecimal()).toBigInteger()
+                                (baseBalance.toBigDecimal() / sizeFactor.toBigDecimal()).toBigInteger()
                             }
                         }
                         logger.debug { "$id going to create a market $side order in $marketId market (amount: $amount, market price: $price" }
