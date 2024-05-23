@@ -19,20 +19,24 @@ open class Actor(val native: BigInteger?, val assets: Map<String, BigInteger>, k
     protected var settledTrades = mutableListOf<Trade>()
 
     protected fun depositAssets() {
-        Faucet.fund(wallet.address, (native ?: 2.toFundamentalUnits(18)) * BigInteger.TWO)
-        native?.let { wallet.depositNative(it) }
-        assets.forEach { (symbol, amount) ->
-            wallet.mintERC20(symbol, amount)
-            wallet.depositERC20(symbol, amount)
-        }
-        val fundedAssets = mutableSetOf<String>()
-        while (fundedAssets.size < assets.size + if (native == null) 0 else 1) {
-            Thread.sleep(100)
-            apiClient.getBalances().balances.forEach {
-                if (it.available > BigInteger.ZERO) {
-                    fundedAssets.add(it.symbol.value)
+        // quick fix for org.web3j.protocol.exceptions.JsonRpcError: replacement transaction underpriced
+        // looks like same nonce is re-used due to concurrent start of actors which lead to exiting thread
+        synchronized(Actor::class) {
+            Faucet.fund(wallet.address, (native ?: 2.toFundamentalUnits(18)) * BigInteger.TWO)
+            native?.let { wallet.depositNative(it) }
+            assets.forEach { (symbol, amount) ->
+                wallet.mintERC20(symbol, amount)
+                wallet.depositERC20(symbol, amount)
+            }
+            val fundedAssets = mutableSetOf<String>()
+            while (fundedAssets.size < assets.size + if (native == null) 0 else 1) {
+                Thread.sleep(100)
+                apiClient.getBalances().balances.forEach {
+                    if (it.available > BigInteger.ZERO) {
+                        fundedAssets.add(it.symbol.value)
+                    }
+                    balances[it.symbol.value] = it.available
                 }
-                balances[it.symbol.value] = it.available
             }
         }
     }

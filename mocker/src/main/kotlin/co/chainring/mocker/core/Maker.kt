@@ -217,7 +217,7 @@ class Maker(
     private fun offerAndBidAmounts(market: Market, offerPrices: List<BigDecimal>, bidPrices: List<BigDecimal>): Pair<List<BigInteger>, List<BigInteger>> {
         val marketId = market.id
         // don't try to use all of available inventory
-        val useFraction = 0.70.toBigDecimal()
+        val useFraction = 0.40.toBigDecimal()
         val baseInventory = (balances.getOrDefault(marketId.baseSymbol(), BigInteger.ZERO).toBigDecimal() * useFraction).toBigInteger()
         val quoteInventory = (balances.getOrDefault(marketId.quoteSymbol(), BigInteger.ZERO).toBigDecimal() * useFraction).toBigInteger()
         val levels = max(offerPrices.size, bidPrices.size)
