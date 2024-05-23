@@ -28,7 +28,9 @@ import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DepositId
+import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
+import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.utils.TraceRecorder
 import kotlinx.datetime.Clock
@@ -36,6 +38,7 @@ import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.Headers
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -62,10 +65,17 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
     val authToken: String = issueAuthToken(ecKeyPair = ecKeyPair)
 
     companion object {
-        fun tryListOrders(authHeadersProvider: (Request) -> Headers): Either<ApiCallFailure, OrdersApiResponse> =
+        private fun listOrdersUrl(statuses: List<OrderStatus>, marketId: MarketId?) = "$apiServerRootUrl/v1/orders".toHttpUrl().newBuilder().apply {
+            addQueryParameter("statuses", statuses.joinToString(","))
+            marketId?.let {
+                addQueryParameter("marketId", it.value)
+            }
+        }.build()
+
+        fun tryListOrders(statuses: List<OrderStatus> = emptyList(), marketId: MarketId? = null, authHeadersProvider: (Request) -> Headers): Either<ApiCallFailure, OrdersApiResponse> =
             execute(
                 Request.Builder()
-                    .url("$apiServerRootUrl/v1/orders")
+                    .url(listOrdersUrl(statuses, marketId))
                     .get()
                     .build().let {
                         it.addHeaders(authHeadersProvider(it))
@@ -164,15 +174,16 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
-    fun tryListOrders(): Either<ApiCallFailure, OrdersApiResponse> =
-        executeAndTrace(
+    fun tryListOrders(statuses: List<OrderStatus> = emptyList(), marketId: MarketId? = null): Either<ApiCallFailure, OrdersApiResponse> {
+        return executeAndTrace(
             TraceRecorder.Op.ListOrders,
             Request.Builder()
-                .url("$apiServerRootUrl/v1/orders")
+                .url(listOrdersUrl(statuses, marketId))
                 .get()
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
+    }
 
     fun tryCancelOpenOrders(): Either<ApiCallFailure, Unit> =
         executeAndTrace(
@@ -279,8 +290,8 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
     open fun getOrder(id: OrderId): Order =
         tryGetOrder(id).throwOrReturn()
 
-    open fun listOrders(): OrdersApiResponse =
-        tryListOrders().throwOrReturn()
+    open fun listOrders(statuses: List<OrderStatus> = emptyList(), marketId: MarketId? = null): OrdersApiResponse =
+        tryListOrders(statuses).throwOrReturn()
 
     open fun cancelOpenOrders() =
         tryCancelOpenOrders().throwOrReturn()
