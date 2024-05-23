@@ -14,7 +14,7 @@ export function DepositsTable({
   symbols: TradingSymbols
 }) {
   return (
-    <div className="grid max-h-72 auto-rows-max grid-cols-[max-content_max-content_1fr_max-content] overflow-scroll">
+    <div className="grid max-h-72 auto-rows-max grid-cols-[max-content_max-content_1fr_max-content] items-center overflow-scroll">
       {deposits.map((deposit) => {
         const symbol = symbols.getByName(deposit.symbol)
 

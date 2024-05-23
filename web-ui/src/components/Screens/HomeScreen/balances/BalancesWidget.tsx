@@ -36,10 +36,12 @@ export default function BalancesWidget({
   })
 
   const pendingDepositsCount = useMemo(() => {
-    return (depositsQuery.data?.deposits || []).filter(
-      (d) => d.status == 'Pending'
-    ).length
-  }, [depositsQuery.data])
+    return walletAddress === undefined
+      ? 0
+      : (depositsQuery.data?.deposits || []).filter(
+          (d) => d.status == 'Pending'
+        ).length
+  }, [depositsQuery.data, walletAddress])
 
   const withdrawalsQuery = useQuery({
     queryKey: withdrawalsQueryKey,
@@ -48,10 +50,12 @@ export default function BalancesWidget({
   })
 
   const pendingWithdrawalsCount = useMemo(() => {
-    return (withdrawalsQuery.data?.withdrawals || []).filter(
-      (w) => w.status == 'Pending'
-    ).length
-  }, [withdrawalsQuery.data])
+    return walletAddress === undefined
+      ? 0
+      : (withdrawalsQuery.data?.withdrawals || []).filter(
+          (w) => w.status == 'Pending'
+        ).length
+  }, [withdrawalsQuery.data, walletAddress])
 
   return (
     <Widget
