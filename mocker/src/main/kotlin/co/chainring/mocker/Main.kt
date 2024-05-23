@@ -137,7 +137,6 @@ fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: Bi
 
     val taker = Taker(
         rate = Random.nextLong(10000, 30000),
-        sizeFactor = Random.nextDouble(5.0, 20.0),
         native = if (baseAssetBtc) baseAsset.second else BigDecimal.ONE.movePointRight(18).toBigInteger(),
         assets = when {
             baseAssetBtc -> mapOf(quoteAsset)
