@@ -42,7 +42,6 @@ import kotlinx.datetime.Clock
 
 class Taker(
     private val rate: Long,
-    private val sizeFactor: Double,
     native: BigInteger?,
     assets: Map<String, BigInteger>,
     private val priceCorrectionFunction: DeterministicHarmonicPriceMovement
@@ -215,14 +214,14 @@ class Taker(
                         val amount = when (side) {
                             OrderSide.Buy -> {
                                 quoteBalance.let { notional ->
-                                    ((notional.toBigDecimal() / (Random.nextDouble(1.0, 2.0) * sizeFactor).toBigDecimal()) / price).movePointLeft(
+                                    ((notional.toBigDecimal() * Random.nextDouble(0.01, 0.5).toBigDecimal()) / price).movePointLeft(
                                         market.quoteDecimals - market.baseDecimals
                                     ).toBigInteger()
                                 } ?: BigInteger.ZERO
                             }
 
                             OrderSide.Sell -> {
-                                (baseBalance.toBigDecimal() / (Random.nextDouble(1.0, 2.0) * sizeFactor).toBigDecimal()).toBigInteger()
+                                (baseBalance.toBigDecimal() * Random.nextDouble(0.01, 0.5).toBigDecimal()).toBigInteger()
                             }
                         }
                         logger.debug { "$id going to create a market $side order in $marketId market (amount: $amount, market price: $price" }
