@@ -62,6 +62,8 @@ class DepositTest {
 
             assertEquals(listOf(pendingBtcDeposit), apiClient.listDeposits().deposits.filter { it.symbol.value == btc.name })
 
+            // test idempotence
+            assertEquals(pendingBtcDeposit, apiClient.createDeposit(CreateDepositApiRequest(Symbol(btc.name), btcDepositAmount.inFundamentalUnits, btcDepositTxHash)).deposit)
             wallet.currentBlockchainClient().mine()
 
             waitForBalance(

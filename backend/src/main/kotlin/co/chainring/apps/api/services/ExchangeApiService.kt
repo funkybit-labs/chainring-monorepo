@@ -283,13 +283,16 @@ class ExchangeApiService(
 
     fun deposit(walletAddress: Address, apiRequest: CreateDepositApiRequest): DepositApiResponse =
         transaction {
-            DepositEntity.create(
-                wallet = WalletEntity.getOrCreate(walletAddress),
-                symbol = getSymbolEntity(apiRequest.symbol),
-                amount = apiRequest.amount,
-                blockNumber = BigInteger.ZERO,
-                transactionHash = apiRequest.txHash,
-            ).let {
+            (
+                DepositEntity.findByTxHash(apiRequest.txHash)
+                    ?: DepositEntity.create(
+                        wallet = WalletEntity.getOrCreate(walletAddress),
+                        symbol = getSymbolEntity(apiRequest.symbol),
+                        amount = apiRequest.amount,
+                        blockNumber = BigInteger.ZERO,
+                        transactionHash = apiRequest.txHash,
+                    ).also { it.refresh(flush = true) }
+                ).let {
                 it.refresh(flush = true)
                 DepositApiResponse(Deposit.fromEntity(it))
             }
