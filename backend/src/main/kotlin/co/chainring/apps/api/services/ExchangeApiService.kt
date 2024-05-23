@@ -140,6 +140,7 @@ class ExchangeApiService(
                 nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
                 signature = orderRequest.signature,
                 orderId = orderId,
+                chainId = orderRequest.verifyingChainId,
             )
         }
 
@@ -170,6 +171,7 @@ class ExchangeApiService(
                 nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
                 signature = orderRequest.signature,
                 orderId = orderRequest.orderId,
+                chainId = orderRequest.verifyingChainId,
             )
         }
 

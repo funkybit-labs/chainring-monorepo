@@ -7,6 +7,7 @@ import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.SequencerOrderId
 import co.chainring.core.model.SequencerWalletId
+import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketId
@@ -80,6 +81,7 @@ open class SequencerClient {
         val nonce: BigInteger?,
         val signature: EvmSignature?,
         val orderId: OrderId,
+        val chainId: ChainId,
     )
 
     protected val channel: ManagedChannel = ManagedChannelBuilder.forAddress(
@@ -317,6 +319,7 @@ open class SequencerClient {
         this.nonce = order.nonce?.toIntegerValue() ?: BigInteger.ZERO.toIntegerValue()
         this.signature = order.signature?.value ?: EvmSignature.emptySignature().value
         this.externalGuid = order.orderId.value
+        this.chainId = order.chainId.value.toInt()
     }
 
     private fun toCancelOrderDSL(orderId: OrderId) = cancelOrder {
