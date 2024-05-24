@@ -199,10 +199,13 @@ class Maker(
         val marketId = market.id
         val currentOffers = currentOrders[marketId]?.filter { it.side == OrderSide.Sell } ?: emptyList()
         val currentBids = currentOrders[marketId]?.filter { it.side == OrderSide.Buy } ?: emptyList()
-        val(offerPrices, bidPrices) = offerAndBidPrices(market, levels, curPrice)
-        val(offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
+        val ordersToCancel = currentOffers + currentBids
+        val (offerPrices, bidPrices) = offerAndBidPrices(market, levels, curPrice)
+        val (offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
 
-        apiClient.batchOrders(
+        logger.debug { "$id: going to cancel orders ${ordersToCancel.joinToString(", ") { it.id.value }}" }
+
+        apiClient.tryBatchOrders(
             BatchOrdersApiRequest(
                 marketId = marketId,
                 createOrders = offerPrices.mapIndexed { ix, price ->
@@ -227,17 +230,7 @@ class Maker(
                     ))
                 },
                 updateOrders = emptyList(),
-                cancelOrders = currentOffers.map {
-                    wallet.signCancelOrder(CancelOrderApiRequest(
-                        orderId = it.id,
-                        marketId = it.marketId,
-                        amount = it.amount,
-                        side = it.side,
-                        nonce = generateOrderNonce(),
-                        signature = EvmSignature.emptySignature(),
-                        verifyingChainId = ChainId.empty,
-                    ))
-                } + currentBids.map {
+                cancelOrders = ordersToCancel.map {
                     wallet.signCancelOrder(CancelOrderApiRequest(
                         orderId = it.id,
                         marketId = it.marketId,
@@ -249,9 +242,11 @@ class Maker(
                     ))
                 }
             )
-        )
-
-        logger.info { "$id: applied update batch" }
+        ).onLeft {
+            logger.warn { "$id could not apply batch: ${it.error?.message}" }
+        }.onRight {
+            logger.info { "$id: applied update batch" }
+        }
 
         currentOrders[marketId] = apiClient
             .listOrders(listOf(OrderStatus.Open, OrderStatus.Partial), marketId)
