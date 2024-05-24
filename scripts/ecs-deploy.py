@@ -162,7 +162,7 @@ class ChainringDeploymentManager:
                 taskDefinition=new_task_def_arn
             )
             if restart_required:
-                self.update_instances_count([service], desired_count=service_config['count'])
+                self.update_instances_count([service_name], desired_count=service_config['count'])
 
         self.wait_for_stable_state(service_names)
 
