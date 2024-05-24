@@ -239,7 +239,7 @@ class Broadcaster(val db: Database) {
                         SubscriptionTopic.Orders,
                         Orders(
                             OrderEntity
-                                .listForWallet(WalletEntity.getOrCreate(client.principal))
+                                .listForWallet(WalletEntity.getOrCreate(client.principal), limit = 1000)
                                 .map(OrderEntity::toOrderResponse),
                         ),
                     ),

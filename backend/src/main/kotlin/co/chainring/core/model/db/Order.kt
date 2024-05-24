@@ -30,6 +30,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.times
 import org.jetbrains.exposed.sql.alias
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.andIfNotNull
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.decimalLiteral
@@ -279,17 +280,21 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             }
         }
 
-        fun listForWallet(wallet: WalletEntity, statuses: List<OrderStatus> = emptyList(), marketId: MarketId? = null): List<OrderEntity> {
-            var query = OrderTable.walletGuid.eq(wallet.guid)
-            marketId?.let {
-                query = query.and(OrderTable.marketGuid.eq(it))
-            }
-            if (statuses.isNotEmpty()) {
-                query = query.and(OrderTable.status.inList(statuses))
-            }
+        fun listForWallet(wallet: WalletEntity, statuses: List<OrderStatus> = emptyList(), marketId: MarketId? = null, limit: Int? = null): List<OrderEntity> {
             return OrderEntity
-                .find(query)
+                .find(
+                    OrderTable.walletGuid.eq(wallet.guid)
+                        .andIfNotNull(marketId?.let { OrderTable.marketGuid.eq(it) })
+                        .andIfNotNull(statuses.ifEmpty { null }?.let { OrderTable.status.inList(statuses) }),
+                )
                 .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
+                .let {
+                    if (limit == null) {
+                        it
+                    } else {
+                        it.limit(limit)
+                    }
+                }
                 .toList()
         }
 
