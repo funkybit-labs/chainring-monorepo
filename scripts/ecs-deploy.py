@@ -100,6 +100,7 @@ class ChainringDeploymentManager:
 
             if restart_required:
                 self.update_instances_count([service_name], desired_count=0)
+                self.wait_for_stable_state(service_names)
 
             new_task_def = {key: task_def[key] for key in [
                 'family',
