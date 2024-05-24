@@ -9,8 +9,8 @@ import co.chainring.apps.api.model.websocket.Balances
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.Orders
-import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
+import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
@@ -23,182 +23,142 @@ import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.utils.generateOrderNonce
-import co.chainring.core.client.ws.blocking
-import co.chainring.core.client.ws.receivedDecoded
-import co.chainring.core.client.ws.subscribeToBalances
-import co.chainring.core.client.ws.subscribeToOrders
-import co.chainring.core.client.ws.subscribeToPrices
-import co.chainring.core.client.ws.subscribeToTrades
-import co.chainring.core.client.ws.unsubscribe
 import co.chainring.core.model.db.ChainId
+import de.fxlae.typeid.TypeId
+import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.http4k.client.WebsocketClient
-import org.http4k.websocket.WsStatus
 import java.math.BigDecimal
 import java.math.BigInteger
-import kotlin.concurrent.thread
 import kotlin.math.max
 import kotlin.math.pow
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
 
 class Maker(
+    marketIds: List<MarketId>,
     private val tightness: Int,
     private val skew: Int,
     private val levels: Int,
     native: BigInteger,
     assets: Map<String, BigInteger>,
     keyPair: ECKeyPair = Keys.createEcKeyPair()
-) : Actor(native, assets, keyPair) {
+) : Actor(marketIds, native, assets, keyPair) {
+    override val id: String = TypeId.generate("mm").toString()
+    override val logger: KLogger = KotlinLogging.logger {}
     private var currentOrders = mutableMapOf<MarketId,MutableList<Order.Limit>>()
-    private var markets = setOf<Market>()
-    private val logger = KotlinLogging.logger {}
-    private var listenerThread: Thread? = null
-    private var stopping = false
+    private var quotesCreated = false
 
-    fun start(marketIds: List<MarketId>) {
-        val config = apiClient.getConfiguration()
-        markets = config.markets.toSet()
-        listenerThread = thread(start = true, name = "mm-$id", isDaemon = false) {
-            logger.info { "Market maker $id starting" }
-            depositAssets()
-            val wsClient = WebsocketClient.blocking(apiClient.authToken)
-            marketIds.forEach {
-                wsClient.subscribeToPrices(it, OHLCDuration.P1M)
-                val prices = (wsClient.receivedDecoded().first() as OutgoingWSMessage.Publish).data as Prices
-                wsClient.unsubscribe(SubscriptionTopic.Prices(it, OHLCDuration.P1M))
-                createQuotes(it, levels, prices.ohlc.lastOrNull()?.close?.toBigDecimal() ?: BigDecimal.ONE)
-            }
-            marketIds.forEach {
-                wsClient.subscribeToPrices(it)
-            }
-            wsClient.subscribeToOrders()
-            wsClient.subscribeToTrades()
-            wsClient.subscribeToBalances()
-            logger.info { "Market maker $id initialized, entering run-loop" }
-            while (!stopping) {
-                try {
-                    val message = (wsClient.receivedDecoded().firstOrNull() as OutgoingWSMessage.Publish?)
-                    when (message?.topic) {
-                        SubscriptionTopic.Trades -> {
-                            when (val data = message.data) {
-                                is TradeCreated -> {
-                                    logger.info { "Received trade created" }
-                                    pendingTrades.add(data.trade)
+    override val websocketSubscriptionTopics: List<SubscriptionTopic> =
+        marketIds
+            .map { SubscriptionTopic.Prices(it, OHLCDuration.P5M) } +
+            listOf(
+                SubscriptionTopic.Trades,
+                SubscriptionTopic.Orders,
+                SubscriptionTopic.Balances
+            )
 
-                                }
-                                is TradeUpdated -> {
-                                    logger.info { "Received trade update" }
-                                    val trade = data.trade
-                                    if (trade.settlementStatus == SettlementStatus.Pending) {
-                                        pendingTrades.add(trade)
-                                    } else if (trade.settlementStatus == SettlementStatus.Completed) {
-                                        pendingTrades.removeIf { it.id == trade.id }
-                                        settledTrades.add(trade)
-                                    }
-                                    data.trade
-                                }
-                                is Trades -> {
-                                    logger.info { "Received ${data.trades.size} trade updates" }
-                                    data.trades.forEach { trade ->
-                                        if (trade.settlementStatus == SettlementStatus.Pending) {
-                                            pendingTrades.add(trade)
-                                        } else if (trade.settlementStatus == SettlementStatus.Completed) {
-                                            pendingTrades.removeIf { it.id == trade.id }
-                                            settledTrades.add(trade)
-                                        }
-                                    }
-                                }
-                                else -> {}
-                            }
-                        }
-                        SubscriptionTopic.Balances -> {
-                            val balanceData = message.data as Balances
-                            balanceData.balances.forEach {
-                                balances[it.symbol.value] = it.available
-                            }
-                            logger.info { "Balance update ${balanceData.balances}" }
-                        }
-                        SubscriptionTopic.Orders -> {
-                            val orders = when (val data = message.data) {
-                                is Orders -> data.orders
-                                is OrderCreated -> listOf(data.order)
-                                is OrderUpdated -> listOf(data.order)
-                                else -> emptyList()
-                            }
-                            orders.forEach { order ->
-                                logger.info { "Order update $order" }
-                                when (order.status) {
-                                    OrderStatus.Partial -> {
-                                        val oldOrder = currentOrders[order.marketId]!!.find { it.id == order.id }
-                                        if (oldOrder == null) {
-                                            logger.info { "Received partial fill for unknown order ${order.id}" }
-                                        } else {
-                                            val filled = oldOrder.amount - order.amount
-                                            logger.info { "Order ${order.id} filled $filled of ${oldOrder.amount} remaining" }
-                                            currentOrders[order.marketId]!!.remove(oldOrder)
-                                            currentOrders[order.marketId]!!.add(
-                                                oldOrder.copy(
-                                                    amount = order.amount
-                                                )
-                                            )
-                                        }
-                                    }
-
-                                    OrderStatus.Filled -> {
-                                        logger.info { "Order ${order.id} fully filled ${order.amount}" }
-                                        currentOrders[order.marketId]!!.removeIf { it.id == order.id }
-                                    }
-
-                                    OrderStatus.Cancelled -> {
-                                        logger.info { "Order ${order.id} canceled" }
-                                        currentOrders[order.marketId]!!.removeIf { it.id == order.id }
-                                    }
-
-                                    OrderStatus.Expired -> {
-                                        logger.info { "Order ${order.id} expired" }
-                                        currentOrders[order.marketId]!!.removeIf { it.id == order.id }
-                                    }
-
-                                    else -> {}
-                                }
-                            }
-                        }
-                        is SubscriptionTopic.Prices -> {
-                            val prices = message.data as Prices
-                            if (prices.full) {
-                                logger.info { "Full price update for ${prices.market}" }
-                            } else {
-                                if (prices.ohlc.isNotEmpty()) {
-                                    logger.info { "Incremental price update: $prices" }
-                                    markets.find { it.id == prices.market }?.let {
-                                        adjustQuotes(it, prices.ohlc.last().close.toBigDecimal())
-                                    }
-                                }
-                            }
-                        }
-                        else -> {}
-                    }
-                } catch (e: Exception) {
-                    logger.warn(e) { "Error occurred while running maker in market $markets" }
-                }
-            }
-            marketIds.forEach {
-                wsClient.unsubscribe(SubscriptionTopic.Prices(it, OHLCDuration.P5M))
-            }
-            wsClient.unsubscribe(SubscriptionTopic.Trades)
-            wsClient.unsubscribe(SubscriptionTopic.Orders)
-            wsClient.close(WsStatus.GOING_AWAY)
-            apiClient.cancelOpenOrders()
-        }
+    override fun onStopping() {
+        quotesCreated = false
+        apiClient.cancelOpenOrders()
     }
 
-    fun stop() {
-        logger.info { "Market maker $id stopping" }
-        listenerThread?.let {
-            stopping = true
-            it.interrupt()
-            it.join(1000)
+    override fun handleWebsocketMessage(message: Publishable) {
+        when (message) {
+            is TradeCreated -> {
+                logger.info { "$id: received trade created" }
+                pendingTrades.add(message.trade)
+            }
+            is TradeUpdated -> {
+                logger.info { "$id: received trade update" }
+                val trade = message.trade
+                if (trade.settlementStatus == SettlementStatus.Pending) {
+                    pendingTrades.add(trade)
+                } else if (trade.settlementStatus == SettlementStatus.Completed) {
+                    pendingTrades.removeIf { it.id == trade.id }
+                    settledTrades.add(trade)
+                }
+            }
+            is Trades -> {
+                logger.info { "$id: received ${message.trades.size} trade updates" }
+                message.trades.forEach { trade ->
+                    if (trade.settlementStatus == SettlementStatus.Pending) {
+                        pendingTrades.add(trade)
+                    } else if (trade.settlementStatus == SettlementStatus.Completed) {
+                        pendingTrades.removeIf { it.id == trade.id }
+                        settledTrades.add(trade)
+                    }
+                }
+            }
+            is Balances -> {
+                message.balances.forEach {
+                    balances[it.symbol.value] = it.available
+                }
+                logger.info { "$id: received balance update ${message.balances}" }
+            }
+            is Orders, is OrderCreated, is OrderUpdated -> {
+                val orders = when (message) {
+                    is Orders -> message.orders
+                    is OrderCreated -> listOf(message.order)
+                    is OrderUpdated -> listOf(message.order)
+                    else -> emptyList()
+                }
+                orders.forEach { order ->
+                    logger.info { "$id: received order update $order" }
+                    when (order.status) {
+                        OrderStatus.Partial -> {
+                            val oldOrder = currentOrders[order.marketId]!!.find { it.id == order.id }
+                            if (oldOrder == null) {
+                                logger.info { "$id: received partial fill for unknown order ${order.id}" }
+                            } else {
+                                val filled = oldOrder.amount - order.amount
+                                logger.info { "$id: order ${order.id} filled $filled of ${oldOrder.amount} remaining" }
+                                currentOrders[order.marketId]!!.remove(oldOrder)
+                                currentOrders[order.marketId]!!.add(
+                                    oldOrder.copy(
+                                        amount = order.amount
+                                    )
+                                )
+                            }
+                        }
+
+                        OrderStatus.Filled -> {
+                            logger.info { "$id: order ${order.id} fully filled ${order.amount}" }
+                            currentOrders[order.marketId]!!.removeIf { it.id == order.id }
+                        }
+
+                        OrderStatus.Cancelled -> {
+                            logger.info { "$id: order ${order.id} canceled" }
+                            currentOrders[order.marketId]!!.removeIf { it.id == order.id }
+                        }
+
+                        OrderStatus.Expired -> {
+                            logger.info { "$id: order ${order.id} expired" }
+                            currentOrders[order.marketId]!!.removeIf { it.id == order.id }
+                        }
+
+                        else -> {}
+                    }
+                }
+            }
+            is Prices -> {
+                if (message.full) {
+                    logger.info { "$id: full price update for ${message.market}" }
+                    if (!quotesCreated) {
+                        markets.find { it.id == message.market }?.let {
+                            createQuotes(message.market, levels, message.ohlc.lastOrNull()?.close?.toBigDecimal() ?: BigDecimal.ONE)
+                            quotesCreated = true
+                        }
+                    }
+                } else {
+                    if (message.ohlc.isNotEmpty()) {
+                        logger.info { "$id: incremental price update $message" }
+                        markets.find { it.id == message.market }?.let {
+                            adjustQuotes(it, message.ohlc.last().close.toBigDecimal())
+                        }
+                    }
+                }
+            }
+            else -> {}
         }
     }
 
@@ -235,43 +195,40 @@ class Maker(
     }
 
     private fun adjustQuotes(market: Market, curPrice: BigDecimal) {
+        logger.debug { "$id: adjusting quotes in market ${market.id}, current price: $curPrice" }
         val marketId = market.id
         val currentOffers = currentOrders[marketId]?.filter { it.side == OrderSide.Sell } ?: emptyList()
         val currentBids = currentOrders[marketId]?.filter { it.side == OrderSide.Buy } ?: emptyList()
         val(offerPrices, bidPrices) = offerAndBidPrices(market, levels, curPrice)
         val(offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
 
-        val result = apiClient.tryBatchOrders(
+        apiClient.batchOrders(
             BatchOrdersApiRequest(
                 marketId = marketId,
                 createOrders = offerPrices.mapIndexed { ix, price ->
-                        CreateOrderApiRequest.Limit(
-                            nonce = generateOrderNonce(),
-                            marketId = marketId,
-                            side = OrderSide.Sell,
-                            amount = offerAmounts[ix],
-                            price = price,
-                            signature = EvmSignature.emptySignature(),
-                            verifyingChainId = ChainId.empty,
-                        ).let {
-                            wallet.signOrder(it)
-                        }
+                    wallet.signOrder(CreateOrderApiRequest.Limit(
+                        nonce = generateOrderNonce(),
+                        marketId = marketId,
+                        side = OrderSide.Sell,
+                        amount = offerAmounts[ix],
+                        price = price,
+                        signature = EvmSignature.emptySignature(),
+                        verifyingChainId = ChainId.empty,
+                    ))
                 } + bidPrices.mapIndexed { ix, price ->
-                        CreateOrderApiRequest.Limit(
-                            nonce = generateOrderNonce(),
-                            marketId = marketId,
-                            side = OrderSide.Buy,
-                            amount = bidAmounts[ix],
-                            price = price,
-                            signature = EvmSignature.emptySignature(),
-                            verifyingChainId = ChainId.empty,
-                        ).let {
-                            wallet.signOrder(it)
-                        }
+                    wallet.signOrder(CreateOrderApiRequest.Limit(
+                        nonce = generateOrderNonce(),
+                        marketId = marketId,
+                        side = OrderSide.Buy,
+                        amount = bidAmounts[ix],
+                        price = price,
+                        signature = EvmSignature.emptySignature(),
+                        verifyingChainId = ChainId.empty,
+                    ))
                 },
                 updateOrders = emptyList(),
                 cancelOrders = currentOffers.map {
-                    CancelOrderApiRequest(
+                    wallet.signCancelOrder(CancelOrderApiRequest(
                         orderId = it.id,
                         marketId = it.marketId,
                         amount = it.amount,
@@ -279,11 +236,9 @@ class Maker(
                         nonce = generateOrderNonce(),
                         signature = EvmSignature.emptySignature(),
                         verifyingChainId = ChainId.empty,
-                    ).let { request ->
-                        wallet.signCancelOrder(request)
-                    }
+                    ))
                 } + currentBids.map {
-                    CancelOrderApiRequest(
+                    wallet.signCancelOrder(CancelOrderApiRequest(
                         orderId = it.id,
                         marketId = it.marketId,
                         amount = it.amount,
@@ -291,18 +246,13 @@ class Maker(
                         nonce = generateOrderNonce(),
                         signature = EvmSignature.emptySignature(),
                         verifyingChainId = ChainId.empty,
-                    ).let { request ->
-                        wallet.signCancelOrder(request)
-                    }
+                    ))
                 }
             )
         )
-        result.mapLeft {
-            logger.warn { "Could not apply batch: ${it.error?.message}" }
-        }
-        .map {
-            logger.info { "Applied update batch" }
-        }
+
+        logger.info { "$id: applied update batch" }
+
         currentOrders[marketId] = apiClient
             .listOrders(listOf(OrderStatus.Open, OrderStatus.Partial), marketId)
             .orders
@@ -311,14 +261,17 @@ class Maker(
     }
 
     private fun createQuotes(marketId: MarketId, levels: Int, curPrice: BigDecimal) {
+        logger.debug { "$id: creating quotes in market $marketId, current price: $curPrice" }
         markets.find { it.id == marketId }?.let { market ->
             apiClient.cancelOpenOrders()
-            val(offerPrices, bidPrices) = offerAndBidPrices(market, levels, curPrice)
-            val(offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
+
+            val (offerPrices, bidPrices) = offerAndBidPrices(market, levels, curPrice)
+            val (offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
+
             offerPrices.forEachIndexed { ix, price ->
                 val amount = offerAmounts[ix]
                 apiClient.tryCreateOrder(
-                    CreateOrderApiRequest.Limit(
+                    wallet.signOrder(CreateOrderApiRequest.Limit(
                         nonce = generateOrderNonce(),
                         marketId = marketId,
                         side = OrderSide.Sell,
@@ -326,15 +279,16 @@ class Maker(
                         price = price,
                         signature = EvmSignature.emptySignature(),
                         verifyingChainId = ChainId.empty,
-                    ).let {
-                        wallet.signOrder(it)
-                    },
-                ).onLeft { e: ApiCallFailure -> logger.warn { "$id failed to create Sell order in $marketId market with: $e" } }
+                    ))
+                ).onLeft { e: ApiCallFailure ->
+                    logger.warn { "$id failed to create Sell order in $marketId market with: $e" }
+                }
             }
+
             bidPrices.forEachIndexed { ix, price ->
                 val amount = bidAmounts[ix]
                 apiClient.tryCreateOrder(
-                    CreateOrderApiRequest.Limit(
+                    wallet.signOrder(CreateOrderApiRequest.Limit(
                         nonce = generateOrderNonce(),
                         marketId = marketId,
                         side = OrderSide.Buy,
@@ -342,18 +296,21 @@ class Maker(
                         price = price,
                         signature = EvmSignature.emptySignature(),
                         verifyingChainId = ChainId.empty,
-                    ).let {
-                        wallet.signOrder(it)
-                    },
-                ).onLeft { e: ApiCallFailure -> logger.warn { "$id failed to create Buy order in $marketId market with: $e" } }
+                    ))
+                ).onLeft { e: ApiCallFailure ->
+                    logger.warn { "$id failed to create Buy order in $marketId market with: $e" }
+                }
             }
-            currentOrders[marketId] = apiClient
-                .listOrders(listOf(OrderStatus.Open, OrderStatus.Partial), marketId)
-                .orders
-                .map { it as Order.Limit }
-                .toMutableList()
+
+            currentOrders[marketId] =
+                apiClient
+                    .listOrders(listOf(OrderStatus.Open, OrderStatus.Partial), marketId)
+                    .orders
+                    .map { it as Order.Limit }
+                    .toMutableList()
+
             if (currentOrders[marketId]!!.size != levels * 2) {
-                logger.warn { "Not all quotes accepted: ${currentOrders[marketId]}" }
+                logger.warn { "$id: not all quotes accepted: ${currentOrders[marketId]}" }
             }
         } ?: throw RuntimeException("Market $marketId not found")
     }

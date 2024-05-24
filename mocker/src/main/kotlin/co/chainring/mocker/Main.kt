@@ -118,6 +118,7 @@ fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: Bi
     val quoteAsset = market.quoteSymbol.value to quoteAssetAmount.toFundamentalUnits(market.quoteDecimals)
 
     val maker = Maker(
+        marketIds = listOf(market.id),
         tightness = 5, skew = 0, levels = 10,
         native = if (baseAssetBtc) baseAsset.second else BigDecimal.TEN.movePointRight(18).toBigInteger(),
         assets = when {
@@ -126,7 +127,7 @@ fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: Bi
         },
         keyPair = keyPair
     )
-    maker.start(listOf(market.id))
+    maker.start()
     return maker
 }
 
@@ -136,6 +137,7 @@ fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: Bi
     val quoteAsset = market.quoteSymbol.value to quoteAssetAmount.toFundamentalUnits(market.quoteDecimals)
 
     val taker = Taker(
+        marketIds = listOf(market.id),
         rate = Random.nextLong(10000, 30000),
         native = if (baseAssetBtc) baseAsset.second else BigDecimal.ONE.movePointRight(18).toBigInteger(),
         assets = when {
@@ -144,7 +146,7 @@ fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: Bi
         },
         priceCorrectionFunction = priceFunction,
     )
-    taker.start(listOf(market.id))
+    taker.start()
     return taker
 }
 

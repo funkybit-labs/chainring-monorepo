@@ -52,7 +52,7 @@ data class MarketParams(
 
 class MockerApp(
     httpPort: Int = System.getenv("HTTP_PORT")?.toIntOrNull() ?: 8000,
-    config: List<String> = System.getenv("MARKETS")?.split(',') ?: emptyList()
+    config: List<String> = System.getenv("MARKETS")?.split(',') ?: listOf("BTC/ETH")
 ) {
     private val logger = KotlinLogging.logger {}
     private val marketsConfig = mutableMapOf<MarketId, MarketParams>()
