@@ -39,6 +39,7 @@ dependencies {
     implementation("org.apache.logging.log4j:log4j-layout-template-json:$log4j2Version")
     implementation("org.apache.logging.log4j:log4j-slf4j2-impl:$log4j2Version")
     implementation("io.arrow-kt:arrow-core:1.2.1")
+    implementation("de.fxlae:typeid-java:0.2.0")
     implementation(project(":backend"))
     implementation(project(":integrationtests"))
 }
