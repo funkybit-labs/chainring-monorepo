@@ -17,9 +17,6 @@ export function mergeOHLC(
   incoming: OHLC[],
   duration: OHLCDuration
 ): OHLC[] {
-  // update completes of last item before merge
-  updateLastItemCompleteness(draft, ohlcDurationsMs[duration])
-
   // merge new data
   incoming.forEach((newItem) => {
     // lookup if recent item is being replaced
@@ -35,18 +32,7 @@ export function mergeOHLC(
       draft[index] = newItem
     }
   })
-  // update completes of last item after merge
-  updateLastItemCompleteness(draft, ohlcDurationsMs[duration])
   return draft
-}
-
-function updateLastItemCompleteness(ohlc: OHLC[], duration: number): OHLC[] {
-  if (ohlc.length > 0) {
-    const mostRecentItem = ohlc[ohlc.length - 1]
-    mostRecentItem.incomplete =
-      mostRecentItem.start.getTime() + duration > Date.now()
-  }
-  return ohlc
 }
 
 function fillGaps(draft: OHLC[], newItem: OHLC, duration: number) {
@@ -63,8 +49,7 @@ function fillGaps(draft: OHLC[], newItem: OHLC, duration: number) {
       open: lastItem.close,
       high: lastItem.close,
       low: lastItem.close,
-      close: lastItem.close,
-      incomplete: false
+      close: lastItem.close
     })
   }
 }

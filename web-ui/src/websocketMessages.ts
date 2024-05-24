@@ -72,8 +72,7 @@ const OHLCSchema = z.object({
   open: z.number(),
   high: z.number(),
   low: z.number(),
-  close: z.number(),
-  incomplete: z.boolean().optional()
+  close: z.number()
 })
 export type OHLC = z.infer<typeof OHLCSchema>
 
