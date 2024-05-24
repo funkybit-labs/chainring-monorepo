@@ -1,9 +1,7 @@
 import argparse
 import os
-from string import Template
 
 import boto3
-import mimetypes
 import yaml
 import json
 
@@ -30,6 +28,14 @@ class ChainringDeploymentManager:
             }
         )
 
+
+    def get_desired_instances_count(self, service_name):
+        return self.ecs_client.describe_services(
+            cluster=self.cluster_name,
+            services=[service_name]
+        )['services'][0]['desiredCount']
+
+
     def update_instances_count(self, service_names, desired_count):
         print(f"Updating {service_names} instances count to {desired_count} in region {self.region_name}")
         for service_name in service_names:
@@ -38,6 +44,24 @@ class ChainringDeploymentManager:
                 service=service_name,
                 desiredCount=desired_count
             )
+
+
+    def stop_services(self, service_names, env_name, env_config):
+        if contains_essential_services(service_names, env_name, env_config):
+            self.switch_to_holding(env_name)
+        self.update_instances_count(service_names, desired_count=0)
+        self.wait_for_stable_state(service_names)
+
+
+    def start_services(self, service_names, env_name, env_config):
+        self.wait_for_stable_state(service_names)
+        for service in service_names:
+            config_service_name = service.removeprefix(f"{env_name}-")
+            self.update_instances_count([service], desired_count=env_config['services'][config_service_name]['count'])
+        self.wait_for_stable_state(service_names)
+        if contains_essential_services(service_names, env_name, env_config):
+            self.switch_to_app(env_name)
+
 
     def get_latest_task_definitions(self, service_names):
         services = self.ecs_client.describe_services(
@@ -61,10 +85,22 @@ class ChainringDeploymentManager:
 
         return latest_task_defs
 
+
     def update_services(self, service_names, env_name, env_config, image_tag):
+        self.wait_for_stable_state(service_names)
+
         print(f"Updating {service_names} services")
         task_defs = self.get_latest_task_definitions(service_names)
+
         for service_name, task_def in task_defs.items():
+            config_service_name = service_name.removeprefix(f"{env_name}-")
+            service_config = env_config['services'][config_service_name]
+            restart_required = service_config.get('no_rolling_upgrade', 'false') == 'true' and \
+                               self.get_desired_instances_count(service_name) > 0
+
+            if restart_required:
+                self.update_instances_count([service_name], desired_count=0)
+
             new_task_def = {key: task_def[key] for key in [
                 'family',
                 'taskRoleArn',
@@ -83,7 +119,6 @@ class ChainringDeploymentManager:
                 'inferenceAccelerators'
             ] if key in task_def}
             primary_container = new_task_def['containerDefinitions'][0]
-            service_config = env_config['services'][service_name.removeprefix(f"{args.env}-")]
             primary_container['image'] = f"{service_config['image']}:{image_tag}"
 
             service_env = service_config.get('environment')
@@ -107,7 +142,7 @@ class ChainringDeploymentManager:
             })
             primary_container['environment'].append({
                 'name': 'APP_NAME',
-                'value': service_name.removeprefix(f"{args.env}-")
+                'value': config_service_name
             })
 
             if 'secrets' in service_config:
@@ -126,6 +161,11 @@ class ChainringDeploymentManager:
                 service=service_name,
                 taskDefinition=new_task_def_arn
             )
+            if restart_required:
+                self.update_instances_count([service], desired_count=service_config['count'])
+
+        self.wait_for_stable_state(service_names)
+
 
     def switch_to_holding(self, env_name):
         print(f"Setting up holding page for environment: {env_name}")
@@ -158,6 +198,7 @@ class ChainringDeploymentManager:
 
         print("Holding page rule was added successfully.")
 
+
     def switch_to_app(self, env_name):
         print(f"Removing holding page for environment: {env_name}")
 
@@ -173,6 +214,7 @@ class ChainringDeploymentManager:
 
         print("Holding page rule was removed successfully.")
 
+
     def resolve_load_balancer_listener_arn(self, env_name):
         lb_name = f"{env_name}-lb"
         lb = self.elbv2_client.describe_load_balancers(Names=[lb_name])['LoadBalancers'][0]
@@ -181,6 +223,13 @@ class ChainringDeploymentManager:
         listener_arn = next(filter(lambda l: l['Port'] == 443, listeners))['ListenerArn']
         print(f"LB ARN: {lb_arn}, Listener ARN: {listener_arn}")
         return listener_arn
+
+
+def contains_essential_services(service_names, env_name, env_config):
+    return any(
+        env_config['services'][service.removeprefix(f"{env_name}-")].get('is_essential', 'false') == 'true'
+        for service in service_names
+    )
 
 
 if __name__ == "__main__":
@@ -218,29 +267,12 @@ if __name__ == "__main__":
 
     if len(services) > 0:
         if args.action == 'start':
-            service_manager.wait_for_stable_state(services)
-            for service in services:
-                config_service_name = service.removeprefix(f"{args.env}-")
-                service_manager.update_instances_count([service], desired_count=env_config['services'][config_service_name]['count'])
-            service_manager.wait_for_stable_state(services)
-            service_manager.switch_to_app(args.env)
+            service_manager.start_services(services, args.env, env_config)
         elif args.action == 'stop':
-            service_manager.switch_to_holding(args.env)
-            service_manager.update_instances_count(services, desired_count=0)
-            service_manager.wait_for_stable_state(services)
+            service_manager.stop_services(services, args.env, env_config)
         elif args.action == 'upgrade':
             print("UPGRADE")
-            for service in services:
-              config_service_name = service.removeprefix(f"{args.env}-")
-              if config_service_name == "sequencer":
-                  service_manager.update_instances_count([service], desired_count=0)
-            service_manager.wait_for_stable_state(services)
             service_manager.update_services(services, args.env, env_config, args.tag)
-            for service in services:
-              config_service_name = service.removeprefix(f"{args.env}-")
-              if config_service_name == "sequencer":
-                  service_manager.update_instances_count([service], desired_count=env_config['services'][config_service_name]['count'])
-            service_manager.wait_for_stable_state(services)
 
     if args.action == 'switch-to-holding':
         service_manager.switch_to_holding(args.env)

@@ -24,12 +24,14 @@ services:
   api:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
     count: 1
+    is_essential: "true"
     environment: api
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
   anvil:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
     count: 1
+    is_essential: "true"
   otterscan:
     image: otterscan/otterscan
     count: 1
@@ -37,6 +39,7 @@ services:
   anvil2:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
     count: 1
+    is_essential: "true"
     environment: anvil2
   otterscan2:
     image: otterscan/otterscan
@@ -45,6 +48,8 @@ services:
   sequencer:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer
     count: 1
+    is_essential: "true"
+    no_rolling_upgrade: "true"
     environment: sequencer
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
