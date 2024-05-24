@@ -199,7 +199,7 @@ class Broadcaster(val db: Database) {
                                 .listForWallet(
                                     WalletEntity.getOrCreate(client.principal),
                                     beforeTimestamp = Clock.System.now(),
-                                    limit = 1000,
+                                    limit = 100,
                                 ).map(OrderExecutionEntity::toTradeResponse),
                         ),
                     ),
@@ -239,7 +239,7 @@ class Broadcaster(val db: Database) {
                         SubscriptionTopic.Orders,
                         Orders(
                             OrderEntity
-                                .listForWallet(WalletEntity.getOrCreate(client.principal), limit = 1000)
+                                .listForWallet(WalletEntity.getOrCreate(client.principal), limit = 100)
                                 .map(OrderEntity::toOrderResponse),
                         ),
                     ),
