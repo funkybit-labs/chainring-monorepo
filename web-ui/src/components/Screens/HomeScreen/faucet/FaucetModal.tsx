@@ -124,8 +124,7 @@ export function FaucetModal({
 
           {phase == 'sent' ? (
             <div className="mt-2 flex text-center text-statusGreen">
-              Your request has been processed. The tokens may arrive with a
-              slight delay.
+              Success. Your wallet balance will be updated shortly.
             </div>
           ) : (
             <></>

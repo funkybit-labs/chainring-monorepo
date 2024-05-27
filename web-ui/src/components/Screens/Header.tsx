@@ -85,7 +85,7 @@ export function Header({
     )
   }
 
-  function faucet(onOpen: () => void) {
+  function faucetButton({ onClick }: { onClick: () => void }) {
     return (
       <span className="mx-5 whitespace-nowrap">
         {faucetEnabled && account.isConnected ? (
@@ -97,7 +97,7 @@ export function Header({
                 Faucet
               </span>
             )}
-            onClick={() => onOpen()}
+            onClick={() => onClick()}
             disabled={false}
           />
         ) : (
@@ -146,7 +146,7 @@ export function Header({
 
           <div className="hidden narrow:inline-block">{walletConnector()}</div>
           <div className="hidden narrow:inline-block">
-            {faucet(() => setShowFaucetModal(true))}
+            {faucetButton({ onClick: () => setShowFaucetModal(true) })}
           </div>
         </div>
       </div>
@@ -173,9 +173,11 @@ export function Header({
               <div>
                 <div className="mb-2">{walletConnector()}</div>
                 <div className="mb-8">
-                  {faucet(() => {
-                    setShowMenu(false)
-                    setShowFaucetModal(true)
+                  {faucetButton({
+                    onClick: () => {
+                      setShowMenu(false)
+                      setShowFaucetModal(true)
+                    }
                   })}
                 </div>
               </div>
