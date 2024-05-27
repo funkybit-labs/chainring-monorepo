@@ -16,6 +16,7 @@ import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
 import co.chainring.core.client.rest.ApiCallFailure
+import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
@@ -24,7 +25,6 @@ import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.utils.generateOrderNonce
 import co.chainring.core.model.db.ChainId
-import de.fxlae.typeid.TypeId
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.math.BigDecimal
@@ -43,7 +43,7 @@ class Maker(
     assets: Map<String, BigInteger>,
     keyPair: ECKeyPair = Keys.createEcKeyPair()
 ) : Actor(marketIds, native, assets, keyPair) {
-    override val id: String = TypeId.generate("mm").toString()
+    override val id: String = "mm_${Address(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
     override val logger: KLogger = KotlinLogging.logger {}
     private var currentOrders = mutableMapOf<MarketId,MutableList<Order.Limit>>()
     private var quotesCreated = false
