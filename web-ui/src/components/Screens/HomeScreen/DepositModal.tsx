@@ -1,7 +1,7 @@
 import { Address, formatUnits } from 'viem'
 import { BaseError as WagmiError, useConfig } from 'wagmi'
 import { ERC20Abi, ExchangeAbi } from 'contracts'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   getBalance,
   getTransactionCount,
@@ -62,6 +62,7 @@ export default function DepositModal({
   })
 
   const [submitPhase, setSubmitPhase] = useState<
+    | 'waitingForTxCount'
     | 'waitingForAllowanceApproval'
     | 'waitingForDepositApproval'
     | 'submittingDeposit'
@@ -76,6 +77,7 @@ export default function DepositModal({
         let depositHash: string
 
         if (symbol.contractAddress) {
+          setSubmitPhase('waitingForTxCount')
           const transactionCount = await getTransactionCount(config, {
             address: walletAddress
           })
@@ -129,7 +131,7 @@ export default function DepositModal({
     }
   })
 
-  const canSubmit = (function () {
+  const canSubmit = useMemo(() => {
     if (submitPhase !== null) return false
 
     try {
@@ -142,7 +144,7 @@ export default function DepositModal({
     } catch {
       return false
     }
-  })()
+  }, [submitPhase, walletBalanceQuery, amount])
 
   return (
     <Modal
@@ -173,6 +175,7 @@ export default function DepositModal({
                   error={mutation.error?.message}
                   caption={() => {
                     switch (submitPhase) {
+                      case 'waitingForTxCount':
                       case 'waitingForAllowanceApproval':
                         return 'Waiting for allowance approval'
                       case 'waitingForDepositApproval':
