@@ -52,6 +52,10 @@ export default class Markets {
     return this.markets.map(f)
   }
 
+  flatMap<A>(f: (m: Market) => A[]): A[] {
+    return this.markets.flatMap(f)
+  }
+
   first(): Market | null {
     return this.markets.length > 0 ? this.markets[0] : null
   }

@@ -8,6 +8,10 @@ export function isNotNullable<T>(element: T | null | undefined): element is T {
   return typeof element !== 'undefined' && element !== null
 }
 
+export function uniqueFilter<T>(value: T, index: number, self: T[]): boolean {
+  return self.indexOf(value) === index
+}
+
 export function addressDisplay(address: string): string {
   const without0x = address.startsWith('0x') ? address.slice(2) : address
   return (

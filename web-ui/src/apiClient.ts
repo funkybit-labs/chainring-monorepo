@@ -24,7 +24,7 @@ const decimal = () =>
       }
     })
 
-const AddressSchema = z.custom<`0x${string}`>((val: unknown) =>
+export const AddressSchema = z.custom<`0x${string}`>((val: unknown) =>
   /^0x/.test(val as string)
 )
 export type AddressType = z.infer<typeof AddressSchema>
@@ -300,6 +300,12 @@ const ListWithdrawalsApiResponseSchema = z.object({
   withdrawals: z.array(WithdrawalSchema)
 })
 
+const FaucetRequestSchema = z.object({
+  chainId: z.number(),
+  address: AddressSchema
+})
+export type FaucetRequest = z.infer<typeof FaucetRequestSchema>
+
 const ApiErrorSchema = z.object({
   displayMessage: z.string()
 })
@@ -428,6 +434,25 @@ export const apiClient = new Zodios(apiBaseUrl, [
     path: '/v1/withdrawals',
     alias: 'listWithdrawals',
     response: ListWithdrawalsApiResponseSchema
+  },
+  {
+    method: 'post',
+    path: '/v1/faucet',
+    alias: 'faucet',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: FaucetRequestSchema
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
   }
 ])
 
