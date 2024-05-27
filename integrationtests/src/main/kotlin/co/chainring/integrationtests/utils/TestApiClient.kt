@@ -13,6 +13,7 @@ import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.DepositApiResponse
+import co.chainring.apps.api.model.FaucetApiRequest
 import co.chainring.apps.api.model.ListDepositsApiResponse
 import co.chainring.apps.api.model.ListWithdrawalsApiResponse
 import co.chainring.apps.api.model.Market
@@ -262,6 +263,9 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
 
     override fun getBalances(): BalancesApiResponse =
         tryGetBalances().assertSuccess()
+
+    override fun faucet(apiRequest: FaucetApiRequest): Unit =
+        tryFaucet(apiRequest).assertSuccess()
 }
 
 fun <T> Either<ApiCallFailure, T>.assertSuccess(): T {

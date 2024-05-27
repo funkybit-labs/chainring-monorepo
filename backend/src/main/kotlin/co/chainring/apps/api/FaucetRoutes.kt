@@ -1,14 +1,12 @@
 package co.chainring.apps.api
 
 import co.chainring.apps.api.model.ApiError
+import co.chainring.apps.api.model.FaucetApiRequest
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.errorResponse
 import co.chainring.core.blockchain.BlockchainClient
-import co.chainring.core.model.Address
-import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.SymbolEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.Serializable
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.Tag
 import org.http4k.contract.meta
@@ -23,16 +21,8 @@ import java.math.BigDecimal
 class FaucetRoutes(blockchainClients: Collection<BlockchainClient>) {
     private val logger = KotlinLogging.logger { }
 
-    companion object {
-        @Serializable
-        data class FaucetRequest(
-            val chainId: ChainId,
-            val address: Address,
-        )
-    }
-
     private val faucet: ContractRoute = run {
-        val requestBody = Body.auto<FaucetRequest>().toLens()
+        val requestBody = Body.auto<FaucetApiRequest>().toLens()
 
         "faucet" meta {
             operationId = "faucet"
@@ -48,6 +38,7 @@ class FaucetRoutes(blockchainClients: Collection<BlockchainClient>) {
                 null -> errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.ChainNotSupported, "Chain not supported"))
                 else -> {
                     val nativeSymbol = transaction { SymbolEntity.forChainAndContractAddress(chainId = payload.chainId, contractAddress = null) }
+                    logger.debug { "Sending 0.1 ${nativeSymbol.name} on chain ${nativeSymbol.chainId.value} to ${payload.address.value}" }
                     blockchainClient.asyncDepositNative(payload.address, BigDecimal("0.1").movePointRight(nativeSymbol.decimals.toInt()).toBigInteger())
                     Response(Status.NO_CONTENT)
                 }

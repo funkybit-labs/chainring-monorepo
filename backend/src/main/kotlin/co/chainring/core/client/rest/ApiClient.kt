@@ -16,6 +16,7 @@ import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.DepositApiResponse
+import co.chainring.apps.api.model.FaucetApiRequest
 import co.chainring.apps.api.model.ListDepositsApiResponse
 import co.chainring.apps.api.model.ListWithdrawalsApiResponse
 import co.chainring.apps.api.model.Order
@@ -276,6 +277,16 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
+    fun tryFaucet(apiRequest: FaucetApiRequest): Either<ApiCallFailure, Unit> =
+        executeAndTrace(
+            TraceRecorder.Op.GetBalances,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/faucet")
+                .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
+
     private fun executeAndTrace(op: TraceRecorder.Op, request: Request): Response {
         return traceRecorder.record(op) {
             httpClient.newCall(request).execute()
@@ -327,6 +338,9 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
 
     open fun getBalances(): BalancesApiResponse =
         tryGetBalances().throwOrReturn()
+
+    open fun faucet(apiRequest: FaucetApiRequest) =
+        tryFaucet(apiRequest).throwOrReturn()
 }
 
 fun <T> Either<ApiCallFailure, T>.throwOrReturn(): T {
