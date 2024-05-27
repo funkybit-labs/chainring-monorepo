@@ -416,6 +416,8 @@ class SequencerApp(
             }
 
             val lastSequenceNumberProcessedBeforeRestart = getLastSequenceNumberInOutputQueue()
+            var caughtUp = false
+            var requestsProcessedSinceStarted: Long = 0
 
             val outputAppender = outputQueue.acquireAppender()
             var tailerPrevState = inputTailer.state()
@@ -433,7 +435,12 @@ class SequencerApp(
                         dc.wire()?.read()?.bytes { bytes ->
                             val request = SequencerRequest.parseFrom(bytes.toByteArray())
                             val response = processRequest(request, dc.index(), startTime)
+                            requestsProcessedSinceStarted += 1
                             if (response.sequence > lastSequenceNumberProcessedBeforeRestart) {
+                                if (!caughtUp) {
+                                    logger.info { "Caught up after re-processing $requestsProcessedSinceStarted requests" }
+                                    caughtUp = true
+                                }
                                 outputAppender.writingDocument().use {
                                     it.wire()?.write()?.bytes(response.toByteArray())
                                 }
