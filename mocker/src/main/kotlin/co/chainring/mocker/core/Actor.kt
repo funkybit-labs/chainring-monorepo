@@ -26,7 +26,7 @@ abstract class Actor(
     private val marketIds: List<MarketId>,
     private val native: BigInteger?,
     private val assets: Map<String, BigInteger>,
-    keyPair: ECKeyPair = Keys.createEcKeyPair()
+    keyPair: ECKeyPair
 ) {
     abstract val id: String
     protected abstract val logger: KLogger

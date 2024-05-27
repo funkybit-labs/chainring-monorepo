@@ -13,6 +13,7 @@ import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
+import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
@@ -23,7 +24,6 @@ import co.chainring.core.utils.generateHexString
 import co.chainring.core.utils.TraceRecorder
 import co.chainring.core.utils.WSSpans
 import co.chainring.core.model.db.ChainId
-import de.fxlae.typeid.TypeId
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.math.BigDecimal
@@ -32,15 +32,18 @@ import kotlin.concurrent.thread
 import kotlin.random.Random
 import kotlinx.datetime.Clock
 import okhttp3.WebSocket
+import org.web3j.crypto.ECKeyPair
+import org.web3j.crypto.Keys
 
 class Taker(
     marketIds: List<MarketId>,
     private val rate: Long,
     native: BigInteger?,
     assets: Map<String, BigInteger>,
-    private val priceCorrectionFunction: DeterministicHarmonicPriceMovement
-) : Actor(marketIds, native, assets) {
-    override val id: String = TypeId.generate("tkr").toString()
+    private val priceCorrectionFunction: DeterministicHarmonicPriceMovement,
+    keyPair: ECKeyPair = Keys.createEcKeyPair()
+) : Actor(marketIds, native, assets, keyPair) {
+    override val id: String = "tkr_${Address(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
     override val logger: KLogger = KotlinLogging.logger {}
     private var currentOrder: Order.Market? = null
     private var marketPrices = mutableMapOf<MarketId, BigDecimal>()
