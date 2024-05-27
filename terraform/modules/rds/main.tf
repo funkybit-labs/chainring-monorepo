@@ -51,6 +51,35 @@ resource "aws_rds_cluster_instance" "db_instance" {
   engine_version       = "16.1"
   publicly_accessible  = false
   db_subnet_group_name = aws_db_subnet_group.db_subnet_group.name
+
+  # Enhanced advanced monitoring (CPU, I/O). '0' interval is disabled
+  monitoring_interval = var.enable_advanced_monitoring ? 60 : 0
+  monitoring_role_arn = var.enable_advanced_monitoring ? aws_iam_role.rds_monitoring_role[0].arn : null
+
+  # Enable performance insights (query level)
+  performance_insights_enabled = var.enable_performance_insights
+  performance_insights_retention_period = var.enable_performance_insights ? var.performance_insights_retention_days : null
+}
+
+resource "aws_iam_role" "rds_monitoring_role" {
+  count = var.enable_advanced_monitoring ? 1 : 0
+  name = "rds-monitoring-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Action = "sts:AssumeRole",
+      Effect = "Allow",
+      Principal = {
+        Service = "monitoring.rds.amazonaws.com"
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "rds_monitoring_role_attachment" {
+  count = var.enable_advanced_monitoring ? 1 : 0
+  role       = aws_iam_role.rds_monitoring_role[0].name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }
 
 locals {
