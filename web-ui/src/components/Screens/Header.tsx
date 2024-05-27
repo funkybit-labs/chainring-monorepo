@@ -1,13 +1,15 @@
 import logo from 'assets/logo-name.svg'
 import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { useAccount } from 'wagmi'
-import { addressDisplay } from 'utils'
+import { addressDisplay, uniqueFilter } from 'utils'
 import { Button } from 'components/common/Button'
 import React, { useEffect, useState } from 'react'
 import { MarketSelector } from 'components/Screens/HomeScreen/MarketSelector'
 import Markets, { Market } from 'markets'
 import { useMaintenance } from 'apiClient'
 import Menu from 'assets/Menu.svg'
+import { FaucetModal } from 'components/Screens/HomeScreen/faucet/FaucetModal'
+import faucetIcon from 'assets/faucet.svg'
 
 export function Header({
   markets,
@@ -24,6 +26,8 @@ export function Header({
   const [icon, setIcon] = useState<string>()
   const maintenance = useMaintenance()
   const [showMenu, setShowMenu] = useState(false)
+  const [showFaucetModal, setShowFaucetModal] = useState<boolean>(false)
+  const faucetEnabled = import.meta.env.ENV_FAUCET_ENABLED === 'true'
 
   useEffect(() => {
     if (account.isConnected && account.connector) {
@@ -48,7 +52,7 @@ export function Header({
 
   function walletConnector() {
     return (
-      <span className="mx-5">
+      <span className="ml-5 whitespace-nowrap">
         {account.isConnected ? (
           <Button
             style={'normal'}
@@ -76,6 +80,28 @@ export function Header({
             primary={true}
             disabled={false}
           />
+        )}
+      </span>
+    )
+  }
+
+  function faucetButton({ onClick }: { onClick: () => void }) {
+    return (
+      <span className="mx-5 whitespace-nowrap">
+        {faucetEnabled && account.isConnected ? (
+          <Button
+            style={'normal'}
+            caption={() => (
+              <span className="flex">
+                <img className="h-5 pr-2" src={faucetIcon} alt="Faucet" />
+                Faucet
+              </span>
+            )}
+            onClick={() => onClick()}
+            disabled={false}
+          />
+        ) : (
+          <></>
         )}
       </span>
     )
@@ -119,6 +145,9 @@ export function Header({
           )}
 
           <div className="hidden narrow:inline-block">{walletConnector()}</div>
+          <div className="hidden narrow:inline-block">
+            {faucetButton({ onClick: () => setShowFaucetModal(true) })}
+          </div>
         </div>
       </div>
       {showMenu && (
@@ -141,7 +170,17 @@ export function Header({
                   Orders & Trades
                 </div>
               </div>
-              <div className="mb-8">{walletConnector()}</div>
+              <div>
+                <div className="mb-2">{walletConnector()}</div>
+                <div className="mb-8">
+                  {faucetButton({
+                    onClick: () => {
+                      setShowMenu(false)
+                      setShowFaucetModal(true)
+                    }
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </>
@@ -153,6 +192,21 @@ export function Header({
             soon.
           </span>
         </div>
+      )}
+      {faucetEnabled && account.isConnected && showFaucetModal ? (
+        <div className="fixed">
+          <FaucetModal
+            isOpen={showFaucetModal}
+            walletAddress={account.address!}
+            symbols={markets
+              .flatMap((m) => [m.baseSymbol, m.quoteSymbol])
+              .filter((s) => s.contractAddress == null)
+              .filter(uniqueFilter)}
+            close={() => setShowFaucetModal(false)}
+          />
+        </div>
+      ) : (
+        <></>
       )}
     </>
   )

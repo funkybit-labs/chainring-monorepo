@@ -33,6 +33,8 @@ enum class ReasonCode {
     ProcessingError,
 
     RejectedBySequencer,
+
+    ChainNotSupported,
 }
 
 val jsonWithDefaults = Json { encodeDefaults = true }

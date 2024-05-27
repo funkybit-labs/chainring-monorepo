@@ -1,5 +1,6 @@
 package co.chainring.core.blockchain
 
+import co.chainring.core.model.Address
 import co.chainring.core.model.db.ChainId
 import java.math.BigInteger
 
@@ -73,17 +74,13 @@ object ChainManager {
         }
     }
 
-    fun getBlockchainClients() = blockchainClientsByChainId.values
-
-    fun getBlockchainClient(chainId: ChainId, privateKeyHex: String) = BlockchainClient(
-        blockchainClientsByChainId.getValue(chainId).config.copy(privateKeyHex = privateKeyHex),
-    )
+    fun getBlockchainClients(): Collection<BlockchainClient> = blockchainClientsByChainId.values
 
     fun getBlockchainClient(config: BlockchainClientConfig, privateKeyHex: String) = BlockchainClient(
         config.copy(privateKeyHex = privateKeyHex),
     )
 
-    fun getContractAddress(chainId: ChainId, contractType: ContractType) =
+    fun getContractAddress(chainId: ChainId, contractType: ContractType): Address =
         blockchainClientsByChainId.getValue(chainId).getContractAddress(contractType)
 
     private fun stringValue(chainName: String, paramName: String, defaultValue: String): String {

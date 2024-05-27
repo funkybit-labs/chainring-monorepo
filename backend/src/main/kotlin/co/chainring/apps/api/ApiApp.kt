@@ -61,7 +61,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         ),
     )
 
-    private val enableTestRoutes = (System.getenv("ENABLE_TEST_ROUTES") ?: "true") == "true"
+    private val enableTestRoutes = System.getenv("ENABLE_TEST_ROUTES")?.toBoolean() ?: true
+    private val enableFaucetRoutes = System.getenv("ENABLE_FAUCET_ROUTES")?.toBoolean() ?: true
 
     private val contractsPublishers = ChainManager.getBlockchainClients().map { ContractsPublisher(it) }
 
@@ -124,6 +125,9 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
 
                         if (enableTestRoutes) {
                             routes += TestRoutes(sequencerClient).routes
+                        }
+                        if (enableFaucetRoutes) {
+                            routes += FaucetRoutes(ChainManager.getBlockchainClients()).routes
                         }
                     },
             ),
