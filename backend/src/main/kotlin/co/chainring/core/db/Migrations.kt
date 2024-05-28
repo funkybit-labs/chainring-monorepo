@@ -24,6 +24,7 @@ import co.chainring.core.model.db.migrations.V29_ExchangeTransactionBatch
 import co.chainring.core.model.db.migrations.V2_ERC20Token
 import co.chainring.core.model.db.migrations.V30_AddErrorToTrade
 import co.chainring.core.model.db.migrations.V31_AddWithdrawalStatuses
+import co.chainring.core.model.db.migrations.V32_Indexes
 import co.chainring.core.model.db.migrations.V3_UpdateDeployedSmartContract
 import co.chainring.core.model.db.migrations.V4_AddDecimalsToERC20Token
 import co.chainring.core.model.db.migrations.V5_ChainTable
@@ -64,4 +65,5 @@ val migrations = listOf(
     V29_ExchangeTransactionBatch(),
     V30_AddErrorToTrade(),
     V31_AddWithdrawalStatuses(),
+    V32_Indexes(),
 )
