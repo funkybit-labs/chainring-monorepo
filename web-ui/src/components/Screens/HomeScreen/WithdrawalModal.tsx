@@ -8,11 +8,7 @@ import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
 import { apiClient } from 'apiClient'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  getDomain,
-  getERC20WithdrawMessage,
-  getNativeWithdrawMessage
-} from 'utils/eip712'
+import { addressZero, getDomain, getWithdrawMessage } from 'utils/eip712'
 import useAmountInputState from 'hooks/useAmountInputState'
 import { withdrawalsQueryKey } from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import { isErrorFromAlias } from '@zodios/core'
@@ -39,19 +35,15 @@ export default function WithdrawalModal({
   const availableBalanceQuery = useQuery({
     queryKey: ['availableBalance', symbol.name],
     queryFn: async function () {
-      return symbol.contractAddress
-        ? await readContract(config, {
-            abi: ExchangeAbi,
-            address: exchangeContractAddress,
-            functionName: 'balances',
-            args: [walletAddress, symbol.contractAddress]
-          })
-        : await readContract(config, {
-            abi: ExchangeAbi,
-            address: exchangeContractAddress,
-            functionName: 'balances',
-            args: [walletAddress, zeroAddress]
-          })
+      return await readContract(config, {
+        abi: ExchangeAbi,
+        address: exchangeContractAddress,
+        functionName: 'balances',
+        args: [
+          walletAddress,
+          symbol.contractAddress ? symbol.contractAddress : zeroAddress
+        ]
+      })
     }
   })
 
@@ -75,53 +67,30 @@ export default function WithdrawalModal({
       try {
         const nonce = Date.now()
         setSubmitPhase('waitingForApproval')
-        const signature = symbol.contractAddress
-          ? await signTypedDataAsync({
-              types: {
-                EIP712Domain: [
-                  { name: 'name', type: 'string' },
-                  { name: 'version', type: 'string' },
-                  { name: 'chainId', type: 'uint256' },
-                  { name: 'verifyingContract', type: 'address' }
-                ],
-                Withdraw: [
-                  { name: 'sender', type: 'address' },
-                  { name: 'token', type: 'address' },
-                  { name: 'amount', type: 'uint256' },
-                  { name: 'nonce', type: 'uint64' }
-                ]
-              },
-              domain: getDomain(exchangeContractAddress, config.state.chainId),
-              primaryType: 'Withdraw',
-              message: getERC20WithdrawMessage(
-                walletAddress,
-                symbol.contractAddress!,
-                amount,
-                BigInt(nonce)
-              )
-            })
-          : await signTypedDataAsync({
-              types: {
-                EIP712Domain: [
-                  { name: 'name', type: 'string' },
-                  { name: 'version', type: 'string' },
-                  { name: 'chainId', type: 'uint256' },
-                  { name: 'verifyingContract', type: 'address' }
-                ],
-                Withdraw: [
-                  { name: 'sender', type: 'address' },
-                  { name: 'amount', type: 'uint256' },
-                  { name: 'nonce', type: 'uint64' }
-                ]
-              },
-              domain: getDomain(exchangeContractAddress, config.state.chainId),
-              primaryType: 'Withdraw',
-              message: getNativeWithdrawMessage(
-                walletAddress,
-                amount,
-                BigInt(nonce)
-              )
-            })
+        const signature = await signTypedDataAsync({
+          types: {
+            EIP712Domain: [
+              { name: 'name', type: 'string' },
+              { name: 'version', type: 'string' },
+              { name: 'chainId', type: 'uint256' },
+              { name: 'verifyingContract', type: 'address' }
+            ],
+            Withdraw: [
+              { name: 'sender', type: 'address' },
+              { name: 'token', type: 'address' },
+              { name: 'amount', type: 'uint256' },
+              { name: 'nonce', type: 'uint64' }
+            ]
+          },
+          domain: getDomain(exchangeContractAddress, config.state.chainId),
+          primaryType: 'Withdraw',
+          message: getWithdrawMessage(
+            walletAddress,
+            symbol.contractAddress ? symbol.contractAddress : addressZero,
+            amount,
+            BigInt(nonce)
+          )
+        })
 
         setSubmitPhase('submittingRequest')
         return await apiClient.createWithdrawal({

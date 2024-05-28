@@ -180,11 +180,6 @@ export default [
                 "name": "_feeAccount",
                 "type": "address",
                 "internalType": "address"
-            },
-            {
-                "name": "_nativePrecision",
-                "type": "uint8",
-                "internalType": "uint8"
             }
         ],
         "outputs": [
@@ -206,21 +201,6 @@ export default [
             }
         ],
         "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "prepareBatch",
-        "inputs": [
-            {
-                "name": "transactions",
-                "type": "bytes[]",
-                "internalType": "bytes[]"
-            }
-        ],
-        "outputs": [
-            
-        ],
-        "stateMutability": "nonpayable"
     },
     {
         "type": "function",
@@ -306,21 +286,6 @@ export default [
     },
     {
         "type": "function",
-        "name": "submitBatch",
-        "inputs": [
-            {
-                "name": "transactions",
-                "type": "bytes[]",
-                "internalType": "bytes[]"
-            }
-        ],
-        "outputs": [
-            
-        ],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
         "name": "submitSettlementBatch",
         "inputs": [
             {
@@ -366,25 +331,6 @@ export default [
     },
     {
         "type": "function",
-        "name": "tokenPrecision",
-        "inputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint8",
-                "internalType": "uint8"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
         "name": "transferOwnership",
         "inputs": [
             {
@@ -397,21 +343,6 @@ export default [
             
         ],
         "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "txProcessedCount",
-        "inputs": [
-            
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
     },
     {
         "type": "function",
@@ -512,104 +443,6 @@ export default [
     },
     {
         "type": "event",
-        "name": "OrderFilled",
-        "inputs": [
-            {
-                "name": "digest",
-                "type": "bytes32",
-                "indexed": true,
-                "internalType": "bytes32"
-            },
-            {
-                "name": "sender",
-                "type": "address",
-                "indexed": true,
-                "internalType": "address"
-            },
-            {
-                "name": "baseToken",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address"
-            },
-            {
-                "name": "quoteToken",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address"
-            },
-            {
-                "name": "isTaker",
-                "type": "bool",
-                "indexed": false,
-                "internalType": "bool"
-            },
-            {
-                "name": "order",
-                "type": "tuple",
-                "indexed": false,
-                "internalType": "struct IExchange.Order",
-                "components": [
-                    {
-                        "name": "sender",
-                        "type": "address",
-                        "internalType": "address"
-                    },
-                    {
-                        "name": "amount",
-                        "type": "int256",
-                        "internalType": "int256"
-                    },
-                    {
-                        "name": "price",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    },
-                    {
-                        "name": "nonce",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    }
-                ]
-            },
-            {
-                "name": "executionInfo",
-                "type": "tuple",
-                "indexed": false,
-                "internalType": "struct IExchange.ExecutionInfo",
-                "components": [
-                    {
-                        "name": "filledAmount",
-                        "type": "int256",
-                        "internalType": "int256"
-                    },
-                    {
-                        "name": "executionPrice",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    },
-                    {
-                        "name": "fee",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    },
-                    {
-                        "name": "baseAdjustment",
-                        "type": "int256",
-                        "internalType": "int256"
-                    },
-                    {
-                        "name": "quoteAdjustment",
-                        "type": "int256",
-                        "internalType": "int256"
-                    }
-                ]
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
         "name": "OwnershipTransferred",
         "inputs": [
             {
@@ -623,25 +456,6 @@ export default [
                 "type": "address",
                 "indexed": true,
                 "internalType": "address"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "PrepareTransactionFailed",
-        "inputs": [
-            {
-                "name": "sequence",
-                "type": "uint64",
-                "indexed": false,
-                "internalType": "uint64"
-            },
-            {
-                "name": "errorCode",
-                "type": "uint8",
-                "indexed": false,
-                "internalType": "enum IExchange.ErrorCode"
             }
         ],
         "anonymous": false
@@ -724,6 +538,25 @@ export default [
                 "type": "uint256",
                 "indexed": false,
                 "internalType": "uint256"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "WithdrawalFailed",
+        "inputs": [
+            {
+                "name": "sequence",
+                "type": "uint64",
+                "indexed": false,
+                "internalType": "uint64"
+            },
+            {
+                "name": "errorCode",
+                "type": "uint8",
+                "indexed": false,
+                "internalType": "enum IExchange.ErrorCode"
             }
         ],
         "anonymous": false

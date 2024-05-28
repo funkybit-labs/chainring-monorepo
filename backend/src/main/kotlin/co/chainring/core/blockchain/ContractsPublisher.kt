@@ -2,10 +2,8 @@ package co.chainring.core.blockchain
 
 import co.chainring.core.model.Address
 import co.chainring.core.model.db.DeployedSmartContractEntity
-import co.chainring.core.model.db.SymbolEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.math.BigInteger
 
 class ContractsPublisher(val blockchainClient: BlockchainClient) {
     val logger = KotlinLogging.logger {}
@@ -31,13 +29,7 @@ class ContractsPublisher(val blockchainClient: BlockchainClient) {
 
     private fun deployOrUpgradeWithProxy(contractType: ContractType, existingProxyAddress: Address?) {
         blockchainClient.deployOrUpgradeWithProxy(
-            when (contractType) {
-                ContractType.Exchange -> BlockchainClient.DeployContractParams.Exchange(
-                    nativePrecision = SymbolEntity.forChain(blockchainClient.chainId)
-                        .firstOrNull { it.contractAddress == null }?.decimals?.toInt()?.toBigInteger()
-                        ?: BigInteger("18"),
-                )
-            },
+            contractType,
             existingProxyAddress,
         ).also {
             DeployedSmartContractEntity.create(

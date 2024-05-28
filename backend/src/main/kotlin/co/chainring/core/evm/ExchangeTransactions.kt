@@ -25,18 +25,6 @@ sealed class ExchangeTransactions {
         Uint64(nonce),
     )
 
-    class WithdrawNative(sequence: Long, sender: String, amount: BigInteger, nonce: BigInteger) : StaticStruct(
-        Uint256(sequence),
-        Address(160, sender),
-        Uint256(amount),
-        Uint64(nonce),
-    )
-
-    class WithdrawNativeWithSignature(tx: WithdrawNative, signature: ByteArray) : DynamicStruct(
-        tx,
-        DynamicBytes(signature),
-    )
-
     class WithdrawWithSignature(tx: Withdraw, signature: ByteArray) : DynamicStruct(
         tx,
         DynamicBytes(signature),

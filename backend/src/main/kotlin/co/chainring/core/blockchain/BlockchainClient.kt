@@ -137,27 +137,17 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         }
     }
 
-    sealed class DeployContractParams {
-        abstract val contractType: ContractType
-
-        data class Exchange(
-            val nativePrecision: BigInteger,
-        ) : DeployContractParams() {
-            override val contractType: ContractType = ContractType.Exchange
-        }
-    }
-
     data class DeployedContract(
         val proxyAddress: Address,
         val implementationAddress: Address,
         val version: Int,
     )
 
-    fun deployOrUpgradeWithProxy(params: DeployContractParams, existingProxyAddress: Address?): DeployedContract {
-        logger.debug { "Starting deployment for ${params.contractType}" }
+    fun deployOrUpgradeWithProxy(contractType: ContractType, existingProxyAddress: Address?): DeployedContract {
+        logger.debug { "Starting deployment for $contractType" }
 
-        val (implementationContractAddress, version) = when (params) {
-            is DeployContractParams.Exchange -> {
+        val (implementationContractAddress, version) = when (contractType) {
+            ContractType.Exchange -> {
                 val implementationContract = Exchange.deploy(web3j, transactionManager, gasProvider).send()
                 Pair(
                     Address(Keys.toChecksumAddress(implementationContract.contractAddress)),
@@ -168,7 +158,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
 
         val proxyAddress = if (existingProxyAddress != null) {
             // for now call upgradeTo here
-            logger.debug { "Calling upgradeTo for ${params.contractType}" }
+            logger.debug { "Calling upgradeTo for $contractType" }
             UUPSUpgradeable.load(
                 existingProxyAddress.value,
                 web3j,
@@ -178,7 +168,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
             existingProxyAddress
         } else {
             // deploy the proxy and call the initialize method in contract - this can only be called once
-            logger.debug { "Deploying proxy for ${params.contractType}" }
+            logger.debug { "Deploying proxy for $contractType" }
             val proxyContract = ERC1967Proxy.deploy(
                 web3j,
                 transactionManager,
@@ -187,9 +177,9 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
                 implementationContractAddress.value,
                 ByteArray(0),
             ).send()
-            logger.debug { "Deploying initialize for ${params.contractType}" }
-            when (params) {
-                is DeployContractParams.Exchange -> {
+            logger.debug { "Deploying initialize for $contractType" }
+            when (contractType) {
+                ContractType.Exchange -> {
                     Exchange.load(
                         proxyContract.contractAddress,
                         web3j,
@@ -198,15 +188,14 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
                     ).initialize(
                         submitterCredentials.address,
                         config.feeAccountAddress,
-                        params.nativePrecision,
                     ).send()
                 }
             }
             Address(Keys.toChecksumAddress(proxyContract.contractAddress))
         }
 
-        logger.debug { "Deployment complete for ${params.contractType}" }
-        setContractAddress(params.contractType, proxyAddress)
+        logger.debug { "Deployment complete for $contractType" }
+        setContractAddress(contractType, proxyAddress)
 
         return DeployedContract(
             proxyAddress = proxyAddress,
