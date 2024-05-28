@@ -1,5 +1,6 @@
 package co.chainring.mocker.core
 
+import co.chainring.apps.api.model.Chain
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
@@ -8,6 +9,7 @@ import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.core.client.rest.ApiClient
 import co.chainring.core.client.ws.subscribe
 import co.chainring.core.client.ws.unsubscribe
+import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketId
 import co.chainring.integrationtests.utils.Faucet
 import co.chainring.core.utils.TraceRecorder
@@ -20,11 +22,12 @@ import kotlinx.serialization.json.Json
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import java.math.BigDecimal
 import kotlin.time.Duration.Companion.seconds
 
 abstract class Actor(
     private val marketIds: List<MarketId>,
-    private val native: BigInteger?,
+    private val nativeAssets: Map<String, BigInteger>,
     private val assets: Map<String, BigInteger>,
     keyPair: ECKeyPair
 ) {
@@ -41,11 +44,14 @@ abstract class Actor(
     protected var wsCooldownBeforeReconnecting = 5.seconds
 
     protected var markets = setOf<Market>()
+    private lateinit var chainIdBySymbol: Map<String, ChainId>
 
     open fun start() {
         logger.info { "$id: starting" }
 
-        markets = apiClient.getConfiguration().markets.filter { marketIds.contains(it.id) }.toSet()
+        val config = apiClient.getConfiguration()
+        chainIdBySymbol = config.chains.map { chain -> chain.symbols.map { it.name to chain.id } }.flatten().toMap()
+        markets = config.markets.filter { marketIds.contains(it.id) }.toSet()
         depositAssets()
         connectWebsocket()
 
@@ -112,14 +118,25 @@ abstract class Actor(
         while (!deposited) {
             try {
                 synchronized(Actor::class) {
-                    Faucet.fund(wallet.address, (native ?: 2.toFundamentalUnits(18)) * BigInteger.TWO)
-                    native?.let { wallet.depositNative(it) }
+                    val nativeAmountByChainId = nativeAssets.map { chainIdBySymbol.getValue(it.key) to it.value }.toMap()
+                    val chainIds = nativeAmountByChainId.keys + assets.map { chainIdBySymbol.getValue(it.key) }.toSet()
+                    chainIds.forEach { chainId ->
+                        val amount = (nativeAmountByChainId[chainId] ?: BigDecimal.ONE.movePointRight(18).toBigInteger()) * BigInteger.TWO
+                        logger.debug { "funding ${wallet.address} with ${amount * BigInteger.TWO} on chain $chainId" }
+                        Faucet.fund(wallet.address, amount * BigInteger.TWO, chainId)
+                        wallet.switchChain(chainId)
+                        logger.debug { "Native deposit $amount to ${wallet.address} on chain $chainId" }
+                        wallet.depositNative(amount)
+                    }
                     assets.forEach { (symbol, amount) ->
+                        val chainId = chainIdBySymbol.getValue(symbol)
+                        wallet.switchChain(chainId)
                         wallet.mintERC20(symbol, amount)
+                        logger.debug { "$symbol deposit $amount to ${wallet.address} on chain $chainId" }
                         wallet.depositERC20(symbol, amount)
                     }
                     val fundedAssets = mutableSetOf<String>()
-                    while (fundedAssets.size < assets.size + if (native == null) 0 else 1) {
+                    while (fundedAssets.size < assets.size + nativeAssets.size) {
                         Thread.sleep(100)
                         apiClient.getBalances().balances.forEach {
                             if (it.available > BigInteger.ZERO) {

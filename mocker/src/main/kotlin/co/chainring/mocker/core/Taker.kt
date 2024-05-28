@@ -38,11 +38,11 @@ import org.web3j.crypto.Keys
 class Taker(
     marketIds: List<MarketId>,
     private val rate: Long,
-    native: BigInteger?,
+    nativeAssets: Map<String, BigInteger>,
     assets: Map<String, BigInteger>,
     private val priceCorrectionFunction: DeterministicHarmonicPriceMovement,
     keyPair: ECKeyPair = Keys.createEcKeyPair()
-) : Actor(marketIds, native, assets, keyPair) {
+) : Actor(marketIds, nativeAssets, assets, keyPair) {
     override val id: String = "tkr_${Address(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
     override val logger: KLogger = KotlinLogging.logger {}
     private var currentOrder: Order.Market? = null

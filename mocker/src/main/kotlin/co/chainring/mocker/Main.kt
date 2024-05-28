@@ -114,15 +114,23 @@ fun main() {
 
 fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, keyPair: ECKeyPair = Keys.createEcKeyPair()): Maker {
     val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
+    val quoteAssetBtc = market.quoteSymbol.value.startsWith("BTC")
     val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)
     val quoteAsset = market.quoteSymbol.value to quoteAssetAmount.toFundamentalUnits(market.quoteDecimals)
 
     val maker = Maker(
         marketIds = listOf(market.id),
         tightness = 5, skew = 0, levels = 10,
-        native = if (baseAssetBtc) baseAsset.second else BigDecimal.TEN.movePointRight(18).toBigInteger(),
+        nativeAssets = when {
+            baseAssetBtc && quoteAssetBtc -> listOf(baseAsset, quoteAsset).toMap()
+            baseAssetBtc -> listOf(baseAsset).toMap()
+            quoteAssetBtc -> listOf(quoteAsset).toMap()
+            else -> emptyMap()
+        },
         assets = when {
+            baseAssetBtc && quoteAssetBtc -> emptyMap()
             baseAssetBtc -> mapOf(quoteAsset)
+            quoteAssetBtc -> mapOf(baseAsset)
             else -> mapOf(baseAsset, quoteAsset)
         },
         keyPair = keyPair
@@ -133,15 +141,23 @@ fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: Bi
 
 fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, priceFunction: DeterministicHarmonicPriceMovement): Taker {
     val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
+    val quoteAssetBtc = market.quoteSymbol.value.startsWith("BTC")
     val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)
     val quoteAsset = market.quoteSymbol.value to quoteAssetAmount.toFundamentalUnits(market.quoteDecimals)
 
     val taker = Taker(
         marketIds = listOf(market.id),
         rate = Random.nextLong(10000, 30000),
-        native = if (baseAssetBtc) baseAsset.second else BigDecimal.ONE.movePointRight(18).toBigInteger(),
+        nativeAssets = when {
+            baseAssetBtc && quoteAssetBtc -> listOf(baseAsset, quoteAsset).toMap()
+            baseAssetBtc -> listOf(baseAsset).toMap()
+            quoteAssetBtc -> listOf(quoteAsset).toMap()
+            else -> emptyMap()
+        },
         assets = when {
+            baseAssetBtc && quoteAssetBtc -> emptyMap()
             baseAssetBtc -> mapOf(quoteAsset)
+            quoteAssetBtc -> mapOf(baseAsset)
             else -> mapOf(baseAsset, quoteAsset)
         },
         priceCorrectionFunction = priceFunction,
