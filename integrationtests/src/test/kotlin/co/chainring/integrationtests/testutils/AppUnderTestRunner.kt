@@ -77,6 +77,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                     private val sequencerResponseProcessorApp = SequencerResponseProcessorApp(
                         sequencerApp.inputQueue,
                         sequencerApp.outputQueue,
+                        onAbnormalStop = {},
                     )
 
                     private val isIntegrationRun = (getenv("INTEGRATION_RUN") ?: "0") == "1"
