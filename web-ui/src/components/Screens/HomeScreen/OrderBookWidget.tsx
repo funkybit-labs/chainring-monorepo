@@ -40,7 +40,7 @@ function calculateParameters(
   const lastPriceHeight = 50
   const maxLevels = 10
   const buyLevels = orderBook.buy.slice(0, maxLevels)
-  const sellLevels = orderBook.sell.slice(0, maxLevels)
+  const sellLevels = orderBook.sell.slice(-maxLevels)
   const maxSize = Math.max(
     0.00000001,
     ...sellLevels.map((l) => l.size),
