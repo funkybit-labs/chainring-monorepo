@@ -57,6 +57,14 @@ object ExchangeTransactionTable : GUIDTable<ExchangeTransactionId>("exchange_tra
                 status.eq(ExchangeTransactionStatus.Pending)
             },
         )
+
+        index(
+            customIndexName = "exchange_transaction_sequencer_chain_pending_status",
+            columns = arrayOf(sequenceId, chainId, status),
+            filterCondition = {
+                status.eq(ExchangeTransactionStatus.Pending)
+            },
+        )
     }
 }
 

@@ -32,7 +32,7 @@ enum class ExecutionRole {
 
 object OrderExecutionTable : GUIDTable<ExecutionId>("order_execution", ::ExecutionId) {
     val createdAt = timestamp("created_at")
-    val timestamp = timestamp("timestamp")
+    val timestamp = timestamp("timestamp").index()
     val orderGuid = reference("order_guid", OrderTable).index()
     val tradeGuid = reference("trade_guid", TradeTable).index()
     val role = customEnumeration(

@@ -42,11 +42,21 @@ object ExchangeTransactionBatchTable : GUIDTable<ExchangeTransactionBatchId>("ex
     val prepareBlockchainTransactionGuid = reference(
         "prepare_tx_guid",
         BlockchainTransactionTable,
-    )
+    ).index()
     val submitBlockchainTransactionGuid = reference(
         "submit_tx_guid",
         BlockchainTransactionTable,
-    ).nullable()
+    ).index().nullable()
+
+    init {
+        index(
+            customIndexName = "exchange_transaction_batch_sequencer_chain_status",
+            columns = arrayOf(sequenceId, chainId, status),
+            filterCondition = {
+                status.neq(ExchangeTransactionBatchStatus.Completed)
+            },
+        )
+    }
 }
 
 class ExchangeTransactionBatchEntity(guid: EntityID<ExchangeTransactionBatchId>) : GUIDEntity<ExchangeTransactionBatchId>(guid) {

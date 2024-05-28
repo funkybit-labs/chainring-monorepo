@@ -18,5 +18,5 @@ object BalanceLogTable : GUIDTable<BalanceLogId>("balance_log", ::BalanceLogId) 
     val balanceBefore = (decimal("balance_before", 30, 0))
     val balanceAfter = (decimal("balance_after", 30, 0))
     val delta = (decimal("delta", 30, 0))
-    val balanceGuid = reference("balance_guid", BalanceTable)
+    val balanceGuid = reference("balance_guid", BalanceTable).index()
 }
