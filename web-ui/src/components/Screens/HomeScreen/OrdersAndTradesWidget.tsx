@@ -148,7 +148,7 @@ export default function OrdersAndTradesWidget({
       <>
         <div className="max-h-96 min-h-24 overflow-scroll">
           <table className="relative w-full text-left text-sm">
-            <thead className="sticky top-0 font-normal text-darkBluishGray2">
+            <thead className="sticky top-0 z-10 bg-darkBluishGray9 font-normal text-darkBluishGray2">
               <tr key="header">
                 <td className="pl-4">Date</td>
                 <td className="pl-4">Side</td>
@@ -252,7 +252,7 @@ export default function OrdersAndTradesWidget({
       <>
         <div className="max-h-96 min-h-24 overflow-scroll">
           <table className="relative w-full text-left text-sm">
-            <thead className="sticky top-0 font-normal text-darkBluishGray2">
+            <thead className="sticky top-0 z-10 bg-darkBluishGray9 font-normal text-darkBluishGray2">
               <tr key="header">
                 <td className="pl-4">Date</td>
                 <td className="pl-4">Side</td>
