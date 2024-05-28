@@ -82,7 +82,6 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.extension.ExtendWith
@@ -384,7 +383,7 @@ class OrderRoutesApiTest {
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribeToOrders()
-        val initialOrdersOverWs = wsClient.assertOrdersMessageReceived().orders
+        wsClient.assertOrdersMessageReceived().orders
 
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()
@@ -414,9 +413,10 @@ class OrderRoutesApiTest {
 
         apiClient.cancelOpenOrders()
 
-        wsClient.assertOrdersMessageReceived { msg ->
-            assertNotEquals(initialOrdersOverWs, msg.orders)
-            assertTrue(msg.orders.all { it.status == OrderStatus.Cancelled })
+        repeat(times = 10) {
+            wsClient.assertOrderUpdatedMessageReceived { msg ->
+                assertEquals(OrderStatus.Cancelled, msg.order.status)
+            }
         }
         wsClient.assertLimitsMessageReceived(usdcDaiMarket.id)
 
@@ -880,11 +880,22 @@ class OrderRoutesApiTest {
             }
         }
 
+        val takerOrderCount = takerApiClient.listOrders(statuses = listOf(OrderStatus.Open, OrderStatus.Partial)).orders.filterNot { it is Order.Market }.size
         takerApiClient.cancelOpenOrders()
-        takerWsClient.assertOrdersMessageReceived()
+        repeat(takerOrderCount) {
+            takerWsClient.assertOrderUpdatedMessageReceived { msg ->
+                assertEquals(OrderStatus.Cancelled, msg.order.status)
+            }
+        }
 
+        val makerOrderCount = makerApiClient.listOrders(statuses = listOf(OrderStatus.Open, OrderStatus.Partial)).orders.filterNot { it is Order.Market }.size
         makerApiClient.cancelOpenOrders()
-        makerWsClient.assertOrdersMessageReceived()
+        repeat(makerOrderCount) {
+            makerWsClient.assertOrderUpdatedMessageReceived { msg ->
+                assertEquals(OrderStatus.Cancelled, msg.order.status)
+            }
+        }
+
         listOf(makerWsClient, takerWsClient).forEach { wsClient ->
             wsClient.assertOrderBookMessageReceived(
                 market.id,
