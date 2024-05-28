@@ -7,16 +7,19 @@ import co.chainring.sequencer.apps.services.SequencerResponseProcessorService
 import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.datetime.Clock
 import net.openhft.chronicle.queue.impl.RollingChronicleQueue
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.lang.Thread.UncaughtExceptionHandler
 import kotlin.concurrent.thread
+import kotlin.time.Duration.Companion.minutes
 
 val dbConfig: DbConfig = DbConfig()
 
 class SequencerResponseProcessorApp(
     val inputQueue: RollingChronicleQueue,
     val outputQueue: RollingChronicleQueue,
+    val onAbnormalStop: () -> Unit,
 ) : BaseApp(dbConfig) {
     override val logger = KotlinLogging.logger {}
     private var stop = false
@@ -27,13 +30,16 @@ class SequencerResponseProcessorApp(
         logger.info { "Starting Sequencer Response Processor" }
         stop = false
 
+        val lastIndex = transaction {
+            getLastProcessedIndex()
+                ?.let { minOf(it, outputQueue.lastIndex()) }
+                ?: outputQueue.lastIndex()
+        }
+
         processorThread = thread(start = false, name = "sequencer_response_processor", isDaemon = false) {
             val inputTailer = inputQueue.createTailer("queue_processor")
             val outputTailer = outputQueue.createTailer("queue_processor")
 
-            val lastIndex = getLastProcessedIndex()?.let {
-                minOf(it, outputQueue.lastIndex())
-            } ?: outputQueue.lastIndex()
             outputTailer.moveToIndex(lastIndex + 1)
             logger.debug { "Moving index to ${lastIndex + 1}" }
 
@@ -53,12 +59,7 @@ class SequencerResponseProcessorApp(
                         if (dc.isPresent) {
                             dc.wire()?.read()?.bytes { bytes ->
                                 val lastReadIndex = outputTailer.lastReadIndex()
-                                try {
-                                    processResponse(bytes.toByteArray(), resp, lastReadIndex)
-                                } catch (t: Throwable) {
-                                    logger.error(t) { "unhandled exception processing ${resp.sequence} - failed after max retries - stopping" }
-                                    stop = true
-                                }
+                                processResponseWithRetries(bytes.toByteArray(), resp, lastReadIndex)
                             }
                         }
                     }
@@ -67,40 +68,13 @@ class SequencerResponseProcessorApp(
             logger.info { "Processor thread stopped" }
         }
         processorThread.uncaughtExceptionHandler = UncaughtExceptionHandler { _, throwable ->
-            logger.error(throwable) { "Error in processor main thread" }
-            stop()
+            logger.error(throwable) { "Unhandled error in processor main thread" }
+            onAbnormalStop()
         }
 
         processorThread.start()
 
         logger.info { "Started" }
-    }
-
-    private fun processResponse(requestBytes: ByteArray, response: SequencerResponse, lastReadIndex: Long, retryCount: Int = 0) {
-        try {
-            transaction {
-                val request = SequencerRequest.parseFrom(requestBytes)
-                logger.debug {
-                    "${if (retryCount > 0) {
-                        "Retry $retryCount -"
-                    } else {
-                        ""
-                    }}Processing sequence ${response.sequence} request = <$request> response=<$response>"
-                }
-
-                SequencerResponseProcessorService.processResponse(response, request)
-                logger.debug { "storing last processed index $lastReadIndex" }
-                updateLastProcessedIndex(lastReadIndex)
-            }
-        } catch (t: Throwable) {
-            logger.error(t) { "Failed processing response" }
-            if (retryCount < 4) {
-                Thread.sleep(100)
-                processResponse(requestBytes, response, lastReadIndex, retryCount + 1)
-            } else {
-                throw t
-            }
-        }
     }
 
     override fun stop() {
@@ -111,13 +85,42 @@ class SequencerResponseProcessorApp(
         logger.info { "Stopped" }
     }
 
+    private fun processResponseWithRetries(requestBytes: ByteArray, response: SequencerResponse, lastReadIndex: Long) {
+        val startedAt = Clock.System.now()
+        val alertAfterDuration = 1.minutes
+        var attempt = 0L
+        var notified = false
+
+        while (true) {
+            runCatching {
+                attempt += 1
+                transaction {
+                    val request = SequencerRequest.parseFrom(requestBytes)
+
+                    logger.debug { "Processing sequence ${response.sequence}: attempt=$attempt, request=<$request>, response=<$response>" }
+                    SequencerResponseProcessorService.processResponse(response, request)
+
+                    logger.debug { "Storing last processed index $lastReadIndex" }
+                    updateLastProcessedIndex(lastReadIndex)
+                }
+            }.onSuccess {
+                return
+            }.onFailure { error ->
+                Thread.sleep(100)
+                val timeSinceStarted = Clock.System.now() - startedAt
+                if (timeSinceStarted > alertAfterDuration && !notified) {
+                    logger.error(error) { "Can't process sequencer response after retrying for $timeSinceStarted" }
+                    notified = true
+                }
+            }
+        }
+    }
+
     private val lastProcessedOutputIndexKey = "LastProcessedOutputIndex"
 
-    private fun getLastProcessedIndex() = transaction {
+    private fun getLastProcessedIndex(): Long? =
         KeyValueStore.getLong(lastProcessedOutputIndexKey)
-    }
 
-    private fun updateLastProcessedIndex(lastProcessedIndex: Long) = transaction {
+    private fun updateLastProcessedIndex(lastProcessedIndex: Long) =
         KeyValueStore.setLong(lastProcessedOutputIndexKey, lastProcessedIndex)
-    }
 }

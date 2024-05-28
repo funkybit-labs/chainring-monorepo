@@ -21,16 +21,20 @@ fun main(args: Array<String>) {
                 null
             },
         )
-        sequencer.start()
+        val gateway = GatewayApp()
         val sequencerResponseProcessorApp = SequencerResponseProcessorApp(
             sequencer.inputQueue,
             sequencer.outputQueue,
+            onAbnormalStop = {
+                gateway.stop()
+                sequencer.stop()
+            },
         )
-        sequencerResponseProcessorApp.start()
+
         try {
-            val gateway = GatewayApp()
+            sequencer.start()
+            sequencerResponseProcessorApp.start()
             gateway.start()
-            logger.info { "Started up" }
             gateway.blockUntilShutdown()
         } catch (e: Exception) {
             logger.error(e) { "Failed, stopping sequencer and exiting" }

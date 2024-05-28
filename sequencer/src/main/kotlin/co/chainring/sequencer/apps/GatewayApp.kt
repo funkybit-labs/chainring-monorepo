@@ -43,6 +43,7 @@ class GatewayApp(
             .build()
 
     override fun start() {
+        logger.info { "Starting" }
         server.start()
         logger.info { "gRPC server started, listening on ${this.config.port}" }
         Runtime.getRuntime().addShutdownHook(
@@ -52,6 +53,7 @@ class GatewayApp(
                 logger.info { "gRPC server shut down" }
             },
         )
+        logger.info { "Started" }
     }
 
     override fun stop() {
