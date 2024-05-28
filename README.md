@@ -10,10 +10,11 @@ viewing and forking the repository.
 
 ## How to run locally
 
-Build anvil docker image
+Build anvil and otterscan docker images
 
 ```
 make anvil_image
+make otterscan_image
 ```
 
 Start the containers

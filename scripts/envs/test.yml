@@ -33,7 +33,7 @@ services:
     count: 1
     is_essential: "true"
   otterscan:
-    image: otterscan/otterscan
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/otterscan
     count: 1
     environment: otterscan
   anvil2:
@@ -42,7 +42,7 @@ services:
     is_essential: "true"
     environment: anvil2
   otterscan2:
-    image: otterscan/otterscan
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/otterscan
     count: 1
     environment: otterscan2
   sequencer:
