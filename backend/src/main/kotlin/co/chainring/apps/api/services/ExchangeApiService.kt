@@ -21,7 +21,6 @@ import co.chainring.apps.api.model.Withdrawal
 import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.apps.api.model.invalidEIP712SignatureError
 import co.chainring.apps.api.model.processingError
-import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.evm.ECHelper
@@ -30,7 +29,6 @@ import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.evm.TokenAddressAndChain
 import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
-import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.MarketEntity
@@ -41,7 +39,6 @@ import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.WithdrawalEntity
-import co.chainring.core.model.db.publishBroadcasterNotifications
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.sequencer.toSequencerId
 import co.chainring.core.utils.toFundamentalUnits
@@ -327,21 +324,6 @@ class ExchangeApiService(
                         cancelAll = true,
                     )
                 }
-            }
-        } else {
-            transaction {
-                publishBroadcasterNotifications(
-                    listOf(
-                        BroadcasterNotification(
-                            Orders(
-                                OrderEntity
-                                    .listForWallet(walletEntity)
-                                    .map(OrderEntity::toOrderResponse),
-                            ),
-                            walletEntity.address,
-                        ),
-                    ),
-                )
             }
         }
     }

@@ -2,7 +2,6 @@ package co.chainring.sequencer.apps.services
 
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
-import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.TradeCreated
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.FeeRate
@@ -69,7 +68,7 @@ object SequencerResponseProcessorService {
                         if (response.balancesChangedList.firstOrNull { it.wallet == withdrawal.wallet } == null) {
                             withdrawalEntity.update(WithdrawalStatus.Failed, error(response))
                         } else {
-                            handleSequencerResponse(request, response, withdrawalEntity.wallet, listOf())
+                            handleSequencerResponse(request = request, response = response, ordersBeingUpdated = listOf())
                             withdrawalEntity.update(WithdrawalStatus.Sequenced, null)
                         }
                     }
@@ -81,7 +80,7 @@ object SequencerResponseProcessorService {
                             ?.update(DepositStatus.Failed, error(response))
                     } else {
                         DepositEntity.findById(deposit.externalGuid.depositId())?.let {
-                            handleSequencerResponse(request, response, it.wallet, listOf())
+                            handleSequencerResponse(request = request, response = response, ordersBeingUpdated = listOf())
                         }
                     }
                 }
@@ -89,7 +88,7 @@ object SequencerResponseProcessorService {
                 if (request.balanceBatch.failedWithdrawalsList.isNotEmpty() ||
                     request.balanceBatch.failedSettlementsList.isNotEmpty()
                 ) {
-                    handleSequencerResponse(request, response, null, listOf())
+                    handleSequencerResponse(request = request, response = response, ordersBeingUpdated = listOf())
                 }
             }
 
@@ -98,11 +97,9 @@ object SequencerResponseProcessorService {
                     WalletEntity.getBySequencerId(request.orderBatch.wallet.sequencerWalletId())?.let { wallet ->
                         handleOrderBatchUpdates(request.orderBatch, wallet, response)
                         handleSequencerResponse(
-                            request,
-                            response,
-                            wallet,
-                            request.orderBatch.ordersToChangeList.map { it.guid },
-                            cancelAll = request.orderBatch.cancelAll,
+                            request = request,
+                            response = response,
+                            ordersBeingUpdated = request.orderBatch.ordersToChangeList.map { it.guid },
                         )
                     }
                 }
@@ -167,7 +164,7 @@ object SequencerResponseProcessorService {
         }
     }
 
-    private fun handleSequencerResponse(request: SequencerRequest, response: SequencerResponse, walletEntity: WalletEntity?, ordersBeingUpdated: List<Long> = listOf(), cancelAll: Boolean = false) {
+    private fun handleSequencerResponse(request: SequencerRequest, response: SequencerResponse, ordersBeingUpdated: List<Long> = listOf()) {
         val timestamp = Clock.System.now()
 
         val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
@@ -234,29 +231,15 @@ object SequencerResponseProcessorService {
                     orderChanged.newQuantityOrNull?.also { newQuantity ->
                         orderToUpdate.amount = newQuantity.toBigInteger()
                     }
-                    if (!cancelAll) {
-                        broadcasterNotifications.add(
-                            BroadcasterNotification(
-                                OrderUpdated(orderToUpdate.toOrderResponse()),
-                                recipient = orderToUpdate.wallet.address,
-                            ),
-                        )
-                    }
+                    broadcasterNotifications.add(
+                        BroadcasterNotification(
+                            OrderUpdated(orderToUpdate.toOrderResponse()),
+                            recipient = orderToUpdate.wallet.address,
+                        ),
+                    )
                     limitsChanged.add(Pair(orderToUpdate.wallet, orderToUpdate.market))
                 }
             }
-        }
-        if (cancelAll && walletEntity != null) {
-            broadcasterNotifications.add(
-                BroadcasterNotification(
-                    Orders(
-                        OrderEntity
-                            .listForWallet(walletEntity)
-                            .map(OrderEntity::toOrderResponse),
-                    ),
-                    recipient = walletEntity.address,
-                ),
-            )
         }
 
         val markets = MarketEntity.all().toList()
