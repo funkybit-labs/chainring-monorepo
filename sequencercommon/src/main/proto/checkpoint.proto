@@ -40,8 +40,8 @@ message MarketCheckpoint {
   int32 maxOfferIx = 8;
   int32 minBidIx = 9;
   repeated OrderBookLevel levels = 10;
-  optional DecimalValue bestBid = 11;
-  optional DecimalValue bestOffer = 12;
+  DecimalValue bestBid = 11;
+  DecimalValue bestOffer = 12;
 
   message OrderBookLevel {
     int32 levelIx = 1;
