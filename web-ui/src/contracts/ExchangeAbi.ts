@@ -224,6 +224,21 @@ export default [
     },
     {
         "type": "function",
+        "name": "prepareSettlementBatch",
+        "inputs": [
+            {
+                "name": "data",
+                "type": "bytes",
+                "internalType": "bytes"
+            }
+        ],
+        "outputs": [
+            
+        ],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
         "name": "proxiableUUID",
         "inputs": [
             
@@ -297,6 +312,21 @@ export default [
                 "name": "transactions",
                 "type": "bytes[]",
                 "internalType": "bytes[]"
+            }
+        ],
+        "outputs": [
+            
+        ],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "submitSettlementBatch",
+        "inputs": [
+            {
+                "name": "data",
+                "type": "bytes",
+                "internalType": "bytes"
             }
         ],
         "outputs": [
@@ -618,6 +648,50 @@ export default [
     },
     {
         "type": "event",
+        "name": "SettlementCompleted",
+        "inputs": [
+            {
+                "name": "_address",
+                "type": "address",
+                "indexed": false,
+                "internalType": "address"
+            },
+            {
+                "name": "tradeHashes",
+                "type": "bytes32[]",
+                "indexed": false,
+                "internalType": "bytes32[]"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "SettlementFailed",
+        "inputs": [
+            {
+                "name": "_address",
+                "type": "address",
+                "indexed": false,
+                "internalType": "address"
+            },
+            {
+                "name": "tradeHashes",
+                "type": "bytes32[]",
+                "indexed": false,
+                "internalType": "bytes32[]"
+            },
+            {
+                "name": "errorCode",
+                "type": "uint8",
+                "indexed": false,
+                "internalType": "enum IExchange.ErrorCode"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
         "name": "Upgraded",
         "inputs": [
             {
@@ -710,6 +784,17 @@ export default [
         "name": "ERC1967NonPayable",
         "inputs": [
             
+        ]
+    },
+    {
+        "type": "error",
+        "name": "ErrorDidNotNetToZero",
+        "inputs": [
+            {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+            }
         ]
     },
     {

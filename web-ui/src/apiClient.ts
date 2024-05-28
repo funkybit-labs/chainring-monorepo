@@ -216,7 +216,13 @@ export const OrderSchema = z
   })
 export type Order = z.infer<typeof OrderSchema>
 
-const TradeSettlementStatusSchema = z.enum(['Pending', 'Completed', 'Failed'])
+const TradeSettlementStatusSchema = z.enum([
+  'Pending',
+  'Settling',
+  'FailedSettling',
+  'Completed',
+  'Failed'
+])
 export type TradeSettlementStatus = z.infer<typeof TradeSettlementStatusSchema>
 
 export const TradeSchema = z.object({

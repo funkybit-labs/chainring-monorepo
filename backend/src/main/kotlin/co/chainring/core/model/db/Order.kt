@@ -6,16 +6,11 @@ import co.chainring.apps.api.model.websocket.LastTradeDirection
 import co.chainring.apps.api.model.websocket.Limits
 import co.chainring.apps.api.model.websocket.OrderBook
 import co.chainring.apps.api.model.websocket.OrderBookEntry
-import co.chainring.core.evm.EIP712Transaction
-import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.SequencerOrderId
-import co.chainring.core.model.toEvmSignature
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.toByteArrayNoSign
-import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHex
-import co.chainring.core.utils.toHexBytes
 import co.chainring.sequencer.proto.OrderDisposition
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
@@ -209,17 +204,6 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             )
         }
     }
-
-    fun toEip712Transaction(baseToken: Address, quoteToken: Address, quoteDecimals: Int) =
-        EIP712Transaction.Order(
-            this.wallet.address,
-            baseToken,
-            quoteToken,
-            this.amount,
-            this.price?.toFundamentalUnits(quoteDecimals) ?: BigInteger.ZERO,
-            BigInteger(1, this.nonce.toHexBytes()),
-            this.signature.toEvmSignature(),
-        )
 
     companion object : EntityClass<OrderId, OrderEntity>(OrderTable) {
         fun batchUpdate(market: MarketEntity, wallet: WalletEntity, createAssignments: List<CreateOrderAssignment>, updateAssignments: List<UpdateOrderAssignment>) {

@@ -12,10 +12,10 @@ import co.chainring.core.model.db.BlockchainNonceTable
 import co.chainring.core.model.db.BlockchainTransactionTable
 import co.chainring.core.model.db.ChainEntity
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.ChainSettlementBatchTable
 import co.chainring.core.model.db.ChainTable
 import co.chainring.core.model.db.DeployedSmartContractTable
 import co.chainring.core.model.db.DepositTable
-import co.chainring.core.model.db.ExchangeTransactionTable
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketTable
 import co.chainring.core.model.db.OHLCTable
@@ -26,6 +26,7 @@ import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.OrderTable
 import co.chainring.core.model.db.OrderType
+import co.chainring.core.model.db.SettlementBatchTable
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.SymbolTable
 import co.chainring.core.model.db.TradeTable
@@ -65,6 +66,8 @@ open class TestWithDb {
     @BeforeEach
     fun cleanupDb() {
         transaction {
+            ChainSettlementBatchTable.deleteAll()
+            SettlementBatchTable.deleteAll()
             OrderExecutionTable.deleteAll()
             TradeTable.deleteAll()
             OrderTable.deleteAll()
@@ -73,7 +76,6 @@ open class TestWithDb {
             DepositTable.deleteAll()
             WithdrawalTable.deleteAll()
             WalletTable.deleteAll()
-            ExchangeTransactionTable.deleteAll()
             BlockchainTransactionTable.deleteAll()
             BlockchainNonceTable.deleteAll()
             OHLCTable.deleteAll()

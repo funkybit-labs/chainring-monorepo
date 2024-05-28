@@ -6,6 +6,7 @@ import co.chainring.apps.api.model.websocket.OrderBook
 import co.chainring.apps.api.model.websocket.OrderBookEntry
 import co.chainring.core.model.SequencerOrderId
 import co.chainring.core.model.Symbol
+import co.chainring.core.utils.generateHexString
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.testutils.TestWithDb
 import kotlinx.datetime.Clock
@@ -1101,6 +1102,7 @@ class OrderBookTest : TestWithDb() {
                     tradeMarket,
                     amount = trade.amount.toFundamentalUnits(tradeMarket.baseSymbol.decimals),
                     price = trade.price,
+                    tradeHash = generateHexString(32),
                 )
 
                 listOf(trade.buyOrder, trade.sellOrder).forEach { orderId ->

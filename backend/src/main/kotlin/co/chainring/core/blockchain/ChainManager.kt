@@ -74,7 +74,11 @@ object ChainManager {
         }
     }
 
-    fun getBlockchainClients(): Collection<BlockchainClient> = blockchainClientsByChainId.values
+    fun getBlockchainClients() = blockchainClientsByChainId.values.toList()
+
+    fun getBlockchainClient(chainId: ChainId, privateKeyHex: String) = BlockchainClient(
+        blockchainClientsByChainId.getValue(chainId).config.copy(privateKeyHex = privateKeyHex),
+    )
 
     fun getBlockchainClient(config: BlockchainClientConfig, privateKeyHex: String) = BlockchainClient(
         config.copy(privateKeyHex = privateKeyHex),

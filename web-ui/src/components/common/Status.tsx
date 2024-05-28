@@ -36,6 +36,7 @@ export function Status({
       case 'Completed':
         return 'Completed'
       case 'Failed':
+      case 'FailedSettling':
       case 'Rejected':
       case 'Cancelled':
         return 'Canceled'
