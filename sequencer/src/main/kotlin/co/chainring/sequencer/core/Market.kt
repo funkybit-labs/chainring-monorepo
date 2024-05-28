@@ -844,14 +844,12 @@ data class Market(
             this.maxOfferIx = this@Market.maxOfferIx
             this.bestBid = this@Market.bestBid.toDecimalValue()
             this.bestOffer = this@Market.bestOffer.toDecimalValue()
-            if (this.minBidIx != -1 || this.maxOfferIx != -1) {
-                val maxBidIx = (this@Market.bestBid - this@Market.levels[0].price).divideToIntegralValue(this@Market.tickSize).toInt()
-                val minOfferIx = (this@Market.bestOffer - this@Market.levels[0].price).divideToIntegralValue(this@Market.tickSize).toInt()
-                val firstLevelWithData = this.minBidIx.let { if (it == -1) minOfferIx else it }
-                val lastLevelWithData = this.maxOfferIx.let { if (it == -1) maxBidIx else it }
-                (firstLevelWithData..lastLevelWithData).forEach { i ->
-                    this.levels.add(this@Market.levels[i].toCheckpoint())
-                }
+            val maxBidIx = (this@Market.bestBid - this@Market.levels[0].price).divideToIntegralValue(this@Market.tickSize).toInt()
+            val minOfferIx = (this@Market.bestOffer - this@Market.levels[0].price).divideToIntegralValue(this@Market.tickSize).toInt()
+            val firstLevelWithData = this.minBidIx.let { if (it == -1) minOfferIx else it }
+            val lastLevelWithData = this.maxOfferIx.let { if (it == -1) maxBidIx else it }
+            (firstLevelWithData..lastLevelWithData).forEach { i ->
+                this.levels.add(this@Market.levels[i].toCheckpoint())
             }
         }
     }
