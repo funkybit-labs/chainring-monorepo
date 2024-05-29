@@ -364,7 +364,7 @@ export default function OrderTicketWidget({
                     : handleQuoteAmountChange
                 }
                 className={classNames(
-                  'w-full mt-2 text-center bg-darkBluishGray9 border-darkBluishGray6 rounded text-white disabled:bg-mutedGray'
+                  'w-full mt-2 text-center bg-darkBluishGray9 border-darkBluishGray6 rounded-xl text-white disabled:bg-mutedGray'
                 )}
               />
             </div>
@@ -391,7 +391,7 @@ export default function OrderTicketWidget({
                     : handleBaseAmountChange
                 }
                 className={classNames(
-                  'w-full mt-2 text-center bg-darkBluishGray9 rounded text-white disabled:bg-mutedGray',
+                  'w-full mt-2 text-center bg-darkBluishGray9 rounded-xl text-white disabled:bg-mutedGray',
                   sellLimit !== undefined && sellAmount > sellLimit
                     ? 'border-brightRed focus:ring-brightRed'
                     : 'border-darkBluishGray6'
@@ -425,7 +425,7 @@ export default function OrderTicketWidget({
                   : `~${formatUnits(marketPrice, quoteSymbol.decimals)}`
               }
               onChange={handlePriceChange}
-              className="w-36 rounded border-darkBluishGray6 bg-darkBluishGray9 text-center text-white disabled:bg-darkBluishGray7"
+              className="w-36 rounded-xl border-darkBluishGray6 bg-darkBluishGray9 text-center text-white disabled:bg-darkBluishGray7"
             />
           </div>
           {sellLimit !== undefined && sellAmount > sellLimit && (

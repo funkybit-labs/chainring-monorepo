@@ -14,10 +14,10 @@ export function Button({ caption, onClick, disabled, style, primary }: Props) {
     <button
       disabled={disabled}
       className={classNames(
-        'overflow-ellipsis overflow-hidden border-transparent rounded-md',
+        'overflow-ellipsis overflow-hidden border-transparent rounded-[20px]',
         'transition-colors duration-300 ease-in-out text-darkBluishGray1',
         primary
-          ? 'bg-primary4 text-white hover:bg-primary5'
+          ? 'bg-blue4 text-white hover:bg-blue5'
           : 'bg-darkBluishGray7 text-darkBluishGray1',
         style == 'narrow' ? 'px-2 my-1 mx-1' : 'px-4 py-2',
         style == 'full' ? 'w-full' : '',

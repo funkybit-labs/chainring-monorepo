@@ -12,11 +12,11 @@ import { useWebsocketSubscription } from 'contexts/websocket'
 import { produce } from 'immer'
 import * as d3 from 'd3'
 
-import { Market } from 'markets'
-import SymbolIcon from 'components/common/SymbolIcon'
+import Markets, { Market } from 'markets'
 import { classNames } from 'utils'
 import { useMeasure } from 'react-use'
 import { useGesture } from '@use-gesture/react'
+import { MarketSelector } from 'components/Screens/HomeScreen/MarketSelector'
 
 enum PricesInterval {
   PT1H = '1h',
@@ -92,7 +92,15 @@ function longerDurationOrNull(duration: OHLCDuration): OHLCDuration | null {
     : null
 }
 
-export function PricesWidget({ market }: { market: Market }) {
+export function PricesWidget({
+  markets,
+  market,
+  onMarketChanged
+}: {
+  markets: Markets
+  market: Market
+  onMarketChanged: (m: Market) => void
+}) {
   const [ref, { width }] = useMeasure()
 
   const [interval, setInterval] = useState<PricesInterval | null>(
@@ -146,9 +154,11 @@ export function PricesWidget({ market }: { market: Market }) {
         <div className="min-h-[600px]">
           <div className="flex flex-row align-middle">
             <Title
+              markets={markets}
               market={market}
               price={lastPrice()}
               dailyChange={dailyChange}
+              onMarketChanged={onMarketChanged}
             />
           </div>
           <div className="flex w-full place-items-center justify-between py-4 text-sm">
@@ -659,29 +669,26 @@ function formatPrice(market: Market, price: number | null) {
 }
 
 function Title({
+  markets,
   market,
   price,
-  dailyChange
+  dailyChange,
+  onMarketChanged
 }: {
+  markets: Markets
   market: Market
   price: number | null
   dailyChange: number | null
+  onMarketChanged: (m: Market) => void
 }) {
   return (
     <div className="flex w-full justify-between text-xl font-semibold">
-      <div className="place-items-center text-left">
-        <SymbolIcon
-          symbol={market.baseSymbol.name}
-          className="relative left-1 inline-block size-7"
+      <div className="flex items-center gap-1">
+        <MarketSelector
+          markets={markets}
+          selected={market}
+          onChange={onMarketChanged}
         />
-        <SymbolIcon
-          symbol={market.quoteSymbol.name}
-          className="mr-4 inline-block size-7"
-        />
-        {market.baseSymbol.name}
-        <span className="">/</span>
-        {market.quoteSymbol.name}
-        <span className="ml-4">Price</span>
       </div>
       <div className="flex place-items-center gap-4 text-right">
         {formatPrice(market, price)}

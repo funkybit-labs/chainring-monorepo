@@ -2,10 +2,10 @@ import { useQuery } from '@tanstack/react-query'
 import { apiClient } from 'apiClient'
 import { useAccount } from 'wagmi'
 import BalancesWidget from 'components/Screens/HomeScreen/balances/BalancesWidget'
-import { Header } from 'components/Screens/Header'
+import { Header, Tab } from 'components/Screens/Header'
 import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
 import OrderTicketWidget from 'components/Screens/HomeScreen/OrderTicketWidget'
-import { LegacyRef, useEffect, useMemo, useState } from 'react'
+import React, { LegacyRef, useEffect, useMemo, useState } from 'react'
 import Spinner from 'components/common/Spinner'
 import OrdersAndTradesWidget from 'components/Screens/HomeScreen/OrdersAndTradesWidget'
 import TradingSymbols from 'tradingSymbols'
@@ -14,6 +14,7 @@ import { WebsocketProvider } from 'contexts/websocket'
 import { PricesWidget } from 'components/Screens/HomeScreen/PricesWidget'
 import { useMeasure } from 'react-use'
 import TradingSymbol from 'tradingSymbol'
+import { Swap } from 'components/Screens/HomeScreen/Swap'
 
 export default function HomeScreen() {
   const configQuery = useQuery({
@@ -24,6 +25,7 @@ export default function HomeScreen() {
   const wallet = useAccount()
 
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
+  const [tab, setTab] = useState<Tab>('Swap')
 
   const { exchangeContract, markets, symbols, feeRates } = useMemo(() => {
     const config = configQuery.data
@@ -68,7 +70,17 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (markets !== null && selectedMarket == null) {
-      setSelectedMarket(markets.first())
+      const savedMarketId = window.sessionStorage.getItem('market')
+      if (savedMarketId) {
+        const market = markets.findById(savedMarketId)
+        if (market) {
+          setSelectedMarket(market)
+        } else {
+          setSelectedMarket(markets.first())
+        }
+      } else {
+        setSelectedMarket(markets.first())
+      }
     }
   }, [markets, selectedMarket])
 
@@ -78,57 +90,71 @@ export default function HomeScreen() {
     <WebsocketProvider wallet={wallet}>
       {markets && feeRates && selectedMarket ? (
         <div className="min-h-screen bg-darkBluishGray10">
-          <Header
-            markets={markets}
-            selectedMarket={selectedMarket}
-            onMarketChange={setSelectedMarket}
-          />
+          <Header markets={markets} onTabChange={setTab} />
 
-          <div className="mx-4 flex justify-center py-24">
+          <div className="mx-4 flex h-screen justify-center py-24">
             <div
-              className="min-w-[400px] laptop:max-w-[1800px]"
+              className="my-auto min-w-[400px] laptop:max-w-[1800px]"
               ref={ref as LegacyRef<HTMLDivElement>}
             >
-              <div className="grid grid-cols-1 gap-4 laptop:grid-cols-3">
-                <div className="col-span-1 space-y-4 laptop:col-span-2">
-                  <PricesWidget market={selectedMarket} />
-                  {symbols && width >= 1100 && (
-                    <BalancesWidget
-                      walletAddress={wallet.address}
-                      exchangeContractAddress={exchangeContract?.address}
-                      symbols={symbols}
+              {tab == 'Swap' && (
+                <Swap
+                  markets={markets}
+                  walletAddress={wallet.address}
+                  exchangeContractAddress={exchangeContract?.address}
+                  feeRates={feeRates}
+                  onMarketChange={setSelectedMarket}
+                />
+              )}
+              {tab == 'Dashboard' && (
+                <div className="grid grid-cols-1 gap-4 laptop:grid-cols-3">
+                  <div className="col-span-1 space-y-4 laptop:col-span-2">
+                    <PricesWidget
+                      markets={markets}
+                      market={selectedMarket}
+                      onMarketChanged={(m) => {
+                        setSelectedMarket(m)
+                        window.sessionStorage.setItem('market', m.id)
+                      }}
                     />
-                  )}
-                </div>
-                <div className="col-span-1 space-y-4">
-                  <OrderTicketWidget
-                    market={selectedMarket}
-                    walletAddress={wallet.address}
-                    exchangeContractAddress={exchangeContract?.address}
-                    feeRates={feeRates}
-                  />
-                  {width >= 1100 && (
-                    <OrderBookWidget marketId={selectedMarket.id} />
-                  )}
-                </div>
-                {symbols && width < 1100 && (
+                    {symbols && width >= 1100 && (
+                      <BalancesWidget
+                        walletAddress={wallet.address}
+                        exchangeContractAddress={exchangeContract?.address}
+                        symbols={symbols}
+                      />
+                    )}
+                  </div>
                   <div className="col-span-1 space-y-4">
-                    <OrderBookWidget marketId={selectedMarket.id} />
-                    <BalancesWidget
+                    <OrderTicketWidget
+                      market={selectedMarket}
                       walletAddress={wallet.address}
                       exchangeContractAddress={exchangeContract?.address}
-                      symbols={symbols}
+                      feeRates={feeRates}
+                    />
+                    {width >= 1100 && (
+                      <OrderBookWidget marketId={selectedMarket.id} />
+                    )}
+                  </div>
+                  {symbols && width < 1100 && (
+                    <div className="col-span-1 space-y-4">
+                      <OrderBookWidget marketId={selectedMarket.id} />
+                      <BalancesWidget
+                        walletAddress={wallet.address}
+                        exchangeContractAddress={exchangeContract?.address}
+                        symbols={symbols}
+                      />
+                    </div>
+                  )}
+                  <div className="col-span-1 space-y-4 laptop:col-span-3">
+                    <OrdersAndTradesWidget
+                      markets={markets}
+                      walletAddress={wallet.address}
+                      exchangeContractAddress={exchangeContract?.address}
                     />
                   </div>
-                )}
-                <div className="col-span-1 space-y-4 laptop:col-span-3">
-                  <OrdersAndTradesWidget
-                    markets={markets}
-                    walletAddress={wallet.address}
-                    exchangeContractAddress={exchangeContract?.address}
-                  />
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

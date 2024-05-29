@@ -11,7 +11,16 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['"Roboto Mono"', ...defaultTheme.fontFamily.sans]
+        sans: ['Inter', ...defaultTheme.fontFamily.sans]
+      },
+      keyframes: {
+        swivel: {
+          'from': {transform: 'rotateY(0deg)'},
+          'to': {transform: 'rotateY(180deg)'}
+        }
+      },
+      animation: {
+        swivel: 'swivel 0.3s linear'
       }
     },
     colors: {
@@ -24,11 +33,18 @@ export default {
       darkBluishGray3: "#89919D",
       darkBluishGray2: "#A0A6B1",
       darkBluishGray1: "#BABEC5",
+      lightBluishGray2: "#EBEEF4",
       lightBluishGray5: "#CDD1D7",
       primary4: "#FF8718",
       primary5: "#E4720B",
+      blue4: "#2D94FF",
+      blue5: "#2984e6",
       olhcGreen: "#39CF63",
       olhcRed: "#FF5A50",
+      swapRowBackground: "#2A3F59",
+      swapModalBackground: "#253447",
+      swapDropdownBackground: "#34557C",
+      swapHighlight: "#426d9e",
 
       // status colors
       statusOrange: "#FFA337",
