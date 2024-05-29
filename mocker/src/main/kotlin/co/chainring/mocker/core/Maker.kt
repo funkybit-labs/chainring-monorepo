@@ -45,7 +45,7 @@ class Maker(
 ) : Actor(marketIds, nativeAssets, assets, keyPair) {
     override val id: String = "mm_${Address(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
     override val logger: KLogger = KotlinLogging.logger {}
-    private var currentOrders = mutableMapOf<MarketId,MutableList<Order.Limit>>()
+    private var currentOrders = mutableMapOf<MarketId,MutableSet<Order.Limit>>()
     private var quotesCreated = false
 
     override val websocketSubscriptionTopics: List<SubscriptionTopic> =
@@ -105,6 +105,12 @@ class Maker(
                 orders.forEach { order ->
                     logger.info { "$id: received order update $order" }
                     when (order.status) {
+                        OrderStatus.Open -> {
+                            currentOrders[order.marketId]!!.add(
+                                order as Order.Limit
+                            )
+                        }
+
                         OrderStatus.Partial -> {
                             val oldOrder = currentOrders[order.marketId]!!.find { it.id == order.id }
                             if (oldOrder == null) {
@@ -177,7 +183,7 @@ class Maker(
     private fun offerAndBidAmounts(market: Market, offerPrices: List<BigDecimal>, bidPrices: List<BigDecimal>): Pair<List<BigInteger>, List<BigInteger>> {
         val marketId = market.id
         // don't try to use all of available inventory
-        val useFraction = 0.15.toBigDecimal()
+        val useFraction = 0.5.toBigDecimal()
         val baseInventory = (balances.getOrDefault(marketId.baseSymbol(), BigInteger.ZERO).toBigDecimal() * useFraction).toBigInteger()
         val quoteInventory = (balances.getOrDefault(marketId.quoteSymbol(), BigInteger.ZERO).toBigDecimal() * useFraction).toBigInteger()
         val levels = max(offerPrices.size, bidPrices.size)
@@ -203,56 +209,58 @@ class Maker(
         val (offerPrices, bidPrices) = offerAndBidPrices(market, levels, curPrice)
         val (offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
 
-        logger.debug { "$id: going to cancel orders ${ordersToCancel.joinToString(", ") { it.id.value }}" }
+        val createOrders = offerPrices.mapIndexed { ix, price ->
+            wallet.signOrder(
+                CreateOrderApiRequest.Limit(
+                    nonce = generateOrderNonce(),
+                    marketId = marketId,
+                    side = OrderSide.Sell,
+                    amount = offerAmounts[ix],
+                    price = price,
+                    signature = EvmSignature.emptySignature(),
+                    verifyingChainId = ChainId.empty,
+                )
+            )
+        } + bidPrices.mapIndexed { ix, price ->
+            wallet.signOrder(
+                CreateOrderApiRequest.Limit(
+                    nonce = generateOrderNonce(),
+                    marketId = marketId,
+                    side = OrderSide.Buy,
+                    amount = bidAmounts[ix],
+                    price = price,
+                    signature = EvmSignature.emptySignature(),
+                    verifyingChainId = ChainId.empty,
+                )
+            )
+        }
+
+        val cancelOrders = ordersToCancel.map {
+            wallet.signCancelOrder(
+                CancelOrderApiRequest(
+                    orderId = it.id,
+                    marketId = it.marketId,
+                    amount = it.amount,
+                    side = it.side,
+                    nonce = generateOrderNonce(),
+                    signature = EvmSignature.emptySignature(),
+                    verifyingChainId = ChainId.empty,
+                )
+            )
+        }
 
         apiClient.tryBatchOrders(
             BatchOrdersApiRequest(
                 marketId = marketId,
-                createOrders = offerPrices.mapIndexed { ix, price ->
-                    wallet.signOrder(CreateOrderApiRequest.Limit(
-                        nonce = generateOrderNonce(),
-                        marketId = marketId,
-                        side = OrderSide.Sell,
-                        amount = offerAmounts[ix],
-                        price = price,
-                        signature = EvmSignature.emptySignature(),
-                        verifyingChainId = ChainId.empty,
-                    ))
-                } + bidPrices.mapIndexed { ix, price ->
-                    wallet.signOrder(CreateOrderApiRequest.Limit(
-                        nonce = generateOrderNonce(),
-                        marketId = marketId,
-                        side = OrderSide.Buy,
-                        amount = bidAmounts[ix],
-                        price = price,
-                        signature = EvmSignature.emptySignature(),
-                        verifyingChainId = ChainId.empty,
-                    ))
-                },
+                createOrders = createOrders,
                 updateOrders = emptyList(),
-                cancelOrders = ordersToCancel.map {
-                    wallet.signCancelOrder(CancelOrderApiRequest(
-                        orderId = it.id,
-                        marketId = it.marketId,
-                        amount = it.amount,
-                        side = it.side,
-                        nonce = generateOrderNonce(),
-                        signature = EvmSignature.emptySignature(),
-                        verifyingChainId = ChainId.empty,
-                    ))
-                }
+                cancelOrders = cancelOrders
             )
         ).onLeft {
             logger.warn { "$id could not apply batch: ${it.error?.message}" }
         }.onRight {
-            logger.info { "$id: applied update batch" }
+            logger.info { "$id: applied update batch: created ${createOrders.size}, cancelled ${cancelOrders.size}" }
         }
-
-        currentOrders[marketId] = apiClient
-            .listOrders(listOf(OrderStatus.Open, OrderStatus.Partial), marketId)
-            .orders
-            .map { it as Order.Limit }
-            .toMutableList()
     }
 
     private fun createQuotes(marketId: MarketId, levels: Int, curPrice: BigDecimal) {
@@ -297,16 +305,8 @@ class Maker(
                 }
             }
 
-            currentOrders[marketId] =
-                apiClient
-                    .listOrders(listOf(OrderStatus.Open, OrderStatus.Partial), marketId)
-                    .orders
-                    .map { it as Order.Limit }
-                    .toMutableList()
+            currentOrders[marketId] = mutableSetOf()
 
-            if (currentOrders[marketId]!!.size != levels * 2) {
-                logger.warn { "$id: not all quotes accepted: ${currentOrders[marketId]}" }
-            }
         } ?: throw RuntimeException("Market $marketId not found")
     }
 }

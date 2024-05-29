@@ -62,7 +62,7 @@ class MockerApp(
         config.forEach {
             marketsConfig[MarketId(it)] = MarketParams(
                 desiredTakersCount = System.getenv("${it}_TAKERS")?.toIntOrNull() ?: 5,
-                priceBaseline = System.getenv("${it}_PRICE_BASELINE")?.toBigDecimalOrNull() ?: BigDecimal.TEN,
+                priceBaseline = System.getenv("${it}_PRICE_BASELINE")?.toBigDecimalOrNull() ?: BigDecimal("17.5"),
                 initialBaseBalance = System.getenv("${it}_INITIAL_BASE_BALANCE")?.toBigDecimalOrNull() ?: BigDecimal.ONE,
                 makerPrivateKeyHex = System.getenv("${it}_MAKER_PRIVATE_KEY_HEX") ?: ("0x" + Keys.createEcKeyPair().privateKey.toString(16)),
             )
@@ -118,7 +118,7 @@ class MockerApp(
             val priceFunction = marketsPriceFunctions.getOrPut(marketId) {
                 DeterministicHarmonicPriceMovement.generateRandom(
                     initialValue = params.priceBaseline.toDouble(),
-                    maxFluctuation = market.tickSize.toDouble() * 25
+                    maxFluctuation = market.tickSize.toDouble() * 30
                 )
             }
 
@@ -127,8 +127,8 @@ class MockerApp(
                 params.makers.add(
                     startMaker(
                         market,
-                        params.initialBaseBalance * BigDecimal(100),
-                        params.initialBaseBalance * params.priceBaseline * BigDecimal(100),
+                        params.initialBaseBalance * BigDecimal(150),
+                        params.initialBaseBalance * params.priceBaseline * BigDecimal(150),
                         keyPair = ECKeyPair.create(Numeric.toBigInt(params.makerPrivateKeyHex))
                     )
                 )
