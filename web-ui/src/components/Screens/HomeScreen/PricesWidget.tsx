@@ -57,7 +57,7 @@ function offsetInterval(date: Date, interval: PricesInterval): Date {
   }
 }
 
-function floorToDurationStart(date: Date, duration: OHLCDuration): Date {
+function floorToDuration(date: Date, duration: OHLCDuration): Date {
   switch (duration) {
     case 'P1M':
       return d3.timeMinute.every(1)!.floor(date)
@@ -71,6 +71,23 @@ function floorToDurationStart(date: Date, duration: OHLCDuration): Date {
       return d3.timeHour.every(4)!.floor(date)
     case 'P1D':
       return d3.timeDay.every(1)!.floor(date)
+  }
+}
+
+function ceilToDuration(date: Date, duration: OHLCDuration): Date {
+  switch (duration) {
+    case 'P1M':
+      return d3.timeMinute.every(1)!.ceil(date)
+    case 'P5M':
+      return d3.timeMinute.every(5)!.ceil(date)
+    case 'P15M':
+      return d3.timeMinute.every(15)!.ceil(date)
+    case 'P1H':
+      return d3.timeHour.every(1)!.ceil(date)
+    case 'P4H':
+      return d3.timeHour.every(4)!.ceil(date)
+    case 'P1D':
+      return d3.timeDay.every(1)!.ceil(date)
   }
 }
 
@@ -95,7 +112,7 @@ function longerDurationOrNull(duration: OHLCDuration): OHLCDuration | null {
 export function PricesWidget({ market }: { market: Market }) {
   const [ref, { width }] = useMeasure()
 
-  const [interval, setInterval] = useState<PricesInterval | null>(
+  const [interval, setPricesInterval] = useState<PricesInterval | null>(
     PricesInterval.PT6H
   )
   const [duration, setDuration] = useState<OHLCDuration>('P5M')
@@ -130,6 +147,27 @@ export function PricesWidget({ market }: { market: Market }) {
     )
   })
 
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  useEffect(() => {
+    // add empty ohlc candle if no updates from the server
+    const timeUntilNextOhlcInterval =
+      ceilToDuration(new Date(), duration).getTime() - Date.now()
+
+    intervalRef.current = setInterval(() => {
+      setOhlc(
+        produce((draft) => {
+          mergeOHLC(draft, [], duration)
+        })
+      )
+    }, timeUntilNextOhlcInterval)
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [ohlc.length, duration])
+
   function lastPrice(): number | null {
     if (ohlc.length > 0) {
       return ohlc[ohlc.length - 1].close
@@ -161,7 +199,7 @@ export function PricesWidget({ market }: { market: Market }) {
                     setDuration(newDuration)
                     setOhlcLoading(true)
                   }
-                  setInterval(int)
+                  setPricesInterval(int)
                 }}
               />
             </div>
@@ -181,7 +219,7 @@ export function PricesWidget({ market }: { market: Market }) {
                 width: Math.max(width - 40, 0), // paddings
                 height: 500,
                 interval: interval,
-                resetInterval: () => setInterval(null),
+                resetInterval: () => setPricesInterval(null),
                 duration: duration,
                 shorterDuration: shorterDurationOrNull(duration),
                 longerDuration: longerDurationOrNull(duration),
@@ -238,7 +276,7 @@ function OHLCChart({
   const domainXRef = useRef<[Date, Date]>([
     offsetInterval(new Date(), PricesInterval.PT6H),
     d3.timeMillisecond.offset(
-      floorToDurationStart(new Date(), params.duration),
+      floorToDuration(new Date(), params.duration),
       halfOhlcDurationMs(params.duration)
     )
   ])
@@ -332,7 +370,10 @@ function OHLCChart({
       // calculate candle width
       const candleWidth =
         ohlc.length >= 2
-          ? Math.abs(newXScale(ohlc[1].start) - newXScale(ohlc[0].start)) * 0.6
+          ? Math.abs(
+              newXScale(Date.now() + ohlcDurationsMs[params.duration]) -
+                newXScale(Date.now())
+            ) * 0.6
           : 1
       const lineWidth = candleWidth * 0.2
 
@@ -398,7 +439,17 @@ function OHLCChart({
         .attr('rx', candleWidth / 10)
         .attr('fill', (d) => (d.close >= d.open ? '#39CF63' : '#FF5A50'))
     },
-    [innerWidth, lastPrice, ohlc, svg, xAxis, yAxis, yAxisGrid, yScale]
+    [
+      innerWidth,
+      lastPrice,
+      ohlc,
+      svg,
+      xAxis,
+      yAxis,
+      yAxisGrid,
+      yScale,
+      params.duration
+    ]
   )
 
   useEffect(() => {
@@ -407,7 +458,7 @@ function OHLCChart({
       domainXRef.current = [
         offsetInterval(new Date(), params.interval),
         d3.timeMillisecond.offset(
-          floorToDurationStart(new Date(), params.duration),
+          floorToDuration(new Date(), params.duration),
           halfOhlcDurationMs(params.duration)
         )
       ]
@@ -424,7 +475,7 @@ function OHLCChart({
       const currentEndOfTheWorldTime = domainXRef.current[1].getTime()
       const newEndOfTheWorldTime = d3.timeMillisecond
         .offset(
-          floorToDurationStart(new Date(), params.duration),
+          floorToDuration(new Date(), params.duration),
           halfOhlcDurationMs(params.duration)
         )
         .getTime()
