@@ -1,4 +1,10 @@
-import { apiClient, CancelOrderRequest, Order, Trade } from 'apiClient'
+import {
+  apiClient,
+  CancelOrderRequest,
+  FeeRates,
+  Order,
+  Trade
+} from 'apiClient'
 import React, { useCallback, useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import { Address, formatUnits } from 'viem'
@@ -23,11 +29,13 @@ import { useWeb3Modal } from '@web3modal/wagmi/react'
 export default function OrdersAndTradesWidget({
   markets,
   exchangeContractAddress,
-  walletAddress
+  walletAddress,
+  feeRates
 }: {
   markets: Markets
   exchangeContractAddress?: Address
   walletAddress?: Address
+  feeRates: FeeRates
 }) {
   const [orders, setOrders] = useState<Order[]>(() => [])
   const [changedOrder, setChangedOrder] = useState<Order | null>(null)
@@ -239,6 +247,7 @@ export default function OrdersAndTradesWidget({
             markets={markets}
             exchangeContractAddress={exchangeContractAddress!}
             walletAddress={walletAddress!}
+            feeRates={feeRates}
             close={() => setShowChangeModal(false)}
             onClosed={() => setChangedOrder(null)}
           />

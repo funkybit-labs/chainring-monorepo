@@ -151,6 +151,7 @@ export default function HomeScreen() {
                       markets={markets}
                       walletAddress={wallet.address}
                       exchangeContractAddress={exchangeContract?.address}
+                      feeRates={feeRates}
                     />
                   </div>
                 </div>

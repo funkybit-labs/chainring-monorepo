@@ -1,4 +1,4 @@
-import { apiClient, Order } from 'apiClient'
+import { apiClient, FeeRates, Order } from 'apiClient'
 import Markets from 'markets'
 import { Address, formatUnits, parseUnits } from 'viem'
 import { BaseError as WagmiError, useConfig, useSignTypedData } from 'wagmi'
@@ -15,12 +15,14 @@ import { AmountWithSymbol } from 'components/common/AmountWithSymbol'
 import SubmitButton from 'components/common/SubmitButton'
 import { isErrorFromAlias } from '@zodios/core'
 import { MarketTitle } from 'components/Screens/HomeScreen/MarketSelector'
+import { calculateFee, calculateNotional } from 'utils'
 
 export function ChangeOrderModal({
   order,
   markets,
   exchangeContractAddress,
   walletAddress,
+  feeRates,
   isOpen,
   close,
   onClosed
@@ -29,6 +31,7 @@ export function ChangeOrderModal({
   markets: Markets
   exchangeContractAddress: Address
   walletAddress: Address
+  feeRates: FeeRates
   isOpen: boolean
   close: () => void
   onClosed: () => void
@@ -54,7 +57,7 @@ export function ChangeOrderModal({
     valueInFundamentalUnits: price
   } = useAmountInputState({
     initialInputValue: order.type == 'limit' ? String(order.price) : '',
-    decimals: baseSymbol.decimals
+    decimals: quoteSymbol.decimals
   })
 
   const [baseLimit, setBaseLimit] = useState<bigint | undefined>(undefined)
@@ -62,12 +65,25 @@ export function ChangeOrderModal({
 
   useWebsocketSubscription({
     topics: useMemo(() => [limitsTopic(market.id)], [market.id]),
-    handler: useCallback((message: Publishable) => {
-      if (message.type === 'Limits') {
-        setBaseLimit(message.base)
-        setQuoteLimit(message.quote)
-      }
-    }, [])
+    handler: useCallback(
+      (message: Publishable) => {
+        const originalPrice =
+          order.type == 'limit'
+            ? parseUnits(String(order.price), quoteSymbol.decimals)
+            : BigInt(0)
+        const remainingNotional = calculateNotional(
+          originalPrice,
+          order.amount,
+          baseSymbol
+        )
+
+        if (message.type === 'Limits') {
+          setBaseLimit(message.base + order.amount)
+          setQuoteLimit(message.quote + remainingNotional)
+        }
+      },
+      [order, quoteSymbol, baseSymbol]
+    )
   })
 
   const exceedsLimit = useMemo(() => {
@@ -79,15 +95,14 @@ export function ChangeOrderModal({
       return false
     }
 
-    const originalAmount = order.amount
-    const originalPrice = parseUnits(String(order.price), quoteSymbol.decimals)
-
     if (order.side == 'Buy') {
-      return price * amount - originalPrice * originalAmount > quoteLimit
+      const notional = calculateNotional(price, amount, baseSymbol)
+      const fee = calculateFee(notional, feeRates.maker)
+      return notional + fee > quoteLimit
     } else {
-      return amount - originalAmount > baseLimit
+      return amount > baseLimit
     }
-  }, [price, amount, order, baseLimit, quoteLimit, quoteSymbol.decimals])
+  }, [price, amount, order, baseLimit, quoteLimit, baseSymbol, feeRates])
 
   const changeOrderMutation = useMutation({
     mutationFn: async () => {
