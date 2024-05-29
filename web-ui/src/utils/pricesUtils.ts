@@ -25,26 +25,27 @@ export function mergeOHLC(
     )
     if (index == -1) {
       // fill gaps before pushing new ohlc
-      fillGaps(draft, newItem, ohlcDurationsMs[duration])
+      fillGaps(draft, newItem.start.getTime(), ohlcDurationsMs[duration])
 
       draft.push(newItem)
     } else {
       draft[index] = newItem
     }
   })
+  fillGaps(draft, Date.now(), ohlcDurationsMs[duration])
   return draft
 }
 
-function fillGaps(draft: OHLC[], newItem: OHLC, duration: number) {
+function fillGaps(draft: OHLC[], untilTime: number, ohlcDuration: number) {
   while (
     draft.length > 0 &&
-    newItem.start > draft[draft.length - 1].start &&
-    newItem.start.getTime() - draft[draft.length - 1].start.getTime() > duration
+    untilTime - draft[draft.length - 1].start.getTime() > ohlcDuration &&
+    draft[draft.length - 1].start.getTime() + ohlcDuration < Date.now()
   ) {
     const lastItem = draft[draft.length - 1]
 
     draft.push({
-      start: new Date(lastItem.start.getTime() + duration),
+      start: new Date(lastItem.start.getTime() + ohlcDuration),
       duration: lastItem.duration,
       open: lastItem.close,
       high: lastItem.close,
