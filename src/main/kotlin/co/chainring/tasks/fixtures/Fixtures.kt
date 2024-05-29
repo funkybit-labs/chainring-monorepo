@@ -88,6 +88,12 @@ fun getFixtures(chainringChainIds: List<ChainId>) = Fixtures(
             tickSize = "0.001".toBigDecimal(),
             marketPrice = "1.0005".toBigDecimal()
         ),
+        Fixtures.Market(
+            baseSymbol = SymbolId(chainringChainIds[0], "BTC".toChainSymbol(0)),
+            quoteSymbol = SymbolId(chainringChainIds[1], "ETH".toChainSymbol(1)),
+            tickSize = "0.05".toBigDecimal(),
+            marketPrice = "17.525".toBigDecimal()
+        ),
     ) else emptyList(),
     wallets = listOf(
         Fixtures.Wallet(
