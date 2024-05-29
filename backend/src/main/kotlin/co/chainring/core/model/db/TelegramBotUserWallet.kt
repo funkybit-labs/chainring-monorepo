@@ -1,16 +1,13 @@
 package co.chainring.core.model.db
 
-import co.chainring.core.model.db.BalanceEntity.Companion.transform
+import co.chainring.core.model.Address
 import co.chanring.core.model.EncryptedString
-import co.chanring.core.model.encrypt
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
-import org.jetbrains.exposed.sql.update
 
 @Serializable
 @JvmInline
@@ -32,48 +29,20 @@ object TelegramBotUserWalletTable : GUIDTable<TelegramBotUserWalletId>("telegram
 }
 
 class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUIDEntity<TelegramBotUserWalletId>(guid) {
-
     companion object : EntityClass<TelegramBotUserWalletId, TelegramBotUserWalletEntity>(TelegramBotUserWalletTable) {
         fun create(
             wallet: WalletEntity,
             telegramBotUser: TelegramBotUserEntity,
-            privateKey: String,
+            privateKey: EncryptedString,
             isCurrent: Boolean,
         ) = TelegramBotUserWalletEntity.new(TelegramBotUserWalletId.generate()) {
             val now = Clock.System.now()
-            this.encryptedPrivateKey = privateKey.encrypt()
+            this.encryptedPrivateKey = privateKey
             this.createdAt = now
             this.createdBy = telegramBotUser.guid.value.value
             this.walletGuid = wallet.guid
             this.telegramBotUserGuid = telegramBotUser.guid
             this.isCurrent = isCurrent
-        }
-
-        fun makeCurrent(telegramBotUserWallet: TelegramBotUserWalletEntity) {
-            TelegramBotUserWalletTable.update(
-                {
-                    TelegramBotUserWalletTable.telegrambotUserGuid.eq(telegramBotUserWallet.telegramBotUserGuid) and
-                        TelegramBotUserWalletTable.isCurrent.eq(true)
-                },
-            ) {
-                it[this.isCurrent] = false
-            }
-            telegramBotUserWallet.isCurrent = true
-        }
-
-        fun findForTelegramBotUser(telegramBotUser: TelegramBotUserEntity): List<TelegramBotUserWalletEntity> {
-            return TelegramBotUserWalletEntity.find {
-                TelegramBotUserWalletTable.telegrambotUserGuid.eq(telegramBotUser.guid)
-            }.toList()
-        }
-
-        fun findCurrentForTelegramBotUser(telegramBotUser: TelegramBotUserEntity): TelegramBotUserWalletEntity? {
-            return TelegramBotUserWalletEntity.find {
-                TelegramBotUserWalletTable.telegrambotUserGuid.eq(telegramBotUser.guid) and
-                    TelegramBotUserWalletTable.isCurrent.eq(true)
-            }.firstOrNull() ?: findForTelegramBotUser(telegramBotUser).firstOrNull()?.also {
-                it.isCurrent = true
-            }
         }
     }
 
@@ -88,4 +57,7 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
         toColumn = { it.encrypted },
     )
     var isCurrent by TelegramBotUserWalletTable.isCurrent
+
+    val address: Address
+        get() = Address.fromPrivateKey(encryptedPrivateKey.decrypt())
 }

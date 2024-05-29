@@ -4,7 +4,6 @@ import co.chainring.apps.BaseApp
 import co.chainring.core.db.DbConfig
 import co.chainring.core.model.db.TelegramBotUserEntity
 import com.github.ehsannarmani.bot.Bot
-import com.github.ehsannarmani.bot.model.message.TextMessage
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.sql.transactions.transaction
 
@@ -21,43 +20,42 @@ class BotApp : BaseApp(dbConfig = dbConfig) {
         bot = Bot(
             token = botToken,
             onUpdate = {
+                onCallbackQuery {
+                    CallbackData.deserialize(it.data)?.also { callbackData ->
+                        getOrCreateBotSession(it.from.id)
+                            .handleCallbackButtonClick(callbackData)
+                    }
+                }
                 onMessage { message ->
                     val session = getOrCreateBotSession(message.from.id)
                     onText {
                         onCommand("start") {
-                            this.mainMenu(session)
+                            session.sendMainMenu()
                         }
-
                         onText { text ->
                             // these are replies to messages we sent requesting input
-                            message.replyToMessage?.messageId?.let { replyMessageId ->
-                                session.handleReplyMessage(replyMessageId, text, message.messageId)?.let {
-                                    sendMessage(
-                                        TextMessage(
-                                            text = it,
-                                            chatId = message.chat.id.toString(),
-                                        ),
-                                    )
-                                }
-                                if (session.showMenuAfterReply()) {
-                                    this.mainMenu(session)
-                                }
+                            val originalMessage = message.replyToMessage
+                            if (originalMessage != null) {
+                                session.handleReplyMessage(originalMessage.messageId, message.messageId, text)
                             }
                         }
                     }
                 }
             },
         )
+
+        transaction {
+            TelegramBotUserEntity.all().forEach {
+                botSessions[it.telegramUserId] = BotSession(it.telegramUserId, bot)
+            }
+        }
+
         bot.startPolling()
     }
 
     private fun getOrCreateBotSession(userId: Long): BotSession {
         return botSessions.getOrPut(userId) {
-            transaction {
-                BotSession(TelegramBotUserEntity.getOrCreate(telegramUserId = userId), bot = bot)
-            }.also {
-                it.loadUserWallet()
-            }
+            BotSession(userId, bot)
         }
     }
 
