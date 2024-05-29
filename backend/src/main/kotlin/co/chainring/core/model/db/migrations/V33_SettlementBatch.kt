@@ -119,7 +119,7 @@ class V33_SettlementBatch : Migration() {
             exec("CREATE TYPE SettlementBatchStatus AS ENUM (${enumDeclaration<V33_SettlementBatchStatus>()})")
             SchemaUtils.createMissingTablesAndColumns(V33_SettlementBatchTable, V33_ChainSettlementBatchTable, V33_TradeTable)
 
-            exec("""update trade set trade_hash = (SELECT md5(random()::text))""")
+            exec("""update trade set trade_hash = (SELECT md5(guid))""")
             exec("""ALTER TABLE trade ALTER COLUMN trade_hash SET NOT NULL""")
 
             exec("DROP TABLE exchange_transaction")
