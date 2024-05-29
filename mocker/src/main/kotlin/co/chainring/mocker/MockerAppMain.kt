@@ -127,8 +127,8 @@ class MockerApp(
                 params.makers.add(
                     startMaker(
                         market,
-                        params.initialBaseBalance * BigDecimal(150),
-                        params.initialBaseBalance * params.priceBaseline * BigDecimal(150),
+                        params.initialBaseBalance * BigDecimal(100),
+                        params.initialBaseBalance * params.priceBaseline * BigDecimal(100),
                         keyPair = ECKeyPair.create(Numeric.toBigInt(params.makerPrivateKeyHex))
                     )
                 )
