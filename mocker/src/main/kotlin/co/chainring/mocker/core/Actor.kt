@@ -14,7 +14,6 @@ import co.chainring.core.model.db.MarketId
 import co.chainring.integrationtests.utils.Faucet
 import co.chainring.core.utils.TraceRecorder
 import co.chainring.integrationtests.utils.Wallet
-import org.web3j.crypto.Keys
 import java.math.BigInteger
 import org.web3j.crypto.ECKeyPair
 import io.github.oshai.kotlinlogging.KLogger
@@ -117,23 +116,41 @@ abstract class Actor(
         logger.debug { "$id: going to deposit" }
         while (!deposited) {
             try {
+                val config = apiClient.getConfiguration()
+                val initialBalances = apiClient.getBalances().balances
+
                 synchronized(Actor::class) {
                     val nativeAmountByChainId = nativeAssets.map { chainIdBySymbol.getValue(it.key) to it.value }.toMap()
                     val chainIds = nativeAmountByChainId.keys + assets.map { chainIdBySymbol.getValue(it.key) }.toSet()
                     chainIds.forEach { chainId ->
-                        val amount = (nativeAmountByChainId[chainId] ?: BigDecimal.ONE.movePointRight(18).toBigInteger()) * BigInteger.TWO
-                        logger.debug { "funding ${wallet.address} with ${amount * BigInteger.TWO} on chain $chainId" }
-                        Faucet.fund(wallet.address, amount * BigInteger.TWO, chainId)
-                        wallet.switchChain(chainId)
-                        logger.debug { "Native deposit $amount to ${wallet.address} on chain $chainId" }
-                        wallet.depositNative(amount)
+                        val desiredAmount = (nativeAmountByChainId[chainId] ?: BigDecimal.ONE.movePointRight(18).toBigInteger()) * BigInteger.TWO
+                        Faucet.fund(wallet.address, desiredAmount * BigInteger.TWO, chainId)
+
+                        val availableAmount = initialBalances.find { it.symbol.value == config.chains.first { it.id == chainId }.symbols.first { it.contractAddress == null }.name }?.available ?: BigInteger.ZERO
+                        val deltaAmount = desiredAmount - availableAmount
+
+                        if (deltaAmount > BigInteger.ZERO) {
+                            logger.debug { "Funding ${wallet.address} with ${deltaAmount * BigInteger.TWO} on chain $chainId" }
+                            wallet.switchChain(chainId)
+                            logger.debug { "Native deposit $deltaAmount to ${wallet.address} on chain $chainId" }
+                            wallet.depositNative(deltaAmount)
+                        } else {
+                            logger.debug { "Skipping funding for ${wallet.address}, available native balance $availableAmount" }
+                        }
                     }
-                    assets.forEach { (symbol, amount) ->
+                    assets.forEach { (symbol, desiredAmount) ->
                         val chainId = chainIdBySymbol.getValue(symbol)
-                        wallet.switchChain(chainId)
-                        wallet.mintERC20(symbol, amount)
-                        logger.debug { "$symbol deposit $amount to ${wallet.address} on chain $chainId" }
-                        wallet.depositERC20(symbol, amount)
+                        val availableAmount = initialBalances.find { it.symbol.value == symbol }?.available ?: BigInteger.ZERO
+                        val deltaAmount = desiredAmount - availableAmount
+
+                        if (deltaAmount > BigInteger.ZERO) {
+                            wallet.switchChain(chainId)
+                            wallet.mintERC20(symbol, deltaAmount)
+                            logger.debug { "$symbol deposit $deltaAmount to ${wallet.address} on chain $chainId" }
+                            wallet.depositERC20(symbol, deltaAmount)
+                        } else {
+                            logger.debug { "Skipping $symbol deposit to ${wallet.address} on chain $chainId, available balance $availableAmount" }
+                        }
                     }
                     val fundedAssets = mutableSetOf<String>()
                     while (fundedAssets.size < assets.size + nativeAssets.size) {
