@@ -39,10 +39,10 @@ class Maker(
     private val tightness: Int,
     private val skew: Int,
     private val levels: Int,
-    native: BigInteger,
+    nativeAssets: Map<String, BigInteger>,
     assets: Map<String, BigInteger>,
     keyPair: ECKeyPair = Keys.createEcKeyPair()
-) : Actor(marketIds, native, assets, keyPair) {
+) : Actor(marketIds, nativeAssets, assets, keyPair) {
     override val id: String = "mm_${Address(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
     override val logger: KLogger = KotlinLogging.logger {}
     private var currentOrders = mutableMapOf<MarketId,MutableList<Order.Limit>>()
