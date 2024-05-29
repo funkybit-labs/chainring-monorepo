@@ -1,5 +1,6 @@
 package co.chainring.mocker.core
 
+import co.chainring.apps.api.model.Chain
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
