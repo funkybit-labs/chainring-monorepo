@@ -167,8 +167,7 @@ export default function DepositModal({
                   onChange={(e) => setAmountInputValue(e.target.value)}
                 />
                 <p className="mb-2 mt-4 text-center text-sm text-darkBluishGray2">
-                  Wallet balance:{' '}
-                  {formatUnits(walletBalance, symbol.decimals)}
+                  Wallet balance: {formatUnits(walletBalance, symbol.decimals)}
                 </p>
 
                 <SubmitButton
