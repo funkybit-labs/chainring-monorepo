@@ -2,7 +2,7 @@ module "github_oidc" {
   source = "../modules/github_oidc"
 }
 locals {
-  repos = toset(["otterscan", "mocker", "sequencer", "anvil", "backend"])
+  repos = toset(["otterscan", "mocker", "sequencer", "anvil", "backend", "telegrambot"])
 }
 resource "aws_iam_role_policy" "auth" {
   role   = module.github_oidc.role.name

@@ -14,6 +14,12 @@ environment:
     SANDBOX_MODE: "true"
     DB_HOST: test-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
+  telegrambot:
+    DB_HOST: test-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
+    EVM_CHAINS: anvil,anvil2
+    EVM_NETWORK_URL_anvil: http://test-anvil.chainring.co:8545
+    EVM_NETWORK_URL_anvil2: http://test-anvil2.chainring.co:8545
+    JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
   anvil2:
     CHAIN_ID: "31339"
   otterscan:
@@ -28,6 +34,14 @@ services:
     environment: api
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
+  telegrambot:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/telegrambot
+    count: 1
+    environment: telegrambot
+    no_rolling_upgrade: "true"
+    secrets:
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
+      TELEGRAM_BOT_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:test/telegrambot/TELEGRAM_BOT_TOKEN-EJTdMA
   anvil:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
     count: 1

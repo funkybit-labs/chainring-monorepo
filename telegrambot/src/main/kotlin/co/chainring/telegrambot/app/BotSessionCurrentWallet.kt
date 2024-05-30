@@ -1,6 +1,7 @@
 package co.chainring.telegrambot.app
 
 import arrow.core.Either
+import co.chainring.apps.api.model.Balance
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
@@ -14,17 +15,14 @@ import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
+import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.client.rest.ApiCallFailure
 import co.chainring.core.client.rest.ApiClient
-import co.chainring.core.client.ws.nonBlocking
-import co.chainring.core.client.ws.subscribeToBalances
-import co.chainring.core.client.ws.subscribeToOrders
-import co.chainring.core.client.ws.subscribeToPrices
-import co.chainring.core.client.ws.subscribeToTrades
+import co.chainring.core.client.ws.subscribe
 import co.chainring.core.client.ws.unsubscribe
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
@@ -37,34 +35,37 @@ import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OrderSide
-import co.chainring.core.model.db.OrderStatus
-import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.model.db.TelegramBotUserWalletEntity
-import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.generateOrderNonce
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHex
 import co.chainring.core.utils.toHexBytes
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.future.await
 import kotlinx.serialization.json.Json
-import org.http4k.client.WebsocketClient
-import org.http4k.websocket.Websocket
-import org.http4k.websocket.WsStatus
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.Keys
 import java.math.BigDecimal
 import java.math.BigInteger
-import java.math.RoundingMode
+import kotlin.time.Duration.Companion.seconds
 
 data class WalletAvailableBalances(
     val baseSymbol: Symbol,
     val quoteSymbol: Symbol,
-    val availableBaseBalance: String,
-    val availableQuoteBalance: String,
+    val availableBaseBalance: BigInteger,
+    val availableQuoteBalance: BigInteger,
 )
 
-class BotSessionCurrentWallet(val wallet: TelegramBotUserWalletEntity, val botSession: BotSession) {
+class BotSessionCurrentWallet(
+    val wallet: TelegramBotUserWalletEntity,
+    val onBalanceUpdated: (List<Balance>) -> Unit,
+    val onOrderCreated: (Order) -> Unit,
+    val onOrderUpdated: (Order) -> Unit,
+    val onTradeUpdated: (Trade) -> Unit,
+) {
     private val logger = KotlinLogging.logger { }
     private val ecKeyPair = Credentials.create(wallet.encryptedPrivateKey.decrypt()).ecKeyPair
     private val apiClient = ApiClient(ecKeyPair)
@@ -74,7 +75,7 @@ class BotSessionCurrentWallet(val wallet: TelegramBotUserWalletEntity, val botSe
     private val chainBySymbol = config.chains.map { chain ->
         chain.symbols.associate { Symbol(it.name) to chain.id }
     }.flatMap { map -> map.entries }.associate(Map.Entry<Symbol, ChainId>::toPair)
-    private val symbolInfoBySymbol = config.chains.map { chain ->
+    val symbolInfoBySymbol = config.chains.map { chain ->
         chain.symbols.associateBy { Symbol(it.name) }
     }.flatMap { map -> map.entries }.associate(Map.Entry<Symbol, SymbolInfo>::toPair)
     private val blockchainClientsByChainId = ChainManager.blockchainConfigs.associate { blockchainConfig ->
@@ -93,113 +94,90 @@ class BotSessionCurrentWallet(val wallet: TelegramBotUserWalletEntity, val botSe
     var currentMarket = config.markets.find { it.id.value == "BTC/ETH" } ?: config.markets.first()
     val walletAddress = Address(Keys.toChecksumAddress("0x" + Keys.getAddress(ecKeyPair)))
     private val balances = mutableMapOf<Symbol, BigInteger>()
-    private val pendingDeposits = mutableSetOf<TxHash>()
 
-    private var websocket: Websocket? = null
+    private var websocket: WebSocket? = null
+    private val websocketSubscriptionTopics = listOf(
+        SubscriptionTopic.Orders,
+        SubscriptionTopic.Trades,
+        SubscriptionTopic.Balances,
+    ) + config.markets.map { market -> SubscriptionTopic.Prices(market.id, OHLCDuration.P5M) }
 
     fun start() {
-        WebsocketClient.nonBlocking(apiClient.authToken) { ws ->
-            logger.debug { "websocket connected" }
-            websocket = ws
-            config.markets.map { it.id }.forEach {
-                ws.subscribeToPrices(it)
+        connectWebsocket()
+    }
+
+    fun stop() {
+        try {
+            websocket?.also { ws ->
+                websocketSubscriptionTopics.forEach(ws::unsubscribe)
+                ws.close(1001, "Going away")
             }
-            ws.subscribeToOrders()
-            ws.subscribeToTrades()
-            ws.subscribeToBalances()
-            ws.onMessage {
-                val message = Json.decodeFromString<OutgoingWSMessage>(it.bodyString()) as OutgoingWSMessage.Publish
-                when (message.topic) {
-                    SubscriptionTopic.Trades -> {
-                        when (val data = message.data) {
-                            is TradeUpdated -> {
-                                val trade = data.trade
-                                if (trade.settlementStatus == SettlementStatus.Completed) {
-                                    runBlocking {
-                                        botSession.sendMessage(formatTrade(trade))
-                                        botSession.sendMainMenu()
-                                    }
-                                }
-                            }
+        } catch (e: Exception) {
+            logger.error(e) { "failed to stop bot wallet" }
+        }
+    }
 
-                            else -> {}
-                        }
-                    }
+    private fun connectWebsocket() {
+        logger.debug { "Connecting websocket" }
+        val cooldownBeforeReconnecting = 1.seconds
 
-                    SubscriptionTopic.Balances -> {
-                        val balanceData = message.data as Balances
-                        balanceData.balances.forEach {
-                            balances[it.symbol] = it.available
-                        }
-                        if (pendingDeposits.isNotEmpty()) {
-                            apiClient.tryListDeposits().getOrNull()?.deposits?.let { deposits ->
-                                pendingDeposits.forEach { txHash ->
-                                    deposits.firstOrNull { it.txHash == txHash }?.let {
-                                        when (it.status) {
-                                            Deposit.Status.Failed -> "❌ Deposit of ${it.symbol.value} failed"
-                                            Deposit.Status.Complete -> "✅ Deposit of ${it.symbol.value} completed"
-                                            else -> null
-                                        }?.let { message ->
-                                            pendingDeposits.remove(it.txHash)
-                                            runBlocking {
-                                                botSession.sendMessage(message)
-                                                botSession.sendMainMenu()
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+        websocket = apiClient.newWebSocket(object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                logger.debug { "Websocket connected" }
+                websocketSubscriptionTopics.forEach(webSocket::subscribe)
+            }
 
-                    SubscriptionTopic.Orders -> {
-                        runBlocking {
-                            when (val data = message.data) {
-                                is OrderCreated -> botSession.sendMessage(formatOrder(data.order, isCreated = true))
-                                is OrderUpdated -> botSession.sendMessage(formatOrder(data.order, isCreated = false))
-                                else -> {}
-                            }
-                        }
-                    }
-
-                    is SubscriptionTopic.Prices -> {
-                        val prices = message.data as Prices
-                        prices.ohlc.lastOrNull()?.let {
-                            marketPrices[prices.market] = it.close.toBigDecimal()
-                        }
-                    }
-
-                    else -> {}
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                try {
+                    val decodedMessage = Json.decodeFromString<OutgoingWSMessage>(text) as OutgoingWSMessage.Publish
+                    handleWebsocketMessage(decodedMessage.data)
+                } catch (e: Exception) {
+                    logger.error(e) { "Error while handling websocket message" }
                 }
             }
-            ws.onClose {
-                logger.debug { "web socket closed" }
+
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                connectWebsocket()
             }
-            ws.onError {
-                logger.error(it) { "web socket exception" }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                logger.warn(t) { "Websocket error, reconnecting in $cooldownBeforeReconnecting" }
+                webSocket.cancel()
+                Thread.sleep(cooldownBeforeReconnecting.inWholeMilliseconds)
+                connectWebsocket()
             }
+        })
+    }
+
+    private fun handleWebsocketMessage(message: Publishable) {
+        when (message) {
+            is Balances -> {
+                message.balances.forEach {
+                    balances[it.symbol] = it.available
+                }
+                onBalanceUpdated(message.balances)
+            }
+            is Prices -> {
+                message.ohlc.lastOrNull()?.let {
+                    marketPrices[message.market] = it.close.toBigDecimal()
+                }
+            }
+            is OrderCreated -> {
+                onOrderCreated(message.order)
+            }
+            is OrderUpdated -> {
+                onOrderUpdated(message.order)
+            }
+            is TradeUpdated -> {
+                onTradeUpdated(message.trade)
+            }
+            else -> {}
         }
     }
 
     fun switchCurrentMarket(marketId: MarketId) {
         config.markets.find { it.id == marketId }?.let {
             currentMarket = it
-        }
-    }
-
-    fun stop() {
-        try {
-            websocket?.let { ws ->
-                config.markets.map { it.id }.forEach {
-                    ws.unsubscribe(SubscriptionTopic.Prices(it, OHLCDuration.P5M))
-                }
-                ws.unsubscribe(SubscriptionTopic.Trades)
-                ws.unsubscribe(SubscriptionTopic.Orders)
-                ws.unsubscribe(SubscriptionTopic.Balances)
-                ws.close(WsStatus.GOING_AWAY)
-            }
-        } catch (e: Exception) {
-            logger.error(e) { "failed to stop bot wallet" }
         }
     }
 
@@ -216,16 +194,12 @@ class BotSessionCurrentWallet(val wallet: TelegramBotUserWalletEntity, val botSe
         return WalletAvailableBalances(
             baseSymbol,
             quoteSymbol,
-            formatAmount(baseSymbol, balances[baseSymbol] ?: BigInteger.ZERO),
-            formatAmount(quoteSymbol, balances[quoteSymbol] ?: BigInteger.ZERO),
+            balances[baseSymbol] ?: BigInteger.ZERO,
+            balances[quoteSymbol] ?: BigInteger.ZERO,
         )
     }
 
-    private fun formatAmountWithSymbol(symbol: Symbol, amount: BigInteger): String {
-        return "${formatAmount(symbol, amount)} ${symbol.value}"
-    }
-
-    private fun getWalletBalance(symbol: Symbol): BigInteger {
+    fun getWalletBalance(symbol: Symbol): BigInteger {
         val blockchainClient = blockchainClient(symbol)
         return contractAddress(symbol)?.let {
             blockchainClient.getERC20Balance(it, walletAddress)
@@ -236,60 +210,39 @@ class BotSessionCurrentWallet(val wallet: TelegramBotUserWalletEntity, val botSe
         return marketPrices[currentMarket.id]
     }
 
-    fun getFormattedWalletBalance(symbol: Symbol): String {
-        return formatAmount(symbol, getWalletBalance(symbol))
-    }
-
-    fun depositBase(amount: String) {
-        deposit(amount, currentMarket.baseSymbol)
-    }
-
-    fun depositQuote(amount: String) {
-        deposit(amount, currentMarket.quoteSymbol)
-    }
-
-    private fun deposit(amount: String, symbol: Symbol) {
+    suspend fun deposit(amount: String, symbol: Symbol): TxHash? {
         val blockchainClient = blockchainClient(symbol)
         val exchangeContractAddress = blockchainClient.getContractAddress(ContractType.Exchange)
         val bigIntAmount = amountToBigInteger(symbol, amount)
         val tokenAddress = contractAddress(symbol)
-        if (tokenAddress != null) {
-            val erc20Contract = blockchainClient.loadERC20(tokenAddress)
-            erc20Contract.approve(exchangeContractAddress.value, bigIntAmount).sendAsync().thenAccept { txReceipt ->
-                if (txReceipt.isStatusOK) {
-                    val txHash = blockchainClient.sendTransaction(
-                        exchangeContractAddress,
-                        blockchainClient.loadExchangeContract(exchangeContractAddress).deposit(tokenAddress.value, bigIntAmount).encodeFunctionCall(),
-                        BigInteger.ZERO,
-                    )
-                    pendingDeposits.add(txHash)
-                    runBlocking {
-                        botSession.sendMessage("✅ Deposit of ${symbol.value} initiated")
-                    }
-                } else {
-                    runBlocking {
-                        botSession.sendMessage("❌ Deposit of ${symbol.value} approval failed")
-                    }
-                }
+        return if (tokenAddress != null) {
+            val allowanceTxReceipt = blockchainClient
+                .loadERC20(tokenAddress)
+                .approve(exchangeContractAddress.value, bigIntAmount)
+                .sendAsync()
+                .await()
+            if (allowanceTxReceipt.isStatusOK) {
+                blockchainClient.sendTransaction(
+                    exchangeContractAddress,
+                    blockchainClient
+                        .loadExchangeContract(exchangeContractAddress)
+                        .deposit(tokenAddress.value, bigIntAmount).encodeFunctionCall(),
+                    BigInteger.ZERO,
+                )
+            } else {
+                null
             }
         } else {
-            val txHash = blockchainClient.asyncDepositNative(exchangeContractAddress, bigIntAmount)
-            pendingDeposits.add(txHash)
-            runBlocking {
-                botSession.sendMessage("✅ Deposit of ${symbol.value} initiated")
-            }
+            blockchainClient.asyncDepositNative(exchangeContractAddress, bigIntAmount)
         }
     }
 
-    fun withdrawBase(amount: String): Either<ApiCallFailure, WithdrawalApiResponse> {
-        return withdraw(amount, currentMarket.baseSymbol)
-    }
+    fun listDeposits(): List<Deposit> =
+        apiClient
+            .tryListDeposits()
+            .fold({ emptyList() }, { it.deposits })
 
-    fun withdrawQuote(amount: String): Either<ApiCallFailure, WithdrawalApiResponse> {
-        return withdraw(amount, currentMarket.quoteSymbol)
-    }
-
-    private fun withdraw(amount: String, symbol: Symbol): Either<ApiCallFailure, WithdrawalApiResponse> {
+    fun withdraw(amount: String, symbol: Symbol): Either<ApiCallFailure, WithdrawalApiResponse> {
         val blockchainClient = blockchainClient(symbol)
         val exchangeContractAddress = blockchainClient.getContractAddress(ContractType.Exchange)
         val bigIntAmount = amountToBigInteger(symbol, amount)
@@ -312,28 +265,43 @@ class BotSessionCurrentWallet(val wallet: TelegramBotUserWalletEntity, val botSe
     }
 
     fun createOrder(amount: String, side: OrderSide): Either<ApiCallFailure, CreateOrderApiResponse> {
+        return apiClient.tryCreateOrder(
+            signOrder(
+                CreateOrderApiRequest.Market(
+                    nonce = generateOrderNonce(),
+                    marketId = currentMarket.id,
+                    side = side,
+                    amount = amountToBigInteger(currentMarket.baseSymbol, amount),
+                    signature = EvmSignature.emptySignature(),
+                    verifyingChainId = ChainId.empty,
+                ),
+            ),
+        )
+    }
+
+    private fun signOrder(order: CreateOrderApiRequest.Market): CreateOrderApiRequest.Market {
         val blockchainClient = blockchainClient(currentMarket.baseSymbol)
         val exchangeContractAddress = blockchainClient.getContractAddress(ContractType.Exchange)
-        return apiClient.tryCreateOrder(
-            CreateOrderApiRequest.Market(
-                nonce = generateOrderNonce(),
-                marketId = currentMarket.id,
-                side = side,
-                amount = amountToBigInteger(currentMarket.baseSymbol, amount),
-                signature = EvmSignature.emptySignature(),
-                verifyingChainId = ChainId.empty,
-            ).let {
-                val tx = EIP712Transaction.Order(
-                    walletAddress,
-                    baseToken = contractAddress(currentMarket.baseSymbol) ?: Address.zero,
-                    quoteToken = contractAddress(currentMarket.quoteSymbol) ?: Address.zero,
-                    amount = if (it.side == OrderSide.Buy) it.amount else it.amount.negate(),
-                    price = BigInteger.ZERO,
-                    nonce = BigInteger(1, it.nonce.toHexBytes()),
-                    EvmSignature.emptySignature(),
-                )
-                it.copy(signature = blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress)))
-            },
+
+        val tx = EIP712Transaction.Order(
+            walletAddress,
+            baseToken = contractAddress(currentMarket.baseSymbol) ?: Address.zero,
+            quoteToken = contractAddress(currentMarket.quoteSymbol) ?: Address.zero,
+            amount = if (order.side == OrderSide.Buy) order.amount else order.amount.negate(),
+            price = BigInteger.ZERO,
+            nonce = BigInteger(1, order.nonce.toHexBytes()),
+            EvmSignature.emptySignature(),
+        )
+
+        return order.copy(
+            signature = blockchainClient.signData(
+                EIP712Helper.computeHash(
+                    tx,
+                    blockchainClient.chainId,
+                    exchangeContractAddress,
+                ),
+            ),
+            verifyingChainId = blockchainClient.chainId,
         )
     }
 
@@ -346,34 +314,4 @@ class BotSessionCurrentWallet(val wallet: TelegramBotUserWalletEntity, val botSe
     private fun blockchainClient(symbol: Symbol) = blockchainClientsByChainId.getValue(chain(symbol))
 
     private fun amountToBigInteger(symbol: Symbol, amount: String) = BigDecimal(amount).toFundamentalUnits(decimals(symbol))
-
-    private fun formatAmount(symbol: Symbol, amount: BigInteger): String {
-        return amount.fromFundamentalUnits(decimals(symbol)).setScale(minOf(decimals(symbol), 8), RoundingMode.FLOOR).toPlainString()
-    }
-
-    private fun formatOrder(order: Order, isCreated: Boolean = false): String {
-        val market = config.markets.first { it.id == order.marketId }
-        val status = when (order.status) {
-            OrderStatus.Filled -> "filled"
-            OrderStatus.Partial -> "partially filled (${formatAmountWithSymbol(market.baseSymbol, order.executions.first().amount)})"
-            OrderStatus.Failed, OrderStatus.Rejected -> "rejected"
-            OrderStatus.Cancelled -> "cancelled"
-            OrderStatus.Open -> if (isCreated) "opened" else "updated"
-            OrderStatus.Expired -> "expired"
-        }
-        val executionPrice = when (order.status) {
-            OrderStatus.Partial, OrderStatus.Filled -> "at price of ${order.executions.first().price.setScale(6, RoundingMode.FLOOR).toPlainString()}"
-            else -> ""
-        }
-        val emoji = when (order.status) {
-            OrderStatus.Partial, OrderStatus.Filled, OrderStatus.Open -> "✅"
-            else -> "❌"
-        }
-        return "$emoji Order to ${order.side} ${formatAmountWithSymbol(market.baseSymbol, order.amount)} $status $executionPrice"
-    }
-
-    private fun formatTrade(trade: Trade): String {
-        val market = config.markets.first { it.id == trade.marketId }
-        return "✅ Trade to ${trade.side} ${formatAmountWithSymbol(market.baseSymbol, trade.amount)} has settled"
-    }
 }

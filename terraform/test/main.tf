@@ -46,6 +46,23 @@ module "api" {
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
 }
 
+module "telegrambot" {
+  source            = "../modules/ecs_task"
+  name_prefix       = local.name_prefix
+  task_name         = "telegrambot"
+  image             = "telegrambot"
+  cpu               = 2048
+  memory            = 4096
+  ecs_cluster_id    = module.ecs.cluster.id
+  app_ecs_task_role = module.ecs.app_ecs_task_role
+  aws_region        = var.aws_region
+  subnet_id_1       = module.vpc.private_subnet_id_1
+  subnet_id_2       = module.vpc.private_subnet_id_2
+  vpc               = module.vpc.vpc
+  allow_inbound     = false
+  service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
+}
+
 module "anvil" {
   source            = "../modules/ecs_task"
   name_prefix       = local.name_prefix

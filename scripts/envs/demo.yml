@@ -16,6 +16,12 @@ environment:
     DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
+  telegrambot:
+    DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
+    EVM_CHAINS: Bitlayer,Botanix
+    EVM_NETWORK_URL_Bitlayer: http://demo-anvil.chainring.co:8545
+    EVM_NETWORK_URL_Botanix: http://demo-anvil2.chainring.co:8545
+    JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
   anvil2:
     CHAIN_ID: "31338"
   otterscan:
@@ -56,6 +62,14 @@ services:
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-d567d2ec-6ebb-4c6d-b48a-529eb09febfb-KMOVrv
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
+  telegrambot:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/telegrambot
+    count: 1
+    environment: telegrambot
+    no_rolling_upgrade: "true"
+    secrets:
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-d567d2ec-6ebb-4c6d-b48a-529eb09febfb-KMOVrv
+      TELEGRAM_BOT_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:demo/telegrambot/TELEGRAM_BOT_TOKEN-p8R0DM
   anvil:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
     count: 1
