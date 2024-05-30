@@ -92,6 +92,26 @@ object SequencerResponseProcessorService {
             }
 
             SequencerRequest.Type.ApplyOrderBatch -> {
+                response.bidOfferState?.let {
+                    val bestBid = it.bestBid.toBigDecimal()
+                    val bestOffer = it.bestOffer.toBigDecimal()
+                    logger.debug { "bestBid = $bestBid, bestOffer = $bestOffer, minBidIx=${it.minBidIx.toBigInteger()}, maxOfferIx=${it.maxOfferIx.toBigInteger()}}" }
+                    if (bestBid >= bestOffer) {
+                        request.orderBatch.ordersToAddList.forEach {
+                            logger.debug { "add - ${it.guid} ${it.externalGuid} ${it.type} ${it.amount.toBigInteger()} ${it.price.toBigDecimal()}" }
+                        }
+                        request.orderBatch.ordersToChangeList.forEach {
+                            logger.debug { "change - ${it.guid} ${it.externalGuid} ${it.type} ${it.amount.toBigInteger()} ${it.price.toBigDecimal()}" }
+                        }
+                        request.orderBatch.ordersToCancelList.forEach {
+                            logger.debug { "cancel - ${it.guid} ${it.externalGuid}" }
+                        }
+                        response.ordersChangedList.forEach {
+                            logger.debug { "changed - ${it.guid} ${it.disposition}" }
+                        }
+                    }
+                }
+
                 if (response.error == SequencerError.None) {
                     WalletEntity.getBySequencerId(request.orderBatch.wallet.sequencerWalletId())?.let { wallet ->
                         handleOrderBatchUpdates(request.orderBatch, wallet, response)

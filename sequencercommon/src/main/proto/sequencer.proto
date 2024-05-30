@@ -45,6 +45,13 @@ message FeeRates {
   uint64 taker = 2;
 }
 
+message BidOfferState {
+  int32 maxOfferIx = 1;
+  int32 minBidIx = 2;
+  DecimalValue bestBid = 3;
+  DecimalValue bestOffer = 4;
+}
+
 message SequencerRequest {
   enum Type {
     AddMarket = 0;
@@ -89,6 +96,7 @@ message SequencerResponse {
   repeated OrderChangeRejected ordersChangeRejected = 9;
   optional StateDump stateDump = 10;
   optional FeeRates feeRatesSet = 11;
+  optional BidOfferState bidOfferState = 12;
 }
 
 message Sequenced {

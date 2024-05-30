@@ -165,6 +165,9 @@ class SequencerApp(
                         this.error = it
                     }
                     this.ordersChangeRejected.addAll(ordersChangeRejected)
+                    market?.let {
+                        this.bidOfferState = market.getBidOfferState()
+                    }
                 }
             }
 
