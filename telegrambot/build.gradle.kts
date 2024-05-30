@@ -96,9 +96,3 @@ jib {
         creationTime.set("USE_CURRENT_TIMESTAMP")
     }
 }
-
-tasks.register("printImageTag") {
-    doLast {
-        println("IMAGE_TAG=${version}-${buildNumber}")
-    }
-}
