@@ -20,8 +20,12 @@ environment:
     CHAIN_ID: "31338"
   otterscan:
     ERIGON_URL: https://demo-anvil.chainring.co
+    NET_NAME: "ChainRing Demo BitLayer"
+    NATIVE_CURRENCY_NAME: "Demo BitLayer BTC"
   otterscan2:
     ERIGON_URL: https://demo-anvil2.chainring.co
+    NET_NAME: "ChainRing Demo Botanix"
+    NATIVE_CURRENCY_NAME: "Demo Botanix BTC"
   mocker:
     API_URL: http://demo-api.chainring.co:9000
     EVM_CHAINS: anvil,anvil2
@@ -57,7 +61,7 @@ services:
     count: 1
     is_essential: "true"
   otterscan:
-    image: otterscan/otterscan
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/otterscan
     count: 1
     environment: otterscan
   anvil2:
@@ -66,7 +70,7 @@ services:
     is_essential: "true"
     environment: anvil2
   otterscan2:
-    image: otterscan/otterscan
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/otterscan
     count: 1
     environment: otterscan2
   sequencer:

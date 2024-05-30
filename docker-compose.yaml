@@ -20,17 +20,22 @@ services:
     volumes:
       - anvil-data:/root/.foundry
   otterscan:
-    image: otterscan/otterscan
+    image: otterscan
     container_name: otterscan
     restart: always
+    environment:
+      NET_NAME: "Local BitLayer"
+      NATIVE_CURRENCY_NAME: "BitLayer BTC"
     ports:
       - "5100:80"
   otterscan2:
-    image: otterscan/otterscan
+    image: otterscan
     container_name: otterscan2
     restart: always
     environment:
       ERIGON_URL: "http://localhost:8546"
+      NET_NAME: "Local Botanix"
+      NATIVE_CURRENCY_NAME: "Botanix BTC"
     ports:
       - "5101:80"
   db:

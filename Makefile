@@ -1,10 +1,13 @@
-.PHONY: contracts anvil_image start_containers stop_containers
+.PHONY: contracts anvil_image otterscan_image start_containers stop_containers
 
 contracts:
 	./gradlew compileContractsAndGenerateWrappers
 
 anvil_image:
 	cd docker/anvil && docker build -t anvil -f ./Dockerfile .&& cd ../..
+
+otterscan_image:
+	cd docker/otterscan && docker build -t otterscan -f ./Dockerfile .&& cd ../..
 
 stop_containers:
 	docker-compose down --remove-orphans

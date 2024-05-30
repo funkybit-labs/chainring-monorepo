@@ -57,13 +57,13 @@ resource "aws_rds_cluster_instance" "db_instance" {
   monitoring_role_arn = var.enable_advanced_monitoring ? aws_iam_role.rds_monitoring_role[0].arn : null
 
   # Enable performance insights (query level)
-  performance_insights_enabled = var.enable_performance_insights
+  performance_insights_enabled          = var.enable_performance_insights
   performance_insights_retention_period = var.enable_performance_insights ? var.performance_insights_retention_days : null
 }
 
 resource "aws_iam_role" "rds_monitoring_role" {
   count = var.enable_advanced_monitoring ? 1 : 0
-  name = "rds-monitoring-role"
+  name  = "rds-monitoring-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -77,7 +77,7 @@ resource "aws_iam_role" "rds_monitoring_role" {
 }
 
 resource "aws_iam_role_policy_attachment" "rds_monitoring_role_attachment" {
-  count = var.enable_advanced_monitoring ? 1 : 0
+  count      = var.enable_advanced_monitoring ? 1 : 0
   role       = aws_iam_role.rds_monitoring_role[0].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }
