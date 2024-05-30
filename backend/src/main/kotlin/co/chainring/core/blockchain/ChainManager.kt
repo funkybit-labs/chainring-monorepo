@@ -5,6 +5,7 @@ import co.chainring.core.model.db.ChainId
 import java.math.BigInteger
 
 data class BlockchainClientConfig(
+    val name: String,
     val url: String,
     val privateKeyHex: String,
     val submitterPrivateKeyHex: String,
@@ -22,6 +23,7 @@ object ChainManager {
     private val chainNames = (System.getenv("EVM_CHAINS") ?: "localhost:8545,localhost:8546").split(",").map { it.trim() }
     val blockchainConfigs = chainNames.map { chainName ->
         BlockchainClientConfig(
+            name = chainName,
             url = System.getenv("EVM_NETWORK_URL_$chainName") ?: "http://$chainName",
             privateKeyHex = stringValue(
                 chainName,

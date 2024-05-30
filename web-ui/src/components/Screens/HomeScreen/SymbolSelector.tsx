@@ -38,8 +38,12 @@ export function SymbolSelector({
             <SymbolIcon
               symbol={selected}
               className="mr-2 inline-block size-6 align-text-bottom"
-            />{' '}
-            {selected.name}
+            />
+            <span className="leading-none">
+              {selected.name}
+              <br />
+              <span className="text-xs">{selected.chainName}</span>
+            </span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <ChevronDownIcon
                 className="size-6 text-darkBluishGray1"
@@ -53,7 +57,7 @@ export function SymbolSelector({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-max overflow-auto rounded-[20px] bg-swapDropdownBackground py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
+            <Listbox.Options className="absolute z-10 mt-1 max-h-72 w-max overflow-auto rounded-[20px] bg-swapDropdownBackground py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
               {availableSymbols.map((symbol) => (
                 <Listbox.Option
                   key={symbol.name}
@@ -65,7 +69,7 @@ export function SymbolSelector({
                   {({ selected }) => (
                     <>
                       <div
-                        className={`block truncate ${
+                        className={`flex truncate py-1 ${
                           selected
                             ? 'font-bold text-white'
                             : 'font-normal text-darkBluishGray1'
@@ -73,9 +77,13 @@ export function SymbolSelector({
                       >
                         <SymbolIcon
                           symbol={symbol}
-                          className="mr-1 inline-block size-6"
-                        />{' '}
-                        {symbol.name}
+                          className="mr-2 inline-block size-6 align-text-bottom"
+                        />
+                        <span className="leading-none">
+                          {symbol.name}
+                          <br />
+                          <span className="text-xs">{symbol.chainName}</span>
+                        </span>
                       </div>
                     </>
                   )}

@@ -1,9 +1,9 @@
 environment:
   api:
     DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
-    EVM_CHAINS: anvil,anvil2
-    EVM_NETWORK_URL_anvil: http://demo-anvil.chainring.co:8545
-    EVM_NETWORK_URL_anvil2: http://demo-anvil2.chainring.co:8545
+    EVM_CHAINS: Bitlayer,Botanix
+    EVM_NETWORK_URL_Bitlayer: http://demo-anvil.chainring.co:8545
+    EVM_NETWORK_URL_Botanix: http://demo-anvil2.chainring.co:8545
     AUTH_TOKEN_VALIDITY_INTERVAL: P30D
     SEQUENCER_HOST_NAME: demo-sequencer.chainring.co
     SEQUENCER_PORT: "5337"
@@ -28,9 +28,9 @@ environment:
     NATIVE_CURRENCY_NAME: "Demo Botanix BTC"
   mocker:
     API_URL: http://demo-api.chainring.co:9000
-    EVM_CHAINS: anvil,anvil2
-    EVM_NETWORK_URL_anvil: http://demo-anvil.chainring.co:8545
-    EVM_NETWORK_URL_anvil2: http://demo-anvil2.chainring.co:8545
+    EVM_CHAINS: Bitlayer,Botanix
+    EVM_NETWORK_URL_Bitlayer: http://demo-anvil.chainring.co:8545
+    EVM_NETWORK_URL_Botanix: http://demo-anvil2.chainring.co:8545
     MARKETS: "BTC/ETH,BTC/ETH2,BTC/BTC2,BTC/USDC,USDC/DAI"
     BTC/ETH_PRICE_BASELINE: "17.5"
     BTC/ETH_INITIAL_BASE_BALANCE: "1"

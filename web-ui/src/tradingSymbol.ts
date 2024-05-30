@@ -2,6 +2,7 @@ import { AddressType } from 'apiClient'
 
 export default class TradingSymbol {
   name: string
+  chainName: string
   description: string
   contractAddress: AddressType | null
   decimals: number
@@ -9,12 +10,14 @@ export default class TradingSymbol {
 
   constructor(
     name: string,
+    chainName: string,
     description: string,
     contactAddress: AddressType | null,
     decimals: number,
     chainId: number
   ) {
     this.name = name
+    this.chainName = chainName
     this.description = description
     this.contractAddress = contactAddress
     this.decimals = decimals

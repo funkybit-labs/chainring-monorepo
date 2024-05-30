@@ -144,6 +144,7 @@ export function FaucetModal({
                 return 'Send'
             }
           }}
+          status={mutation.status}
         />
       </div>
     </Modal>

@@ -763,11 +763,6 @@ export function Swap({
                   No price found.
                 </span>
               )}
-              {mutation.isSuccess && (
-                <span className="w-full text-center text-green">
-                  Swap created!
-                </span>
-              )}
               <SubmitButton
                 disabled={!canSubmit}
                 onClick={mutation.mutate}
@@ -775,10 +770,13 @@ export function Swap({
                 caption={() => {
                   if (mutation.isPending) {
                     return 'Submitting order...'
+                  } else if (mutation.isSuccess) {
+                    return 'Swapped!'
                   } else {
                     return 'Swap'
                   }
                 }}
+                status={mutation.status}
               />
             </>
           ) : (

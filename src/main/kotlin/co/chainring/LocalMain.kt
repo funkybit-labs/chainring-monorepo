@@ -16,7 +16,7 @@ fun main(args: Array<String>) {
     when (args.firstOrNull()) {
         "db:migrate" -> migrateDatabase()
         "db:seed" -> {
-            val fixtures = getFixtures(blockchainClients.map { it.chainId })
+            val fixtures = getFixtures(blockchainClients)
             val symbolContractAddresses = seedBlockchain(fixtures)
             seedDatabase(fixtures, symbolContractAddresses)
             seedSequencer(fixtures)
