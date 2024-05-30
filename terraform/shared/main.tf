@@ -1,7 +1,9 @@
 module "github_oidc" {
   source = "../modules/github_oidc"
 }
-
+locals {
+  repos = toset(["otterscan", "mocker", "sequencer", "anvil", "backend"])
+}
 resource "aws_iam_role_policy" "auth" {
   role   = module.github_oidc.role.name
   policy = <<EOF
@@ -50,158 +52,45 @@ resource "aws_iam_role_policy" "auth" {
 EOF
 }
 
-resource "aws_ecr_repository" "backend" {
-  name                 = "backend"
-  image_tag_mutability = "MUTABLE"
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-  encryption_configuration {
-    encryption_type = "AES256"
-  }
+module "ecr_repo" {
+  for_each             = local.repos
+  source               = "../modules/ecr_repo"
+  github_oidc_role_arn = module.github_oidc.role.arn
+  repo_name            = each.key
 }
 
-resource "aws_ecr_repository_policy" "backend" {
-  repository = aws_ecr_repository.backend.name
-  policy     = <<EOF
-{
-    "Version": "2008-10-17",
-    "Statement": [
-        {
-            "Sid": "AllowPushPull",
-            "Effect": "Allow",
-            "Principal": {
-                "AWS": "${module.github_oidc.role.arn}"
-            },
-            "Action": [
-                "ecr:GetDownloadUrlForLayer",
-                "ecr:BatchGetImage",
-                "ecr:BatchCheckLayerAvailability",
-                "ecr:PutImage",
-                "ecr:InitiateLayerUpload",
-                "ecr:UploadLayerPart",
-                "ecr:CompleteLayerUpload"
-            ]
-        }
-    ]
+moved {
+  from = aws_ecr_repository.backend
+  to   = module.ecr_repo["backend"].aws_ecr_repository.repo
 }
-EOF
+moved {
+  from = aws_ecr_repository_policy.backend
+  to   = module.ecr_repo["backend"].aws_ecr_repository_policy.policy
 }
-
-resource "aws_ecr_repository" "anvil" {
-  name                 = "anvil"
-  image_tag_mutability = "MUTABLE"
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-  encryption_configuration {
-    encryption_type = "AES256"
-  }
+moved {
+  from = aws_ecr_repository.anvil
+  to   = module.ecr_repo["anvil"].aws_ecr_repository.repo
 }
-
-resource "aws_ecr_repository_policy" "anvil" {
-  repository = aws_ecr_repository.anvil.name
-  policy     = <<EOF
-{
-    "Version": "2008-10-17",
-    "Statement": [
-        {
-            "Sid": "AllowPushPull",
-            "Effect": "Allow",
-            "Principal": {
-                "AWS": "${module.github_oidc.role.arn}"
-            },
-            "Action": [
-                "ecr:GetDownloadUrlForLayer",
-                "ecr:BatchGetImage",
-                "ecr:BatchCheckLayerAvailability",
-                "ecr:PutImage",
-                "ecr:InitiateLayerUpload",
-                "ecr:UploadLayerPart",
-                "ecr:CompleteLayerUpload"
-            ]
-        }
-    ]
+moved {
+  from = aws_ecr_repository_policy.anvil
+  to   = module.ecr_repo["anvil"].aws_ecr_repository_policy.policy
 }
-EOF
+moved {
+  from = aws_ecr_repository.sequencer
+  to   = module.ecr_repo["sequencer"].aws_ecr_repository.repo
 }
-
-resource "aws_ecr_repository" "sequencer" {
-  name                 = "sequencer"
-  image_tag_mutability = "MUTABLE"
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-  encryption_configuration {
-    encryption_type = "AES256"
-  }
+moved {
+  from = aws_ecr_repository_policy.sequencer
+  to   = module.ecr_repo["sequencer"].aws_ecr_repository_policy.policy
 }
-
-resource "aws_ecr_repository_policy" "sequencer" {
-  repository = aws_ecr_repository.sequencer.name
-  policy     = <<EOF
-{
-    "Version": "2008-10-17",
-    "Statement": [
-        {
-            "Sid": "AllowPushPull",
-            "Effect": "Allow",
-            "Principal": {
-                "AWS": "${module.github_oidc.role.arn}"
-            },
-            "Action": [
-                "ecr:GetDownloadUrlForLayer",
-                "ecr:BatchGetImage",
-                "ecr:BatchCheckLayerAvailability",
-                "ecr:PutImage",
-                "ecr:InitiateLayerUpload",
-                "ecr:UploadLayerPart",
-                "ecr:CompleteLayerUpload"
-            ]
-        }
-    ]
+moved {
+  from = aws_ecr_repository.mocker
+  to   = module.ecr_repo["mocker"].aws_ecr_repository.repo
 }
-EOF
+moved {
+  from = aws_ecr_repository_policy.mocker
+  to   = module.ecr_repo["mocker"].aws_ecr_repository_policy.policy
 }
-
-resource "aws_ecr_repository" "mocker" {
-  name                 = "mocker"
-  image_tag_mutability = "MUTABLE"
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-  encryption_configuration {
-    encryption_type = "AES256"
-  }
-}
-
-resource "aws_ecr_repository_policy" "mocker" {
-  repository = aws_ecr_repository.mocker.name
-  policy     = <<EOF
-{
-    "Version": "2008-10-17",
-    "Statement": [
-        {
-            "Sid": "AllowPushPull",
-            "Effect": "Allow",
-            "Principal": {
-                "AWS": "${module.github_oidc.role.arn}"
-            },
-            "Action": [
-                "ecr:GetDownloadUrlForLayer",
-                "ecr:BatchGetImage",
-                "ecr:BatchCheckLayerAvailability",
-                "ecr:PutImage",
-                "ecr:InitiateLayerUpload",
-                "ecr:UploadLayerPart",
-                "ecr:CompleteLayerUpload"
-            ]
-        }
-    ]
-}
-EOF
-}
-
 moved {
   from = aws_ecr_repository.ecr
   to   = aws_ecr_repository.backend
