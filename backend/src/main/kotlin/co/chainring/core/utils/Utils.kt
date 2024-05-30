@@ -3,6 +3,7 @@ package co.chainring.core.utils
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
 import org.bouncycastle.util.encoders.Hex
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.math.BigInteger
 import java.security.SecureRandom
 import kotlin.text.HexFormat
@@ -65,4 +66,16 @@ fun BigInteger.toByteArrayNoSign(len: Int = 32): ByteArray {
         byteArray.size < len -> byteArray.pad(len)
         else -> byteArray
     }
+}
+
+fun tryAcquireAdvisoryLock(keyId: Long): Boolean {
+    var ret = false
+    TransactionManager.current().exec(
+        "SELECT pg_try_advisory_xact_lock($keyId::bigint)",
+    ) { rs ->
+        if (rs.next()) {
+            ret = rs.getBoolean(1)
+        }
+    }
+    return ret
 }
