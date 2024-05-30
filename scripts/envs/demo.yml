@@ -18,6 +18,7 @@ environment:
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
   telegrambot:
     DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
+    API_URL: http://demo-api.chainring.co:9000
     EVM_CHAINS: Bitlayer,Botanix
     EVM_NETWORK_URL_Bitlayer: http://demo-anvil.chainring.co:8545
     EVM_NETWORK_URL_Botanix: http://demo-anvil2.chainring.co:8545
