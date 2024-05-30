@@ -17,6 +17,7 @@ data class ConfigurationApiResponse(
 @Serializable
 data class Chain(
     val id: ChainId,
+    val name: String,
     val contracts: List<DeployedContract>,
     val symbols: List<SymbolInfo>,
 )

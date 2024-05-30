@@ -79,7 +79,7 @@ export function MarketTitle({
     >
       <SymbolIcon
         symbol={market.baseSymbol.name}
-        className="relative left-1 inline-block size-6"
+        className="mr-2 inline-block size-6"
       />
       <SymbolIcon
         symbol={market.quoteSymbol.name}

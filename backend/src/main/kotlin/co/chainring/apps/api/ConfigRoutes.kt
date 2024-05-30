@@ -46,6 +46,7 @@ object ConfigRoutes {
                         chains = listOf(
                             Chain(
                                 id = ChainId(1337u),
+                                name = "Bitlayer",
                                 contracts = listOf(
                                     DeployedContract(
                                         name = "Exchange",
@@ -92,6 +93,7 @@ object ConfigRoutes {
                             chains = ChainEntity.all().orderBy(ChainTable.id to SortOrder.ASC).map { chain ->
                                 Chain(
                                     id = chain.id.value,
+                                    name = chain.name,
                                     contracts = DeployedSmartContractEntity.validContracts(chain.id.value).map {
                                         DeployedContract(
                                             name = it.name,

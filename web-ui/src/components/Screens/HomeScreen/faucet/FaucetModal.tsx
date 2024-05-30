@@ -144,6 +144,7 @@ export function FaucetModal({
                 return 'Send'
             }
           }}
+          success={false}
         />
       </div>
     </Modal>

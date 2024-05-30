@@ -47,6 +47,7 @@ export type SymbolType = z.infer<typeof SymbolSchema>
 
 const ChainSchema = z.object({
   id: z.number(),
+  name: z.string(),
   contracts: z.array(DeployedContractSchema),
   symbols: z.array(SymbolSchema)
 })

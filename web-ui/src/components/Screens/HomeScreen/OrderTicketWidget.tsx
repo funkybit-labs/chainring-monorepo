@@ -515,6 +515,7 @@ export default function OrderTicketWidget({
                     return side
                   }
                 }}
+                success={false}
               />
             ) : (
               <div className="mt-4">
