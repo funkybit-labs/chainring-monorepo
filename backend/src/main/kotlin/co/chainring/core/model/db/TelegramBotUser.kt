@@ -1,9 +1,12 @@
 package co.chainring.core.model.db
 
+import co.chainring.core.model.TxHash
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
+import org.http4k.format.KotlinxSerialization
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 
 @Serializable
@@ -41,6 +44,7 @@ object TelegramBotUserTable : GUIDTable<TelegramBotUserId>("telegram_bot_user", 
         { PGEnum("TelegramUserReplyType", it) },
     ).default(TelegramUserReplyType.None)
     val messageIdsForDeletion = array<Int>("message_ids_for_deletion").default(emptyList())
+    val pendingDeposits = jsonb<List<TxHash>>("pending_deposits", KotlinxSerialization.json).default(emptyList())
 }
 
 class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<TelegramBotUserId>(guid) {
@@ -72,5 +76,14 @@ class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<Tele
     var expectedReplyMessageId by TelegramBotUserTable.expectedReplyMessageId
     var expectedReplyType by TelegramBotUserTable.expectedReplyType
     var messageIdsForDeletion by TelegramBotUserTable.messageIdsForDeletion
+    var pendingDeposits by TelegramBotUserTable.pendingDeposits
     val wallets by TelegramBotUserWalletEntity referrersOn TelegramBotUserWalletTable.telegrambotUserGuid
+
+    fun addPendingDeposit(txHash: TxHash) {
+        this.pendingDeposits += txHash
+    }
+
+    fun removePendingDeposit(txHash: TxHash) {
+        this.pendingDeposits -= txHash
+    }
 }

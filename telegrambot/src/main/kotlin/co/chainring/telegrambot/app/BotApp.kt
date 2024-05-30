@@ -7,9 +7,7 @@ import com.github.ehsannarmani.bot.Bot
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.sql.transactions.transaction
 
-val dbConfig: DbConfig = DbConfig()
-
-class BotApp : BaseApp(dbConfig = dbConfig) {
+class BotApp : BaseApp(dbConfig = DbConfig()) {
     override val logger = KotlinLogging.logger {}
 
     private val botSessions = mutableMapOf<Long, BotSession>()

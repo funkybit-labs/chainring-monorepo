@@ -1,13 +1,21 @@
 package co.chainring.telegrambot.app
 
+import co.chainring.apps.api.model.Balance
+import co.chainring.apps.api.model.Deposit
+import co.chainring.apps.api.model.Order
+import co.chainring.apps.api.model.Trade
 import co.chainring.core.model.Address
+import co.chainring.core.model.Symbol
 import co.chainring.core.model.abbreviated
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderSide
+import co.chainring.core.model.db.OrderStatus
+import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.model.db.TelegramBotUserEntity
 import co.chainring.core.model.db.TelegramBotUserWalletEntity
 import co.chainring.core.model.db.TelegramUserReplyType
 import co.chainring.core.model.db.WalletEntity
+import co.chainring.core.utils.fromFundamentalUnits
 import co.chanring.core.model.encrypt
 import com.github.ehsannarmani.bot.Bot
 import com.github.ehsannarmani.bot.model.message.TextMessage
@@ -18,18 +26,18 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.crypto.Keys
+import java.math.BigInteger
+import java.math.RoundingMode
 
-class BotSession(private val telegramUserId: Long, val bot: Bot) {
+class BotSession(private val telegramUserId: Long, private val bot: Bot) {
     private val logger = KotlinLogging.logger { }
 
-    val chatId = telegramUserId.toString()
+    private val chatId = telegramUserId.toString()
     private lateinit var currentWallet: BotSessionCurrentWallet
-
-    private val botUser: TelegramBotUserEntity
-        get() = TelegramBotUserEntity.getOrCreate(telegramUserId)
 
     init {
         transaction {
+            val botUser = TelegramBotUserEntity.getOrCreate(telegramUserId)
             if (botUser.wallets.empty()) {
                 val privateKey = Keys.createEcKeyPair().privateKey.toString(16)
                 switchWallet(
@@ -62,8 +70,8 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
                     "\n<code>${balances.baseSymbol.value + "/" + balances.quoteSymbol.value}</code>" +
                     "\nMarket Price: <b>${(currentWallet.getMarketPrice()?.toPlainString() ?: "Unknown") + " " + balances.quoteSymbol.value}</b>" +
                     "\n\n-- Available Balances --" +
-                    "\n${balances.baseSymbol.value}: <b>${balances.availableBaseBalance}</b>" +
-                    "\n${balances.quoteSymbol.value}: <b>${balances.availableQuoteBalance}</b>",
+                    "\n${balances.baseSymbol.value}: <b>${formatAmount(balances.baseSymbol, balances.availableBaseBalance)}</b>" +
+                    "\n${balances.quoteSymbol.value}: <b>${formatAmount(balances.quoteSymbol, balances.availableQuoteBalance)}</b>",
                 chatId = chatId,
                 parseMode = "HTML",
                 keyboard = InlineKeyboard(
@@ -100,7 +108,9 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
             }
 
             CallbackData.Settings -> {
-                val wallets = transaction { botUser.wallets.toList() }
+                val wallets = transaction {
+                    TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList()
+                }
                 deleteMessages()
                 sendMessage(
                     TextMessage(
@@ -143,9 +153,12 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
             }
 
             CallbackData.ShowAddresses -> {
+                val wallets = transaction {
+                    TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList()
+                }
                 sendMessage(
                     TextMessage(
-                        text = transaction { botUser.wallets.toList() }.joinToString("\n") {
+                        text = wallets.joinToString("\n") {
                             "<code>${it.address.value}</code>"
                         },
                         chatId = chatId,
@@ -167,7 +180,7 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
             CallbackData.Buy -> {
                 val balances = currentWallet.getBalances()
                 sendMessageForReply(
-                    "Enter amount (${balances.availableQuoteBalance} ${balances.quoteSymbol.value} available)",
+                    "Enter amount (${formatAmountWithSymbol(balances.quoteSymbol, balances.availableQuoteBalance)} available)",
                     TelegramUserReplyType.BuyAmount,
                 )
             }
@@ -175,7 +188,7 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
             CallbackData.Sell -> {
                 val balances = currentWallet.getBalances()
                 sendMessageForReply(
-                    "Enter amount (${balances.availableBaseBalance} ${balances.baseSymbol.value} available)",
+                    "Enter amount (${formatAmountWithSymbol(balances.baseSymbol, balances.availableBaseBalance)} available)",
                     TelegramUserReplyType.SellAmount,
                 )
             }
@@ -203,7 +216,7 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
             }
 
             CallbackData.ListWallets -> {
-                val wallets = transaction { botUser.wallets.toList() }
+                val wallets = transaction { TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList() }
                 sendMessage(
                     TextMessage(
                         text = "Press the appropriate button to switch wallets",
@@ -221,7 +234,7 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
             }
 
             is CallbackData.SwitchWallet -> {
-                val wallet = transaction { botUser.wallets.toList() }
+                val wallet = transaction { TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList() }
                     .find { it.address.abbreviated() == callbackData.to }
                     ?: throw RuntimeException("Invalid wallet")
 
@@ -230,19 +243,19 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
             }
 
             CallbackData.DepositBase -> {
-                val balances = currentWallet.getBalances()
-                val walletBalance = currentWallet.getFormattedWalletBalance(balances.baseSymbol)
+                val symbol = currentWallet.currentMarket.baseSymbol
+                val walletBalance = currentWallet.getWalletBalance(symbol)
                 sendMessageForReply(
-                    "Enter amount ($walletBalance ${balances.baseSymbol.value} available)",
+                    "Enter amount (${formatAmountWithSymbol(symbol, walletBalance)} available)",
                     TelegramUserReplyType.DepositBaseAmount,
                 )
             }
 
             CallbackData.DepositQuote -> {
-                val balances = currentWallet.getBalances()
-                val walletBalance = currentWallet.getFormattedWalletBalance(balances.quoteSymbol)
+                val symbol = currentWallet.currentMarket.quoteSymbol
+                val walletBalance = currentWallet.getWalletBalance(symbol)
                 sendMessageForReply(
-                    "Enter amount ($walletBalance ${balances.quoteSymbol.value} available)",
+                    "Enter amount (${formatAmountWithSymbol(symbol, walletBalance)} available)",
                     TelegramUserReplyType.DepositQuoteAmount,
                 )
             }
@@ -250,7 +263,7 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
             CallbackData.WithdrawBase -> {
                 val walletBalance = currentWallet.getBalances()
                 sendMessageForReply(
-                    "Enter amount (${walletBalance.availableBaseBalance} ${walletBalance.baseSymbol.value} available)",
+                    "Enter amount (${formatAmountWithSymbol(walletBalance.baseSymbol, walletBalance.availableBaseBalance)} available)",
                     TelegramUserReplyType.WithdrawBaseAmount,
                 )
             }
@@ -258,7 +271,7 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
             CallbackData.WithdrawQuote -> {
                 val walletBalance = currentWallet.getBalances()
                 sendMessageForReply(
-                    "Enter amount (${walletBalance.availableQuoteBalance} ${walletBalance.quoteSymbol.value} available)",
+                    "Enter amount (${formatAmountWithSymbol(walletBalance.quoteSymbol, walletBalance.availableQuoteBalance)} available)",
                     TelegramUserReplyType.WithdrawQuoteAmount,
                 )
             }
@@ -266,85 +279,94 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
     }
 
     suspend fun handleReplyMessage(originalMessageId: Int, replyMessageId: Int, text: String) {
-        val messageToSend = transaction {
-            if (originalMessageId != botUser.expectedReplyMessageId) {
-                return@transaction "❌ Unexpected reply message"
-            }
-            when (botUser.expectedReplyType) {
-                TelegramUserReplyType.ImportKey -> {
-                    scheduleMessageDeletion(replyMessageId)
-                    runUpdate {
-                        val privateKey = text
-                        switchWallet(
-                            TelegramBotUserWalletEntity.create(
-                                WalletEntity.getOrCreate(Address.fromPrivateKey(privateKey)),
-                                botUser,
-                                privateKey.encrypt(),
-                                isCurrent = true,
-                            ).also {
-                                it.flush()
-                            },
-                        )
-                        "✅ Your private key has been imported. Your wallet address is ${currentWallet.walletAddress.value}"
-                    }
-                }
-
-                TelegramUserReplyType.DepositBaseAmount -> {
-                    runUpdate {
-                        currentWallet.depositBase(text)
-                        "✅ Deposit in progress"
-                    }
-                }
-
-                TelegramUserReplyType.DepositQuoteAmount -> {
-                    runUpdate {
-                        currentWallet.depositQuote(text)
-                        "✅ Deposit in progress"
-                    }
-                }
-
-                TelegramUserReplyType.WithdrawBaseAmount -> {
-                    currentWallet
-                        .withdrawBase(text)
-                        .fold(
-                            { "❌ Withdraw failed (${it.error?.displayMessage ?: "Unknown Error"})" },
-                            { "✅ Withdraw succeeded" },
-                        )
-                }
-
-                TelegramUserReplyType.WithdrawQuoteAmount -> {
-                    currentWallet
-                        .withdrawQuote(text)
-                        .fold(
-                            { "❌ Withdraw failed (${it.error?.displayMessage ?: "Unknown Error"})" },
-                            { "✅ Withdraw succeeded" },
-                        )
-                }
-
-                TelegramUserReplyType.BuyAmount -> {
-                    currentWallet
-                        .createOrder(text, OrderSide.Buy)
-                        .fold(
-                            { "❌ Order failed (${it.error?.displayMessage ?: "Unknown Error"})" },
-                            { null },
-                        )
-                }
-
-                TelegramUserReplyType.SellAmount -> {
-                    currentWallet
-                        .createOrder(text, OrderSide.Sell)
-                        .fold(
-                            { "❌ Order failed (${it.error?.displayMessage ?: "Unknown Error"})" },
-                            { null },
-                        )
-                }
-
-                else -> "❌ Unexpected reply"
-            }
+        val botUser = transaction {
+            TelegramBotUserEntity.getOrCreate(telegramUserId)
         }
 
-        if (messageToSend != null) {
-            sendMessage(messageToSend)
+        if (originalMessageId != botUser.expectedReplyMessageId) {
+            sendMessage("❌ Unexpected reply message")
+        } else {
+            when (val expectedReplyType = botUser.expectedReplyType) {
+                TelegramUserReplyType.ImportKey -> {
+                    scheduleMessageDeletion(replyMessageId)
+                    try {
+                        transaction {
+                            val privateKey = text
+                            switchWallet(
+                                TelegramBotUserWalletEntity.create(
+                                    WalletEntity.getOrCreate(Address.fromPrivateKey(privateKey)),
+                                    botUser,
+                                    privateKey.encrypt(),
+                                    isCurrent = true,
+                                ).also {
+                                    it.flush()
+                                },
+                            )
+                        }
+                        sendMessage("✅ Your private key has been imported. Your wallet address is ${currentWallet.walletAddress.value}")
+                    } catch (e: Exception) {
+                        logger.error(e) { "Failed to import key" }
+                        sendMessage("❌ ${e.message}")
+                    }
+                }
+
+                TelegramUserReplyType.DepositBaseAmount, TelegramUserReplyType.DepositQuoteAmount -> {
+                    try {
+                        val symbol = if (expectedReplyType == TelegramUserReplyType.DepositBaseAmount) {
+                            currentWallet.currentMarket.baseSymbol
+                        } else {
+                            currentWallet.currentMarket.quoteSymbol
+                        }
+
+                        val txHash = currentWallet.deposit(text, symbol)
+                        if (txHash == null) {
+                            sendMessage("❌ Deposit of ${symbol.value} approval failed")
+                        } else {
+                            transaction {
+                                botUser.addPendingDeposit(txHash)
+                            }
+                            sendMessage("✅ Deposit of ${symbol.value} initiated")
+                            sendMessage("✅ Deposit in progress")
+                        }
+                    } catch (e: Exception) {
+                        logger.error(e) { "Deposit failed" }
+                        sendMessage("❌ ${e.message}")
+                    }
+                }
+
+                TelegramUserReplyType.WithdrawBaseAmount, TelegramUserReplyType.WithdrawQuoteAmount -> {
+                    val symbol = if (expectedReplyType == TelegramUserReplyType.WithdrawBaseAmount) {
+                        currentWallet.currentMarket.baseSymbol
+                    } else {
+                        currentWallet.currentMarket.quoteSymbol
+                    }
+
+                    sendMessage(
+                        currentWallet
+                            .withdraw(text, symbol)
+                            .fold(
+                                { "❌ Withdraw failed (${it.error?.displayMessage ?: "Unknown Error"})" },
+                                { "✅ Withdraw succeeded" },
+                            ),
+                    )
+                }
+
+                TelegramUserReplyType.BuyAmount, TelegramUserReplyType.SellAmount -> {
+                    val side = if (expectedReplyType == TelegramUserReplyType.BuyAmount) {
+                        OrderSide.Buy
+                    } else {
+                        OrderSide.Sell
+                    }
+
+                    currentWallet
+                        .createOrder(text, side)
+                        .onLeft {
+                            sendMessage("❌ Order failed (${it.error?.displayMessage ?: "Unknown Error"})")
+                        }
+                }
+
+                else -> listOf("❌ Unexpected reply")
+            }
         }
 
         if (showMenuAfterReply()) {
@@ -362,11 +384,94 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
             transaction {
                 walletEntity.isCurrent = true
 
-                currentWallet = BotSessionCurrentWallet(walletEntity, this@BotSession)
+                currentWallet = BotSessionCurrentWallet(
+                    walletEntity,
+                    onBalanceUpdated = ::onBalanceUpdated,
+                    onOrderCreated = ::onOderCreated,
+                    onOrderUpdated = ::onOrderUpdated,
+                    onTradeUpdated = ::onTradeUpdated,
+                )
                 currentWallet.start()
-                botUser.currentMarketId?.value?.also {
+                TelegramBotUserEntity.getOrCreate(telegramUserId).currentMarketId?.value?.also {
                     currentWallet.switchCurrentMarket(it)
                 }
+            }
+        }
+    }
+
+    private fun onBalanceUpdated(balances: List<Balance>) {
+        transaction {
+            TelegramBotUserEntity.getOrCreate(telegramUserId).apply {
+                if (pendingDeposits.isNotEmpty()) {
+                    val finalizedDeposits = currentWallet
+                        .listDeposits()
+                        .filter {
+                            (it.status == Deposit.Status.Complete || it.status == Deposit.Status.Failed) &&
+                                pendingDeposits.contains(it.txHash)
+                        }
+
+                    finalizedDeposits.forEach { deposit ->
+                        removePendingDeposit(deposit.txHash)
+                        when (deposit.status) {
+                            Deposit.Status.Failed -> {
+                                runBlocking {
+                                    sendMessage("❌ Deposit of ${deposit.symbol.value} failed")
+                                    sendMainMenu()
+                                }
+                            }
+                            Deposit.Status.Complete -> {
+                                runBlocking {
+                                    sendMessage("✅ Deposit of ${deposit.symbol.value} completed")
+                                    sendMainMenu()
+                                }
+                            }
+                            else -> {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun onOderCreated(order: Order) {
+        runBlocking {
+            sendMessage(formatOrder(order, isCreated = true))
+        }
+    }
+
+    private fun onOrderUpdated(order: Order) {
+        runBlocking {
+            sendMessage(formatOrder(order, isCreated = false))
+        }
+    }
+
+    private fun formatOrder(order: Order, isCreated: Boolean = false): String {
+        val market = currentWallet.config.markets.first { it.id == order.marketId }
+        val status = when (order.status) {
+            OrderStatus.Filled -> "filled"
+            OrderStatus.Partial -> "partially filled (${formatAmountWithSymbol(market.baseSymbol, order.executions.first().amount)})"
+            OrderStatus.Failed, OrderStatus.Rejected -> "rejected"
+            OrderStatus.Cancelled -> "cancelled"
+            OrderStatus.Open -> if (isCreated) "opened" else "updated"
+            OrderStatus.Expired -> "expired"
+        }
+        val executionPrice = when (order.status) {
+            OrderStatus.Partial, OrderStatus.Filled -> "at price of ${order.executions.first().price.setScale(6, RoundingMode.FLOOR).toPlainString()}"
+            else -> ""
+        }
+        val emoji = when (order.status) {
+            OrderStatus.Partial, OrderStatus.Filled, OrderStatus.Open -> "✅"
+            else -> "❌"
+        }
+        return "$emoji Order to ${order.side} ${formatAmountWithSymbol(market.baseSymbol, order.amount)} $status $executionPrice"
+    }
+
+    private fun onTradeUpdated(trade: Trade) {
+        if (trade.settlementStatus == SettlementStatus.Completed) {
+            val market = currentWallet.config.markets.first { it.id == trade.marketId }
+            runBlocking {
+                sendMessage("✅ Trade to ${trade.side} ${formatAmountWithSymbol(market.baseSymbol, trade.amount)} has settled")
+                sendMainMenu()
             }
         }
     }
@@ -374,46 +479,37 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
     private fun switchMarket(marketId: MarketId) {
         currentWallet.switchCurrentMarket(marketId)
         transaction {
-            botUser.updateMarket(marketId)
+            TelegramBotUserEntity.getOrCreate(telegramUserId).updateMarket(marketId)
         }
     }
 
     private fun scheduleMessageDeletion(messageId: Int) {
         transaction {
-            botUser.messageIdsForDeletion += messageId
+            TelegramBotUserEntity.getOrCreate(telegramUserId).messageIdsForDeletion += messageId
         }
     }
 
     private fun deleteMessages() {
         transaction {
             runBlocking {
-                botUser.messageIdsForDeletion.forEach {
+                TelegramBotUserEntity.getOrCreate(telegramUserId).messageIdsForDeletion.forEach {
                     bot.deleteMessage(chatId, it)
                 }
             }
-            botUser.messageIdsForDeletion = emptyList()
+            TelegramBotUserEntity.getOrCreate(telegramUserId).messageIdsForDeletion = emptyList()
         }
     }
 
     private fun showMenuAfterReply(): Boolean {
         return transaction {
-            when (botUser.expectedReplyType) {
+            when (TelegramBotUserEntity.getOrCreate(telegramUserId).expectedReplyType) {
                 TelegramUserReplyType.ImportKey, TelegramUserReplyType.WithdrawBaseAmount, TelegramUserReplyType.WithdrawQuoteAmount -> true
                 else -> false
             }
         }
     }
 
-    private fun runUpdate(logic: () -> String): String {
-        return try {
-            logic()
-        } catch (e: Exception) {
-            logger.error(e) { "error is ${e.message}" }
-            "❌ ${e.message}"
-        }
-    }
-
-    suspend fun sendMessage(message: String) =
+    private suspend fun sendMessage(message: String) =
         sendMessage(
             TextMessage(
                 text = message,
@@ -441,13 +537,24 @@ class BotSession(private val telegramUserId: Long, val bot: Bot) {
             }
         }?.let {
             transaction {
-                botUser.apply {
+                TelegramBotUserEntity.getOrCreate(telegramUserId).apply {
                     this.expectedReplyMessageId = it.result!!.messageId
                     this.expectedReplyType = replyType
                 }
             }
         }
     }
+
+    private fun formatAmountWithSymbol(symbol: Symbol, amount: BigInteger): String {
+        return "${formatAmount(symbol, amount)} ${symbol.value}"
+    }
+
+    private fun formatAmount(symbol: Symbol, amount: BigInteger): String {
+        return amount.fromFundamentalUnits(decimals(symbol)).setScale(minOf(decimals(symbol), 8), RoundingMode.FLOOR).toPlainString()
+    }
+
+    private fun decimals(symbol: Symbol) =
+        currentWallet.symbolInfoBySymbol.getValue(symbol).decimals.toInt()
 }
 
 fun callbackButton(text: String, callbackData: CallbackData): InlineKeyboardItem =
