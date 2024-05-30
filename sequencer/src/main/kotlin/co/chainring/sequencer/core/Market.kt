@@ -554,7 +554,7 @@ data class Market(
         return if (order.type == Order.Type.LimitSell) {
             val orderPrice = order.price.toBigDecimal()
             val levelIx = (orderPrice - levels[0].price).divideToIntegralValue(tickSize).toInt()
-            if (levelIx > levels.lastIndex) {
+            if (levelIx > levels.lastIndex || levelIx < 0) {
                 AddOrderResult(OrderDisposition.Rejected, noExecutions)
             } else {
                 if (levelIx > maxOfferIx) {
@@ -593,7 +593,7 @@ data class Market(
         } else if (order.type == Order.Type.LimitBuy) {
             val orderPrice = order.price.toBigDecimal()
             val levelIx = (orderPrice - levels[0].price).divideToIntegralValue(tickSize).toInt()
-            if (levelIx < 0) {
+            if (levelIx < 0 || levelIx > levels.lastIndex) {
                 AddOrderResult(OrderDisposition.Rejected, noExecutions)
             } else {
                 if (levelIx < minBidIx || minBidIx == -1) {

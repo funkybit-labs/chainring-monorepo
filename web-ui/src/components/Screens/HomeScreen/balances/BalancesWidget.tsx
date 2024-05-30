@@ -65,7 +65,7 @@ export default function BalancesWidget({
           <div className="flex w-full text-center font-medium">
             <div
               className={classNames(
-                'cursor-pointer border-b-2 mr-4 w-full h-10 flex-col content-end pb-1',
+                'cursor-pointer border-b-2 mr-4 w-full h-12 flex-col content-end pb-1',
                 selectedTab == 'available'
                   ? 'border-b-primary4'
                   : 'border-b-darkBluishGray3'
@@ -84,7 +84,7 @@ export default function BalancesWidget({
             </div>
             <div
               className={classNames(
-                'cursor-pointer border-b-2 mx-4 w-full h-10 flex-col content-end pb-1',
+                'cursor-pointer border-b-2 mx-4 w-full h-12 flex-col content-end pb-1',
                 selectedTab == 'deposits'
                   ? 'border-b-primary4'
                   : 'border-b-darkBluishGray3'
@@ -115,7 +115,7 @@ export default function BalancesWidget({
             </div>
             <div
               className={classNames(
-                'cursor-pointer border-b-2 ml-4 w-full h-10 flex-col content-end pb-1',
+                'cursor-pointer border-b-2 ml-4 w-full h-12 flex-col content-end pb-1',
                 selectedTab == 'withdrawals'
                   ? 'border-b-primary4'
                   : 'border-b-darkBluishGray3'
@@ -134,7 +134,7 @@ export default function BalancesWidget({
               {pendingWithdrawalsCount > 0 && (
                 <div
                   className={classNames(
-                    'whitespace-nowrap text-xs',
+                    'whitespace-nowrap text-xs mb-1',
                     selectedTab == 'withdrawals'
                       ? 'text-primary4'
                       : 'text-darkBluishGray3'

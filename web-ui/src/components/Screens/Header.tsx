@@ -72,7 +72,7 @@ export function Header({
             disabled={false}
             primary={false}
           />
-        ) : (
+        ) : tab === 'Dashboard' ? (
           <Button
             style={'normal'}
             caption={() => <>Connect Wallet</>}
@@ -80,6 +80,8 @@ export function Header({
             primary={true}
             disabled={false}
           />
+        ) : (
+          <div className="w-[152px]" />
         )}
       </span>
     )
@@ -108,6 +110,8 @@ export function Header({
   }
 
   function navigate(id: string) {
+    setTab('Dashboard')
+    onTabChange('Dashboard')
     window.location.hash = id
     window.scrollBy({ top: -80, behavior: 'smooth' })
     setShowMenu(false)

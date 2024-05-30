@@ -1,10 +1,10 @@
-import btc from 'cryptocurrency-icons/svg/color/btc.svg'
-import eth from 'cryptocurrency-icons/svg/color/eth.svg'
-import usdc from 'cryptocurrency-icons/svg/color/usdc.svg'
-import dai from 'cryptocurrency-icons/svg/color/dai.svg'
+import btc from 'assets/btc.svg'
+import eth from 'assets/eth.svg'
+import usdc from 'assets/usdc.svg'
+import dai from 'assets/dai.svg'
 import generic from 'cryptocurrency-icons/svg/color/generic.svg'
-import botanix from 'assets/botanix.png'
-import bitlayer from 'assets/bitlayer.png'
+import botanix from 'assets/botanix.svg'
+import bitlayer from 'assets/bitlayer.svg'
 import TradingSymbol from 'tradingSymbol'
 
 interface Props {
@@ -38,7 +38,7 @@ export default function SymbolIcon(props: Props) {
   })()
 
   return (
-    <span className="relative p-1">
+    <span className="relative mt-[-1px] p-1">
       <img src={icon} className={props.className || ''} alt={symbolName} />
       <img src={chainIcon} className="absolute -bottom-1 right-1 size-4" />
     </span>
