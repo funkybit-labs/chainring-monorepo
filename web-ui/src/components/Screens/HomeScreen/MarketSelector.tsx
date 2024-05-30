@@ -15,14 +15,14 @@ export function MarketSelector({
   onChange: (newValue: Market) => void
 }) {
   return (
-    <div className="w-40">
+    <div className="min-w-40">
       <Listbox value={selected} onChange={onChange}>
         <div className="relative">
-          <Listbox.Button className="relative w-full cursor-default rounded-md bg-darkBluishGray7 py-2 pl-3 pr-10 text-left transition-colors duration-300 ease-in-out hover:bg-darkBluishGray6 hover:text-white">
+          <Listbox.Button className="relative w-full cursor-default rounded-[20px] bg-darkBluishGray7 py-2 pl-3 pr-10 text-left transition-colors duration-300 ease-in-out hover:bg-darkBluishGray6 hover:text-white">
             <MarketTitle market={selected} alwaysShowLabel={true} />
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
               <ChevronDownIcon
-                className="size-5 text-darkBluishGray1"
+                className="size-6 text-darkBluishGray1"
                 aria-hidden="true"
               />
             </span>
@@ -33,7 +33,7 @@ export function MarketSelector({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-darkBluishGray7 py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none">
+            <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-[20px] bg-darkBluishGray7 py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none">
               {markets.map((market) => (
                 <Listbox.Option
                   key={market.id}
@@ -79,11 +79,11 @@ export function MarketTitle({
     >
       <SymbolIcon
         symbol={market.baseSymbol.name}
-        className="relative left-1 inline-block size-4"
+        className="relative left-1 inline-block size-6"
       />
       <SymbolIcon
         symbol={market.quoteSymbol.name}
-        className="mr-2 inline-block size-4"
+        className="mr-2 inline-block size-6"
       />
       <span className={classNames(alwaysShowLabel || 'hidden narrow:inline')}>
         {market.baseSymbol.name}

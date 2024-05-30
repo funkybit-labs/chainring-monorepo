@@ -59,4 +59,8 @@ export default class Markets {
   first(): Market | null {
     return this.markets.length > 0 ? this.markets[0] : null
   }
+
+  find(f: (m: Market) => boolean): Market | undefined {
+    return this.markets.find(f)
+  }
 }

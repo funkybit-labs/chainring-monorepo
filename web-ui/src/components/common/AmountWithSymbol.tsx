@@ -14,7 +14,10 @@ export function AmountWithSymbol({
   return (
     <div className={'inline-block whitespace-nowrap'}>
       {approximate && '~'}
-      {formatUnits(amount, symbol.decimals)} {symbol.name}
+      <span className="inline-block max-w-[10ch] overflow-x-clip text-ellipsis hover:max-w-full">
+        {formatUnits(amount, symbol.decimals)}
+      </span>{' '}
+      {symbol.name}
     </div>
   )
 }

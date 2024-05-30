@@ -179,7 +179,7 @@ export default function WithdrawalModal({
                 />
 
                 <p className="mb-2 mt-4 text-center text-sm text-darkBluishGray2">
-                  Available balance:{' '}
+                  Wallet balance:{' '}
                   {formatUnits(availableBalance, symbol.decimals)}
                 </p>
 

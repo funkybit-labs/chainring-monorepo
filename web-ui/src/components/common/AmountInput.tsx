@@ -1,16 +1,27 @@
+import { classNames } from 'utils'
+
 export default function AmountInput({
   value,
   disabled,
-  onChange
+  onChange,
+  className
 }: {
   value: string
   disabled: boolean
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  className?: string
 }) {
   return (
-    <div className="relative rounded">
+    <div className="relative grow rounded-xl">
       <input
-        className="block w-full rounded border-0 bg-darkBluishGray9 py-3 text-center text-white ring-1 ring-inset ring-darkBluishGray6 [appearance:textfield] placeholder:text-darkBluishGray2 focus:ring-1 focus:ring-inset focus:ring-mutedGray [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className={classNames(
+          'block w-full rounded-xl border-0',
+          'bg-darkBluishGray9 py-3 text-white',
+          'ring-1 ring-inset ring-darkBluishGray6 focus:ring-1 focus:ring-inset focus:ring-mutedGray',
+          '[appearance:textfield] placeholder:text-darkBluishGray2',
+          '[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
+          className
+        )}
         disabled={disabled}
         placeholder="0"
         value={value}

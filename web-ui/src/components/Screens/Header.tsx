@@ -1,24 +1,23 @@
 import logo from 'assets/logo-name.svg'
 import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { useAccount } from 'wagmi'
-import { addressDisplay, uniqueFilter } from 'utils'
+import { addressDisplay, classNames, uniqueFilter } from 'utils'
 import { Button } from 'components/common/Button'
 import React, { useEffect, useState } from 'react'
-import { MarketSelector } from 'components/Screens/HomeScreen/MarketSelector'
-import Markets, { Market } from 'markets'
+import Markets from 'markets'
 import { useMaintenance } from 'apiClient'
 import Menu from 'assets/Menu.svg'
 import { FaucetModal } from 'components/Screens/HomeScreen/faucet/FaucetModal'
 import faucetIcon from 'assets/faucet.svg'
 
+export type Tab = 'Swap' | 'Dashboard'
+
 export function Header({
   markets,
-  selectedMarket,
-  onMarketChange
+  onTabChange
 }: {
   markets: Markets
-  selectedMarket: Market | null
-  onMarketChange: (newValue: Market) => void
+  onTabChange: (newTab: Tab) => void
 }) {
   const { open: openWalletConnectModal } = useWeb3Modal()
   const account = useAccount()
@@ -28,6 +27,7 @@ export function Header({
   const [showMenu, setShowMenu] = useState(false)
   const [showFaucetModal, setShowFaucetModal] = useState<boolean>(false)
   const faucetEnabled = import.meta.env.ENV_FAUCET_ENABLED === 'true'
+  const [tab, setTab] = useState<Tab>('Swap')
 
   useEffect(() => {
     if (account.isConnected && account.connector) {
@@ -115,8 +115,8 @@ export function Header({
 
   return (
     <>
-      <div className="fixed z-50 flex h-20 w-full flex-row place-items-center justify-between bg-darkBluishGray10 p-0 text-sm text-darkBluishGray1">
-        <span>
+      <div className="fixed z-50 grid h-20 w-full grid-cols-[max-content_1fr_max-content] place-items-center bg-darkBluishGray10 p-0 text-sm text-darkBluishGray1">
+        <span className="justify-self-start">
           <img
             className="m-6 hidden h-10 narrow:inline-block"
             src={logo}
@@ -131,19 +131,34 @@ export function Header({
             />
           </div>
         </span>
+        <div className="cursor-pointer space-x-4 text-[16px]">
+          <span
+            className={classNames(
+              'border-b-2 pb-2',
+              tab == 'Swap' ? 'text-primary4' : 'text-darkBluishGray3'
+            )}
+            onClick={() => {
+              setTab('Swap')
+              onTabChange('Swap')
+            }}
+          >
+            <span className="px-2">Swap</span>
+          </span>
+          <span
+            className={classNames(
+              'border-b-2 pb-2',
+              tab == 'Dashboard' ? 'text-primary4' : 'text-darkBluishGray3'
+            )}
+            onClick={() => {
+              setTab('Dashboard')
+              onTabChange('Dashboard')
+            }}
+          >
+            <span className="px-2">Dashboard</span>
+          </span>
+        </div>
 
-        <div className="mr-4 flex narrow:mr-0">
-          {selectedMarket && (
-            <div className="flex items-center gap-1">
-              <span className="mr-2 hidden narrow:inline">Market:</span>
-              <MarketSelector
-                markets={markets}
-                selected={selectedMarket}
-                onChange={onMarketChange}
-              />
-            </div>
-          )}
-
+        <div className="flex space-x-2 narrow:mr-0">
           <div className="hidden narrow:inline-block">{walletConnector()}</div>
           <div className="hidden narrow:inline-block">
             {faucetButton({ onClick: () => setShowFaucetModal(true) })}
@@ -193,7 +208,7 @@ export function Header({
           </span>
         </div>
       )}
-      {faucetEnabled && account.isConnected && showFaucetModal ? (
+      {faucetEnabled && account.isConnected && showFaucetModal && (
         <div className="fixed">
           <FaucetModal
             isOpen={showFaucetModal}
@@ -205,8 +220,6 @@ export function Header({
             close={() => setShowFaucetModal(false)}
           />
         </div>
-      ) : (
-        <></>
       )}
     </>
   )
