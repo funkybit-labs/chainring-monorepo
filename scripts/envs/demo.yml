@@ -52,6 +52,7 @@ services:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
     count: 1
     is_essential: "true"
+    no_rolling_upgrade: "true"
     environment: api
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-d567d2ec-6ebb-4c6d-b48a-529eb09febfb-KMOVrv
