@@ -25,8 +25,7 @@ export default function DepositModal({
   symbol,
   isOpen,
   close,
-  onClosed,
-  initialValue
+  onClosed
 }: {
   exchangeContractAddress: Address
   walletAddress: Address
@@ -34,7 +33,6 @@ export default function DepositModal({
   isOpen: boolean
   close: () => void
   onClosed: () => void
-  initialValue?: string
 }) {
   const config = useConfig()
 
@@ -59,7 +57,7 @@ export default function DepositModal({
     setInputValue: setAmountInputValue,
     valueInFundamentalUnits: amount
   } = useAmountInputState({
-    initialInputValue: initialValue ?? '',
+    initialInputValue: '',
     decimals: symbol.decimals
   })
 

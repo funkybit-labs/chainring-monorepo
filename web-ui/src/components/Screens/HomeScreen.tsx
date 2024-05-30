@@ -93,7 +93,7 @@ export default function HomeScreen() {
         <div className="min-h-screen bg-darkBluishGray10">
           <Header markets={markets} onTabChange={setTab} />
 
-          <div className="mx-4 flex justify-center py-24">
+          <div className="mx-4 flex h-screen justify-center py-24">
             <div
               className="my-auto min-w-[400px] laptop:max-w-[1800px]"
               ref={ref as LegacyRef<HTMLDivElement>}

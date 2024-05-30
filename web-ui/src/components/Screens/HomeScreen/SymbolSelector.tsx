@@ -34,10 +34,10 @@ export function SymbolSelector({
         }}
       >
         <div className="relative">
-          <Listbox.Button className="relative flex cursor-default rounded-[20px] bg-swapDropdownBackground py-2 pl-3 pr-10 text-left text-darkBluishGray1 transition-colors duration-300 ease-in-out hover:bg-swapHighlight hover:text-white">
+          <Listbox.Button className="relative flex cursor-default rounded-[32px] bg-swapDropdownBackground py-2 pl-3 pr-10 text-left text-darkBluishGray1 transition-colors duration-300 ease-in-out hover:bg-swapHighlight hover:text-white">
             <SymbolIcon
               symbol={selected}
-              className="mr-2 inline-block size-6 align-text-bottom"
+              className="mr-2 inline-block size-6 align-top"
             />
             <span className="leading-none">
               {selected.name}
@@ -57,7 +57,7 @@ export function SymbolSelector({
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Listbox.Options className="absolute z-10 mt-1 max-h-72 w-max overflow-auto rounded-[20px] bg-swapDropdownBackground py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
+            <Listbox.Options className="absolute z-10 mt-1 max-h-72 w-max overflow-auto rounded-[32px] bg-swapDropdownBackground py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
               {availableSymbols.map((symbol) => (
                 <Listbox.Option
                   key={symbol.name}
@@ -77,7 +77,7 @@ export function SymbolSelector({
                       >
                         <SymbolIcon
                           symbol={symbol}
-                          className="mr-2 inline-block size-6 align-text-bottom"
+                          className="mr-2 inline-block size-6 align-top"
                         />
                         <span className="leading-none">
                           {symbol.name}

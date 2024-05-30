@@ -16,6 +16,7 @@ const connectionUrl =
 const CloseEventCodeUnauthorized = 3000
 
 type SubscriptionEventHandler = (data: Publishable) => void
+type UnsubscriptionHandler = () => void
 
 export const WebsocketContext = createContext<{
   subscribe: (
@@ -167,10 +168,12 @@ export function WebsocketProvider({
 
 export function useWebsocketSubscription({
   topics,
-  handler
+  handler,
+  onUnsubscribe
 }: {
   topics: SubscriptionTopic[]
   handler: SubscriptionEventHandler
+  onUnsubscribe?: UnsubscriptionHandler
 }) {
   const context = useContext(WebsocketContext)
   if (!context) {
@@ -185,6 +188,7 @@ export function useWebsocketSubscription({
 
     return () => {
       topics.forEach((t) => unsubscribe(t, handler))
+      if (onUnsubscribe) onUnsubscribe()
     }
-  }, [topics, subscribe, unsubscribe, handler])
+  }, [topics, subscribe, unsubscribe, handler, onUnsubscribe])
 }

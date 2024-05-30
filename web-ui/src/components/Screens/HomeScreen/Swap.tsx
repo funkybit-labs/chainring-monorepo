@@ -38,7 +38,6 @@ import {
 import SwapIcon from 'assets/Swap.svg'
 import SubmitButton from 'components/common/SubmitButton'
 import { Button } from 'components/common/Button'
-import { AmountWithSymbol } from 'components/common/AmountWithSymbol'
 import { allChains } from 'wagmiConfig'
 import DepositModal from 'components/Screens/HomeScreen/DepositModal'
 import { useMeasure } from 'react-use'
@@ -93,6 +92,9 @@ export function Swap({
       if (message.type === 'Balances') {
         setBalances(message.balances)
       }
+    }, []),
+    onUnsubscribe: useCallback(() => {
+      setBalances([])
     }, [])
   })
 
@@ -147,7 +149,7 @@ export function Swap({
       market.tickSize.toString(),
       quoteSymbol.decimals
     )
-    if (side === 'Buy') {
+    if (side === 'Sell') {
       return priceInput - (priceInput % tickAsInt)
     } else {
       const rawPrice = parseFloat(formatUnits(priceInput, baseSymbol.decimals))
@@ -184,6 +186,10 @@ export function Swap({
         setBaseLimit(message.base)
         setQuoteLimit(message.quote)
       }
+    }, []),
+    onUnsubscribe: useCallback(() => {
+      setBaseLimit(undefined)
+      setQuoteLimit(undefined)
     }, [])
   })
 
@@ -228,7 +234,6 @@ export function Swap({
 
   useEffect(() => {
     if (baseAmountManuallyChanged) {
-      setBaseAmountManuallyChanged(false)
       if (orderBook !== undefined) {
         const indicativePrice =
           isLimitOrder && limitPrice !== 0n
@@ -260,7 +265,6 @@ export function Swap({
 
   useEffect(() => {
     if (quoteAmountManuallyChanged) {
-      setQuoteAmountManuallyChanged(false)
       if (orderBook !== undefined) {
         const indicativePrice =
           isLimitOrder && limitPrice !== 0n
@@ -376,21 +380,6 @@ export function Swap({
 
   function setPriceFromMarketPrice(incrementDivisor?: bigint) {
     if (side === 'Buy') {
-      if (incrementDivisor) {
-        const rawPrice = parseFloat(
-          formatUnits(
-            marketPrice + marketPrice / incrementDivisor,
-            quoteSymbol.decimals
-          )
-        )
-        setPriceInputValue(rawPrice.toFixed(market.tickSize.decimalPlaces()))
-      } else {
-        const rawPrice = parseFloat(
-          formatUnits(marketPrice, quoteSymbol.decimals)
-        )
-        setPriceInputValue(rawPrice.toFixed(market.tickSize.decimalPlaces()))
-      }
-    } else {
       let rawPrice
       if (incrementDivisor) {
         rawPrice = parseFloat(
@@ -404,6 +393,19 @@ export function Swap({
       }
       const invertedPrice = 1.0 / rawPrice
       setPriceInputValue(invertedPrice.toFixed(6))
+    } else {
+      let rawPrice
+      if (incrementDivisor) {
+        rawPrice = parseFloat(
+          formatUnits(
+            marketPrice + marketPrice / incrementDivisor,
+            quoteSymbol.decimals
+          )
+        )
+      } else {
+        rawPrice = parseFloat(formatUnits(marketPrice, quoteSymbol.decimals))
+      }
+      setPriceInputValue(rawPrice.toFixed(market.tickSize.decimalPlaces()))
     }
   }
 
@@ -529,14 +531,9 @@ export function Swap({
 
   const [depositSymbol, setDepositSymbol] = useState<TradingSymbol | null>(null)
   const [showDepositModal, setShowDepositModal] = useState<boolean>(false)
-  const [depositRequestedAmount, setDepositRequestedAmount] =
-    useState<bigint>(0n)
 
-  function openDepositModal(symbol: TradingSymbol, sellAssetsNeeded?: bigint) {
+  function openDepositModal(symbol: TradingSymbol) {
     setDepositSymbol(symbol)
-    if (sellAssetsNeeded) {
-      setDepositRequestedAmount(sellAssetsNeeded)
-    }
     setShowDepositModal(true)
     if (symbol.chainId != config.state.chainId) {
       setSwitchToChainId(symbol.chainId)
@@ -625,7 +622,7 @@ export function Swap({
             <div className="flex flex-row items-baseline space-x-2 text-sm">
               {depositAmount(topBalance, topSymbol)}
               <button
-                className="rounded bg-swapDropdownBackground px-2 text-darkBluishGray2 hover:bg-swapHighlight"
+                className="rounded bg-swapDropdownBackground px-2 py-1 text-darkBluishGray2 hover:bg-swapHighlight"
                 onClick={() => openDepositModal(topSymbol)}
               >
                 Deposit
@@ -633,7 +630,7 @@ export function Swap({
             </div>
           </div>
           <div
-            className="flex cursor-text flex-row justify-between"
+            className="flex cursor-text flex-row justify-between pt-2"
             onClick={() => sellAmountInputRef.current?.focus()}
           >
             <SellAmountInput
@@ -646,7 +643,7 @@ export function Swap({
               }
               sellAssetsNeeded={sellAssetsNeeded}
               onDeposit={() => {
-                openDepositModal(topSymbol, sellAssetsNeeded)
+                openDepositModal(topSymbol)
               }}
               inputRef={sellAmountInputRef}
             />
@@ -747,14 +744,6 @@ export function Swap({
             </button>
           ))}
         </div>
-        <div className="text-center text-darkBluishGray2">
-          FEE:{' '}
-          <AmountWithSymbol
-            amount={fee}
-            symbol={quoteSymbol}
-            approximate={false}
-          />
-        </div>
         <div className="flex w-full flex-col">
           {walletAddress && exchangeContractAddress ? (
             <>
@@ -802,13 +791,7 @@ export function Swap({
           close={() => setShowDepositModal(false)}
           onClosed={() => {
             setDepositSymbol(null)
-            setDepositRequestedAmount(0n)
           }}
-          initialValue={
-            depositRequestedAmount
-              ? formatUnits(depositRequestedAmount, depositSymbol.decimals)
-              : undefined
-          }
         />
       )}
     </>
@@ -833,7 +816,7 @@ function SellAmountInput({
   const [divRef, { width: spanWidth }] = useMeasure<HTMLDivElement>()
   useEffect(() => {
     if (inputRef.current) {
-      inputRef.current.style.width = spanWidth + 40 + 'px'
+      inputRef.current.style.width = Math.max(40, spanWidth + 24) + 'px'
     }
   }, [inputRef, spanWidth])
   return (
