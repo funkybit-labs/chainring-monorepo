@@ -1,6 +1,5 @@
 package co.chainring.mocker.core
 
-import co.chainring.apps.api.model.Chain
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
@@ -123,19 +122,29 @@ abstract class Actor(
                     val nativeAmountByChainId = nativeAssets.map { chainIdBySymbol.getValue(it.key) to it.value }.toMap()
                     val chainIds = nativeAmountByChainId.keys + assets.map { chainIdBySymbol.getValue(it.key) }.toSet()
                     chainIds.forEach { chainId ->
-                        val desiredAmount = (nativeAmountByChainId[chainId] ?: BigDecimal.ONE.movePointRight(18).toBigInteger()) * BigInteger.TWO
-                        Faucet.fund(wallet.address, desiredAmount * BigInteger.TWO, chainId)
+                        when (val nativeAmount = nativeAmountByChainId[chainId]) {
+                            null -> {
+                                // put some balance to pay gas, but do not deposit
+                                Faucet.fund(wallet.address, BigDecimal.ONE.movePointRight(18).toBigInteger(), chainId)
+                            }
+                            else -> {
+                                val desiredAmount = nativeAmount * BigInteger.TWO
+                                Faucet.fund(wallet.address, desiredAmount * BigInteger.TWO, chainId)
 
-                        val availableAmount = initialBalances.find { it.symbol.value == config.chains.first { it.id == chainId }.symbols.first { it.contractAddress == null }.name }?.available ?: BigInteger.ZERO
-                        val deltaAmount = desiredAmount - availableAmount
+                                val availableAmount =
+                                    initialBalances.find { it.symbol.value == config.chains.first { it.id == chainId }.symbols.first { it.contractAddress == null }.name }?.available
+                                        ?: BigInteger.ZERO
+                                val deltaAmount = desiredAmount - availableAmount
 
-                        if (deltaAmount > BigInteger.ZERO) {
-                            logger.debug { "Funding ${wallet.address} with ${deltaAmount * BigInteger.TWO} on chain $chainId" }
-                            wallet.switchChain(chainId)
-                            logger.debug { "Native deposit $deltaAmount to ${wallet.address} on chain $chainId" }
-                            wallet.depositNative(deltaAmount)
-                        } else {
-                            logger.debug { "Skipping funding for ${wallet.address}, available native balance $availableAmount" }
+                                if (deltaAmount > BigInteger.ZERO) {
+                                    logger.debug { "Funding ${wallet.address} with ${deltaAmount * BigInteger.TWO} on chain $chainId" }
+                                    wallet.switchChain(chainId)
+                                    logger.debug { "Native deposit $deltaAmount to ${wallet.address} on chain $chainId" }
+                                    wallet.depositNative(deltaAmount)
+                                } else {
+                                    logger.debug { "Skipping funding for ${wallet.address}, available native balance $availableAmount" }
+                                }
+                            }
                         }
                     }
                     assets.forEach { (symbol, desiredAmount) ->
