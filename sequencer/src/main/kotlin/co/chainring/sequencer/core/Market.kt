@@ -1,6 +1,7 @@
 package co.chainring.sequencer.core
 
 import co.chainring.sequencer.proto.BalanceChange
+import co.chainring.sequencer.proto.BidOfferState
 import co.chainring.sequencer.proto.MarketCheckpoint
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderBatch
@@ -9,12 +10,14 @@ import co.chainring.sequencer.proto.OrderChanged
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.TradeCreated
 import co.chainring.sequencer.proto.balanceChange
+import co.chainring.sequencer.proto.bidOfferState
 import co.chainring.sequencer.proto.copy
 import co.chainring.sequencer.proto.marketCheckpoint
 import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderChangeRejected
 import co.chainring.sequencer.proto.orderChanged
 import co.chainring.sequencer.proto.tradeCreated
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.concurrent.CopyOnWriteArrayList
@@ -33,6 +36,8 @@ data class Market(
     private var minBidIx: Int = -1,
 ) {
     private val halfTick = tickSize.setScale(tickSize.scale() + 1) / BigDecimal.valueOf(2)
+
+    private val logger = KotlinLogging.logger { }
 
     private fun marketIx(): Int = min(maxLevels / 2, (marketPrice - halfTick).divideToIntegralValue(tickSize).toInt())
 
@@ -242,6 +247,18 @@ data class Market(
             },
             ordersChangeRejected,
         )
+    }
+
+    fun getBidOfferState(): BidOfferState {
+        if (bestBid >= bestOffer) {
+            logState()
+        }
+        return bidOfferState {
+            this.bestBid = this@Market.bestBid.toDecimalValue()
+            this.bestOffer = this@Market.bestOffer.toDecimalValue()
+            this.minBidIx = this@Market.minBidIx
+            this.maxOfferIx = this@Market.maxOfferIx
+        }
     }
 
     private fun processExecution(
@@ -850,6 +867,23 @@ data class Market(
             val lastLevelWithData = this.maxOfferIx.let { if (it == -1) maxBidIx else it }
             (firstLevelWithData..lastLevelWithData).forEach { i ->
                 this.levels.add(this@Market.levels[i].toCheckpoint())
+            }
+        }
+    }
+
+    private fun logState() {
+        logger.debug { "maxLevels = ${this.maxLevels}" }
+        logger.debug { "maxOrdersPerLevel = ${this.maxOrdersPerLevel}" }
+        logger.debug { "baseDecimals = ${this.baseDecimals}" }
+        logger.debug { "minBidIx = ${this.minBidIx}" }
+        logger.debug { "maxBidIx = ${(bestBid - levels[0].price).divideToIntegralValue(tickSize).toInt()} " }
+        logger.debug { "minOfferIx = ${(bestOffer - levels[0].price).divideToIntegralValue(tickSize).toInt()} " }
+        logger.debug { "maxOfferIx = ${this.maxOfferIx}" }
+        logger.debug { "bestBid = ${this.bestBid}" }
+        logger.debug { "bestOffer = ${this.bestOffer}" }
+        (0 until 1000).forEach { i ->
+            if (levels[i].totalQuantity > BigInteger.ZERO) {
+                logger.debug { "   levelIx = ${this.levels[i].levelIx} price = ${this.levels[i].price} side = ${this.levels[i].side}  maxOrderCount = ${this.levels[i].maxOrderCount} totalQuantity = ${this.levels[i].totalQuantity} " }
             }
         }
     }
