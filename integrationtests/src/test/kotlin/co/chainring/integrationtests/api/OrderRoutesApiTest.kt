@@ -179,7 +179,7 @@ class OrderRoutesApiTest {
 
         // client is notified over websocket
         wsClient.assertLimitOrderCreatedMessageReceived(createLimitOrderResponse)
-        wsClient.assertLimitsMessageReceived(usdcDaiMarket, base = BigDecimal("0"), quote = BigDecimal("13.999999999998"))
+        wsClient.assertLimitsMessageReceived(usdcDaiMarket, base = BigDecimal("0"), quote = BigDecimal("12"))
         wsClient.close()
 
         // check that order is included in the orders list sent via websocket
@@ -202,7 +202,7 @@ class OrderRoutesApiTest {
             wallet,
         )
         wsClient.assertLimitOrderUpdatedMessageReceived(updatedOrderApiResponse)
-        wsClient.assertLimitsMessageReceived(usdcDaiMarket, base = BigDecimal("0"), quote = BigDecimal("13.99999999999397"))
+        wsClient.assertLimitsMessageReceived(usdcDaiMarket, base = BigDecimal("0"), quote = BigDecimal("7.97"))
 
         // cancel order is idempotent
         apiClient.cancelOrder(createLimitOrderResponse, wallet)

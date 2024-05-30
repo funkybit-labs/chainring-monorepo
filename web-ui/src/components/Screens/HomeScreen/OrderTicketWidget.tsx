@@ -282,13 +282,13 @@ export default function OrderTicketWidget({
             signature: signature,
             verifyingChainId: config.state.chainId
           })
-          setQuoteAmountManuallyChanged(false)
-          setBaseAmountManuallyChanged(false)
-          setBaseAmountInputValue('')
-          setQuoteAmountInputValue('')
-          setPriceInputValue('')
-          return response
         }
+        setQuoteAmountManuallyChanged(false)
+        setBaseAmountManuallyChanged(false)
+        setBaseAmountInputValue('')
+        setQuoteAmountInputValue('')
+        setPriceInputValue('')
+        return response
       } catch (error) {
         throw Error(
           isErrorFromAlias(apiClient.api, 'createOrder', error)
@@ -307,7 +307,7 @@ export default function OrderTicketWidget({
     if (baseAmount <= 0n) return false
     if (price <= 0n && isLimitOrder) return false
 
-    if (side == 'Buy' && notional > (quoteLimit || 0n)) return false
+    if (side == 'Buy' && notional + fee > (quoteLimit || 0n)) return false
     if (side == 'Sell' && baseAmount > (baseLimit || 0n)) return false
 
     return true
@@ -319,7 +319,8 @@ export default function OrderTicketWidget({
     notional,
     isLimitOrder,
     quoteLimit,
-    baseLimit
+    baseLimit,
+    fee
   ])
 
   const [buySymbol, sellSymbol] =

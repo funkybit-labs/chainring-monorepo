@@ -409,6 +409,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 .andWhere { OrderTable.type.eq(OrderType.Limit) }
                 .limit(1)
                 .first()[totalQuoteAmountCol]
+                .movePointRight(market.quoteSymbol.decimals.toInt() - market.baseSymbol.decimals.toInt())
                 .toBigInteger()
 
             return Limits(
