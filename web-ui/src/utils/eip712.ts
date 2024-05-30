@@ -11,7 +11,7 @@ export function getDomain(exchangeContractAddress: Address, chain: number) {
   }
 }
 
-export function getERC20WithdrawMessage(
+export function getWithdrawMessage(
   walletAddress: Address,
   tokenAddress: Address,
   amount: bigint,
@@ -20,18 +20,6 @@ export function getERC20WithdrawMessage(
   return {
     sender: walletAddress,
     token: tokenAddress,
-    amount: amount,
-    nonce: nonce
-  }
-}
-
-export function getNativeWithdrawMessage(
-  walletAddress: Address,
-  amount: bigint,
-  nonce: bigint
-) {
-  return {
-    sender: walletAddress,
     amount: amount,
     nonce: nonce
   }

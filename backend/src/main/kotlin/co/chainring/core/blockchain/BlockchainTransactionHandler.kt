@@ -122,10 +122,10 @@ class BlockchainTransactionHandler(
                             // extract the failed withdrawals from the events
                             val failedWithdrawals = txReceipt.logs.mapNotNull { eventLog ->
                                 Contract.staticExtractEventParameters(
-                                    Exchange.PREPARETRANSACTIONFAILED_EVENT,
+                                    Exchange.WITHDRAWALFAILED_EVENT,
                                     eventLog,
                                 )?.let {
-                                    Exchange.getPrepareTransactionFailedEventFromLog(eventLog)
+                                    Exchange.getWithdrawalFailedEventFromLog(eventLog)
                                 }
                             }
 
