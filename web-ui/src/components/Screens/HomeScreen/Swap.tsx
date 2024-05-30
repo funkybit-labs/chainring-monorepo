@@ -850,7 +850,7 @@ function SellAmountInput({
           <>
             <span className="text-sm text-brightRed">Insufficient Balance</span>
             <button
-              className="ml-2 rounded bg-swapDropdownBackground px-2 text-sm text-darkBluishGray2 hover:bg-swapHighlight"
+              className="ml-2 rounded bg-swapDropdownBackground px-2 py-1 text-sm text-darkBluishGray2 hover:bg-swapHighlight"
               onClick={onDeposit}
             >
               Deposit
