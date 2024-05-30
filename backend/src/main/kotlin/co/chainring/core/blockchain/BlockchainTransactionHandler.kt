@@ -25,6 +25,7 @@ import co.chainring.core.model.db.publishBroadcasterNotifications
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.sequencer.toSequencerId
 import co.chainring.core.utils.toHex
+import co.chainring.core.utils.tryAcquireAdvisoryLock
 import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.proto.SequencerError
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -43,6 +44,7 @@ class BlockchainTransactionHandler(
     private val numConfirmations: Int = System.getenv("BLOCKCHAIN_TX_HANDLER_NUM_CONFIRMATIONS")?.toIntOrNull() ?: 1,
     private val activePollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_TX_HANDLER_ACTIVE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 100L,
     private val inactivePollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_TX_HANDLER_INACTIVE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
+    private val failurePollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_TX_HANDLER_FAILURE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 2000L,
 ) {
     private val chainId = blockchainClient.chainId
     private val symbolMap = mutableMapOf<String, SymbolEntity>()
@@ -58,7 +60,7 @@ class BlockchainTransactionHandler(
 
                 // defensive code (may only happen in lower env if we clear out the DB, but don't redeploy proxy)
                 // no settlement in progress based on DB but onchain has one in progress so roll it back.
-                if (noBatchInProgress(blockchainClient.chainId) && batchInProgressOnChain()) {
+                if (!settlementBatchInProgress(chainId) && batchInProgressOnChain()) {
                     logger.debug { "rolling back on chain on startup" }
                     rollbackOnChain()
                 }
@@ -69,15 +71,27 @@ class BlockchainTransactionHandler(
                 try {
                     if (withdrawalBatchInProgress) {
                         withdrawalBatchInProgress = dbTransaction {
-                            processWithdrawalBatch()
+                            if (tryAcquireAdvisoryLock(chainId.value.toLong())) {
+                                processWithdrawalBatch()
+                            } else {
+                                withdrawalBatchInProgress(chainId)
+                            }
                         }
                     } else {
                         settlementBatchInProgress = dbTransaction {
-                            processSettlementBatch()
+                            if (tryAcquireAdvisoryLock(chainId.value.toLong())) {
+                                processSettlementBatch()
+                            } else {
+                                settlementBatchInProgress(chainId)
+                            }
                         }
                         if (!settlementBatchInProgress) {
                             withdrawalBatchInProgress = dbTransaction {
-                                processWithdrawalBatch()
+                                if (tryAcquireAdvisoryLock(chainId.value.toLong())) {
+                                    processWithdrawalBatch()
+                                } else {
+                                    withdrawalBatchInProgress(chainId)
+                                }
                             }
                         }
                     }
@@ -90,6 +104,7 @@ class BlockchainTransactionHandler(
                     return@thread
                 } catch (e: Exception) {
                     logger.error(e) { "Unhandled exception submitting tx" }
+                    Thread.sleep(failurePollingIntervalInMs)
                 }
             }
         }
@@ -102,10 +117,16 @@ class BlockchainTransactionHandler(
         }
     }
 
-    private fun noBatchInProgress(chainId: ChainId): Boolean =
-        ChainSettlementBatchEntity.findCurrentBatch(chainId) == null
+    private fun settlementBatchInProgress(chainId: ChainId) =
+        ChainSettlementBatchEntity.findInProgressBatch(chainId) != null
+
+    private fun withdrawalBatchInProgress(chainId: ChainId) =
+        WithdrawalEntity.findSettling(chainId).isNotEmpty()
 
     private fun processWithdrawalBatch(): Boolean {
+        if (settlementBatchInProgress(chainId)) {
+            return false
+        }
         val settlingWithdrawals = WithdrawalEntity.findSettling(chainId)
         if (settlingWithdrawals.isEmpty()) {
             return createNextWithdrawalBatch()
@@ -161,18 +182,18 @@ class BlockchainTransactionHandler(
     }
 
     private fun processSettlementBatch(): Boolean {
-        val currentBatch = ChainSettlementBatchEntity.findCurrentBatch(chainId)
+        val inProgressBatch = ChainSettlementBatchEntity.findInProgressBatch(chainId)
             ?: return false
 
-        return when (currentBatch.status) {
+        return when (inProgressBatch.status) {
             SettlementBatchStatus.Preparing -> {
-                when (currentBatch.prepararationTx.status) {
+                when (inProgressBatch.prepararationTx.status) {
                     BlockchainTransactionStatus.Pending -> {
                         // send prepare transaction call
-                        submitToBlockchain(currentBatch.prepararationTx)
+                        submitToBlockchain(inProgressBatch.prepararationTx)
                     }
                     BlockchainTransactionStatus.Submitted -> {
-                        refreshSubmittedTransaction(currentBatch.prepararationTx, blockchainClient.getBlockNumber(), 1) { txReceipt, error ->
+                        refreshSubmittedTransaction(inProgressBatch.prepararationTx, blockchainClient.getBlockNumber(), 1) { txReceipt, error ->
                             if (error == null) {
                                 // extract the failed trades from the failed event
                                 val failedTrades = txReceipt.logs.mapNotNull { eventLog ->
@@ -186,9 +207,9 @@ class BlockchainTransactionHandler(
                                 if (failedTrades.isNotEmpty()) {
                                     TradeEntity.markAsFailedSettling(failedTrades.map { it.tradeHashes.map { it.toHex() } }.flatten().toSet(), errorCodeToString(failedTrades.first().errorCode))
                                 }
-                                currentBatch.markAsPrepared()
+                                inProgressBatch.markAsPrepared()
                             } else {
-                                currentBatch.markAsFailed(error)
+                                inProgressBatch.markAsFailed(error)
                             }
                         }
                     }
@@ -197,21 +218,21 @@ class BlockchainTransactionHandler(
                 true
             }
             SettlementBatchStatus.Submitting -> {
-                submitBatch(currentBatch)
+                submitBatch(inProgressBatch)
                 true
             }
 
             SettlementBatchStatus.RollingBack -> {
-                rollbackBatch(currentBatch)
+                rollbackBatch(inProgressBatch)
                 true
             }
             SettlementBatchStatus.Submitted -> {
-                currentBatch.submissionTx?.let { submissionTx ->
+                inProgressBatch.submissionTx?.let { submissionTx ->
                     refreshSubmittedTransaction(submissionTx, blockchainClient.getBlockNumber(), numConfirmations) { _, error ->
                         if (error == null) {
-                            currentBatch.markAsCompleted()
+                            inProgressBatch.markAsCompleted()
                         } else {
-                            currentBatch.markAsFailed(error)
+                            inProgressBatch.markAsFailed(error)
                         }
                     }
                 }

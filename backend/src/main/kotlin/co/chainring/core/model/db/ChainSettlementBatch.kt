@@ -70,7 +70,7 @@ class ChainSettlementBatchEntity(guid: EntityID<ChainSettlementBatchId>) : GUIDE
             return entity
         }
 
-        fun findCurrentBatch(chainId: ChainId): ChainSettlementBatchEntity? {
+        fun findInProgressBatch(chainId: ChainId): ChainSettlementBatchEntity? {
             return ChainSettlementBatchTable
                 .join(SettlementBatchTable, JoinType.INNER, SettlementBatchTable.guid, ChainSettlementBatchTable.settlementBatchGuid)
                 .selectAll().where {

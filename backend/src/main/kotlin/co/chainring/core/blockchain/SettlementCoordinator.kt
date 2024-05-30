@@ -29,6 +29,7 @@ import co.chainring.core.model.db.publishBroadcasterNotifications
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.sequencer.toSequencerId
 import co.chainring.core.utils.toHexBytes
+import co.chainring.core.utils.tryAcquireAdvisoryLock
 import co.chainring.sequencer.core.sumBigIntegers
 import co.chainring.sequencer.proto.SequencerError
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -44,11 +45,13 @@ class SettlementCoordinator(
     private val sequencerClient: SequencerClient,
     private val activePollingIntervalInMs: Long = System.getenv("SETTLEMENT_COORDINATOR_ACTIVE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 100L,
     private val inactivePollingIntervalInMs: Long = System.getenv("SETTLEMENT_COORDINATOR_INACTIVE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
+    private val failurePollingIntervalMs: Long = System.getenv("SETTLEMENT_COORDINATOR_FAILURE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 2000L,
 ) {
     private val marketMap = mutableMapOf<MarketId, MarketEntity>()
     private val symbolMap = mutableMapOf<SymbolId, SymbolEntity>()
     private val chainIds = blockchainClients.map { it.chainId }
     private val blockchainClientsByChainId = blockchainClients.associateBy { it.chainId }
+    private val advisoryLockKey = Long.MAX_VALUE
 
     private var workerThread: Thread? = null
     val logger = KotlinLogging.logger {}
@@ -60,7 +63,11 @@ class SettlementCoordinator(
             while (true) {
                 try {
                     val batchInProgress = dbTransaction {
-                        processSettlementBatch()
+                        if (tryAcquireAdvisoryLock(advisoryLockKey)) {
+                            processSettlementBatch()
+                        } else {
+                            false
+                        }
                     }
 
                     Thread.sleep(
@@ -71,6 +78,7 @@ class SettlementCoordinator(
                     return@thread
                 } catch (e: Exception) {
                     logger.error(e) { "Unhandled exception in settlement coordinator thread" }
+                    Thread.sleep(failurePollingIntervalMs)
                 }
             }
         }
