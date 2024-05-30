@@ -2,6 +2,7 @@ package co.chainring.core.model
 
 import co.chainring.core.utils.generateHexString
 import kotlinx.serialization.Serializable
+import org.web3j.crypto.Credentials
 import org.web3j.crypto.Keys
 
 @Serializable
@@ -16,6 +17,9 @@ value class Address(val value: String) {
         fun generate() = Address(Keys.toChecksumAddress("0x${generateHexString(40)}"))
 
         val zero = Address("0x0000000000000000000000000000000000000000")
+
+        fun fromPrivateKey(privateKey: String): Address =
+            Address(Keys.toChecksumAddress(Credentials.create(privateKey).address))
     }
 }
 

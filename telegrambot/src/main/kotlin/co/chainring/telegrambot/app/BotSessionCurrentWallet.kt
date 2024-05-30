@@ -39,21 +39,19 @@ import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.SettlementStatus
-import co.chainring.core.model.db.TelegramBotUserWalletId
+import co.chainring.core.model.db.TelegramBotUserWalletEntity
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.generateOrderNonce
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHex
 import co.chainring.core.utils.toHexBytes
-import com.github.ehsannarmani.bot.Bot
-import com.github.ehsannarmani.bot.model.message.TextMessage
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.Websocket
 import org.http4k.websocket.WsStatus
-import org.web3j.crypto.ECKeyPair
+import org.web3j.crypto.Credentials
 import org.web3j.crypto.Keys
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -66,9 +64,9 @@ data class WalletAvailableBalances(
     val availableQuoteBalance: String,
 )
 
-class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: BotSession, ecKeyPair: ECKeyPair, val bot: Bot) {
-
+class BotSessionCurrentWallet(val wallet: TelegramBotUserWalletEntity, val botSession: BotSession) {
     private val logger = KotlinLogging.logger { }
+    private val ecKeyPair = Credentials.create(wallet.encryptedPrivateKey.decrypt()).ecKeyPair
     private val apiClient = ApiClient(ecKeyPair)
     val config = apiClient.tryGetConfiguration().getOrNull()
         ?: throw Exception("Unable to retrieve config")
@@ -117,9 +115,9 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
                             is TradeUpdated -> {
                                 val trade = data.trade
                                 if (trade.settlementStatus == SettlementStatus.Completed) {
-                                    sendMessage(formatTrade(trade))
                                     runBlocking {
-                                        bot.mainMenu(botSession)
+                                        botSession.sendMessage(formatTrade(trade))
+                                        botSession.sendMainMenu()
                                     }
                                 }
                             }
@@ -142,9 +140,11 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
                                             Deposit.Status.Complete -> "✅ Deposit of ${it.symbol.value} completed"
                                             else -> null
                                         }?.let { message ->
-                                            sendMessage(message)
                                             pendingDeposits.remove(it.txHash)
-                                            runBlocking { bot.mainMenu(botSession) }
+                                            runBlocking {
+                                                botSession.sendMessage(message)
+                                                botSession.sendMainMenu()
+                                            }
                                         }
                                     }
                                 }
@@ -153,13 +153,12 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
                     }
 
                     SubscriptionTopic.Orders -> {
-                        val (orders, isCreated) = when (val data = message.data) {
-                            is OrderCreated -> Pair(listOf(data.order), true)
-                            is OrderUpdated -> Pair(listOf(data.order), false)
-                            else -> Pair(emptyList(), false)
-                        }
-                        orders.forEach { order ->
-                            sendMessage(formatOrder(order, isCreated))
+                        runBlocking {
+                            when (val data = message.data) {
+                                is OrderCreated -> botSession.sendMessage(formatOrder(data.order, isCreated = true))
+                                is OrderUpdated -> botSession.sendMessage(formatOrder(data.order, isCreated = false))
+                                else -> {}
+                            }
                         }
                     }
 
@@ -179,17 +178,6 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
             ws.onError {
                 logger.error(it) { "web socket exception" }
             }
-        }
-    }
-
-    private fun sendMessage(message: String) {
-        runBlocking {
-            bot.sendMessage(
-                TextMessage(
-                    text = message,
-                    chatId = botSession.id,
-                ),
-            )
         }
     }
 
@@ -244,8 +232,8 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
         } ?: blockchainClient.getNativeBalance(walletAddress)
     }
 
-    fun getMarketPrice(): String {
-        return marketPrices[currentMarket.id]?.toPlainString() ?: "Unknown"
+    fun getMarketPrice(): BigDecimal? {
+        return marketPrices[currentMarket.id]
     }
 
     fun getFormattedWalletBalance(symbol: Symbol): String {
@@ -275,15 +263,21 @@ class TelegramUserWallet(val walletId: TelegramBotUserWalletId, val botSession: 
                         BigInteger.ZERO,
                     )
                     pendingDeposits.add(txHash)
-                    sendMessage("✅ Deposit of ${symbol.value} initiated")
+                    runBlocking {
+                        botSession.sendMessage("✅ Deposit of ${symbol.value} initiated")
+                    }
                 } else {
-                    sendMessage("❌ Deposit of ${symbol.value} approval failed")
+                    runBlocking {
+                        botSession.sendMessage("❌ Deposit of ${symbol.value} approval failed")
+                    }
                 }
             }
         } else {
             val txHash = blockchainClient.asyncDepositNative(exchangeContractAddress, bigIntAmount)
             pendingDeposits.add(txHash)
-            sendMessage("✅ Deposit of ${symbol.value} initiated")
+            runBlocking {
+                botSession.sendMessage("✅ Deposit of ${symbol.value} initiated")
+            }
         }
     }
 

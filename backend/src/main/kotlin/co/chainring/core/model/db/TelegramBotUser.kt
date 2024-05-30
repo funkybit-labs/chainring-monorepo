@@ -7,6 +7,18 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 
 @Serializable
+enum class TelegramUserReplyType {
+    None,
+    ImportKey,
+    BuyAmount,
+    SellAmount,
+    DepositBaseAmount,
+    DepositQuoteAmount,
+    WithdrawBaseAmount,
+    WithdrawQuoteAmount,
+}
+
+@Serializable
 @JvmInline
 value class TelegramBotUserId(override val value: String) : EntityId {
     companion object {
@@ -21,10 +33,17 @@ object TelegramBotUserTable : GUIDTable<TelegramBotUserId>("telegram_bot_user", 
     val createdBy = varchar("created_by", 10485760)
     val telegramUserId = long("telegram_user_id").uniqueIndex()
     val currentMarketGuid = reference("current_market_guid", MarketTable).nullable()
+    val expectedReplyMessageId = integer("expected_reply_message_id").nullable()
+    val expectedReplyType = customEnumeration(
+        "expected_reply_type",
+        "TelegramUserReplyType",
+        { value -> TelegramUserReplyType.valueOf(value as String) },
+        { PGEnum("TelegramUserReplyType", it) },
+    ).default(TelegramUserReplyType.None)
+    val messageIdsForDeletion = array<Int>("message_ids_for_deletion").default(emptyList())
 }
 
 class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<TelegramBotUserId>(guid) {
-
     companion object : EntityClass<TelegramBotUserId, TelegramBotUserEntity>(TelegramBotUserTable) {
         fun getOrCreate(telegramUserId: Long): TelegramBotUserEntity {
             return getByTelegramUserId(telegramUserId)
@@ -50,4 +69,8 @@ class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<Tele
     var createdBy by TelegramBotUserTable.createdBy
     var telegramUserId by TelegramBotUserTable.telegramUserId
     var currentMarketId by TelegramBotUserTable.currentMarketGuid
+    var expectedReplyMessageId by TelegramBotUserTable.expectedReplyMessageId
+    var expectedReplyType by TelegramBotUserTable.expectedReplyType
+    var messageIdsForDeletion by TelegramBotUserTable.messageIdsForDeletion
+    val wallets by TelegramBotUserWalletEntity referrersOn TelegramBotUserWalletTable.telegrambotUserGuid
 }
