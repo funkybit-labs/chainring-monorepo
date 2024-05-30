@@ -73,7 +73,7 @@ class BlockchainDepositHandler(
             ?: System.getenv("EVM_NETWORK_EARLIEST_BLOCK")?.let { DefaultBlockParameter.valueOf(it.toBigInteger()) }
             ?: DefaultBlockParameterName.LATEST
 
-        logger.debug { "registerDepositEventsConsumer starting from block $startFromBlock" }
+        logger.debug { "registerDepositEventsConsumer starting from block ${startFromBlock.value}" }
 
         val filter = EthFilter(startFromBlock, DefaultBlockParameterName.LATEST, exchangeContractAddress)
 

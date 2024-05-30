@@ -1,5 +1,6 @@
 package co.chainring.mocker.core
 
+import co.chainring.apps.api.model.CreateDepositApiRequest
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
@@ -8,6 +9,8 @@ import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.core.client.rest.ApiClient
 import co.chainring.core.client.ws.subscribe
 import co.chainring.core.client.ws.unsubscribe
+import co.chainring.core.model.Symbol
+import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketId
 import co.chainring.integrationtests.utils.Faucet
@@ -131,8 +134,9 @@ abstract class Actor(
                                 val desiredAmount = nativeAmount * BigInteger.TWO
                                 Faucet.fund(wallet.address, desiredAmount * BigInteger.TWO, chainId)
 
+                                val nativeSymbol = config.chains.first { it.id == chainId }.symbols.first { it.contractAddress == null }
                                 val availableAmount =
-                                    initialBalances.find { it.symbol.value == config.chains.first { it.id == chainId }.symbols.first { it.contractAddress == null }.name }?.available
+                                    initialBalances.find { it.symbol.value == nativeSymbol.name }?.available
                                         ?: BigInteger.ZERO
                                 val deltaAmount = desiredAmount - availableAmount
 
@@ -140,7 +144,12 @@ abstract class Actor(
                                     logger.debug { "Funding ${wallet.address} with ${deltaAmount * BigInteger.TWO} on chain $chainId" }
                                     wallet.switchChain(chainId)
                                     logger.debug { "Native deposit $deltaAmount to ${wallet.address} on chain $chainId" }
-                                    wallet.depositNative(deltaAmount)
+                                    val receipt = wallet.depositNative(deltaAmount)
+                                    apiClient.createDeposit(CreateDepositApiRequest(
+                                        symbol = Symbol(nativeSymbol.name),
+                                        amount = deltaAmount,
+                                        txHash = TxHash(receipt.transactionHash)
+                                    ))
                                 } else {
                                     logger.debug { "Skipping funding for ${wallet.address}, available native balance $availableAmount" }
                                 }
@@ -156,7 +165,12 @@ abstract class Actor(
                             wallet.switchChain(chainId)
                             wallet.mintERC20(symbol, deltaAmount)
                             logger.debug { "$symbol deposit $deltaAmount to ${wallet.address} on chain $chainId" }
-                            wallet.depositERC20(symbol, deltaAmount)
+                            val receipt = wallet.depositERC20(symbol, deltaAmount)
+                            apiClient.createDeposit(CreateDepositApiRequest(
+                                symbol = Symbol(symbol),
+                                amount = deltaAmount,
+                                txHash = TxHash(receipt.transactionHash)
+                            ))
                         } else {
                             logger.debug { "Skipping $symbol deposit to ${wallet.address} on chain $chainId, available balance $availableAmount" }
                         }
