@@ -228,7 +228,7 @@ export function ChangeOrderModal({
               return 'Submit'
             }
           }}
-          success={false}
+          status={changeOrderMutation.status}
         />
       </div>
     </Modal>

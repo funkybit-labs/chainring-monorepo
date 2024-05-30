@@ -776,7 +776,7 @@ export function Swap({
                     return 'Swap'
                   }
                 }}
-                success={mutation.isSuccess}
+                status={mutation.status}
               />
             </>
           ) : (

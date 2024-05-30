@@ -1,17 +1,19 @@
 import { classNames } from 'utils'
 
+export type SubmitStatus = 'idle' | 'pending' | 'success' | 'error'
+
 export default function SubmitButton({
   disabled,
   onClick,
   caption,
   error,
-  success
+  status
 }: {
   disabled: boolean
   onClick: () => void
   caption: () => string
   error: string | null | undefined
-  success: boolean
+  status: SubmitStatus
 }) {
   return (
     <>
@@ -20,7 +22,7 @@ export default function SubmitButton({
         disabled={disabled}
         className={classNames(
           'mt-4 w-full inline-flex justify-center rounded-[50px] px-4 py-3 text-md text-white focus:outline-none focus:ring-1 focus:ring-inset',
-          success
+          status === 'success'
             ? 'bg-statusGreen'
             : disabled
               ? 'bg-neutralGray focus:ring-mutedGray'

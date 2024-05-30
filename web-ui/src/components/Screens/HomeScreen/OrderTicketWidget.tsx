@@ -515,7 +515,7 @@ export default function OrderTicketWidget({
                     return side
                   }
                 }}
-                success={false}
+                status={mutation.status}
               />
             ) : (
               <div className="mt-4">

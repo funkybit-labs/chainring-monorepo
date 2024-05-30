@@ -197,7 +197,7 @@ export default function WithdrawalModal({
                         return 'Submit'
                     }
                   }}
-                  success={false}
+                  status={mutation.status}
                 />
               </div>
             )
