@@ -18,6 +18,8 @@ class BotApp : BaseApp(dbConfig = DbConfig()) {
         bot = Bot(
             token = botToken,
             onUpdate = {
+                logger.debug { "Got update: $it" }
+
                 onCallbackQuery {
                     CallbackData.deserialize(it.data)?.also { callbackData ->
                         getOrCreateBotSession(it.from.id)
@@ -39,6 +41,9 @@ class BotApp : BaseApp(dbConfig = DbConfig()) {
                         }
                     }
                 }
+            },
+            onErrorThrown = { error ->
+                logger.error(error) { "Got error" }
             },
         )
 
