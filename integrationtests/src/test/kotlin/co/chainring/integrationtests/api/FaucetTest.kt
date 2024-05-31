@@ -1,6 +1,7 @@
 package co.chainring.integrationtests.api
 
 import co.chainring.apps.api.model.FaucetApiRequest
+import co.chainring.core.model.TxHash
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.utils.Faucet
 import co.chainring.integrationtests.utils.TestApiClient
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import java.math.BigInteger
 import java.time.Duration
 import kotlin.test.Test
+import kotlin.test.assertNotEquals
 
 @ExtendWith(AppUnderTestRunner::class)
 class FaucetTest {
@@ -29,7 +31,11 @@ class FaucetTest {
             wallet.switchChain(chain.id)
 
             val nativeBalanceBefore = wallet.getWalletNativeBalance()
-            apiClient.faucet(FaucetApiRequest(chainId = chain.id, wallet.address))
+            apiClient.faucet(FaucetApiRequest(chainId = chain.id, wallet.address)).also {
+                assertEquals(BigInteger("100000000000000000"), it.amount)
+                assertEquals(chain.id, it.chainId)
+                assertNotEquals(TxHash.emptyHash(), it.txHash)
+            }
 
             await
                 .withAlias("Waiting for block confirmation")

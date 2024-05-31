@@ -6,6 +6,8 @@ import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.Deposit
+import co.chainring.apps.api.model.FaucetApiRequest
+import co.chainring.apps.api.model.FaucetApiResponse
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.apps.api.model.Trade
@@ -48,6 +50,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.Keys
+import org.web3j.protocol.core.methods.response.TransactionReceipt
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.time.Duration.Companion.seconds
@@ -278,6 +281,23 @@ class BotSessionCurrentWallet(
             ),
         )
     }
+
+    fun airdropSupported(symbol: Symbol): Boolean {
+        if (!faucetSupported) return false
+
+        val symbolInfo = symbolInfoBySymbol[symbol]
+        return if (symbolInfo == null) {
+            false
+        } else {
+            symbolInfo.contractAddress == null
+        }
+    }
+
+    fun airdrop(symbol: Symbol): Either<ApiCallFailure, FaucetApiResponse> =
+        apiClient.tryFaucet(FaucetApiRequest(chain(symbol), walletAddress))
+
+    fun getTxReceipt(chainId: ChainId, txHash: TxHash): TransactionReceipt? =
+        blockchainClientsByChainId.getValue(chainId).getTransactionReceipt(txHash)
 
     private fun signOrder(order: CreateOrderApiRequest.Market): CreateOrderApiRequest.Market {
         val blockchainClient = blockchainClient(currentMarket.baseSymbol)

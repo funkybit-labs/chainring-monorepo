@@ -6,7 +6,9 @@ import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.Trade
 import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
+import co.chainring.core.model.TxHash
 import co.chainring.core.model.abbreviated
+import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
@@ -26,10 +28,17 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.crypto.Keys
+import org.web3j.protocol.core.methods.response.TransactionReceipt
 import java.math.BigInteger
 import java.math.RoundingMode
+import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
-class BotSession(private val telegramUserId: Long, private val bot: Bot) {
+class BotSession(
+    private val telegramUserId: Long,
+    private val bot: Bot,
+    private val timer: ScheduledThreadPoolExecutor,
+) {
     private val logger = KotlinLogging.logger { }
 
     private val chatId = telegramUserId.toString()
@@ -61,36 +70,54 @@ class BotSession(private val telegramUserId: Long, private val bot: Bot) {
 
     suspend fun sendMainMenu() {
         val balances = currentWallet.getBalances()
+        val baseSymbol = balances.baseSymbol
+        val quoteSymbol = balances.quoteSymbol
+
         deleteMessages()
         sendMessage(
             TextMessage(
                 text = "-- Current Wallet --" +
                     "\n<code>${currentWallet.walletAddress.value}</code>" +
                     "\n\n-- Current Market --" +
-                    "\n<code>${balances.baseSymbol.value + "/" + balances.quoteSymbol.value}</code>" +
-                    "\nMarket Price: <b>${(currentWallet.getMarketPrice()?.toPlainString() ?: "Unknown") + " " + balances.quoteSymbol.value}</b>" +
+                    "\n<code>${baseSymbol.value + "/" + quoteSymbol.value}</code>" +
+                    "\nMarket Price: <b>${(currentWallet.getMarketPrice()?.toPlainString() ?: "Unknown") + " " + quoteSymbol.value}</b>" +
+                    "\n\n-- Wallet Balances --" +
+                    "\n${baseSymbol.value}: <b>${formatAmount(baseSymbol, currentWallet.getWalletBalance(baseSymbol))}</b>" +
+                    "\n${quoteSymbol.value}: <b>${formatAmount(quoteSymbol, currentWallet.getWalletBalance(quoteSymbol))}</b>" +
                     "\n\n-- Available Balances --" +
-                    "\n${balances.baseSymbol.value}: <b>${formatAmount(balances.baseSymbol, balances.availableBaseBalance)}</b>" +
-                    "\n${balances.quoteSymbol.value}: <b>${formatAmount(balances.quoteSymbol, balances.availableQuoteBalance)}</b>",
+                    "\n${baseSymbol.value}: <b>${formatAmount(baseSymbol, balances.availableBaseBalance)}</b>" +
+                    "\n${quoteSymbol.value}: <b>${formatAmount(quoteSymbol, balances.availableQuoteBalance)}</b>",
                 chatId = chatId,
                 parseMode = "HTML",
                 keyboard = InlineKeyboard(
                     listOf(
                         listOf(
-                            callbackButton("Buy ${balances.baseSymbol.value}", CallbackData.Buy),
-                            callbackButton("Sell ${balances.baseSymbol.value}", CallbackData.Sell),
+                            callbackButton("Buy ${baseSymbol.value}", CallbackData.Buy),
+                            callbackButton("Sell ${baseSymbol.value}", CallbackData.Sell),
                         ),
                         listOf(
                             callbackButton("Switch Markets", CallbackData.ListMarkets),
                             callbackButton("Switch Wallets", CallbackData.ListWallets),
                         ),
                         listOf(
-                            callbackButton("Deposit ${balances.baseSymbol.value}", CallbackData.DepositBase),
-                            callbackButton("Deposit ${balances.quoteSymbol.value}", CallbackData.DepositQuote),
+                            callbackButton("Deposit ${baseSymbol.value}", CallbackData.DepositBase),
+                            callbackButton("Deposit ${quoteSymbol.value}", CallbackData.DepositQuote),
                         ),
                         listOf(
-                            callbackButton("Withdraw ${balances.baseSymbol.value}", CallbackData.WithdrawBase),
-                            callbackButton("Withdraw ${balances.quoteSymbol.value}", CallbackData.WithdrawQuote),
+                            callbackButton("Withdraw ${baseSymbol.value}", CallbackData.WithdrawBase),
+                            callbackButton("Withdraw ${quoteSymbol.value}", CallbackData.WithdrawQuote),
+                        ),
+                        listOfNotNull(
+                            if (currentWallet.airdropSupported(baseSymbol)) {
+                                callbackButton("Airdrop ${baseSymbol.value}", CallbackData.Airdrop(baseSymbol))
+                            } else {
+                                null
+                            },
+                            if (currentWallet.airdropSupported(quoteSymbol)) {
+                                callbackButton("Airdrop ${quoteSymbol.value}", CallbackData.Airdrop(quoteSymbol))
+                            } else {
+                                null
+                            },
                         ),
                         listOf(
                             callbackButton("Settings", CallbackData.Settings),
@@ -274,6 +301,30 @@ class BotSession(private val telegramUserId: Long, private val bot: Bot) {
                     "Enter amount (${formatAmountWithSymbol(walletBalance.quoteSymbol, walletBalance.availableQuoteBalance)} available)",
                     TelegramUserReplyType.WithdrawQuoteAmount,
                 )
+            }
+
+            is CallbackData.Airdrop -> {
+                val symbol = callbackData.symbol
+                if (currentWallet.airdropSupported(symbol)) {
+                    currentWallet
+                        .airdrop(symbol)
+                        .onLeft {
+                            sendMessage("❌ Airdrop failed with error: (${it.error?.displayMessage ?: "Unknown Error"})")
+                        }
+                        .onRight {
+                            sendMessage("✅ ${formatAmountWithSymbol(symbol, it.amount)} will be transferred to your wallet")
+                            onTxReceipt(it.chainId, it.txHash) { receipt ->
+                                if (receipt.isStatusOK) {
+                                    sendMessage("✅ ${formatAmountWithSymbol(symbol, it.amount)} was transferred to your wallet")
+                                    sendMainMenu()
+                                } else {
+                                    sendMessage("❌ Airdrop transaction ${it.txHash.value} has failed")
+                                }
+                            }
+                        }
+                } else {
+                    sendMessage("❌ Airdrop is not supported for ${symbol.value}")
+                }
             }
         }
     }
@@ -555,6 +606,18 @@ class BotSession(private val telegramUserId: Long, private val bot: Bot) {
 
     private fun decimals(symbol: Symbol) =
         currentWallet.symbolInfoBySymbol.getValue(symbol).decimals.toInt()
+
+    // checks for tx receipt periodically with 1-second delay until it gets one
+    private fun onTxReceipt(chainId: ChainId, txHash: TxHash, callback: suspend (TransactionReceipt) -> Unit) {
+        timer.schedule({
+            val txReceipt = currentWallet.getTxReceipt(chainId, txHash)
+            if (txReceipt == null) {
+                onTxReceipt(chainId, txHash, callback)
+            } else {
+                runBlocking { callback(txReceipt) }
+            }
+        }, 1L, TimeUnit.SECONDS)
+    }
 }
 
 fun callbackButton(text: String, callbackData: CallbackData): InlineKeyboardItem =
