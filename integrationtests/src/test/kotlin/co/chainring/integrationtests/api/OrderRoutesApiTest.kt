@@ -4,11 +4,9 @@ import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
-import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.RequestStatus
-import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.websocket.LastTrade
 import co.chainring.apps.api.model.websocket.LastTradeDirection
@@ -20,30 +18,19 @@ import co.chainring.core.client.ws.subscribeToBalances
 import co.chainring.core.client.ws.subscribeToLimits
 import co.chainring.core.client.ws.subscribeToOrderBook
 import co.chainring.core.client.ws.subscribeToOrders
-import co.chainring.core.client.ws.subscribeToPrices
 import co.chainring.core.client.ws.subscribeToTrades
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.ExecutionRole
-import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
-import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
-import co.chainring.core.model.db.SettlementBatchEntity
-import co.chainring.core.model.db.SettlementBatchStatus
-import co.chainring.core.model.db.SettlementBatchTable
 import co.chainring.core.model.db.SettlementStatus
-import co.chainring.core.model.db.TradeEntity
-import co.chainring.core.model.db.TradeId
-import co.chainring.core.model.db.TradeTable
-import co.chainring.core.model.db.WithdrawalEntity
-import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.utils.generateOrderNonce
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
+import co.chainring.integrationtests.testutils.OrderBaseTest
 import co.chainring.integrationtests.testutils.waitForBalance
-import co.chainring.integrationtests.testutils.waitForFinalizedWithdrawal
 import co.chainring.integrationtests.utils.AssetAmount
 import co.chainring.integrationtests.utils.ExchangeContractManager
 import co.chainring.integrationtests.utils.ExpectedBalance
@@ -53,16 +40,12 @@ import co.chainring.integrationtests.utils.Wallet
 import co.chainring.integrationtests.utils.assertAmount
 import co.chainring.integrationtests.utils.assertBalances
 import co.chainring.integrationtests.utils.assertBalancesMessageReceived
-import co.chainring.integrationtests.utils.assertContainsBalancesMessage
-import co.chainring.integrationtests.utils.assertContainsLimitsMessage
-import co.chainring.integrationtests.utils.assertContainsTradeUpdatedMessage
 import co.chainring.integrationtests.utils.assertError
 import co.chainring.integrationtests.utils.assertFee
 import co.chainring.integrationtests.utils.assertLimitOrderCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertLimitOrderUpdatedMessageReceived
 import co.chainring.integrationtests.utils.assertLimitsMessageReceived
 import co.chainring.integrationtests.utils.assertMarketOrderCreatedMessageReceived
-import co.chainring.integrationtests.utils.assertMessagesReceived
 import co.chainring.integrationtests.utils.assertOrderBookMessageReceived
 import co.chainring.integrationtests.utils.assertOrderCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertOrderUpdatedMessageReceived
@@ -76,74 +59,19 @@ import co.chainring.integrationtests.utils.ofAsset
 import co.chainring.integrationtests.utils.sum
 import co.chainring.integrationtests.utils.toCancelOrderRequest
 import kotlinx.datetime.Clock
-import org.awaitility.kotlin.await
-import org.awaitility.kotlin.withAlias
 import org.http4k.client.WebsocketClient
-import org.http4k.websocket.WsClient
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import java.math.BigDecimal
 import java.math.BigInteger
-import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertIs
 
 @ExtendWith(AppUnderTestRunner::class)
-class OrderRoutesApiTest {
-    companion object {
-        lateinit var symbols: Map<String, SymbolInfo>
-        lateinit var btc: SymbolInfo
-        lateinit var btc2: SymbolInfo
-        lateinit var eth: SymbolInfo
-        lateinit var eth2: SymbolInfo
-        lateinit var usdc: SymbolInfo
-        lateinit var usdc2: SymbolInfo
-        lateinit var dai: SymbolInfo
-        private lateinit var btcEthMarket: Market
-        private lateinit var btc2Eth2Market: Market
-        private lateinit var btcUsdcMarket: Market
-        private lateinit var btc2Usdc2Market: Market
-        private lateinit var usdcDaiMarket: Market
-        private lateinit var btcbtc2Market: Market
-        private lateinit var chainIdBySymbol: Map<String, ChainId>
-
-        @JvmStatic
-        @BeforeAll
-        fun loadSymbols() {
-            val config = TestApiClient.getConfiguration()
-            usdcDaiMarket = config.markets.first { it.id.value == "USDC/DAI" }
-            btcEthMarket = config.markets.first { it.id.value == "BTC/ETH" }
-            btc2Eth2Market = config.markets.first { it.id.value == "BTC2/ETH2" }
-            btcUsdcMarket = config.markets.first { it.id.value == "BTC/USDC" }
-            btc2Usdc2Market = config.markets.first { it.id.value == "BTC2/USDC2" }
-            btcbtc2Market = config.markets.first { it.id.value == "BTC/BTC2" }
-            symbols = config.chains.flatMap { it.symbols }.associateBy { it.name }
-            btc = symbols.getValue("BTC")
-            btc2 = symbols.getValue("BTC2")
-            eth = symbols.getValue("ETH")
-            eth2 = symbols.getValue("ETH2")
-            usdc = symbols.getValue("USDC")
-            usdc2 = symbols.getValue("USDC2")
-            dai = symbols.getValue("DAI")
-            chainIdBySymbol = config.chains.map { chain -> chain.symbols.map { it.name to chain.id } }.flatten().toMap()
-        }
-
-        @JvmStatic
-        fun chainIndices() = listOf(
-            Arguments.of(0),
-            Arguments.of(1),
-        )
-    }
+class OrderRoutesApiTest : OrderBaseTest() {
 
     @Test
     fun `CRUD order`() {
@@ -1233,236 +1161,6 @@ class OrderRoutesApiTest {
         takerWsClient.close()
     }
 
-    @ParameterizedTest
-    @MethodSource("chainIndices")
-    fun `settlement failure`(chainIndex: Int) {
-        val (market, baseSymbol, quoteSymbol) = if (chainIndex == 0) {
-            Triple(btcEthMarket, btc, eth)
-        } else {
-            Triple(btc2Eth2Market, btc2, eth2)
-        }
-
-        val (takerApiClient, takerWallet, takerWsClient) = setupTrader(
-            market.id,
-            airdrops = listOf(
-                AssetAmount(baseSymbol, "0.5"),
-                AssetAmount(quoteSymbol, "2"),
-            ),
-            deposits = listOf(
-                AssetAmount(baseSymbol, "0.1"),
-                AssetAmount(quoteSymbol, "2"),
-            ),
-        )
-
-        val (makerApiClient, makerWallet, makerWsClient) = setupTrader(
-            market.id,
-            airdrops = listOf(
-                AssetAmount(baseSymbol, "0.5"),
-                AssetAmount(quoteSymbol, "2"),
-            ),
-            deposits = listOf(
-                AssetAmount(quoteSymbol, "2"),
-            ),
-        )
-
-        // starting onchain balances
-        val makerStartingBaseBalance = makerWallet.getExchangeBalance(baseSymbol)
-        val makerStartingQuoteBalance = makerWallet.getExchangeBalance(quoteSymbol)
-        val takerStartingBaseBalance = takerWallet.getExchangeBalance(baseSymbol)
-        val takerStartingQuoteBalance = takerWallet.getExchangeBalance(quoteSymbol)
-
-        val baseWithdrawalAmount = AssetAmount(baseSymbol, "0.015")
-
-        val pendingBaseWithdrawal = takerApiClient.createWithdrawal(takerWallet.signWithdraw(baseSymbol.name, baseWithdrawalAmount.inFundamentalUnits)).withdrawal
-        assertEquals(WithdrawalStatus.Pending, pendingBaseWithdrawal.status)
-
-        takerWsClient.apply {
-            assertBalancesMessageReceived(
-                listOf(
-                    ExpectedBalance(baseSymbol, total = takerStartingBaseBalance, available = takerStartingBaseBalance - baseWithdrawalAmount),
-                    ExpectedBalance(quoteSymbol, total = takerStartingQuoteBalance, available = takerStartingQuoteBalance),
-                ),
-            )
-            assertLimitsMessageReceived(market, base = takerStartingBaseBalance - baseWithdrawalAmount, quote = takerStartingQuoteBalance)
-        }
-
-        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id)
-
-        takerWsClient.apply {
-            assertBalancesMessageReceived(
-                listOf(
-                    ExpectedBalance(baseSymbol, total = takerStartingBaseBalance - baseWithdrawalAmount, available = takerStartingBaseBalance - baseWithdrawalAmount),
-                    ExpectedBalance(quoteSymbol, total = takerStartingQuoteBalance, available = takerStartingQuoteBalance),
-                ),
-            )
-        }
-
-        // hack to resubmit the same transaction again bypassing the sequencer. This way taker will not have a
-        // sufficient on chain balance for the order so settlement will fail.
-        transaction {
-            WithdrawalEntity[pendingBaseWithdrawal.id].status = WithdrawalStatus.Sequenced
-        }
-
-        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id)
-
-        takerWsClient.apply {
-            assertBalancesMessageReceived(
-                listOf(
-                    ExpectedBalance(baseSymbol, total = takerStartingBaseBalance - baseWithdrawalAmount * BigDecimal(2), available = takerStartingBaseBalance - baseWithdrawalAmount),
-                    ExpectedBalance(quoteSymbol, total = takerStartingQuoteBalance, available = takerStartingQuoteBalance),
-                ),
-            )
-        }
-
-        // place a limit order
-        val limitBuyOrderApiResponse = makerApiClient.createLimitOrder(
-            market,
-            OrderSide.Buy,
-            amount = BigDecimal("0.08"),
-            price = BigDecimal("17.55"),
-            makerWallet,
-        )
-        makerWsClient.apply {
-            assertLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
-            assertLimitsMessageReceived(market, base = BigDecimal("0"), quote = BigDecimal("0.596"))
-        }
-
-        listOf(makerWsClient, takerWsClient).forEach { wsClient ->
-            wsClient.assertOrderBookMessageReceived(
-                market.id,
-                OrderBook(
-                    marketId = market.id,
-                    buy = listOf(
-                        OrderBookEntry(price = "17.550", size = "0.08".toBigDecimal()),
-                    ),
-                    sell = emptyList(),
-                    last = LastTrade("0.000", LastTradeDirection.Unchanged),
-                ),
-            )
-        }
-
-        // place a sell order
-        val marketBuyOrderApiResponse = takerApiClient.createMarketOrder(
-            market,
-            OrderSide.Sell,
-            BigDecimal("0.08"),
-            takerWallet,
-        )
-
-        takerWsClient.apply {
-            assertMarketOrderCreatedMessageReceived(marketBuyOrderApiResponse)
-            assertTradeCreatedMessageReceived(
-                order = marketBuyOrderApiResponse,
-                price = BigDecimal("17.55"),
-                amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount),
-                fee = AssetAmount(quoteSymbol, "0.02808"),
-                settlementStatus = SettlementStatus.Pending,
-            )
-            assertOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Filled, msg.order.status)
-                assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.08"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "17.550"), msg.order.executions[0].price)
-                assertEquals(ExecutionRole.Taker, msg.order.executions[0].role)
-            }
-            assertBalancesMessageReceived(
-                listOf(
-                    ExpectedBalance(baseSymbol, total = BigDecimal("0.07"), available = BigDecimal("0.005")),
-                    ExpectedBalance(quoteSymbol, total = BigDecimal("2.0"), available = BigDecimal("3.37592")),
-                ),
-            )
-        }
-
-        makerWsClient.apply {
-            assertTradeCreatedMessageReceived(
-                order = limitBuyOrderApiResponse,
-                price = BigDecimal("17.55"),
-                amount = AssetAmount(baseSymbol, "0.08"),
-                fee = AssetAmount(quoteSymbol, "0.01404"),
-                settlementStatus = SettlementStatus.Pending,
-            )
-            assertOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Filled, msg.order.status)
-                assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.08"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "17.550"), msg.order.executions[0].price)
-                assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
-            }
-            assertBalancesMessageReceived(
-                listOf(
-                    ExpectedBalance(baseSymbol, total = BigDecimal("0"), available = BigDecimal("0.08")),
-                    ExpectedBalance(quoteSymbol, total = BigDecimal("2.0"), available = BigDecimal("0.58196")),
-                ),
-            )
-        }
-
-        listOf(makerWsClient, takerWsClient).forEach { wsClient ->
-            wsClient.assertOrderBookMessageReceived(
-                market.id,
-                OrderBook(
-                    marketId = market.id,
-                    buy = listOf(),
-                    sell = listOf(),
-                    last = LastTrade("17.550", LastTradeDirection.Up),
-                ),
-            )
-        }
-        val trade = getTradesForOrders(listOf(marketBuyOrderApiResponse.orderId)).first()
-
-        takerWsClient.apply {
-            assertPricesMessageReceived(market.id)
-            assertLimitsMessageReceived(market, base = BigDecimal("0.005"), quote = BigDecimal("3.37592"))
-        }
-
-        makerWsClient.apply {
-            assertPricesMessageReceived(market.id)
-            assertLimitsMessageReceived(market, base = BigDecimal("0.08"), quote = BigDecimal("0.58196"))
-        }
-
-        assertAmount(AssetAmount(baseSymbol, "0.08"), trade.amount)
-        assertAmount(AssetAmount(quoteSymbol, "17.550"), trade.price)
-
-        waitForSettlementToFinish(listOf(trade.id.value), SettlementStatus.Failed)
-
-        takerWsClient.apply {
-            assertMessagesReceived(3) { messages ->
-                assertContainsTradeUpdatedMessage(messages) { msg ->
-                    assertEquals(marketBuyOrderApiResponse.orderId, msg.trade.orderId)
-                    assertEquals(SettlementStatus.Failed, msg.trade.settlementStatus)
-                    assertEquals("Insufficient Balance", msg.trade.error)
-                }
-                assertContainsBalancesMessage(
-                    messages,
-                    listOf(
-                        ExpectedBalance(baseSymbol, total = AssetAmount(baseSymbol, "0.07"), available = takerStartingBaseBalance - baseWithdrawalAmount),
-                        ExpectedBalance(takerStartingQuoteBalance),
-                    ),
-                )
-                assertContainsLimitsMessage(messages, market, base = takerStartingBaseBalance - baseWithdrawalAmount, quote = takerStartingQuoteBalance)
-            }
-        }
-
-        makerWsClient.apply {
-            assertMessagesReceived(3) { messages ->
-                assertContainsTradeUpdatedMessage(messages) { msg ->
-                    assertEquals(limitBuyOrderApiResponse.orderId, msg.trade.orderId)
-                    assertEquals(SettlementStatus.Failed, msg.trade.settlementStatus)
-                    assertEquals("Insufficient Balance", msg.trade.error)
-                }
-                assertContainsBalancesMessage(
-                    messages,
-                    listOf(
-                        ExpectedBalance(makerStartingBaseBalance),
-                        ExpectedBalance(makerStartingQuoteBalance),
-                    ),
-                )
-                assertContainsLimitsMessage(messages, market, base = makerStartingBaseBalance, quote = makerStartingQuoteBalance)
-            }
-        }
-
-        makerWsClient.close()
-    }
-
     @Test
     fun `cross chain trade execution`() {
         val market = btcbtc2Market
@@ -1988,306 +1686,5 @@ class OrderRoutesApiTest {
         takerWsClient.close()
 
         Thread.sleep(100)
-    }
-
-    @Test
-    fun `cross chain settlement failure`() {
-        val market = btcbtc2Market
-        val baseSymbol = btc
-        val quoteSymbol = btc2
-
-        val (takerApiClient, takerWallet, takerWsClient) = setupTrader(
-            market.id,
-            airdrops = listOf(
-                AssetAmount(baseSymbol, "0.5"),
-                AssetAmount(quoteSymbol, "0.6"),
-            ),
-            deposits = listOf(
-                AssetAmount(baseSymbol, "0.3"),
-                AssetAmount(quoteSymbol, "0.4"),
-            ),
-            subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
-        )
-
-        val (makerApiClient, makerWallet, makerWsClient) = setupTrader(
-            market.id,
-            airdrops = listOf(
-                AssetAmount(baseSymbol, "0.5"),
-                AssetAmount(quoteSymbol, "0.7"),
-            ),
-            deposits = listOf(
-                AssetAmount(quoteSymbol, "0.55"),
-            ),
-            subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
-        )
-
-        // starting onchain balances
-        val makerStartingBaseBalance = makerWallet.getExchangeBalance(baseSymbol)
-        val makerStartingQuoteBalance = makerWallet.getExchangeBalance(quoteSymbol)
-        val takerStartingBaseBalance = takerWallet.getExchangeBalance(baseSymbol)
-        val takerStartingQuoteBalance = takerWallet.getExchangeBalance(quoteSymbol)
-        takerWallet.switchChain(chainIdBySymbol.getValue(baseSymbol.name))
-
-        val baseWithdrawalAmount = AssetAmount(baseSymbol, "0.12")
-
-        val pendingBaseWithdrawal = takerApiClient.createWithdrawal(takerWallet.signWithdraw(baseSymbol.name, baseWithdrawalAmount.inFundamentalUnits)).withdrawal
-        assertEquals(WithdrawalStatus.Pending, pendingBaseWithdrawal.status)
-
-        takerWsClient.apply {
-            assertBalancesMessageReceived(
-                listOf(
-                    ExpectedBalance(baseSymbol, total = takerStartingBaseBalance, available = takerStartingBaseBalance - baseWithdrawalAmount),
-                    ExpectedBalance(quoteSymbol, total = takerStartingQuoteBalance, available = takerStartingQuoteBalance),
-                ),
-            )
-            assertLimitsMessageReceived(market, base = takerStartingBaseBalance - baseWithdrawalAmount, quote = takerStartingQuoteBalance)
-        }
-
-        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id)
-
-        takerWsClient.apply {
-            assertBalancesMessageReceived(
-                listOf(
-                    ExpectedBalance(baseSymbol, total = takerStartingBaseBalance - baseWithdrawalAmount, available = takerStartingBaseBalance - baseWithdrawalAmount),
-                    ExpectedBalance(quoteSymbol, total = takerStartingQuoteBalance, available = takerStartingQuoteBalance),
-                ),
-            )
-        }
-
-        // hack to resubmit the same transaction again bypassing the sequencer. This way taker will not have a
-        // sufficient on chain balance for the order so settlement will fail.
-        transaction {
-            WithdrawalEntity[pendingBaseWithdrawal.id].status = WithdrawalStatus.Sequenced
-        }
-
-        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id)
-
-        takerWsClient.apply {
-            assertBalancesMessageReceived(
-                listOf(
-                    ExpectedBalance(baseSymbol, total = takerStartingBaseBalance - baseWithdrawalAmount * BigDecimal(2), available = takerStartingBaseBalance - baseWithdrawalAmount),
-                    ExpectedBalance(quoteSymbol, total = takerStartingQuoteBalance, available = takerStartingQuoteBalance),
-                ),
-            )
-        }
-
-        // place a limit order
-        val limitBuyOrderApiResponse = makerApiClient.createLimitOrder(
-            market,
-            OrderSide.Buy,
-            amount = BigDecimal("0.08"),
-            price = BigDecimal("0.999"),
-            makerWallet,
-        )
-        makerWsClient.apply {
-            assertLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
-            assertLimitsMessageReceived(market, base = BigDecimal("0"), quote = BigDecimal("0.47008"))
-        }
-
-        // place a sell order
-        val marketBuyOrderApiResponse = takerApiClient.createMarketOrder(
-            market,
-            OrderSide.Sell,
-            BigDecimal("0.08"),
-            takerWallet,
-        )
-
-        takerWsClient.apply {
-            assertMarketOrderCreatedMessageReceived(marketBuyOrderApiResponse)
-            assertTradeCreatedMessageReceived(
-                order = marketBuyOrderApiResponse,
-                price = BigDecimal("0.999"),
-                amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount),
-                fee = AssetAmount(quoteSymbol, "0.0015984"),
-                settlementStatus = SettlementStatus.Pending,
-            )
-            assertOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Filled, msg.order.status)
-                assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.08"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "0.999"), msg.order.executions[0].price)
-                assertEquals(ExecutionRole.Taker, msg.order.executions[0].role)
-            }
-            assertBalancesMessageReceived(
-                listOf(
-                    ExpectedBalance(baseSymbol, total = BigDecimal("0.06"), available = BigDecimal("0.1")),
-                    ExpectedBalance(quoteSymbol, total = BigDecimal("0.4"), available = BigDecimal("0.4783216")),
-                ),
-            )
-        }
-
-        makerWsClient.apply {
-            assertTradeCreatedMessageReceived(
-                order = limitBuyOrderApiResponse,
-                price = BigDecimal("0.999"),
-                amount = AssetAmount(baseSymbol, "0.08"),
-                fee = AssetAmount(quoteSymbol, "0.0007992"),
-                settlementStatus = SettlementStatus.Pending,
-            )
-            assertOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Filled, msg.order.status)
-                assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.08"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "0.999"), msg.order.executions[0].price)
-                assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
-            }
-            assertBalancesMessageReceived(
-                listOf(
-                    ExpectedBalance(baseSymbol, total = BigDecimal("0"), available = BigDecimal("0.08")),
-                    ExpectedBalance(quoteSymbol, total = BigDecimal("0.55"), available = BigDecimal("0.4692808")),
-                ),
-            )
-        }
-
-        val trade = getTradesForOrders(listOf(marketBuyOrderApiResponse.orderId)).first()
-
-        takerWsClient.apply {
-            assertLimitsMessageReceived(market, base = BigDecimal("0.1"), quote = BigDecimal("0.4783216"))
-        }
-
-        makerWsClient.apply {
-            assertLimitsMessageReceived(market, base = BigDecimal("0.08"), quote = BigDecimal("0.4692808"))
-        }
-
-        assertAmount(AssetAmount(baseSymbol, "0.08"), trade.amount)
-        assertAmount(AssetAmount(quoteSymbol, "0.999"), trade.price)
-
-        waitForSettlementToFinish(listOf(trade.id.value), SettlementStatus.Failed)
-
-        takerWsClient.apply {
-            assertMessagesReceived(3) { messages ->
-                assertContainsTradeUpdatedMessage(messages) { msg ->
-                    assertEquals(marketBuyOrderApiResponse.orderId, msg.trade.orderId)
-                    assertEquals(SettlementStatus.Failed, msg.trade.settlementStatus)
-                    assertEquals("Insufficient Balance", msg.trade.error)
-                }
-                assertContainsBalancesMessage(
-                    messages,
-                    listOf(
-                        ExpectedBalance(baseSymbol, total = AssetAmount(baseSymbol, "0.06"), available = takerStartingBaseBalance - baseWithdrawalAmount),
-                        ExpectedBalance(takerStartingQuoteBalance),
-                    ),
-                )
-                assertContainsLimitsMessage(messages, market, base = takerStartingBaseBalance - baseWithdrawalAmount, quote = takerStartingQuoteBalance)
-            }
-        }
-
-        makerWsClient.apply {
-            assertMessagesReceived(3) { messages ->
-                assertContainsTradeUpdatedMessage(messages) { msg ->
-                    assertEquals(limitBuyOrderApiResponse.orderId, msg.trade.orderId)
-                    assertEquals(SettlementStatus.Failed, msg.trade.settlementStatus)
-                    assertEquals("Insufficient Balance", msg.trade.error)
-                }
-                assertContainsBalancesMessage(
-                    messages,
-                    listOf(
-                        ExpectedBalance(makerStartingBaseBalance),
-                        ExpectedBalance(makerStartingQuoteBalance),
-                    ),
-                )
-                assertContainsLimitsMessage(messages, market, base = makerStartingBaseBalance, quote = makerStartingQuoteBalance)
-            }
-        }
-
-        makerWsClient.close()
-
-        waitForSettlementBatchToFinish()
-    }
-    private fun setupTrader(
-        marketId: MarketId,
-        airdrops: List<AssetAmount>,
-        deposits: List<AssetAmount>,
-        subscribeToOrderBook: Boolean = true,
-        subscribeToOrderPrices: Boolean = true,
-    ): Triple<TestApiClient, Wallet, WsClient> {
-        val apiClient = TestApiClient()
-        val wallet = Wallet(apiClient)
-
-        val wsClient = WebsocketClient.blocking(apiClient.authToken).apply {
-            if (subscribeToOrderBook) {
-                subscribeToOrderBook(marketId)
-                assertOrderBookMessageReceived(marketId)
-            }
-
-            if (subscribeToOrderPrices) {
-                subscribeToPrices(marketId)
-                assertPricesMessageReceived(marketId)
-            }
-
-            subscribeToOrders()
-            assertOrdersMessageReceived()
-
-            subscribeToTrades()
-            assertTradesMessageReceived()
-
-            subscribeToBalances()
-            assertBalancesMessageReceived()
-
-            subscribeToLimits(marketId)
-            assertLimitsMessageReceived(marketId)
-        }
-
-        airdrops.forEach {
-            val chainId = chainIdBySymbol.getValue(it.symbol.name)
-            if (chainId != wallet.currentChainId) {
-                wallet.switchChain(chainId)
-            }
-            if (it.symbol.contractAddress == null) {
-                Faucet.fund(wallet.address, it.inFundamentalUnits, chainId)
-            } else {
-                wallet.mintERC20(it)
-            }
-        }
-
-        deposits.forEach {
-            val chainId = chainIdBySymbol.getValue(it.symbol.name)
-            if (chainId != wallet.currentChainId) {
-                wallet.switchChain(chainId)
-            }
-            wallet.deposit(it)
-            wsClient.assertBalancesMessageReceived()
-            wsClient.assertLimitsMessageReceived(marketId)
-        }
-
-        assertBalances(deposits.map { ExpectedBalance(it) }, apiClient.getBalances().balances)
-
-        return Triple(apiClient, wallet, wsClient)
-    }
-
-    private fun waitForSettlementToFinish(tradeIds: List<TradeId>, expectedStatus: SettlementStatus = SettlementStatus.Completed) {
-        await
-            .withAlias("Waiting for trade settlement to finish. TradeIds: ${tradeIds.joinToString { it.value }}")
-            .pollInSameThread()
-            .pollDelay(Duration.ofMillis(100))
-            .pollInterval(Duration.ofMillis(100))
-            .atMost(Duration.ofMillis(20000L))
-            .until {
-                Faucet.mine()
-                transaction {
-                    TradeEntity.count(TradeTable.guid.inList(tradeIds) and TradeTable.settlementStatus.eq(expectedStatus))
-                } == tradeIds.size.toLong()
-            }
-    }
-
-    private fun waitForSettlementBatchToFinish() {
-        await
-            .pollInSameThread()
-            .pollDelay(Duration.ofMillis(100))
-            .pollInterval(Duration.ofMillis(100))
-            .atMost(Duration.ofMillis(20000L))
-            .until {
-                transaction {
-                    SettlementBatchEntity.count(SettlementBatchTable.status.neq(SettlementBatchStatus.Completed)) == 0L
-                }
-            }
-    }
-
-    private fun getTradesForOrders(orderIds: List<OrderId>): List<TradeEntity> {
-        return transaction {
-            OrderExecutionEntity.findForOrders(orderIds).map { it.trade }
-        }
     }
 }

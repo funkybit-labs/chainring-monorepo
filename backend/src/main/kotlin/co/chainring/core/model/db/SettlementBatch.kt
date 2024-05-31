@@ -74,7 +74,7 @@ class SettlementBatchEntity(guid: EntityID<SettlementBatchId>) : GUIDEntity<Sett
     fun settlingTrades() = this.trades.filter { it.settlementStatus == SettlementStatus.Settling }
 
     fun markAsPreparing() {
-        this.status = SettlementBatchStatus.Submitted
+        this.status = SettlementBatchStatus.Preparing
         this.updatedAt = Clock.System.now()
         this.updatedBy = "system"
     }
