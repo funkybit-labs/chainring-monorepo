@@ -92,7 +92,8 @@ class ChainringDeploymentManager:
         print(f"Updating {service_names} services")
         task_defs = self.get_latest_task_definitions(service_names)
 
-        for service_name, task_def in task_defs.items():
+        for service_name in service_names:
+            task_def = task_defs[service_name]
             config_service_name = service_name.removeprefix(f"{env_name}-")
             service_config = env_config['services'][config_service_name]
             restart_required = service_config.get('no_rolling_upgrade', 'false') == 'true' and \
@@ -258,13 +259,21 @@ if __name__ == "__main__":
 
     service_manager = ChainringDeploymentManager(cluster_name=cluster, region_name=region)
 
-    services = set(env_config['services'].keys())
+    all_services = list(env_config['services'].keys())
 
+    services = []
     if args.services:
-        services = services.intersection(set(x.strip() for x in args.services.split(",")))
+        for s in args.services.split(","):
+            user_provided_service_name = s.strip()
+            if user_provided_service_name in all_services:
+                services.append(user_provided_service_name)
+            else:
+                raise Exception(f"Unknown service {user_provided_service_name}")
+    else:
+        services = all_services
 
     # services in ECS are prefixed with env
-    services = {f"{args.env}-{service}" for service in services}
+    services = [f"{args.env}-{service}" for service in services]
 
     if len(services) > 0:
         if args.action == 'start':
