@@ -21,7 +21,6 @@ environment:
     EVM_NETWORK_URL_anvil: http://test-anvil.chainring.co:8545
     EVM_NETWORK_URL_anvil2: http://test-anvil2.chainring.co:8545
     FAUCET_SUPPORTED: "true"
-    JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
   anvil2:
     CHAIN_ID: "31339"
   otterscan:
