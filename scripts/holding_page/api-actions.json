@@ -4,7 +4,7 @@
     "FixedResponseConfig": {
       "StatusCode": "418",
       "ContentType": "application/json",
-      "MessageBody": "{\"error\":{\"code\":418,\"message\":\"ChainRing is currently undergoing maintenance, we'll be back soon.\"}}",
+      "MessageBody": "{\"error\":{\"code\":418,\"message\":\"ChainRing is currently undergoing maintenance, we'll be back soon.\"}}"
     }
   }
 ]
