@@ -59,6 +59,8 @@ object BlockchainTransactionTable : GUIDTable<BlockchainTransactionId>("blockcha
     val blockNumber = decimal("block_number", 30, 0).nullable()
     val gasAccountFee = decimal("gas_account_fee", 30, 0).nullable()
     val actualGas = decimal("actual_gas", 30, 0).nullable()
+    val lastSeenBlock = decimal("last_seen_block", 30, 0).nullable()
+    val batchHash = varchar("batch_hash", 10485760).nullable()
 }
 
 class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUIDEntity<BlockchainTransactionId>(guid) {
@@ -66,6 +68,7 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
         fun create(
             chainId: ChainId,
             transactionData: BlockchainTransactionData,
+            batchHash: String?,
         ): BlockchainTransactionEntity {
             val entity = BlockchainTransactionEntity.new(BlockchainTransactionId.generate()) {
                 val now = Clock.System.now()
@@ -74,19 +77,28 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
                 this.status = BlockchainTransactionStatus.Pending
                 this.transactionData = transactionData
                 this.chainId = EntityID(chainId, ChainTable)
+                this.batchHash = batchHash
             }
             return entity
         }
     }
 
-    fun markAsSeen(blockNumber: BigInteger) {
+    fun updateBlockProcessed(blockNumber: BigInteger) {
         this.blockNumber = blockNumber
         this.updatedAt = Clock.System.now()
         this.updatedBy = "system"
     }
 
-    fun markAsSubmitted(txHash: TxHash) {
+    fun markAsSeen(blockNumber: BigInteger) {
+        this.lastSeenBlock = blockNumber
+        this.updatedAt = Clock.System.now()
+        this.updatedBy = "system"
+    }
+
+    fun markAsSubmitted(txHash: TxHash, blockNumber: BigInteger) {
         this.txHash = txHash
+        this.blockNumber = blockNumber
+        this.lastSeenBlock = blockNumber
         this.status = BlockchainTransactionStatus.Submitted
         this.updatedAt = Clock.System.now()
         this.updatedBy = "system"
@@ -139,6 +151,11 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
         toReal = { it?.toBigInteger() },
         toColumn = { it?.toBigDecimal() },
     )
+    var lastSeenBlock by BlockchainTransactionTable.lastSeenBlock.transform(
+        toReal = { it?.toBigInteger() },
+        toColumn = { it?.toBigDecimal() },
+    )
+    var batchHash by BlockchainTransactionTable.batchHash
 
     var chainId by BlockchainTransactionTable.chainId
     var chain by ChainEntity referencedOn BlockchainTransactionTable.chainId

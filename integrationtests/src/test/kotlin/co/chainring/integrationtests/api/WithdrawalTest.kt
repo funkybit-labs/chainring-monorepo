@@ -10,6 +10,7 @@ import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.waitForBalance
 import co.chainring.integrationtests.testutils.waitForFinalizedWithdrawal
+import co.chainring.integrationtests.testutils.waitForFinalizedWithdrawalWithForking
 import co.chainring.integrationtests.utils.AssetAmount
 import co.chainring.integrationtests.utils.ExpectedBalance
 import co.chainring.integrationtests.utils.Faucet
@@ -126,7 +127,7 @@ class WithdrawalTest {
                 ),
             )
 
-            waitForFinalizedWithdrawal(pendingBtcWithdrawal.id)
+            waitForFinalizedWithdrawalWithForking(pendingBtcWithdrawal.id)
 
             val btcWithdrawal = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
             assertEquals(WithdrawalStatus.Complete, btcWithdrawal.status)
@@ -213,7 +214,7 @@ class WithdrawalTest {
                 ),
             )
 
-            waitForFinalizedWithdrawal(pendingUsdcWithdrawal2.id)
+            waitForFinalizedWithdrawalWithForking(pendingUsdcWithdrawal2.id)
 
             val usdcWithdrawal2 = apiClient.getWithdrawal(pendingUsdcWithdrawal2.id).withdrawal
             assertEquals(WithdrawalStatus.Complete, usdcWithdrawal2.status)

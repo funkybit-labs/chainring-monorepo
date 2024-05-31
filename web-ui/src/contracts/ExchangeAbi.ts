@@ -189,6 +189,36 @@ export default [
     },
     {
         "type": "function",
+        "name": "lastSettlementBatchHash",
+        "inputs": [
+            
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "bytes32",
+                "internalType": "bytes32"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "lastWithdrawalBatchHash",
+        "inputs": [
+            
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "bytes32",
+                "internalType": "bytes32"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
         "name": "owner",
         "inputs": [
             

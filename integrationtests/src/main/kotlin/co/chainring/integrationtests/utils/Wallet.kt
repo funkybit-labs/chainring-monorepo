@@ -218,6 +218,10 @@ class Wallet(
         )
     }
 
+    fun rollbackSettlement() {
+        exchangeContractByChainId.getValue(currentChainId).rollbackBatch().sendAsync()
+    }
+
     private fun limitOrderEip712TxSignature(marketId: MarketId, amount: BigInteger, price: BigDecimal, side: OrderSide, nonce: String): EvmSignature {
         val (baseSymbol, quoteSymbol) = marketSymbols(marketId)
         val tx = EIP712Transaction.Order(
