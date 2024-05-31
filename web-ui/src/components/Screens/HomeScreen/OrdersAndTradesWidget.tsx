@@ -1,23 +1,14 @@
-import {
-  apiClient,
-  CancelOrderRequest,
-  FeeRates,
-  Order,
-  Trade
-} from 'apiClient'
+import { FeeRates, Order, Trade } from 'apiClient'
 import React, { useCallback, useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import { Address, formatUnits } from 'viem'
 import { format } from 'date-fns'
 import { produce } from 'immer'
-import { useMutation } from '@tanstack/react-query'
-import { isErrorFromAlias } from '@zodios/core'
 import { classNames } from 'utils'
 import Markets from 'markets'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { ordersTopic, Publishable, tradesTopic } from 'websocketMessages'
-import { generateOrderNonce, getDomain } from 'utils/eip712'
-import { useConfig, useSignTypedData } from 'wagmi'
+import { CancelOrderModal } from 'components/Screens/HomeScreen/CancelOrderModal'
 import { ChangeOrderModal } from 'components/Screens/HomeScreen/ChangeOrderModal'
 import { MarketTitle } from 'components/Screens/HomeScreen/MarketSelector'
 import { Status } from 'components/common/Status'
@@ -40,9 +31,9 @@ export default function OrdersAndTradesWidget({
   const [orders, setOrders] = useState<Order[]>(() => [])
   const [changedOrder, setChangedOrder] = useState<Order | null>(null)
   const [showChangeModal, setShowChangeModal] = useState<boolean>(false)
+  const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null)
+  const [showCancelModal, setShowCancelModal] = useState<boolean>(false)
   const [trades, setTrades] = useState<Trade[]>(() => [])
-  const config = useConfig()
-  const { signTypedDataAsync } = useSignTypedData()
   const [selectedTab, setSelectedTab] = useState<'orders' | 'trade-history'>(
     'orders'
   )
@@ -92,63 +83,14 @@ export default function OrdersAndTradesWidget({
     }, [])
   })
 
-  async function cancelOrder(order: Order) {
-    if (confirm('Are you sure you want to cancel your order?')) {
-      const nonce = generateOrderNonce()
-      const signature = await signTypedDataAsync({
-        types: {
-          EIP712Domain: [
-            { name: 'name', type: 'string' },
-            { name: 'version', type: 'string' },
-            { name: 'chainId', type: 'uint256' },
-            { name: 'verifyingContract', type: 'address' }
-          ],
-          CancelOrder: [
-            { name: 'sender', type: 'address' },
-            { name: 'marketId', type: 'string' },
-            { name: 'amount', type: 'int256' },
-            { name: 'nonce', type: 'int256' }
-          ]
-        },
-        domain: getDomain(exchangeContractAddress!, config.state.chainId),
-        primaryType: 'CancelOrder',
-        message: {
-          sender: walletAddress!,
-          marketId: order.marketId,
-          amount: order.side == 'Buy' ? order.amount : -order.amount,
-          nonce: BigInt('0x' + nonce)
-        }
-      })
-      cancelOrderMutation.mutate({
-        orderId: order.id,
-        amount: order.amount,
-        marketId: order.marketId,
-        side: order.side,
-        nonce: nonce,
-        signature: signature,
-        verifyingChainId: config.state.chainId
-      })
-    }
-  }
-
-  const cancelOrderMutation = useMutation({
-    mutationFn: (payload: CancelOrderRequest) =>
-      apiClient.cancelOrder(payload, { params: { id: payload.orderId } }),
-    onError: (error) => {
-      alert(
-        isErrorFromAlias(apiClient.api, 'cancelOrder', error)
-          ? error.response.data.errors[0].displayMessage
-          : 'Something went wrong'
-      )
-    },
-    onSettled: () => {
-      cancelOrderMutation.reset()
-    }
-  })
-
   function openEditModal(order: Order) {
     setChangedOrder(order)
     setShowChangeModal(true)
+  }
+
+  function openCancelModal(order: Order) {
+    setCancellingOrder(order)
+    setShowCancelModal(true)
   }
 
   function ordersContent() {
@@ -219,14 +161,12 @@ export default function OrdersAndTradesWidget({
                           <button
                             className="shrink-0 rounded bg-darkBluishGray7 p-2 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray"
                             onClick={() => openEditModal(order)}
-                            disabled={!cancelOrderMutation.isIdle}
                           >
                             <img src={Edit} alt={'Change'} />
                           </button>
                           <button
                             className="shrink-0 rounded bg-darkBluishGray7 p-2 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray"
-                            onClick={() => cancelOrder(order)}
-                            disabled={!cancelOrderMutation.isIdle}
+                            onClick={() => openCancelModal(order)}
                           >
                             <img src={Trash} alt={'Cancel'} />
                           </button>
@@ -250,6 +190,17 @@ export default function OrdersAndTradesWidget({
             feeRates={feeRates}
             close={() => setShowChangeModal(false)}
             onClosed={() => setChangedOrder(null)}
+          />
+        )}
+
+        {cancellingOrder && (
+          <CancelOrderModal
+            isOpen={showCancelModal}
+            order={cancellingOrder}
+            exchangeContractAddress={exchangeContractAddress!}
+            walletAddress={walletAddress!}
+            close={() => setShowCancelModal(false)}
+            onClosed={() => setCancellingOrder(null)}
           />
         )}
       </>
