@@ -6,15 +6,21 @@ import co.chainring.core.model.db.TelegramBotUserEntity
 import com.github.ehsannarmani.bot.Bot
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.util.concurrent.ScheduledThreadPoolExecutor
+
+private val botToken = System.getenv("TELEGRAM_BOT_TOKEN") ?: "6650191369:AAEwYfYkRjd3pBf7OEHmCIQ6MZZ1Wgygv6Q"
+val faucetSupported = System.getenv("FAUCET_SUPPORTED")?.toBoolean() ?: true
 
 class BotApp : BaseApp(dbConfig = DbConfig()) {
     override val logger = KotlinLogging.logger {}
 
     private val botSessions = mutableMapOf<Long, BotSession>()
-    private val botToken = System.getenv("TELEGRAM_BOT_TOKEN") ?: "6650191369:AAEwYfYkRjd3pBf7OEHmCIQ6MZZ1Wgygv6Q"
 
     private lateinit var bot: Bot
-    private fun run() {
+    private val timer = ScheduledThreadPoolExecutor(1)
+
+    override fun start() {
+        super.start()
         bot = Bot(
             token = botToken,
             onUpdate = {
@@ -49,25 +55,21 @@ class BotApp : BaseApp(dbConfig = DbConfig()) {
 
         transaction {
             TelegramBotUserEntity.all().forEach {
-                botSessions[it.telegramUserId] = BotSession(it.telegramUserId, bot)
+                botSessions[it.telegramUserId] = BotSession(it.telegramUserId, bot, timer)
             }
         }
 
         bot.startPolling()
     }
 
-    private fun getOrCreateBotSession(userId: Long): BotSession {
-        return botSessions.getOrPut(userId) {
-            BotSession(userId, bot)
-        }
-    }
-
-    override fun start() {
-        super.start()
-        run()
-    }
-
     override fun stop() {
         logger.info { "Stopping" }
+        timer.shutdown()
+    }
+
+    private fun getOrCreateBotSession(userId: Long): BotSession {
+        return botSessions.getOrPut(userId) {
+            BotSession(userId, bot, timer)
+        }
     }
 }

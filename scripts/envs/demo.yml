@@ -22,6 +22,7 @@ environment:
     EVM_CHAINS: Bitlayer,Botanix
     EVM_NETWORK_URL_Bitlayer: http://demo-anvil.chainring.co:8545
     EVM_NETWORK_URL_Botanix: http://demo-anvil2.chainring.co:8545
+    FAUCET_SUPPORTED: "true"
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
   anvil2:
     CHAIN_ID: "31338"

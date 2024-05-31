@@ -1,5 +1,7 @@
 package co.chainring.telegrambot.app
 
+import co.chainring.core.model.Symbol
+
 sealed class CallbackData {
     data object MainMenu : CallbackData()
     data object Settings : CallbackData()
@@ -16,6 +18,7 @@ sealed class CallbackData {
     data object DepositQuote : CallbackData()
     data object WithdrawBase : CallbackData()
     data object WithdrawQuote : CallbackData()
+    data class Airdrop(val symbol: Symbol) : CallbackData()
 
     fun serialize(): String =
         when (this) {
@@ -34,6 +37,7 @@ sealed class CallbackData {
             DepositQuote -> "DepositQuote"
             WithdrawBase -> "WithdrawBase"
             WithdrawQuote -> "WithdrawQuote"
+            is Airdrop -> "Airdrop ${symbol.value}"
         }
 
     companion object {
@@ -57,6 +61,7 @@ sealed class CallbackData {
                 "DepositQuote" -> DepositQuote
                 "WithdrawBase" -> WithdrawBase
                 "WithdrawQuote" -> WithdrawQuote
+                "Airdrop" -> Airdrop(Symbol(words[1]))
                 else -> null
             }
         }
