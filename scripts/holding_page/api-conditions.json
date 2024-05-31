@@ -6,12 +6,5 @@
         "/*"
       ]
     }
-  },
-  {
-    "Field": "http-header",
-    "HttpHeaderConfig": {
-      "HttpHeaderName": "X-IsApi",
-      "Values": ["true"]
-    }
   }
 ]
