@@ -1,4 +1,5 @@
 import { classNames } from 'utils'
+import { JSX } from 'react'
 
 export type SubmitStatus = 'idle' | 'pending' | 'success' | 'error'
 
@@ -11,7 +12,7 @@ export default function SubmitButton({
 }: {
   disabled: boolean
   onClick: () => void
-  caption: () => string
+  caption: () => string | JSX.Element
   error: string | null | undefined
   status: SubmitStatus
 }) {

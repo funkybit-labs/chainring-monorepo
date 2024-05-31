@@ -760,7 +760,7 @@ export function Swap({
                   if (mutation.isPending) {
                     return 'Submitting order...'
                   } else if (mutation.isSuccess) {
-                    return 'Swapped!'
+                    return <span className="text-xl">&#10003;</span>
                   } else {
                     return 'Swap'
                   }
