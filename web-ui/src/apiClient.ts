@@ -1,6 +1,6 @@
 import z from 'zod'
 import { Zodios } from '@zodios/core'
-import { pluginHeader, pluginToken } from '@zodios/plugins'
+import { pluginToken } from '@zodios/plugins'
 import { loadAuthToken } from 'auth'
 import Decimal from 'decimal.js'
 import { useEffect, useState } from 'react'
@@ -473,8 +473,6 @@ apiClient.use(
     }
   })
 )
-
-apiClient.use(pluginHeader('X-IsApi', async () => 'true'))
 
 export function useMaintenance() {
   const [maintenance, setMaintenance] = useState(false)
