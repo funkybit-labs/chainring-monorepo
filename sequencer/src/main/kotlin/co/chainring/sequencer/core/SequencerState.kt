@@ -1,5 +1,6 @@
 package co.chainring.sequencer.core
 
+import co.chainring.core.utils.humanReadableNanoseconds
 import co.chainring.sequencer.proto.BalancesCheckpoint
 import co.chainring.sequencer.proto.BalancesCheckpointKt.BalanceKt.consumption
 import co.chainring.sequencer.proto.BalancesCheckpointKt.balance
@@ -67,7 +68,7 @@ data class SequencerState(
                 }
             }
         }.let {
-            logger.debug { "load of balances took ${it / 1000}us" }
+            logger.debug { "load of balances took ${humanReadableNanoseconds(it)}" }
         }
 
         measureNanoTime {
@@ -83,15 +84,19 @@ data class SequencerState(
             val marketIds = metaInfoCheckpoint.marketsList.map(::MarketId)
 
             marketIds.forEach { marketId ->
-                val marketCheckpointFileName = "market_${marketId.baseAsset()}_${marketId.quoteAsset()}"
-                FileInputStream(Path.of(sourceDir.toString(), marketCheckpointFileName).toFile()).use { inputStream ->
-                    val marketCheckpoint = MarketCheckpoint.parseFrom(inputStream)
-                    val market = Market.fromCheckpoint(marketCheckpoint)
-                    markets[market.id] = market
+                measureNanoTime {
+                    val marketCheckpointFileName = "market_${marketId.baseAsset()}_${marketId.quoteAsset()}"
+                    FileInputStream(Path.of(sourceDir.toString(), marketCheckpointFileName).toFile()).use { inputStream ->
+                        val marketCheckpoint = MarketCheckpoint.parseFrom(inputStream)
+                        val market = Market.fromCheckpoint(marketCheckpoint)
+                        markets[market.id] = market
+                    }
+                }.let {
+                    logger.debug { "load of marketId market took ${humanReadableNanoseconds(it)}" }
                 }
             }
         }.let {
-            logger.debug { "load of ${markets.size} markets took ${it / 1000}us" }
+            logger.debug { "load all ${markets.size} markets took ${humanReadableNanoseconds(it)}" }
         }
     }
 
@@ -114,19 +119,23 @@ data class SequencerState(
                 getBalancesCheckpoint().writeTo(outputStream)
             }
         }.let {
-            logger.debug { "persist of balances took ${it / 1000}us" }
+            logger.debug { "persist of balances took ${humanReadableNanoseconds(it)}" }
         }
 
         measureNanoTime {
             markets.forEach { (id, market) ->
-                val fileName = "market_${id.baseAsset()}_${id.quoteAsset()}"
+                measureNanoTime {
+                    val fileName = "market_${id.baseAsset()}_${id.quoteAsset()}"
 
-                FileOutputStream(Path.of(destinationDir.toString(), fileName).toFile()).use { outputStream ->
-                    market.toCheckpoint().writeTo(outputStream)
+                    FileOutputStream(Path.of(destinationDir.toString(), fileName).toFile()).use { outputStream ->
+                        market.toCheckpoint().writeTo(outputStream)
+                    }
+                }.let {
+                    logger.debug { "persist of $id market took ${humanReadableNanoseconds(it)}" }
                 }
             }
         }.let {
-            logger.debug { "persist of ${markets.size} markets took ${it / 1000}us" }
+            logger.debug { "persist all ${markets.size} markets took ${humanReadableNanoseconds(it)}" }
         }
     }
 
