@@ -14,7 +14,6 @@ import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.ChainSettlementBatchEntity
 import co.chainring.core.model.db.SettlementBatchStatus
-import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.TradeEntity
 import co.chainring.core.model.db.TxHash
 import co.chainring.core.model.db.WalletEntity
@@ -25,12 +24,15 @@ import co.chainring.core.model.db.publishBroadcasterNotifications
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.sequencer.toSequencerId
 import co.chainring.core.utils.toHex
+import co.chainring.core.utils.toHexBytes
 import co.chainring.core.utils.tryAcquireAdvisoryLock
 import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.proto.SequencerError
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.web3j.crypto.Hash.sha3
+import org.web3j.crypto.RawTransaction
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.Contract
 import org.web3j.utils.Numeric
@@ -45,9 +47,9 @@ class BlockchainTransactionHandler(
     private val activePollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_TX_HANDLER_ACTIVE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 100L,
     private val inactivePollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_TX_HANDLER_INACTIVE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
     private val failurePollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_TX_HANDLER_FAILURE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 2000L,
+    private val maxUnseenBlocksForFork: Int = System.getenv("BLOCKCHAIN_TX_HANDLER_MAX_UNSEEN_BLOCKS_FOR_FORK")?.toIntOrNull() ?: 6,
 ) {
     private val chainId = blockchainClient.chainId
-    private val symbolMap = mutableMapOf<String, SymbolEntity>()
     private var workerThread: Thread? = null
     val logger = KotlinLogging.logger {}
 
@@ -58,11 +60,25 @@ class BlockchainTransactionHandler(
             dbTransaction {
                 BlockchainNonceEntity.clearNonce(blockchainClient.submitterAddress, chainId)
 
-                // defensive code (may only happen in lower env if we clear out the DB, but don't redeploy proxy)
-                // no settlement in progress based on DB but onchain has one in progress so roll it back.
-                if (!settlementBatchInProgress(chainId) && batchInProgressOnChain()) {
-                    logger.debug { "rolling back on chain on startup" }
-                    rollbackOnChain()
+                try {
+                    if (tryAcquireAdvisoryLock(chainId.value.toLong())) {
+                        // this is primarily to handle cases where we sent something on chain but process exited
+                        // before tx that updated the blockchain entity was committed,so looks like it was not sent onchain yet.
+                        val withdrawalsSettling = WithdrawalEntity.findSettling(chainId)
+                        if (withdrawalsSettling.isNotEmpty()) {
+                            syncWithdrawalWithBlockchain(withdrawalsSettling)
+                        } else {
+                            val inProgressSettlementBatch = ChainSettlementBatchEntity.findInProgressBatch(chainId)
+                            if (inProgressSettlementBatch != null) {
+                                syncSettlementWithBlockchain(inProgressSettlementBatch)
+                            } else if (batchInProgressOnChain()) {
+                                logger.debug { "rolling back on chain on startup" }
+                                rollbackOnChain()
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    logger.error(e) { "Error on startup trying to sync to consistent state" }
                 }
             }
             var settlementBatchInProgress = false
@@ -110,6 +126,70 @@ class BlockchainTransactionHandler(
         }
     }
 
+    private fun syncSettlementWithBlockchain(inProgressSettlementBatch: ChainSettlementBatchEntity) {
+        val blockNumber = blockchainClient.getBlockNumber()
+        when (inProgressSettlementBatch.status) {
+            SettlementBatchStatus.Preparing -> {
+                when (inProgressSettlementBatch.prepararationTx.status) {
+                    BlockchainTransactionStatus.Pending -> {
+                        if (inProgressSettlementBatch.prepararationTx.batchHash == blockchainClient.batchHash()) {
+                            // batch with this hash is already prepared on onchain
+                            inProgressSettlementBatch.markAsPrepared()
+                        } else {
+                            // check if in mempool and if so update txHash and mark tx submitted
+                            val txHash = getTxHash(inProgressSettlementBatch.prepararationTx.transactionData)
+                            blockchainClient.getTransactionByHash(txHash.value)?.let {
+                                inProgressSettlementBatch.prepararationTx.markAsSubmitted(txHash, blockNumber)
+                            }
+                        }
+                    }
+                    else -> {}
+                }
+            }
+            SettlementBatchStatus.Submitting -> {
+                inProgressSettlementBatch.submissionTx?.let { submissionTx ->
+                    when (submissionTx.status) {
+                        BlockchainTransactionStatus.Pending -> {
+                            if (submissionTx.batchHash == blockchainClient.lastSettlementBatchHash()) {
+                                // this batch is the last one successfully settled, so mark as submitted
+                                inProgressSettlementBatch.markAsCompleted()
+                            } else {
+                                val txHash = getTxHash(submissionTx.transactionData)
+                                blockchainClient.getTransactionByHash(txHash.value)?.let {
+                                    submissionTx.markAsSubmitted(txHash, blockNumber)
+                                }
+                            }
+                        }
+
+                        else -> {}
+                    }
+                }
+            }
+
+            else -> {}
+        }
+    }
+
+    private fun syncWithdrawalWithBlockchain(settlingWithdrawals: List<WithdrawalEntity>) {
+        val blockNumber = blockchainClient.getBlockNumber()
+
+        val blockchainTx: BlockchainTransactionEntity = settlingWithdrawals.first().blockchainTransaction!!
+        when (blockchainTx.status) {
+            BlockchainTransactionStatus.Pending -> {
+                if (blockchainTx.batchHash == blockchainClient.lastWithdrawalBatchHash()) {
+                    completeWithdrawals(settlingWithdrawals)
+                } else {
+                    // check if in mempool and if so update txHash and mark tx submitted
+                    val txHash = getTxHash(blockchainTx.transactionData)
+                    blockchainClient.getTransactionByHash(txHash.value)?.let {
+                        blockchainTx.markAsSubmitted(txHash, blockNumber)
+                    }
+                }
+            }
+            else -> {}
+        }
+    }
+
     fun stop() {
         workerThread?.let {
             it.interrupt()
@@ -138,7 +218,12 @@ class BlockchainTransactionHandler(
                     return true
                 }
                 BlockchainTransactionStatus.Submitted -> {
-                    return !refreshSubmittedTransaction(blockchainTx, blockchainClient.getBlockNumber(), numConfirmations) { txReceipt, error ->
+                    return !refreshSubmittedTransaction(
+                        tx = blockchainTx,
+                        currentBlock = blockchainClient.getBlockNumber(),
+                        confirmationsNeeded = numConfirmations,
+                        onTxNotFound = { onWithdrawalTxNotFound(blockchainTx) },
+                    ) { txReceipt, error ->
                         if (error == null) {
                             // extract the failed withdrawals from the events
                             val failedWithdrawals = txReceipt.logs.mapNotNull { eventLog ->
@@ -154,23 +239,15 @@ class BlockchainTransactionHandler(
                                 val errorMsg = errorCodeToString(failedWithdrawal.errorCode)
                                 logger.error { "Received failed event for sequence ${failedWithdrawal.sequence}, errorMsg=$errorMsg errorCode=${failedWithdrawal.errorCode}" }
                                 settlingWithdrawals.firstOrNull { it.sequenceId.toBigInteger() == failedWithdrawal.sequence }?.let {
-                                    try {
-                                        onTxComplete(it.transactionData!!, errorMsg)
-                                    } catch (e: Exception) {
-                                        logger.error(e) { "Callback exception for withdrawal with sequence ${it.sequenceId}" }
-                                    }
+                                    completeWithdrawals(listOf(it), errorMsg)
                                 }
                                 failedWithdrawal.sequence
                             }.toSet()
 
-                            settlingWithdrawals.filterNot { failedSequences.contains(it.sequenceId.toBigInteger()) }.forEach {
-                                onTxComplete(it.transactionData!!, null)
-                            }
+                            completeWithdrawals(settlingWithdrawals.filterNot { failedSequences.contains(it.sequenceId.toBigInteger()) })
                         } else {
                             // mark all the withdrawals as failed
-                            settlingWithdrawals.forEach {
-                                onTxComplete(it.transactionData!!, error)
-                            }
+                            completeWithdrawals(settlingWithdrawals, error)
                         }
                     }
                 }
@@ -193,7 +270,12 @@ class BlockchainTransactionHandler(
                         submitToBlockchain(inProgressBatch.prepararationTx)
                     }
                     BlockchainTransactionStatus.Submitted -> {
-                        refreshSubmittedTransaction(inProgressBatch.prepararationTx, blockchainClient.getBlockNumber(), 1) { txReceipt, error ->
+                        refreshSubmittedTransaction(
+                            tx = inProgressBatch.prepararationTx,
+                            currentBlock = blockchainClient.getBlockNumber(),
+                            confirmationsNeeded = 1,
+                            onTxNotFound = { onPreparationTxNotFound(inProgressBatch) },
+                        ) { txReceipt, error ->
                             if (error == null) {
                                 // extract the failed trades from the failed event
                                 val failedTrades = txReceipt.logs.mapNotNull { eventLog ->
@@ -228,7 +310,12 @@ class BlockchainTransactionHandler(
             }
             SettlementBatchStatus.Submitted -> {
                 inProgressBatch.submissionTx?.let { submissionTx ->
-                    refreshSubmittedTransaction(submissionTx, blockchainClient.getBlockNumber(), numConfirmations) { _, error ->
+                    refreshSubmittedTransaction(
+                        tx = submissionTx,
+                        currentBlock = blockchainClient.getBlockNumber(),
+                        confirmationsNeeded = numConfirmations,
+                        onTxNotFound = { onSubmissionTxNotFound(inProgressBatch) },
+                    ) { _, error ->
                         if (error == null) {
                             inProgressBatch.markAsCompleted()
                         } else {
@@ -252,8 +339,56 @@ class BlockchainTransactionHandler(
         }
     }
 
+    private fun onPreparationTxNotFound(batch: ChainSettlementBatchEntity) {
+        val onChainBatchHash = blockchainClient.batchHash()
+        logger.debug { "batchHash stored = ${batch.prepararationTx.batchHash} from contract = $onChainBatchHash" }
+        if (batch.prepararationTx.batchHash == onChainBatchHash) {
+            // batch with this hash is already prepared on onchain (anvil restarted case)
+            batch.markAsPrepared()
+        } else {
+            // fork case
+            batch.prepararationTx.status = BlockchainTransactionStatus.Pending
+        }
+    }
+
+    private fun onSubmissionTxNotFound(batch: ChainSettlementBatchEntity) {
+        val lastSuccessfulBatchHash = blockchainClient.lastSettlementBatchHash()
+        batch.submissionTx?.let { submissionTx ->
+            logger.debug { "batchHash stored = ${submissionTx.batchHash} from contract = $lastSuccessfulBatchHash" }
+            if (submissionTx.batchHash == lastSuccessfulBatchHash) {
+                // batch with this hash is already submitted on onchain (anvil restarted case)
+                batch.markAsCompleted()
+            } else {
+                // fork case
+                batch.status = SettlementBatchStatus.Submitting
+                submissionTx.status = BlockchainTransactionStatus.Pending
+            }
+        }
+    }
+    private fun onWithdrawalTxNotFound(blockchainTx: BlockchainTransactionEntity) {
+        val onChainBatchHash = blockchainClient.lastWithdrawalBatchHash()
+        logger.debug { "batchHash stored = ${blockchainTx.batchHash} from contract = $onChainBatchHash" }
+        if (blockchainTx.batchHash == onChainBatchHash) {
+            // batch with this hash is already submitted on onchain (anvil restarted case)
+            completeWithdrawals(WithdrawalEntity.findSettling(chainId))
+        } else {
+            // fork case
+            blockchainTx.status = BlockchainTransactionStatus.Pending
+        }
+    }
+
+    private fun completeWithdrawals(settlingWithdrawals: List<WithdrawalEntity>, error: String? = null) {
+        settlingWithdrawals.forEach {
+            try {
+                onTxComplete(it.transactionData!!, error)
+            } catch (e: Exception) {
+                logger.error(e) { "Callback exception for withdrawal with sequence ${it.sequenceId}" }
+            }
+        }
+    }
+
     private fun batchInProgressOnChain(): Boolean {
-        return BigInteger(blockchainClient.exchangeContract.batchHash().send().toHex(false), 16) != BigInteger.ZERO
+        return BigInteger(blockchainClient.batchHash(), 16) != BigInteger.ZERO
     }
 
     private fun rollbackBatch(currentBatch: ChainSettlementBatchEntity) {
@@ -271,9 +406,25 @@ class BlockchainTransactionHandler(
         }
     }
 
-    private fun refreshSubmittedTransaction(tx: BlockchainTransactionEntity, currentBlock: BigInteger, confirmationsNeeded: Int, onComplete: (TransactionReceipt, String?) -> Unit): Boolean {
+    private fun refreshSubmittedTransaction(tx: BlockchainTransactionEntity, currentBlock: BigInteger, confirmationsNeeded: Int, onTxNotFound: () -> Unit, onComplete: (TransactionReceipt, String?) -> Unit): Boolean {
         val txHash = tx.txHash ?: return true
-        val receipt = blockchainClient.getTransactionReceipt(txHash.value) ?: return true
+        val receipt = blockchainClient.getTransactionReceipt(txHash.value)
+        if (receipt == null) {
+            if (blockchainClient.getTransactionByHash(txHash.value) == null) {
+                tx.lastSeenBlock?.let { lastSeenBlock ->
+                    logger.debug { "Tx Not found - currentBlock=$currentBlock lastSeen=$lastSeenBlock maxUnseen=$maxUnseenBlocksForFork" }
+                    if (currentBlock > lastSeenBlock + maxUnseenBlocksForFork.toBigInteger()) {
+                        logger.debug { "Transaction not found in $maxUnseenBlocksForFork blocks, handling as a fork" }
+                        BlockchainNonceEntity.clearNonce(blockchainClient.submitterAddress, chainId)
+                        onTxNotFound()
+                    }
+                }
+            } else {
+                tx.markAsSeen(currentBlock)
+            }
+            return true
+        }
+        tx.markAsSeen(currentBlock)
 
         val receiptBlockNumber = receipt.blockNumber ?: return true
 
@@ -281,7 +432,7 @@ class BlockchainTransactionHandler(
             "0x1" -> {
                 val confirmationsReceived = confirmations(currentBlock, receiptBlockNumber)
                 if (tx.blockNumber == null) {
-                    tx.markAsSeen(blockNumber = receiptBlockNumber)
+                    tx.updateBlockProcessed(blockNumber = receiptBlockNumber)
                 }
                 if (confirmationsReceived >= confirmationsNeeded) {
                     tx.markAsConfirmed(gasAccountFee(receipt), receipt.gasUsed)
@@ -320,14 +471,17 @@ class BlockchainTransactionHandler(
     }
 
     private fun submitToBlockchain(tx: BlockchainTransactionEntity) {
+        val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
+        val blockNumber = blockchainClient.getBlockNumber()
         try {
-            val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
             val nonce = submitterNonce.nonce?.let { it + BigInteger.ONE } ?: getConsistentNonce(submitterNonce.key)
+            logger.debug { "sending Tx with nonce $nonce" }
             val txHash = sendPendingTransaction(tx.transactionData, nonce)
             submitterNonce.nonce = nonce
-            tx.markAsSubmitted(txHash)
+            tx.markAsSubmitted(txHash, blockNumber)
         } catch (ce: BlockchainClientException) {
-            logger.error(ce) { "Failed with client exception, ${ce.message}" }
+            logger.warn(ce) { "Failed with client exception, ${ce.message}" }
+            BlockchainNonceEntity.clearNonce(blockchainClient.submitterAddress, chainId)
         } catch (se: BlockchainServerException) {
             logger.warn(se) { "Failed to send, will retry, ${se.message}" }
         }
@@ -383,6 +537,31 @@ class BlockchainTransactionHandler(
         }
     }
 
+    private fun getTxHash(transactionData: BlockchainTransactionData): TxHash {
+        val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
+        val nonce = getConsistentNonce(submitterNonce.key)
+
+        val txManager = blockchainClient.getTxManager(nonce)
+        val gasProvider = blockchainClient.gasProvider
+
+        return TxHash(
+            sha3(
+                txManager.sign(
+                    RawTransaction.createTransaction(
+                        gasProvider.chainId,
+                        nonce,
+                        gasProvider.gasLimit,
+                        transactionData.to.value,
+                        transactionData.value,
+                        transactionData.data,
+                        gasProvider.getMaxPriorityFeePerGas(""),
+                        gasProvider.getMaxFeePerGas(""),
+                    ),
+                ).toHexBytes(),
+            ).toHex(),
+        )
+    }
+
     private fun errorCodeToString(errorCode: BigInteger): String {
         return when (errorCode) {
             BigInteger.ZERO -> "Invalid Signature"
@@ -421,17 +600,20 @@ class BlockchainTransactionHandler(
         val sequencedWithdrawals = WithdrawalEntity.findSequenced(blockchainClient.chainId, 50)
         return if (sequencedWithdrawals.isNotEmpty()) {
             val transactionDataByWithdrawal = mutableMapOf<WithdrawalId, EIP712Transaction>()
+            val withdrawals = sequencedWithdrawals.map { withdrawal ->
+                (
+                    withdrawal.transactionData ?: run {
+                        withdrawal.toEip712Transaction().also {
+                            transactionDataByWithdrawal[withdrawal.guid.value] = it
+                        }
+                    }
+                    ).getTxData(withdrawal.sequenceId.toLong())
+            }
+            val batchHash = sha3(withdrawals.map { sha3(it) }.reduce { a, b -> a + b }).toHex(false)
+            logger.debug { "calculated withdrawal hash = $batchHash" }
             val transactionData = BlockchainTransactionData(
                 data = blockchainClient.exchangeContract.submitWithdrawals(
-                    sequencedWithdrawals.map { withdrawal ->
-                        (
-                            withdrawal.transactionData ?: run {
-                                withdrawal.toEip712Transaction().also {
-                                    transactionDataByWithdrawal[withdrawal.guid.value] = it
-                                }
-                            }
-                            ).getTxData(withdrawal.sequenceId.toLong())
-                    },
+                    withdrawals,
                 ).encodeFunctionCall(),
                 to = Address(blockchainClient.exchangeContract.contractAddress),
                 value = BigInteger.ZERO,
@@ -439,6 +621,7 @@ class BlockchainTransactionHandler(
             val transaction = BlockchainTransactionEntity.create(
                 chainId = chainId,
                 transactionData = transactionData,
+                batchHash = batchHash,
             )
             transaction.flush()
             WithdrawalEntity.updateToSettling(sequencedWithdrawals, transaction, transactionDataByWithdrawal)
@@ -447,16 +630,6 @@ class BlockchainTransactionHandler(
         } else {
             false
         }
-    }
-
-    private fun getSymbol(asset: String): SymbolEntity {
-        return symbolMap.getOrPut(asset) {
-            transaction { SymbolEntity.forChainAndName(blockchainClient.chainId, asset) }
-        }
-    }
-
-    private fun getContractAddress(asset: String): Address {
-        return getSymbol(asset).contractAddress ?: Address.zero
     }
 
     private fun onTxComplete(tx: EIP712Transaction, error: String?) {

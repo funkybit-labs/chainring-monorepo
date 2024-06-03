@@ -37,6 +37,7 @@ import org.web3j.tx.RawTransactionManager
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import org.web3j.utils.Async
 import java.math.BigInteger
+import kotlin.jvm.optionals.getOrNull
 
 enum class ContractType {
     Exchange,
@@ -244,6 +245,10 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         }
     }
 
+    fun getTransactionByHash(txHash: String): org.web3j.protocol.core.methods.response.Transaction? {
+        return web3j.ethGetTransactionByHash(txHash).send().transaction.getOrNull()
+    }
+
     open fun getBlockNumber(): BigInteger {
         return web3j.ethBlockNumber().send().blockNumber
     }
@@ -301,4 +306,9 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
 
     fun asyncDepositNative(address: Address, amount: BigInteger): TxHash =
         sendTransaction(address, "", amount)
+
+    fun batchHash(): String = exchangeContract.batchHash().send().toHex(false)
+    fun lastSettlementBatchHash(): String = exchangeContract.lastSettlementBatchHash().send().toHex(false)
+
+    fun lastWithdrawalBatchHash(): String = exchangeContract.lastWithdrawalBatchHash().send().toHex(false)
 }

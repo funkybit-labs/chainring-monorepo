@@ -620,7 +620,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
             assertLimitsMessageReceived(market, base = BigDecimal("0.19945679"), quote = BigDecimal("2.005347146450000000"))
         }
 
-        waitForSettlementToFinish(listOf(trade.id.value))
+        waitForSettlementToFinishWithForking(listOf(trade.id.value), rollbackSettlement = false)
 
         val baseQuantity = AssetAmount(baseSymbol, trade.amount)
         val notional = trade.price.ofAsset(quoteSymbol) * baseQuantity.amount
@@ -738,7 +738,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
             assertAmount(AssetAmount(quoteSymbol, "17.500"), it.price)
         }
 
-        waitForSettlementToFinish(listOf(trade2.id.value))
+        waitForSettlementToFinishWithForking(listOf(trade2.id.value), rollbackSettlement = true)
 
         val baseQuantity2 = AssetAmount(baseSymbol, trade2.amount)
         val notional2 = trade2.price.ofAsset(quoteSymbol) * baseQuantity2.amount
@@ -1132,7 +1132,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
         assertEquals(expectedAmounts, trades.map { AssetAmount(baseSymbol, it.amount) }.toSet())
         assertEquals(prices.size, 2)
 
-        waitForSettlementToFinish(trades.map { it.id.value })
+        waitForSettlementToFinishWithForking(trades.map { it.id.value })
 
         val notionals = trades.map { it.price.ofAsset(quoteSymbol) * AssetAmount(baseSymbol, it.amount).amount }
         val notional = notionals.sum()

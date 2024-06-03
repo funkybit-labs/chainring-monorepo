@@ -9,7 +9,9 @@ import co.chainring.core.client.ws.subscribeToOrderBook
 import co.chainring.core.client.ws.subscribeToOrders
 import co.chainring.core.client.ws.subscribeToPrices
 import co.chainring.core.client.ws.subscribeToTrades
+import co.chainring.core.model.db.BlockchainTransactionStatus
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.ChainSettlementBatchEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
@@ -20,6 +22,7 @@ import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.model.db.TradeEntity
 import co.chainring.core.model.db.TradeId
 import co.chainring.core.model.db.TradeTable
+import co.chainring.core.model.db.TxHash
 import co.chainring.integrationtests.utils.AssetAmount
 import co.chainring.integrationtests.utils.ExpectedBalance
 import co.chainring.integrationtests.utils.Faucet
@@ -32,8 +35,6 @@ import co.chainring.integrationtests.utils.assertOrderBookMessageReceived
 import co.chainring.integrationtests.utils.assertOrdersMessageReceived
 import co.chainring.integrationtests.utils.assertPricesMessageReceived
 import co.chainring.integrationtests.utils.assertTradesMessageReceived
-import org.awaitility.kotlin.await
-import org.awaitility.kotlin.withAlias
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.WsClient
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -43,7 +44,7 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.params.provider.Arguments
-import java.time.Duration
+import org.web3j.crypto.Credentials
 
 open class OrderBaseTest {
 
@@ -153,35 +154,66 @@ open class OrderBaseTest {
         return Triple(apiClient, wallet, wsClient)
     }
 
-    fun waitForSettlementToFinish(
-        tradeIds: List<TradeId>,
-        expectedStatus: SettlementStatus = SettlementStatus.Completed,
-    ) {
-        await
-            .withAlias("Waiting for trade settlement to finish. TradeIds: ${tradeIds.joinToString { it.value }}")
-            .pollInSameThread()
-            .pollDelay(Duration.ofMillis(100))
-            .pollInterval(Duration.ofMillis(100))
-            .atMost(Duration.ofMillis(20000L))
-            .until {
-                Faucet.mine()
-                transaction {
-                    TradeEntity.count(TradeTable.guid.inList(tradeIds) and TradeTable.settlementStatus.eq(expectedStatus))
-                } == tradeIds.size.toLong()
+    fun waitForSettlementToFinishWithForking(tradeIds: List<TradeId>, rollbackSettlement: Boolean = false) {
+        waitFor {
+            transaction {
+                TradeEntity[tradeIds.first()].settlementBatchGuid != null
             }
+        }
+
+        val chainBatchGuid = transaction { TradeEntity[tradeIds.first()].settlementBatch!!.chainBatches.first().guid }
+
+        // wait for the prepareTx to be submitted
+        waitFor {
+            transaction {
+                ChainSettlementBatchEntity[chainBatchGuid].prepararationTx.status == BlockchainTransactionStatus.Submitted
+            }
+        }
+
+        // rolling back the onchain prepared batch and changing the tx hash, so it's not found simulates a fork since
+        // the preparation tx will need to be resubmitted again
+        // Not rolling back on chain but changing the tx hash simulates anvil restarting
+        if (rollbackSettlement) {
+            val submitterWallet = Wallet(TestApiClient(ecKeyPair = Credentials.create("0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba").ecKeyPair))
+            submitterWallet.switchChain(transaction { ChainSettlementBatchEntity[chainBatchGuid].chainId.value })
+            submitterWallet.rollbackSettlement()
+        }
+
+        // now change the hash in DB - this will cause it to think the tx does not exist
+        transaction {
+            ChainSettlementBatchEntity[chainBatchGuid].prepararationTx.txHash = TxHash("0x6d37aaf942f1679e7c34d241859017d5caf42f57f7c1b4f1f0c149c2649bb822")
+        }
+
+        waitFor {
+            Faucet.mine()
+            transaction {
+                ChainSettlementBatchEntity[chainBatchGuid].submissionTx?.status == BlockchainTransactionStatus.Submitted
+            }
+        }
+
+        // now change the submission hash - simulates anvil restarting
+        transaction {
+            ChainSettlementBatchEntity[chainBatchGuid].submissionTx!!.txHash = TxHash("0x6d37aaf942f1679e7c34d241859017d5caf42f57f7c1b4f1f0c149c2649bb833")
+        }
+
+        waitForSettlementToFinish(tradeIds)
+    }
+
+    fun waitForSettlementToFinish(tradeIds: List<TradeId>, expectedStatus: SettlementStatus = SettlementStatus.Completed) {
+        waitFor {
+            Faucet.mine()
+            transaction {
+                TradeEntity.count(TradeTable.guid.inList(tradeIds) and TradeTable.settlementStatus.eq(expectedStatus))
+            } == tradeIds.size.toLong()
+        }
     }
 
     fun waitForSettlementBatchToFinish() {
-        await
-            .pollInSameThread()
-            .pollDelay(Duration.ofMillis(100))
-            .pollInterval(Duration.ofMillis(100))
-            .atMost(Duration.ofMillis(20000L))
-            .until {
-                transaction {
-                    SettlementBatchEntity.count(SettlementBatchTable.status.neq(SettlementBatchStatus.Completed)) == 0L
-                }
+        waitFor {
+            transaction {
+                SettlementBatchEntity.count(SettlementBatchTable.status.neq(SettlementBatchStatus.Completed)) == 0L
             }
+        }
     }
 
     fun getTradesForOrders(orderIds: List<OrderId>): List<TradeEntity> {

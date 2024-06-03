@@ -1,5 +1,7 @@
 package co.chainring.integrationtests.testutils
 
+import co.chainring.core.model.db.BlockchainTransactionStatus
+import co.chainring.core.model.db.TxHash
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.integrationtests.utils.ExpectedBalance
@@ -17,7 +19,17 @@ fun waitForBalance(apiClient: TestApiClient, wsClient: WsClient, expectedBalance
     assertBalances(expectedBalances, apiClient.getBalances().balances)
 }
 
-fun waitForFinalizedWithdrawal(id: WithdrawalId) {
+fun waitForFinalizedWithdrawalWithForking(id: WithdrawalId) {
+    waitFor {
+        transaction {
+            WithdrawalEntity[id].blockchainTransaction?.status == BlockchainTransactionStatus.Submitted
+        }
+    }
+
+    transaction {
+        WithdrawalEntity[id].blockchainTransaction!!.txHash = TxHash("0x6d37aaf942f1679e7c34d241859017d5caf42f57f7c1b4f1f0c149c2649bb822")
+    }
+
     await
         .pollInSameThread()
         .pollDelay(Duration.ofMillis(100))
@@ -29,4 +41,24 @@ fun waitForFinalizedWithdrawal(id: WithdrawalId) {
                 WithdrawalEntity[id].status.isFinal()
             }
         }
+}
+
+fun waitFor(condition: () -> Boolean) {
+    await
+        .pollInSameThread()
+        .pollDelay(Duration.ofMillis(100))
+        .pollInterval(Duration.ofMillis(100))
+        .atMost(Duration.ofMillis(30000L))
+        .until {
+            condition()
+        }
+}
+
+fun waitForFinalizedWithdrawal(id: WithdrawalId) {
+    waitFor {
+        Faucet.mine()
+        transaction {
+            WithdrawalEntity[id].status.isFinal()
+        }
+    }
 }

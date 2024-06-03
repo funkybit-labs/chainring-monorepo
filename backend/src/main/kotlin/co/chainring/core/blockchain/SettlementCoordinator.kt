@@ -3,6 +3,7 @@ package co.chainring.core.blockchain
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.core.evm.Adjustment
 import co.chainring.core.evm.BatchSettlement
+import co.chainring.core.evm.ECHelper.sha3
 import co.chainring.core.evm.TokenAdjustmentList
 import co.chainring.core.evm.WalletTradeList
 import co.chainring.core.model.Address
@@ -28,6 +29,7 @@ import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.publishBroadcasterNotifications
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.sequencer.toSequencerId
+import co.chainring.core.utils.toHex
 import co.chainring.core.utils.toHexBytes
 import co.chainring.core.utils.tryAcquireAdvisoryLock
 import co.chainring.sequencer.core.sumBigIntegers
@@ -165,7 +167,7 @@ class SettlementCoordinator(
                 ChainSettlementBatchEntity.create(
                     chainId = chainId,
                     settlementBatch = it,
-                    createBlockchainTransactionRecord(chainId, batchSettlement),
+                    createBlockchainTransactionRecord(chainId, batchSettlement, calculateBatchHash(batchSettlement)),
                 )
             }
         }
@@ -187,7 +189,7 @@ class SettlementCoordinator(
             val batchSettlement = batchSettlementsByChainId[chainId]
             if (batchSettlement != null) {
                 chainSettlementBatch.markAsPreparing(
-                    createBlockchainTransactionRecord(chainId, batchSettlement),
+                    createBlockchainTransactionRecord(chainId, batchSettlement, calculateBatchHash(batchSettlement)),
                 )
             } else {
                 // no remaining for this chain - mark as complete
@@ -209,6 +211,7 @@ class SettlementCoordinator(
                         blockchainClient.getContractAddress(ContractType.Exchange),
                         BigInteger.ZERO,
                     ),
+                    null,
                 ),
             )
         }
@@ -230,7 +233,7 @@ class SettlementCoordinator(
             val batchSettlement = batchSettlementsByChainId[chainId]
             if (batchSettlement != null) {
                 chainSettlementBatch.markAsSubmitting(
-                    createBlockchainTransactionRecord(chainId, batchSettlement, isSubmit = true),
+                    createBlockchainTransactionRecord(chainId, batchSettlement, chainSettlementBatch.prepararationTx.batchHash, isSubmit = true),
                 )
             } else {
                 // no remaining for this chain - mark as complete
@@ -348,7 +351,7 @@ class SettlementCoordinator(
             }
         }.toMap()
     }
-    private fun createBlockchainTransactionRecord(chainId: ChainId, batchSettlement: BatchSettlement, isSubmit: Boolean = false): BlockchainTransactionEntity {
+    private fun createBlockchainTransactionRecord(chainId: ChainId, batchSettlement: BatchSettlement, batchHash: String?, isSubmit: Boolean = false): BlockchainTransactionEntity {
         val blockchainClient = blockchainClientsByChainId.getValue(chainId)
         val paramData = DefaultFunctionEncoder().encodeParameters(listOf(batchSettlement)).toHexBytes()
         val transactionData = BlockchainTransactionData(
@@ -363,7 +366,12 @@ class SettlementCoordinator(
         return BlockchainTransactionEntity.create(
             chainId = chainId,
             transactionData = transactionData,
+            batchHash = batchHash,
         )
+    }
+
+    private fun calculateBatchHash(batchSettlement: BatchSettlement): String {
+        return sha3(DefaultFunctionEncoder().encodeParameters(listOf(batchSettlement)).toHexBytes()).toHex(false)
     }
 
     private fun notionalWithFee(amount: BigInteger, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int, feeAmount: BigInteger): BigInteger =
