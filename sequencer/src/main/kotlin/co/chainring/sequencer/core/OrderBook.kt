@@ -155,7 +155,7 @@ class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal
             }
         }
         // remove consumed orders
-        orderHead = ix // FIXME should also reset consumed orders?
+        orderHead = ix // TODO: CHAIN-274 Also reset consumed orders
 
         return OrderBookLevelFill(
             remainingAmount,
