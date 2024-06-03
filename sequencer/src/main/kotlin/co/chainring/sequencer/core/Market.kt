@@ -506,10 +506,11 @@ data class Market(
 
     private fun findNextBestOffer(level: OrderBookLevel): BigDecimal {
         var index = level.levelIx
-        while (index++ <= maxOfferIx) {
+        while (index <= maxOfferIx) {
             if (levels[index].totalQuantity > BigInteger.ZERO) {
                 return levels[index].price
             }
+            index += 1
         }
         maxOfferIx = -1
         return levels.last().price
@@ -517,10 +518,11 @@ data class Market(
 
     private fun findNextBestBid(lastExecutionLevel: OrderBookLevel): BigDecimal {
         var index = lastExecutionLevel.levelIx
-        while (index-- > minBidIx) {
+        while (index >= minBidIx) {
             if (levels[index].totalQuantity > BigInteger.ZERO) {
                 return levels[index].price
             }
+            index -= 1
         }
         minBidIx = -1
         return levels.first().price
@@ -529,10 +531,11 @@ data class Market(
     private fun findMinBidIx(): Int {
         var index: Int = minBidIx
         val maxBidIx = (bestBid - levels[0].price).divideToIntegralValue(tickSize).toInt()
-        while (index++ <= maxBidIx) {
+        while (index <= maxBidIx) {
             if (levels[index].totalQuantity > BigInteger.ZERO) {
                 return index
             }
+            index += 1
         }
         bestBid = levels.first().price
         return -1
@@ -541,10 +544,11 @@ data class Market(
     private fun findMaxOfferIx(): Int {
         var index: Int = maxOfferIx
         val minOfferIx = (bestOffer - levels[0].price).divideToIntegralValue(tickSize).toInt()
-        while (index-- >= minOfferIx) {
+        while (index >= minOfferIx) {
             if (levels[index].totalQuantity > BigInteger.ZERO) {
                 return index
             }
+            index -= 1
         }
         bestOffer = levels.last().price
         return -1
@@ -557,10 +561,6 @@ data class Market(
             if (levelIx > levels.lastIndex || levelIx < 0) {
                 AddOrderResult(OrderDisposition.Rejected, noExecutions)
             } else {
-                if (levelIx > maxOfferIx) {
-                    maxOfferIx = levelIx
-                }
-
                 if (orderPrice <= bestBid) {
                     // in case when crossing market execute as market sell order until `levelIx`
                     val crossingOrderResult = handleCrossingOrder(order, stopAtLevelIx = levelIx)
@@ -568,6 +568,10 @@ data class Market(
                     val remainingAmount = order.amount.toBigInteger() - filledAmount
 
                     if (remainingAmount > BigInteger.ZERO) {
+                        if (levelIx > maxOfferIx) {
+                            maxOfferIx = levelIx
+                        }
+
                         // and then create limit order for the remaining amount
                         val adjustedOrder = order.copy { amount = remainingAmount.toIntegerValue() }
                         val disposition = createLimitSellOrder(levelIx, wallet, adjustedOrder, feeRates.maker)
@@ -585,6 +589,9 @@ data class Market(
                         AddOrderResult(crossingOrderResult.disposition, crossingOrderResult.executions)
                     }
                 } else {
+                    if (levelIx > maxOfferIx) {
+                        maxOfferIx = levelIx
+                    }
                     // or just create a limit order
                     val disposition = createLimitSellOrder(levelIx, wallet, order, feeRates.maker)
                     AddOrderResult(disposition, noExecutions)
@@ -596,10 +603,6 @@ data class Market(
             if (levelIx < 0 || levelIx > levels.lastIndex) {
                 AddOrderResult(OrderDisposition.Rejected, noExecutions)
             } else {
-                if (levelIx < minBidIx || minBidIx == -1) {
-                    minBidIx = levelIx
-                }
-
                 if (orderPrice >= bestOffer) {
                     // in case when crossing market execute as market buy order until `levelIx`
                     val crossingOrderResult = handleCrossingOrder(order, stopAtLevelIx = levelIx)
@@ -607,6 +610,10 @@ data class Market(
                     val remainingAmount = order.amount.toBigInteger() - filledAmount
 
                     if (remainingAmount > BigInteger.ZERO) {
+                        if (levelIx < minBidIx || minBidIx == -1) {
+                            minBidIx = levelIx
+                        }
+
                         // and then create limit order for the remaining amount
                         val adjustedOrder = order.copy { amount = remainingAmount.toIntegerValue() }
                         val disposition = createLimitBuyOrder(levelIx, wallet, adjustedOrder, feeRates.maker)
@@ -625,6 +632,10 @@ data class Market(
                         AddOrderResult(crossingOrderResult.disposition, crossingOrderResult.executions)
                     }
                 } else {
+                    if (levelIx < minBidIx || minBidIx == -1) {
+                        minBidIx = levelIx
+                    }
+
                     // or just create a limit order
                     val disposition = createLimitBuyOrder(levelIx, wallet, order, feeRates.maker)
                     AddOrderResult(disposition, noExecutions)

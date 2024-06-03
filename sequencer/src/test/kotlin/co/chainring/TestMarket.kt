@@ -250,6 +250,83 @@ class TestMarket {
     }
 
     @Test
+    fun testCrossingEdgeCases() {
+        validateBidAndOffer("0.050", -1, "50.000", -1)
+
+        addOrder(1L, Order.Type.LimitSell, "5", "50.000")
+        addOrder(2L, Order.Type.LimitBuy, "5", "0.050")
+
+        validateBidAndOffer(
+            bestBid = "0.050",
+            minBidIx = 0,
+            bestOffer = "50.000",
+            maxOfferIx = 999,
+        )
+
+        // limit buy that exactly consumes all of resting sell
+        addOrder(3L, Order.Type.LimitBuy, "5", "50.000", OrderDisposition.Filled, counterOrderGuid = 1L)
+        validateBidAndOffer(
+            bestBid = "0.050",
+            minBidIx = 0,
+            bestOffer = "50.000",
+            maxOfferIx = -1,
+        )
+
+        // put the LimitSell back
+        addOrder(4L, Order.Type.LimitSell, "5", "50.000")
+        validateBidAndOffer(
+            bestBid = "0.050",
+            minBidIx = 0,
+            bestOffer = "50.000",
+            maxOfferIx = 999,
+        )
+
+        // LimitBuy that consumes all of resting sell and stays on the book
+        addOrder(5L, Order.Type.LimitBuy, "6", "50.000", OrderDisposition.PartiallyFilled, counterOrderGuid = 4L)
+        validateBidAndOffer(
+            bestBid = "50.000",
+            minBidIx = 0,
+            bestOffer = "50.000",
+            maxOfferIx = -1,
+        )
+        // cancel that Limit Buy
+        cancelOrders(listOf(5L))
+        validateBidAndOffer(
+            bestBid = "0.050",
+            minBidIx = 0,
+            bestOffer = "50.000",
+            maxOfferIx = -1,
+        )
+
+        // add a LimitSell that exactly consumes resting buy
+        addOrder(6L, Order.Type.LimitSell, "5", "0.050", OrderDisposition.Filled, counterOrderGuid = 2L)
+        validateBidAndOffer(
+            bestBid = "0.050",
+            minBidIx = -1,
+            bestOffer = "50.000",
+            maxOfferIx = -1,
+        )
+
+        // put a LimitBuy back at the edge
+        addOrder(7L, Order.Type.LimitBuy, "5", "0.050")
+        validateBidAndOffer(
+            bestBid = "0.050",
+            minBidIx = 0,
+            bestOffer = "50.000",
+            maxOfferIx = -1,
+        )
+
+        // LimitSell that consumes all of resting buy and stays on the book
+        addOrder(8L, Order.Type.LimitSell, "6", "0.050", OrderDisposition.PartiallyFilled, counterOrderGuid = 7L)
+        validateBidAndOffer(
+            bestBid = "0.050",
+            minBidIx = -1,
+            bestOffer = "0.050",
+            maxOfferIx = 0,
+        )
+    }
+
+    @Test
     fun testCrossingLimitBuyOrders() {
         validateBidAndOffer("0.050", -1, "50.000", -1)
 
