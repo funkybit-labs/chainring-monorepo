@@ -11,7 +11,6 @@ import { Balance } from 'apiClient'
 import { useQueryClient } from '@tanstack/react-query'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { balancesTopic, Publishable } from 'websocketMessages'
-import SymbolIcon from 'components/common/SymbolIcon'
 import { Button } from 'components/common/Button'
 import DepositModal from 'components/Screens/HomeScreen/DepositModal'
 import WithdrawalModal from 'components/Screens/HomeScreen/WithdrawalModal'
@@ -24,6 +23,7 @@ import Withdrawal from 'assets/Withdrawal.svg'
 import { useConfig, useSwitchChain } from 'wagmi'
 import { allChains } from 'wagmiConfig'
 import TradingSymbol from 'tradingSymbol'
+import { SymbolAndChain } from 'components/common/SymbolAndChain'
 
 export function BalancesTable({
   walletAddress,
@@ -109,11 +109,7 @@ export function BalancesTable({
           return (
             <Fragment key={symbol.name}>
               <div className="mb-4 inline-block whitespace-nowrap align-text-top">
-                <SymbolIcon
-                  symbol={symbol}
-                  className="mr-2 inline-block size-6"
-                />
-                {symbol.name}
+                <SymbolAndChain symbol={symbol} />
               </div>
               <div className="mb-4 inline-block w-full text-center align-text-top">
                 {formatUnits(balance.available, symbol.decimals)}

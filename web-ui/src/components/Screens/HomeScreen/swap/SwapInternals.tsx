@@ -1,13 +1,5 @@
 import Markets, { Market } from 'markets'
-import React, {
-  ChangeEvent,
-  LegacyRef,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from 'react'
+import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import TradingSymbol from 'tradingSymbol'
 import { apiClient, Balance, FeeRates, OrderSide } from 'apiClient'
 import { useWebsocketSubscription } from 'contexts/websocket'
@@ -19,41 +11,69 @@ import {
   Publishable
 } from 'websocketMessages'
 import { Address, formatUnits, parseUnits } from 'viem'
-import { SymbolSelector } from 'components/Screens/HomeScreen/SymbolSelector'
-import AmountInput from 'components/common/AmountInput'
-import { calculateFee, calculateNotional, classNames } from 'utils'
-import { useWeb3Modal } from '@web3modal/wagmi/react'
-import { getMarketPrice } from 'utils/pricesUtils'
-import { useMutation } from '@tanstack/react-query'
+import { calculateFee, calculateNotional } from 'utils'
+import {
+  bigintToScaledDecimal,
+  getMarketPrice,
+  scaledDecimalToBigint
+} from 'utils/pricesUtils'
+import { useMutation, UseMutationResult } from '@tanstack/react-query'
 import { addressZero, generateOrderNonce, getDomain } from 'utils/eip712'
 import Decimal from 'decimal.js'
 import { isErrorFromAlias } from '@zodios/core'
 import useAmountInputState from 'hooks/useAmountInputState'
-import {
-  useConfig,
-  useSignTypedData,
-  BaseError as WagmiError,
-  useSwitchChain
-} from 'wagmi'
-import SwapIcon from 'assets/Swap.svg'
-import SubmitButton from 'components/common/SubmitButton'
-import { Button } from 'components/common/Button'
-import { allChains } from 'wagmiConfig'
-import DepositModal from 'components/Screens/HomeScreen/DepositModal'
-import { useMeasure } from 'react-use'
+import { useConfig, useSignTypedData, BaseError as WagmiError } from 'wagmi'
 
-export function Swap({
+export type SwapRender = {
+  topBalance: Balance | undefined
+  topSymbol: TradingSymbol
+  bottomBalance: Balance | undefined
+  bottomSymbol: TradingSymbol
+  mutation: UseMutationResult<
+    { orderId: string; requestStatus: 'Rejected' | 'Accepted' },
+    Error,
+    void,
+    unknown
+  >
+  buyAmountInputValue: string
+  sellAmountInputValue: string
+  side: OrderSide
+  handleQuoteAmountChange: (e: ChangeEvent<HTMLInputElement>) => void
+  handleBaseAmountChange: (e: ChangeEvent<HTMLInputElement>) => void
+  sellAssetsNeeded: bigint
+  handleTopSymbolChange: (newSymbol: TradingSymbol) => void
+  handleBottomSymbolChange: (newSymbol: TradingSymbol) => void
+  handleChangeSide: () => void
+  isLimitOrder: boolean
+  handleMarketOrderFlagChange: (e: ChangeEvent<HTMLInputElement>) => void
+  limitPriceInputValue: string
+  limitPrice: bigint
+  handlePriceChange: (e: ChangeEvent<HTMLInputElement>) => void
+  setPriceFromMarketPrice: (incrementDivisor?: bigint) => void
+  noPriceFound: boolean
+  canSubmit: boolean
+  getMarketPrice: (side: OrderSide, amount: bigint) => bigint | undefined
+  quoteDecimals: number
+}
+
+export function SwapInternals({
   markets,
   exchangeContractAddress,
   walletAddress,
   feeRates,
-  onMarketChange
+  onMarketChange,
+  onSideChange,
+  isLimitOrder: initialIsLimitOrder,
+  Renderer
 }: {
   markets: Markets
   exchangeContractAddress?: Address
   walletAddress?: Address
   feeRates: FeeRates
   onMarketChange: (m: Market) => void
+  onSideChange: (s: OrderSide) => void
+  isLimitOrder: boolean
+  Renderer: (r: SwapRender) => JSX.Element
 }) {
   const [market, setMarket] = useState<Market>(markets.first()!)
   const [topSymbol, setTopSymbol] = useState<TradingSymbol>(
@@ -63,7 +83,6 @@ export function Swap({
     markets.first()!.baseSymbol
   )
   const [side, setSide] = useState<OrderSide>('Buy')
-  const [animateSide, setAnimateSide] = useState(false)
   const [balances, setBalances] = useState<Balance[]>(() => [])
 
   useEffect(() => {
@@ -116,7 +135,7 @@ export function Swap({
   }, [market])
 
   const {
-    inputValue: priceInputValue,
+    inputValue: limitPriceInputValue,
     setInputValue: setPriceInputValue,
     valueInFundamentalUnits: priceInput
   } = useAmountInputState({
@@ -142,28 +161,29 @@ export function Swap({
     decimals: quoteSymbol.decimals
   })
 
-  const [isLimitOrder, setIsLimitOrder] = useState(false)
+  const [isLimitOrder, setIsLimitOrder] = useState(initialIsLimitOrder)
 
   const limitPrice = useMemo(() => {
     const tickAsInt = parseUnits(
       market.tickSize.toString(),
       quoteSymbol.decimals
     )
-    if (side === 'Sell') {
+    if (side === 'Buy') {
       return priceInput - (priceInput % tickAsInt)
     } else {
-      const rawPrice = parseFloat(formatUnits(priceInput, baseSymbol.decimals))
-      if (rawPrice) {
-        const invertedPrice = parseUnits(
-          (1.0 / rawPrice).toString(),
+      if (priceInput === 0n) {
+        return 0n
+      } else {
+        const invertedPrice = scaledDecimalToBigint(
+          new Decimal(1).div(
+            bigintToScaledDecimal(priceInput, quoteSymbol.decimals)
+          ),
           quoteSymbol.decimals
         )
         return invertedPrice - (invertedPrice % tickAsInt)
-      } else {
-        return BigInt(0)
       }
     }
-  }, [priceInput, side, market, quoteSymbol, baseSymbol])
+  }, [priceInput, side, market, quoteSymbol])
 
   const [orderBook, setOrderBook] = useState<OrderBook | undefined>(undefined)
   useWebsocketSubscription({
@@ -177,7 +197,6 @@ export function Swap({
 
   const [baseLimit, setBaseLimit] = useState<bigint | undefined>(undefined)
   const [quoteLimit, setQuoteLimit] = useState<bigint | undefined>(undefined)
-  const { open: openWalletConnectModal } = useWeb3Modal()
 
   useWebsocketSubscription({
     topics: useMemo(() => [limitsTopic(market.id)], [market.id]),
@@ -320,6 +339,7 @@ export function Swap({
     window.sessionStorage.setItem('market', market.id)
     window.sessionStorage.setItem('side', side)
     onMarketChange(market)
+    onSideChange(side)
   }
 
   function handleTopSymbolChange(newSymbol: TradingSymbol) {
@@ -355,11 +375,8 @@ export function Swap({
   }
 
   function handleChangeSide() {
-    setAnimateSide(true)
-    setTimeout(() => {
-      setAnimateSide(false)
-    }, 1000)
-    saveMarketAndSide(market, side === 'Buy' ? 'Sell' : 'Buy')
+    const newSide = side === 'Buy' ? 'Sell' : 'Buy'
+    saveMarketAndSide(market, newSide)
     const tempSymbol = topSymbol
     setTopSymbol(bottomSymbol)
     setBottomSymbol(tempSymbol)
@@ -379,12 +396,12 @@ export function Swap({
   }
 
   function setPriceFromMarketPrice(incrementDivisor?: bigint) {
-    if (side === 'Buy') {
+    if (side === 'Sell') {
       let rawPrice
       if (incrementDivisor) {
         rawPrice = parseFloat(
           formatUnits(
-            marketPrice - marketPrice / incrementDivisor,
+            marketPrice + marketPrice / incrementDivisor,
             quoteSymbol.decimals
           )
         )
@@ -398,7 +415,7 @@ export function Swap({
       if (incrementDivisor) {
         rawPrice = parseFloat(
           formatUnits(
-            marketPrice + marketPrice / incrementDivisor,
+            marketPrice - marketPrice / incrementDivisor,
             quoteSymbol.decimals
           )
         )
@@ -509,36 +526,6 @@ export function Swap({
       ? [baseAmountInputValue, quoteAmountInputValue]
       : [quoteAmountInputValue, baseAmountInputValue]
   }, [side, baseAmountInputValue, quoteAmountInputValue])
-  const [switchToChainId, setSwitchToChainId] = useState<number | null>(null)
-  const { switchChain } = useSwitchChain()
-
-  useEffect(() => {
-    if (switchToChainId) {
-      const chain = allChains.find((c) => c.id == switchToChainId)
-      chain &&
-        switchChain({
-          addEthereumChainParameter: {
-            chainName: chain.name,
-            nativeCurrency: chain.nativeCurrency,
-            rpcUrls: chain.rpcUrls.default.http,
-            blockExplorerUrls: [chain.blockExplorers.default.url]
-          },
-          chainId: chain.id
-        })
-    }
-    setSwitchToChainId(null)
-  }, [switchToChainId, switchChain])
-
-  const [depositSymbol, setDepositSymbol] = useState<TradingSymbol | null>(null)
-  const [showDepositModal, setShowDepositModal] = useState<boolean>(false)
-
-  function openDepositModal(symbol: TradingSymbol) {
-    setDepositSymbol(symbol)
-    setShowDepositModal(true)
-    if (symbol.chainId != config.state.chainId) {
-      setSwitchToChainId(symbol.chainId)
-    }
-  }
 
   function getMarketForSideAndSymbol(
     side: OrderSide,
@@ -581,283 +568,55 @@ export function Swap({
     )
   }
 
-  function depositAmount(deposit: Balance | undefined, symbol: TradingSymbol) {
-    return deposit?.available ?? BigInt(0) > BigInt(0) ? (
-      <>
-        <span className="font-[400] text-darkBluishGray2">On deposit:</span>
-        <span className="text-lightBluishGray2">
-          <span
-            className={
-              'inline-block max-w-[10ch] overflow-x-clip text-ellipsis text-lightBluishGray2 hover:max-w-full'
-            }
-          >
-            {deposit && formatUnits(deposit.available, symbol.decimals)}
-          </span>{' '}
-          {symbol.name}
-        </span>
-      </>
-    ) : (
-      <>
-        <span className="font-[400] text-darkBluishGray2">
-          You have not deposited any {symbol.name}
-        </span>
-      </>
-    )
-  }
-
   const sellAssetsNeeded = useMemo(() => {
     return topSymbol.name === quoteSymbol.name
       ? notional + fee - (quoteLimit || 0n)
       : baseAmount - (baseLimit || 0n)
   }, [topSymbol, quoteSymbol, notional, fee, quoteLimit, baseAmount, baseLimit])
 
-  const sellAmountInputRef = useRef<HTMLInputElement>(null)
-
-  return (
-    <>
-      <div className="w-[680px] space-y-4 rounded-[20px] bg-swapModalBackground p-8">
-        <div className="rounded-[20px] bg-swapRowBackground p-4">
-          <div className="mb-2 flex flex-row justify-between">
-            <span className="text-base text-darkBluishGray1">Sell</span>
-            <div className="flex flex-row items-baseline space-x-2 text-sm">
-              {depositAmount(topBalance, topSymbol)}
-              <button
-                className="rounded bg-swapDropdownBackground px-2 py-1 text-darkBluishGray2 hover:bg-swapHighlight"
-                onClick={() => openDepositModal(topSymbol)}
-              >
-                Deposit
-              </button>
-            </div>
-          </div>
-          <div
-            className="flex cursor-text flex-row justify-between pt-2"
-            onClick={() => sellAmountInputRef.current?.focus()}
-          >
-            <SellAmountInput
-              value={sellAmountInputValue}
-              disabled={false}
-              onChange={
-                side === 'Buy'
-                  ? handleQuoteAmountChange
-                  : handleBaseAmountChange
-              }
-              sellAssetsNeeded={sellAssetsNeeded}
-              onDeposit={() => {
-                openDepositModal(topSymbol)
-              }}
-              inputRef={sellAmountInputRef}
-            />
-            <SymbolSelector
-              markets={markets}
-              selected={topSymbol}
-              onChange={handleTopSymbolChange}
-            />
-          </div>
-        </div>
-        <div
-          className="relative flex w-full justify-center"
-          style={{ marginTop: '-32px', top: '24px' }}
-        >
-          <img
-            className={classNames(
-              'cursor-pointer',
-              animateSide && 'animate-swivel'
-            )}
-            src={SwapIcon}
-            alt={'Swap'}
-            onClick={() => handleChangeSide()}
-          />
-        </div>
-        <div className="rounded-[20px] bg-swapRowBackground p-4">
-          <div className="mb-2 flex flex-row justify-between">
-            <span className="text-base text-darkBluishGray1">Buy</span>
-            <div className="flex flex-row space-x-2 align-middle text-sm">
-              {depositAmount(bottomBalance, bottomSymbol)}
-            </div>
-          </div>
-          <div className="flex flex-row justify-between">
-            <AmountInput
-              className="!focus:ring-0 bg-swapRowBackground text-left text-xl !ring-0"
-              value={buyAmountInputValue}
-              disabled={false}
-              onChange={
-                side === 'Buy'
-                  ? handleBaseAmountChange
-                  : handleQuoteAmountChange
-              }
-            />
-            <SymbolSelector
-              markets={markets}
-              selected={bottomSymbol}
-              onChange={handleBottomSymbolChange}
-            />
-          </div>
-        </div>
-        <div className="text-center">
-          <input
-            id="isLimitOrder"
-            name="isLimitOrder"
-            type="checkbox"
-            checked={isLimitOrder}
-            disabled={mutation.isPending}
-            onChange={handleMarketOrderFlagChange}
-            className="!focus:border-0 size-5 rounded
-                         !border-0
-                         !bg-darkBluishGray6 text-darkBluishGray1
-                         !outline-0
-                         !ring-0"
-          />
-          <label
-            htmlFor="isLimitOrder"
-            className="whitespace-nowrap px-4 text-darkBluishGray1"
-          >
-            Limit Order
-          </label>
-          <input
-            value={priceInputValue}
-            disabled={!isLimitOrder || mutation.isPending}
-            onChange={handlePriceChange}
-            autoFocus={isLimitOrder}
-            className="w-36 rounded-xl border-swapRowBackground bg-swapRowBackground text-center text-white disabled:bg-darkBluishGray7"
-          />
-          {[
-            ['Market', undefined],
-            ['+1%', 100],
-            ['+5%', 20]
-          ].map(([label, incrementDivisor]) => (
-            <button
-              key={label}
-              className={classNames(
-                'rounded bg-swapDropdownBackground px-2 text-darkBluishGray2 ml-4',
-                isLimitOrder && 'hover:bg-swapHighlight'
-              )}
-              disabled={!isLimitOrder}
-              onClick={() =>
-                setPriceFromMarketPrice(
-                  incrementDivisor
-                    ? BigInt(incrementDivisor as number)
-                    : undefined
-                )
-              }
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex w-full flex-col">
-          {walletAddress && exchangeContractAddress ? (
-            <>
-              {noPriceFound && (
-                <span className="w-full text-center text-brightRed">
-                  No price found.
-                </span>
-              )}
-              <SubmitButton
-                disabled={!canSubmit}
-                onClick={mutation.mutate}
-                error={mutation.error?.message}
-                caption={() => {
-                  if (mutation.isPending) {
-                    return 'Submitting order...'
-                  } else if (mutation.isSuccess) {
-                    return <span className="text-xl">&#10003;</span>
-                  } else {
-                    return 'Swap'
-                  }
-                }}
-                status={mutation.status}
-              />
-            </>
-          ) : (
-            <div className="mt-4">
-              <Button
-                caption={() => <>Connect Wallet</>}
-                onClick={() => openWalletConnectModal({ view: 'Connect' })}
-                disabled={false}
-                primary={true}
-                style={'full'}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {depositSymbol && depositSymbol.chainId == config.state.chainId && (
-        <DepositModal
-          isOpen={showDepositModal}
-          exchangeContractAddress={exchangeContractAddress!}
-          walletAddress={walletAddress!}
-          symbol={depositSymbol}
-          close={() => setShowDepositModal(false)}
-          onClosed={() => {
-            setDepositSymbol(null)
-          }}
-        />
-      )}
-    </>
-  )
-}
-
-function SellAmountInput({
-  value,
-  disabled,
-  onChange,
-  sellAssetsNeeded,
-  onDeposit,
-  inputRef
-}: {
-  value: string
-  disabled: boolean
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  sellAssetsNeeded: bigint
-  onDeposit: () => void
-  inputRef: React.RefObject<HTMLInputElement>
-}) {
-  const [divRef, { width: spanWidth }] = useMeasure<HTMLDivElement>()
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.style.width = Math.max(40, spanWidth + 24) + 'px'
+  function getSimulatedPrice(
+    side: OrderSide,
+    amount: bigint
+  ): bigint | undefined {
+    if (orderBook) {
+      const marketPrice = getMarketPrice(side, amount, market, orderBook)
+      if (side === 'Sell' && marketPrice !== 0n) {
+        return scaledDecimalToBigint(
+          new Decimal(1).div(
+            bigintToScaledDecimal(marketPrice, quoteSymbol.decimals)
+          ),
+          quoteSymbol.decimals
+        )
+      }
+      return marketPrice
     }
-  }, [inputRef, spanWidth])
-  return (
-    <span className="flex flex-row justify-start align-middle">
-      <span>
-        <span className="align-middle">
-          <div className="absolute text-2xl opacity-0" ref={divRef}>
-            {value}
-          </div>
-          <input
-            ref={inputRef as LegacyRef<HTMLInputElement>}
-            className={classNames(
-              'text-white text-2xl text-left',
-              'inline-block rounded-xl border-0',
-              'bg-darkBluishGray9 py-3',
-              'ring-1 ring-inset ring-darkBluishGray6 focus:ring-1 focus:ring-inset focus:ring-mutedGray',
-              '[appearance:textfield] placeholder:text-darkBluishGray2',
-              '[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
-              'text-left bg-swapRowBackground !ring-0 !focus:ring-0',
-              sellAssetsNeeded > 0n &&
-                '!text-brightRed max-w-52 overflow-auto overflow-ellipsis'
-            )}
-            disabled={disabled}
-            placeholder="0"
-            value={value}
-            onChange={onChange}
-            autoFocus={true}
-          />
-        </span>
-        {sellAssetsNeeded > 0n && (
-          <>
-            <span className="text-sm text-brightRed">Insufficient Balance</span>
-            <button
-              className="ml-2 rounded bg-swapDropdownBackground px-2 py-1 text-sm text-darkBluishGray2 hover:bg-swapHighlight"
-              onClick={onDeposit}
-            >
-              Deposit
-            </button>
-          </>
-        )}
-      </span>
-    </span>
-  )
+    return
+  }
+
+  return Renderer({
+    topBalance,
+    topSymbol,
+    bottomBalance,
+    bottomSymbol,
+    mutation,
+    buyAmountInputValue,
+    sellAmountInputValue,
+    side,
+    handleQuoteAmountChange,
+    handleBaseAmountChange,
+    sellAssetsNeeded,
+    handleTopSymbolChange,
+    handleBottomSymbolChange,
+    handleChangeSide,
+    isLimitOrder,
+    handleMarketOrderFlagChange,
+    limitPriceInputValue,
+    limitPrice,
+    handlePriceChange,
+    setPriceFromMarketPrice,
+    noPriceFound,
+    canSubmit,
+    getMarketPrice: getSimulatedPrice,
+    quoteDecimals: market.quoteDecimalPlaces
+  })
 }

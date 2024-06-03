@@ -1,36 +1,32 @@
-import { FeeRates, Order, Trade } from 'apiClient'
+import { Order, OrderSide, Trade } from 'apiClient'
 import React, { useCallback, useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import { Address, formatUnits } from 'viem'
 import { format } from 'date-fns'
 import { produce } from 'immer'
-import { classNames } from 'utils'
-import Markets from 'markets'
+import { calculateNotional, classNames } from 'utils'
+import Markets, { Market } from 'markets'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { ordersTopic, Publishable, tradesTopic } from 'websocketMessages'
 import { CancelOrderModal } from 'components/Screens/HomeScreen/CancelOrderModal'
-import { ChangeOrderModal } from 'components/Screens/HomeScreen/ChangeOrderModal'
-import { MarketTitle } from 'components/Screens/HomeScreen/MarketSelector'
 import { Status } from 'components/common/Status'
-import Edit from 'assets/Edit.svg'
 import Trash from 'assets/Trash.svg'
 import { Button } from 'components/common/Button'
 import { useWeb3Modal } from '@web3modal/wagmi/react'
+import { SymbolAndChain } from 'components/common/SymbolAndChain'
+import Decimal from 'decimal.js'
+import { scaledDecimalToBigint } from 'utils/pricesUtils'
 
 export default function OrdersAndTradesWidget({
   markets,
   exchangeContractAddress,
-  walletAddress,
-  feeRates
+  walletAddress
 }: {
   markets: Markets
   exchangeContractAddress?: Address
   walletAddress?: Address
-  feeRates: FeeRates
 }) {
   const [orders, setOrders] = useState<Order[]>(() => [])
-  const [changedOrder, setChangedOrder] = useState<Order | null>(null)
-  const [showChangeModal, setShowChangeModal] = useState<boolean>(false)
   const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null)
   const [showCancelModal, setShowCancelModal] = useState<boolean>(false)
   const [trades, setTrades] = useState<Trade[]>(() => [])
@@ -83,11 +79,6 @@ export default function OrdersAndTradesWidget({
     }, [])
   })
 
-  function openEditModal(order: Order) {
-    setChangedOrder(order)
-    setShowChangeModal(true)
-  }
-
   function openCancelModal(order: Order) {
     setCancellingOrder(order)
     setShowCancelModal(true)
@@ -101,7 +92,8 @@ export default function OrdersAndTradesWidget({
             <thead className="sticky top-0 z-10 bg-darkBluishGray9 font-normal text-darkBluishGray2">
               <tr key="header">
                 <td className="pl-4">Date</td>
-                <td className="pl-4">Side</td>
+                <td className="pl-4">Sell</td>
+                <td className="pl-4">Buy</td>
                 <td className="hidden pl-4 narrow:table-cell">Amount</td>
                 <td className="hidden pl-4 narrow:table-cell">Price</td>
                 <td className="table-cell pl-4 narrow:hidden">
@@ -109,9 +101,8 @@ export default function OrdersAndTradesWidget({
                   <br />
                   Price
                 </td>
-                <td className="pl-4">Market</td>
-                <td className="pl-4 text-center">Status</td>
-                <td className="px-4">Edit</td>
+                <td className="pl-4 text-left">Status</td>
+                <td className="px-4">Cancel</td>
               </tr>
             </thead>
             <tbody>
@@ -133,24 +124,43 @@ export default function OrdersAndTradesWidget({
                         {format(order.timing.createdAt, 'HH:mm:ss a')}
                       </span>
                     </td>
-                    <td className="pl-4">{order.side}</td>
+                    <td className="pl-4">
+                      <SymbolAndChain
+                        symbol={
+                          order.side === 'Buy'
+                            ? market.quoteSymbol
+                            : market.baseSymbol
+                        }
+                      />
+                    </td>
+                    <td className="pl-4">
+                      <SymbolAndChain
+                        symbol={
+                          order.side === 'Buy'
+                            ? market.baseSymbol
+                            : market.quoteSymbol
+                        }
+                      />
+                    </td>
                     <td className="hidden pl-4 narrow:table-cell">
-                      {formatUnits(order.amount, market.baseSymbol.decimals)}
+                      {displayAmount(
+                        order.amount,
+                        order.side,
+                        market,
+                        undefined
+                      )}
                     </td>
                     <td className="hidden pl-4 narrow:table-cell">
                       {order.type == 'limit'
-                        ? order.price.toFixed(market.quoteDecimalPlaces)
+                        ? displayPrice(order.price, order.side, market)
                         : 'MKT'}
                     </td>
                     <td className="table-cell pl-4 narrow:hidden">
                       {formatUnits(order.amount, market.baseSymbol.decimals)}
                       <br />
                       {order.type == 'limit'
-                        ? order.price.toFixed(market.quoteDecimalPlaces)
+                        ? displayPrice(order.price, order.side, market)
                         : 'MKT'}
-                    </td>
-                    <td className="pl-4">
-                      <MarketTitle market={market} alwaysShowLabel={false} />
                     </td>
                     <td className="pl-4 text-center">
                       <Status status={order.status} />
@@ -158,12 +168,6 @@ export default function OrdersAndTradesWidget({
                     <td className="rounded-r px-4 py-1">
                       {!order.isFinal() && (
                         <div className="flex items-center gap-2">
-                          <button
-                            className="shrink-0 rounded bg-darkBluishGray7 p-2 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray"
-                            onClick={() => openEditModal(order)}
-                          >
-                            <img src={Edit} alt={'Change'} />
-                          </button>
                           <button
                             className="shrink-0 rounded bg-darkBluishGray7 p-2 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray"
                             onClick={() => openCancelModal(order)}
@@ -180,19 +184,6 @@ export default function OrdersAndTradesWidget({
           </table>
         </div>
 
-        {changedOrder && (
-          <ChangeOrderModal
-            isOpen={showChangeModal}
-            order={changedOrder}
-            markets={markets}
-            exchangeContractAddress={exchangeContractAddress!}
-            walletAddress={walletAddress!}
-            feeRates={feeRates}
-            close={() => setShowChangeModal(false)}
-            onClosed={() => setChangedOrder(null)}
-          />
-        )}
-
         {cancellingOrder && (
           <CancelOrderModal
             isOpen={showCancelModal}
@@ -207,6 +198,57 @@ export default function OrdersAndTradesWidget({
     )
   }
 
+  function displayAmount(
+    amount: bigint,
+    side: OrderSide,
+    market: Market,
+    price?: Decimal
+  ): string {
+    if (side === 'Sell') {
+      return (
+        formatUnits(amount, market.baseSymbol.decimals) +
+        ' ' +
+        market.baseSymbol.name +
+        ' (' +
+        market.baseSymbol.chainName +
+        ')'
+      )
+    } else {
+      if (price) {
+        return formatUnits(
+          calculateNotional(
+            scaledDecimalToBigint(price, market.quoteSymbol.decimals),
+            amount,
+            market.baseSymbol
+          ),
+          market.quoteSymbol.decimals
+        )
+      } else {
+        return (
+          formatUnits(amount, market.baseSymbol.decimals) +
+          ' ' +
+          market.baseSymbol.name +
+          ' (' +
+          market.baseSymbol.chainName +
+          ')'
+        )
+      }
+    }
+  }
+
+  function displayPrice(
+    price: Decimal,
+    side: OrderSide,
+    market: Market
+  ): string {
+    if (side === 'Buy') {
+      return price.toFixed(market.quoteDecimalPlaces)
+    } else {
+      const invertedPrice = new Decimal(1).div(price)
+      return invertedPrice.toFixed(6)
+    }
+  }
+
   function tradeHistoryContent() {
     return (
       <>
@@ -215,7 +257,8 @@ export default function OrdersAndTradesWidget({
             <thead className="sticky top-0 z-10 bg-darkBluishGray9 font-normal text-darkBluishGray2">
               <tr key="header">
                 <td className="pl-4">Date</td>
-                <td className="pl-4">Side</td>
+                <td className="pl-4">Sell</td>
+                <td className="pl-4">Buy</td>
                 <td className="hidden pl-4 narrow:table-cell">Amount</td>
                 <td className="hidden pl-4 narrow:table-cell">Price</td>
                 <td className="table-cell pl-4 narrow:hidden">
@@ -224,7 +267,6 @@ export default function OrdersAndTradesWidget({
                   Price
                 </td>
                 <td className="pl-4">Fee</td>
-                <td className="pl-4">Market</td>
                 <td className="pl-4 text-center">Status</td>
               </tr>
             </thead>
@@ -246,26 +288,50 @@ export default function OrdersAndTradesWidget({
                         {format(trade.timestamp, 'HH:mm:ss a')}
                       </span>
                     </td>
-                    <td className="pl-4">{trade.side}</td>
-                    <td className="hidden pl-4 narrow:table-cell">
-                      {formatUnits(trade.amount, market.baseSymbol.decimals)}
+                    <td className="pl-4">
+                      <SymbolAndChain
+                        symbol={
+                          trade.side === 'Buy'
+                            ? market.quoteSymbol
+                            : market.baseSymbol
+                        }
+                      />
+                    </td>
+                    <td className="pl-4">
+                      <SymbolAndChain
+                        symbol={
+                          trade.side === 'Buy'
+                            ? market.baseSymbol
+                            : market.quoteSymbol
+                        }
+                      />
                     </td>
                     <td className="hidden pl-4 narrow:table-cell">
-                      {trade.price.toFixed(market.quoteDecimalPlaces)}
+                      {displayAmount(
+                        trade.amount,
+                        trade.side,
+                        market,
+                        trade.price
+                      )}
+                    </td>
+                    <td className="hidden pl-4 narrow:table-cell">
+                      {displayPrice(trade.price, trade.side, market)}
                     </td>
                     <td className="table-cell pl-4 narrow:hidden">
                       {formatUnits(trade.amount, market.baseSymbol.decimals)}
                       <br />
                       {trade.price.toFixed(market.quoteDecimalPlaces)}
                     </td>
+
                     <td className="pl-4">
                       {formatUnits(
                         trade.feeAmount,
                         market.quoteSymbol.decimals
-                      )}
-                    </td>
-                    <td className="pl-4">
-                      <MarketTitle market={market} alwaysShowLabel={false} />
+                      )}{' '}
+                      <SymbolAndChain
+                        symbol={market.quoteSymbol}
+                        noIcon={true}
+                      />
                     </td>
                     <td className="rounded-r px-4 text-center">
                       <Status status={trade.settlementStatus} />
