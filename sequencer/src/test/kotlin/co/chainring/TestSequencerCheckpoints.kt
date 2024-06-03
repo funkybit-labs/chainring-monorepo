@@ -407,6 +407,32 @@ class TestSequencerCheckpoints {
     }
 
     @Test
+    fun `test state storing and loading - balances and consumptions`() {
+        verifySerialization(
+            SequencerState(
+                balances = mutableMapOf(
+                    wallet1 to mutableMapOf(
+                        btc to BigDecimal("1").inSats(),
+                        eth to BigDecimal("2").inWei(),
+                    ),
+                    wallet2 to mutableMapOf(
+                        btc to BigDecimal("3").inSats(),
+                    ),
+                ),
+                consumed = mutableMapOf(
+                    wallet1 to mutableMapOf(
+                        btc to mutableMapOf(btcEthMarketId to BigDecimal("1").inSats()),
+                        eth to mutableMapOf(btcEthMarketId to BigDecimal("2").inWei()),
+                    ),
+                    wallet2 to mutableMapOf(
+                        btc to mutableMapOf(btcEthMarketId to BigDecimal("3").inSats()),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun `test state storing and loading - single empty market`() {
         verifySerialization(
             SequencerState(
@@ -426,7 +452,7 @@ class TestSequencerCheckpoints {
                         tickSize = BigDecimal("0.05"),
                         maxLevels = 1000,
                         maxOrdersPerLevel = 1000,
-                        marketPrice = BigDecimal("17.525"),
+                        initialMarketPrice = BigDecimal("17.525"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
                     ),
@@ -455,7 +481,7 @@ class TestSequencerCheckpoints {
                         tickSize = BigDecimal("0.05"),
                         maxLevels = 1000,
                         maxOrdersPerLevel = 1000,
-                        marketPrice = BigDecimal("17.525"),
+                        initialMarketPrice = BigDecimal("17.525"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
                     ).also { market ->
@@ -511,7 +537,7 @@ class TestSequencerCheckpoints {
                         tickSize = BigDecimal("0.05"),
                         maxLevels = 1000,
                         maxOrdersPerLevel = 1000,
-                        marketPrice = BigDecimal("17.525"),
+                        initialMarketPrice = BigDecimal("17.525"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
                     ).also { market ->
@@ -569,7 +595,7 @@ class TestSequencerCheckpoints {
                         tickSize = BigDecimal("0.05"),
                         maxLevels = 1000,
                         maxOrdersPerLevel = 1000,
-                        marketPrice = BigDecimal("17.525"),
+                        initialMarketPrice = BigDecimal("17.525"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
                     ).also { market ->
@@ -623,7 +649,7 @@ class TestSequencerCheckpoints {
                         tickSize = BigDecimal("1.00"),
                         maxLevels = 1000,
                         maxOrdersPerLevel = 1000,
-                        marketPrice = BigDecimal("70000"),
+                        initialMarketPrice = BigDecimal("70000"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
                     ).also { market ->
@@ -725,7 +751,7 @@ class TestSequencerCheckpoints {
                 initialState.markets[marketId]!!.let { initialMarket ->
                     assertEquals(initialMarket.id, marketCheckpoint.id.toMarketId())
                     assertEquals(initialMarket.tickSize, marketCheckpoint.tickSize.toBigDecimal())
-                    assertEquals(initialMarket.marketPrice, marketCheckpoint.marketPrice.toBigDecimal())
+                    assertEquals(initialMarket.initialMarketPrice, marketCheckpoint.marketPrice.toBigDecimal())
                     assertEquals(initialMarket.maxLevels, marketCheckpoint.maxLevels)
                     assertEquals(initialMarket.maxOrdersPerLevel, marketCheckpoint.maxOrdersPerLevel)
                     assertEquals(initialMarket.baseDecimals, marketCheckpoint.baseDecimals)

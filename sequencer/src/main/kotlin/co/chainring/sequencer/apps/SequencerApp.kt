@@ -38,6 +38,7 @@ import java.lang.Thread.UncaughtExceptionHandler
 import java.math.BigInteger
 import java.nio.file.Path
 import kotlin.concurrent.thread
+import kotlin.system.exitProcess
 import co.chainring.sequencer.core.inputQueue as defaultInputQueue
 import co.chainring.sequencer.core.outputQueue as defaultOutputQueue
 
@@ -46,6 +47,7 @@ class SequencerApp(
     val outputQueue: RollingChronicleQueue = defaultOutputQueue,
     val checkpointsPath: Path?,
     val inSandboxMode: Boolean = System.getenv("SANDBOX_MODE").toBoolean(),
+    private val strictReplayValidation: Boolean = System.getenv("STRICT_REPLAY_VALIDATION").toBoolean(),
 ) : BaseApp() {
     override val logger = KotlinLogging.logger {}
     private var stop = false
@@ -66,7 +68,7 @@ class SequencerApp(
                     state.markets[marketId] = Market(
                         id = marketId,
                         tickSize = tickSize,
-                        marketPrice = marketPrice,
+                        initialMarketPrice = marketPrice,
                         maxLevels = market.maxLevels,
                         maxOrdersPerLevel = market.maxOrdersPerLevel,
                         baseDecimals = market.baseDecimals,
@@ -437,6 +439,18 @@ class SequencerApp(
                         dc.wire()?.read()?.bytes { bytes ->
                             val request = SequencerRequest.parseFrom(bytes.toByteArray())
                             val response = processRequest(request, dc.index(), startTime)
+
+                            if (strictReplayValidation && response.sequence <= lastSequenceNumberProcessedBeforeRestart) {
+                                // validate actual response matches expected while replaying requests
+                                loadResponseFromOutputQueue(response.sequence)?.let {
+                                    val expectedResponse = it.toBuilder().setProcessingTime(response.processingTime).build()
+                                    if (response != expectedResponse) {
+                                        logger.error { "Actual response did not match expected, exiting. Sequence: ${dc.index()}, requests processed since start: $requestsProcessedSinceStarted, request: $request, expected response: $expectedResponse, actual response: $response" }
+                                        exitProcess(1)
+                                    }
+                                }
+                            }
+
                             requestsProcessedSinceStarted += 1
                             if (response.sequence == lastSequenceNumberProcessedBeforeRestart) {
                                 logger.info { "Caught up after re-processing $requestsProcessedSinceStarted requests" }
@@ -475,6 +489,24 @@ class SequencerApp(
             }
             result
         }
+
+    private lateinit var outputTailer: ExcerptTailer
+    private fun loadResponseFromOutputQueue(sequence: Long): SequencerResponse? {
+        if (!::outputTailer.isInitialized) {
+            outputTailer = outputQueue.createTailer()
+        }
+
+        var result: SequencerResponse? = null
+        outputTailer.moveToIndex(sequence)
+        outputTailer.readingDocument().use {
+            if (it.isPresent) {
+                it.wire()?.read()?.bytes { bytes ->
+                    result = SequencerResponse.parseFrom(bytes.toByteArray())
+                }
+            }
+        }
+        return result
+    }
 
     private fun saveCheckpoint(checkpointsPath: Path, currentCycle: Int) {
         val checkpointPath = Path.of(checkpointsPath.toString(), currentCycle.toString())

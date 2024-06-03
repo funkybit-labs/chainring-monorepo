@@ -26,7 +26,7 @@ class TestMarket {
         market = Market(
             id = MarketId("BTC/ETH"),
             tickSize = BigDecimal("0.05"),
-            marketPrice = BigDecimal("17.525"),
+            initialMarketPrice = BigDecimal("17.525"),
             maxLevels = 1000,
             maxOrdersPerLevel = 100,
             baseDecimals = 18,

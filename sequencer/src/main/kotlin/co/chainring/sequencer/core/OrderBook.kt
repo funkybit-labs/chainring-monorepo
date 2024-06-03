@@ -96,6 +96,11 @@ class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal
     fun fromCheckpoint(checkpoint: MarketCheckpoint.OrderBookLevel) {
         orderHead = checkpoint.orderHead
         orderTail = checkpoint.orderTail
+        side = when (checkpoint.side) {
+            MarketCheckpoint.BookSide.Buy -> BookSide.Buy
+            MarketCheckpoint.BookSide.Sell -> BookSide.Sell
+            else -> throw IllegalStateException("Unexpected level book side '${checkpoint.side}'")
+        }
         val checkpointOrdersCount = checkpoint.ordersList.size
         (0.until(checkpointOrdersCount)).forEach { i ->
             val orderCheckpoint = checkpoint.ordersList[i]
@@ -150,7 +155,7 @@ class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal
             }
         }
         // remove consumed orders
-        orderHead = ix
+        orderHead = ix // TODO: CHAIN-274 Also reset consumed orders
 
         return OrderBookLevelFill(
             remainingAmount,
