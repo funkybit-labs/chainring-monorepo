@@ -1,10 +1,10 @@
 import { Withdrawal } from 'apiClient'
 import TradingSymbols from 'tradingSymbols'
 import { format } from 'date-fns'
-import SymbolIcon from 'components/common/SymbolIcon'
 import { formatUnits } from 'viem'
 import React, { Fragment } from 'react'
 import { Status } from 'components/common/Status'
+import { SymbolAndChain } from 'components/common/SymbolAndChain'
 
 export function WithdrawalsTable({
   withdrawals,
@@ -29,11 +29,7 @@ export function WithdrawalsTable({
               </span>
             </div>
             <div className="mb-4 mr-4 inline-block whitespace-nowrap align-text-top text-sm">
-              <SymbolIcon
-                symbol={symbol}
-                className="mr-2 inline-block size-6"
-              />
-              {symbol.name}
+              <SymbolAndChain symbol={symbol} />
             </div>
             <div className="mb-4 inline-block w-full text-center align-text-top text-sm">
               {formatUnits(withdrawal.amount, symbol.decimals)}

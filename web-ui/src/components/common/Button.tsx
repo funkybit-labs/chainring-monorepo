@@ -17,12 +17,12 @@ export function Button({ caption, onClick, disabled, style, primary }: Props) {
         'overflow-ellipsis overflow-hidden border-transparent rounded-[20px]',
         'transition-colors duration-300 ease-in-out text-darkBluishGray1',
         primary
-          ? 'bg-blue4 text-white hover:bg-blue5'
+          ? 'bg-primary5 text-white hover:bg-blue5'
           : 'bg-darkBluishGray7 text-darkBluishGray1',
         style == 'narrow' ? 'px-2 my-1 mx-1' : 'px-4 py-2',
         style == 'full' ? 'w-full' : '',
         'focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray',
-        disabled ? 'opacity-50' : 'hover:bg-mutedGray'
+        disabled ? 'opacity-50' : 'hover:bg-primary4'
       )}
       onClick={onClick}
     >

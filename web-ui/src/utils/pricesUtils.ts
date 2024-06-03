@@ -2,6 +2,7 @@ import { OHLC, OHLCDuration, OrderBook } from 'websocketMessages'
 import { OrderSide } from 'apiClient'
 import { parseUnits } from 'viem'
 import { Market } from 'markets'
+import Decimal from 'decimal.js'
 
 export const ohlcDurationsMs: Record<OHLCDuration, number> = {
   ['P1M']: 60 * 1000,
@@ -95,4 +96,15 @@ export function getMarketPrice(
   return (
     orderChunks.reduce((acc, c) => acc + c.price * c.size, 0n) / amountCovered
   )
+}
+
+export function bigintToScaledDecimal(bi: bigint, decimals: number): Decimal {
+  const scaleFactor = new Decimal(10).pow(decimals)
+  return new Decimal(bi.toString()).div(scaleFactor)
+}
+
+export function scaledDecimalToBigint(sd: Decimal, decimals: number): bigint {
+  const scaleFactor = new Decimal(10).pow(decimals)
+  const scaled = sd.mul(scaleFactor).floor()
+  return BigInt(scaled.toHex())
 }

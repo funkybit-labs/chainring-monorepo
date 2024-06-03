@@ -10,12 +10,14 @@ import Menu from 'assets/Menu.svg'
 import { FaucetModal } from 'components/Screens/HomeScreen/faucet/FaucetModal'
 import faucetIcon from 'assets/faucet.svg'
 
-export type Tab = 'Swap' | 'Dashboard'
+export type Tab = 'Swap' | 'Limit' | 'Dashboard'
 
 export function Header({
+  initialTab,
   markets,
   onTabChange
 }: {
+  initialTab: Tab
   markets: Markets
   onTabChange: (newTab: Tab) => void
 }) {
@@ -27,7 +29,7 @@ export function Header({
   const [showMenu, setShowMenu] = useState(false)
   const [showFaucetModal, setShowFaucetModal] = useState<boolean>(false)
   const faucetEnabled = import.meta.env.ENV_FAUCET_ENABLED === 'true'
-  const [tab, setTab] = useState<Tab>('Swap')
+  const [tab, setTab] = useState<Tab>(initialTab)
 
   useEffect(() => {
     if (account.isConnected && account.connector) {
@@ -136,32 +138,22 @@ export function Header({
           </div>
         </span>
         <div className="cursor-pointer space-x-4 text-[16px]">
-          <span
-            className={classNames(
-              'border-b-2 pb-2',
-              tab == 'Swap' ? 'text-primary4' : 'text-darkBluishGray3'
-            )}
-            onClick={() => {
-              setTab('Swap')
-              onTabChange('Swap')
-            }}
-          >
-            <span className="px-2">Swap</span>
-          </span>
-          <span
-            className={classNames(
-              'border-b-2 pb-2',
-              tab == 'Dashboard' ? 'text-primary4' : 'text-darkBluishGray3'
-            )}
-            onClick={() => {
-              setTab('Dashboard')
-              onTabChange('Dashboard')
-            }}
-          >
-            <span className="px-2">Dashboard</span>
-          </span>
+          {(['Swap', 'Limit', 'Dashboard'] as Tab[]).map((t) => (
+            <span
+              key={t}
+              className={classNames(
+                'border-b-2 pb-2',
+                tab === t ? 'text-primary4' : 'text-darkBluishGray3'
+              )}
+              onClick={() => {
+                setTab(t)
+                onTabChange(t)
+              }}
+            >
+              <span className="px-2">{t}</span>
+            </span>
+          ))}
         </div>
-
         <div className="flex space-x-2 narrow:mr-0">
           <div className="hidden narrow:inline-block">{walletConnector()}</div>
           <div className="hidden narrow:inline-block">

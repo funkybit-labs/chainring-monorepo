@@ -7,10 +7,12 @@ import {
   Publishable,
   orderBookTopic,
   Direction,
-  OrderBookEntry
+  OrderBookEntry,
+  LastTrade
 } from 'websocketMessages'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { useMeasure } from 'react-use'
+import { OrderSide } from 'apiClient'
 
 type OrderBookParameters = {
   gridLines: number
@@ -82,8 +84,14 @@ function calculateParameters(
   }
 }
 
-export function OrderBookWidget({ marketId }: { marketId: string }) {
-  const [orderBook, setOrderBook] = useState<OrderBook>()
+export function OrderBookWidget({
+  marketId,
+  side
+}: {
+  marketId: string
+  side: OrderSide
+}) {
+  const [rawOrderBook, setRawOrderBook] = useState<OrderBook>()
   const [params, setParams] = useState<OrderBookParameters>()
 
   const [ref, { width }] = useMeasure()
@@ -92,16 +100,54 @@ export function OrderBookWidget({ marketId }: { marketId: string }) {
     topics: useMemo(() => [orderBookTopic(marketId)], [marketId]),
     handler: useCallback((message: Publishable) => {
       if (message.type === 'OrderBook') {
-        setOrderBook(message)
+        setRawOrderBook(message)
       }
     }, [])
   })
+
+  function invertPrices(entries: OrderBookEntry[]): OrderBookEntry[] {
+    return entries.map((entry) => {
+      return {
+        price: (1.0 / parseFloat(entry.price)).toFixed(6),
+        size: entry.size
+      }
+    })
+  }
+
+  function invertLast(last: LastTrade): LastTrade {
+    return {
+      price: (1.0 / parseFloat(last.price)).toFixed(6),
+      direction:
+        last.direction === 'Up'
+          ? 'Down'
+          : last.direction === 'Down'
+            ? 'Up'
+            : 'Unchanged'
+    }
+  }
+
+  const orderBook = useMemo(() => {
+    if (side === 'Sell') {
+      if (rawOrderBook) {
+        return {
+          type: rawOrderBook.type,
+          buy: invertPrices(rawOrderBook.sell).toReversed(),
+          sell: invertPrices(rawOrderBook.buy).toReversed(),
+          last: invertLast(rawOrderBook.last)
+        }
+      } else {
+        return rawOrderBook
+      }
+    } else {
+      return rawOrderBook
+    }
+  }, [rawOrderBook, side])
 
   useEffect(() => {
     if (orderBook) {
       setParams(calculateParameters(orderBook, width))
     }
-  }, [orderBook, width])
+  }, [orderBook, width, side])
 
   return (
     <Widget

@@ -12,11 +12,12 @@ import { useWebsocketSubscription } from 'contexts/websocket'
 import { produce } from 'immer'
 import * as d3 from 'd3'
 
-import Markets, { Market } from 'markets'
+import { Market } from 'markets'
 import { classNames } from 'utils'
 import { useMeasure } from 'react-use'
 import { useGesture } from '@use-gesture/react'
-import { MarketSelector } from 'components/Screens/HomeScreen/MarketSelector'
+import { MarketTitle } from 'components/Screens/HomeScreen/MarketTitle'
+import { OrderSide } from 'apiClient'
 
 enum PricesInterval {
   PT1H = '1h',
@@ -110,13 +111,11 @@ function longerDurationOrNull(duration: OHLCDuration): OHLCDuration | null {
 }
 
 export function PricesWidget({
-  markets,
   market,
-  onMarketChanged
+  side
 }: {
-  markets: Markets
   market: Market
-  onMarketChanged: (m: Market) => void
+  side: OrderSide
 }) {
   const [ref, { width }] = useMeasure()
 
@@ -124,9 +123,12 @@ export function PricesWidget({
     PricesInterval.PT6H
   )
   const [duration, setDuration] = useState<OHLCDuration>('P5M')
+  // the raw ohlc are as returned by backend
+  const [rawOhlc, setRawOhlc] = useState<OHLC[]>([])
+  // ohlc is what the price chart uses, and has them inverted if the side is Sell
   const [ohlc, setOhlc] = useState<OHLC[]>([])
   const [ohlcLoading, setOhlcLoading] = useState<boolean>(true)
-  const [dailyChange, setDailyChange] = useState<number | null>(null)
+  const [rawDailyChange, setRawDailyChange] = useState<number | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   useWebsocketSubscription({
@@ -138,14 +140,14 @@ export function PricesWidget({
       (message: Publishable) => {
         if (message.type === 'Prices') {
           if (message.full) {
-            setOhlc(mergeOHLC([], message.ohlc, duration))
+            setRawOhlc(mergeOHLC([], message.ohlc, duration))
           } else {
-            setOhlc(
+            setRawOhlc(
               produce((draft) => {
                 mergeOHLC(draft, message.ohlc, duration)
               })
             )
-            setDailyChange(message.dailyChange)
+            setRawDailyChange(message.dailyChange)
           }
           setLastUpdated(new Date())
           setOhlcLoading(false)
@@ -162,7 +164,7 @@ export function PricesWidget({
       ceilToDuration(new Date(), duration).getTime() - Date.now()
 
     intervalRef.current = setInterval(() => {
-      setOhlc(
+      setRawOhlc(
         produce((draft) => {
           mergeOHLC(draft, [], duration)
         })
@@ -175,6 +177,33 @@ export function PricesWidget({
       }
     }
   }, [ohlc.length, duration])
+
+  useEffect(() => {
+    if (side === 'Sell') {
+      setOhlc(
+        rawOhlc.map((ohlc) => {
+          return {
+            duration: ohlc.duration,
+            start: ohlc.start,
+            open: 1.0 / ohlc.open,
+            close: 1.0 / ohlc.close,
+            low: 1.0 / ohlc.high,
+            high: 1.0 / ohlc.low
+          }
+        })
+      )
+    } else {
+      setOhlc(rawOhlc)
+    }
+  }, [rawOhlc, side])
+
+  const dailyChange = useMemo(() => {
+    if (side === 'Sell') {
+      return -(rawDailyChange ?? 0)
+    } else {
+      return rawDailyChange
+    }
+  }, [rawDailyChange, side])
 
   function lastPrice(): number | null {
     if (ohlc.length > 0) {
@@ -192,11 +221,10 @@ export function PricesWidget({
         <div className="min-h-[600px]">
           <div className="flex flex-row align-middle">
             <Title
-              markets={markets}
               market={market}
+              side={side}
               price={lastPrice()}
               dailyChange={dailyChange}
-              onMarketChanged={onMarketChanged}
             />
           </div>
           <div className="flex w-full place-items-center justify-between py-4 text-sm">
@@ -276,7 +304,7 @@ function OHLCChart({
     bottom: 18,
     left: 0,
     // calculate 8 pixels for every price digit
-    right: lastPrice ? lastPrice.toFixed(2).length * 8 : 30
+    right: lastPrice ? lastPrice.toFixed(4).length * 8 : 30
   }
   const innerWidth = params.width - margin.left - margin.right
   const innerHeight = params.height - margin.top - margin.bottom
@@ -329,7 +357,7 @@ function OHLCChart({
       d3
         .axisRight(yScale)
         .tickSize(0)
-        .tickFormat((x: d3.NumberValue) => x.valueOf().toFixed(2))
+        .tickFormat((x: d3.NumberValue) => x.valueOf().toFixed(4))
         .tickPadding(5),
     [yScale]
   )
@@ -375,7 +403,7 @@ function OHLCChart({
         .duration(150)
         .attr('transform', `translate(0,${lastPrice ? yScale(lastPrice) : 0})`)
         .select('text')
-        .text(lastPrice ? lastPrice.toFixed(2) : '')
+        .text(lastPrice ? lastPrice.toFixed(4) : '')
 
       // calculate candle width
       const candleWidth =
@@ -514,7 +542,7 @@ function OHLCChart({
       .classed('hidden', mouseY > innerHeight)
       .attr('transform', `translate(0,${mouseY})`)
       .select('text')
-      .text(yScale.invert(mouseY).toFixed(2))
+      .text(yScale.invert(mouseY).toFixed(4))
   }
 
   function hideMouseProjections() {
@@ -720,26 +748,20 @@ function formatPrice(market: Market, price: number | null) {
 }
 
 function Title({
-  markets,
   market,
+  side,
   price,
-  dailyChange,
-  onMarketChanged
+  dailyChange
 }: {
-  markets: Markets
   market: Market
+  side: OrderSide
   price: number | null
   dailyChange: number | null
-  onMarketChanged: (m: Market) => void
 }) {
   return (
     <div className="flex w-full justify-between text-xl font-semibold">
       <div className="flex items-center gap-1">
-        <MarketSelector
-          markets={markets}
-          selected={market}
-          onChange={onMarketChanged}
-        />
+        <MarketTitle market={market} alwaysShowLabel={true} side={side} />
       </div>
       <div className="flex place-items-center gap-4 text-right">
         {formatPrice(market, price)}

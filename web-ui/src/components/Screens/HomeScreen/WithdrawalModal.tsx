@@ -108,6 +108,9 @@ export default function WithdrawalModal({
         )
       }
     },
+    onError: () => {
+      setTimeout(mutation.reset, 3000)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: withdrawalsQueryKey })
       close()

@@ -38,7 +38,7 @@ export default function SymbolIcon(props: Props) {
   })()
 
   return (
-    <span className="relative mt-[-1px] p-1">
+    <span className="relative mt-[-1px] min-w-8 p-1">
       <img src={icon} className={props.className || ''} alt={symbolName} />
       <img src={chainIcon} className="absolute -bottom-1 right-1 size-4" />
     </span>

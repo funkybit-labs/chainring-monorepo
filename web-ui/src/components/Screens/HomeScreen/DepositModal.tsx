@@ -125,6 +125,9 @@ export default function DepositModal({
         )
       }
     },
+    onError: () => {
+      setTimeout(mutation.reset, 3000)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: depositsQueryKey })
       close()

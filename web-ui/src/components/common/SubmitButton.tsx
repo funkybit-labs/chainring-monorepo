@@ -25,9 +25,11 @@ export default function SubmitButton({
           'mt-4 w-full inline-flex justify-center rounded-[50px] px-4 py-3 text-md text-white focus:outline-none focus:ring-1 focus:ring-inset',
           status === 'success'
             ? 'bg-statusGreen'
-            : disabled
-              ? 'bg-neutralGray focus:ring-mutedGray'
-              : 'bg-blue4 hover:bg-blue4 focus:ring-lightBackground'
+            : status === 'error'
+              ? 'bg-statusRed hover:bg-statusRed'
+              : disabled
+                ? 'bg-neutralGray focus:ring-mutedGray'
+                : 'bg-primary5 hover:bg-primary5 focus:ring-lightBackground'
         )}
         onClick={onClick}
       >

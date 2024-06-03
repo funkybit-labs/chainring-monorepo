@@ -14,8 +14,8 @@ import AmountInput from 'components/common/AmountInput'
 import { AmountWithSymbol } from 'components/common/AmountWithSymbol'
 import SubmitButton from 'components/common/SubmitButton'
 import { isErrorFromAlias } from '@zodios/core'
-import { MarketTitle } from 'components/Screens/HomeScreen/MarketSelector'
 import { calculateFee, calculateNotional } from 'utils'
+import { SymbolAndChain } from 'components/common/SymbolAndChain'
 
 export function ChangeOrderModal({
   order,
@@ -52,9 +52,9 @@ export function ChangeOrderModal({
   })
 
   const {
-    inputValue: priceInputValue,
-    setInputValue: setPriceInputValue,
-    valueInFundamentalUnits: price
+    inputValue: limitPriceInputValue,
+    setInputValue: setLimitPriceInputValue,
+    valueInFundamentalUnits: limitPrice
   } = useAmountInputState({
     initialInputValue: order.type == 'limit' ? String(order.price) : '',
     decimals: quoteSymbol.decimals
@@ -96,13 +96,13 @@ export function ChangeOrderModal({
     }
 
     if (order.side == 'Buy') {
-      const notional = calculateNotional(price, amount, baseSymbol)
+      const notional = calculateNotional(limitPrice, amount, baseSymbol)
       const fee = calculateFee(notional, feeRates.maker)
       return notional + fee > quoteLimit
     } else {
       return amount > baseLimit
     }
-  }, [price, amount, order, baseLimit, quoteLimit, baseSymbol, feeRates])
+  }, [limitPrice, amount, order, baseLimit, quoteLimit, baseSymbol, feeRates])
 
   const changeOrderMutation = useMutation({
     mutationFn: async () => {
@@ -132,7 +132,7 @@ export function ChangeOrderModal({
             baseToken: baseSymbol.contractAddress ?? addressZero,
             quoteToken: quoteSymbol.contractAddress ?? addressZero,
             amount: order.side == 'Buy' ? amount : -amount,
-            price: BigInt(price),
+            price: BigInt(limitPrice),
             nonce: BigInt('0x' + nonce)
           }
         })
@@ -142,7 +142,7 @@ export function ChangeOrderModal({
             orderId: order.id,
             type: 'limit',
             amount: amount,
-            price: new Decimal(priceInputValue),
+            price: new Decimal(limitPriceInputValue),
             marketId: order.marketId,
             side: order.side,
             nonce: nonce,
@@ -159,6 +159,9 @@ export function ChangeOrderModal({
         )
       }
     },
+    onError: () => {
+      setTimeout(changeOrderMutation.reset, 3000)
+    },
     onSuccess: () => {
       close()
     }
@@ -167,9 +170,15 @@ export function ChangeOrderModal({
   const canSubmit = useMemo(() => {
     if (changeOrderMutation.isPending) return false
     if (amount <= 0n) return false
-    if (price <= 0n && order.type === 'market') return false
+    if (limitPrice <= 0n && order.type === 'market') return false
     return !exceedsLimit
-  }, [amount, price, order.type, changeOrderMutation.isPending, exceedsLimit])
+  }, [
+    amount,
+    limitPrice,
+    order.type,
+    changeOrderMutation.isPending,
+    exceedsLimit
+  ])
 
   async function onSubmit() {
     changeOrderMutation.mutate()
@@ -185,10 +194,18 @@ export function ChangeOrderModal({
       <div className="overflow-y-auto text-sm text-white">
         <div className="mb-4 flex flex-col gap-2">
           <div className="flex">
-            <span className="mr-2 text-darkBluishGray1">Market:</span>
-            <MarketTitle market={market} alwaysShowLabel={true} />
-            <span className="ml-8 mr-2 text-darkBluishGray1">Side:</span>
-            {order.side}
+            <span className="mr-2 text-darkBluishGray1">Sell:</span>
+            <SymbolAndChain
+              symbol={
+                order.side === 'Buy' ? market.quoteSymbol : market.baseSymbol
+              }
+            />
+            <span className="ml-8 mr-2 text-darkBluishGray1">Buy:</span>
+            <SymbolAndChain
+              symbol={
+                order.side === 'Buy' ? market.baseSymbol : market.quoteSymbol
+              }
+            />
           </div>
           <div>
             <label className="my-2 block text-darkBluishGray1">Amount</label>
@@ -203,9 +220,9 @@ export function ChangeOrderModal({
             <div>
               <label className="my-2 block text-darkBluishGray1">Price</label>
               <AmountInput
-                value={priceInputValue}
+                value={limitPriceInputValue}
                 disabled={changeOrderMutation.isPending}
-                onChange={(e) => setPriceInputValue(e.target.value)}
+                onChange={(e) => setLimitPriceInputValue(e.target.value)}
               />
             </div>
           )}
