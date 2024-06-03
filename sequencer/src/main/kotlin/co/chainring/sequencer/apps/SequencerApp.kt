@@ -442,7 +442,7 @@ class SequencerApp(
 
                             if (strictReplayValidation && response.sequence <= lastSequenceNumberProcessedBeforeRestart) {
                                 // validate actual response matches expected while replaying requests
-                                getResponseAtSequenceInOutputQueue(response.sequence)?.let {
+                                loadResponseFromOutputQueue(response.sequence)?.let {
                                     val expectedResponse = it.toBuilder().setProcessingTime(response.processingTime).build()
                                     if (response != expectedResponse) {
                                         logger.error { "Actual response did not match expected, exiting. Sequence: ${dc.index()}, requests processed since start: ${requestsProcessedSinceStarted}, request: ${request}, expected response: ${expectedResponse}, actual response: $response" }
@@ -491,7 +491,7 @@ class SequencerApp(
         }
 
     private lateinit var outputTailer: ExcerptTailer
-    private fun getResponseAtSequenceInOutputQueue(sequence: Long): SequencerResponse? {
+    private fun loadResponseFromOutputQueue(sequence: Long): SequencerResponse? {
         if (!::outputTailer.isInitialized) {
             outputTailer = outputQueue.createTailer()
         }
