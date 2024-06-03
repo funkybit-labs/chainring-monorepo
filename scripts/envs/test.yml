@@ -12,6 +12,7 @@ environment:
     QUEUE_HOME: "/data/queues/test"
     CHECKPOINTS_ENABLED: "false"
     SANDBOX_MODE: "true"
+    STRICT_REPLAY_VALIDATION: "true"
     DB_HOST: test-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
   telegrambot:

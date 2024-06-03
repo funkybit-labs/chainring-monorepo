@@ -27,7 +27,7 @@ import kotlin.math.min
 data class Market(
     val id: MarketId,
     val tickSize: BigDecimal,
-    var marketPrice: BigDecimal,
+    val initialMarketPrice: BigDecimal,
     val maxLevels: Int,
     val maxOrdersPerLevel: Int,
     val baseDecimals: Int,
@@ -39,7 +39,7 @@ data class Market(
 
     private val logger = KotlinLogging.logger { }
 
-    private fun marketIx(): Int = min(maxLevels / 2, (marketPrice - halfTick).divideToIntegralValue(tickSize).toInt())
+    private fun marketIx(): Int = min(maxLevels / 2, (initialMarketPrice - halfTick).divideToIntegralValue(tickSize).toInt())
 
     fun levelIx(price: BigDecimal): Int = (price - levels[0].price).divideToIntegralValue(tickSize).toInt()
 
@@ -52,14 +52,14 @@ data class Market(
                 OrderBookLevel(
                     n,
                     BookSide.Buy,
-                    marketPrice.minus(tickSize.multiply((marketIx - n - 0.5).toBigDecimal())),
+                    initialMarketPrice.minus(tickSize.multiply((marketIx - n - 0.5).toBigDecimal())),
                     maxOrdersPerLevel,
                 )
             } else {
                 OrderBookLevel(
                     n,
                     BookSide.Sell,
-                    marketPrice.plus(tickSize.multiply((n - marketIx + 0.5).toBigDecimal())),
+                    initialMarketPrice.plus(tickSize.multiply((n - marketIx + 0.5).toBigDecimal())),
                     maxOrdersPerLevel,
                 )
             }
@@ -815,7 +815,7 @@ data class Market(
         if (maxLevels != other.maxLevels) return false
         if (maxOrdersPerLevel != other.maxOrdersPerLevel) return false
         if (tickSize != other.tickSize) return false
-        if (marketPrice != other.marketPrice) return false
+        if (initialMarketPrice != other.initialMarketPrice) return false
         if (baseDecimals != other.baseDecimals) return false
         if (quoteDecimals != other.quoteDecimals) return false
         if (maxOfferIx != other.maxOfferIx) return false
@@ -833,7 +833,7 @@ data class Market(
         var result = maxLevels
         result = 31 * result + maxOrdersPerLevel
         result = 31 * result + tickSize.hashCode()
-        result = 31 * result + marketPrice.hashCode()
+        result = 31 * result + initialMarketPrice.hashCode()
         result = 31 * result + baseDecimals
         result = 31 * result + quoteDecimals
         result = 31 * result + maxOfferIx
@@ -852,7 +852,7 @@ data class Market(
         return marketCheckpoint {
             this.id = this@Market.id.value
             this.tickSize = this@Market.tickSize.toDecimalValue()
-            this.marketPrice = this@Market.marketPrice.toDecimalValue()
+            this.marketPrice = this@Market.initialMarketPrice.toDecimalValue()
             this.maxLevels = this@Market.maxLevels
             this.maxOrdersPerLevel = this@Market.maxOrdersPerLevel
             this.baseDecimals = this@Market.baseDecimals
@@ -894,7 +894,7 @@ data class Market(
             return Market(
                 id = checkpoint.id.toMarketId(),
                 tickSize = tickSize,
-                marketPrice = checkpoint.marketPrice.toBigDecimal(),
+                initialMarketPrice = checkpoint.marketPrice.toBigDecimal(),
                 maxLevels = checkpoint.maxLevels,
                 maxOrdersPerLevel = checkpoint.maxOrdersPerLevel,
                 baseDecimals = checkpoint.baseDecimals,
