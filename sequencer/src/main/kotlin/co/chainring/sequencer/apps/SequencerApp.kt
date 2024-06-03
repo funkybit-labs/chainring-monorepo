@@ -38,9 +38,9 @@ import java.lang.Thread.UncaughtExceptionHandler
 import java.math.BigInteger
 import java.nio.file.Path
 import kotlin.concurrent.thread
+import kotlin.system.exitProcess
 import co.chainring.sequencer.core.inputQueue as defaultInputQueue
 import co.chainring.sequencer.core.outputQueue as defaultOutputQueue
-import kotlin.system.exitProcess
 
 class SequencerApp(
     val inputQueue: RollingChronicleQueue = defaultInputQueue,
@@ -445,7 +445,7 @@ class SequencerApp(
                                 loadResponseFromOutputQueue(response.sequence)?.let {
                                     val expectedResponse = it.toBuilder().setProcessingTime(response.processingTime).build()
                                     if (response != expectedResponse) {
-                                        logger.error { "Actual response did not match expected, exiting. Sequence: ${dc.index()}, requests processed since start: ${requestsProcessedSinceStarted}, request: ${request}, expected response: ${expectedResponse}, actual response: $response" }
+                                        logger.error { "Actual response did not match expected, exiting. Sequence: ${dc.index()}, requests processed since start: $requestsProcessedSinceStarted, request: $request, expected response: $expectedResponse, actual response: $response" }
                                         exitProcess(1)
                                     }
                                 }

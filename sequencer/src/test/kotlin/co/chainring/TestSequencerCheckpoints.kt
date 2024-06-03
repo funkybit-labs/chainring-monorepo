@@ -427,7 +427,7 @@ class TestSequencerCheckpoints {
                     wallet2 to mutableMapOf(
                         btc to mutableMapOf(btcEthMarketId to BigDecimal("3").inSats()),
                     ),
-                )
+                ),
             ),
         )
     }
