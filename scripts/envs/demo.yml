@@ -25,7 +25,7 @@ environment:
     EVM_NETWORK_URL_Botanix: http://demo-anvil2.chainring.co:8545
     FAUCET_SUPPORTED: "true"
   anvil2:
-    CHAIN_ID: "31338"
+    CHAIN_ID: "31339"
   otterscan:
     ERIGON_URL: https://demo-anvil.chainring.co
     NET_NAME: "ChainRing Demo BitLayer"
