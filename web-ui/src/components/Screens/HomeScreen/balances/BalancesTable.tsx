@@ -24,6 +24,7 @@ import { useConfig, useSwitchChain } from 'wagmi'
 import { allChains } from 'wagmiConfig'
 import TradingSymbol from 'tradingSymbol'
 import { SymbolAndChain } from 'components/common/SymbolAndChain'
+import { ExpandableValue } from 'components/common/ExpandableNumber'
 
 export function BalancesTable({
   walletAddress,
@@ -112,7 +113,9 @@ export function BalancesTable({
                 <SymbolAndChain symbol={symbol} />
               </div>
               <div className="mb-4 inline-block w-full text-center align-text-top">
-                {formatUnits(balance.available, symbol.decimals)}
+                <ExpandableValue
+                  value={formatUnits(balance.available, symbol.decimals)}
+                />
               </div>
               <div className="mb-4 inline-block space-x-4 justify-self-end text-xs">
                 <Button

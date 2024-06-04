@@ -8,6 +8,7 @@ import {
   limitsTopic,
   OrderBook,
   orderBookTopic,
+  ordersTopic,
   Publishable
 } from 'websocketMessages'
 import { Address, formatUnits, parseUnits } from 'viem'
@@ -54,6 +55,7 @@ export type SwapRender = {
   canSubmit: boolean
   getMarketPrice: (side: OrderSide, amount: bigint) => bigint | undefined
   quoteDecimals: number
+  lastOrderFilled: boolean
 }
 
 export function SwapInternals({
@@ -84,6 +86,8 @@ export function SwapInternals({
   )
   const [side, setSide] = useState<OrderSide>('Buy')
   const [balances, setBalances] = useState<Balance[]>(() => [])
+  const [lastOrderId, setLastOrderId] = useState<string | undefined>()
+  const [lastOrderFilled, setLastOrderFilled] = useState<boolean>(false)
 
   useEffect(() => {
     const selectedMarket = window.sessionStorage.getItem('market')
@@ -106,12 +110,21 @@ export function SwapInternals({
   }, [markets])
 
   useWebsocketSubscription({
-    topics: useMemo(() => [balancesTopic], []),
-    handler: useCallback((message: Publishable) => {
-      if (message.type === 'Balances') {
-        setBalances(message.balances)
-      }
-    }, []),
+    topics: useMemo(() => [balancesTopic, ordersTopic], []),
+    handler: useCallback(
+      (message: Publishable) => {
+        if (message.type === 'Balances') {
+          setBalances(message.balances)
+        } else if (message.type === 'OrderUpdated') {
+          if (message.order.id === lastOrderId) {
+            setLastOrderFilled(
+              ['Partial', 'Filled'].includes(message.order.status)
+            )
+          }
+        }
+      },
+      [lastOrderId]
+    ),
     onUnsubscribe: useCallback(() => {
       setBalances([])
     }, [])
@@ -428,6 +441,8 @@ export function SwapInternals({
 
   const mutation = useMutation({
     mutationFn: async () => {
+      setLastOrderFilled(false)
+      setLastOrderId(undefined)
       try {
         const nonce = generateOrderNonce()
         const signature = await signTypedDataAsync({
@@ -482,6 +497,7 @@ export function SwapInternals({
             verifyingChainId: config.state.chainId
           })
         }
+        setLastOrderId(response.orderId)
         clearAmountFields()
         return response
       } catch (error) {
@@ -493,7 +509,11 @@ export function SwapInternals({
       }
     },
     onSuccess: () => {
-      setTimeout(mutation.reset, 3000)
+      setTimeout(() => {
+        setLastOrderFilled(false)
+        setLastOrderId(undefined)
+        mutation.reset()
+      }, 3000)
     }
   })
 
@@ -617,6 +637,7 @@ export function SwapInternals({
     noPriceFound,
     canSubmit,
     getMarketPrice: getSimulatedPrice,
-    quoteDecimals: market.quoteDecimalPlaces
+    quoteDecimals: market.quoteDecimalPlaces,
+    lastOrderFilled
   })
 }

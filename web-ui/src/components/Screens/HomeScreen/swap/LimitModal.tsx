@@ -21,6 +21,7 @@ import {
 } from 'components/Screens/HomeScreen/swap/SwapInternals'
 import { bigintToScaledDecimal, scaledDecimalToBigint } from 'utils/pricesUtils'
 import Decimal from 'decimal.js'
+import { ExpandableValue } from 'components/common/ExpandableNumber'
 
 export function LimitModal({
   markets,
@@ -122,13 +123,11 @@ export function LimitModal({
           <>
             <span className="font-[400] text-darkBluishGray2">On deposit:</span>
             <span className="text-lightBluishGray2">
-              <span
-                className={
-                  'inline-block max-w-[10ch] overflow-x-clip text-ellipsis text-lightBluishGray2 hover:max-w-full'
-                }
-              >
-                {deposit && formatUnits(deposit.available, symbol.decimals)}
-              </span>{' '}
+              {deposit && (
+                <ExpandableValue
+                  value={formatUnits(deposit.available, symbol.decimals)}
+                />
+              )}{' '}
               {symbol.name}
             </span>
           </>
@@ -274,14 +273,7 @@ export function LimitModal({
               onClick={() => setMarketPriceInverted(!marketPriceInverted)}
             >
               1 {marketPriceInverted ? sr.topSymbol.name : sr.bottomSymbol.name}{' '}
-              ≈{' '}
-              <div
-                className={
-                  'inline-block max-w-[10ch] overflow-x-clip text-ellipsis hover:max-w-full'
-                }
-              >
-                {marketPrice}
-              </div>{' '}
+              ≈ <ExpandableValue value={marketPrice} />{' '}
               {marketPriceInverted ? sr.bottomSymbol.name : sr.topSymbol.name}
             </div>
             <div className="flex w-full flex-col">
@@ -298,9 +290,11 @@ export function LimitModal({
                     error={sr.mutation.error?.message}
                     caption={() => {
                       if (sr.mutation.isPending) {
-                        return 'Submitting order...'
+                        return 'Submitting...'
+                      } else if (sr.lastOrderFilled) {
+                        return '✓ Swapped'
                       } else if (sr.mutation.isSuccess) {
-                        return '✓'
+                        return '✓ Submitted'
                       } else {
                         return 'Swap'
                       }
