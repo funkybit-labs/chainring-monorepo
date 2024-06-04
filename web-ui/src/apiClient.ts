@@ -453,7 +453,7 @@ export const apiClient = new Zodios(apiBaseUrl, [
         schema: FaucetRequestSchema
       }
     ],
-    response: z.undefined(),
+    response: z.any(),
     errors: [
       {
         status: 'default',
