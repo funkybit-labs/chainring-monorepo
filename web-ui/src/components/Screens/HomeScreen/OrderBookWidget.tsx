@@ -109,7 +109,7 @@ export function OrderBookWidget({
     return entries.map((entry) => {
       return {
         price: (1.0 / parseFloat(entry.price)).toFixed(6),
-        size: entry.size
+        size: entry.size * parseFloat(entry.price)
       }
     })
   }
