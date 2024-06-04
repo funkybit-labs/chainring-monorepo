@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { apiClient, OrderSide } from 'apiClient'
+import { apiClient, OrderSide, useMaintenance } from 'apiClient'
 import { useAccount } from 'wagmi'
 import BalancesWidget from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import { Header, Tab } from 'components/Screens/Header'
@@ -24,6 +24,7 @@ export default function HomeScreen() {
   })
 
   const wallet = useAccount()
+  const maintenance = useMaintenance()
 
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
   const [side, setSide] = useState<OrderSide>(
@@ -100,6 +101,14 @@ export default function HomeScreen() {
 
   return (
     <WebsocketProvider wallet={wallet}>
+      {maintenance && (
+        <div className="fixed z-[100] flex w-full flex-row place-items-center justify-center bg-red p-0 text-white opacity-80">
+          <span className="animate-bounce">
+            ChainRing is currently undergoing maintenance, we&apos;ll be back
+            soon. HOME.
+          </span>
+        </div>
+      )}
       {markets && feeRates && selectedMarket ? (
         <div className="min-h-screen bg-darkBluishGray10">
           <Header initialTab={tab} markets={markets} onTabChange={saveTab} />
