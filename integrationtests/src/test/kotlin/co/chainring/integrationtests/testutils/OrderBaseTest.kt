@@ -144,7 +144,7 @@ open class OrderBaseTest {
             if (chainId != wallet.currentChainId) {
                 wallet.switchChain(chainId)
             }
-            wallet.deposit(it)
+            deposit(wallet, apiClient, it)
             wsClient.assertBalancesMessageReceived()
             wsClient.assertLimitsMessageReceived(marketId)
         }
@@ -187,7 +187,9 @@ open class OrderBaseTest {
         waitFor {
             Faucet.mine()
             transaction {
-                ChainSettlementBatchEntity[chainBatchGuid].submissionTx?.status == BlockchainTransactionStatus.Submitted
+                ChainSettlementBatchEntity[chainBatchGuid].submissionTx?.let {
+                    listOf(BlockchainTransactionStatus.Submitted, BlockchainTransactionStatus.Confirmed, BlockchainTransactionStatus.Completed).contains(it.status)
+                } ?: false
             }
         }
 

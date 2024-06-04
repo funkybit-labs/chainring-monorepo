@@ -8,6 +8,7 @@ import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
+import co.chainring.integrationtests.testutils.deposit
 import co.chainring.integrationtests.testutils.waitForBalance
 import co.chainring.integrationtests.testutils.waitForFinalizedWithdrawal
 import co.chainring.integrationtests.testutils.waitForFinalizedWithdrawalWithForking
@@ -60,7 +61,7 @@ class WithdrawalTest {
 
             // deposit some BTC
             val btcDepositAmount = AssetAmount(btc, "0.001")
-            val depositTxReceipt = wallet.deposit(btcDepositAmount)
+            val depositTxReceipt = deposit(wallet, apiClient, btcDepositAmount)
             waitForBalance(
                 apiClient,
                 wsClient,
@@ -73,7 +74,7 @@ class WithdrawalTest {
             assertEquals(walletStartingBtcBalance - btcDepositAmount - depositGasCost, wallet.getWalletBalance(btc))
 
             // deposit more BTC
-            val depositTxReceipt2 = wallet.deposit(btcDepositAmount)
+            val depositTxReceipt2 = deposit(wallet, apiClient, btcDepositAmount)
             waitForBalance(
                 apiClient,
                 wsClient,
@@ -91,7 +92,7 @@ class WithdrawalTest {
 
             // deposit some USDC
             val usdcDepositAmount = AssetAmount(usdc, "15")
-            wallet.deposit(usdcDepositAmount)
+            deposit(wallet, apiClient, usdcDepositAmount)
             waitForBalance(
                 apiClient,
                 wsClient,
@@ -245,7 +246,7 @@ class WithdrawalTest {
         val amount = AssetAmount(usdc, "1000")
         wallet.mintERC20(amount * BigDecimal("2"))
 
-        wallet.deposit(amount)
+        deposit(wallet, apiClient, amount)
         waitForBalance(
             apiClient,
             wsClient,
@@ -283,8 +284,8 @@ class WithdrawalTest {
         val btcDeposit1Amount = AssetAmount(btc, "0.01")
         val btcDeposit2Amount = AssetAmount(btc, "0.02")
 
-        wallet1.depositNative(btcDeposit1Amount.inFundamentalUnits)
-        wallet2.depositNative(btcDeposit2Amount.inFundamentalUnits)
+        deposit(wallet1, apiClient1, btcDeposit1Amount)
+        deposit(wallet2, apiClient2, btcDeposit2Amount)
 
         waitForBalance(
             apiClient1,
@@ -325,7 +326,7 @@ class WithdrawalTest {
 
         // deposit some BTC
         val btcDepositAmount = AssetAmount(btc, "0.002")
-        wallet.deposit(btcDepositAmount)
+        deposit(wallet, apiClient, btcDepositAmount)
         waitForBalance(
             apiClient,
             wsClient,

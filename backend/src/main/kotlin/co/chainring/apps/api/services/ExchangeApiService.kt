@@ -281,20 +281,26 @@ class ExchangeApiService(
     }
 
     fun deposit(walletAddress: Address, apiRequest: CreateDepositApiRequest): DepositApiResponse =
-        transaction {
-            (
-                DepositEntity.findByTxHash(apiRequest.txHash)
-                    ?: DepositEntity.create(
-                        wallet = WalletEntity.getOrCreate(walletAddress),
-                        symbol = getSymbolEntity(apiRequest.symbol),
-                        amount = apiRequest.amount,
-                        blockNumber = BigInteger.ZERO,
-                        transactionHash = apiRequest.txHash,
-                    ).also { it.refresh(flush = true) }
-                ).let {
-                it.refresh(flush = true)
-                DepositApiResponse(Deposit.fromEntity(it))
+        try {
+            transaction {
+                (
+                    DepositEntity.findByTxHash(apiRequest.txHash)
+                        ?: DepositEntity.create(
+                            wallet = WalletEntity.getOrCreate(walletAddress),
+                            symbol = getSymbolEntity(apiRequest.symbol),
+                            amount = apiRequest.amount,
+                            blockNumber = BigInteger.ZERO,
+                            transactionHash = apiRequest.txHash,
+                        ).also { it.refresh(flush = true) }
+                    ).let {
+                    it.refresh(flush = true)
+                    DepositApiResponse(Deposit.fromEntity(it))
+                }
             }
+        } catch (e: Exception) {
+            transaction {
+                DepositEntity.findByTxHash(apiRequest.txHash)?.let { DepositApiResponse(Deposit.fromEntity(it)) }
+            } ?: throw e
         }
 
     fun cancelOrder(walletAddress: Address, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {

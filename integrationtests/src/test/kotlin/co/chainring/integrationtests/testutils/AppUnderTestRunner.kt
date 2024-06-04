@@ -147,6 +147,8 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
     }
 
     override fun beforeEach(context: ExtensionContext) {
+        waitForActivityToComplete()
+
         TestApiClient.resetSequencer()
         transaction {
             KeyValueStore.deleteAll()
@@ -174,6 +176,15 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             )
         }
 
+        try {
+            deleteAll()
+        } catch (e: Exception) {
+            Thread.sleep(1000)
+            deleteAll()
+        }
+    }
+
+    private fun deleteAll() {
         transaction {
             TelegramBotUserWalletTable.deleteAll()
             TelegramBotUserTable.deleteAll()
