@@ -168,17 +168,28 @@ class ChainringDeploymentManager:
 
         self.wait_for_stable_state(service_names)
 
+    def get_holding_page_target_group_arn(self, env_name):
+        tg_name = f"{env_name}-holding-page-lambda-tg"
+        response = self.elbv2_client.describe_target_groups(Names=[tg_name])
+        if response['TargetGroups']:
+            return response['TargetGroups'][0]['TargetGroupArn']
+        else:
+            raise Exception(f"Target group {tg_name} not found")
 
     def switch_to_holding(self, env_name):
         print(f"Setting up holding page for environment: {env_name}")
 
         listener_arn = self.resolve_load_balancer_listener_arn(env_name)
+        target_group_arn = self.get_holding_page_target_group_arn(env_name)
 
         # Load JSON files for rules
         with open(f"./holding_page/api-conditions.json", 'r') as f:
             api_conditions = json.load(f)
-        with open(f"./holding_page/api-actions.json", 'r') as f:
-            api_actions = json.load(f)
+
+        api_actions = [{
+            'Type': 'forward',
+            'TargetGroupArn': target_group_arn
+        }]
 
         # Create and tag holding rule
         create_rule_response = self.elbv2_client.create_rule(

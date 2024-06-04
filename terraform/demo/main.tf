@@ -249,3 +249,8 @@ module "mocker" {
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
 }
 
+module "holding_page" {
+  source      = "../modules/holding_page_lambda"
+  name_prefix = local.name_prefix
+  vpc         = module.vpc.vpc
+}

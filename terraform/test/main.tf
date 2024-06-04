@@ -218,10 +218,16 @@ module "sequencer" {
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
 }
 
-module "loadtest" {
-  source      = "../modules/loadtest"
+module "holding_page" {
+  source      = "../modules/holding_page_lambda"
   name_prefix = local.name_prefix
-  subnet_id   = module.vpc.private_subnet_id_2
   vpc         = module.vpc.vpc
-  bastion_ip  = module.bastion.private_ip
 }
+
+#module "loadtest" {
+#  source      = "../modules/loadtest"
+#  name_prefix = local.name_prefix
+#  subnet_id   = module.vpc.private_subnet_id_2
+#  vpc         = module.vpc.vpc
+#  bastion_ip  = module.bastion.private_ip
+#}
