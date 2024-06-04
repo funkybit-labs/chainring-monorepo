@@ -15,15 +15,12 @@ import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.model.db.TelegramBotUserEntity
 import co.chainring.core.model.db.TelegramBotUserWalletEntity
+import co.chainring.core.model.db.TelegramMessageId
+import co.chainring.core.model.db.TelegramUserId
 import co.chainring.core.model.db.TelegramUserReplyType
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chanring.core.model.encrypt
-import com.github.ehsannarmani.bot.Bot
-import com.github.ehsannarmani.bot.model.message.TextMessage
-import com.github.ehsannarmani.bot.model.message.keyboard.ForceReply
-import com.github.ehsannarmani.bot.model.message.keyboard.InlineKeyboard
-import com.github.ehsannarmani.bot.model.message.keyboard.inline.InlineKeyboardItem
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -35,47 +32,62 @@ import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 class BotSession(
-    private val telegramUserId: Long,
-    private val bot: Bot,
+    private val telegramUserId: TelegramUserId,
     private val timer: ScheduledThreadPoolExecutor,
+    private val outputChannel: Bot.OutputChannel,
 ) {
     private val logger = KotlinLogging.logger { }
 
-    private val chatId = telegramUserId.toString()
+    private val chatId = telegramUserId.value.toString()
     private lateinit var currentWallet: BotSessionCurrentWallet
 
     init {
-        transaction {
-            val botUser = TelegramBotUserEntity.getOrCreate(telegramUserId)
-            if (botUser.wallets.empty()) {
-                val privateKey = Keys.createEcKeyPair().privateKey.toString(16)
-                switchWallet(
-                    TelegramBotUserWalletEntity.create(
-                        WalletEntity.getOrCreate(Address.fromPrivateKey(privateKey)),
-                        botUser,
-                        privateKey.encrypt(),
-                        isCurrent = true,
-                    ).also {
-                        it.flush()
-                    },
-                )
-            } else {
-                switchWallet(
-                    botUser.wallets.find { it.isCurrent }
-                        ?: botUser.wallets.first(),
-                )
+        val botUser = TelegramBotUserEntity.getOrCreate(telegramUserId)
+        if (botUser.wallets.empty()) {
+            val privateKey = Keys.createEcKeyPair().privateKey.toString(16)
+            switchWallet(
+                TelegramBotUserWalletEntity.create(
+                    WalletEntity.getOrCreate(Address.fromPrivateKey(privateKey)),
+                    botUser,
+                    privateKey.encrypt(),
+                    isCurrent = true,
+                ).also {
+                    it.flush()
+                },
+            )
+        } else {
+            switchWallet(
+                botUser.wallets.find { it.isCurrent }
+                    ?: botUser.wallets.first(),
+            )
+        }
+    }
+
+    fun handleInput(input: Bot.Input) {
+        when (input) {
+            is Bot.Input.StartCommand -> {
+                sendMainMenu()
+            }
+            is Bot.Input.CallbackQuery -> {
+                handleCallbackButtonClick(input.data)
+            }
+            is Bot.Input.TextMessage -> {
+                if (input.replyToMessage != null) {
+                    handleReplyMessage(input.replyToMessage, input.id, input.text)
+                }
             }
         }
     }
 
-    suspend fun sendMainMenu() {
+    private fun sendMainMenu() {
         val balances = currentWallet.getBalances()
         val baseSymbol = balances.baseSymbol
         val quoteSymbol = balances.quoteSymbol
 
         deleteMessages()
         sendMessage(
-            TextMessage(
+            Bot.Output.SendMessage(
+                chatId = chatId,
                 text = "-- Current Wallet --" +
                     "\n<code>${currentWallet.walletAddress.value}</code>" +
                     "\n\n-- Current Market --" +
@@ -87,9 +99,8 @@ class BotSession(
                     "\n\n-- Available Balances --" +
                     "\n${baseSymbol.value}: <b>${formatAmount(baseSymbol, balances.availableBaseBalance)}</b>" +
                     "\n${quoteSymbol.value}: <b>${formatAmount(quoteSymbol, balances.availableQuoteBalance)}</b>",
-                chatId = chatId,
                 parseMode = "HTML",
-                keyboard = InlineKeyboard(
+                keyboard = Bot.Output.SendMessage.Keyboard.Inline(
                     listOf(
                         listOf(
                             callbackButton("Buy ${baseSymbol.value}", CallbackData.Buy),
@@ -128,22 +139,20 @@ class BotSession(
         )
     }
 
-    suspend fun handleCallbackButtonClick(callbackData: CallbackData) {
+    private fun handleCallbackButtonClick(callbackData: CallbackData) {
         when (callbackData) {
             CallbackData.MainMenu -> {
                 sendMainMenu()
             }
 
             CallbackData.Settings -> {
-                val wallets = transaction {
-                    TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList()
-                }
+                val wallets = TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList()
                 deleteMessages()
                 sendMessage(
-                    TextMessage(
-                        text = "Use this menu to change or view settings",
+                    Bot.Output.SendMessage(
                         chatId = chatId,
-                        keyboard = InlineKeyboard(
+                        text = "Use this menu to change or view settings",
+                        keyboard = Bot.Output.SendMessage.Keyboard.Inline(
                             listOf(
                                 listOf(
                                     // TODO - this should be done by standing up a web page. Then when they click on the button, telegram pops
@@ -168,27 +177,27 @@ class BotSession(
                             ),
                         ),
                     ),
-                )?.result?.messageId?.also { id -> scheduleMessageDeletion(id) }
+                    scheduleDeletion = true,
+                )
             }
 
             CallbackData.ImportWallet -> {
                 sendMessageForReply(
-                    "Import the private key of an existing wallet",
-                    TelegramUserReplyType.ImportKey,
-                    "Paste key here",
+                    text = "Import the private key of an existing wallet",
+                    replyType = TelegramUserReplyType.ImportKey,
+                    placeHolder = "Paste key here",
+                    scheduleDeletion = true,
                 )
             }
 
             CallbackData.ShowAddresses -> {
-                val wallets = transaction {
-                    TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList()
-                }
+                val wallets = TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList()
                 sendMessage(
-                    TextMessage(
+                    Bot.Output.SendMessage(
+                        chatId = chatId,
                         text = wallets.joinToString("\n") {
                             "<code>${it.address.value}</code>"
                         },
-                        chatId = chatId,
                         parseMode = "HTML",
                     ),
                 )
@@ -196,12 +205,13 @@ class BotSession(
 
             is CallbackData.ShowPrivateKey -> {
                 sendMessage(
-                    TextMessage(
-                        text = "<code>${currentWallet.wallet.encryptedPrivateKey.decrypt()}</code>",
+                    Bot.Output.SendMessage(
                         chatId = chatId,
+                        text = "<code>${currentWallet.wallet.encryptedPrivateKey.decrypt()}</code>",
                         parseMode = "HTML",
                     ),
-                )?.result?.messageId?.also { id -> scheduleMessageDeletion(id) }
+                    scheduleDeletion = true,
+                )
             }
 
             CallbackData.Buy -> {
@@ -223,10 +233,10 @@ class BotSession(
             CallbackData.ListMarkets -> {
                 val markets = currentWallet.config.markets
                 sendMessage(
-                    TextMessage(
-                        text = "Press the appropriate button to switch markets",
+                    Bot.Output.SendMessage(
                         chatId = chatId,
-                        keyboard = InlineKeyboard(
+                        text = "Press the appropriate button to switch markets",
+                        keyboard = Bot.Output.SendMessage.Keyboard.Inline(
                             markets.map { market ->
                                 listOf(
                                     callbackButton("${if (market == currentWallet.currentMarket) "✔ " else ""}${market.id.value}", CallbackData.SwitchMarket(market.id.value)),
@@ -234,7 +244,8 @@ class BotSession(
                             },
                         ),
                     ),
-                )?.result?.messageId?.let { id -> scheduleMessageDeletion(id) }
+                    scheduleDeletion = true,
+                )
             }
 
             is CallbackData.SwitchMarket -> {
@@ -243,12 +254,12 @@ class BotSession(
             }
 
             CallbackData.ListWallets -> {
-                val wallets = transaction { TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList() }
+                val wallets = TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList()
                 sendMessage(
-                    TextMessage(
+                    Bot.Output.SendMessage(
                         text = "Press the appropriate button to switch wallets",
                         chatId = chatId,
-                        keyboard = InlineKeyboard(
+                        keyboard = Bot.Output.SendMessage.Keyboard.Inline(
                             wallets.map { wallet ->
                                 val abbreviateAddress = wallet.address.abbreviated()
                                 listOf(
@@ -257,11 +268,12 @@ class BotSession(
                             },
                         ),
                     ),
-                )?.result?.messageId?.let { id -> scheduleMessageDeletion(id) }
+                    scheduleDeletion = true,
+                )
             }
 
             is CallbackData.SwitchWallet -> {
-                val wallet = transaction { TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList() }
+                val wallet = TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList()
                     .find { it.address.abbreviated() == callbackData.to }
                     ?: throw RuntimeException("Invalid wallet")
 
@@ -314,11 +326,13 @@ class BotSession(
                         .onRight {
                             sendMessage("✅ ${formatAmountWithSymbol(symbol, it.amount)} will be transferred to your wallet")
                             onTxReceipt(it.chainId, it.txHash) { receipt ->
-                                if (receipt.isStatusOK) {
-                                    sendMessage("✅ ${formatAmountWithSymbol(symbol, it.amount)} was transferred to your wallet")
-                                    sendMainMenu()
-                                } else {
-                                    sendMessage("❌ Airdrop transaction ${it.txHash.value} has failed")
+                                transaction {
+                                    if (receipt.isStatusOK) {
+                                        sendMessage("✅ ${formatAmountWithSymbol(symbol, it.amount)} was transferred to your wallet")
+                                        sendMainMenu()
+                                    } else {
+                                        sendMessage("❌ Airdrop transaction ${it.txHash.value} has failed")
+                                    }
                                 }
                             }
                         }
@@ -329,34 +343,31 @@ class BotSession(
         }
     }
 
-    suspend fun handleReplyMessage(originalMessageId: Int, replyMessageId: Int, text: String) {
-        val botUser = transaction {
-            TelegramBotUserEntity.getOrCreate(telegramUserId)
-        }
+    private fun handleReplyMessage(originalMessageId: TelegramMessageId, replyMessageId: TelegramMessageId, text: String) {
+        val botUser = TelegramBotUserEntity.getOrCreate(telegramUserId)
 
         if (originalMessageId != botUser.expectedReplyMessageId) {
             sendMessage("❌ Unexpected reply message")
         } else {
             when (val expectedReplyType = botUser.expectedReplyType) {
                 TelegramUserReplyType.ImportKey -> {
-                    scheduleMessageDeletion(replyMessageId)
                     try {
-                        transaction {
-                            val privateKey = text
-                            switchWallet(
-                                TelegramBotUserWalletEntity.create(
-                                    WalletEntity.getOrCreate(Address.fromPrivateKey(privateKey)),
-                                    botUser,
-                                    privateKey.encrypt(),
-                                    isCurrent = true,
-                                ).also {
-                                    it.flush()
-                                },
-                            )
-                        }
+                        val privateKey = text
+                        switchWallet(
+                            TelegramBotUserWalletEntity.create(
+                                WalletEntity.getOrCreate(Address.fromPrivateKey(privateKey)),
+                                botUser,
+                                privateKey.encrypt(),
+                                isCurrent = true,
+                            ).also {
+                                it.flush()
+                            },
+                        )
+                        botUser.messageIdsForDeletion += replyMessageId
                         sendMessage("✅ Your private key has been imported. Your wallet address is ${currentWallet.walletAddress.value}")
                     } catch (e: Exception) {
                         logger.error(e) { "Failed to import key" }
+                        botUser.messageIdsForDeletion += replyMessageId
                         sendMessage("❌ ${e.message}")
                     }
                 }
@@ -369,13 +380,11 @@ class BotSession(
                             currentWallet.currentMarket.quoteSymbol
                         }
 
-                        val txHash = currentWallet.deposit(text, symbol)
+                        val txHash = runBlocking { currentWallet.deposit(text, symbol) }
                         if (txHash == null) {
                             sendMessage("❌ Deposit of ${symbol.value} approval failed")
                         } else {
-                            transaction {
-                                botUser.addPendingDeposit(txHash)
-                            }
+                            botUser.addPendingDeposit(txHash)
                             sendMessage("✅ Deposit of ${symbol.value} initiated")
                             sendMessage("✅ Deposit in progress")
                         }
@@ -416,7 +425,7 @@ class BotSession(
                         }
                 }
 
-                else -> listOf("❌ Unexpected reply")
+                else -> sendMessage("❌ Unexpected reply")
             }
         }
 
@@ -432,20 +441,18 @@ class BotSession(
                 currentWallet.wallet.isCurrent = false
             }
 
-            transaction {
-                walletEntity.isCurrent = true
+            walletEntity.isCurrent = true
 
-                currentWallet = BotSessionCurrentWallet(
-                    walletEntity,
-                    onBalanceUpdated = ::onBalanceUpdated,
-                    onOrderCreated = ::onOderCreated,
-                    onOrderUpdated = ::onOrderUpdated,
-                    onTradeUpdated = ::onTradeUpdated,
-                )
-                currentWallet.start()
-                TelegramBotUserEntity.getOrCreate(telegramUserId).currentMarketId?.value?.also {
-                    currentWallet.switchCurrentMarket(it)
-                }
+            currentWallet = BotSessionCurrentWallet(
+                walletEntity,
+                onBalanceUpdated = ::onBalanceUpdated,
+                onOrderCreated = ::onOderCreated,
+                onOrderUpdated = ::onOrderUpdated,
+                onTradeUpdated = ::onTradeUpdated,
+            )
+            currentWallet.start()
+            TelegramBotUserEntity.getOrCreate(telegramUserId).currentMarketId?.value?.also {
+                currentWallet.switchCurrentMarket(it)
             }
         }
     }
@@ -485,13 +492,13 @@ class BotSession(
     }
 
     private fun onOderCreated(order: Order) {
-        runBlocking {
+        transaction {
             sendMessage(formatOrder(order, isCreated = true))
         }
     }
 
     private fun onOrderUpdated(order: Order) {
-        runBlocking {
+        transaction {
             sendMessage(formatOrder(order, isCreated = false))
         }
     }
@@ -518,9 +525,9 @@ class BotSession(
     }
 
     private fun onTradeUpdated(trade: Trade) {
-        if (trade.settlementStatus == SettlementStatus.Completed) {
-            val market = currentWallet.config.markets.first { it.id == trade.marketId }
-            runBlocking {
+        transaction {
+            if (trade.settlementStatus == SettlementStatus.Completed) {
+                val market = currentWallet.config.markets.first { it.id == trade.marketId }
                 sendMessage("✅ Trade to ${trade.side} ${formatAmountWithSymbol(market.baseSymbol, trade.amount)} has settled")
                 sendMainMenu()
             }
@@ -529,70 +536,62 @@ class BotSession(
 
     private fun switchMarket(marketId: MarketId) {
         currentWallet.switchCurrentMarket(marketId)
-        transaction {
-            TelegramBotUserEntity.getOrCreate(telegramUserId).updateMarket(marketId)
-        }
+        TelegramBotUserEntity.getOrCreate(telegramUserId).updateMarket(marketId)
     }
 
-    private fun scheduleMessageDeletion(messageId: Int) {
-        transaction {
-            TelegramBotUserEntity.getOrCreate(telegramUserId).messageIdsForDeletion += messageId
+    private fun showMenuAfterReply(): Boolean {
+        return when (TelegramBotUserEntity.getOrCreate(telegramUserId).expectedReplyType) {
+            TelegramUserReplyType.ImportKey, TelegramUserReplyType.WithdrawBaseAmount, TelegramUserReplyType.WithdrawQuoteAmount -> true
+            else -> false
         }
     }
 
     private fun deleteMessages() {
-        transaction {
-            runBlocking {
-                TelegramBotUserEntity.getOrCreate(telegramUserId).messageIdsForDeletion.forEach {
-                    bot.deleteMessage(chatId, it)
-                }
+        TelegramBotUserEntity.getOrCreate(telegramUserId).apply {
+            messageIdsForDeletion.forEach { messageId ->
+                outputChannel.deleteMessage(Bot.Output.DeleteMessage(chatId, messageId))
             }
-            TelegramBotUserEntity.getOrCreate(telegramUserId).messageIdsForDeletion = emptyList()
+            messageIdsForDeletion = emptyList()
         }
     }
 
-    private fun showMenuAfterReply(): Boolean {
-        return transaction {
-            when (TelegramBotUserEntity.getOrCreate(telegramUserId).expectedReplyType) {
-                TelegramUserReplyType.ImportKey, TelegramUserReplyType.WithdrawBaseAmount, TelegramUserReplyType.WithdrawQuoteAmount -> true
-                else -> false
-            }
-        }
-    }
+    private fun sendMessage(message: String) =
+        sendMessage(Bot.Output.SendMessage(chatId = chatId, text = message))
 
-    private suspend fun sendMessage(message: String) =
-        sendMessage(
-            TextMessage(
-                text = message,
-                chatId = chatId,
-            ),
-        )
-
-    private suspend fun sendMessage(message: TextMessage) =
-        bot.sendMessage(message)
-
-    private suspend fun sendMessageForReply(
+    private fun sendMessageForReply(
         text: String,
         replyType: TelegramUserReplyType,
         placeHolder: String = text,
+        scheduleDeletion: Boolean = false,
     ) {
-        bot.sendMessage(
-            TextMessage(
-                text = text,
+        sendMessage(
+            Bot.Output.SendMessage(
                 chatId = chatId,
-                keyboard = ForceReply(forceReply = true, inputFieldPlaceholder = placeHolder),
+                text = text,
+                keyboard = Bot.Output.SendMessage.Keyboard.ForceReply(
+                    inputFieldPlaceholder = placeHolder,
+                    expectedReplyType = replyType,
+                ),
             ),
-        ).also {
-            if (replyType == TelegramUserReplyType.ImportKey) {
-                it?.result?.messageId?.let { id -> scheduleMessageDeletion(id) }
-            }
-        }?.let {
-            transaction {
+            scheduleDeletion = scheduleDeletion,
+        )
+    }
+
+    private fun sendMessage(message: Bot.Output.SendMessage, scheduleDeletion: Boolean = false) {
+        val sentMessageId = outputChannel.sendMessage(message)
+
+        when (message.keyboard) {
+            is Bot.Output.SendMessage.Keyboard.ForceReply -> {
                 TelegramBotUserEntity.getOrCreate(telegramUserId).apply {
-                    this.expectedReplyMessageId = it.result!!.messageId
-                    this.expectedReplyType = replyType
+                    this.expectedReplyMessageId = sentMessageId
+                    this.expectedReplyType = message.keyboard.expectedReplyType
                 }
             }
+            else -> {}
+        }
+
+        if (scheduleDeletion) {
+            TelegramBotUserEntity.getOrCreate(telegramUserId).messageIdsForDeletion += sentMessageId
         }
     }
 
@@ -620,5 +619,5 @@ class BotSession(
     }
 }
 
-fun callbackButton(text: String, callbackData: CallbackData): InlineKeyboardItem =
-    InlineKeyboardItem(text = text, callbackData = callbackData.serialize())
+fun callbackButton(text: String, callbackData: CallbackData): Bot.Output.SendMessage.Keyboard.Inline.CallbackButton =
+    Bot.Output.SendMessage.Keyboard.Inline.CallbackButton(text = text, data = callbackData)

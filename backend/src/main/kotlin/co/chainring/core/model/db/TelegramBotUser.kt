@@ -9,6 +9,13 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 
+@JvmInline
+value class TelegramUserId(val value: Long)
+
+@Serializable
+@JvmInline
+value class TelegramMessageId(val value: Int)
+
 @Serializable
 enum class TelegramUserReplyType {
     None,
@@ -25,7 +32,7 @@ enum class TelegramUserReplyType {
 @JvmInline
 value class TelegramBotUserId(override val value: String) : EntityId {
     companion object {
-        fun generate(telegramUserId: Long): TelegramBotUserId = TelegramBotUserId("tbuser_$telegramUserId")
+        fun generate(telegramUserId: TelegramUserId): TelegramBotUserId = TelegramBotUserId("tbuser_${telegramUserId.value}")
     }
 
     override fun toString(): String = value
@@ -49,7 +56,7 @@ object TelegramBotUserTable : GUIDTable<TelegramBotUserId>("telegram_bot_user", 
 
 class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<TelegramBotUserId>(guid) {
     companion object : EntityClass<TelegramBotUserId, TelegramBotUserEntity>(TelegramBotUserTable) {
-        fun getOrCreate(telegramUserId: Long): TelegramBotUserEntity {
+        fun getOrCreate(telegramUserId: TelegramUserId): TelegramBotUserEntity {
             return getByTelegramUserId(telegramUserId)
                 ?: TelegramBotUserEntity.new(TelegramBotUserId.generate(telegramUserId)) {
                     this.telegramUserId = telegramUserId
@@ -58,9 +65,9 @@ class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<Tele
                 }
         }
 
-        private fun getByTelegramUserId(telegramUserId: Long): TelegramBotUserEntity? {
+        private fun getByTelegramUserId(telegramUserId: TelegramUserId): TelegramBotUserEntity? {
             return TelegramBotUserEntity.find {
-                TelegramBotUserTable.telegramUserId.eq(telegramUserId)
+                TelegramBotUserTable.telegramUserId.eq(telegramUserId.value)
             }.firstOrNull()
         }
     }
@@ -71,11 +78,20 @@ class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<Tele
 
     var createdAt by TelegramBotUserTable.createdAt
     var createdBy by TelegramBotUserTable.createdBy
-    var telegramUserId by TelegramBotUserTable.telegramUserId
+    var telegramUserId by TelegramBotUserTable.telegramUserId.transform(
+        toReal = { TelegramUserId(it) },
+        toColumn = { it.value },
+    )
     var currentMarketId by TelegramBotUserTable.currentMarketGuid
-    var expectedReplyMessageId by TelegramBotUserTable.expectedReplyMessageId
+    var expectedReplyMessageId by TelegramBotUserTable.expectedReplyMessageId.transform(
+        toReal = { it?.let { TelegramMessageId(it) } },
+        toColumn = { it?.value },
+    )
     var expectedReplyType by TelegramBotUserTable.expectedReplyType
-    var messageIdsForDeletion by TelegramBotUserTable.messageIdsForDeletion
+    var messageIdsForDeletion by TelegramBotUserTable.messageIdsForDeletion.transform(
+        toReal = { it.map { msgId -> TelegramMessageId(msgId) } },
+        toColumn = { it.map { msgId -> msgId.value } },
+    )
     var pendingDeposits by TelegramBotUserTable.pendingDeposits
     val wallets by TelegramBotUserWalletEntity referrersOn TelegramBotUserWalletTable.telegrambotUserGuid
 
