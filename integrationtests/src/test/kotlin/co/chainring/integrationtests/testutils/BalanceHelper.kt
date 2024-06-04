@@ -43,17 +43,6 @@ fun waitForFinalizedWithdrawalWithForking(id: WithdrawalId) {
         }
 }
 
-fun waitFor(condition: () -> Boolean) {
-    await
-        .pollInSameThread()
-        .pollDelay(Duration.ofMillis(100))
-        .pollInterval(Duration.ofMillis(100))
-        .atMost(Duration.ofMillis(30000L))
-        .until {
-            condition()
-        }
-}
-
 fun waitForFinalizedWithdrawal(id: WithdrawalId) {
     waitFor {
         Faucet.mine()

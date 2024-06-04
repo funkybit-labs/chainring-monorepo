@@ -283,8 +283,8 @@ class WithdrawalTest {
         val btcDeposit1Amount = AssetAmount(btc, "0.01")
         val btcDeposit2Amount = AssetAmount(btc, "0.02")
 
-        wallet1.depositNative(btcDeposit1Amount.inFundamentalUnits)
-        wallet2.depositNative(btcDeposit2Amount.inFundamentalUnits)
+        wallet1.deposit(btcDeposit1Amount)
+        wallet2.deposit(btcDeposit2Amount)
 
         waitForBalance(
             apiClient1,

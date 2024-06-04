@@ -3,6 +3,7 @@ package co.chainring.integrationtests.exchange
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
+import co.chainring.integrationtests.utils.AssetAmount
 import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.Wallet
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -21,18 +22,18 @@ class DepositTest {
     fun testERC20Deposits() {
         val apiClient = TestApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
         val wallet = Wallet(apiClient)
-        val decimals = wallet.chains.first { it.id == wallet.currentChainId }.symbols.first { it.name == "USDC" }.decimals.toInt()
+        val symbolInfo = wallet.chains.first { it.id == wallet.currentChainId }.symbols.first { it.name == "USDC" }
 
         // mint some USDC
         val startingUsdcWalletBalance = wallet.getWalletERC20Balance("USDC")
-        val mintAmount = BigDecimal("20").toFundamentalUnits(decimals)
+        val mintAmount = BigDecimal("20").toFundamentalUnits(symbolInfo.decimals.toInt())
         wallet.mintERC20("USDC", mintAmount)
         assertEquals(wallet.getWalletERC20Balance("USDC"), startingUsdcWalletBalance + mintAmount)
 
         val startingUsdcExchangeBalance = wallet.getExchangeERC20Balance("USDC")
-        val depositAmount = BigDecimal("15").toFundamentalUnits(decimals)
+        val depositAmount = BigDecimal("15").toFundamentalUnits(symbolInfo.decimals.toInt())
 
-        wallet.depositERC20("USDC", depositAmount)
+        wallet.deposit(AssetAmount(symbolInfo, depositAmount))
         assertEquals(wallet.getExchangeERC20Balance("USDC"), startingUsdcExchangeBalance + depositAmount)
         assertEquals(wallet.getWalletERC20Balance("USDC"), startingUsdcWalletBalance + mintAmount - depositAmount)
     }
@@ -41,13 +42,13 @@ class DepositTest {
     fun testNativeDeposits() {
         val apiClient = TestApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
         val wallet = Wallet(apiClient)
-        val decimals = wallet.chains.first { it.id == wallet.currentChainId }.symbols.first { it.contractAddress == null }.decimals.toInt()
+        val symbolInfo = wallet.chains.first { it.id == wallet.currentChainId }.symbols.first { it.contractAddress == null }
 
         val startingWalletBalance = wallet.getWalletNativeBalance()
         val startingExchangeBalance = wallet.getExchangeNativeBalance()
-        val depositAmount = BigDecimal("2").toFundamentalUnits(decimals)
+        val depositAmount = BigDecimal("2").toFundamentalUnits(symbolInfo.decimals.toInt())
 
-        val depositTxReceipt = wallet.depositNative(depositAmount)
+        val depositTxReceipt = wallet.deposit(AssetAmount(symbolInfo, depositAmount))
         val depositGasCost = depositTxReceipt.gasUsed * Numeric.decodeQuantity(depositTxReceipt.effectiveGasPrice)
         assertEquals(wallet.getExchangeNativeBalance(), startingExchangeBalance + depositAmount)
         assertEquals(wallet.getWalletNativeBalance(), startingWalletBalance - depositAmount - depositGasCost)

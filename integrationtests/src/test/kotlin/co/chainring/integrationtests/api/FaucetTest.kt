@@ -27,7 +27,7 @@ class FaucetTest {
 
         assertEquals(config.chains.size, 2)
 
-        config.chains.forEachIndexed { index, chain ->
+        config.chains.forEach { chain ->
             wallet.switchChain(chain.id)
 
             val nativeBalanceBefore = wallet.getWalletNativeBalance()
