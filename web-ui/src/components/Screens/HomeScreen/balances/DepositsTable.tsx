@@ -5,6 +5,7 @@ import { formatUnits } from 'viem'
 import React, { Fragment } from 'react'
 import { Status } from 'components/common/Status'
 import { SymbolAndChain } from 'components/common/SymbolAndChain'
+import { ExpandableValue } from 'components/common/ExpandableNumber'
 
 export function DepositsTable({
   deposits,
@@ -32,7 +33,9 @@ export function DepositsTable({
               <SymbolAndChain symbol={symbol} />
             </div>
             <div className="mb-4 inline-block w-full text-center align-text-top text-sm">
-              {formatUnits(deposit.amount, symbol.decimals)}
+              <ExpandableValue
+                value={formatUnits(deposit.amount, symbol.decimals)}
+              />
             </div>
             <div className="mb-4 mr-4 inline-block text-center align-text-top text-sm">
               <Status status={deposit.status} />

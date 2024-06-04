@@ -16,6 +16,7 @@ import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { SymbolAndChain } from 'components/common/SymbolAndChain'
 import Decimal from 'decimal.js'
 import { scaledDecimalToBigint } from 'utils/pricesUtils'
+import { ExpandableValue } from 'components/common/ExpandableNumber'
 
 export default function OrdersAndTradesWidget({
   markets,
@@ -203,34 +204,44 @@ export default function OrdersAndTradesWidget({
     side: OrderSide,
     market: Market,
     price?: Decimal
-  ): string {
+  ): JSX.Element {
     if (side === 'Sell') {
       return (
-        formatUnits(amount, market.baseSymbol.decimals) +
-        ' ' +
-        market.baseSymbol.name +
-        ' (' +
-        market.baseSymbol.chainName +
-        ')'
+        <>
+          <ExpandableValue
+            value={formatUnits(amount, market.baseSymbol.decimals)}
+          />{' '}
+          {market.baseSymbol.name}
+          {' ('}
+          {market.baseSymbol.chainName}
+          {')'}
+        </>
       )
     } else {
       if (price) {
-        return formatUnits(
-          calculateNotional(
-            scaledDecimalToBigint(price, market.quoteSymbol.decimals),
-            amount,
-            market.baseSymbol
-          ),
-          market.quoteSymbol.decimals
+        return (
+          <ExpandableValue
+            value={formatUnits(
+              calculateNotional(
+                scaledDecimalToBigint(price, market.quoteSymbol.decimals),
+                amount,
+                market.baseSymbol
+              ),
+              market.quoteSymbol.decimals
+            )}
+          />
         )
       } else {
         return (
-          formatUnits(amount, market.baseSymbol.decimals) +
-          ' ' +
-          market.baseSymbol.name +
-          ' (' +
-          market.baseSymbol.chainName +
-          ')'
+          <>
+            <ExpandableValue
+              value={formatUnits(amount, market.baseSymbol.decimals)}
+            />{' '}
+            {market.baseSymbol.name}
+            {' ('}
+            {market.baseSymbol.chainName}
+            {')'}
+          </>
         )
       }
     }
@@ -324,10 +335,12 @@ export default function OrdersAndTradesWidget({
                     </td>
 
                     <td className="pl-4">
-                      {formatUnits(
-                        trade.feeAmount,
-                        market.quoteSymbol.decimals
-                      )}{' '}
+                      <ExpandableValue
+                        value={formatUnits(
+                          trade.feeAmount,
+                          market.quoteSymbol.decimals
+                        )}
+                      />{' '}
                       <SymbolAndChain
                         symbol={market.quoteSymbol}
                         noIcon={true}

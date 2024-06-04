@@ -14,6 +14,7 @@ import {
   SwapInternals,
   SwapRender
 } from 'components/Screens/HomeScreen/swap/SwapInternals'
+import { ExpandableValue } from 'components/common/ExpandableNumber'
 
 export function SwapWidget({
   markets,
@@ -57,13 +58,11 @@ export function SwapWidget({
           <>
             <span className="font-[400] text-darkBluishGray2">On deposit:</span>
             <span className="text-lightBluishGray2">
-              <span
-                className={
-                  'inline-block max-w-[10ch] overflow-x-clip text-ellipsis text-lightBluishGray2 hover:max-w-full'
-                }
-              >
-                {deposit && formatUnits(deposit.available, symbol.decimals)}
-              </span>{' '}
+              {deposit && (
+                <ExpandableValue
+                  value={formatUnits(deposit.available, symbol.decimals)}
+                />
+              )}{' '}
               {symbol.name}
             </span>
           </>
