@@ -30,7 +30,6 @@ import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.utils.generateOrderNonce
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.OrderBaseTest
-import co.chainring.integrationtests.testutils.deposit
 import co.chainring.integrationtests.testutils.waitForBalance
 import co.chainring.integrationtests.utils.AssetAmount
 import co.chainring.integrationtests.utils.ExchangeContractManager
@@ -93,7 +92,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
 
         val daiAmountToDeposit = AssetAmount(dai, "14")
         wallet.mintERC20(daiAmountToDeposit)
-        deposit(wallet, apiClient, daiAmountToDeposit)
+        wallet.deposit(daiAmountToDeposit)
         waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(daiAmountToDeposit)))
 
         wsClient.assertLimitsMessageReceived(usdcDaiMarket, base = AssetAmount(usdc, "0"), quote = daiAmountToDeposit)
@@ -162,7 +161,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
         Faucet.fund(wallet.address)
         val daiAmountToDeposit = AssetAmount(dai, "20")
         wallet.mintERC20(daiAmountToDeposit)
-        deposit(wallet, apiClient, daiAmountToDeposit)
+        wallet.deposit(daiAmountToDeposit)
         waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(daiAmountToDeposit)))
 
         // operation on non-existent order
@@ -331,7 +330,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
         Faucet.fund(wallet.address)
         val daiAmountToDeposit = AssetAmount(dai, "30")
         wallet.mintERC20(daiAmountToDeposit)
-        deposit(wallet, apiClient, daiAmountToDeposit)
+        wallet.deposit(daiAmountToDeposit)
         waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(daiAmountToDeposit)))
         wsClient.assertLimitsMessageReceived(usdcDaiMarket.id)
 

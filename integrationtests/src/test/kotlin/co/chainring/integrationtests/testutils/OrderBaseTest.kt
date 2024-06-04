@@ -144,7 +144,7 @@ open class OrderBaseTest {
             if (chainId != wallet.currentChainId) {
                 wallet.switchChain(chainId)
             }
-            deposit(wallet, apiClient, it)
+            wallet.deposit(it)
             wsClient.assertBalancesMessageReceived()
             wsClient.assertLimitsMessageReceived(marketId)
         }

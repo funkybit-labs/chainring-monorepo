@@ -3,7 +3,6 @@ package co.chainring.integrationtests.exchange
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
-import co.chainring.integrationtests.testutils.deposit
 import co.chainring.integrationtests.utils.AssetAmount
 import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.Wallet
@@ -34,7 +33,7 @@ class DepositTest {
         val startingUsdcExchangeBalance = wallet.getExchangeERC20Balance("USDC")
         val depositAmount = BigDecimal("15").toFundamentalUnits(symbolInfo.decimals.toInt())
 
-        deposit(wallet, apiClient, AssetAmount(symbolInfo, depositAmount))
+        wallet.deposit(AssetAmount(symbolInfo, depositAmount))
         assertEquals(wallet.getExchangeERC20Balance("USDC"), startingUsdcExchangeBalance + depositAmount)
         assertEquals(wallet.getWalletERC20Balance("USDC"), startingUsdcWalletBalance + mintAmount - depositAmount)
     }
@@ -49,7 +48,7 @@ class DepositTest {
         val startingExchangeBalance = wallet.getExchangeNativeBalance()
         val depositAmount = BigDecimal("2").toFundamentalUnits(symbolInfo.decimals.toInt())
 
-        val depositTxReceipt = deposit(wallet, apiClient, AssetAmount(symbolInfo, depositAmount))
+        val depositTxReceipt = wallet.deposit(AssetAmount(symbolInfo, depositAmount))
         val depositGasCost = depositTxReceipt.gasUsed * Numeric.decodeQuantity(depositTxReceipt.effectiveGasPrice)
         assertEquals(wallet.getExchangeNativeBalance(), startingExchangeBalance + depositAmount)
         assertEquals(wallet.getWalletNativeBalance(), startingWalletBalance - depositAmount - depositGasCost)

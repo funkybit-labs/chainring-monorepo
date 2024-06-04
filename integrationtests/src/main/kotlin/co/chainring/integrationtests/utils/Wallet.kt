@@ -2,6 +2,7 @@ package co.chainring.integrationtests.utils
 
 import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.Chain
+import co.chainring.apps.api.model.CreateDepositApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.SymbolInfo
@@ -33,12 +34,13 @@ import java.math.BigInteger
 class Wallet(
     val walletKeypair: ECKeyPair,
     val chains: List<Chain>,
+    val apiClient: ApiClient,
 ) {
 
     companion object {
         operator fun invoke(apiClient: ApiClient): Wallet {
             val config = apiClient.getConfiguration().chains
-            return Wallet(apiClient.ecKeyPair, config)
+            return Wallet(apiClient.ecKeyPair, config, apiClient)
         }
     }
     private val blockchainClients = ChainManager.blockchainConfigs.map {
@@ -113,11 +115,18 @@ class Wallet(
     }
 
     fun deposit(assetAmount: AssetAmount): TransactionReceipt {
-        // deposit onchain and update sequencer
         return if (assetAmount.symbol.contractAddress == null) {
             depositNative(assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
         } else {
             depositERC20(assetAmount.symbol.name, assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
+        }.also {
+            apiClient.createDeposit(
+                CreateDepositApiRequest(
+                    symbol = Symbol(assetAmount.symbol.name),
+                    amount = assetAmount.inFundamentalUnits,
+                    txHash = TxHash(it.transactionHash),
+                ),
+            )
         }
     }
 
