@@ -3,7 +3,8 @@ exports.handler = async (event) => {
     const method = event.httpMethod;
     if (method === 'OPTIONS') {
         return {
-            statusCode: 200, // must return 200 for CORS preflight request to succeed
+            // server must reply with 200 for CORS preflight request to succeed
+            statusCode: 200,
             headers: {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',

@@ -5,7 +5,6 @@ import { addressDisplay, classNames, uniqueFilter } from 'utils'
 import { Button } from 'components/common/Button'
 import React, { useEffect, useState } from 'react'
 import Markets from 'markets'
-import { useMaintenance } from 'apiClient'
 import Menu from 'assets/Menu.svg'
 import { FaucetModal } from 'components/Screens/HomeScreen/faucet/FaucetModal'
 import faucetIcon from 'assets/faucet.svg'
@@ -25,7 +24,6 @@ export function Header({
   const account = useAccount()
   const [name, setName] = useState<string>()
   const [icon, setIcon] = useState<string>()
-  const maintenance = useMaintenance()
   const [showMenu, setShowMenu] = useState(false)
   const [showFaucetModal, setShowFaucetModal] = useState<boolean>(false)
   const faucetEnabled = import.meta.env.ENV_FAUCET_ENABLED === 'true'
@@ -195,14 +193,6 @@ export function Header({
             </div>
           </div>
         </>
-      )}
-      {maintenance && (
-        <div className="fixed z-50 flex w-full flex-row place-items-center justify-center bg-red p-0 text-white opacity-80">
-          <span className="animate-bounce">
-            ChainRing is currently undergoing maintenance, we&apos;ll be back
-            soon.
-          </span>
-        </div>
       )}
       {faucetEnabled && account.isConnected && showFaucetModal && (
         <div className="fixed">
