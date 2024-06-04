@@ -50,7 +50,8 @@ dependencies {
     implementation("org.apache.logging.log4j:log4j-layout-template-json:$log4j2Version")
     implementation("org.apache.logging.log4j:log4j-slf4j2-impl:$log4j2Version")
     implementation("io.arrow-kt:arrow-core:1.2.1")
-    implementation("com.github.ehsannarmani:EasyBot:1.0.0")
+    implementation("org.telegram:telegrambots-longpolling:7.2.1")
+    implementation("org.telegram:telegrambots-client:7.2.1")
     implementation(project(":backend"))
 }
 
