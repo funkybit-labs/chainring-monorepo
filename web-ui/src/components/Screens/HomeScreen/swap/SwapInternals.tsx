@@ -41,21 +41,24 @@ export type SwapRender = {
   side: OrderSide
   handleQuoteAmountChange: (e: ChangeEvent<HTMLInputElement>) => void
   handleBaseAmountChange: (e: ChangeEvent<HTMLInputElement>) => void
+  handleBuyLimitPriceChange: (v: string) => void
+  handleSellLimitPriceChange: (v: string) => void
   sellAssetsNeeded: bigint
   handleTopSymbolChange: (newSymbol: TradingSymbol) => void
   handleBottomSymbolChange: (newSymbol: TradingSymbol) => void
   handleChangeSide: () => void
   isLimitOrder: boolean
-  handleMarketOrderFlagChange: (e: ChangeEvent<HTMLInputElement>) => void
-  limitPriceInputValue: string
+  handleMarketOrderFlagChange: (c: boolean) => void
+  sellLimitPriceInputValue: string
+  buyLimitPriceInputValue: string
   limitPrice: bigint
-  handlePriceChange: (e: ChangeEvent<HTMLInputElement>) => void
   setPriceFromMarketPrice: (incrementDivisor?: bigint) => void
   noPriceFound: boolean
   canSubmit: boolean
   getMarketPrice: (side: OrderSide, amount: bigint) => bigint | undefined
   quoteDecimals: number
   lastOrderFilled: boolean
+  percentOffMarket: number | undefined
 }
 
 export function SwapInternals({
@@ -148,9 +151,18 @@ export function SwapInternals({
   }, [market])
 
   const {
-    inputValue: limitPriceInputValue,
-    setInputValue: setPriceInputValue,
-    valueInFundamentalUnits: priceInput
+    inputValue: sellLimitPriceInputValue,
+    setInputValue: setSellLimitPriceInputValue,
+    valueInFundamentalUnits: sellLimitPrice
+  } = useAmountInputState({
+    initialInputValue: '',
+    decimals: quoteSymbol.decimals
+  })
+
+  const {
+    inputValue: buyLimitPriceInputValue,
+    setInputValue: setBuyLimitPriceInputValue,
+    valueInFundamentalUnits: buyLimitPrice
   } = useAmountInputState({
     initialInputValue: '',
     decimals: quoteSymbol.decimals
@@ -181,22 +193,22 @@ export function SwapInternals({
       market.tickSize.toString(),
       quoteSymbol.decimals
     )
-    if (side === 'Buy') {
-      return priceInput - (priceInput % tickAsInt)
+    if (side === 'Sell') {
+      return sellLimitPrice - (sellLimitPrice % tickAsInt)
     } else {
-      if (priceInput === 0n) {
+      if (sellLimitPrice === 0n) {
         return 0n
       } else {
         const invertedPrice = scaledDecimalToBigint(
           new Decimal(1).div(
-            bigintToScaledDecimal(priceInput, quoteSymbol.decimals)
+            bigintToScaledDecimal(sellLimitPrice, quoteSymbol.decimals)
           ),
           quoteSymbol.decimals
         )
         return invertedPrice - (invertedPrice % tickAsInt)
       }
     }
-  }, [priceInput, side, market, quoteSymbol])
+  }, [sellLimitPrice, side, market, quoteSymbol])
 
   const [orderBook, setOrderBook] = useState<OrderBook | undefined>(undefined)
   useWebsocketSubscription({
@@ -338,12 +350,81 @@ export function SwapInternals({
     mutation.reset()
   }
 
+  const [sellLimitPriceManuallyChanged, setSellLimitPriceManuallyChanged] =
+    useState(false)
+  const [buyLimitPriceManuallyChanged, setBuyLimitPriceManuallyChanged] =
+    useState(false)
+
+  function handleSellLimitPriceChange(v: string) {
+    setSellLimitPriceManuallyChanged(true)
+    setBuyLimitPriceManuallyChanged(false)
+    setSellLimitPriceInputValue(v)
+
+    mutation.reset()
+  }
+
+  function invertBigintToString(
+    bi: bigint,
+    decimals: number,
+    maxPrecision: number
+  ): string {
+    return new Decimal(1)
+      .div(bigintToScaledDecimal(bi, decimals))
+      .toPrecision(maxPrecision)
+  }
+
+  useEffect(() => {
+    if (sellLimitPriceManuallyChanged) {
+      if (sellLimitPrice) {
+        setBuyLimitPriceInputValue(
+          invertBigintToString(sellLimitPrice, quoteSymbol.decimals, 6)
+        )
+      } else {
+        setBuyLimitPriceInputValue('')
+      }
+    }
+  }, [
+    sellLimitPrice,
+    sellLimitPriceManuallyChanged,
+    setBuyLimitPriceInputValue,
+    quoteSymbol
+  ])
+
+  useEffect(() => {
+    if (buyLimitPriceManuallyChanged) {
+      if (buyLimitPrice) {
+        setSellLimitPriceInputValue(
+          invertBigintToString(buyLimitPrice, quoteSymbol.decimals, 6)
+        )
+      } else {
+        setSellLimitPriceInputValue('')
+      }
+    }
+  }, [
+    buyLimitPrice,
+    buyLimitPriceManuallyChanged,
+    setSellLimitPriceInputValue,
+    quoteSymbol
+  ])
+
+  function handleBuyLimitPriceChange(v: string) {
+    setSellLimitPriceManuallyChanged(false)
+    setBuyLimitPriceManuallyChanged(true)
+    setBuyLimitPriceInputValue(v)
+
+    mutation.reset()
+  }
+
   function clearAmountFields() {
     setQuoteAmountManuallyChanged(false)
     setBaseAmountManuallyChanged(false)
     setBaseAmountInputValue('')
     setQuoteAmountInputValue('')
-    setPriceInputValue('')
+    setBuyLimitPriceManuallyChanged(false)
+    setSellLimitPriceManuallyChanged(false)
+    setBuyLimitPriceInputValue('')
+    setSellLimitPriceInputValue('')
+    setSellLimitPriceInputValue('')
   }
 
   function saveMarketAndSide(market: Market, side: OrderSide) {
@@ -393,37 +474,19 @@ export function SwapInternals({
     const tempSymbol = topSymbol
     setTopSymbol(bottomSymbol)
     setBottomSymbol(tempSymbol)
-    setPriceInputValue('')
+    setSellLimitPriceInputValue('')
     mutation.reset()
   }
 
-  function handlePriceChange(e: ChangeEvent<HTMLInputElement>) {
-    setPriceInputValue(e.target.value)
-    mutation.reset()
-  }
-
-  function handleMarketOrderFlagChange(e: ChangeEvent<HTMLInputElement>) {
-    setPriceInputValue('')
-    setIsLimitOrder(e.target.checked)
+  function handleMarketOrderFlagChange(c: boolean) {
+    setSellLimitPriceInputValue('')
+    setBuyLimitPriceInputValue('')
+    setIsLimitOrder(c)
     mutation.reset()
   }
 
   function setPriceFromMarketPrice(incrementDivisor?: bigint) {
-    if (side === 'Sell') {
-      let rawPrice
-      if (incrementDivisor) {
-        rawPrice = parseFloat(
-          formatUnits(
-            marketPrice + marketPrice / incrementDivisor,
-            quoteSymbol.decimals
-          )
-        )
-      } else {
-        rawPrice = parseFloat(formatUnits(marketPrice, quoteSymbol.decimals))
-      }
-      const invertedPrice = 1.0 / rawPrice
-      setPriceInputValue(invertedPrice.toFixed(6))
-    } else {
+    if (side === 'Buy') {
       let rawPrice
       if (incrementDivisor) {
         rawPrice = parseFloat(
@@ -435,7 +498,23 @@ export function SwapInternals({
       } else {
         rawPrice = parseFloat(formatUnits(marketPrice, quoteSymbol.decimals))
       }
-      setPriceInputValue(rawPrice.toFixed(market.tickSize.decimalPlaces()))
+      const invertedPrice = 1.0 / rawPrice
+      handleSellLimitPriceChange(invertedPrice.toFixed(6))
+    } else {
+      let rawPrice
+      if (incrementDivisor) {
+        rawPrice = parseFloat(
+          formatUnits(
+            marketPrice + marketPrice / incrementDivisor,
+            quoteSymbol.decimals
+          )
+        )
+      } else {
+        rawPrice = parseFloat(formatUnits(marketPrice, quoteSymbol.decimals))
+      }
+      handleSellLimitPriceChange(
+        rawPrice.toFixed(market.tickSize.decimalPlaces())
+      )
     }
   }
 
@@ -613,6 +692,20 @@ export function SwapInternals({
     return
   }
 
+  const percentOffMarket = useMemo(() => {
+    if (orderBook) {
+      const mktPrice = getMarketPrice(side, baseAmount, market, orderBook)
+      if (buyLimitPrice && mktPrice) {
+        return new Decimal((mktPrice - buyLimitPrice).toString())
+          .div(new Decimal(mktPrice.toString()))
+          .mul(100)
+          .toDecimalPlaces(1)
+          .toNumber()
+      }
+    }
+    return
+  }, [orderBook, side, baseAmount, market, buyLimitPrice])
+
   return Renderer({
     topBalance,
     topSymbol,
@@ -624,20 +717,23 @@ export function SwapInternals({
     side,
     handleQuoteAmountChange,
     handleBaseAmountChange,
+    handleBuyLimitPriceChange,
+    handleSellLimitPriceChange,
     sellAssetsNeeded,
     handleTopSymbolChange,
     handleBottomSymbolChange,
     handleChangeSide,
     isLimitOrder,
     handleMarketOrderFlagChange,
-    limitPriceInputValue,
+    sellLimitPriceInputValue,
+    buyLimitPriceInputValue,
     limitPrice,
-    handlePriceChange,
     setPriceFromMarketPrice,
     noPriceFound,
     canSubmit,
     getMarketPrice: getSimulatedPrice,
     quoteDecimals: market.quoteDecimalPlaces,
-    lastOrderFilled
+    lastOrderFilled,
+    percentOffMarket
   })
 }

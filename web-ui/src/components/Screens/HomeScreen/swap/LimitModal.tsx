@@ -191,18 +191,32 @@ export function LimitModal({
               </div>
               <div className="text-center">
                 <span className="whitespace-nowrap px-4 text-darkBluishGray1">
-                  Buy {sr.bottomSymbol.name} at a rate of
+                  Sell {sr.topSymbol.name} at
                 </span>
-                <input
-                  value={sr.limitPriceInputValue}
-                  disabled={sr.mutation.isPending}
-                  onChange={sr.handlePriceChange}
-                  className="w-36 rounded-xl border-darkBluishGray6 bg-darkBluishGray8 text-center text-white disabled:bg-darkBluishGray7"
-                />
+                <span className="relative">
+                  <input
+                    value={sr.sellLimitPriceInputValue}
+                    disabled={sr.mutation.isPending}
+                    onChange={(e) =>
+                      sr.handleSellLimitPriceChange(e.target.value)
+                    }
+                    className="w-36 rounded-xl border-darkBluishGray6 bg-darkBluishGray8 text-center text-white disabled:bg-darkBluishGray7"
+                  />
+                  {sr.percentOffMarket !== undefined && (
+                    <span
+                      className={classNames(
+                        'ml-2 text-xs absolute right-1 -top-2.5 text-darkBluishGray1'
+                      )}
+                    >
+                      {sr.percentOffMarket > 0 && '+'}
+                      {sr.percentOffMarket.toFixed(1)}%
+                    </span>
+                  )}
+                </span>
                 {[
                   ['Market', undefined],
-                  ['-1%', 100],
-                  ['-5%', 20]
+                  ['+1%', 100],
+                  ['+5%', 20]
                 ].map(([label, incrementDivisor]) => (
                   <button
                     key={label}
@@ -252,26 +266,76 @@ export function LimitModal({
                   {depositAmount(sr.bottomBalance, sr.bottomSymbol)}
                 </div>
               </div>
-              <div className="flex flex-row justify-between">
-                <AmountInput
-                  className="!focus:ring-0 !bg-darkBluishGray8 text-left text-xl !ring-0"
-                  value={sr.buyAmountInputValue}
-                  disabled={false}
-                  onChange={
-                    sr.side === 'Buy'
-                      ? sr.handleBaseAmountChange
-                      : sr.handleQuoteAmountChange
-                  }
-                />
-                <SymbolSelector
-                  markets={markets}
-                  selected={sr.bottomSymbol}
-                  onChange={sr.handleBottomSymbolChange}
-                />
+              <div>
+                <div className="flex flex-row justify-between">
+                  <AmountInput
+                    className="!focus:ring-0 !bg-darkBluishGray8 text-left text-xl !ring-0"
+                    value={sr.buyAmountInputValue}
+                    disabled={false}
+                    onChange={
+                      sr.side === 'Buy'
+                        ? sr.handleBaseAmountChange
+                        : sr.handleQuoteAmountChange
+                    }
+                  />
+                  <SymbolSelector
+                    markets={markets}
+                    selected={sr.bottomSymbol}
+                    onChange={sr.handleBottomSymbolChange}
+                  />
+                </div>
+                <div className="text-center">
+                  <span className="whitespace-nowrap px-4 text-darkBluishGray1">
+                    Buy {sr.bottomSymbol.name} at
+                  </span>
+                  <span className="relative">
+                    <input
+                      value={sr.buyLimitPriceInputValue}
+                      disabled={sr.mutation.isPending}
+                      onChange={(e) =>
+                        sr.handleBuyLimitPriceChange(e.target.value)
+                      }
+                      className="w-36 rounded-xl border-darkBluishGray6 bg-darkBluishGray8 text-center text-white disabled:bg-darkBluishGray7"
+                    />
+                    {sr.percentOffMarket !== undefined && (
+                      <span
+                        className={classNames(
+                          'ml-2 text-xs absolute right-1 -top-2.5 text-darkBluishGray1'
+                        )}
+                      >
+                        {sr.percentOffMarket < 0 && '+'}
+                        {(-sr.percentOffMarket).toFixed(1)}%
+                      </span>
+                    )}
+                  </span>
+                  {[
+                    ['Market', undefined],
+                    ['-1%', 100],
+                    ['-5%', 20]
+                  ].map(([label, incrementDivisor]) => (
+                    <button
+                      key={label}
+                      className={classNames(
+                        'rounded bg-darkBluishGray6 px-2 text-darkBluishGray2 ml-4',
+                        'hover:bg-blue5'
+                      )}
+                      disabled={false}
+                      onClick={() =>
+                        sr.setPriceFromMarketPrice(
+                          incrementDivisor
+                            ? BigInt(incrementDivisor as number)
+                            : undefined
+                        )
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div
-              className="mt-1 cursor-pointer pl-4 text-darkBluishGray1 hover:text-lightBluishGray5"
+              className="mt-1 cursor-pointer pl-4 text-darkBluishGray1 hover:text-statusOrange"
               onClick={() => setMarketPriceInverted(!marketPriceInverted)}
             >
               1 {marketPriceInverted ? sr.topSymbol.name : sr.bottomSymbol.name}{' '}

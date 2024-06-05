@@ -105,38 +105,33 @@ export function SwapWidget({
                   onChange={sr.handleTopSymbolChange}
                 />
               </div>
-              <div className="mt-2 text-center">
-                <input
-                  id="isLimitOrder"
-                  name="isLimitOrder"
-                  type="checkbox"
-                  checked={sr.isLimitOrder}
-                  disabled={sr.mutation.isPending}
-                  onChange={sr.handleMarketOrderFlagChange}
-                  className="!focus:border-0 size-5 rounded
-                         !border-0
-                         !bg-darkBluishGray6 text-darkBluishGray1
-                         !outline-0
-                         !ring-0"
-                />
-                <label
-                  htmlFor="isLimitOrder"
-                  className="whitespace-nowrap px-4 text-darkBluishGray1"
-                >
-                  Limit Order
-                </label>
-                <input
-                  value={sr.limitPriceInputValue}
-                  disabled={!sr.isLimitOrder || sr.mutation.isPending}
-                  onChange={sr.handlePriceChange}
-                  autoFocus={sr.isLimitOrder}
-                  className="w-36 rounded-xl border-darkBluishGray8 bg-darkBluishGray9 text-center text-white disabled:bg-darkBluishGray6"
-                />
-                <br />
+              <div className="mt-2 space-x-2 text-center text-white">
+                <span>Sell at</span>
+                <span className="relative">
+                  <input
+                    value={sr.sellLimitPriceInputValue}
+                    disabled={sr.mutation.isPending}
+                    onChange={(e) => {
+                      sr.handleMarketOrderFlagChange(e.target.value != '')
+                      sr.handleSellLimitPriceChange(e.target.value)
+                    }}
+                    className="w-36 rounded-xl border-darkBluishGray8 bg-darkBluishGray9 text-center text-white disabled:bg-darkBluishGray6"
+                  />
+                  {sr.percentOffMarket !== undefined && (
+                    <span
+                      className={classNames(
+                        'ml-2 text-xs absolute right-1 -top-2.5 text-darkBluishGray1'
+                      )}
+                    >
+                      {sr.percentOffMarket > 0 && '+'}
+                      {sr.percentOffMarket.toFixed(1)}%
+                    </span>
+                  )}
+                </span>
                 {[
                   ['Market', undefined],
-                  ['-1%', 100],
-                  ['-5%', 20]
+                  ['+1%', 100],
+                  ['+5%', 20]
                 ].map(([label, incrementDivisor]) => (
                   <button
                     key={label}
@@ -144,7 +139,7 @@ export function SwapWidget({
                       'rounded bg-darkBluishGray6 px-2 text-darkBluishGray2 ml-4 mt-2',
                       sr.isLimitOrder && 'hover:bg-blue5'
                     )}
-                    disabled={!sr.isLimitOrder}
+                    disabled={sr.mutation.isPending}
                     onClick={() =>
                       sr.setPriceFromMarketPrice(
                         incrementDivisor
@@ -195,6 +190,53 @@ export function SwapWidget({
                   selected={sr.bottomSymbol}
                   onChange={sr.handleBottomSymbolChange}
                 />
+              </div>
+              <div className="mt-2 space-x-2 text-center text-white">
+                <span>Buy at</span>
+                <span className="relative">
+                  <input
+                    value={sr.buyLimitPriceInputValue}
+                    disabled={sr.mutation.isPending}
+                    onChange={(e) => {
+                      sr.handleMarketOrderFlagChange(e.target.value != '')
+                      sr.handleBuyLimitPriceChange(e.target.value)
+                    }}
+                    className="w-36 rounded-xl border-darkBluishGray8 bg-darkBluishGray9 text-center text-white disabled:bg-darkBluishGray6"
+                  />
+                  {sr.percentOffMarket !== undefined && (
+                    <span
+                      className={classNames(
+                        'ml-2 text-xs absolute right-1 -top-2.5 text-darkBluishGray1'
+                      )}
+                    >
+                      {sr.percentOffMarket < 0 && '+'}
+                      {(-sr.percentOffMarket).toFixed(1)}%
+                    </span>
+                  )}
+                </span>
+                {[
+                  ['Market', undefined],
+                  ['-1%', 100],
+                  ['-5%', 20]
+                ].map(([label, incrementDivisor]) => (
+                  <button
+                    key={label}
+                    className={classNames(
+                      'rounded bg-darkBluishGray6 px-2 text-darkBluishGray2 ml-4 mt-2',
+                      sr.isLimitOrder && 'hover:bg-blue5'
+                    )}
+                    disabled={sr.mutation.isPending}
+                    onClick={() =>
+                      sr.setPriceFromMarketPrice(
+                        incrementDivisor
+                          ? BigInt(incrementDivisor as number)
+                          : undefined
+                      )
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
 
