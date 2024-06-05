@@ -17,7 +17,7 @@ export function Modal({
 }) {
   return (
     <>
-      <div className="fixed left-0 top-0 z-20 h-screen w-screen bg-darkGray opacity-65"></div>
+      <div className="fixed left-0 top-0 z-20 h-screen w-screen bg-black opacity-75"></div>
       <Transition appear show={isOpen} as={Fragment}>
         <Dialog as="div" className="relative z-30" onClose={close}>
           <Transition.Child
@@ -44,14 +44,14 @@ export function Modal({
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <Dialog.Panel className="w-full max-w-md overflow-hidden rounded-lg bg-darkBluishGray9 text-left align-middle transition-all">
+                <Dialog.Panel className="w-full max-w-md overflow-hidden rounded-md bg-darkBluishGray9 text-left align-middle transition-all">
                   <Dialog.Title
                     as="h3"
-                    className="p-2 pt-4 text-center text-lg font-medium leading-6 text-white"
+                    className="py-5 text-center font-medium leading-4 text-white"
                   >
                     {title}
                   </Dialog.Title>
-                  <div className="p-6">{children}</div>
+                  <div className="p-5 pt-0">{children}</div>
                 </Dialog.Panel>
               </Transition.Child>
             </div>

@@ -18,6 +18,7 @@ import { depositsQueryKey } from 'components/Screens/HomeScreen/balances/Balance
 import { encodeFunctionData, EncodeFunctionDataParameters } from 'viem'
 import { isErrorFromAlias } from '@zodios/core'
 import TradingSymbol from 'tradingSymbol'
+import { ExpandableValue } from 'components/common/ExpandableNumber'
 
 export default function DepositModal({
   exchangeContractAddress,
@@ -161,14 +162,18 @@ export default function DepositModal({
           asyncData={walletBalanceQuery}
           success={(walletBalance) => {
             return (
-              <div className="mt-2">
+              <div>
                 <AmountInput
                   value={amountInputValue}
                   disabled={submitPhase !== null}
                   onChange={(e) => setAmountInputValue(e.target.value)}
+                  className="!rounded-md !bg-darkBluishGray8 !text-center !text-white !placeholder-lightBackground !ring-darkBluishGray8"
                 />
                 <p className="mb-2 mt-4 text-center text-sm text-darkBluishGray2">
-                  Wallet balance: {formatUnits(walletBalance, symbol.decimals)}
+                  Wallet balance:{' '}
+                  <ExpandableValue
+                    value={formatUnits(walletBalance, symbol.decimals)}
+                  />
                 </p>
 
                 <SubmitButton

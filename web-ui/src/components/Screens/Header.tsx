@@ -140,8 +140,10 @@ export function Header({
             <span
               key={t}
               className={classNames(
-                'border-b-2 pb-2',
-                tab === t ? 'text-primary4' : 'text-darkBluishGray3'
+                'border-b-2 pb-2 transition-colors',
+                tab === t
+                  ? 'text-statusOrange'
+                  : 'text-darkBluishGray3 hover:text-white'
               )}
               onClick={() => {
                 setTab(t)

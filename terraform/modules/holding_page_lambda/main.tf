@@ -71,7 +71,7 @@ resource "aws_lambda_permission" "allow_elb_invoke" {
 }
 
 resource "aws_lb_target_group_attachment" "target_group_attachment" {
-  depends_on = [aws_lambda_permission.allow_elb_invoke]
+  depends_on       = [aws_lambda_permission.allow_elb_invoke]
   target_group_arn = aws_alb_target_group.target_group.arn
   target_id        = aws_lambda_function.holding_page_function.arn
 }
