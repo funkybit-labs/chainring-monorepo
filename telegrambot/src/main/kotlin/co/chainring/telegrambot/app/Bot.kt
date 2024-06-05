@@ -79,17 +79,27 @@ class Bot(private val client: TelegramClient) {
             }
         }
 
-        client.startPolling { input ->
-            transaction {
-                val session = botSessions.getOrPut(input.from) {
-                    BotSession(input.from, timer, client)
-                }
-                session.handleInput(input)
-            }
-        }
+        client.startPolling(::handleInput)
     }
 
     fun stop() {
         timer.shutdown()
+    }
+
+    private fun handleInput(input: Input) {
+        // bot session creation happens in a separate transaction for now
+        // because otherwise we are creating wallet record and in the same db transaction
+        // we are trying to get its balances over the API which in turn also
+        // attempts to create the same wallet record and in the end one of the transactions fail
+        // with duplicate key violation
+        // TODO: change back to one transaction here after bot no longer uses the API (CHAIN-173)
+        val session = transaction {
+            botSessions.getOrPut(input.from) {
+                BotSession(input.from, timer, client)
+            }
+        }
+        transaction {
+            session.handleInput(input)
+        }
     }
 }
