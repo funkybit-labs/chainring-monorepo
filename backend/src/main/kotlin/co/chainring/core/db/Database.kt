@@ -3,10 +3,15 @@ package co.chainring.core.db
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.apache.commons.dbcp2.BasicDataSource
+import org.jetbrains.exposed.dao.Entity
+import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.DatabaseConfig
+import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.Transaction
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.lang.System.getenv
+import java.sql.ResultSet
 import java.time.Duration
 
 @Serializable
@@ -73,3 +78,16 @@ fun Transaction.notifyDbListener(
         ).joinToString(", "),
     )
 }
+
+fun <T : Entity<Q>, Q : Comparable<Q>> Transaction.executeRaw(sql: String, entity: EntityClass<Q, T>): List<T> {
+    val result = arrayListOf<T>()
+    TransactionManager.current().exec(sql) { rs ->
+        while (rs.next()) {
+            result += entityFromResultSet(rs, entity)
+        }
+    }
+    return result
+}
+
+fun <T : Entity<Q>, Q : Comparable<Q>> Transaction.entityFromResultSet(rs: ResultSet, entity: EntityClass<Q, T>): T =
+    entity.wrapRow(ResultRow.create(rs, entity.table.columns.mapIndexed { index, field -> field to index }.toMap()))

@@ -1,105 +1,81 @@
 package co.chainring.telegrambot.app
 
 import co.chainring.core.model.db.TelegramBotUserEntity
-import co.chainring.core.model.db.TelegramMessageId
-import co.chainring.core.model.db.TelegramUserId
-import co.chainring.core.model.db.TelegramUserReplyType
+import co.chainring.core.model.tgbot.TelegramMessageId
+import co.chainring.core.model.tgbot.TelegramUserId
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.util.concurrent.ScheduledThreadPoolExecutor
+import kotlin.concurrent.thread
 
 class Bot(private val client: TelegramClient) {
-    sealed class Input {
-        abstract val from: TelegramUserId
-
-        data class StartCommand(
-            override val from: TelegramUserId,
-        ) : Input()
-
-        data class TextMessage(
-            override val from: TelegramUserId,
-            val id: TelegramMessageId,
-            val text: String,
-            val replyToMessage: TelegramMessageId?,
-        ) : Input()
-
-        data class CallbackQuery(
-            override val from: TelegramUserId,
-            val id: String,
-            val data: CallbackData,
-        ) : Input()
-    }
-
-    sealed class Output {
-        data class SendMessage(
-            val chatId: String,
-            val text: String,
-            val parseMode: String = "markdown",
-            val keyboard: Keyboard? = null,
-        ) : Output() {
-            sealed class Keyboard {
-                data class Inline(
-                    val items: List<List<CallbackButton>>,
-                ) : Keyboard() {
-                    data class CallbackButton(
-                        val text: String,
-                        val data: CallbackData,
-                    )
-                }
-
-                data class ForceReply(
-                    val inputFieldPlaceholder: String,
-                    val expectedReplyType: TelegramUserReplyType,
-                ) : Keyboard()
-            }
-        }
-
-        data class DeleteMessage(
-            val chatId: String,
-            val messageId: TelegramMessageId,
-        ) : Output()
-    }
+    private val logger = KotlinLogging.logger { }
 
     interface OutputChannel {
-        fun sendMessage(cmd: Output.SendMessage): TelegramMessageId
-        fun deleteMessage(cmd: Output.DeleteMessage)
+        fun sendMessage(cmd: BotOutput.SendMessage): TelegramMessageId
+        fun deleteMessage(cmd: BotOutput.DeleteMessage)
     }
 
     interface TelegramClient : OutputChannel {
-        fun startPolling(inputHandler: (Input) -> Unit)
+        fun startPolling(updateHandler: (BotInput) -> Unit)
         fun stopPolling()
     }
 
     private val botSessions = mutableMapOf<TelegramUserId, BotSession>()
-    private val timer = ScheduledThreadPoolExecutor(1)
+    private var stopRequested = false
 
     fun start() {
         transaction {
             TelegramBotUserEntity.all().forEach {
-                botSessions[it.telegramUserId] = BotSession(it.telegramUserId, timer, client)
+                botSessions[it.telegramUserId] = BotSession(it.telegramUserId, client)
             }
         }
 
         client.startPolling(::handleInput)
+        pendingSessionsRefresherThread.start()
     }
 
     fun stop() {
-        timer.shutdown()
+        stopRequested = true
+        client.stopPolling()
+        pendingSessionsRefresherThread.join(1000)
+        if (pendingSessionsRefresherThread.isAlive) {
+            pendingSessionsRefresherThread.interrupt()
+            pendingSessionsRefresherThread.join()
+        }
     }
 
-    private fun handleInput(input: Input) {
+    private fun handleInput(input: BotInput) {
         // bot session creation happens in a separate transaction for now
         // because otherwise we are creating wallet record and in the same db transaction
         // we are trying to get its balances over the API which in turn also
         // attempts to create the same wallet record and in the end one of the transactions fail
         // with duplicate key violation
         // TODO: change back to one transaction here after bot no longer uses the API (CHAIN-173)
-        val session = transaction {
-            botSessions.getOrPut(input.from) {
-                BotSession(input.from, timer, client)
-            }
-        }
+        val session = transaction { getBotSession(input.from) }
         transaction {
             session.handleInput(input)
         }
     }
+
+    private val pendingSessionsRefresherThread = thread(start = false, isDaemon = false) {
+        while (!stopRequested) {
+            try {
+                transaction {
+                    val botUser = TelegramBotUserEntity.leastRecentlyUpdatedWithPendingSession()
+                    if (botUser == null) {
+                        Thread.sleep(50)
+                    } else {
+                        getBotSession(botUser.telegramUserId).also(BotSession::refresh)
+                    }
+                }
+            } catch (e: Exception) {
+                logger.error(e) { "Processing thread exception" }
+            }
+        }
+    }
+
+    private fun getBotSession(telegramUserId: TelegramUserId): BotSession =
+        botSessions.getOrPut(telegramUserId) {
+            BotSession(telegramUserId, client)
+        }
 }

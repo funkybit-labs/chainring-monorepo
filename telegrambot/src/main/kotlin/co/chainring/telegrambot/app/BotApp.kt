@@ -4,7 +4,7 @@ import co.chainring.apps.BaseApp
 import co.chainring.core.db.DbConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 
-private val botToken = System.getenv("TELEGRAM_BOT_TOKEN") ?: "6650191369:AAEwYfYkRjd3pBf7OEHmCIQ6MZZ1Wgygv6Q"
+private val botToken = System.getenv("TELEGRAM_BOT_TOKEN") ?: "7230554779:AAFo2lE3E_UHst7lKkiZxXJHwDeKmP6Hcn8"
 val faucetSupported = System.getenv("FAUCET_SUPPORTED")?.toBoolean() ?: true
 
 class BotApp : BaseApp(dbConfig = DbConfig()) {
