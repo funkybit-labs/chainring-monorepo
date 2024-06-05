@@ -418,6 +418,8 @@ class SequencerApp(
 
             if (checkpointsPath != null) {
                 restoreFromLatestValidCheckpoint(inputTailer, checkpointsPath)
+            } else {
+                inputTailer.toStart()
             }
 
             val lastSequenceNumberProcessedBeforeRestart = getLastSequenceNumberInOutputQueue()
@@ -448,6 +450,9 @@ class SequencerApp(
                                         logger.error { "Actual response did not match expected, exiting. Sequence: ${dc.index()}, requests processed since start: $requestsProcessedSinceStarted, request: $request, expected response: $expectedResponse, actual response: $response" }
                                         exitProcess(1)
                                     }
+                                }
+                                if (requestsProcessedSinceStarted.toInt() % 1000 == 0) {
+                                    logger.info { "Replayed and validated $requestsProcessedSinceStarted requests" }
                                 }
                             }
 
