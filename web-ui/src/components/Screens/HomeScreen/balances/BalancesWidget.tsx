@@ -15,6 +15,8 @@ import { useWeb3Modal } from '@web3modal/wagmi/react'
 export const withdrawalsQueryKey = ['withdrawals']
 export const depositsQueryKey = ['deposits']
 
+type Tab = 'Available' | 'Deposits' | 'Withdrawals'
+
 export default function BalancesWidget({
   walletAddress,
   exchangeContractAddress,
@@ -24,9 +26,7 @@ export default function BalancesWidget({
   exchangeContractAddress?: Address
   symbols: TradingSymbols
 }) {
-  const [selectedTab, setSelectedTab] = useState<
-    'available' | 'deposits' | 'withdrawals'
-  >('available')
+  const [selectedTab, setSelectedTab] = useState<Tab>('Available')
   const { open: openWalletConnectModal } = useWeb3Modal()
 
   const depositsQuery = useQuery({
@@ -62,88 +62,45 @@ export default function BalancesWidget({
       id="balances"
       contents={
         <>
-          <div className="flex w-full text-center font-medium">
-            <div
-              className={classNames(
-                'cursor-pointer border-b-2 mr-4 w-full h-12 flex-col content-end pb-1',
-                selectedTab == 'available'
-                  ? 'border-b-primary4'
-                  : 'border-b-darkBluishGray3'
-              )}
-              onClick={() => setSelectedTab('available')}
-            >
+          <div className="flex w-full space-x-4 text-center font-medium">
+            {(['Available', 'Deposits', 'Withdrawals'] as Tab[]).map((t) => (
               <div
-                className={
-                  selectedTab == 'available'
-                    ? 'text-primary4'
-                    : 'text-darkBluishGray3'
-                }
+                key={t}
+                className={classNames(
+                  'cursor-pointer border-b-2 w-full h-12 flex-col content-end pb-2 transition-colors',
+                  selectedTab === t
+                    ? 'text-statusOrange'
+                    : 'text-darkBluishGray3 hover:text-white'
+                )}
+                onClick={() => setSelectedTab(t)}
               >
-                Available
+                {t}
+                {pendingDepositsCount > 0 && t === 'Deposits' && (
+                  <div
+                    className={classNames(
+                      'whitespace-nowrap text-xs',
+                      selectedTab === t
+                        ? 'text-statusOrange'
+                        : 'text-darkBluishGray3 hover:text-white'
+                    )}
+                  >
+                    ({pendingDepositsCount} pending)
+                  </div>
+                )}
+                {pendingWithdrawalsCount > 0 && t === 'Withdrawals' && (
+                  <div
+                    className={classNames(
+                      'whitespace-nowrap text-xs',
+                      selectedTab === t
+                        ? 'text-statusOrange'
+                        : 'text-darkBluishGray3 hover:text-white'
+                    )}
+                  >
+                    ({pendingWithdrawalsCount} pending)
+                  </div>
+                )}
               </div>
-            </div>
-            <div
-              className={classNames(
-                'cursor-pointer border-b-2 mx-4 w-full h-12 flex-col content-end pb-1',
-                selectedTab == 'deposits'
-                  ? 'border-b-primary4'
-                  : 'border-b-darkBluishGray3'
-              )}
-              onClick={() => setSelectedTab('deposits')}
-            >
-              <div
-                className={
-                  selectedTab == 'deposits'
-                    ? 'text-primary4'
-                    : 'text-darkBluishGray3'
-                }
-              >
-                Deposits
-              </div>
-              {pendingDepositsCount > 0 && (
-                <div
-                  className={classNames(
-                    'whitespace-nowrap text-xs',
-                    selectedTab == 'deposits'
-                      ? 'text-primary4'
-                      : 'text-darkBluishGray3'
-                  )}
-                >
-                  ({pendingDepositsCount} pending)
-                </div>
-              )}
-            </div>
-            <div
-              className={classNames(
-                'cursor-pointer border-b-2 ml-4 w-full h-12 flex-col content-end pb-1',
-                selectedTab == 'withdrawals'
-                  ? 'border-b-primary4'
-                  : 'border-b-darkBluishGray3'
-              )}
-              onClick={() => setSelectedTab('withdrawals')}
-            >
-              <div
-                className={
-                  selectedTab == 'withdrawals'
-                    ? 'text-primary4'
-                    : 'text-darkBluishGray3'
-                }
-              >
-                Withdrawals
-              </div>
-              {pendingWithdrawalsCount > 0 && (
-                <div
-                  className={classNames(
-                    'whitespace-nowrap text-xs mb-1',
-                    selectedTab == 'withdrawals'
-                      ? 'text-primary4'
-                      : 'text-darkBluishGray3'
-                  )}
-                >
-                  ({pendingWithdrawalsCount} pending)
-                </div>
-              )}
-            </div>
+            ))}
           </div>
           <div className="mt-8">
             {walletAddress !== undefined &&
@@ -156,7 +113,7 @@ export default function BalancesWidget({
                   return <Spinner />
                 } else {
                   switch (selectedTab) {
-                    case 'available':
+                    case 'Available':
                       return (
                         <BalancesTable
                           walletAddress={walletAddress}
@@ -164,14 +121,14 @@ export default function BalancesWidget({
                           symbols={symbols}
                         />
                       )
-                    case 'withdrawals':
+                    case 'Withdrawals':
                       return (
                         <WithdrawalsTable
                           withdrawals={withdrawalsQuery.data.withdrawals}
                           symbols={symbols}
                         />
                       )
-                    case 'deposits':
+                    case 'Deposits':
                       return (
                         <DepositsTable
                           deposits={depositsQuery.data.deposits}
@@ -185,9 +142,9 @@ export default function BalancesWidget({
               <div className="flex w-full flex-col place-items-center">
                 <div className="mb-4 text-darkBluishGray2">
                   If you want to see your{' '}
-                  {selectedTab == 'available'
+                  {selectedTab === 'Available'
                     ? 'available balances'
-                    : selectedTab == 'deposits'
+                    : selectedTab === 'Deposits'
                       ? 'deposits'
                       : 'withdrawals'}
                   , connect your wallet.

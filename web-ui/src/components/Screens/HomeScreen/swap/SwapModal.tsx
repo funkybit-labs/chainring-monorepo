@@ -155,12 +155,14 @@ export function SwapModal({
                 <span className="text-base text-darkBluishGray1">Sell</span>
                 <div className="flex flex-row items-baseline space-x-2 text-sm">
                   {depositAmount(sr.topBalance, sr.topSymbol)}
-                  <button
-                    className="rounded bg-darkBluishGray6 px-2 py-1 text-darkBluishGray2 hover:bg-blue5"
-                    onClick={() => openDepositModal(sr.topSymbol)}
-                  >
-                    Deposit
-                  </button>
+                  {walletAddress && exchangeContractAddress && (
+                    <button
+                      className="rounded bg-darkBluishGray6 px-2 py-1 text-darkBluishGray2 hover:bg-blue5"
+                      onClick={() => openDepositModal(sr.topSymbol)}
+                    >
+                      Deposit
+                    </button>
+                  )}
                 </div>
               </div>
               <div

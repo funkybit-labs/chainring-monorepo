@@ -18,6 +18,8 @@ import Decimal from 'decimal.js'
 import { scaledDecimalToBigint } from 'utils/pricesUtils'
 import { ExpandableValue } from 'components/common/ExpandableNumber'
 
+type Tab = 'Orders' | 'Trade History'
+
 export default function OrdersAndTradesWidget({
   markets,
   exchangeContractAddress,
@@ -31,9 +33,7 @@ export default function OrdersAndTradesWidget({
   const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null)
   const [showCancelModal, setShowCancelModal] = useState<boolean>(false)
   const [trades, setTrades] = useState<Trade[]>(() => [])
-  const [selectedTab, setSelectedTab] = useState<'orders' | 'trade-history'>(
-    'orders'
-  )
+  const [selectedTab, setSelectedTab] = useState<Tab>('Orders')
   const { open: openWalletConnectModal } = useWeb3Modal()
 
   useWebsocketSubscription({
@@ -364,54 +364,30 @@ export default function OrdersAndTradesWidget({
       id="orders-and-trades"
       contents={
         <>
-          <div className="flex w-full text-center font-medium">
-            <div
-              className={classNames(
-                'cursor-pointer border-b-2 mr-4 w-full h-10 flex-col content-end pb-1',
-                selectedTab == 'orders'
-                  ? 'border-b-primary4'
-                  : 'border-b-darkBluishGray3'
-              )}
-              onClick={() => setSelectedTab('orders')}
-            >
+          <div className="flex w-full space-x-2 text-center font-medium">
+            {(['Orders', 'Trade History'] as Tab[]).map((t) => (
               <div
-                className={
-                  selectedTab == 'orders'
-                    ? 'text-primary4'
-                    : 'text-darkBluishGray3'
-                }
+                key={t}
+                className={classNames(
+                  'cursor-pointer border-b-2 pb-2 w-full h-10 flex-col content-end transition-colors',
+                  selectedTab === t
+                    ? 'text-statusOrange'
+                    : 'text-darkBluishGray3 hover:text-white'
+                )}
+                onClick={() => setSelectedTab(t)}
               >
-                Orders
+                {t}
               </div>
-            </div>
-            <div
-              className={classNames(
-                'cursor-pointer border-b-2 ml-4 w-full h-10 flex-col content-end pb-1',
-                selectedTab == 'trade-history'
-                  ? 'border-b-primary4'
-                  : 'border-b-darkBluishGray3'
-              )}
-              onClick={() => setSelectedTab('trade-history')}
-            >
-              <div
-                className={
-                  selectedTab == 'trade-history'
-                    ? 'text-primary4'
-                    : 'text-darkBluishGray3'
-                }
-              >
-                Trade History
-              </div>
-            </div>
+            ))}
           </div>
           <div className="mt-4">
             {walletAddress !== undefined &&
             exchangeContractAddress !== undefined ? (
               (function () {
                 switch (selectedTab) {
-                  case 'orders':
+                  case 'Orders':
                     return ordersContent()
-                  case 'trade-history':
+                  case 'Trade History':
                     return tradeHistoryContent()
                 }
               })()
@@ -419,7 +395,7 @@ export default function OrdersAndTradesWidget({
               <div className="flex w-full flex-col place-items-center">
                 <div className="mb-4 text-darkBluishGray2">
                   If you want to see your{' '}
-                  {selectedTab == 'orders' ? 'orders' : 'trade history'},
+                  {selectedTab === 'Orders' ? 'orders' : 'trade history'},
                   connect your wallet.
                 </div>
                 <Button

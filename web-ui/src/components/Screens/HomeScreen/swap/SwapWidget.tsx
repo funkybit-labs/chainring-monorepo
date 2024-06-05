@@ -77,8 +77,8 @@ export function SwapWidget({
 
       return (
         <>
-          <div className="space-y-4 rounded-[20px] bg-darkBluishGray9 p-8">
-            <div className="rounded-[20px] bg-darkBluishGray8 p-4">
+          <div className="space-y-4 rounded bg-darkBluishGray9 p-8">
+            <div className="rounded bg-darkBluishGray8 p-4">
               <div className="mb-2 flex flex-row justify-between">
                 <span className="text-base text-darkBluishGray1">Sell</span>
                 <div className="flex flex-row items-baseline space-x-2 text-sm">
@@ -172,7 +172,7 @@ export function SwapWidget({
                 onClick={() => sr.handleChangeSide()}
               />
             </div>
-            <div className="rounded-[20px] bg-darkBluishGray8 p-4">
+            <div className="rounded bg-darkBluishGray8 p-4">
               <div className="mb-2 flex flex-row justify-between">
                 <span className="text-base text-darkBluishGray1">Buy</span>
                 <div className="flex flex-row space-x-2 align-middle text-sm">

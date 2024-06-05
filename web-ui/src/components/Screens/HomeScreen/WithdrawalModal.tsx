@@ -143,11 +143,12 @@ export default function WithdrawalModal({
           asyncData={availableBalanceQuery}
           success={(availableBalance) => {
             return (
-              <div className="mt-2">
+              <div>
                 <AmountInput
                   value={amountInputValue}
                   disabled={submitPhase !== null}
                   onChange={(e) => setAmountInputValue(e.target.value)}
+                  className="!rounded-md !bg-darkBluishGray8 !text-center !text-white !placeholder-lightBackground !ring-darkBluishGray8"
                 />
 
                 <p className="mb-2 mt-4 text-center text-sm text-darkBluishGray2">
