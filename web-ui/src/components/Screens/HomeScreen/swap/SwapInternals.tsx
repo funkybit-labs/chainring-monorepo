@@ -695,8 +695,20 @@ export function SwapInternals({
   const percentOffMarket = useMemo(() => {
     if (orderBook) {
       const mktPrice = getMarketPrice(side, baseAmount, market, orderBook)
-      if (buyLimitPrice && mktPrice) {
-        return new Decimal((mktPrice - buyLimitPrice).toString())
+      if (mktPrice && buyLimitPrice) {
+        return (() => {
+          if (side === 'Buy') {
+            return new Decimal((mktPrice - buyLimitPrice).toString())
+          } else {
+            const invertedPrice = scaledDecimalToBigint(
+              new Decimal(1).div(
+                bigintToScaledDecimal(buyLimitPrice, quoteSymbol.decimals)
+              ),
+              quoteSymbol.decimals
+            )
+            return new Decimal((invertedPrice - mktPrice).toString())
+          }
+        })()
           .div(new Decimal(mktPrice.toString()))
           .mul(100)
           .toDecimalPlaces(1)
@@ -704,7 +716,7 @@ export function SwapInternals({
       }
     }
     return
-  }, [orderBook, side, baseAmount, market, buyLimitPrice])
+  }, [orderBook, side, baseAmount, market, buyLimitPrice, quoteSymbol])
 
   return Renderer({
     topBalance,
