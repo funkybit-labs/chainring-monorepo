@@ -1083,18 +1083,18 @@ class OrderRoutesApiTest : OrderBaseTest() {
                 assertEquals(
                     OHLC(
                         // initial ohlc in the BTC/USDC market
-                        // price is weighted across limit orders that have been filled within execution
+                        // price is a weighted price across all order execution of market order
                         start = OHLCDuration.P5M.durationStart(Clock.System.now()),
-                        open = 68400.3,
-                        high = 68400.3,
-                        low = 68400.3,
-                        close = 68400.3,
+                        open = 68400.8,
+                        high = 68400.8,
+                        low = 68400.8,
+                        close = 68400.8,
                         duration = OHLCDuration.P5M,
                     ),
                     msg.ohlc.last(),
                 )
             }
-            assertLimitsMessageReceived(market, base = BigDecimal("0.0018"), quote = BigDecimal("374.416988"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0.0018"), quote = BigDecimal("374.416070"))
         }
 
         makerWsClient.apply {
@@ -1105,16 +1105,16 @@ class OrderRoutesApiTest : OrderBaseTest() {
                 assertEquals(
                     OHLC(
                         start = OHLCDuration.P5M.durationStart(Clock.System.now()),
-                        open = 68400.3,
-                        high = 68400.3,
-                        low = 68400.3,
-                        close = 68400.3,
+                        open = 68400.8,
+                        high = 68400.8,
+                        low = 68400.8,
+                        close = 68400.8,
                         duration = OHLCDuration.P5M,
                     ),
                     msg.ohlc.last(),
                 )
             }
-            assertLimitsMessageReceived(market, base = BigDecimal("0.1982"), quote = BigDecimal("621.889395"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0.1982"), quote = BigDecimal("621.890285"))
         }
 
         val takerOrders = takerApiClient.listOrders(emptyList(), market.id).orders

@@ -73,13 +73,13 @@ fun getFixtures(chainringChainClients: List<BlockchainClient>) = Fixtures(
                 baseSymbol = SymbolId(client.chainId, "USDC".toChainSymbol(index)),
                 quoteSymbol = SymbolId(client.chainId, "DAI".toChainSymbol(index)),
                 tickSize = "0.01".toBigDecimal(),
-                marketPrice = "2.05".toBigDecimal()
+                marketPrice = "2.005".toBigDecimal()
             ),
             Fixtures.Market(
                 baseSymbol = SymbolId(client.chainId, "BTC".toChainSymbol(index)),
                 quoteSymbol = SymbolId(client.chainId, "USDC".toChainSymbol(index)),
                 tickSize = "1.00".toBigDecimal(),
-                marketPrice = "68390.000".toBigDecimal()
+                marketPrice = "68390.500".toBigDecimal()
             ),
         )
     }.flatten() + if (chainringChainClients.size > 1) listOf(

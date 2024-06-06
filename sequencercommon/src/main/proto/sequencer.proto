@@ -76,6 +76,7 @@ enum SequencerError {
   UnknownMarket = 3;
   ExceedsLimit = 4;
   InvalidFeeRate = 5;
+  InvalidPrice = 6;
 }
 
 message StateDump {
