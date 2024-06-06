@@ -197,9 +197,10 @@ export function LimitModal({
                   <input
                     value={sr.sellLimitPriceInputValue}
                     disabled={sr.mutation.isPending}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      if (e.target.value) setMarketPriceInverted(true)
                       sr.handleSellLimitPriceChange(e.target.value)
-                    }
+                    }}
                     className="w-36 rounded-xl border-darkBluishGray6 bg-darkBluishGray8 text-center text-white disabled:bg-darkBluishGray7"
                   />
                   {sr.percentOffMarket !== undefined && (
@@ -225,13 +226,14 @@ export function LimitModal({
                       'hover:bg-blue5'
                     )}
                     disabled={false}
-                    onClick={() =>
+                    onClick={() => {
                       sr.setPriceFromMarketPrice(
                         incrementDivisor
                           ? BigInt(incrementDivisor as number)
                           : undefined
                       )
-                    }
+                      setMarketPriceInverted(true)
+                    }}
                   >
                     {label}
                   </button>
@@ -292,9 +294,10 @@ export function LimitModal({
                     <input
                       value={sr.buyLimitPriceInputValue}
                       disabled={sr.mutation.isPending}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        if (e.target.value) setMarketPriceInverted(false)
                         sr.handleBuyLimitPriceChange(e.target.value)
-                      }
+                      }}
                       className="w-36 rounded-xl border-darkBluishGray6 bg-darkBluishGray8 text-center text-white disabled:bg-darkBluishGray7"
                     />
                     {sr.percentOffMarket !== undefined && (
@@ -320,13 +323,14 @@ export function LimitModal({
                         'hover:bg-blue5'
                       )}
                       disabled={false}
-                      onClick={() =>
+                      onClick={() => {
                         sr.setPriceFromMarketPrice(
                           incrementDivisor
                             ? BigInt(incrementDivisor as number)
                             : undefined
                         )
-                      }
+                        setMarketPriceInverted(false)
+                      }}
                     >
                       {label}
                     </button>
@@ -425,13 +429,13 @@ function SellAmountInput({
     <span className="flex flex-row justify-start align-middle">
       <span>
         <span className="align-middle">
-          <div className="absolute text-2xl opacity-0" ref={divRef}>
+          <div className="absolute text-xl opacity-0" ref={divRef}>
             {value}
           </div>
           <input
             ref={inputRef as LegacyRef<HTMLInputElement>}
             className={classNames(
-              'text-white text-2xl text-left',
+              'text-white text-xl text-left',
               'inline-block rounded-xl border-0',
               'bg-darkBluishGray8 py-3',
               'ring-1 ring-inset ring-darkBluishGray6 focus:ring-1 focus:ring-inset focus:ring-mutedGray',
