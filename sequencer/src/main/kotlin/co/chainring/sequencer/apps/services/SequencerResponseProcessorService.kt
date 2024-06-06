@@ -66,11 +66,12 @@ object SequencerResponseProcessorService {
             SequencerRequest.Type.ApplyBalanceBatch -> {
                 request.balanceBatch!!.withdrawalsList.forEach { withdrawal ->
                     WithdrawalEntity.findById(withdrawal.externalGuid.withdrawalId())?.let { withdrawalEntity ->
-                        if (response.balancesChangedList.firstOrNull { it.wallet == withdrawal.wallet } == null) {
-                            withdrawalEntity.update(WithdrawalStatus.Failed, error(response))
+                        val balanceChange = response.balancesChangedList.firstOrNull { it.wallet == withdrawal.wallet }
+                        if (balanceChange == null) {
+                            withdrawalEntity.update(WithdrawalStatus.Failed, error(response, "Insufficient Balance"))
                         } else {
                             handleSequencerResponse(request = request, response = response, ordersBeingUpdated = listOf())
-                            withdrawalEntity.update(WithdrawalStatus.Sequenced, null)
+                            withdrawalEntity.update(WithdrawalStatus.Sequenced, null, actualAmount = balanceChange.delta.toBigInteger().negate())
                         }
                     }
                 }
@@ -139,8 +140,8 @@ object SequencerResponseProcessorService {
         }
     }
 
-    private fun error(response: SequencerResponse) =
-        if (response.error != SequencerError.None) response.error.name else "Rejected by sequencer"
+    private fun error(response: SequencerResponse, defaultMessage: String = "Rejected by sequencer") =
+        if (response.error != SequencerError.None) response.error.name else defaultMessage
 
     private fun handleOrderBatchUpdates(orderBatch: OrderBatch, wallet: WalletEntity, response: SequencerResponse) {
         if (orderBatch.ordersToAddList.isNotEmpty() || orderBatch.ordersToChangeList.isNotEmpty()) {

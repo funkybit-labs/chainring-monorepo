@@ -199,7 +199,7 @@ class SequencerClient {
                             },
                         )
                     }
-                    amounts.filter { a -> a < BigDecimal.ZERO }.let { withdrawals ->
+                    amounts.filter { a -> a <= BigDecimal.ZERO }.let { withdrawals ->
                         this.withdrawals.addAll(
                             withdrawals.map {
                                 co.chainring.sequencer.proto.withdrawal {

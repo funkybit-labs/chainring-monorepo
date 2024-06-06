@@ -248,6 +248,7 @@ class ExchangeApiService(
                 TokenAddressAndChain(symbol.contractAddress ?: Address.zero, symbol.chainId.value),
                 apiRequest.amount,
                 apiRequest.nonce,
+                apiRequest.amount == BigInteger.ZERO,
                 apiRequest.signature,
             ),
             symbol.chainId.value,
