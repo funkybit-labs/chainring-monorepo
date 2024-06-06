@@ -252,7 +252,7 @@ export default function OrdersAndTradesWidget({
     side: OrderSide,
     market: Market
   ): string {
-    if (side === 'Buy') {
+    if (side === 'Sell') {
       return price.toFixed(market.quoteDecimalPlaces)
     } else {
       const invertedPrice = new Decimal(1).div(price)
