@@ -57,7 +57,8 @@ const MarketSchema = z.object({
   id: z.string(),
   baseSymbol: z.string(),
   quoteSymbol: z.string(),
-  tickSize: decimal()
+  tickSize: decimal(),
+  lastPrice: decimal()
 })
 export type Market = z.infer<typeof MarketSchema>
 

@@ -238,7 +238,7 @@ export function SwapModal({
                 </div>
               </div>
               <div
-                className="mt-1 cursor-pointer pl-4 text-darkBluishGray1 hover:text-lightBluishGray5"
+                className="mt-1 cursor-pointer pl-4 text-darkBluishGray1 hover:text-statusOrange"
                 onClick={() => setMarketPriceInverted(!marketPriceInverted)}
               >
                 1{' '}
@@ -330,13 +330,13 @@ function SellAmountInput({
     <span className="flex flex-row justify-start align-middle">
       <span className="whitespace-nowrap">
         <span className="align-middle">
-          <div className="absolute text-2xl opacity-0" ref={divRef}>
+          <div className="absolute text-xl opacity-0" ref={divRef}>
             {value}
           </div>
           <input
             ref={inputRef as LegacyRef<HTMLInputElement>}
             className={classNames(
-              'text-white text-2xl text-left',
+              'text-white text-xl text-left',
               'inline-block rounded-xl border-0',
               'bg-darkBluishGray8 py-3',
               'ring-1 ring-inset ring-darkBluishGray6 focus:ring-1 focus:ring-inset focus:ring-mutedGray',

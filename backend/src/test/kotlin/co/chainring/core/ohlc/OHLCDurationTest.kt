@@ -23,8 +23,8 @@ class OHLCDurationTest : TestWithDb() {
             val btc = createNativeSymbol("BTC", chain.id.value, decimals = 18U)
             val eth = createSymbol("ETH", chain.id.value, decimals = 18U)
             val usdc = createSymbol("USDC", chain.id.value, decimals = 18U)
-            createMarket(btc, eth, tickSize = "0.05".toBigDecimal()).id.value
-            createMarket(eth, usdc, tickSize = "0.01".toBigDecimal()).id.value
+            createMarket(btc, eth, tickSize = "0.05".toBigDecimal(), lastPrice = "17.525".toBigDecimal()).id.value
+            createMarket(eth, usdc, tickSize = "0.01".toBigDecimal(), lastPrice = "2999.995".toBigDecimal()).id.value
         }
     }
 

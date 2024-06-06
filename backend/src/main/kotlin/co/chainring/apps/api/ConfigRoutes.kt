@@ -77,6 +77,7 @@ object ConfigRoutes {
                                 quoteSymbol = Symbol("DAI"),
                                 quoteDecimals = 6,
                                 tickSize = "0.01".toBigDecimal(),
+                                lastPrice = "0.995".toBigDecimal(),
                             ),
                         ),
                         feeRates = FeeRates(
@@ -118,6 +119,7 @@ object ConfigRoutes {
                                     quoteSymbol = Symbol(market.quoteSymbol.name),
                                     quoteDecimals = market.quoteSymbol.decimals.toInt(),
                                     tickSize = market.tickSize,
+                                    lastPrice = market.lastPrice,
                                 )
                             }.sortedWith(compareBy({ it.baseSymbol.value }, { it.quoteSymbol.value })),
                             feeRates = FeeRates.fetch(),
