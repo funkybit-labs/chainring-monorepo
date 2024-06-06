@@ -112,10 +112,12 @@ function longerDurationOrNull(duration: OHLCDuration): OHLCDuration | null {
 
 export function PricesWidget({
   market,
-  side
+  side: requestedSide,
+  onSideChanged
 }: {
   market: Market
   side: OrderSide
+  onSideChanged: (s: OrderSide) => void
 }) {
   const [ref, { width }] = useMeasure()
 
@@ -130,6 +132,11 @@ export function PricesWidget({
   const [ohlcLoading, setOhlcLoading] = useState<boolean>(true)
   const [rawDailyChange, setRawDailyChange] = useState<number | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [side, setSide] = useState(requestedSide)
+
+  useEffect(() => {
+    setSide(requestedSide)
+  }, [requestedSide])
 
   useWebsocketSubscription({
     topics: useMemo(
@@ -225,6 +232,10 @@ export function PricesWidget({
               side={side}
               price={lastPrice()}
               dailyChange={dailyChange}
+              onSideChanged={(s: OrderSide) => {
+                setSide(s)
+                onSideChanged(s)
+              }}
             />
           </div>
           <div className="flex w-full place-items-center justify-between py-4 text-sm">
@@ -751,17 +762,24 @@ function Title({
   market,
   side,
   price,
-  dailyChange
+  dailyChange,
+  onSideChanged
 }: {
   market: Market
   side: OrderSide
   price: number | null
   dailyChange: number | null
+  onSideChanged: (s: OrderSide) => void
 }) {
   return (
     <div className="flex w-full justify-between text-xl font-semibold">
       <div className="flex items-center gap-1">
-        <MarketTitle market={market} alwaysShowLabel={true} side={side} />
+        <MarketTitle
+          market={market}
+          alwaysShowLabel={true}
+          side={side}
+          onSideChange={onSideChanged}
+        />
       </div>
       <div className="flex place-items-center gap-4 text-right">
         {formatPrice(market, price)}

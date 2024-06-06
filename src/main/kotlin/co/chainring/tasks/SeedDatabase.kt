@@ -70,7 +70,7 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
             when (val marketEntity = MarketEntity.findById(MarketId(baseSymbol, quoteSymbol))) {
                 null -> {
                     MarketEntity
-                        .create(baseSymbol, quoteSymbol, tickSize)
+                        .create(baseSymbol, quoteSymbol, tickSize, marketPrice)
                         .also {
                             it.flush()
                             println("Created market ${it.guid.value}")

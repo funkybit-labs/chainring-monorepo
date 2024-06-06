@@ -30,6 +30,7 @@ import co.chainring.core.model.db.migrations.V34_AddSessionStateToTelegramBotUse
 import co.chainring.core.model.db.migrations.V35_RemoveExchangeContract
 import co.chainring.core.model.db.migrations.V36_AddPendingDepositsToTelegramBotUser
 import co.chainring.core.model.db.migrations.V37_AddBatchHash
+import co.chainring.core.model.db.migrations.V38_AddLastPriceToMarket
 import co.chainring.core.model.db.migrations.V3_UpdateDeployedSmartContract
 import co.chainring.core.model.db.migrations.V4_AddDecimalsToERC20Token
 import co.chainring.core.model.db.migrations.V5_ChainTable
@@ -76,4 +77,5 @@ val migrations = listOf(
     V35_RemoveExchangeContract(),
     V36_AddPendingDepositsToTelegramBotUser(),
     V37_AddBatchHash(),
+    V38_AddLastPriceToMarket(),
 )

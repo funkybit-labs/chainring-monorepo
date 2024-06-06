@@ -20,7 +20,7 @@ export default {
         }
       },
       animation: {
-        swivel: 'swivel 0.3s linear'
+        swivel: 'swivel 0.5s linear'
       }
     },
     colors: {

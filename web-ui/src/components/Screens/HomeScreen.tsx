@@ -1,21 +1,21 @@
-import { useQuery } from '@tanstack/react-query'
 import { apiClient, OrderSide, useMaintenance } from 'apiClient'
 import { useAccount } from 'wagmi'
 import BalancesWidget from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import { Header, Tab } from 'components/Screens/Header'
 import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
 import React, { LegacyRef, useEffect, useMemo, useState } from 'react'
-import Spinner from 'components/common/Spinner'
 import OrdersAndTradesWidget from 'components/Screens/HomeScreen/OrdersAndTradesWidget'
 import TradingSymbols from 'tradingSymbols'
 import Markets, { Market } from 'markets'
-import { WebsocketProvider } from 'contexts/websocket'
 import { PricesWidget } from 'components/Screens/HomeScreen/PricesWidget'
 import { useMeasure } from 'react-use'
-import TradingSymbol from 'tradingSymbol'
 import { SwapModal } from 'components/Screens/HomeScreen/swap/SwapModal'
 import { SwapWidget } from 'components/Screens/HomeScreen/swap/SwapWidget'
 import { LimitModal } from 'components/Screens/HomeScreen/swap/LimitModal'
+import { useQuery } from '@tanstack/react-query'
+import Spinner from 'components/common/Spinner'
+import { WebsocketProvider } from 'contexts/websocket'
+import TradingSymbol from 'tradingSymbol'
 
 export default function HomeScreen() {
   const configQuery = useQuery({
@@ -94,6 +94,23 @@ export default function HomeScreen() {
 
   const [ref, { width }] = useMeasure()
 
+  const defaultSide = useMemo(() => {
+    if (selectedMarket) {
+      const price = selectedMarket.lastPrice.toNumber()
+      if (price > 1.1) {
+        return 'Buy'
+      } else if (price < 0.9) {
+        return 'Sell'
+      } else {
+        return side
+      }
+    } else {
+      return 'Buy'
+    }
+  }, [side, selectedMarket])
+
+  const [overriddenSide, setOverriddenSide] = useState<OrderSide | undefined>()
+
   function saveTab(tab: Tab) {
     setTab(tab)
     window.sessionStorage.setItem('tab', tab)
@@ -141,7 +158,11 @@ export default function HomeScreen() {
               {tab === 'Dashboard' && (
                 <div className="grid grid-cols-1 gap-4 laptop:grid-cols-3">
                   <div className="col-span-1 space-y-4 laptop:col-span-2">
-                    <PricesWidget side={side} market={selectedMarket} />
+                    <PricesWidget
+                      side={defaultSide}
+                      market={selectedMarket}
+                      onSideChanged={setOverriddenSide}
+                    />
                     {symbols && width >= 1100 && (
                       <BalancesWidget
                         walletAddress={wallet.address}
@@ -161,16 +182,16 @@ export default function HomeScreen() {
                     />
                     {width >= 1100 && (
                       <OrderBookWidget
-                        marketId={selectedMarket.id}
-                        side={side}
+                        market={selectedMarket}
+                        side={overriddenSide ?? defaultSide}
                       />
                     )}
                   </div>
                   {symbols && width < 1100 && (
                     <div className="col-span-1 space-y-4">
                       <OrderBookWidget
-                        marketId={selectedMarket.id}
-                        side={side}
+                        market={selectedMarket}
+                        side={overriddenSide ?? defaultSide}
                       />
                       <BalancesWidget
                         walletAddress={wallet.address}

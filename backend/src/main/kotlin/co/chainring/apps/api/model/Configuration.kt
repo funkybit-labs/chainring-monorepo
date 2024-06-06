@@ -44,4 +44,5 @@ data class Market(
     val quoteSymbol: Symbol,
     val quoteDecimals: Int,
     val tickSize: BigDecimalJson,
+    val lastPrice: BigDecimalJson,
 )

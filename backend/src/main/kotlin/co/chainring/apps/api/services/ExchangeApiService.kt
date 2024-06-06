@@ -351,6 +351,7 @@ class ExchangeApiService(
                         quoteSymbol = Symbol(it.quoteSymbol.name),
                         quoteDecimals = it.quoteSymbol.decimals.toInt(),
                         tickSize = it.tickSize,
+                        lastPrice = it.lastPrice,
                     )
                 }
             }

@@ -50,6 +50,7 @@ import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.newQuantityOrNull
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
+import java.math.BigDecimal
 import java.math.RoundingMode
 import kotlin.time.Duration.Companion.hours
 
@@ -303,6 +304,7 @@ object SequencerResponseProcessorService {
                 .sortedBy { it.guid },
         )
 
+        val lastPriceByMarket = mutableMapOf<MarketId, BigDecimal>()
         val ohlcNotifications = tradesWithTakerOrder
             .fold(mutableMapOf<OrderId, MutableList<TradeEntity>>()) { acc, pair ->
                 val trade = pair.first
@@ -319,6 +321,8 @@ object SequencerResponseProcessorService {
 
                 val h24ClosePrice = OHLCEntity.findSingleByClosestStartTime(market.guid.value, OHLCDuration.P1M, OHLCDuration.P1M.durationStart(Clock.System.now() - 24.hours))?.close
 
+                lastPriceByMarket[market.id.value] = weightedPrice
+
                 OHLCEntity.updateWith(market.guid.value, trades.first().timestamp, weightedPrice, sumOfAmounts)
                     .map {
                         BroadcasterNotification.pricesForMarketPeriods(
@@ -330,6 +334,12 @@ object SequencerResponseProcessorService {
                         )
                     }
             }.flatten()
+
+        markets.forEach { m ->
+            lastPriceByMarket[m.id.value]?.let {
+                m.lastPrice = it
+            }
+        }
 
         val limitsNotifications = limitsChanged
             .groupBy(

@@ -1,5 +1,5 @@
 import Markets, { Market } from 'markets'
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import TradingSymbol from 'tradingSymbol'
 import { Balance, FeeRates, OrderSide } from 'apiClient'
 import { Address, formatUnits } from 'viem'
@@ -15,6 +15,8 @@ import {
   SwapRender
 } from 'components/Screens/HomeScreen/swap/SwapInternals'
 import { ExpandableValue } from 'components/common/ExpandableNumber'
+import { bigintToScaledDecimal, scaledDecimalToBigint } from 'utils/pricesUtils'
+import Decimal from 'decimal.js'
 
 export function SwapWidget({
   markets,
@@ -49,7 +51,31 @@ export function SwapWidget({
     isLimitOrder: false,
     Renderer: function (sr: SwapRender) {
       const { open: openWalletConnectModal } = useWeb3Modal()
+      const [marketPriceInverted, setMarketPriceInverted] = useState(false)
 
+      const marketPrice = useMemo(() => {
+        const quoteDecimals =
+          sr.side === 'Buy' ? sr.topSymbol.decimals : sr.bottomSymbol.decimals
+        const unitPriceInQuote = sr.getMarketPrice(
+          sr.side,
+          scaledDecimalToBigint(new Decimal(1), quoteDecimals)
+        )
+        if (unitPriceInQuote) {
+          if (marketPriceInverted) {
+            const invertedPrice = scaledDecimalToBigint(
+              new Decimal(1).div(
+                bigintToScaledDecimal(unitPriceInQuote, quoteDecimals)
+              ),
+              quoteDecimals
+            )
+            return formatUnits(invertedPrice, quoteDecimals)
+          } else {
+            return formatUnits(unitPriceInQuote, quoteDecimals)
+          }
+        } else {
+          return 'N/A'
+        }
+      }, [sr, marketPriceInverted])
       function depositAmount(
         deposit: Balance | undefined,
         symbol: TradingSymbol
@@ -114,6 +140,7 @@ export function SwapWidget({
                     onChange={(e) => {
                       sr.handleMarketOrderFlagChange(e.target.value != '')
                       sr.handleSellLimitPriceChange(e.target.value)
+                      if (e.target.value) setMarketPriceInverted(true)
                     }}
                     className="w-36 rounded-xl border-darkBluishGray8 bg-darkBluishGray9 text-center text-white disabled:bg-darkBluishGray6"
                   />
@@ -140,13 +167,14 @@ export function SwapWidget({
                       sr.isLimitOrder && 'hover:bg-blue5'
                     )}
                     disabled={sr.mutation.isPending}
-                    onClick={() =>
+                    onClick={() => {
                       sr.setPriceFromMarketPrice(
                         incrementDivisor
                           ? BigInt(incrementDivisor as number)
                           : undefined
                       )
-                    }
+                      setMarketPriceInverted(true)
+                    }}
                   >
                     {label}
                   </button>
@@ -200,6 +228,7 @@ export function SwapWidget({
                     onChange={(e) => {
                       sr.handleMarketOrderFlagChange(e.target.value != '')
                       sr.handleBuyLimitPriceChange(e.target.value)
+                      if (e.target.value) setMarketPriceInverted(false)
                     }}
                     className="w-36 rounded-xl border-darkBluishGray8 bg-darkBluishGray9 text-center text-white disabled:bg-darkBluishGray6"
                   />
@@ -226,20 +255,28 @@ export function SwapWidget({
                       sr.isLimitOrder && 'hover:bg-blue5'
                     )}
                     disabled={sr.mutation.isPending}
-                    onClick={() =>
+                    onClick={() => {
                       sr.setPriceFromMarketPrice(
                         incrementDivisor
                           ? BigInt(incrementDivisor as number)
                           : undefined
                       )
-                    }
+                      setMarketPriceInverted(false)
+                    }}
                   >
                     {label}
                   </button>
                 ))}
               </div>
             </div>
-
+            <div
+              className="mt-1 cursor-pointer pl-4 text-darkBluishGray1 hover:text-statusOrange"
+              onClick={() => setMarketPriceInverted(!marketPriceInverted)}
+            >
+              1 {marketPriceInverted ? sr.topSymbol.name : sr.bottomSymbol.name}{' '}
+              ≈ <ExpandableValue value={marketPrice} />{' '}
+              {marketPriceInverted ? sr.bottomSymbol.name : sr.topSymbol.name}
+            </div>
             <div className="flex w-full flex-col">
               {walletAddress && exchangeContractAddress ? (
                 <>
