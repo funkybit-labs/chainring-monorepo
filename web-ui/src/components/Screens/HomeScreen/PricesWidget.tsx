@@ -129,6 +129,9 @@ export function PricesWidget({
   const [rawOhlc, setRawOhlc] = useState<OHLC[]>([])
   // ohlc is what the price chart uses, and has them inverted if the side is Sell
   const [ohlc, setOhlc] = useState<OHLC[]>([])
+  const [lastPrice, setLastPrice] = useState<number | null>(0)
+  const [lastPriceDecimalPlaces, setLastPriceDecimalPlaces] =
+    useState<number>(0)
   const [ohlcLoading, setOhlcLoading] = useState<boolean>(true)
   const [rawDailyChange, setRawDailyChange] = useState<number | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
@@ -186,6 +189,9 @@ export function PricesWidget({
   }, [ohlc.length, duration])
 
   useEffect(() => {
+    const rawLastPrice =
+      rawOhlc.length > 0 ? rawOhlc[rawOhlc.length - 1].close : null
+
     if (side === 'Sell') {
       setOhlc(
         rawOhlc.map((ohlc) => {
@@ -199,10 +205,18 @@ export function PricesWidget({
           }
         })
       )
+      setLastPrice(rawLastPrice ? 1.0 / rawLastPrice : null)
+      setLastPriceDecimalPlaces(
+        rawLastPrice
+          ? 3 + rawLastPrice.toString().split('.')[0].length
+          : market.tickSize.decimalPlaces() + 1
+      )
     } else {
       setOhlc(rawOhlc)
+      setLastPrice(rawLastPrice)
+      setLastPriceDecimalPlaces(market.tickSize.decimalPlaces() + 1)
     }
-  }, [rawOhlc, side])
+  }, [rawOhlc, side, market.tickSize])
 
   const dailyChange = useMemo(() => {
     if (side === 'Sell') {
@@ -211,14 +225,6 @@ export function PricesWidget({
       return rawDailyChange
     }
   }, [rawDailyChange, side])
-
-  function lastPrice(): number | null {
-    if (ohlc.length > 0) {
-      return ohlc[ohlc.length - 1].close
-    } else {
-      return null
-    }
-  }
 
   return (
     <Widget
@@ -230,7 +236,7 @@ export function PricesWidget({
             <Title
               market={market}
               side={side}
-              price={lastPrice()}
+              price={lastPrice?.toFixed(lastPriceDecimalPlaces) ?? null}
               dailyChange={dailyChange}
               onSideChanged={(s: OrderSide) => {
                 setSide(s)
@@ -263,7 +269,8 @@ export function PricesWidget({
             <OHLCChart
               disabled={ohlcLoading}
               ohlc={ohlc}
-              lastPrice={lastPrice()}
+              lastPrice={lastPrice}
+              lastPriceDecimalPlaces={lastPriceDecimalPlaces}
               params={{
                 width: Math.max(width - 40, 0), // paddings
                 height: 500,
@@ -302,12 +309,14 @@ function OHLCChart({
   disabled,
   params,
   ohlc,
-  lastPrice
+  lastPrice,
+  lastPriceDecimalPlaces
 }: {
   disabled: boolean
   params: PricesParameters
   ohlc: OHLC[]
   lastPrice: number | null
+  lastPriceDecimalPlaces: number
 }) {
   const ref = useRef<SVGSVGElement>(null)
   const margin = {
@@ -315,7 +324,7 @@ function OHLCChart({
     bottom: 18,
     left: 0,
     // calculate 8 pixels for every price digit
-    right: lastPrice ? lastPrice.toFixed(4).length * 8 : 30
+    right: lastPrice ? lastPrice.toFixed(lastPriceDecimalPlaces).length * 8 : 30
   }
   const innerWidth = params.width - margin.left - margin.right
   const innerHeight = params.height - margin.top - margin.bottom
@@ -368,9 +377,11 @@ function OHLCChart({
       d3
         .axisRight(yScale)
         .tickSize(0)
-        .tickFormat((x: d3.NumberValue) => x.valueOf().toFixed(4))
+        .tickFormat((x: d3.NumberValue) =>
+          x.valueOf().toFixed(lastPriceDecimalPlaces)
+        )
         .tickPadding(5),
-    [yScale]
+    [yScale, lastPriceDecimalPlaces]
   )
   // grid is separated from the axis to let ohlc candles be rendered above the grid, but below the axis to slide under ticks
   const yAxisGrid = useMemo(
@@ -414,7 +425,7 @@ function OHLCChart({
         .duration(150)
         .attr('transform', `translate(0,${lastPrice ? yScale(lastPrice) : 0})`)
         .select('text')
-        .text(lastPrice ? lastPrice.toFixed(4) : '')
+        .text(lastPrice ? lastPrice.toFixed(lastPriceDecimalPlaces) : '')
 
       // calculate candle width
       const candleWidth =
@@ -497,7 +508,8 @@ function OHLCChart({
       yAxis,
       yAxisGrid,
       yScale,
-      params.duration
+      params.duration,
+      lastPriceDecimalPlaces
     ]
   )
 
@@ -553,7 +565,7 @@ function OHLCChart({
       .classed('hidden', mouseY > innerHeight)
       .attr('transform', `translate(0,${mouseY})`)
       .select('text')
-      .text(yScale.invert(mouseY).toFixed(4))
+      .text(yScale.invert(mouseY).toFixed(lastPriceDecimalPlaces))
   }
 
   function hideMouseProjections() {
@@ -754,10 +766,6 @@ function OHLCChart({
   )
 }
 
-function formatPrice(market: Market, price: number | null) {
-  return price ? price.toFixed(market.tickSize.decimalPlaces() + 1) : ''
-}
-
 function Title({
   market,
   side,
@@ -767,7 +775,7 @@ function Title({
 }: {
   market: Market
   side: OrderSide
-  price: number | null
+  price: string | null
   dailyChange: number | null
   onSideChanged: (s: OrderSide) => void
 }) {
@@ -782,7 +790,7 @@ function Title({
         />
       </div>
       <div className="flex place-items-center gap-4 text-right">
-        {formatPrice(market, price)}
+        {price ? price : ''}
         <div className="text-sm text-darkBluishGray2">
           <DailyChangeDisplay dailyChange={dailyChange} />
         </div>
