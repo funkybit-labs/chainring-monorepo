@@ -159,7 +159,8 @@ export type OrderExecution = z.infer<typeof OrderExecutionSchema>
 const OrderTimingSchema = z.object({
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date().nullable(),
-  closedAt: z.coerce.date().nullable()
+  closedAt: z.coerce.date().nullable(),
+  sequencerTimeNs: z.coerce.bigint()
 })
 export type OrderTiming = z.infer<typeof OrderTimingSchema>
 

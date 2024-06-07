@@ -153,6 +153,7 @@ object SequencerResponseProcessorService {
                     it.price.toBigDecimal(),
                     it.signature.toEvmSignature(),
                     it.guid.sequencerOrderId(),
+                    response.processingTime.toBigInteger(),
                 )
             }
             val ordersChangeRejected = response.ordersChangeRejectedList.map { it.guid }.toSet()

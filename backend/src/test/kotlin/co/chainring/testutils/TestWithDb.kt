@@ -46,6 +46,7 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import java.lang.System.getenv
 import java.math.BigDecimal
+import java.math.BigInteger
 import java.util.UUID
 
 open class TestWithDb {
@@ -152,5 +153,6 @@ open class TestWithDb {
             this.nonce = UUID.randomUUID().toString().replace("-", "")
             this.signature = "signature"
             this.sequencerOrderId = sequencerId
+            this.sequencerTimeNs = BigInteger.ZERO
         }
 }

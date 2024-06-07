@@ -1,6 +1,7 @@
 package co.chainring.apps.api
 
 import co.chainring.apps.api.model.Balance
+import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CancelOrderApiResponse
 import co.chainring.apps.api.model.CreateOrderApiRequest
@@ -116,6 +117,7 @@ object Examples {
             createdAt = Clock.System.now(),
             updatedAt = null,
             closedAt = null,
+            sequencerTimeNs = BigIntegerJson.ZERO,
         ),
     )
 
@@ -141,6 +143,7 @@ object Examples {
             createdAt = Clock.System.now(),
             updatedAt = null,
             closedAt = null,
+            sequencerTimeNs = BigIntegerJson.ZERO,
         ),
     )
 

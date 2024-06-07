@@ -155,6 +155,7 @@ sealed class Order {
         val createdAt: Instant,
         val updatedAt: Instant?,
         val closedAt: Instant?,
+        val sequencerTimeNs: BigIntegerJson,
     )
 }
 
