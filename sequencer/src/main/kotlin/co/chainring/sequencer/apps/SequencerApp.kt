@@ -68,7 +68,7 @@ class SequencerApp(
                     val halfTick = tickSize.setScale(tickSize.scale() + 1) / BigDecimal.valueOf(2)
                     val marketPrice = market.marketPrice.toBigDecimal()
                     if (BigDecimal.ZERO.compareTo((marketPrice + halfTick).remainder(tickSize)) != 0) {
-                        // initial market price is not exactly in between of 2 ticks
+                        // initial market price is not exactly between ticks
                         error = SequencerError.InvalidPrice
                     } else {
                         state.markets[marketId] = Market(
@@ -425,8 +425,6 @@ class SequencerApp(
 
             if (checkpointsPath != null) {
                 restoreFromLatestValidCheckpoint(inputTailer, checkpointsPath)
-            } else {
-                inputTailer.toStart()
             }
 
             val lastSequenceNumberProcessedBeforeRestart = getLastSequenceNumberInOutputQueue()

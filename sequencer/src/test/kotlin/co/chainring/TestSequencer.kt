@@ -1065,11 +1065,11 @@ class TestSequencer {
 
         // fail
         expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("17"))
-        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("17.005"))
-        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.0024"))
-        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.0026"))
-        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.00251"))
-        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.002500001"))
+        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("17.05"))
+        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.024"))
+        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.026"))
+        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.0251"))
+        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.02500001"))
         // succeed
         sequencerClient.createMarket(MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.05"), marketPrice = BigDecimal("60.025"))
     }
