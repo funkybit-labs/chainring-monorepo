@@ -110,9 +110,11 @@ export function OrderBookWidget({
 
   function invertPrices(entries: OrderBookEntry[]): OrderBookEntry[] {
     return entries.map((entry) => {
+      const price = parseFloat(entry.price)
+      const [integerPart] = entry.price.split('.')
       return {
-        price: (1.0 / parseFloat(entry.price)).toFixed(6),
-        size: entry.size * parseFloat(entry.price)
+        price: (1.0 / price).toFixed(4 + integerPart.length),
+        size: entry.size * price
       }
     })
   }
