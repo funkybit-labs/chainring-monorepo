@@ -1,15 +1,20 @@
 package co.chainring
 
 import co.chainring.core.model.db.FeeRates
+import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.WalletAddress
+import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toOrderGuid
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderChangeRejected
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.SequencerError
+import co.chainring.sequencer.proto.SequencerRequest
+import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.newQuantityOrNull
+import co.chainring.sequencer.proto.sequencerRequest
 import co.chainring.testutils.ExpectedTrade
 import co.chainring.testutils.SequencerClient
 import co.chainring.testutils.assertBalanceChanges
@@ -18,6 +23,7 @@ import co.chainring.testutils.fromFundamentalUnits
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
+import java.util.UUID
 import kotlin.random.Random
 
 class TestSequencer {
@@ -308,7 +314,7 @@ class TestSequencer {
     fun `test limit checking on orders`() {
         val sequencer = SequencerClient()
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
-        val market1 = sequencer.createMarket(MarketId("BTC3/ETH3"), marketPrice = BigDecimal("11.00"))
+        val market1 = sequencer.createMarket(MarketId("BTC3/ETH3"), marketPrice = BigDecimal("11.025"))
 
         val maker = generateWalletAddress()
         // cannot place a buy or sell limit order without any deposits
@@ -332,7 +338,7 @@ class TestSequencer {
         assertEquals(SequencerError.ExceedsLimit, sequencer.addOrder(market1, BigDecimal("0.001"), BigDecimal("11.00"), maker, Order.Type.LimitBuy).error)
 
         // but we can reuse the same liquidity in another market
-        val market2 = sequencer.createMarket(MarketId("ETH3/USDC3"), baseDecimals = 18, quoteDecimals = 6, marketPrice = BigDecimal("100"))
+        val market2 = sequencer.createMarket(MarketId("ETH3/USDC3"), baseDecimals = 18, quoteDecimals = 6, tickSize = BigDecimal("1"), marketPrice = BigDecimal("100.5"))
         sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1.111"), BigDecimal("100.00"), maker, Order.Type.LimitSell)
 
         // if we deposit some more we can add another order
@@ -1020,6 +1026,52 @@ class TestSequencer {
                 ),
             )
         }
+    }
+
+    @Test
+    fun `initial market price should exactly between ticks`() {
+        fun expectMarketCreationFail(sequencerApp: SequencerApp, marketId: MarketId, tickSize: BigDecimal, marketPrice: BigDecimal, baseDecimals: Int = 8, quoteDecimals: Int = 18) {
+            val createMarketResponse = sequencerApp.processRequest(
+                sequencerRequest {
+                    this.guid = UUID.randomUUID().toString()
+                    this.type = SequencerRequest.Type.AddMarket
+                    this.addMarket = market {
+                        this.guid = UUID.randomUUID().toString()
+                        this.marketId = marketId.value
+                        this.tickSize = tickSize.toDecimalValue()
+                        this.maxLevels = 1000
+                        this.maxOrdersPerLevel = 1000
+                        this.marketPrice = marketPrice.toDecimalValue()
+                        this.baseDecimals = baseDecimals
+                        this.quoteDecimals = quoteDecimals
+                    }
+                },
+            )
+            assertEquals(0, createMarketResponse.marketsCreatedCount)
+            assertEquals(0, createMarketResponse.marketsCreatedList.size)
+            assertEquals(SequencerError.InvalidPrice, createMarketResponse.error)
+        }
+
+        val sequencerApp = SequencerApp(checkpointsPath = null)
+        val sequencerClient = SequencerClient()
+
+        // fail
+        expectMarketCreationFail(sequencerApp, MarketId("BTC98/ETH98"), tickSize = BigDecimal("1"), marketPrice = BigDecimal("1"))
+        expectMarketCreationFail(sequencerApp, MarketId("BTC98/ETH98"), tickSize = BigDecimal("1"), marketPrice = BigDecimal("100"))
+        expectMarketCreationFail(sequencerApp, MarketId("BTC98/ETH98"), tickSize = BigDecimal("1"), marketPrice = BigDecimal("100.001"))
+        expectMarketCreationFail(sequencerApp, MarketId("BTC98/ETH98"), tickSize = BigDecimal("1"), marketPrice = BigDecimal("100.501"))
+        // succeed
+        sequencerClient.createMarket(MarketId("BTC98/ETH98"), tickSize = BigDecimal("1"), marketPrice = BigDecimal("100.50"))
+
+        // fail
+        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("17"))
+        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("17.05"))
+        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.024"))
+        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.026"))
+        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.0251"))
+        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.02500001"))
+        // succeed
+        sequencerClient.createMarket(MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.05"), marketPrice = BigDecimal("60.025"))
     }
 
     @Test

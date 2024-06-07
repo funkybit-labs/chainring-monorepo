@@ -35,6 +35,7 @@ import net.openhft.chronicle.queue.TailerDirection
 import net.openhft.chronicle.queue.TailerState
 import net.openhft.chronicle.queue.impl.RollingChronicleQueue
 import java.lang.Thread.UncaughtExceptionHandler
+import java.math.BigDecimal
 import java.math.BigInteger
 import java.nio.file.Path
 import kotlin.concurrent.thread
@@ -64,16 +65,22 @@ class SequencerApp(
                     error = SequencerError.MarketExists
                 } else {
                     val tickSize = market.tickSize.toBigDecimal()
+                    val halfTick = tickSize.setScale(tickSize.scale() + 1) / BigDecimal.valueOf(2)
                     val marketPrice = market.marketPrice.toBigDecimal()
-                    state.markets[marketId] = Market(
-                        id = marketId,
-                        tickSize = tickSize,
-                        initialMarketPrice = marketPrice,
-                        maxLevels = market.maxLevels,
-                        maxOrdersPerLevel = market.maxOrdersPerLevel,
-                        baseDecimals = market.baseDecimals,
-                        quoteDecimals = market.quoteDecimals,
-                    )
+                    if (BigDecimal.ZERO.compareTo((marketPrice + halfTick).remainder(tickSize)) != 0) {
+                        // initial market price is not exactly between ticks
+                        error = SequencerError.InvalidPrice
+                    } else {
+                        state.markets[marketId] = Market(
+                            id = marketId,
+                            tickSize = tickSize,
+                            initialMarketPrice = marketPrice,
+                            maxLevels = market.maxLevels,
+                            maxOrdersPerLevel = market.maxOrdersPerLevel,
+                            baseDecimals = market.baseDecimals,
+                            quoteDecimals = market.quoteDecimals,
+                        )
+                    }
                 }
                 sequencerResponse {
                     this.guid = market.guid
@@ -418,8 +425,6 @@ class SequencerApp(
 
             if (checkpointsPath != null) {
                 restoreFromLatestValidCheckpoint(inputTailer, checkpointsPath)
-            } else {
-                inputTailer.toStart()
             }
 
             val lastSequenceNumberProcessedBeforeRestart = getLastSequenceNumberInOutputQueue()
