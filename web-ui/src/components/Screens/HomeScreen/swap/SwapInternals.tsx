@@ -1,7 +1,7 @@
 import Markets, { Market } from 'markets'
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import TradingSymbol from 'tradingSymbol'
-import { apiClient, Balance, FeeRates, OrderSide } from 'apiClient'
+import { apiClient, Balance, FeeRates, Order, OrderSide } from 'apiClient'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import {
   balancesTopic,
@@ -57,7 +57,7 @@ export type SwapRender = {
   canSubmit: boolean
   getMarketPrice: (side: OrderSide, amount: bigint) => bigint | undefined
   quoteDecimals: number
-  lastOrderFilled: boolean
+  lastOrder: Order | undefined
   percentOffMarket: number | undefined
 }
 
@@ -90,7 +90,7 @@ export function SwapInternals({
   const [side, setSide] = useState<OrderSide>('Buy')
   const [balances, setBalances] = useState<Balance[]>(() => [])
   const [lastOrderId, setLastOrderId] = useState<string | undefined>()
-  const [lastOrderFilled, setLastOrderFilled] = useState<boolean>(false)
+  const [lastOrder, setLastOrder] = useState<Order>()
 
   useEffect(() => {
     const selectedMarket = window.sessionStorage.getItem('market')
@@ -120,9 +120,7 @@ export function SwapInternals({
           setBalances(message.balances)
         } else if (message.type === 'OrderUpdated') {
           if (message.order.id === lastOrderId) {
-            setLastOrderFilled(
-              ['Partial', 'Filled'].includes(message.order.status)
-            )
+            setLastOrder(message.order)
           }
         }
       },
@@ -520,7 +518,6 @@ export function SwapInternals({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      setLastOrderFilled(false)
       setLastOrderId(undefined)
       try {
         const nonce = generateOrderNonce()
@@ -589,7 +586,7 @@ export function SwapInternals({
     },
     onSuccess: () => {
       setTimeout(() => {
-        setLastOrderFilled(false)
+        setLastOrder(undefined)
         setLastOrderId(undefined)
         mutation.reset()
       }, 3000)
@@ -745,7 +742,7 @@ export function SwapInternals({
     canSubmit,
     getMarketPrice: getSimulatedPrice,
     quoteDecimals: market.quoteDecimalPlaces,
-    lastOrderFilled,
+    lastOrder,
     percentOffMarket
   })
 }

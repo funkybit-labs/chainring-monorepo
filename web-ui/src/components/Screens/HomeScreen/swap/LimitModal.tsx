@@ -361,8 +361,20 @@ export function LimitModal({
                     caption={() => {
                       if (sr.mutation.isPending) {
                         return 'Submitting...'
-                      } else if (sr.lastOrderFilled) {
-                        return '✓ Swapped'
+                      } else if (
+                        ['Partial', 'Filled'].includes(
+                          sr.lastOrder?.status ?? ''
+                        )
+                      ) {
+                        const ns = sr.lastOrder?.timing?.sequencerTimeNs
+                        if (ns) {
+                          const us = new Decimal(
+                            ns.toString()
+                          ).dividedToIntegerBy(1000)
+                          return '✓ Swapped in ' + us + 'µs'
+                        } else {
+                          return '✓ Swapped'
+                        }
                       } else if (sr.mutation.isSuccess) {
                         return '✓ Submitted'
                       } else {

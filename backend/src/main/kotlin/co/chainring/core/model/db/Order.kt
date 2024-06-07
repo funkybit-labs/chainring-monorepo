@@ -105,6 +105,7 @@ data class CreateOrderAssignment(
     val price: BigDecimal?,
     val signature: EvmSignature,
     val sequencerOrderId: SequencerOrderId,
+    val sequencerTimeNs: BigInteger,
 )
 
 data class UpdateOrderAssignment(
@@ -149,6 +150,7 @@ object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
     val closedBy = varchar("closed_by", 10485760).nullable()
     val signature = varchar("signature", 10485760)
     val sequencerOrderId = long("sequencer_order_id").uniqueIndex().nullable()
+    val sequencerTimeNs = decimal("sequencer_time_ns", 30, 0)
 }
 
 class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
@@ -175,6 +177,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                     createdAt = this.createdAt,
                     updatedAt = this.updatedAt,
                     closedAt = this.closedAt,
+                    sequencerTimeNs = this.sequencerTimeNs,
                 ),
             )
 
@@ -200,6 +203,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                     createdAt = this.createdAt,
                     updatedAt = this.updatedAt,
                     closedAt = this.closedAt,
+                    sequencerTimeNs = this.sequencerTimeNs,
                 ),
             )
         }
@@ -226,6 +230,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 this[OrderTable.nonce] = assignment.nonce.toByteArrayNoSign().toHex(false)
                 this[OrderTable.signature] = assignment.signature.value
                 this[OrderTable.sequencerOrderId] = assignment.sequencerOrderId.value
+                this[OrderTable.sequencerTimeNs] = assignment.sequencerTimeNs.toBigDecimal()
             }
             if (updateAssignments.isNotEmpty()) {
                 BatchUpdateStatement(OrderTable).apply {
@@ -466,5 +471,9 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
     var sequencerOrderId by OrderTable.sequencerOrderId.transform(
         toReal = { it?.let { SequencerOrderId(it) } },
         toColumn = { it?.value },
+    )
+    var sequencerTimeNs by OrderTable.sequencerTimeNs.transform(
+        toReal = { it.toBigInteger() },
+        toColumn = { it.toBigDecimal() },
     )
 }
