@@ -39,7 +39,7 @@ Connect to `bastion` and bind database to local port using port forwarding
 ssh -L 5556:demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com:5432 demo-bastion.chainring.co
 ```
 
-and then truncate db tables using favourite SQL editor. In this way OHLC records and markets will be preserved.
+and then truncate db tables using favourite SQL editor. In this way OHLC records will be preserved.
 ```
 -- truncate table telegram_bot_user_wallet CASCADE;
 -- truncate table telegram_bot_user CASCADE;
@@ -60,7 +60,7 @@ and then truncate db tables using favourite SQL editor. In this way OHLC records
 -- delete from key_value_store where key = 'LastProcessedOutputIndex';
 ```
 
-## Seed & start
+## Start & seed
 Start sequencer
 ```
 python3 ecs-deploy.py start --env demo --services sequencer
