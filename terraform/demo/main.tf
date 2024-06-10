@@ -70,7 +70,7 @@ module "anvil" {
   name_prefix       = local.name_prefix
   task_name         = "anvil"
   image             = "anvil"
-  memory            = 4096
+  memory            = 16384
   ecs_cluster_id    = module.ecs.cluster.id
   app_ecs_task_role = module.ecs.app_ecs_task_role
   aws_region        = var.aws_region
@@ -122,7 +122,7 @@ module "anvil2" {
   name_prefix       = local.name_prefix
   task_name         = "anvil2"
   image             = "anvil"
-  memory            = 4096
+  memory            = 16384
   ecs_cluster_id    = module.ecs.cluster.id
   app_ecs_task_role = module.ecs.app_ecs_task_role
   aws_region        = var.aws_region
