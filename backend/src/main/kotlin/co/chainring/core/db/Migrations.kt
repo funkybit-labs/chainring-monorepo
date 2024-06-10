@@ -32,8 +32,8 @@ import co.chainring.core.model.db.migrations.V36_AddPendingDepositsToTelegramBot
 import co.chainring.core.model.db.migrations.V37_AddBatchHash
 import co.chainring.core.model.db.migrations.V38_AddLastPriceToMarket
 import co.chainring.core.model.db.migrations.V39_AddSequencerTimeToOrder
-import co.chainring.core.model.db.migrations.V40_ChainConfiguration
 import co.chainring.core.model.db.migrations.V3_UpdateDeployedSmartContract
+import co.chainring.core.model.db.migrations.V40_ChainConfiguration
 import co.chainring.core.model.db.migrations.V4_AddDecimalsToERC20Token
 import co.chainring.core.model.db.migrations.V5_ChainTable
 import co.chainring.core.model.db.migrations.V6_MarketTable
