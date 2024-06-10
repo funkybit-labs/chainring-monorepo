@@ -56,3 +56,10 @@ export function calculateNotional(
 export function calculateFee(notional: bigint, feeRate: bigint): bigint {
   return (notional * feeRate) / 1000000n
 }
+
+export function calculateNotionalMinusFee(
+  notional: bigint,
+  feeRate: bigint
+): bigint {
+  return (notional * 1000000n) / (1000000n + feeRate)
+}

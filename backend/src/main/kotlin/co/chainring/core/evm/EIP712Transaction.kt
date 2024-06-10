@@ -3,6 +3,7 @@ package co.chainring.core.evm
 import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.Percentage
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.utils.toHexBytes
@@ -82,9 +83,10 @@ sealed class EIP712Transaction {
         val sender: Address,
         val baseToken: Address,
         val quoteToken: Address,
-        val amount: BigIntegerJson,
+        val amount: BigIntegerJson?,
         val price: BigIntegerJson,
         val nonce: BigIntegerJson,
+        val percentage: Percentage? = null,
         override val signature: EvmSignature,
     ) : EIP712Transaction() {
 
@@ -96,7 +98,11 @@ sealed class EIP712Transaction {
             StructuredData.Entry("sender", "address"),
             StructuredData.Entry("baseToken", "address"),
             StructuredData.Entry("quoteToken", "address"),
-            StructuredData.Entry("amount", "int256"),
+            if (percentage != null) {
+                StructuredData.Entry("percentage", "int256")
+            } else {
+                StructuredData.Entry("amount", "int256")
+            },
             StructuredData.Entry("price", "uint256"),
             StructuredData.Entry("nonce", "int256"),
         )
@@ -106,7 +112,11 @@ sealed class EIP712Transaction {
                 "sender" to sender.value,
                 "baseToken" to baseToken.value,
                 "quoteToken" to quoteToken.value,
-                "amount" to amount.toString(),
+                if (percentage != null) {
+                    "percentage" to percentage.value.toString()
+                } else {
+                    "amount" to amount.toString()
+                },
                 "price" to price.toString(),
                 "nonce" to nonce.toString(),
             )

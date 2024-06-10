@@ -90,7 +90,8 @@ const CreateMarketOrderSchema = z.object({
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
   signature: z.string(),
-  verifyingChainId: z.number()
+  verifyingChainId: z.number(),
+  percentage: z.number().nullable()
 })
 export type CreateMarketOrder = z.infer<typeof CreateMarketOrderSchema>
 

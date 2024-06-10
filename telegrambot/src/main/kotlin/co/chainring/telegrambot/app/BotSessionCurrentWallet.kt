@@ -358,7 +358,7 @@ class BotSessionCurrentWallet(
             amount = if (order.side == OrderSide.Buy) order.amount else order.amount.negate(),
             price = BigInteger.ZERO,
             nonce = BigInteger(1, order.nonce.toHexBytes()),
-            EvmSignature.emptySignature(),
+            signature = EvmSignature.emptySignature(),
         )
 
         return order.copy(

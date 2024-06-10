@@ -1,6 +1,7 @@
 package co.chainring.apps.api.model
 
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.Percentage
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.ExecutionRole
@@ -34,6 +35,7 @@ sealed class CreateOrderApiRequest {
         override val amount: BigIntegerJson,
         override val signature: EvmSignature,
         override val verifyingChainId: ChainId,
+        val percentage: Percentage? = null,
     ) : CreateOrderApiRequest()
 
     @Serializable

@@ -32,6 +32,7 @@ import co.chainring.core.client.rest.applicationJson
 import co.chainring.core.client.rest.httpClient
 import co.chainring.core.client.rest.json
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.Percentage
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.FeeRates
@@ -52,6 +53,7 @@ import org.junit.jupiter.api.Assertions
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
 import java.math.BigDecimal
+import java.math.BigInteger
 import java.net.HttpURLConnection
 import kotlin.test.DefaultAsserter.fail
 import kotlin.test.assertEquals
@@ -174,12 +176,13 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
         return response
     }
 
-    fun createMarketOrder(market: Market, side: OrderSide, amount: BigDecimal, wallet: Wallet): CreateOrderApiResponse {
+    fun createMarketOrder(market: Market, side: OrderSide, amount: BigDecimal?, wallet: Wallet, percentage: Percentage? = null): CreateOrderApiResponse {
         val request = CreateOrderApiRequest.Market(
             nonce = generateOrderNonce(),
             marketId = market.id,
             side = side,
-            amount = amount.toFundamentalUnits(market.baseDecimals),
+            amount = amount?.toFundamentalUnits(market.baseDecimals) ?: BigInteger.ZERO,
+            percentage = percentage,
             signature = EvmSignature.emptySignature(),
             verifyingChainId = ChainId.empty,
         ).let { wallet.signOrder(it) }

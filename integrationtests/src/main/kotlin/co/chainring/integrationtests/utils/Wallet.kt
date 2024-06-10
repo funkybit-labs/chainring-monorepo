@@ -197,10 +197,11 @@ class Wallet(
             address,
             baseToken = baseSymbol.contractAddress ?: Address.zero,
             quoteToken = quoteSymbol.contractAddress ?: Address.zero,
-            amount = if (request.side == OrderSide.Buy) request.amount else request.amount.negate(),
+            amount = if (request.percentage == null) if (request.side == OrderSide.Buy) request.amount else request.amount.negate() else null,
             price = BigInteger.ZERO,
             nonce = BigInteger(1, request.nonce.toHexBytes()),
             signature = EvmSignature.emptySignature(),
+            percentage = request.percentage,
         )
         return request.copy(
             signature = blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId))),
@@ -241,7 +242,7 @@ class Wallet(
             amount = if (side == OrderSide.Buy) amount else amount.negate(),
             price = price.toFundamentalUnits(quoteSymbol.decimals),
             nonce = BigInteger(1, nonce.toHexBytes()),
-            EvmSignature.emptySignature(),
+            signature = EvmSignature.emptySignature(),
         )
         return blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId)))
     }

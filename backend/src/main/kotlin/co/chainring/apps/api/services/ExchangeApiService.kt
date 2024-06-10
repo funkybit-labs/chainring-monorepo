@@ -27,6 +27,7 @@ import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.evm.TokenAddressAndChain
 import co.chainring.core.model.Address
+import co.chainring.core.model.Percentage
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
@@ -109,6 +110,12 @@ class ExchangeApiService(
                 else -> null
             }?.also { ensurePriceIsMultipleOfTickSize(market, it) }
 
+            val percentage = when (orderRequest) {
+                is CreateOrderApiRequest.Market -> orderRequest.percentage
+                else -> null
+            }
+            ensurePercentageOrAmountSet(percentage, orderRequest.amount)
+
             ensureOrderMarketIdMatchesBatchMarketId(orderRequest.marketId, batchOrdersRequest)
 
             verifyEIP712Signature(
@@ -124,6 +131,7 @@ class ExchangeApiService(
                     },
                     nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
                     signature = orderRequest.signature,
+                    percentage = percentage,
                 ),
                 verifyingChainId = orderRequest.verifyingChainId,
             )
@@ -138,6 +146,7 @@ class ExchangeApiService(
                 signature = orderRequest.signature,
                 orderId = orderId,
                 chainId = orderRequest.verifyingChainId,
+                percentage = percentage?.value,
             )
         }
 
@@ -169,6 +178,7 @@ class ExchangeApiService(
                 signature = orderRequest.signature,
                 orderId = orderRequest.orderId,
                 chainId = orderRequest.verifyingChainId,
+                percentage = null,
             )
         }
 
@@ -384,6 +394,12 @@ class ExchangeApiService(
     private fun ensureOrderMarketIdMatchesBatchMarketId(orderMarketId: MarketId, apiRequest: BatchOrdersApiRequest) {
         if (orderMarketId != apiRequest.marketId) {
             throw RequestProcessingError(processingError("Orders in a batch request have to be in the same market"))
+        }
+    }
+
+    private fun ensurePercentageOrAmountSet(percentage: Percentage?, amount: BigInteger) {
+        if (percentage == null && amount == BigInteger.ZERO) {
+            throw RequestProcessingError(processingError("Either amount or percentage must have a non zero value"))
         }
     }
 

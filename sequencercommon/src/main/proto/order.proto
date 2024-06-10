@@ -23,6 +23,7 @@ message Order {
   optional string signature = 7; // required for add order (created CHAIN-123 as order updates should require a new signature)
   string externalGuid = 8;
   uint32 chainId = 9; // the chain id used when creating the signature - does not need to be related to the chain(s) of the market
+  optional uint32 percentage = 10;
 }
 
 message CancelOrder {
