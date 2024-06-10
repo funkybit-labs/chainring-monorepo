@@ -33,6 +33,7 @@ import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.model.db.TradeId
 import co.chainring.core.model.db.WalletEntity
+import co.chainring.core.model.db.toOrderResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -182,7 +183,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
                     when (val order = OrderEntity.findById(orderId)) {
                         null -> orderNotFoundError
                         else -> Response(Status.OK).with(
-                            responseBody of order.toOrderResponse(),
+                            responseBody of order.toOrderResponse(OrderExecutionEntity.findForOrder(order)),
                         )
                     }
                 }
@@ -208,7 +209,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.GET to { request: Request ->
             val orders = transaction {
-                OrderEntity.listForWallet(
+                OrderEntity.listWithExecutionsForWallet(
                     WalletEntity.getOrCreate(request.principal),
                     request.query("statuses")?.let { statuses ->
                         statuses.split(",").mapNotNull {

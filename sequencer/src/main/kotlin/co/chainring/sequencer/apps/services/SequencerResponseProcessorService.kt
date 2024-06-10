@@ -33,6 +33,7 @@ import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.model.db.publishBroadcasterNotifications
+import co.chainring.core.model.db.toOrderResponse
 import co.chainring.core.model.toEvmSignature
 import co.chainring.core.sequencer.depositId
 import co.chainring.core.sequencer.orderId
@@ -175,7 +176,7 @@ object SequencerResponseProcessorService {
 
             OrderEntity.batchUpdate(market, wallet, createAssignments, updateAssignments)
 
-            val createdOrders = OrderEntity.listOrders(createAssignments.map { it.orderId }).map { it.toOrderResponse() }
+            val createdOrders = OrderEntity.listOrdersWithExecutions(createAssignments.map { it.orderId }).map { it.toOrderResponse() }
             val limitOrdersCreated = createdOrders.count { it is co.chainring.apps.api.model.Order.Limit } > 0
 
             publishBroadcasterNotifications(
@@ -245,23 +246,27 @@ object SequencerResponseProcessorService {
         }
 
         // update all orders that have changed
-        response.ordersChangedList.forEach { orderChanged ->
+        val orderChangedMap = response.ordersChangedList.mapNotNull { orderChanged ->
             if (ordersBeingUpdated.contains(orderChanged.guid) || orderChanged.disposition != OrderDisposition.Accepted) {
                 logger.debug { "order updated for ${orderChanged.guid}, disposition ${orderChanged.disposition}" }
-                OrderEntity.findBySequencerOrderId(orderChanged.guid)?.let { orderToUpdate ->
-                    orderToUpdate.updateStatus(OrderStatus.fromOrderDisposition(orderChanged.disposition))
-                    orderChanged.newQuantityOrNull?.also { newQuantity ->
-                        orderToUpdate.amount = newQuantity.toBigInteger()
-                    }
-                    broadcasterNotifications.add(
-                        BroadcasterNotification(
-                            OrderUpdated(orderToUpdate.toOrderResponse()),
-                            recipient = orderToUpdate.wallet.address,
-                        ),
-                    )
-                    limitsChanged.add(Pair(orderToUpdate.wallet, orderToUpdate.market))
-                }
+                orderChanged.guid to orderChanged
+            } else {
+                null
             }
+        }.toMap()
+        OrderEntity.listWithExecutionsForSequencerOrderIds(orderChangedMap.keys.toList()).forEach { (orderToUpdate, executions) ->
+            val orderChanged = orderChangedMap.getValue(orderToUpdate.sequencerOrderId!!.value)
+            orderToUpdate.updateStatus(OrderStatus.fromOrderDisposition(orderChanged.disposition))
+            orderChanged.newQuantityOrNull?.also { newQuantity ->
+                orderToUpdate.amount = newQuantity.toBigInteger()
+            }
+            broadcasterNotifications.add(
+                BroadcasterNotification(
+                    OrderUpdated(orderToUpdate.toOrderResponse(executions)),
+                    recipient = orderToUpdate.wallet.address,
+                ),
+            )
+            limitsChanged.add(Pair(orderToUpdate.wallet, orderToUpdate.market))
         }
 
         val markets = MarketEntity.all().toList()
