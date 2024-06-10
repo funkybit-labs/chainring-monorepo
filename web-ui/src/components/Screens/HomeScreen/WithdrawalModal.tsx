@@ -1,7 +1,7 @@
 import { Address, formatUnits, zeroAddress } from 'viem'
 import { BaseError as WagmiError, useConfig, useSignTypedData } from 'wagmi'
 import { ExchangeAbi } from 'contracts'
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { readContract } from 'wagmi/actions'
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
@@ -60,6 +60,8 @@ export default function WithdrawalModal({
     'waitingForApproval' | 'submittingRequest' | null
   >(null)
 
+  const [withdrawAll, setWithdrawAll] = useState<boolean>(false)
+
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
@@ -87,7 +89,9 @@ export default function WithdrawalModal({
           message: getWithdrawMessage(
             walletAddress,
             symbol.contractAddress ? symbol.contractAddress : addressZero,
-            amount,
+            withdrawAll && amount === availableBalanceQuery.data
+              ? BigInt(0)
+              : amount,
             BigInt(nonce)
           )
         })
@@ -95,7 +99,10 @@ export default function WithdrawalModal({
         setSubmitPhase('submittingRequest')
         return await apiClient.createWithdrawal({
           symbol: symbol.name,
-          amount: amount,
+          amount:
+            withdrawAll && amount === availableBalanceQuery.data
+              ? BigInt(0)
+              : amount,
           nonce: nonce,
           signature: signature
         })
@@ -144,12 +151,25 @@ export default function WithdrawalModal({
           success={(availableBalance) => {
             return (
               <div>
-                <AmountInput
-                  value={amountInputValue}
-                  disabled={submitPhase !== null}
-                  onChange={(e) => setAmountInputValue(e.target.value)}
-                  className="!rounded-md !bg-darkBluishGray8 !text-center !text-white !placeholder-lightBackground !ring-darkBluishGray8"
-                />
+                <div className="relative">
+                  <AmountInput
+                    value={amountInputValue}
+                    disabled={submitPhase !== null}
+                    onChange={(e) => setAmountInputValue(e.target.value)}
+                    className="!rounded-md !bg-darkBluishGray8 !text-center !text-white !placeholder-lightBackground !ring-darkBluishGray8"
+                  />
+                  <button
+                    className="absolute right-3 top-3 rounded bg-darkBluishGray6 px-2 py-1 text-xs text-darkBluishGray2 hover:bg-blue5"
+                    onClick={() => {
+                      setAmountInputValue(
+                        formatUnits(availableBalance, symbol.decimals)
+                      )
+                      setWithdrawAll(true)
+                    }}
+                  >
+                    100%
+                  </button>
+                </div>
 
                 <p className="mb-2 mt-4 text-center text-sm text-darkBluishGray2">
                   Wallet balance:{' '}

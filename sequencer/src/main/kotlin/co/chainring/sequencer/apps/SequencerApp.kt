@@ -194,10 +194,10 @@ class SequencerApp(
                 balanceBatch.withdrawalsList.forEach { withdrawal ->
                     state.balances[withdrawal.wallet.toWalletAddress()]?.let { balanceByAsset ->
                         val asset = withdrawal.asset.toAsset()
-                        val withdrawalAmount = withdrawal.amount.toBigInteger().min(
-                            balanceByAsset[withdrawal.asset.toAsset()] ?: BigInteger.ZERO,
-                        )
-                        if (withdrawalAmount > BigInteger.ZERO) {
+                        val requestedAmount = withdrawal.amount.toBigInteger()
+                        val balance = balanceByAsset[withdrawal.asset.toAsset()] ?: BigInteger.ZERO
+                        val withdrawalAmount = if (requestedAmount == BigInteger.ZERO) balance else requestedAmount
+                        if (withdrawalAmount > BigInteger.ZERO && withdrawalAmount <= balance) {
                             val wallet = withdrawal.wallet.toWalletAddress()
                             balanceByAsset.merge(asset, -withdrawalAmount, ::sumBigIntegers)
                             balancesChanged.merge(Pair(wallet, asset), -withdrawalAmount, ::sumBigIntegers)

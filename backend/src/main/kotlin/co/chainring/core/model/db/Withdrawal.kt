@@ -67,8 +67,9 @@ object WithdrawalTable : GUIDTable<WithdrawalId>("withdrawal", ::WithdrawalId) {
         "tx_guid",
         BlockchainTransactionTable,
     ).nullable()
-    val sequenceId = integer("sequence_id").autoIncrement()
+    val sequenceId = long("sequence_id").autoIncrement()
     val transactionData = jsonb<EIP712Transaction>("transaction_data", KotlinxSerialization.json).nullable()
+    val actualAmount = decimal("actual_amount", 30, 0).nullable()
 
     init {
         check("tx_when_settling") {
@@ -99,12 +100,6 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
             this.status = WithdrawalStatus.Pending
             this.createdAt = now
             this.createdBy = "system"
-        }
-
-        fun findSettlingByWalletAndNonce(wallet: WalletEntity, nonce: Long): WithdrawalEntity? {
-            return WithdrawalEntity.find {
-                WithdrawalTable.walletGuid.eq(wallet.guid) and WithdrawalTable.nonce.eq(nonce) and WithdrawalTable.status.eq(WithdrawalStatus.Settling)
-            }.firstOrNull()
         }
 
         fun findPending(): List<WithdrawalEntity> {
@@ -165,7 +160,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
         }
     }
 
-    fun update(status: WithdrawalStatus, error: String?, blockchainTransactionEntity: BlockchainTransactionEntity? = null) {
+    fun update(status: WithdrawalStatus, error: String?, blockchainTransactionEntity: BlockchainTransactionEntity? = null, actualAmount: BigInteger? = null) {
         val now = Clock.System.now()
         this.updatedAt = now
         this.status = status
@@ -173,13 +168,17 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
         blockchainTransactionEntity?.let {
             this.blockchainTransaction = it
         }
+        actualAmount?.let {
+            this.actualAmount = it
+        }
     }
 
     fun toEip712Transaction() = EIP712Transaction.WithdrawTx(
         this.wallet.address,
         TokenAddressAndChain(this.symbol.contractAddress ?: Address.zero, this.symbol.chainId.value),
-        this.amount,
+        this.actualAmount ?: this.amount,
         this.nonce,
+        this.amount == BigInteger.ZERO,
         this.signature,
     )
 
@@ -209,4 +208,9 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
 
     var sequenceId by WithdrawalTable.sequenceId
     var transactionData by WithdrawalTable.transactionData
+
+    var actualAmount by WithdrawalTable.actualAmount.transform(
+        toReal = { it?.toBigInteger() },
+        toColumn = { it?.toBigDecimal() },
+    )
 }

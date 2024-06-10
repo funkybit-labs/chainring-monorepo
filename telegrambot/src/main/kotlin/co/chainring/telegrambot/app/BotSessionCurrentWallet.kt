@@ -255,6 +255,7 @@ class BotSessionCurrentWallet(
             TokenAddressAndChain(contractAddress(symbol) ?: Address.zero, chain(symbol)),
             bigIntAmount,
             nonce,
+            bigIntAmount == BigInteger.ZERO,
             EvmSignature.emptySignature(),
         )
         return apiClient.tryCreateWithdrawal(
