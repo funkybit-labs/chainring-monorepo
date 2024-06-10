@@ -10,16 +10,18 @@ let signingPromise: Promise<string> | null = null
 export async function loadAuthToken(
   options: LoadAuthTokenOptions = { forceRefresh: false }
 ): Promise<string> {
-  const account = getAccount(wagmiConfig)
-  if (account.status === 'connected') {
-    const existingToken = localStorage.getItem(`did-${account.address}`)
-    if (existingToken && !options.forceRefresh) return existingToken
+  if (wagmiConfig != null) {
+    const account = getAccount(wagmiConfig)
+    if (account.status === 'connected') {
+      const existingToken = localStorage.getItem(`did-${account.address}`)
+      if (existingToken && !options.forceRefresh) return existingToken
 
-    if (!signingPromise) {
-      signingPromise = signAuthToken(account.address, account.chainId)
+      if (!signingPromise) {
+        signingPromise = signAuthToken(account.address, account.chainId)
+      }
+
+      return signingPromise
     }
-
-    return signingPromise
   }
 
   return ''

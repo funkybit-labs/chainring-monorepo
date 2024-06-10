@@ -7,6 +7,8 @@ import java.math.BigInteger
 data class BlockchainClientConfig(
     val name: String,
     val url: String,
+    val blockExplorerNetName: String,
+    val blockExplorerUrl: String,
     val privateKeyHex: String,
     val submitterPrivateKeyHex: String,
     val feeAccountAddress: String,
@@ -25,6 +27,8 @@ object ChainManager {
         BlockchainClientConfig(
             name = chainName,
             url = System.getenv("EVM_NETWORK_URL_$chainName") ?: "http://$chainName",
+            blockExplorerNetName = System.getenv("BLOCK_EXPLORER_NET_NAME_$chainName") ?: "ChainRing $chainName",
+            blockExplorerUrl = System.getenv("BLOCK_EXPLORER_URL_$chainName") ?: "http://$chainName",
             privateKeyHex = stringValue(
                 chainName,
                 "EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY",

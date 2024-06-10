@@ -67,6 +67,9 @@ object ConfigRoutes {
                                         decimals = 18u,
                                     ),
                                 ),
+                                jsonRpcUrl = "https://demo-anvil.chainring.co",
+                                blockExplorerNetName = "ChainRing Demo BitLayer",
+                                blockExplorerUrl = "https://demo-otterscan.chainring.co",
                             ),
                         ),
                         markets = listOf(
@@ -109,6 +112,9 @@ object ConfigRoutes {
                                             decimals = it.decimals,
                                         )
                                     },
+                                    jsonRpcUrl = chain.jsonRpcUrl,
+                                    blockExplorerNetName = chain.blockExplorerNetName,
+                                    blockExplorerUrl = chain.blockExplorerUrl,
                                 )
                             },
                             markets = MarketEntity.all().map { market ->

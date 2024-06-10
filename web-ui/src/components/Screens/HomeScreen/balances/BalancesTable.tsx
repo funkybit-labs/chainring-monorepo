@@ -74,7 +74,9 @@ export function BalancesTable({
             chainName: chain.name,
             nativeCurrency: chain.nativeCurrency,
             rpcUrls: chain.rpcUrls.default.http,
-            blockExplorerUrls: [chain.blockExplorers.default.url]
+            blockExplorerUrls: chain.blockExplorers
+              ? [chain.blockExplorers.default.url]
+              : undefined
           },
           chainId: chain.id
         })

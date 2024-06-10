@@ -18,11 +18,15 @@ data class Fixtures(
     data class Chain(
         val id: ChainId,
         val name: String,
-        val submitterAddress: Address
+        val submitterAddress: Address,
+        val jsonRpcUrl: String,
+        val blockExplorerNetName: String,
+        val blockExplorerUrl: String,
     )
 
     data class Symbol(
         val name: String,
+        val description: String,
         val chainId: ChainId,
         val isNative: Boolean,
         val decimals: Int
@@ -49,16 +53,16 @@ fun String.toChainSymbol(chainIndex: Int) = "$this${if (chainIndex == 0) "" else
 fun getFixtures(chainringChainClients: List<BlockchainClient>) = Fixtures(
     feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
     chains = chainringChainClients.map {
-        Fixtures.Chain(it.chainId, it.config.name, Address("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"))
+        Fixtures.Chain(it.chainId, it.config.name, Address("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"), it.config.url, it.config.blockExplorerNetName, it.config.blockExplorerUrl)
     },
     symbols = chainringChainClients.mapIndexed { index, client ->
         listOf(
             // BTC is the native token since we would be on Bitcoin L2
-            Fixtures.Symbol(name = "BTC".toChainSymbol(index), chainId = client.chainId, isNative = true, 18),
+            Fixtures.Symbol(name = "BTC".toChainSymbol(index), description = "Bitcoin", chainId = client.chainId, isNative = true, 18),
             // ETH is bridged and represented by an ERC20 token
-            Fixtures.Symbol(name = "ETH".toChainSymbol(index), chainId = client.chainId, isNative = false, 18),
-            Fixtures.Symbol(name = "USDC".toChainSymbol(index), chainId = client.chainId, isNative = false, 6),
-            Fixtures.Symbol(name = "DAI".toChainSymbol(index), chainId = client.chainId, isNative = false, 18)
+            Fixtures.Symbol(name = "ETH".toChainSymbol(index), description = "Ethereum", chainId = client.chainId, isNative = false, 18),
+            Fixtures.Symbol(name = "USDC".toChainSymbol(index), description = "USD Coin", chainId = client.chainId, isNative = false, 6),
+            Fixtures.Symbol(name = "DAI".toChainSymbol(index), description = "Dai", chainId = client.chainId, isNative = false, 18)
         )
     }.flatten(),
     markets = chainringChainClients.mapIndexed { index, client ->
