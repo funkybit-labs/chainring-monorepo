@@ -38,7 +38,7 @@ class ConfigRouteTest {
         }
 
         assertEquals(
-            FeeRates(maker = FeeRate.fromPercents(0.01), taker = FeeRate.fromPercents(0.02)),
+            FeeRates(maker = FeeRate.fromPercents(1.0), taker = FeeRate.fromPercents(2.0)),
             config.feeRates,
         )
     }

@@ -9,6 +9,8 @@ environment:
     SEQUENCER_PORT: "5337"
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
+    MAKER_FEE_RATE: "0.01"
+    TAKER_FEE_RATE: "0.02"
   sequencer:
     QUEUE_HOME: "/data/queues/demo"
     CHECKPOINTS_ENABLED: "true"
