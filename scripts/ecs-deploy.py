@@ -6,7 +6,7 @@ import yaml
 import json
 
 
-class ChainringDeploymentManager:
+class ChainRingDeploymentManager:
     def __init__(self, cluster_name, region_name):
         self.region_name = region_name
         self.cluster_name = cluster_name
@@ -268,7 +268,7 @@ if __name__ == "__main__":
             print(exc)
     cluster = f"{args.env}-cluster"
 
-    service_manager = ChainringDeploymentManager(cluster_name=cluster, region_name=region)
+    service_manager = ChainRingDeploymentManager(cluster_name=cluster, region_name=region)
 
     all_services = list(env_config['services'].keys())
 
