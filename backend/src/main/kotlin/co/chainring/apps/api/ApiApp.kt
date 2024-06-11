@@ -5,11 +5,7 @@ import co.chainring.apps.api.middleware.HttpTransactionLogger
 import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
 import co.chainring.apps.api.middleware.Tracer
 import co.chainring.apps.api.services.ExchangeApiService
-import co.chainring.core.blockchain.BlockchainDepositHandler
-import co.chainring.core.blockchain.BlockchainTransactionHandler
 import co.chainring.core.blockchain.ChainManager
-import co.chainring.core.blockchain.ContractsPublisher
-import co.chainring.core.blockchain.SettlementCoordinator
 import co.chainring.core.db.DbConfig
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.websocket.Broadcaster
@@ -65,18 +61,10 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val enableTestRoutes = System.getenv("ENABLE_TEST_ROUTES")?.toBoolean() ?: true
     private val enableFaucetRoutes = System.getenv("ENABLE_FAUCET_ROUTES")?.toBoolean() ?: true
 
-    private val contractsPublishers = ChainManager.getBlockchainClients().map { ContractsPublisher(it) }
-
     private val sequencerClient = SequencerClient()
     private val broadcaster = Broadcaster(db)
 
     private val exchangeApiService = ExchangeApiService(sequencerClient)
-    private val settlementCoordinator = SettlementCoordinator(
-        ChainManager.getBlockchainClients(),
-        sequencerClient,
-    )
-    private val blockchainTransactionHandlers = ChainManager.getBlockchainClients().map { BlockchainTransactionHandler(it, sequencerClient) }
-    private val blockchainDepositHandlers = ChainManager.getBlockchainClients().map { BlockchainDepositHandler(it, sequencerClient) }
 
     private val depositRoutes = DepositRoutes(exchangeApiService)
     private val withdrawalRoutes = WithdrawalRoutes(exchangeApiService)
@@ -150,16 +138,6 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         super.start()
         server.start()
         broadcaster.start()
-        contractsPublishers.forEach {
-            it.updateContracts()
-        }
-        blockchainTransactionHandlers.forEach {
-            it.start()
-        }
-        blockchainDepositHandlers.forEach {
-            it.start()
-        }
-        settlementCoordinator.start()
         logger.info { "Started" }
     }
 
@@ -168,13 +146,6 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         super.stop()
         broadcaster.stop()
         server.stop()
-        settlementCoordinator.stop()
-        blockchainTransactionHandlers.forEach {
-            it.stop()
-        }
-        blockchainDepositHandlers.forEach {
-            it.stop()
-        }
         logger.info { "Stopped" }
     }
 }

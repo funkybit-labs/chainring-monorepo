@@ -3,6 +3,8 @@ package co.chainring.integrationtests.testutils
 import co.chainring.apps.api.ApiApp
 import co.chainring.apps.api.ApiAppConfig
 import co.chainring.apps.api.TestRoutes
+import co.chainring.apps.ring.RingApp
+import co.chainring.apps.ring.RingAppConfig
 import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.db.DbConfig
@@ -68,6 +70,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                     val logger = KotlinLogging.logger {}
                     private val dbConfig = DbConfig()
                     private val apiApp = ApiApp(ApiAppConfig(httpPort = 9000, dbConfig = dbConfig))
+                    private val ringApp = RingApp(RingAppConfig(dbConfig = dbConfig))
                     private val gatewayApp = GatewayApp(GatewayConfig(port = 5337))
                     private val sequencerApp = SequencerApp(
                         // we want sequencer to start from the clean-slate
@@ -103,6 +106,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                                 }
                                 WithdrawalEntity.findPending().forEach { it.update(WithdrawalStatus.Failed, "restarting test") }
                             }
+                            ringApp.start()
                             apiApp.start()
                         }
                         // wait for contracts to load
@@ -133,6 +137,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                     override fun close() {
                         if (!isIntegrationRun) {
                             apiApp.stop()
+                            ringApp.stop()
                             sequencerApp.stop()
                             gatewayApp.stop()
                         }

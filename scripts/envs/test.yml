@@ -1,5 +1,5 @@
 environment:
-  api:
+  backend:
     DB_HOST: test-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     EVM_CHAINS: anvil,anvil2
     EVM_NETWORK_URL_anvil: http://test-anvil.chainring.co:8545
@@ -33,7 +33,13 @@ services:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
     count: 1
     is_essential: "true"
-    environment: api
+    environment: backend
+    secrets:
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
+  ring:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
+    count: 1
+    environment: backend
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
   telegrambot:
