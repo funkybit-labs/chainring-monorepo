@@ -449,10 +449,19 @@ data class Market(
             }
 
             // remove from buy/sell
-            executions.forEach {
-                if (it.counterOrderExhausted) {
-                    (if (order.type == Order.Type.MarketBuy || order.type == Order.Type.LimitBuy) sellOrdersByWallet else buyOrdersByWallet)[it.counterOrder.wallet]?.remove(it.counterOrder)
-                    ordersByGuid.remove(it.counterOrder.guid)
+            executions.forEach { execution ->
+                if (execution.counterOrderExhausted) {
+                    val ordersByWallet =
+                        (if (order.type == Order.Type.MarketBuy || order.type == Order.Type.LimitBuy) sellOrdersByWallet else buyOrdersByWallet)
+
+                    ordersByWallet[execution.counterOrder.wallet]?.let { orders ->
+                        orders.remove(execution.counterOrder)
+                        if (orders.isEmpty()) {
+                            ordersByWallet.remove(execution.counterOrder.wallet)
+                        }
+                    }
+
+                    ordersByGuid.remove(execution.counterOrder.guid)
                 }
             }
 
@@ -476,10 +485,20 @@ data class Market(
         ordersByGuid[guid]?.let { levelOrder ->
             val level = levels[levelOrder.levelIx]
             ret = if (level.side == BookSide.Buy) {
-                buyOrdersByWallet[levelOrder.wallet]?.remove(levelOrder)
+                buyOrdersByWallet[levelOrder.wallet]?.let {
+                    it.remove(levelOrder)
+                    if (it.isEmpty()) {
+                        buyOrdersByWallet.remove(levelOrder.wallet)
+                    }
+                }
                 RemoveOrderResult(levelOrder.wallet, BigInteger.ZERO, notionalPlusFee(levelOrder.quantity, level.price, baseDecimals, quoteDecimals, feeRates.maker))
             } else {
-                sellOrdersByWallet[levelOrder.wallet]?.remove(levelOrder)
+                sellOrdersByWallet[levelOrder.wallet]?.let {
+                    it.remove(levelOrder)
+                    if (it.isEmpty()) {
+                        sellOrdersByWallet.remove(levelOrder.wallet)
+                    }
+                }
                 RemoveOrderResult(levelOrder.wallet, levelOrder.quantity, BigInteger.ZERO)
             }
             level.removeLevelOrder(levelOrder)
@@ -867,12 +886,10 @@ data class Market(
             this.maxOfferIx = this@Market.maxOfferIx
             this.bestBid = this@Market.bestBid.toDecimalValue()
             this.bestOffer = this@Market.bestOffer.toDecimalValue()
-            val maxBidIx = (this@Market.bestBid - this@Market.levels[0].price).divideToIntegralValue(this@Market.tickSize).toInt()
-            val minOfferIx = (this@Market.bestOffer - this@Market.levels[0].price).divideToIntegralValue(this@Market.tickSize).toInt()
-            val firstLevelWithData = this.minBidIx.let { if (it == -1) minOfferIx else it }
-            val lastLevelWithData = this.maxOfferIx.let { if (it == -1) maxBidIx else it }
-            (firstLevelWithData..lastLevelWithData).forEach { i ->
-                this.levels.add(this@Market.levels[i].toCheckpoint())
+            this@Market.levels.forEach { level ->
+                if (level.totalQuantity > BigInteger.ZERO) {
+                    this.levels.add(level.toCheckpoint())
+                }
             }
         }
     }
@@ -917,8 +934,10 @@ data class Market(
                 }
 
                 levels.forEach { level ->
-                    (level.orderHead.until(level.orderTail)).forEach { i ->
-                        val order = level.orders[i]
+                    // inflate order cache respecting level's circular buffer
+                    var currentIndex = level.orderHead
+                    while (currentIndex != level.orderTail) {
+                        val order = level.orders[currentIndex]
                         this.ordersByGuid[order.guid] = order
 
                         when (level.side) {
@@ -927,6 +946,8 @@ data class Market(
                         }.apply {
                             getOrPut(order.wallet) { CopyOnWriteArrayList<LevelOrder>() }.add(order)
                         }
+
+                        currentIndex = (currentIndex + 1) % level.maxOrderCount
                     }
                 }
             }
