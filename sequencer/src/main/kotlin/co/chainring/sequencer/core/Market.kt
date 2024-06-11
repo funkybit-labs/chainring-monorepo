@@ -886,8 +886,10 @@ data class Market(
             this.maxOfferIx = this@Market.maxOfferIx
             this.bestBid = this@Market.bestBid.toDecimalValue()
             this.bestOffer = this@Market.bestOffer.toDecimalValue()
-            val firstLevelWithData = this.minBidIx.let { if (it == -1) levelIx(this@Market.bestOffer) else it }
-            val lastLevelWithData = this.maxOfferIx.let { if (it == -1) levelIx(this@Market.bestBid) else it }
+            val maxBidIx = levelIx(this@Market.bestBid)
+            val minOfferIx = levelIx(this@Market.bestOffer)
+            val firstLevelWithData = this.minBidIx.let { if (it == -1) minOfferIx else it }
+            val lastLevelWithData = this.maxOfferIx.let { if (it == -1) maxBidIx else it }
             (firstLevelWithData..lastLevelWithData).forEach { i ->
                 val level = this@Market.levels[i]
                 if (level.totalQuantity > BigInteger.ZERO) {
