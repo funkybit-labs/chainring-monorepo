@@ -1,25 +1,21 @@
 package co.chainring.telegrambot.app
 
 import arrow.core.Either
-import co.chainring.apps.api.model.Balance
+import co.chainring.apps.api.model.CreateDepositApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.Deposit
 import co.chainring.apps.api.model.FaucetApiRequest
 import co.chainring.apps.api.model.FaucetApiResponse
+import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.SymbolInfo
-import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.WithdrawalApiResponse
-import co.chainring.apps.api.model.websocket.Balances
-import co.chainring.apps.api.model.websocket.OrderCreated
-import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
-import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.client.rest.ApiCallFailure
@@ -34,16 +30,19 @@ import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.TelegramBotUserWalletEntity
+import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.generateOrderNonce
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHex
 import co.chainring.core.utils.toHexBytes
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -53,21 +52,31 @@ import org.web3j.crypto.Keys
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import java.math.BigDecimal
 import java.math.BigInteger
+import java.math.RoundingMode
 import kotlin.time.Duration.Companion.seconds
 
-data class WalletAvailableBalances(
-    val baseSymbol: Symbol,
-    val quoteSymbol: Symbol,
-    val availableBaseBalance: BigInteger,
-    val availableQuoteBalance: BigInteger,
+data class ExchangeBalance(
+    val symbol: Symbol,
+    val total: BigDecimal,
+    val available: BigDecimal,
+)
+
+data class WalletBalance(
+    val symbol: Symbol,
+    val balance: BigDecimal,
+)
+
+data class SwapEstimation(
+    val from: Symbol,
+    val fromAmount: BigDecimal,
+    val to: Symbol,
+    val toAmount: BigDecimal,
+    val price: BigDecimal,
+    val market: Market,
 )
 
 class BotSessionCurrentWallet(
     val wallet: TelegramBotUserWalletEntity,
-    val onBalanceUpdated: (List<Balance>) -> Unit,
-    val onOrderCreated: (Order) -> Unit,
-    val onOrderUpdated: (Order) -> Unit,
-    val onTradeUpdated: (Trade) -> Unit,
 ) {
     private val logger = KotlinLogging.logger { }
     private val ecKeyPair = Credentials.create(wallet.encryptedPrivateKey.decrypt()).ecKeyPair
@@ -94,16 +103,10 @@ class BotSessionCurrentWallet(
         }
     }
     private val marketPrices = mutableMapOf<MarketId, BigDecimal>()
-    var currentMarket = config.markets.find { it.id.value == "BTC/ETH" } ?: config.markets.first()
     val walletAddress = Address(Keys.toChecksumAddress("0x" + Keys.getAddress(ecKeyPair)))
-    private val balances = mutableMapOf<Symbol, BigInteger>()
 
     private var websocket: WebSocket? = null
-    private val websocketSubscriptionTopics = listOf(
-        SubscriptionTopic.Orders,
-        SubscriptionTopic.Trades,
-        SubscriptionTopic.Balances,
-    ) + config.markets.map { market -> SubscriptionTopic.Prices(market.id, OHLCDuration.P5M) }
+    private val websocketSubscriptionTopics = config.markets.map { market -> SubscriptionTopic.Prices(market.id, OHLCDuration.P5M) }
 
     fun start() {
         connectWebsocket()
@@ -154,89 +157,89 @@ class BotSessionCurrentWallet(
 
     private fun handleWebsocketMessage(message: Publishable) {
         when (message) {
-            is Balances -> {
-                message.balances.forEach {
-                    balances[it.symbol] = it.available
-                }
-                onBalanceUpdated(message.balances)
-            }
             is Prices -> {
                 message.ohlc.lastOrNull()?.let {
                     marketPrices[message.market] = it.close.toBigDecimal()
                 }
             }
-            is OrderCreated -> {
-                onOrderCreated(message.order)
-            }
-            is OrderUpdated -> {
-                onOrderUpdated(message.order)
-            }
-            is TradeUpdated -> {
-                onTradeUpdated(message.trade)
-            }
             else -> {}
         }
     }
 
-    fun switchCurrentMarket(marketId: MarketId) {
-        config.markets.find { it.id == marketId }?.let {
-            currentMarket = it
-        }
-    }
-
-    fun getBalances(): WalletAvailableBalances {
-        val baseSymbol = currentMarket.baseSymbol
-        val quoteSymbol = currentMarket.quoteSymbol
-
-        if (balances.isEmpty()) {
-            apiClient.getBalances().also { response ->
-                response.balances.forEach { balances[it.symbol] = it.available }
+    fun getExchangeBalances(): List<ExchangeBalance> {
+        val balances = apiClient
+            .getBalances().balances
+            .map {
+                ExchangeBalance(
+                    it.symbol,
+                    total = it.total.fromFundamentalUnits(decimals(it.symbol)),
+                    available = it.available.fromFundamentalUnits(decimals(it.symbol)),
+                )
             }
-        }
+            .associateBy { it.symbol }
 
-        return WalletAvailableBalances(
-            baseSymbol,
-            quoteSymbol,
-            balances[baseSymbol] ?: BigInteger.ZERO,
-            balances[quoteSymbol] ?: BigInteger.ZERO,
-        )
+        return symbols().map {
+            balances.getOrDefault(it, ExchangeBalance(it, BigDecimal.ZERO.setScale(decimals(it)), BigDecimal.ZERO.setScale(decimals(it))))
+        }
     }
 
-    fun getWalletBalance(symbol: Symbol): BigInteger {
+    fun getWalletBalances(): List<WalletBalance> {
+        return symbols().map { symbol ->
+            val blockchainClient = blockchainClient(symbol)
+            val balance = contractAddress(symbol)?.let {
+                blockchainClient.getERC20Balance(it, walletAddress).fromFundamentalUnits(decimals(symbol))
+            } ?: blockchainClient.getNativeBalance(walletAddress).fromFundamentalUnits(decimals(symbol))
+
+            WalletBalance(symbol, balance)
+        }
+    }
+
+    fun getWalletBalance(symbol: Symbol): BigDecimal {
         val blockchainClient = blockchainClient(symbol)
         return contractAddress(symbol)?.let {
-            blockchainClient.getERC20Balance(it, walletAddress)
-        } ?: blockchainClient.getNativeBalance(walletAddress)
+            blockchainClient.getERC20Balance(it, walletAddress).fromFundamentalUnits(decimals(symbol))
+        } ?: blockchainClient.getNativeBalance(walletAddress).fromFundamentalUnits(decimals(symbol))
     }
 
-    fun getMarketPrice(): BigDecimal? {
-        return marketPrices[currentMarket.id]
+    fun getExchangeAvailableBalance(symbol: Symbol): BigDecimal =
+        apiClient
+            .getBalances().balances
+            .find { it.symbol == symbol }
+            ?.available?.fromFundamentalUnits(decimals(symbol))
+            ?: BigDecimal.ZERO.setScale(decimals(symbol))
+
+    private fun getMarketPrice(marketId: MarketId): BigDecimal {
+        return marketPrices.getValue(marketId)
     }
 
-    suspend fun deposit(amount: String, symbol: Symbol): TxHash? {
+    fun deposit(amount: BigDecimal, symbol: Symbol): DepositId? {
         val blockchainClient = blockchainClient(symbol)
         val exchangeContractAddress = blockchainClient.getContractAddress(ContractType.Exchange)
-        val bigIntAmount = amountToBigInteger(symbol, amount)
+        val bigIntAmount = amount.toFundamentalUnits(decimals(symbol))
         val tokenAddress = contractAddress(symbol)
         return if (tokenAddress != null) {
-            val allowanceTxReceipt = blockchainClient
-                .loadERC20(tokenAddress)
-                .approve(exchangeContractAddress.value, bigIntAmount)
-                .sendAsync()
-                .await()
-            if (allowanceTxReceipt.isStatusOK) {
-                blockchainClient.sendTransaction(
-                    exchangeContractAddress,
-                    blockchainClient
-                        .loadExchangeContract(exchangeContractAddress)
-                        .deposit(tokenAddress.value, bigIntAmount).encodeFunctionCall(),
-                    BigInteger.ZERO,
-                )
-            } else {
-                null
+            runBlocking {
+                val allowanceTxReceipt = blockchainClient
+                    .loadERC20(tokenAddress)
+                    .approve(exchangeContractAddress.value, bigIntAmount)
+                    .sendAsync()
+                    .await()
+                if (allowanceTxReceipt.isStatusOK) {
+                    val txHash = blockchainClient.sendTransaction(
+                        exchangeContractAddress,
+                        blockchainClient
+                            .loadExchangeContract(exchangeContractAddress)
+                            .deposit(tokenAddress.value, bigIntAmount).encodeFunctionCall(),
+                        BigInteger.ZERO,
+                    )
+                    apiClient.createDeposit(CreateDepositApiRequest(symbol, bigIntAmount, txHash)).deposit.id
+                } else {
+                    null
+                }
             }
         } else {
-            blockchainClient.asyncDepositNative(exchangeContractAddress, bigIntAmount)
+            val txHash = blockchainClient.asyncDepositNative(exchangeContractAddress, bigIntAmount)
+            apiClient.createDeposit(CreateDepositApiRequest(symbol, bigIntAmount, txHash)).deposit.id
         }
     }
 
@@ -245,10 +248,10 @@ class BotSessionCurrentWallet(
             .tryListDeposits()
             .fold({ emptyList() }, { it.deposits })
 
-    fun withdraw(amount: String, symbol: Symbol): Either<ApiCallFailure, WithdrawalApiResponse> {
+    fun withdraw(amount: BigDecimal, symbol: Symbol): Either<ApiCallFailure, WithdrawalApiResponse> {
         val blockchainClient = blockchainClient(symbol)
         val exchangeContractAddress = blockchainClient.getContractAddress(ContractType.Exchange)
-        val bigIntAmount = amountToBigInteger(symbol, amount)
+        val bigIntAmount = amount.toFundamentalUnits(decimals(symbol))
         val nonce = System.currentTimeMillis()
         val tx = EIP712Transaction.WithdrawTx(
             walletAddress,
@@ -268,14 +271,50 @@ class BotSessionCurrentWallet(
         )
     }
 
-    fun createOrder(amount: String, side: OrderSide): Either<ApiCallFailure, CreateOrderApiResponse> {
+    fun estimateSwap(from: Symbol, to: Symbol, amount: BigDecimal): SwapEstimation {
+        val market = config.markets.find { it.baseSymbol == from && it.quoteSymbol == to || it.baseSymbol == to && it.quoteSymbol == from }!!
+
+        return if (market.baseSymbol == from) {
+            val price = getMarketPrice(market.id)
+
+            SwapEstimation(
+                from = market.baseSymbol,
+                fromAmount = amount,
+                to = market.quoteSymbol,
+                toAmount = price * amount.setScale(market.quoteDecimals),
+                price = price,
+                market = market,
+            )
+        } else {
+            val price = (BigDecimal(1).setScale(market.quoteDecimals) / getMarketPrice(market.id))
+                .setScale(market.baseDecimals, RoundingMode.HALF_EVEN)
+
+            SwapEstimation(
+                from = market.quoteSymbol,
+                fromAmount = amount,
+                to = market.baseSymbol,
+                toAmount = price * amount.setScale(market.baseDecimals),
+                price = price,
+                market = market,
+            )
+        }
+    }
+
+    fun submitSwap(estimation: SwapEstimation): Either<ApiCallFailure, CreateOrderApiResponse> {
+        val market = estimation.market
+        val (amount, orderSide) = if (estimation.from == market.baseSymbol) {
+            Pair(estimation.fromAmount, OrderSide.Sell)
+        } else {
+            Pair(estimation.toAmount, OrderSide.Buy)
+        }
+
         return apiClient.tryCreateOrder(
             signOrder(
                 CreateOrderApiRequest.Market(
                     nonce = generateOrderNonce(),
-                    marketId = currentMarket.id,
-                    side = side,
-                    amount = amountToBigInteger(currentMarket.baseSymbol, amount),
+                    marketId = market.id,
+                    side = orderSide,
+                    amount = amount.toFundamentalUnits(decimals(market.baseSymbol)),
                     signature = EvmSignature.emptySignature(),
                     verifyingChainId = ChainId.empty,
                 ),
@@ -283,7 +322,14 @@ class BotSessionCurrentWallet(
         )
     }
 
-    fun airdropSupported(symbol: Symbol): Boolean {
+    fun symbols(): List<Symbol> =
+        symbolInfoBySymbol.keys
+            .sortedBy { it.value }
+
+    fun airDroppableSymbols(): List<Symbol> =
+        symbols().filter { airDropSupported(it) }
+
+    private fun airDropSupported(symbol: Symbol): Boolean {
         if (!faucetSupported) return false
 
         val symbolInfo = symbolInfoBySymbol[symbol]
@@ -294,20 +340,21 @@ class BotSessionCurrentWallet(
         }
     }
 
-    fun airdrop(symbol: Symbol): Either<ApiCallFailure, FaucetApiResponse> =
+    fun airDrop(symbol: Symbol): Either<ApiCallFailure, FaucetApiResponse> =
         apiClient.tryFaucet(FaucetApiRequest(chain(symbol), walletAddress))
 
     fun getTxReceipt(chainId: ChainId, txHash: TxHash): TransactionReceipt? =
         blockchainClientsByChainId.getValue(chainId).getTransactionReceipt(txHash)
 
     private fun signOrder(order: CreateOrderApiRequest.Market): CreateOrderApiRequest.Market {
-        val blockchainClient = blockchainClient(currentMarket.baseSymbol)
+        val market = config.markets.first { it.id == order.marketId }
+        val blockchainClient = blockchainClient(market.baseSymbol)
         val exchangeContractAddress = blockchainClient.getContractAddress(ContractType.Exchange)
 
         val tx = EIP712Transaction.Order(
             walletAddress,
-            baseToken = contractAddress(currentMarket.baseSymbol) ?: Address.zero,
-            quoteToken = contractAddress(currentMarket.quoteSymbol) ?: Address.zero,
+            baseToken = contractAddress(market.baseSymbol) ?: Address.zero,
+            quoteToken = contractAddress(market.quoteSymbol) ?: Address.zero,
             amount = if (order.side == OrderSide.Buy) order.amount else order.amount.negate(),
             price = BigInteger.ZERO,
             nonce = BigInteger(1, order.nonce.toHexBytes()),
@@ -326,13 +373,11 @@ class BotSessionCurrentWallet(
         )
     }
 
-    private fun decimals(symbol: Symbol) = symbolInfoBySymbol.getValue(symbol).decimals.toInt()
+    fun decimals(symbol: Symbol) = symbolInfoBySymbol.getValue(symbol).decimals.toInt()
 
     private fun contractAddress(symbol: Symbol) = symbolInfoBySymbol.getValue(symbol).contractAddress
 
     private fun chain(symbol: Symbol) = chainBySymbol.getValue(symbol)
 
     private fun blockchainClient(symbol: Symbol) = blockchainClientsByChainId.getValue(chain(symbol))
-
-    private fun amountToBigInteger(symbol: Symbol, amount: String) = BigDecimal(amount).toFundamentalUnits(decimals(symbol))
 }

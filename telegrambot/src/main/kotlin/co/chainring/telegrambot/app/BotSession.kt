@@ -1,39 +1,29 @@
 package co.chainring.telegrambot.app
 
-import co.chainring.apps.api.model.Balance
-import co.chainring.apps.api.model.Deposit
-import co.chainring.apps.api.model.Order
-import co.chainring.apps.api.model.Trade
 import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
-import co.chainring.core.model.TxHash
 import co.chainring.core.model.abbreviated
-import co.chainring.core.model.db.ChainId
-import co.chainring.core.model.db.MarketId
-import co.chainring.core.model.db.OrderSide
+import co.chainring.core.model.db.DepositEntity
+import co.chainring.core.model.db.DepositStatus
+import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderStatus
-import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.model.db.TelegramBotUserEntity
 import co.chainring.core.model.db.TelegramBotUserWalletEntity
-import co.chainring.core.model.db.TelegramMessageId
-import co.chainring.core.model.db.TelegramUserId
-import co.chainring.core.model.db.TelegramUserReplyType
 import co.chainring.core.model.db.WalletEntity
+import co.chainring.core.model.db.WithdrawalEntity
+import co.chainring.core.model.db.WithdrawalStatus
+import co.chainring.core.model.tgbot.BotSessionState
+import co.chainring.core.model.tgbot.TelegramUserId
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chanring.core.model.encrypt
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.runBlocking
-import org.jetbrains.exposed.sql.transactions.transaction
+import kotlinx.datetime.Clock
 import org.web3j.crypto.Keys
-import org.web3j.protocol.core.methods.response.TransactionReceipt
+import java.math.BigDecimal
 import java.math.BigInteger
-import java.math.RoundingMode
-import java.util.concurrent.ScheduledThreadPoolExecutor
-import java.util.concurrent.TimeUnit
 
 class BotSession(
     private val telegramUserId: TelegramUserId,
-    private val timer: ScheduledThreadPoolExecutor,
     private val outputChannel: Bot.OutputChannel,
 ) {
     private val logger = KotlinLogging.logger { }
@@ -63,375 +53,618 @@ class BotSession(
         }
     }
 
-    fun handleInput(input: Bot.Input) {
-        when (input) {
-            is Bot.Input.StartCommand -> {
-                sendMainMenu()
+    fun handleInput(input: BotInput) {
+        val botUser = TelegramBotUserEntity.getOrCreate(telegramUserId)
+
+        when (val currentState = botUser.sessionState) {
+            is BotSessionState.Initial -> {
+                when (input) {
+                    is BotInput.Start -> {
+                        deleteMessages()
+                        sendMainMenu()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+                    else -> {
+                        sendInvalidCommand()
+                    }
+                }
             }
-            is Bot.Input.CallbackQuery -> {
-                handleCallbackButtonClick(input.data)
+
+            is BotSessionState.MainMenu -> {
+                when (input) {
+                    is BotInput.Start -> {
+                        deleteMessages()
+                        sendMainMenu()
+                    }
+                    is BotInput.Airdrop -> {
+                        send(BotMessage.SelectSymbol.toAirdrop(currentWallet.airDroppableSymbols()), scheduleDeletion = true)
+                        botUser.updateSessionState(BotSessionState.AirdropSymbolSelection)
+                    }
+                    is BotInput.Deposit -> {
+                        send(BotMessage.SelectSymbol.toDeposit(currentWallet.symbols()), scheduleDeletion = true)
+                        botUser.updateSessionState(BotSessionState.DepositSymbolSelection)
+                    }
+                    is BotInput.Withdraw -> {
+                        send(BotMessage.SelectSymbol.toWithdraw(currentWallet.symbols()), scheduleDeletion = true)
+                        botUser.updateSessionState(BotSessionState.WithdrawalSymbolSelection)
+                    }
+                    is BotInput.Swap -> {
+                        send(BotMessage.SelectSymbol.toSwapFrom(currentWallet.symbols()), scheduleDeletion = true)
+                        botUser.updateSessionState(BotSessionState.SwapFromSymbolSelection)
+                    }
+                    is BotInput.Settings -> {
+                        send(BotMessage.Settings(currentWallet.walletAddress), scheduleDeletion = true)
+                        botUser.updateSessionState(BotSessionState.Settings)
+                    }
+                    else -> {
+                        sendInvalidCommand()
+                    }
+                }
             }
-            is Bot.Input.TextMessage -> {
-                if (input.replyToMessage != null) {
-                    handleReplyMessage(input.replyToMessage, input.id, input.text)
+
+            is BotSessionState.AirdropSymbolSelection -> {
+                when (input) {
+                    is BotInput.SymbolSelected -> {
+                        deleteMessages()
+                        currentWallet
+                            .airDrop(input.symbol)
+                            .onLeft {
+                                send(BotMessage.AirdropFailed(it.error))
+                            }
+                            .onRight {
+                                val amount = it.amount.fromFundamentalUnits(currentWallet.decimals(input.symbol))
+                                send(BotMessage.AirdropRequested(input.symbol, amount))
+                                botUser.updateSessionState(BotSessionState.AirdropPending(input.symbol, amount, it.chainId, it.txHash))
+                            }
+                    }
+
+                    is BotInput.Cancel -> {
+                        deleteMessages()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
+                }
+            }
+
+            is BotSessionState.AirdropPending -> {
+                when (input) {
+                    is BotInput.AirdropTxReceipt -> {
+                        if (input.receipt.isStatusOK) {
+                            send(BotMessage.AirdropSucceeded(currentState.symbol, currentState.amount))
+                        } else {
+                            send(BotMessage.AirdropTxFailed(input.receipt))
+                        }
+                        sendMainMenu()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+                    else -> { }
+                }
+            }
+
+            is BotSessionState.DepositSymbolSelection -> {
+                when (input) {
+                    is BotInput.SymbolSelected -> {
+                        deleteMessages()
+                        val available = currentWallet.getWalletBalance(input.symbol)
+                        if (available > BigDecimal.ZERO) {
+                            send(BotMessage.EnterDepositAmount(input.symbol, available))
+                            botUser.updateSessionState(BotSessionState.DepositAmountEntry(input.symbol))
+                        } else {
+                            send(BotMessage.NoBalanceInWallet(input.symbol), scheduleDeletion = true)
+                            send(BotMessage.SelectSymbol.toDeposit(currentWallet.symbols()), scheduleDeletion = true)
+                        }
+                    }
+
+                    is BotInput.Cancel -> {
+                        deleteMessages()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
+                }
+            }
+
+            is BotSessionState.DepositAmountEntry -> {
+                when (input) {
+                    is BotInput.Text -> {
+                        if (input.text == "/cancel") {
+                            deleteMessages()
+                            sendMainMenu()
+                            botUser.updateSessionState(BotSessionState.MainMenu)
+                        } else {
+                            val available = currentWallet.getWalletBalance(currentState.symbol)
+                            val amount = runCatching { BigDecimal(input.text) }.getOrNull()
+                            if (amount == null) {
+                                send(BotMessage.InvalidNumber(input.text))
+                            } else if (amount > available) {
+                                send(BotMessage.DepositAmountTooLarge)
+                                send(BotMessage.EnterDepositAmount(currentState.symbol, available))
+                            } else {
+                                send(BotMessage.DepositConfirmation(currentState.symbol, amount), scheduleDeletion = true)
+                                botUser.updateSessionState(BotSessionState.DepositConfirmation(currentState.symbol, amount))
+                            }
+                        }
+                    }
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
+                }
+            }
+
+            is BotSessionState.DepositConfirmation -> {
+                when (input) {
+                    is BotInput.Confirm -> {
+                        try {
+                            deleteMessages()
+                            val depositId = currentWallet.deposit(currentState.amount, currentState.symbol)
+                            if (depositId == null) {
+                                send(BotMessage.DepositFailed(currentState.symbol))
+                                botUser.updateSessionState(BotSessionState.MainMenu)
+                            } else {
+                                send(BotMessage.DepositInProgress)
+                                botUser.updateSessionState(BotSessionState.DepositPending(depositId))
+                            }
+                        } catch (e: Exception) {
+                            logger.error(e) { "Deposit failed" }
+                            send(BotMessage.DepositFailed(currentState.symbol))
+                            sendMainMenu()
+                            botUser.updateSessionState(BotSessionState.MainMenu)
+                        }
+                    }
+
+                    is BotInput.Cancel -> {
+                        deleteMessages()
+                        sendMainMenu()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+
+                    is BotInput.ChangeAmount -> {
+                        deleteMessages()
+                        send(BotMessage.EnterDepositAmount(currentState.symbol, currentWallet.getWalletBalance(currentState.symbol)), scheduleDeletion = true)
+                        botUser.updateSessionState(BotSessionState.DepositAmountEntry(currentState.symbol))
+                    }
+
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
+                }
+            }
+
+            is BotSessionState.DepositPending -> {
+                when (input) {
+                    is BotInput.DepositCompleted -> {
+                        val deposit = input.deposit
+                        val symbol = Symbol(deposit.symbol.name)
+                        if (deposit.status == DepositStatus.Complete) {
+                            send(
+                                BotMessage.DepositSucceeded(
+                                    symbol,
+                                    amount = deposit.amount.fromFundamentalUnits(currentWallet.decimals(symbol)),
+                                    availableBalance = currentWallet.getExchangeAvailableBalance(symbol),
+                                ),
+                            )
+                        } else {
+                            send(BotMessage.DepositFailed(symbol))
+                        }
+                        sendMainMenu()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+                    else -> {}
+                }
+            }
+
+            is BotSessionState.WithdrawalSymbolSelection -> {
+                when (input) {
+                    is BotInput.SymbolSelected -> {
+                        deleteMessages()
+                        val available = currentWallet.getExchangeAvailableBalance(input.symbol)
+                        if (available == BigInteger.ZERO) {
+                            send(BotMessage.NoBalanceAvailable(input.symbol), scheduleDeletion = true)
+                            send(BotMessage.SelectSymbol.toWithdraw(currentWallet.symbols()), scheduleDeletion = true)
+                        } else {
+                            send(BotMessage.EnterWithdrawalAmount(input.symbol, available))
+                            botUser.updateSessionState(BotSessionState.WithdrawalAmountEntry(input.symbol))
+                        }
+                    }
+
+                    is BotInput.Cancel -> {
+                        deleteMessages()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
+                }
+            }
+
+            is BotSessionState.WithdrawalAmountEntry -> {
+                when (input) {
+                    is BotInput.Text -> {
+                        if (input.text == "/cancel") {
+                            deleteMessages()
+                            sendMainMenu()
+                            botUser.updateSessionState(BotSessionState.MainMenu)
+                        } else {
+                            val available = currentWallet.getExchangeAvailableBalance(currentState.symbol)
+                            val amount = runCatching { BigDecimal(input.text) }.getOrNull()
+                            if (amount == null) {
+                                send(BotMessage.InvalidNumber(input.text))
+                            } else if (amount > available) {
+                                send(BotMessage.WithdrawalAmountTooLarge)
+                                send(BotMessage.EnterWithdrawalAmount(currentState.symbol, available))
+                            } else {
+                                send(BotMessage.WithdrawalConfirmation(currentState.symbol, amount), scheduleDeletion = true)
+                                botUser.updateSessionState(BotSessionState.WithdrawalConfirmation(currentState.symbol, amount))
+                            }
+                        }
+                    }
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
+                }
+            }
+
+            is BotSessionState.WithdrawalConfirmation -> {
+                when (input) {
+                    is BotInput.Confirm -> {
+                        deleteMessages()
+
+                        currentWallet
+                            .withdraw(currentState.amount, currentState.symbol)
+                            .onLeft {
+                                send(BotMessage.WithdrawalFailed(it.error))
+                                sendMainMenu()
+                                botUser.updateSessionState(BotSessionState.MainMenu)
+                            }
+                            .onRight {
+                                send(BotMessage.WithdrawalInProgress)
+                                botUser.updateSessionState(BotSessionState.WithdrawalPending(it.withdrawal.id))
+                            }
+                    }
+
+                    is BotInput.Cancel -> {
+                        deleteMessages()
+                        sendMainMenu()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+
+                    is BotInput.ChangeAmount -> {
+                        deleteMessages()
+                        send(BotMessage.EnterWithdrawalAmount(currentState.symbol, currentWallet.getExchangeAvailableBalance(currentState.symbol)), scheduleDeletion = true)
+                        botUser.updateSessionState(BotSessionState.WithdrawalAmountEntry(currentState.symbol))
+                    }
+
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
+                }
+            }
+
+            is BotSessionState.WithdrawalPending -> {
+                when (input) {
+                    is BotInput.WithdrawalCompleted -> {
+                        val withdrawal = input.withdrawal
+                        if (withdrawal.status == WithdrawalStatus.Complete) {
+                            send(BotMessage.WithdrawalSucceeded)
+                        } else {
+                            send(BotMessage.WithdrawalFailed(null))
+                        }
+                        sendMainMenu()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+                    else -> {}
+                }
+            }
+
+            is BotSessionState.SwapFromSymbolSelection -> {
+                when (input) {
+                    is BotInput.SymbolSelected -> {
+                        deleteMessages()
+                        val available = currentWallet.getExchangeAvailableBalance(input.symbol)
+                        if (available > BigDecimal.ZERO) {
+                            val buySymbolOptions = currentWallet.config.markets.mapNotNull {
+                                if (it.baseSymbol == input.symbol) {
+                                    it.quoteSymbol
+                                } else if (it.quoteSymbol == input.symbol) {
+                                    it.baseSymbol
+                                } else {
+                                    null
+                                }
+                            }
+
+                            send(BotMessage.SelectSymbol.toSwapTo(buySymbolOptions, from = input.symbol), scheduleDeletion = true)
+                            botUser.updateSessionState(BotSessionState.SwapToSymbolSelection(from = input.symbol))
+                        } else {
+                            send(BotMessage.NoBalanceAvailable(input.symbol), scheduleDeletion = true)
+                            send(BotMessage.SelectSymbol.toSwapFrom(currentWallet.symbols()), scheduleDeletion = true)
+                        }
+                    }
+
+                    is BotInput.Cancel -> {
+                        deleteMessages()
+                        sendMainMenu()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
+                }
+            }
+
+            is BotSessionState.SwapToSymbolSelection -> {
+                when (input) {
+                    is BotInput.SymbolSelected -> {
+                        deleteMessages()
+                        send(
+                            BotMessage.EnterSwapAmount(
+                                from = currentState.from,
+                                available = currentWallet.getExchangeAvailableBalance(currentState.from),
+                                to = input.symbol,
+                            ),
+                        )
+                        botUser.updateSessionState(BotSessionState.SwapAmountEntry(from = currentState.from, to = input.symbol))
+                    }
+
+                    is BotInput.Cancel -> {
+                        deleteMessages()
+                        sendMainMenu()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
+                }
+            }
+
+            is BotSessionState.SwapAmountEntry -> {
+                when (input) {
+                    is BotInput.Text -> {
+                        if (input.text == "/cancel") {
+                            deleteMessages()
+                            sendMainMenu()
+                            botUser.updateSessionState(BotSessionState.MainMenu)
+                        } else {
+                            val available = currentWallet.getExchangeAvailableBalance(currentState.from)
+                            val amount = runCatching { BigDecimal(input.text) }.getOrNull()
+                            if (amount == null) {
+                                send(BotMessage.InvalidNumber(input.text))
+                            } else if (amount > available) {
+                                send(BotMessage.SwapAmountTooLarge)
+                                send(BotMessage.EnterSwapAmount(from = currentState.from, available = available, to = currentState.from))
+                            } else {
+                                val swapEstimation = currentWallet.estimateSwap(currentState.from, currentState.to, amount)
+                                send(BotMessage.SwapConfirmation(swapEstimation), scheduleDeletion = true)
+                                botUser.updateSessionState(BotSessionState.SwapConfirmation(currentState.from, currentState.to, amount))
+                            }
+                        }
+                    }
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
+                }
+            }
+
+            is BotSessionState.SwapConfirmation -> {
+                when (input) {
+                    is BotInput.Confirm -> {
+                        deleteMessages()
+
+                        val swapEstimation = currentWallet.estimateSwap(currentState.from, currentState.to, currentState.amount)
+                        send(BotMessage.SubmittingSwap(swapEstimation))
+
+                        currentWallet
+                            .submitSwap(swapEstimation)
+                            .onLeft {
+                                send(BotMessage.SwapFailed(it.error))
+                                sendMainMenu()
+                                botUser.updateSessionState(BotSessionState.MainMenu)
+                            }
+                            .onRight {
+                                botUser.updateSessionState(BotSessionState.SwapPending(it.orderId))
+                            }
+                    }
+
+                    is BotInput.Cancel -> {
+                        deleteMessages()
+                        sendMainMenu()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+
+                    is BotInput.ChangeAmount -> {
+                        deleteMessages()
+                        send(
+                            BotMessage.EnterSwapAmount(
+                                from = currentState.from,
+                                available = currentWallet.getExchangeAvailableBalance(currentState.from),
+                                to = currentState.to,
+                            ),
+                            scheduleDeletion = true,
+                        )
+                        botUser.updateSessionState(BotSessionState.SwapAmountEntry(from = currentState.from, to = currentState.to))
+                    }
+
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
+                }
+            }
+
+            is BotSessionState.SwapPending -> {
+                when (input) {
+                    is BotInput.SwapCompleted -> {
+                        val order = input.order
+                        send(
+                            when (order.status) {
+                                OrderStatus.Filled -> BotMessage.SwapSucceeded(full = true)
+                                OrderStatus.Partial -> BotMessage.SwapSucceeded(full = false)
+                                OrderStatus.Rejected -> BotMessage.SwapRejected
+                                else -> BotMessage.SwapFailed(null)
+                            },
+                        )
+                        sendMainMenu()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+                    else -> { }
+                }
+            }
+
+            is BotSessionState.Settings -> {
+                when (input) {
+                    is BotInput.SwitchWallet -> {
+                        deleteMessages()
+                        send(
+                            BotMessage.SelectWalletToSwitchTo(
+                                wallets = botUser.wallets.map { it.address },
+                                currentWallet = currentWallet.walletAddress,
+                            ),
+                            scheduleDeletion = true,
+                        )
+                        botUser.updateSessionState(BotSessionState.WalletToSwitchToSelection)
+                    }
+                    is BotInput.ImportWallet -> {
+                        deleteMessages()
+                        send(BotMessage.ImportWalletPrivateKeyEntryPrompt)
+                        botUser.updateSessionState(BotSessionState.ImportWalletPrivateKeyEntry)
+                    }
+                    is BotInput.ExportPrivateKey -> {
+                        deleteMessages()
+                        send(
+                            BotMessage.ShowPrivateKey(currentWallet.wallet.encryptedPrivateKey),
+                            scheduleDeletion = true,
+                        )
+                        botUser.updateSessionState(BotSessionState.ShowingPrivateKey)
+                    }
+                    is BotInput.Cancel -> {
+                        deleteMessages()
+                        sendMainMenu()
+                        botUser.updateSessionState(BotSessionState.MainMenu)
+                    }
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
+                }
+            }
+
+            is BotSessionState.ShowingPrivateKey -> {
+                deleteMessages()
+                send(BotMessage.Settings(currentWallet.walletAddress), scheduleDeletion = true)
+                botUser.updateSessionState(BotSessionState.Settings)
+            }
+
+            is BotSessionState.WalletToSwitchToSelection -> {
+                when (input) {
+                    is BotInput.WalletSelected -> {
+                        deleteMessages()
+                        val wallet = botUser.wallets
+                            .find { it.address.abbreviated() == input.abbreviatedAddress }!!
+
+                        switchWallet(wallet)
+                        send(BotMessage.SwitchedToWallet(currentWallet.walletAddress))
+                        send(BotMessage.Settings(currentWallet.walletAddress), scheduleDeletion = true)
+                        botUser.updateSessionState(BotSessionState.Settings)
+                    }
+                    is BotInput.Cancel -> {
+                        deleteMessages()
+                        send(BotMessage.Settings(currentWallet.walletAddress), scheduleDeletion = true)
+                        botUser.updateSessionState(BotSessionState.Settings)
+                    }
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
+                }
+            }
+
+            is BotSessionState.ImportWalletPrivateKeyEntry -> {
+                when (input) {
+                    is BotInput.Text -> {
+                        if (input.text == "/cancel") {
+                            deleteMessages()
+                            send(BotMessage.Settings(currentWallet.walletAddress), scheduleDeletion = true)
+                            botUser.updateSessionState(BotSessionState.Settings)
+                        } else {
+                            try {
+                                val privateKey = input.text
+                                switchWallet(
+                                    TelegramBotUserWalletEntity.create(
+                                        WalletEntity.getOrCreate(Address.fromPrivateKey(privateKey)),
+                                        botUser,
+                                        privateKey.encrypt(),
+                                        isCurrent = true,
+                                    ).also {
+                                        it.flush()
+                                    },
+                                )
+                                send(BotMessage.ImportWalletSuccess(currentWallet.walletAddress))
+                            } catch (e: Exception) {
+                                logger.warn(e) { "Failed to import key" }
+                                send(BotMessage.ImportWalletFailure)
+                            }
+                            botUser.messageIdsForDeletion += input.messageId
+                            deleteMessages()
+                            send(BotMessage.Settings(currentWallet.walletAddress), scheduleDeletion = true)
+                            botUser.updateSessionState(BotSessionState.Settings)
+                        }
+                    }
+                    else -> {
+                        sendInvalidCommand(scheduleDeletion = true)
+                    }
                 }
             }
         }
+    }
+
+    fun refresh() {
+        val botUser = TelegramBotUserEntity.getOrCreate(telegramUserId)
+        when (val sessionState = botUser.sessionState) {
+            is BotSessionState.AirdropPending -> {
+                val txReceipt = currentWallet.getTxReceipt(sessionState.chainId, sessionState.txHash)
+                if (txReceipt != null) {
+                    handleInput(BotInput.AirdropTxReceipt(telegramUserId, txReceipt))
+                }
+            }
+            is BotSessionState.DepositPending -> {
+                val deposit = DepositEntity[sessionState.depositId]
+                if (deposit.status == DepositStatus.Complete || deposit.status == DepositStatus.Failed) {
+                    handleInput(BotInput.DepositCompleted(telegramUserId, deposit))
+                }
+            }
+            is BotSessionState.WithdrawalPending -> {
+                val withdrawal = WithdrawalEntity[sessionState.withdrawalId]
+                if (withdrawal.status == WithdrawalStatus.Complete || withdrawal.status == WithdrawalStatus.Failed) {
+                    handleInput(BotInput.WithdrawalCompleted(telegramUserId, withdrawal))
+                }
+            }
+            is BotSessionState.SwapPending -> {
+                val order = OrderEntity[sessionState.orderId]
+                if (order.status.isFinal()) {
+                    handleInput(BotInput.SwapCompleted(telegramUserId, order))
+                }
+            }
+            else -> {}
+        }
+        botUser.updatedAt = Clock.System.now()
+    }
+
+    private fun sendInvalidCommand(scheduleDeletion: Boolean = false) {
+        send(BotMessage.InvalidCommand, scheduleDeletion)
     }
 
     private fun sendMainMenu() {
-        val balances = currentWallet.getBalances()
-        val baseSymbol = balances.baseSymbol
-        val quoteSymbol = balances.quoteSymbol
-
-        deleteMessages()
-        sendMessage(
-            Bot.Output.SendMessage(
-                chatId = chatId,
-                text = "-- Current Wallet --" +
-                    "\n<code>${currentWallet.walletAddress.value}</code>" +
-                    "\n\n-- Current Market --" +
-                    "\n<code>${baseSymbol.value + "/" + quoteSymbol.value}</code>" +
-                    "\nMarket Price: <b>${(currentWallet.getMarketPrice()?.toPlainString() ?: "Unknown") + " " + quoteSymbol.value}</b>" +
-                    "\n\n-- Wallet Balances --" +
-                    "\n${baseSymbol.value}: <b>${formatAmount(baseSymbol, currentWallet.getWalletBalance(baseSymbol))}</b>" +
-                    "\n${quoteSymbol.value}: <b>${formatAmount(quoteSymbol, currentWallet.getWalletBalance(quoteSymbol))}</b>" +
-                    "\n\n-- Available Balances --" +
-                    "\n${baseSymbol.value}: <b>${formatAmount(baseSymbol, balances.availableBaseBalance)}</b>" +
-                    "\n${quoteSymbol.value}: <b>${formatAmount(quoteSymbol, balances.availableQuoteBalance)}</b>",
-                parseMode = "HTML",
-                keyboard = Bot.Output.SendMessage.Keyboard.Inline(
-                    listOf(
-                        listOf(
-                            callbackButton("Buy ${baseSymbol.value}", CallbackData.Buy),
-                            callbackButton("Sell ${baseSymbol.value}", CallbackData.Sell),
-                        ),
-                        listOf(
-                            callbackButton("Switch Markets", CallbackData.ListMarkets),
-                            callbackButton("Switch Wallets", CallbackData.ListWallets),
-                        ),
-                        listOf(
-                            callbackButton("Deposit ${baseSymbol.value}", CallbackData.DepositBase),
-                            callbackButton("Deposit ${quoteSymbol.value}", CallbackData.DepositQuote),
-                        ),
-                        listOf(
-                            callbackButton("Withdraw ${baseSymbol.value}", CallbackData.WithdrawBase),
-                            callbackButton("Withdraw ${quoteSymbol.value}", CallbackData.WithdrawQuote),
-                        ),
-                        listOfNotNull(
-                            if (currentWallet.airdropSupported(baseSymbol)) {
-                                callbackButton("Airdrop ${baseSymbol.value}", CallbackData.Airdrop(baseSymbol))
-                            } else {
-                                null
-                            },
-                            if (currentWallet.airdropSupported(quoteSymbol)) {
-                                callbackButton("Airdrop ${quoteSymbol.value}", CallbackData.Airdrop(quoteSymbol))
-                            } else {
-                                null
-                            },
-                        ),
-                        listOf(
-                            callbackButton("Settings", CallbackData.Settings),
-                        ),
-                    ),
-                ),
+        send(
+            BotMessage.MainMenu(
+                currentWallet.walletAddress,
+                currentWallet.getWalletBalances(),
+                currentWallet.getExchangeBalances(),
             ),
         )
-    }
-
-    private fun handleCallbackButtonClick(callbackData: CallbackData) {
-        when (callbackData) {
-            CallbackData.MainMenu -> {
-                sendMainMenu()
-            }
-
-            CallbackData.Settings -> {
-                val wallets = TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList()
-                deleteMessages()
-                sendMessage(
-                    Bot.Output.SendMessage(
-                        chatId = chatId,
-                        text = "Use this menu to change or view settings",
-                        keyboard = Bot.Output.SendMessage.Keyboard.Inline(
-                            listOf(
-                                listOf(
-                                    // TODO - this should be done by standing up a web page. Then when they click on the button, telegram pops
-                                    // up a window and navigates to that web page. That page has an input box for the private key and would
-                                    // submit to our backend. This way the private key does not flow through telegram servers or appear in
-                                    // the chat window. Same applies for viewing the private key below. For now they would paste it into
-                                    // the reply box here.
-                                    callbackButton("Import Wallet", CallbackData.ImportWallet),
-                                ),
-                                listOf(
-                                    callbackButton("Show Addresses", CallbackData.ShowAddresses),
-                                ),
-                            ) + wallets.map { wallet ->
-                                val abbreviateAddress = wallet.address.abbreviated()
-                                listOf(
-                                    callbackButton("Show Private Key for $abbreviateAddress", CallbackData.ShowPrivateKey(abbreviateAddress)),
-                                )
-                            } + listOf(
-                                listOf(
-                                    callbackButton("Main Menu", CallbackData.MainMenu),
-                                ),
-                            ),
-                        ),
-                    ),
-                    scheduleDeletion = true,
-                )
-            }
-
-            CallbackData.ImportWallet -> {
-                sendMessageForReply(
-                    text = "Import the private key of an existing wallet",
-                    replyType = TelegramUserReplyType.ImportKey,
-                    placeHolder = "Paste key here",
-                    scheduleDeletion = true,
-                )
-            }
-
-            CallbackData.ShowAddresses -> {
-                val wallets = TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList()
-                sendMessage(
-                    Bot.Output.SendMessage(
-                        chatId = chatId,
-                        text = wallets.joinToString("\n") {
-                            "<code>${it.address.value}</code>"
-                        },
-                        parseMode = "HTML",
-                    ),
-                )
-            }
-
-            is CallbackData.ShowPrivateKey -> {
-                sendMessage(
-                    Bot.Output.SendMessage(
-                        chatId = chatId,
-                        text = "<code>${currentWallet.wallet.encryptedPrivateKey.decrypt()}</code>",
-                        parseMode = "HTML",
-                    ),
-                    scheduleDeletion = true,
-                )
-            }
-
-            CallbackData.Buy -> {
-                val balances = currentWallet.getBalances()
-                sendMessageForReply(
-                    "Enter amount (${formatAmountWithSymbol(balances.quoteSymbol, balances.availableQuoteBalance)} available)",
-                    TelegramUserReplyType.BuyAmount,
-                )
-            }
-
-            CallbackData.Sell -> {
-                val balances = currentWallet.getBalances()
-                sendMessageForReply(
-                    "Enter amount (${formatAmountWithSymbol(balances.baseSymbol, balances.availableBaseBalance)} available)",
-                    TelegramUserReplyType.SellAmount,
-                )
-            }
-
-            CallbackData.ListMarkets -> {
-                val markets = currentWallet.config.markets
-                sendMessage(
-                    Bot.Output.SendMessage(
-                        chatId = chatId,
-                        text = "Press the appropriate button to switch markets",
-                        keyboard = Bot.Output.SendMessage.Keyboard.Inline(
-                            markets.map { market ->
-                                listOf(
-                                    callbackButton("${if (market == currentWallet.currentMarket) "✔ " else ""}${market.id.value}", CallbackData.SwitchMarket(market.id.value)),
-                                )
-                            },
-                        ),
-                    ),
-                    scheduleDeletion = true,
-                )
-            }
-
-            is CallbackData.SwitchMarket -> {
-                switchMarket(MarketId(callbackData.to))
-                sendMainMenu()
-            }
-
-            CallbackData.ListWallets -> {
-                val wallets = TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList()
-                sendMessage(
-                    Bot.Output.SendMessage(
-                        text = "Press the appropriate button to switch wallets",
-                        chatId = chatId,
-                        keyboard = Bot.Output.SendMessage.Keyboard.Inline(
-                            wallets.map { wallet ->
-                                val abbreviateAddress = wallet.address.abbreviated()
-                                listOf(
-                                    callbackButton("${if (wallet.isCurrent) "✔ " else ""}$abbreviateAddress", CallbackData.SwitchWallet(abbreviateAddress)),
-                                )
-                            },
-                        ),
-                    ),
-                    scheduleDeletion = true,
-                )
-            }
-
-            is CallbackData.SwitchWallet -> {
-                val wallet = TelegramBotUserEntity.getOrCreate(telegramUserId).wallets.toList()
-                    .find { it.address.abbreviated() == callbackData.to }
-                    ?: throw RuntimeException("Invalid wallet")
-
-                switchWallet(wallet)
-                sendMainMenu()
-            }
-
-            CallbackData.DepositBase -> {
-                val symbol = currentWallet.currentMarket.baseSymbol
-                val walletBalance = currentWallet.getWalletBalance(symbol)
-                sendMessageForReply(
-                    "Enter amount (${formatAmountWithSymbol(symbol, walletBalance)} available)",
-                    TelegramUserReplyType.DepositBaseAmount,
-                )
-            }
-
-            CallbackData.DepositQuote -> {
-                val symbol = currentWallet.currentMarket.quoteSymbol
-                val walletBalance = currentWallet.getWalletBalance(symbol)
-                sendMessageForReply(
-                    "Enter amount (${formatAmountWithSymbol(symbol, walletBalance)} available)",
-                    TelegramUserReplyType.DepositQuoteAmount,
-                )
-            }
-
-            CallbackData.WithdrawBase -> {
-                val walletBalance = currentWallet.getBalances()
-                sendMessageForReply(
-                    "Enter amount (${formatAmountWithSymbol(walletBalance.baseSymbol, walletBalance.availableBaseBalance)} available)",
-                    TelegramUserReplyType.WithdrawBaseAmount,
-                )
-            }
-
-            CallbackData.WithdrawQuote -> {
-                val walletBalance = currentWallet.getBalances()
-                sendMessageForReply(
-                    "Enter amount (${formatAmountWithSymbol(walletBalance.quoteSymbol, walletBalance.availableQuoteBalance)} available)",
-                    TelegramUserReplyType.WithdrawQuoteAmount,
-                )
-            }
-
-            is CallbackData.Airdrop -> {
-                val symbol = callbackData.symbol
-                if (currentWallet.airdropSupported(symbol)) {
-                    currentWallet
-                        .airdrop(symbol)
-                        .onLeft {
-                            sendMessage("❌ Airdrop failed with error: (${it.error?.displayMessage ?: "Unknown Error"})")
-                        }
-                        .onRight {
-                            sendMessage("✅ ${formatAmountWithSymbol(symbol, it.amount)} will be transferred to your wallet")
-                            onTxReceipt(it.chainId, it.txHash) { receipt ->
-                                transaction {
-                                    if (receipt.isStatusOK) {
-                                        sendMessage("✅ ${formatAmountWithSymbol(symbol, it.amount)} was transferred to your wallet")
-                                        sendMainMenu()
-                                    } else {
-                                        sendMessage("❌ Airdrop transaction ${it.txHash.value} has failed")
-                                    }
-                                }
-                            }
-                        }
-                } else {
-                    sendMessage("❌ Airdrop is not supported for ${symbol.value}")
-                }
-            }
-        }
-    }
-
-    private fun handleReplyMessage(originalMessageId: TelegramMessageId, replyMessageId: TelegramMessageId, text: String) {
-        val botUser = TelegramBotUserEntity.getOrCreate(telegramUserId)
-
-        if (originalMessageId != botUser.expectedReplyMessageId) {
-            sendMessage("❌ Unexpected reply message")
-        } else {
-            when (val expectedReplyType = botUser.expectedReplyType) {
-                TelegramUserReplyType.ImportKey -> {
-                    try {
-                        val privateKey = text
-                        switchWallet(
-                            TelegramBotUserWalletEntity.create(
-                                WalletEntity.getOrCreate(Address.fromPrivateKey(privateKey)),
-                                botUser,
-                                privateKey.encrypt(),
-                                isCurrent = true,
-                            ).also {
-                                it.flush()
-                            },
-                        )
-                        botUser.messageIdsForDeletion += replyMessageId
-                        sendMessage("✅ Your private key has been imported. Your wallet address is ${currentWallet.walletAddress.value}")
-                    } catch (e: Exception) {
-                        logger.error(e) { "Failed to import key" }
-                        botUser.messageIdsForDeletion += replyMessageId
-                        sendMessage("❌ ${e.message}")
-                    }
-                }
-
-                TelegramUserReplyType.DepositBaseAmount, TelegramUserReplyType.DepositQuoteAmount -> {
-                    try {
-                        val symbol = if (expectedReplyType == TelegramUserReplyType.DepositBaseAmount) {
-                            currentWallet.currentMarket.baseSymbol
-                        } else {
-                            currentWallet.currentMarket.quoteSymbol
-                        }
-
-                        val txHash = runBlocking { currentWallet.deposit(text, symbol) }
-                        if (txHash == null) {
-                            sendMessage("❌ Deposit of ${symbol.value} approval failed")
-                        } else {
-                            botUser.addPendingDeposit(txHash)
-                            sendMessage("✅ Deposit of ${symbol.value} initiated")
-                            sendMessage("✅ Deposit in progress")
-                        }
-                    } catch (e: Exception) {
-                        logger.error(e) { "Deposit failed" }
-                        sendMessage("❌ ${e.message}")
-                    }
-                }
-
-                TelegramUserReplyType.WithdrawBaseAmount, TelegramUserReplyType.WithdrawQuoteAmount -> {
-                    val symbol = if (expectedReplyType == TelegramUserReplyType.WithdrawBaseAmount) {
-                        currentWallet.currentMarket.baseSymbol
-                    } else {
-                        currentWallet.currentMarket.quoteSymbol
-                    }
-
-                    sendMessage(
-                        currentWallet
-                            .withdraw(text, symbol)
-                            .fold(
-                                { "❌ Withdraw failed (${it.error?.displayMessage ?: "Unknown Error"})" },
-                                { "✅ Withdraw succeeded" },
-                            ),
-                    )
-                }
-
-                TelegramUserReplyType.BuyAmount, TelegramUserReplyType.SellAmount -> {
-                    val side = if (expectedReplyType == TelegramUserReplyType.BuyAmount) {
-                        OrderSide.Buy
-                    } else {
-                        OrderSide.Sell
-                    }
-
-                    currentWallet
-                        .createOrder(text, side)
-                        .onLeft {
-                            sendMessage("❌ Order failed (${it.error?.displayMessage ?: "Unknown Error"})")
-                        }
-                }
-
-                else -> sendMessage("❌ Unexpected reply")
-            }
-        }
-
-        if (showMenuAfterReply()) {
-            sendMainMenu()
-        }
     }
 
     private fun switchWallet(walletEntity: TelegramBotUserWalletEntity) {
@@ -443,181 +676,27 @@ class BotSession(
 
             walletEntity.isCurrent = true
 
-            currentWallet = BotSessionCurrentWallet(
-                walletEntity,
-                onBalanceUpdated = ::onBalanceUpdated,
-                onOrderCreated = ::onOderCreated,
-                onOrderUpdated = ::onOrderUpdated,
-                onTradeUpdated = ::onTradeUpdated,
-            )
+            currentWallet = BotSessionCurrentWallet(walletEntity)
             currentWallet.start()
-            TelegramBotUserEntity.getOrCreate(telegramUserId).currentMarketId?.value?.also {
-                currentWallet.switchCurrentMarket(it)
-            }
-        }
-    }
-
-    private fun onBalanceUpdated(balances: List<Balance>) {
-        transaction {
-            TelegramBotUserEntity.getOrCreate(telegramUserId).apply {
-                if (pendingDeposits.isNotEmpty()) {
-                    val finalizedDeposits = currentWallet
-                        .listDeposits()
-                        .filter {
-                            (it.status == Deposit.Status.Complete || it.status == Deposit.Status.Failed) &&
-                                pendingDeposits.contains(it.txHash)
-                        }
-
-                    finalizedDeposits.forEach { deposit ->
-                        removePendingDeposit(deposit.txHash)
-                        when (deposit.status) {
-                            Deposit.Status.Failed -> {
-                                runBlocking {
-                                    sendMessage("❌ Deposit of ${deposit.symbol.value} failed")
-                                    sendMainMenu()
-                                }
-                            }
-                            Deposit.Status.Complete -> {
-                                runBlocking {
-                                    sendMessage("✅ Deposit of ${deposit.symbol.value} completed")
-                                    sendMainMenu()
-                                }
-                            }
-                            else -> {}
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun onOderCreated(order: Order) {
-        transaction {
-            sendMessage(formatOrder(order, isCreated = true))
-        }
-    }
-
-    private fun onOrderUpdated(order: Order) {
-        transaction {
-            sendMessage(formatOrder(order, isCreated = false))
-        }
-    }
-
-    private fun formatOrder(order: Order, isCreated: Boolean = false): String {
-        val market = currentWallet.config.markets.first { it.id == order.marketId }
-        val status = when (order.status) {
-            OrderStatus.Filled -> "filled"
-            OrderStatus.Partial -> "partially filled (${formatAmountWithSymbol(market.baseSymbol, order.executions.first().amount)})"
-            OrderStatus.Failed, OrderStatus.Rejected -> "rejected"
-            OrderStatus.Cancelled -> "cancelled"
-            OrderStatus.Open -> if (isCreated) "opened" else "updated"
-            OrderStatus.Expired -> "expired"
-        }
-        val executionPrice = when (order.status) {
-            OrderStatus.Partial, OrderStatus.Filled -> "at price of ${order.executions.first().price.setScale(6, RoundingMode.FLOOR).toPlainString()}"
-            else -> ""
-        }
-        val emoji = when (order.status) {
-            OrderStatus.Partial, OrderStatus.Filled, OrderStatus.Open -> "✅"
-            else -> "❌"
-        }
-        return "$emoji Order to ${order.side} ${formatAmountWithSymbol(market.baseSymbol, order.amount)} $status $executionPrice"
-    }
-
-    private fun onTradeUpdated(trade: Trade) {
-        transaction {
-            if (trade.settlementStatus == SettlementStatus.Completed) {
-                val market = currentWallet.config.markets.first { it.id == trade.marketId }
-                sendMessage("✅ Trade to ${trade.side} ${formatAmountWithSymbol(market.baseSymbol, trade.amount)} has settled")
-                sendMainMenu()
-            }
-        }
-    }
-
-    private fun switchMarket(marketId: MarketId) {
-        currentWallet.switchCurrentMarket(marketId)
-        TelegramBotUserEntity.getOrCreate(telegramUserId).updateMarket(marketId)
-    }
-
-    private fun showMenuAfterReply(): Boolean {
-        return when (TelegramBotUserEntity.getOrCreate(telegramUserId).expectedReplyType) {
-            TelegramUserReplyType.ImportKey, TelegramUserReplyType.WithdrawBaseAmount, TelegramUserReplyType.WithdrawQuoteAmount -> true
-            else -> false
         }
     }
 
     private fun deleteMessages() {
         TelegramBotUserEntity.getOrCreate(telegramUserId).apply {
             messageIdsForDeletion.forEach { messageId ->
-                outputChannel.deleteMessage(Bot.Output.DeleteMessage(chatId, messageId))
+                outputChannel.deleteMessage(BotOutput.DeleteMessage(chatId, messageId))
             }
             messageIdsForDeletion = emptyList()
         }
     }
 
-    private fun sendMessage(message: String) =
-        sendMessage(Bot.Output.SendMessage(chatId = chatId, text = message))
+    private fun send(message: BotMessage, scheduleDeletion: Boolean = false) =
+        send(message.render(chatId), scheduleDeletion)
 
-    private fun sendMessageForReply(
-        text: String,
-        replyType: TelegramUserReplyType,
-        placeHolder: String = text,
-        scheduleDeletion: Boolean = false,
-    ) {
-        sendMessage(
-            Bot.Output.SendMessage(
-                chatId = chatId,
-                text = text,
-                keyboard = Bot.Output.SendMessage.Keyboard.ForceReply(
-                    inputFieldPlaceholder = placeHolder,
-                    expectedReplyType = replyType,
-                ),
-            ),
-            scheduleDeletion = scheduleDeletion,
-        )
-    }
-
-    private fun sendMessage(message: Bot.Output.SendMessage, scheduleDeletion: Boolean = false) {
+    private fun send(message: BotOutput.SendMessage, scheduleDeletion: Boolean = false) {
         val sentMessageId = outputChannel.sendMessage(message)
-
-        when (message.keyboard) {
-            is Bot.Output.SendMessage.Keyboard.ForceReply -> {
-                TelegramBotUserEntity.getOrCreate(telegramUserId).apply {
-                    this.expectedReplyMessageId = sentMessageId
-                    this.expectedReplyType = message.keyboard.expectedReplyType
-                }
-            }
-            else -> {}
-        }
-
         if (scheduleDeletion) {
             TelegramBotUserEntity.getOrCreate(telegramUserId).messageIdsForDeletion += sentMessageId
         }
     }
-
-    private fun formatAmountWithSymbol(symbol: Symbol, amount: BigInteger): String {
-        return "${formatAmount(symbol, amount)} ${symbol.value}"
-    }
-
-    private fun formatAmount(symbol: Symbol, amount: BigInteger): String {
-        return amount.fromFundamentalUnits(decimals(symbol)).setScale(minOf(decimals(symbol), 8), RoundingMode.FLOOR).toPlainString()
-    }
-
-    private fun decimals(symbol: Symbol) =
-        currentWallet.symbolInfoBySymbol.getValue(symbol).decimals.toInt()
-
-    // checks for tx receipt periodically with 1-second delay until it gets one
-    private fun onTxReceipt(chainId: ChainId, txHash: TxHash, callback: suspend (TransactionReceipt) -> Unit) {
-        timer.schedule({
-            val txReceipt = currentWallet.getTxReceipt(chainId, txHash)
-            if (txReceipt == null) {
-                onTxReceipt(chainId, txHash, callback)
-            } else {
-                runBlocking { callback(txReceipt) }
-            }
-        }, 1L, TimeUnit.SECONDS)
-    }
 }
-
-fun callbackButton(text: String, callbackData: CallbackData): Bot.Output.SendMessage.Keyboard.Inline.CallbackButton =
-    Bot.Output.SendMessage.Keyboard.Inline.CallbackButton(text = text, data = callbackData)

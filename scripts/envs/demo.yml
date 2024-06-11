@@ -26,6 +26,7 @@ environment:
     EVM_NETWORK_URL_Bitlayer: http://demo-anvil.chainring.co:8545
     EVM_NETWORK_URL_Botanix: http://demo-anvil2.chainring.co:8545
     FAUCET_SUPPORTED: "true"
+    SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
   anvil2:
     CHAIN_ID: "31339"
   otterscan:
