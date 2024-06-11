@@ -886,12 +886,15 @@ data class Market(
             this.maxOfferIx = this@Market.maxOfferIx
             this.bestBid = this@Market.bestBid.toDecimalValue()
             this.bestOffer = this@Market.bestOffer.toDecimalValue()
-            this@Market.levels.forEach { level ->
+            val firstLevelWithData = this.minBidIx.let { if (it == -1) levelIx(this@Market.bestOffer) else it }
+            val lastLevelWithData = this.maxOfferIx.let { if (it == -1) levelIx(this@Market.bestBid) else it }
+            (firstLevelWithData..lastLevelWithData).forEach { i ->
+                val level = this@Market.levels[i]
                 if (level.totalQuantity > BigInteger.ZERO) {
                     this.levels.add(level.toCheckpoint())
                 }
             }
-        }
+        }feedba
     }
 
     private fun logState() {
