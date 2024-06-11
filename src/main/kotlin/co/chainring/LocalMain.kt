@@ -1,6 +1,7 @@
 package co.chainring
 
 import co.chainring.apps.api.ApiApp
+import co.chainring.apps.ring.RingApp
 import co.chainring.tasks.blockchainClients
 import co.chainring.tasks.fixtures.getFixtures
 import co.chainring.tasks.migrateDatabase
@@ -25,6 +26,7 @@ fun main(args: Array<String>) {
             logger.info { "Starting all apps" }
 
             try {
+                RingApp().start()
                 ApiApp().start()
             } catch (e: Throwable) {
                 logger.error(e) { "Failed to start" }
