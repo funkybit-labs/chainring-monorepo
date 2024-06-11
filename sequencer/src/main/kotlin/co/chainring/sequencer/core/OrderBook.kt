@@ -85,10 +85,13 @@ class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal
             this.totalQuantity = this@OrderBookLevel.totalQuantity.toIntegerValue()
             this.orderHead = this@OrderBookLevel.orderHead
             this.orderTail = this@OrderBookLevel.orderTail
-            // tail points to the next free slot. When level is empty (0..-1) range results in no action.
-            (this@OrderBookLevel.orderHead..this@OrderBookLevel.orderTail - 1).forEach { i ->
-                val order = this@OrderBookLevel.orders[i]
+
+            // store orders respecting level's circular buffer
+            var currentIndex = this@OrderBookLevel.orderHead
+            while (currentIndex != this@OrderBookLevel.orderTail) {
+                val order = this@OrderBookLevel.orders[currentIndex]
                 this.orders.add(order.toCheckpoint())
+                currentIndex = (currentIndex + 1) % this@OrderBookLevel.maxOrderCount
             }
         }
     }
@@ -101,10 +104,13 @@ class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal
             MarketCheckpoint.BookSide.Sell -> BookSide.Sell
             else -> throw IllegalStateException("Unexpected level book side '${checkpoint.side}'")
         }
+
+        // restore orders respecting level's circular buffer
         val checkpointOrdersCount = checkpoint.ordersList.size
-        (0.until(checkpointOrdersCount)).forEach { i ->
+        for (i in 0 until checkpointOrdersCount) {
             val orderCheckpoint = checkpoint.ordersList[i]
-            orders[orderHead + i].fromCheckpoint(orderCheckpoint)
+            val index = (orderHead + i) % maxOrderCount
+            orders[index].fromCheckpoint(orderCheckpoint)
         }
         totalQuantity = checkpoint.totalQuantity.toBigInteger()
     }
@@ -167,8 +173,8 @@ class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal
         val orderIx = orders.indexOf(levelOrder)
         totalQuantity -= levelOrder.quantity
         levelOrder.reset()
-        if (orderIx == (orderTail - 1) % maxOrderCount) {
-            orderTail = (orderTail - 1) % maxOrderCount
+        if (orderIx == (orderTail - 1 + maxOrderCount) % maxOrderCount) {
+            orderTail = (orderTail - 1 + maxOrderCount) % maxOrderCount
         } else if (orderIx < orderHead) {
             // copy from after orderIx to orderTail, and decrement orderTail
             if (orderIx < orderTail) {
@@ -176,7 +182,7 @@ class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal
                 System.arraycopy(orders, orderIx + 1, orders, orderIx, orderTail - orderIx)
                 orders[orderTail] = orderIxRef
             }
-            orderTail = (orderTail - 1) % maxOrderCount
+            orderTail = (orderTail - 1 + maxOrderCount) % maxOrderCount
         } else {
             if (orderIx > orderHead) {
                 val orderIxRef = orders[orderIx]
@@ -199,10 +205,22 @@ class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal
         if (side != other.side) return false
         if (price != other.price) return false
         if (maxOrderCount != other.maxOrderCount) return false
-        if (!orders.contentEquals(other.orders)) return false
         if (totalQuantity != other.totalQuantity) return false
-        if (orderHead != other.orderHead) return false
-        return orderTail == other.orderTail
+
+        // Compare orders between orderHead and orderTail
+        var thisOrderIndex = this.orderHead
+        var otherOrderIndex = other.orderHead
+
+        while (thisOrderIndex != this.orderTail && otherOrderIndex != other.orderTail) {
+            if (this.orders[thisOrderIndex] != other.orders[otherOrderIndex]) return false
+            thisOrderIndex = (thisOrderIndex + 1) % this.maxOrderCount
+            otherOrderIndex = (otherOrderIndex + 1) % other.maxOrderCount
+        }
+
+        // Check if both iterated to their respective tails
+        if (thisOrderIndex != this.orderTail || otherOrderIndex != other.orderTail) return false
+
+        return true
     }
 
     override fun hashCode(): Int {
@@ -210,10 +228,17 @@ class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal
         result = 31 * result + side.hashCode()
         result = 31 * result + price.hashCode()
         result = 31 * result + maxOrderCount
-        result = 31 * result + orders.contentHashCode()
         result = 31 * result + totalQuantity.hashCode()
         result = 31 * result + orderHead
         result = 31 * result + orderTail
+
+        // include orders between head and tail
+        var currentIndex = orderHead
+        while (currentIndex != orderTail) {
+            result = 31 * result + orders[currentIndex].hashCode()
+            currentIndex = (currentIndex + 1) % maxOrderCount
+        }
+
         return result
     }
 }

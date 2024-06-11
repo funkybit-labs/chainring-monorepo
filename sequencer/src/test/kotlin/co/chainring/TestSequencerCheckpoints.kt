@@ -23,9 +23,11 @@ import co.chainring.sequencer.proto.GatewayGrpcKt
 import co.chainring.sequencer.proto.MarketCheckpoint
 import co.chainring.sequencer.proto.MetaInfoCheckpoint
 import co.chainring.sequencer.proto.Order
+import co.chainring.sequencer.proto.Order.Type
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.balanceBatch
+import co.chainring.sequencer.proto.cancelOrder
 import co.chainring.sequencer.proto.deposit
 import co.chainring.sequencer.proto.feeRates
 import co.chainring.sequencer.proto.market
@@ -697,6 +699,104 @@ class TestSequencerCheckpoints {
                                 FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                             )
                         }
+                    },
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `test state storing and loading - order level circular buffer - limit sells`() {
+        `test state storing and loading - order level circular buffer`(Type.LimitSell)
+    }
+
+    @Test
+    fun `test state storing and loading - order level circular buffer - limit buys`() {
+        `test state storing and loading - order level circular buffer`(Type.LimitBuy)
+    }
+
+    private fun `test state storing and loading - order level circular buffer`(orderType: Type) {
+        val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
+        val price = when (orderType) {
+            Type.LimitBuy -> BigDecimal("17.500").toDecimalValue()
+            Type.LimitSell -> BigDecimal("17.550").toDecimalValue()
+            else -> throw IllegalArgumentException("$orderType not supported")
+        }
+
+        verifySerialization(
+            SequencerState(
+                feeRates = feeRates,
+                balances = mutableMapOf(
+                    wallet1 to mutableMapOf(
+                        btc to BigDecimal("1").inSats(),
+                        eth to BigDecimal("2").inWei(),
+                    ),
+                    wallet2 to mutableMapOf(
+                        btc to BigDecimal("3").inSats(),
+                    ),
+                ),
+                markets = mutableMapOf(
+                    btcEthMarketId to Market(
+                        id = btcEthMarketId,
+                        tickSize = BigDecimal("0.05"),
+                        maxLevels = 1000,
+                        maxOrdersPerLevel = 1000,
+                        initialMarketPrice = BigDecimal("17.525"),
+                        baseDecimals = 18,
+                        quoteDecimals = 18,
+                    ).also { market ->
+                        // fill and remove data to set level's head and tail to the position 990
+                        (0..990).map {
+                            order {
+                                this.guid = it.toLong()
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = price
+                                this.type = orderType
+                            }
+                        }.also { orders ->
+                            market.applyOrderBatch(
+                                orderBatch {
+                                    guid = UUID.randomUUID().toString()
+                                    marketId = btcEthMarketId.value
+                                    wallet = wallet1.value
+                                    ordersToAdd.addAll(orders)
+                                },
+                                feeRates,
+                            )
+
+                            market.applyOrderBatch(
+                                orderBatch {
+                                    guid = UUID.randomUUID().toString()
+                                    marketId = btcEthMarketId.value
+                                    wallet = wallet1.value
+                                    ordersToCancel.addAll(
+                                        orders.map {
+                                            cancelOrder {
+                                                this.guid = it.guid
+                                            }
+                                        },
+                                    )
+                                },
+                                feeRates,
+                            )
+                        }
+
+                        // add 20 more orders to wrap level's buffer
+                        (991..1010).map {
+                            order {
+                                this.guid = it.toLong()
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.price = price
+                                this.type = orderType
+                            }
+                        }.forEach { order ->
+                            market.addOrder(wallet1.value, order, feeRates)
+                        }
+
+                        // verify setup
+                        val targetLevel = market.levels[market.levelIx(price.toBigDecimal())]
+                        assertEquals(990, targetLevel.orderHead)
+                        assertEquals(10, targetLevel.orderTail)
                     },
                 ),
             ),
