@@ -200,7 +200,7 @@ module "rds" {
   instance_class = "db.t3.medium"
   security_groups = [
     module.api.security_group_id, module.bastion.security_group.id, module.sequencer.security_group_id,
-    module.telegrambot.security_group_id
+    module.telegrambot.security_group_id, module.ring.security_group_id
   ]
   vpc         = module.vpc.vpc
   aws_region  = var.aws_region
