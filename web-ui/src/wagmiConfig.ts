@@ -30,7 +30,7 @@ export const initializeWagmiConfig = async () => {
       id: chain.id,
       name: chain.name,
       nativeCurrency: {
-        decimals: 18,
+        decimals: nativeSymbol.decimals,
         name: nativeSymbol.description,
         symbol: nativeSymbol.name
       },
