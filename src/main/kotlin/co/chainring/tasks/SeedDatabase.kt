@@ -27,7 +27,7 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
 
         fixtures.chains.forEach { chain ->
             if (ChainEntity.findById(chain.id) == null) {
-                ChainEntity.create(chain.id, chain.name).flush()
+                ChainEntity.create(chain.id, chain.name, chain.jsonRpcUrl, chain.blockExplorerNetName, chain.blockExplorerUrl).flush()
                 println("Created chain ${chain.name} with id=${chain.id}")
             }
             if (BlockchainNonceEntity.findByKeyAndChain(chain.submitterAddress, chain.id) == null) {
@@ -45,7 +45,7 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                         symbol.chainId,
                         contractAddress = contractAddress,
                         decimals = symbol.decimals.toUByte(),
-                        description = ""
+                        description = symbol.description
                     ).also {
                         it.flush()
                         println("Created symbol ${symbol.name} with guid=${it.guid.value}")

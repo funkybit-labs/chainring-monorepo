@@ -173,6 +173,7 @@ class Wallet(
             TokenAddressAndChain(erc20TokenAddress(symbol)?.let { Address(it) } ?: Address.zero, this.currentChainId),
             amount,
             nonce,
+            amount == BigInteger.ZERO,
             EvmSignature.emptySignature(),
         )
         return CreateWithdrawalApiRequest(

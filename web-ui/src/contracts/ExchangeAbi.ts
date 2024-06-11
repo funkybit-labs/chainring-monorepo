@@ -396,37 +396,6 @@ export default [
     },
     {
         "type": "event",
-        "name": "AmountAdjusted",
-        "inputs": [
-            {
-                "name": "sender",
-                "type": "address",
-                "indexed": true,
-                "internalType": "address"
-            },
-            {
-                "name": "token",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address"
-            },
-            {
-                "name": "requested",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256"
-            },
-            {
-                "name": "actual",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
         "name": "Deposit",
         "inputs": [
             {
@@ -497,7 +466,7 @@ export default [
             {
                 "name": "_address",
                 "type": "address",
-                "indexed": false,
+                "indexed": true,
                 "internalType": "address"
             },
             {
@@ -516,7 +485,7 @@ export default [
             {
                 "name": "_address",
                 "type": "address",
-                "indexed": false,
+                "indexed": true,
                 "internalType": "address"
             },
             {
@@ -526,10 +495,16 @@ export default [
                 "internalType": "bytes32[]"
             },
             {
-                "name": "errorCode",
-                "type": "uint8",
+                "name": "requestedAmount",
+                "type": "uint256",
                 "indexed": false,
-                "internalType": "enum IExchange.ErrorCode"
+                "internalType": "uint256"
+            },
+            {
+                "name": "balance",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256"
             }
         ],
         "anonymous": false
@@ -558,6 +533,12 @@ export default [
                 "internalType": "address"
             },
             {
+                "name": "sequence",
+                "type": "uint64",
+                "indexed": false,
+                "internalType": "uint64"
+            },
+            {
                 "name": "token",
                 "type": "address",
                 "indexed": false,
@@ -577,10 +558,34 @@ export default [
         "name": "WithdrawalFailed",
         "inputs": [
             {
+                "name": "_address",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address"
+            },
+            {
                 "name": "sequence",
                 "type": "uint64",
                 "indexed": false,
                 "internalType": "uint64"
+            },
+            {
+                "name": "token",
+                "type": "address",
+                "indexed": false,
+                "internalType": "address"
+            },
+            {
+                "name": "amount",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256"
+            },
+            {
+                "name": "balance",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256"
             },
             {
                 "name": "errorCode",

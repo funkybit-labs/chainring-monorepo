@@ -14,8 +14,8 @@ import org.web3j.abi.DefaultFunctionEncoder
 import org.web3j.abi.datatypes.DynamicStruct
 import org.web3j.crypto.StructuredData
 
-fun serializeTx(struct: DynamicStruct): ByteArray {
-    return DefaultFunctionEncoder().encodeParameters(listOf(struct)).toHexBytes()
+fun serializeTx(txType: ExchangeTransactions.TransactionType, struct: DynamicStruct): ByteArray {
+    return listOf(txType.ordinal.toByte()).toByteArray() + DefaultFunctionEncoder().encodeParameters(listOf(struct)).toHexBytes()
 }
 
 enum class EIP712TransactionType {
@@ -44,6 +44,7 @@ sealed class EIP712Transaction {
         val token: TokenAddressAndChain,
         val amount: BigIntegerJson,
         val nonce: Long,
+        val withdrawAll: Boolean,
         override val signature: EvmSignature,
     ) : EIP712Transaction() {
 
@@ -62,13 +63,14 @@ sealed class EIP712Transaction {
             val message = mutableMapOf<String, String>()
             message["sender"] = sender.value
             message["token"] = token.address.value
-            message["amount"] = amount.toString()
+            message["amount"] = if (withdrawAll) "0" else amount.toString()
             message["nonce"] = nonce.toString()
             return message
         }
 
         override fun getTxData(sequence: Long): ByteArray {
             return serializeTx(
+                if (withdrawAll) ExchangeTransactions.TransactionType.WithdrawAll else ExchangeTransactions.TransactionType.Withdraw,
                 ExchangeTransactions.WithdrawWithSignature(ExchangeTransactions.Withdraw(sequence, sender.value, token.address.value, amount, nonce.toBigInteger()), signature.toByteArray()),
             )
         }

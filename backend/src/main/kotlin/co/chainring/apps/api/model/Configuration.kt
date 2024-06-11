@@ -20,6 +20,9 @@ data class Chain(
     val name: String,
     val contracts: List<DeployedContract>,
     val symbols: List<SymbolInfo>,
+    val jsonRpcUrl: String,
+    val blockExplorerNetName: String,
+    val blockExplorerUrl: String,
 )
 
 @Serializable

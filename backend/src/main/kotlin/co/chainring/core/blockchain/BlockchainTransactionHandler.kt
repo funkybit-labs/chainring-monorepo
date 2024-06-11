@@ -16,7 +16,6 @@ import co.chainring.core.model.db.ChainSettlementBatchEntity
 import co.chainring.core.model.db.SettlementBatchStatus
 import co.chainring.core.model.db.TradeEntity
 import co.chainring.core.model.db.TxHash
-import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
@@ -226,28 +225,34 @@ class BlockchainTransactionHandler(
                     ) { txReceipt, error ->
                         if (error == null) {
                             // extract the failed withdrawals from the events
-                            val failedWithdrawals = txReceipt.logs.mapNotNull { eventLog ->
+                            val failedWithdrawalBySequence = txReceipt.logs.mapNotNull { eventLog ->
                                 Contract.staticExtractEventParameters(
                                     Exchange.WITHDRAWALFAILED_EVENT,
                                     eventLog,
                                 )?.let {
-                                    Exchange.getWithdrawalFailedEventFromLog(eventLog)
+                                    val event = Exchange.getWithdrawalFailedEventFromLog(eventLog)
+                                    Pair(event.sequence.toLong(), event)
                                 }
+                            }.toMap()
+                            val completedWithdrawalBySequence = txReceipt.logs.mapNotNull { eventLog ->
+                                Contract.staticExtractEventParameters(
+                                    Exchange.WITHDRAWAL_EVENT,
+                                    eventLog,
+                                )?.let {
+                                    val event = Exchange.getWithdrawalEventFromLog(eventLog)
+                                    Pair(event.sequence.toLong(), event)
+                                }
+                            }.toMap()
+                            val (completedWithdrawals, failedWithdrawals) = settlingWithdrawals.partition { completedWithdrawalBySequence.keys.contains(it.sequenceId) }
+                            if (failedWithdrawals.isNotEmpty()) {
+                                failWithdrawals(failedWithdrawals, failedWithdrawalBySequence, "Unknown Error")
                             }
-
-                            val failedSequences = failedWithdrawals.map { failedWithdrawal ->
-                                val errorMsg = errorCodeToString(failedWithdrawal.errorCode)
-                                logger.error { "Received failed event for sequence ${failedWithdrawal.sequence}, errorMsg=$errorMsg errorCode=${failedWithdrawal.errorCode}" }
-                                settlingWithdrawals.firstOrNull { it.sequenceId.toBigInteger() == failedWithdrawal.sequence }?.let {
-                                    completeWithdrawals(listOf(it), errorMsg)
-                                }
-                                failedWithdrawal.sequence
-                            }.toSet()
-
-                            completeWithdrawals(settlingWithdrawals.filterNot { failedSequences.contains(it.sequenceId.toBigInteger()) })
+                            if (completedWithdrawals.isNotEmpty()) {
+                                completeWithdrawals(completedWithdrawals, completedWithdrawalBySequence)
+                            }
                         } else {
                             // mark all the withdrawals as failed
-                            completeWithdrawals(settlingWithdrawals, error)
+                            failWithdrawals(settlingWithdrawals, defaultErrorMsg = error)
                         }
                     }
                 }
@@ -287,7 +292,10 @@ class BlockchainTransactionHandler(
                                     }
                                 }
                                 if (failedTrades.isNotEmpty()) {
-                                    TradeEntity.markAsFailedSettling(failedTrades.map { it.tradeHashes.map { it.toHex() } }.flatten().toSet(), errorCodeToString(failedTrades.first().errorCode))
+                                    failedTrades.forEach {
+                                        logger.warn { "Failed trade address=${it._address}, needed=${it.requestedAmount} balance=${it.balance}" }
+                                    }
+                                    TradeEntity.markAsFailedSettling(failedTrades.map { it.tradeHashes.map { it.toHex() } }.flatten().toSet(), "Insufficient Balance")
                                 }
                                 inProgressBatch.markAsPrepared()
                             } else {
@@ -370,17 +378,40 @@ class BlockchainTransactionHandler(
         logger.debug { "batchHash stored = ${blockchainTx.batchHash} from contract = $onChainBatchHash" }
         if (blockchainTx.batchHash == onChainBatchHash) {
             // batch with this hash is already submitted on onchain (anvil restarted case)
-            completeWithdrawals(WithdrawalEntity.findSettling(chainId))
+            completeWithdrawals(WithdrawalEntity.findSettling(chainId), emptyMap())
         } else {
             // fork case
             blockchainTx.status = BlockchainTransactionStatus.Pending
         }
     }
 
-    private fun completeWithdrawals(settlingWithdrawals: List<WithdrawalEntity>, error: String? = null) {
+    private fun completeWithdrawals(settlingWithdrawals: List<WithdrawalEntity>, withdrawalEvents: Map<Long, Exchange.WithdrawalEventResponse> = emptyMap()) {
         settlingWithdrawals.forEach {
             try {
-                onTxComplete(it.transactionData!!, error)
+                val withdrawAmount = withdrawalEvents[it.sequenceId]?.let { event ->
+                    if (it.amount == BigInteger.ZERO && it.actualAmount != null && event.amount.compareTo(it.actualAmount) != 0) {
+                        logger.warn { "Withdraw all mismatch, sequencer=${it.actualAmount} contract=${event.amount} " }
+                    }
+                    event.amount
+                }
+                if (withdrawAmount == null) {
+                    logger.error { "No withdraw event received for ${it.sequenceId}" }
+                }
+                onWithdrawalComplete(it, null, withdrawAmount ?: it.actualAmount ?: it.amount)
+            } catch (e: Exception) {
+                logger.error(e) { "Callback exception for withdrawal with sequence ${it.sequenceId}" }
+            }
+        }
+    }
+
+    private fun failWithdrawals(failedWithdrawals: List<WithdrawalEntity>, failedEvents: Map<Long, Exchange.WithdrawalFailedEventResponse> = emptyMap(), defaultErrorMsg: String = "Unknown Error") {
+        failedWithdrawals.forEach {
+            try {
+                onWithdrawalComplete(
+                    it,
+                    failedEvents[it.sequenceId]?.toErrorString() ?: defaultErrorMsg,
+                    null,
+                )
             } catch (e: Exception) {
                 logger.error(e) { "Callback exception for withdrawal with sequence ${it.sequenceId}" }
             }
@@ -562,14 +593,6 @@ class BlockchainTransactionHandler(
         )
     }
 
-    private fun errorCodeToString(errorCode: BigInteger): String {
-        return when (errorCode) {
-            BigInteger.ZERO -> "Invalid Signature"
-            BigInteger.ONE -> "Insufficient Balance"
-            else -> "Unknown Error"
-        }
-    }
-
     private fun confirmations(currentBlock: BigInteger, startingBlock: BigInteger): Int {
         return (currentBlock - startingBlock).toLong().toInt() + 1
     }
@@ -632,58 +655,52 @@ class BlockchainTransactionHandler(
         }
     }
 
-    private fun onTxComplete(tx: EIP712Transaction, error: String?) {
+    private fun onWithdrawalComplete(withdrawalEntity: WithdrawalEntity, error: String?, withdrawAmount: BigInteger?) {
         transaction {
             val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
-            when (tx) {
-                is EIP712Transaction.WithdrawTx -> {
-                    WithdrawalEntity.findSettlingByWalletAndNonce(
-                        WalletEntity.getByAddress(tx.sender),
-                        tx.nonce,
-                    )?.let {
-                        it.update(
-                            status = error?.let { WithdrawalStatus.Failed }
-                                ?: WithdrawalStatus.Complete,
-                            error = error,
-                        )
-                        if (error == null) {
-                            val finalBalance = runBlocking {
-                                blockchainClient.getExchangeBalance(
-                                    it.wallet.address,
-                                    it.symbol.contractAddress ?: Address.zero,
-                                )
-                            }
-                            BalanceEntity.updateBalances(
-                                listOf(
-                                    BalanceChange.Replace(
-                                        it.wallet.id.value,
-                                        it.symbol.id.value,
-                                        finalBalance,
-                                    ),
-                                ),
-                                BalanceType.Exchange,
-                            )
-                            broadcasterNotifications.add(BroadcasterNotification.walletBalances(it.wallet))
-                        } else {
-                            val sequencerResponse = runBlocking {
-                                sequencerClient.failWithdraw(
-                                    tx.sender.toSequencerId().value,
-                                    Asset(it.symbol.name),
-                                    tx.amount,
-                                )
-                            }
-                            if (sequencerResponse.error == SequencerError.None) {
-                                logger.debug { "Successfully notified sequencer" }
-                            } else {
-                                logger.error { "Sequencer failed with error ${sequencerResponse.error} - fail withdrawals" }
-                            }
-                        }
-                    }
+            val tx = withdrawalEntity.transactionData!! as EIP712Transaction.WithdrawTx
+            withdrawalEntity.update(
+                status = error?.let { WithdrawalStatus.Failed }
+                    ?: WithdrawalStatus.Complete,
+                error = error,
+                actualAmount = withdrawAmount,
+            )
+            if (error == null) {
+                BalanceEntity.updateBalances(
+                    listOf(
+                        BalanceChange.Delta(
+                            withdrawalEntity.wallet.id.value,
+                            withdrawalEntity.symbol.id.value,
+                            withdrawAmount!!.negate(),
+                        ),
+                    ),
+                    BalanceType.Exchange,
+                )
+                broadcasterNotifications.add(BroadcasterNotification.walletBalances(withdrawalEntity.wallet))
+            } else {
+                val sequencerResponse = runBlocking {
+                    sequencerClient.failWithdraw(
+                        tx.sender.toSequencerId().value,
+                        Asset(withdrawalEntity.symbol.name),
+                        tx.amount,
+                    )
                 }
-                else -> {}
+                if (sequencerResponse.error == SequencerError.None) {
+                    logger.debug { "Successfully notified sequencer" }
+                } else {
+                    logger.error { "Sequencer failed with error ${sequencerResponse.error} - fail withdrawals" }
+                }
             }
 
             publishBroadcasterNotifications(broadcasterNotifications)
         }
+    }
+}
+
+fun Exchange.WithdrawalFailedEventResponse.toErrorString(): String {
+    return when (this.errorCode) {
+        BigInteger.ZERO -> "Invalid Signature"
+        BigInteger.ONE -> "Insufficient Balance, token(${this.token}), requested=${this.amount}, balance=${this.balance}"
+        else -> "Unknown Error"
     }
 }

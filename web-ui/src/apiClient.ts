@@ -49,7 +49,10 @@ const ChainSchema = z.object({
   id: z.number(),
   name: z.string(),
   contracts: z.array(DeployedContractSchema),
-  symbols: z.array(SymbolSchema)
+  symbols: z.array(SymbolSchema),
+  jsonRpcUrl: z.string(),
+  blockExplorerNetName: z.string(),
+  blockExplorerUrl: z.string()
 })
 export type Chain = z.infer<typeof ChainSchema>
 
@@ -68,7 +71,7 @@ const FeeRatesSchema = z.object({
 })
 export type FeeRates = z.infer<typeof FeeRatesSchema>
 
-const ConfigurationApiResponseSchema = z.object({
+export const ConfigurationApiResponseSchema = z.object({
   chains: z.array(ChainSchema),
   markets: z.array(MarketSchema),
   feeRates: FeeRatesSchema

@@ -87,8 +87,14 @@ open class TestWithDb {
         }
     }
 
-    protected fun createChain(id: ChainId, name: String): ChainEntity =
-        ChainEntity.create(id, name)
+    protected fun createChain(
+        id: ChainId,
+        name: String,
+        jsonRpcUrl: String = "",
+        blockExplorerNetName: String = "",
+        blockExplorerUrl: String = "",
+    ): ChainEntity =
+        ChainEntity.create(id, name, jsonRpcUrl, blockExplorerNetName, blockExplorerUrl)
 
     protected fun createNativeSymbol(
         name: String,

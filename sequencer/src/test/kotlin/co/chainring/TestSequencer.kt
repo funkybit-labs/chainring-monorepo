@@ -133,10 +133,10 @@ class TestSequencer {
         //         ETH1 = 12.376 - 1.0 - 0.01 = 11.366
         //   taker BTC1 = 0.2 - 0.1 = 0.1
         //         ETH1 = 7.552 + 1.0 - 0.02 = 8.532
-        sequencer.withdrawal(maker, btc1, BigDecimal(100), expectedAmount = BigDecimal("9.9"))
-        sequencer.withdrawal(maker, eth1, BigDecimal(100), expectedAmount = BigDecimal("11.366"))
-        sequencer.withdrawal(taker, btc1, BigDecimal(100), expectedAmount = BigDecimal("0.1"))
-        sequencer.withdrawal(taker, eth1, BigDecimal(100), expectedAmount = BigDecimal("8.532"))
+        sequencer.withdrawal(maker, btc1, BigDecimal.ZERO, expectedAmount = BigDecimal("9.9"))
+        sequencer.withdrawal(maker, eth1, BigDecimal.ZERO, expectedAmount = BigDecimal("11.366"))
+        sequencer.withdrawal(taker, btc1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.1"))
+        sequencer.withdrawal(taker, eth1, BigDecimal.ZERO, expectedAmount = BigDecimal("8.532"))
     }
 
     @Test
@@ -293,8 +293,11 @@ class TestSequencer {
         // withdraw half
         sequencer.withdrawal(walletAddress, asset1, BigDecimal("0.1"))
 
-        // request to withdraw amount, only half should be withdrawn
-        sequencer.withdrawal(walletAddress, asset1, BigDecimal("0.2"), expectedAmount = BigDecimal("0.1"))
+        // request for more than balance - should fail
+        sequencer.withdrawal(walletAddress, asset1, BigDecimal("0.2"), expectedAmount = null)
+
+        // request for the entire balance (set amount to zero) - should withdraw other half
+        sequencer.withdrawal(walletAddress, asset1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.1"))
 
         // attempt to withdraw more does not return a balance change
         sequencer.withdrawal(walletAddress, asset1, BigDecimal("0.1"), expectedAmount = null)
@@ -1178,10 +1181,10 @@ class TestSequencer {
         }
 
         // all balances should be back to original values
-        sequencer.withdrawal(maker, market.baseAsset, BigDecimal("100"), makerBaseBalance)
-        sequencer.withdrawal(maker, market.quoteAsset, BigDecimal("100"), makerQuoteBalance)
-        sequencer.withdrawal(taker, market.baseAsset, BigDecimal("100"), BigDecimal("10"))
-        sequencer.withdrawal(taker, market.quoteAsset, BigDecimal("100"), BigDecimal("10"))
+        sequencer.withdrawal(maker, market.baseAsset, BigDecimal.ZERO, makerBaseBalance)
+        sequencer.withdrawal(maker, market.quoteAsset, BigDecimal.ZERO, makerQuoteBalance)
+        sequencer.withdrawal(taker, market.baseAsset, BigDecimal.ZERO, BigDecimal("10"))
+        sequencer.withdrawal(taker, market.quoteAsset, BigDecimal.ZERO, BigDecimal("10"))
     }
 
     @Test
@@ -1268,10 +1271,10 @@ class TestSequencer {
         }
 
         // all balances should be back to original values
-        sequencer.withdrawal(maker, market.baseAsset, BigDecimal("10"), makerBaseBalance)
-        sequencer.withdrawal(maker, market.quoteAsset, BigDecimal("100"), makerQuoteBalance)
-        sequencer.withdrawal(taker, market.baseAsset, BigDecimal("10"), BigDecimal("1"))
-        sequencer.withdrawal(taker, market.quoteAsset, BigDecimal("100"), BigDecimal("40"))
+        sequencer.withdrawal(maker, market.baseAsset, BigDecimal.ZERO, makerBaseBalance)
+        sequencer.withdrawal(maker, market.quoteAsset, BigDecimal.ZERO, makerQuoteBalance)
+        sequencer.withdrawal(taker, market.baseAsset, BigDecimal.ZERO, BigDecimal("1"))
+        sequencer.withdrawal(taker, market.quoteAsset, BigDecimal.ZERO, BigDecimal("40"))
     }
 
     @Test
@@ -1345,10 +1348,10 @@ class TestSequencer {
         //   taker BTC1 = 10 + 0.43210
         //         ETH1 = 10 - 7.7350221 = 2.2649779
         // withdraw everything
-        sequencer.withdrawal(maker, market.baseAsset, BigDecimal("100"), BigDecimal("9.5679"))
-        sequencer.withdrawal(maker, market.quoteAsset, BigDecimal("100"), BigDecimal("17.50752145"))
-        sequencer.withdrawal(taker, market.baseAsset, BigDecimal("100"), BigDecimal("10.43210"))
-        sequencer.withdrawal(taker, market.quoteAsset, BigDecimal("100"), BigDecimal("2.2649779"))
+        sequencer.withdrawal(maker, market.baseAsset, BigDecimal.ZERO, BigDecimal("9.5679"))
+        sequencer.withdrawal(maker, market.quoteAsset, BigDecimal.ZERO, BigDecimal("17.50752145"))
+        sequencer.withdrawal(taker, market.baseAsset, BigDecimal.ZERO, BigDecimal("10.43210"))
+        sequencer.withdrawal(taker, market.quoteAsset, BigDecimal.ZERO, BigDecimal("2.2649779"))
 
         // now rollback the settlement - some balances go negative (takers base balance, and makers quote balance
         sequencer.failedSettlement(taker, maker, market, trade).also { response ->
@@ -1363,18 +1366,18 @@ class TestSequencer {
             )
         }
 
-        sequencer.withdrawal(maker, market.baseAsset, BigDecimal("100"), BigDecimal("0.43210"))
-        sequencer.withdrawal(taker, market.quoteAsset, BigDecimal("100"), BigDecimal("7.7350221"))
+        sequencer.withdrawal(maker, market.baseAsset, BigDecimal.ZERO, BigDecimal("0.43210"))
+        sequencer.withdrawal(taker, market.quoteAsset, BigDecimal.ZERO, BigDecimal("7.7350221"))
         // no balance change for these two since they went negative
-        sequencer.withdrawal(maker, market.quoteAsset, BigDecimal("100"), null)
-        sequencer.withdrawal(taker, market.baseAsset, BigDecimal("100"), null)
+        sequencer.withdrawal(maker, market.quoteAsset, BigDecimal.ZERO, null)
+        sequencer.withdrawal(taker, market.baseAsset, BigDecimal.ZERO, null)
 
         // now deposit to take balance positive and withdraw all to make sure adjustments are properly applied
         sequencer.deposit(maker, market.quoteAsset, BigDecimal("10"))
         sequencer.deposit(taker, market.baseAsset, BigDecimal("10"))
 
-        sequencer.withdrawal(maker, market.quoteAsset, BigDecimal("100"), BigDecimal("2.49247855"))
-        sequencer.withdrawal(taker, market.baseAsset, BigDecimal("100"), BigDecimal("9.56790000"))
+        sequencer.withdrawal(maker, market.quoteAsset, BigDecimal.ZERO, BigDecimal("2.49247855"))
+        sequencer.withdrawal(taker, market.baseAsset, BigDecimal.ZERO, BigDecimal("9.56790000"))
     }
 
     private val rnd = Random(0)
