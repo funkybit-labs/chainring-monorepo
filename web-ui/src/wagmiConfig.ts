@@ -86,3 +86,10 @@ export const initializeWagmiConfig = async () => {
 function isNonEmptyArray<T>(array: T[]): array is [T, ...T[]] {
   return array.length > 0
 }
+
+// Make wagmi config more type safe, see https://wagmi.sh/react/typescript#config-types
+declare module 'wagmi' {
+  interface Register {
+    config: typeof wagmiConfig
+  }
+}
