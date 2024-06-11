@@ -51,7 +51,7 @@ data class Fixtures(
 fun String.toChainSymbol(chainIndex: Int) = "$this${if (chainIndex == 0) "" else "${chainIndex + 1}"}"
 
 fun getFixtures(chainringChainClients: List<BlockchainClient>) = Fixtures(
-    feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
+    feeRates = FeeRates.fromPercents(maker = System.getenv("MAKER_FEE_RATE")?.toDoubleOrNull() ?: 1.0, taker = System.getenv("TAKER_FEE_RATE")?.toDoubleOrNull() ?: 2.0),
     chains = chainringChainClients.map {
         Fixtures.Chain(it.chainId, it.config.name, Address("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"), it.config.url, it.config.blockExplorerNetName, it.config.blockExplorerUrl)
     },
