@@ -61,17 +61,29 @@ object ChainTable : IdTable<ChainId>("chain") {
     override val primaryKey = PrimaryKey(id)
 
     val name = varchar("name", 10485760)
+    val jsonRpcUrl = varchar("json_rpc_url", 10485760)
+    val blockExplorerNetName = varchar("block_explorer_net_name", 10485760)
+    val blockExplorerUrl = varchar("block_explorer_url", 10485760)
 }
 
 class ChainEntity(id: EntityID<ChainId>) : Entity<ChainId>(id) {
     var name by ChainTable.name
+    var jsonRpcUrl by ChainTable.jsonRpcUrl
+    var blockExplorerNetName by ChainTable.blockExplorerNetName
+    var blockExplorerUrl by ChainTable.blockExplorerUrl
 
     companion object : EntityClass<ChainId, ChainEntity>(ChainTable) {
         fun create(
             id: ChainId,
             name: String,
+            jsonRpcUrl: String,
+            blockExplorerNetName: String,
+            blockExplorerUrl: String,
         ) = ChainEntity.new(id) {
             this.name = name
+            this.jsonRpcUrl = jsonRpcUrl
+            this.blockExplorerNetName = blockExplorerNetName
+            this.blockExplorerUrl = blockExplorerUrl
         }
 
         override fun all(): SizedIterable<ChainEntity> =
