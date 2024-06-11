@@ -35,7 +35,7 @@ import co.chainring.core.model.db.migrations.V39_AddSequencerTimeToOrder
 import co.chainring.core.model.db.migrations.V3_UpdateDeployedSmartContract
 import co.chainring.core.model.db.migrations.V40_OrderIndexes
 import co.chainring.core.model.db.migrations.V41_AddActualAmountToWithdrawalTable
-import co.chainring.core.model.db.migrations.V40_ChainConfiguration
+import co.chainring.core.model.db.migrations.V42_ChainConfiguration
 import co.chainring.core.model.db.migrations.V4_AddDecimalsToERC20Token
 import co.chainring.core.model.db.migrations.V5_ChainTable
 import co.chainring.core.model.db.migrations.V6_MarketTable
@@ -85,5 +85,5 @@ val migrations = listOf(
     V39_AddSequencerTimeToOrder(),
     V40_OrderIndexes(),
     V41_AddActualAmountToWithdrawalTable(),
-    V40_ChainConfiguration(),
+    V42_ChainConfiguration(),
 )

@@ -10,9 +10,9 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
 
 @Suppress("ClassName")
-class V40_ChainConfiguration : Migration() {
+class V42_ChainConfiguration : Migration() {
 
-    private object V40_ChainTable : IdTable<ChainId>("chain") {
+    private object V42_ChainTable : IdTable<ChainId>("chain") {
         override val id: Column<EntityID<ChainId>> = registerColumn<ChainId>("id", ChainIdColumnType()).entityId()
         override val primaryKey = PrimaryKey(id)
 
@@ -24,7 +24,7 @@ class V40_ChainConfiguration : Migration() {
 
     override fun run() {
         transaction {
-            SchemaUtils.createMissingTablesAndColumns(V40_ChainTable)
+            SchemaUtils.createMissingTablesAndColumns(V42_ChainTable)
         }
     }
 }
