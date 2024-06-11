@@ -57,6 +57,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.io.path.createDirectories
 import kotlin.io.path.name
 import kotlin.random.Random
+import kotlin.test.assertContentEquals
 import kotlin.time.Duration.Companion.seconds
 
 class TestSequencerCheckpoints {
@@ -716,7 +717,7 @@ class TestSequencerCheckpoints {
 
     private fun `test state storing and loading - order level circular buffer`(orderType: Type) {
         val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
-        val price = when(orderType) {
+        val price = when (orderType) {
             Type.LimitBuy -> BigDecimal("17.500").toDecimalValue()
             Type.LimitSell -> BigDecimal("17.550").toDecimalValue()
             else -> throw IllegalArgumentException("$orderType not supported")
@@ -745,7 +746,7 @@ class TestSequencerCheckpoints {
                         quoteDecimals = 18,
                     ).also { market ->
                         // fill and remove data to set level's head and tail to the position 990
-                        (0 .. 990).map {
+                        (0..990).map {
                             order {
                                 this.guid = it.toLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
@@ -781,7 +782,7 @@ class TestSequencerCheckpoints {
                         }
 
                         // add 20 more orders to wrap level's buffer
-                        (991 .. 1010).map {
+                        (991..1010).map {
                             order {
                                 this.guid = it.toLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
@@ -826,12 +827,11 @@ class TestSequencerCheckpoints {
                 }
             }
 
-            initialStateMarket.levels.forEachIndexed { levelIx, initialStateLevel ->
-                if (initialStateLevel != restoredStateMarket.levels[levelIx]) {
-                    println("breakpoint")
-                }
-                assertEquals(initialStateLevel, restoredStateMarket.levels[levelIx], "Level $levelIx in market ${initialStateMarket.id} does not match")
-            }
+            assertContentEquals(
+                initialStateMarket.levels,
+                restoredStateMarket.levels,
+                "Levels in market ${initialStateMarket.id} don't match",
+            )
         }
 
         assertEquals(initialState, restoredState)

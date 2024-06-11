@@ -177,7 +177,7 @@ class TestOrderBookLevel {
 
     @Test
     fun totalQuantity() {
-         val obl = OrderBookLevel(300, BookSide.Buy, BigDecimal.ONE, 100)
+        val obl = OrderBookLevel(300, BookSide.Buy, BigDecimal.ONE, 100)
         (1..2000)
             .map { getNextOrder(amount = it.toBigInteger()) }
             .chunked(42)
@@ -217,7 +217,7 @@ class TestOrderBookLevel {
         assertEquals(0, obl1.orderTail)
 
         val obl2 = OrderBookLevel(300, BookSide.Buy, BigDecimal.ONE, 100)
-        (0 .. 40)
+        (0..40)
             .map { obl2.addOrder(0L, getNextOrder(), feeRate = FeeRate.zero).second!! }
             .forEach { obl2.removeLevelOrder(it) }
         assertEquals(40, obl2.orderHead)
@@ -226,7 +226,7 @@ class TestOrderBookLevel {
         // empty levels are equal despite head/tail position
         assertEquals(obl1, obl2)
 
-        val fourtyOrders = (40 .. 80).map { getNextOrder(amount = it.toBigInteger()) }
+        val fourtyOrders = (40..80).map { getNextOrder(amount = it.toBigInteger()) }
         val obl1Orders = fourtyOrders.map { obl1.addOrder(0L, it, feeRate = FeeRate.zero).second!! }.also {
             assertEquals(0, obl1.orderHead)
             assertEquals(41, obl1.orderTail)
