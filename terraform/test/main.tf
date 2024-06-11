@@ -28,6 +28,7 @@ module "api" {
   source            = "../modules/ecs_task"
   name_prefix       = local.name_prefix
   task_name         = "api"
+  include_command   = true
   image             = "backend"
   ecs_cluster_id    = module.ecs.cluster.id
   app_ecs_task_role = module.ecs.app_ecs_task_role
@@ -43,6 +44,22 @@ module "api" {
   lb_dns_name                             = module.alb.dns_name
   zone                                    = data.terraform_remote_state.shared.outputs.zone
   tcp_ports                               = [9000]
+  service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
+}
+
+module "ring" {
+  source                                  = "../modules/ecs_task"
+  name_prefix                             = local.name_prefix
+  task_name                               = "ring"
+  include_command                         = true
+  image                                   = "backend"
+  ecs_cluster_id                          = module.ecs.cluster.id
+  app_ecs_task_role                       = module.ecs.app_ecs_task_role
+  aws_region                              = var.aws_region
+  subnet_id_1                             = module.vpc.private_subnet_id_1
+  subnet_id_2                             = module.vpc.private_subnet_id_2
+  vpc                                     = module.vpc.vpc
+  allow_inbound                           = false
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
 }
 
@@ -176,15 +193,18 @@ module "bastion" {
 }
 
 module "rds" {
-  source          = "../modules/rds"
-  name_prefix     = local.name_prefix
-  subnet_id_1     = module.vpc.private_subnet_id_1
-  subnet_id_2     = module.vpc.private_subnet_id_2
-  instance_class  = "db.t3.medium"
-  security_groups = [module.api.security_group_id, module.bastion.security_group.id, module.sequencer.security_group_id, module.telegrambot.security_group_id]
-  vpc             = module.vpc.vpc
-  aws_region      = var.aws_region
-  ci_role_arn     = data.terraform_remote_state.shared.outputs.ci_role_arn
+  source         = "../modules/rds"
+  name_prefix    = local.name_prefix
+  subnet_id_1    = module.vpc.private_subnet_id_1
+  subnet_id_2    = module.vpc.private_subnet_id_2
+  instance_class = "db.t3.medium"
+  security_groups = [
+    module.api.security_group_id, module.bastion.security_group.id, module.sequencer.security_group_id,
+    module.telegrambot.security_group_id, module.ring.security_group_id
+  ]
+  vpc         = module.vpc.vpc
+  aws_region  = var.aws_region
+  ci_role_arn = data.terraform_remote_state.shared.outputs.ci_role_arn
 }
 
 module "web" {

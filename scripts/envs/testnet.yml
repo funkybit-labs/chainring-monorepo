@@ -1,5 +1,5 @@
 environment:
-  api:
+  backend:
     DB_HOST: testnet-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     EVM_NETWORK_URL: https://testnet-rpc.bitlayer.org
     AUTH_TOKEN_VALIDITY_INTERVAL: P1D
@@ -8,6 +8,8 @@ environment:
     EVM_FEE_ACCOUNT_ADDRESS: "0x5E027795ec717ae1cAfa705F93720C02aB429b95"
     DEFAULT_MAX_PRIORITY_FEE_PER_GAS_WEI: "100000000"
     SLACK_ERROR_REPORTING_CHANNEL_ID: C0723AASGTH
+    MAKER_FEE_RATE: "0.01"
+    TAKER_FEE_RATE: "0.02"
   sequencer:
     QUEUE_HOME: "/data/queues/testnet"
     CHECKPOINTS_ENABLED: "true"
@@ -16,9 +18,17 @@ environment:
 services:
   api:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
-    count: 1
+    count: 2
     is_essential: "true"
-    environment: api
+    environment: backend
+    secrets:
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-45c44b9b-ac53-47ab-8997-6d5d799ce4bc-OY4iRs
+      SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
+  ring:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
+    count: 1
+    no_rolling_upgrade: "true"
+    environment: backend
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-45c44b9b-ac53-47ab-8997-6d5d799ce4bc-OY4iRs
       EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/api/EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY-3R6syW
