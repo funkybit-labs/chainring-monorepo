@@ -21,7 +21,6 @@ import co.chainring.apps.api.model.Withdrawal
 import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.apps.api.model.invalidEIP712SignatureError
 import co.chainring.apps.api.model.processingError
-import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
@@ -30,6 +29,7 @@ import co.chainring.core.evm.TokenAddressAndChain
 import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
@@ -387,8 +387,16 @@ class ExchangeApiService(
         }
     }
 
+    private val exchangeContractsByChain = mutableMapOf<ChainId, Address>()
+
     private fun verifyEIP712Signature(walletAddress: Address, tx: EIP712Transaction, verifyingChainId: ChainId) {
-        val verifyingContract = ChainManager.getContractAddress(verifyingChainId, ContractType.Exchange)
+        val verifyingContract = exchangeContractsByChain[verifyingChainId] ?: transaction {
+            DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, verifyingChainId)?.proxyAddress?.also {
+                exchangeContractsByChain[verifyingChainId] = it
+            } ?: throw RequestProcessingError(
+                processingError("Exchange contract not found for $verifyingChainId"),
+            )
+        }
 
         runCatching {
             ECHelper.isValidSignature(
