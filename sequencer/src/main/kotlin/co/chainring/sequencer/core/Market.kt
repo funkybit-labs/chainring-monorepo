@@ -894,7 +894,7 @@ data class Market(
                     this.levels.add(level.toCheckpoint())
                 }
             }
-        }feedba
+        }
     }
 
     private fun logState() {
