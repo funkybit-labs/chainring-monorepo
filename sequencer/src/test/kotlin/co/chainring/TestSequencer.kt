@@ -174,9 +174,9 @@ class TestSequencer {
         val sell5Order = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.2"), BigDecimal("17.700"), lp1, Order.Type.LimitSell)
         val sell6Order = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.2"), BigDecimal("17.700"), lp2, Order.Type.LimitSell)
 
-        // clearing price would be (0.02 * 17.55 + 0.15 * 17.6) / 0.17 = 17.594
-        // notional is 0.17 * 17.594 = 2.99098, fee would be notional * 0.02 = 0.0598196
-        sequencer.deposit(tkr, market.quoteAsset, BigDecimal("2.99098") + BigDecimal("0.0598196"))
+        // clearing price would be (0.02 * 17.55 + 0.15 * 17.6) / 0.17 = 17.59412
+        // notional is 0.17 * 17.595 = 2.9910004, fee would be notional * 0.02 = 0.059820008
+        sequencer.deposit(tkr, market.quoteAsset, BigDecimal("2.9910004") + BigDecimal("0.059820008"))
 
         sequencer.addOrder(market, BigDecimal("0.17"), null, tkr, Order.Type.MarketBuy).also { response ->
             assertEquals(5, response.ordersChangedCount)
@@ -293,6 +293,35 @@ class TestSequencer {
                     ),
                 ),
             )
+        }
+    }
+
+    @Test
+    fun `Test market order that executes against multiple orders at multiple levels`() {
+        val sequencer = SequencerClient()
+        val market = sequencer.createMarket(MarketId("BTC20/ETH20"))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+
+        val lp1 = generateWalletAddress()
+        val lp2 = generateWalletAddress()
+        val tkr = generateWalletAddress()
+
+        sequencer.deposit(lp1, market.baseAsset, BigDecimal("1"))
+        sequencer.deposit(lp2, market.baseAsset, BigDecimal("1"))
+
+        sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.197628458498023700"), BigDecimal("17.750"), lp1, Order.Type.LimitSell)
+        sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.790513833992094800"), BigDecimal("18.000"), lp2, Order.Type.LimitSell)
+
+        sequencer.deposit(tkr, market.quoteAsset, BigDecimal("10"))
+
+        sequencer.addOrder(market, BigDecimal.ZERO, null, tkr, Order.Type.MarketBuy, percentage = 100).also { response ->
+            assertEquals(3, response.ordersChangedCount)
+            response.ordersChangedList[0].also {
+                assertEquals(OrderDisposition.Filled, it.disposition)
+                assertEquals(BigDecimal("0.54740714").toFundamentalUnits(market.baseDecimals), it.newQuantity.toBigInteger())
+            }
+            assertEquals(OrderDisposition.Filled, response.ordersChangedList[1].disposition)
+            assertEquals(OrderDisposition.PartiallyFilled, response.ordersChangedList[2].disposition)
         }
     }
 

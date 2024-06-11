@@ -413,12 +413,14 @@ data class Market(
                     break
                 }
             }
+            logger.debug { "handle crossing order $index ${levels[index].price}" }
             val orderBookLevelFill = orderBookLevel.fillOrder(remainingAmount)
             remainingAmount = orderBookLevelFill.remainingAmount
             executions.addAll(orderBookLevelFill.executions)
             if (remainingAmount == BigInteger.ZERO) {
                 break
             }
+            logger.debug { "moving to next level" }
             if (order.type == Order.Type.MarketBuy || order.type == Order.Type.LimitBuy) {
                 index += 1
                 if (index > maxOfferIx) {
@@ -710,7 +712,7 @@ data class Market(
                 break
             }
             val quantityAtLevel = levels[index].totalQuantity.min(remainingAmount)
-            totalPriceUnits += quantityAtLevel.toBigDecimal() * levels[index].price
+            totalPriceUnits += quantityAtLevel.toBigDecimal().setScale(18) * levels[index].price
             remainingAmount -= quantityAtLevel
             if (remainingAmount == BigInteger.ZERO) {
                 break
@@ -732,12 +734,20 @@ data class Market(
 
         while (index <= levels.size) {
             val quantityAtLevel = levels[index].totalQuantity
-            val notionalAtLevel = remainingNotional.min(notional(quantityAtLevel, levels[index].price, baseDecimals, quoteDecimals))
-            if (notionalAtLevel == remainingNotional) {
-                return baseAmount + quantityFromNotionalAndPrice(remainingNotional, levels[index].price, baseDecimals, quoteDecimals)
+            if (quantityAtLevel > BigInteger.ZERO) {
+                val notionalAtLevel =
+                    remainingNotional.min(notional(quantityAtLevel, levels[index].price, baseDecimals, quoteDecimals))
+                if (notionalAtLevel == remainingNotional) {
+                    return baseAmount + quantityFromNotionalAndPrice(
+                        remainingNotional,
+                        levels[index].price,
+                        baseDecimals,
+                        quoteDecimals,
+                    )
+                }
+                baseAmount += quantityAtLevel
+                remainingNotional -= notionalAtLevel
             }
-            baseAmount += quantityAtLevel
-            remainingNotional -= notionalAtLevel
             index += 1
             if (index > maxOfferIx) {
                 break
