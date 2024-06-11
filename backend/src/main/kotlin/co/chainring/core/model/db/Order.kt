@@ -17,6 +17,8 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.JoinType
+import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.coalesce
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.div
@@ -31,6 +33,7 @@ import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.decimalLiteral
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.or
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
 import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.transactions.TransactionManager
@@ -151,10 +154,17 @@ object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
     val signature = varchar("signature", 10485760)
     val sequencerOrderId = long("sequencer_order_id").uniqueIndex().nullable()
     val sequencerTimeNs = decimal("sequencer_time_ns", 30, 0)
+
+    init {
+        OrderTable.index(
+            customIndexName = "order_wallet_guid_created_at_index",
+            columns = arrayOf(walletGuid, createdAt),
+        )
+    }
 }
 
 class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
-    fun toOrderResponse(): Order {
+    fun toOrderResponse(executions: List<OrderExecutionEntity>): Order {
         return when (type) {
             OrderType.Market -> Order.Market(
                 id = this.id.value,
@@ -163,7 +173,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 side = this.side,
                 amount = this.amount,
                 originalAmount = this.originalAmount,
-                executions = OrderExecutionEntity.findForOrder(this).map { execution ->
+                executions = executions.map { execution ->
                     Order.Execution(
                         timestamp = execution.timestamp,
                         amount = execution.trade.amount,
@@ -189,7 +199,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 amount = this.amount,
                 originalAmount = this.originalAmount,
                 price = this.price!!,
-                executions = OrderExecutionEntity.findForOrder(this).map { execution ->
+                executions = executions.map { execution ->
                     Order.Execution(
                         timestamp = execution.timestamp,
                         amount = execution.trade.amount,
@@ -254,6 +264,12 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             }.firstOrNull()
         }
 
+        fun listWithExecutionsForSequencerOrderIds(sequencerOrderIds: List<Long>): List<Pair<OrderEntity, List<OrderExecutionEntity>>> {
+            return listWithExecutions(
+                queryFilter = OrderTable.sequencerOrderId.inList(sequencerOrderIds),
+            )
+        }
+
         fun getOrdersMarkets(sequencerOrderIds: List<Long>): Set<MarketEntity> {
             return if (sequencerOrderIds.isEmpty()) {
                 emptySet()
@@ -269,14 +285,30 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             }
         }
 
-        fun listForWallet(wallet: WalletEntity, statuses: List<OrderStatus> = emptyList(), marketId: MarketId? = null, limit: Int? = null): List<OrderEntity> {
-            return OrderEntity
-                .find(
-                    OrderTable.walletGuid.eq(wallet.guid)
-                        .andIfNotNull(marketId?.let { OrderTable.marketGuid.eq(it) })
-                        .andIfNotNull(statuses.ifEmpty { null }?.let { OrderTable.status.inList(statuses) }),
-                )
-                .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
+        fun listWithExecutionsForWallet(wallet: WalletEntity, statuses: List<OrderStatus> = emptyList(), marketId: MarketId? = null, limit: Int? = null): List<Pair<OrderEntity, List<OrderExecutionEntity>>> {
+            return listWithExecutions(
+                queryFilter = OrderTable.walletGuid.eq(wallet.guid)
+                    .andIfNotNull(marketId?.let { OrderTable.marketGuid.eq(it) })
+                    .andIfNotNull(statuses.ifEmpty { null }?.let { OrderTable.status.inList(statuses) }),
+                sort = true,
+                limit = limit,
+            )
+        }
+
+        private fun listWithExecutions(queryFilter: Op<Boolean>, sort: Boolean = false, limit: Int? = null): List<Pair<OrderEntity, List<OrderExecutionEntity>>> {
+            val executions = mutableMapOf<OrderId, MutableList<OrderExecutionEntity>>()
+            val orders = OrderTable
+                .join(OrderExecutionTable, JoinType.LEFT, OrderExecutionTable.orderGuid, OrderTable.guid)
+                .selectAll().where {
+                    queryFilter
+                }
+                .let {
+                    if (sort) {
+                        it.orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
+                    } else {
+                        it
+                    }
+                }
                 .let {
                     if (limit == null) {
                         it
@@ -284,14 +316,30 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                         it.limit(limit)
                     }
                 }
+                .mapNotNull { resultRow ->
+                    val executionsForOrder = executions[resultRow[OrderTable.guid].value]
+                    if (executionsForOrder != null) {
+                        executionsForOrder.add(OrderExecutionEntity.wrapRow(resultRow))
+                        null
+                    } else {
+                        OrderEntity.wrapRow(resultRow).also {
+                            executions[it.guid.value] = listOfNotNull(
+                                resultRow[OrderExecutionTable.guid]?.let {
+                                    OrderExecutionEntity.wrapRow(resultRow)
+                                },
+                            ).toMutableList()
+                        }
+                    }
+                }
                 .toList()
+
+            return orders.map { Pair(it, executions[it.guid.value] ?: emptyList()) }
         }
 
-        fun listOrders(orderIds: List<OrderId>): List<OrderEntity> {
-            return OrderEntity
-                .find { OrderTable.guid.inList(orderIds) }
-                .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
-                .toList()
+        fun listOrdersWithExecutions(orderIds: List<OrderId>): List<Pair<OrderEntity, List<OrderExecutionEntity>>> {
+            return listWithExecutions(
+                queryFilter = OrderTable.guid.inList(orderIds),
+            )
         }
 
         fun listOpenForWallet(wallet: WalletEntity): List<OrderEntity> {
@@ -477,3 +525,5 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         toColumn = { it.toBigDecimal() },
     )
 }
+
+fun Pair<OrderEntity, List<OrderExecutionEntity>>.toOrderResponse() = this.first.toOrderResponse(this.second)

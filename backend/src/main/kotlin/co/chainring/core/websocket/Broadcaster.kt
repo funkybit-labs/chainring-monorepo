@@ -26,6 +26,7 @@ import co.chainring.core.model.db.OHLCEntity
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.WalletEntity
+import co.chainring.core.model.db.toOrderResponse
 import co.chainring.core.model.toChecksumAddress
 import co.chainring.core.utils.PgListener
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -239,8 +240,8 @@ class Broadcaster(val db: Database) {
                         SubscriptionTopic.Orders,
                         Orders(
                             OrderEntity
-                                .listForWallet(WalletEntity.getOrCreate(client.principal), limit = 100)
-                                .map(OrderEntity::toOrderResponse),
+                                .listWithExecutionsForWallet(WalletEntity.getOrCreate(client.principal), limit = 100)
+                                .map(Pair<OrderEntity, List<OrderExecutionEntity>>::toOrderResponse),
                         ),
                     ),
                 )

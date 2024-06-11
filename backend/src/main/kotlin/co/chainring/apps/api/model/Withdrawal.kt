@@ -30,7 +30,7 @@ data class Withdrawal(
             return Withdrawal(
                 entity.id.value,
                 Symbol(entity.symbol.name),
-                entity.amount,
+                entity.actualAmount ?: entity.amount,
                 entity.status,
                 entity.error,
                 entity.createdAt,

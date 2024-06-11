@@ -1,10 +1,13 @@
 package co.chainring.integrationtests.api
 
 import co.chainring.apps.api.model.ApiError
+import co.chainring.apps.api.model.CreateDepositApiRequest
 import co.chainring.apps.api.model.ReasonCode
+import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.core.client.ws.blocking
 import co.chainring.core.client.ws.subscribeToBalances
 import co.chainring.core.evm.EIP712Transaction
+import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
@@ -16,8 +19,10 @@ import co.chainring.integrationtests.utils.ExpectedBalance
 import co.chainring.integrationtests.utils.Faucet
 import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.Wallet
+import co.chainring.integrationtests.utils.assertBalances
 import co.chainring.integrationtests.utils.assertBalancesMessageReceived
 import co.chainring.integrationtests.utils.assertError
+import co.chainring.integrationtests.utils.assertMessagesReceived
 import co.chainring.tasks.fixtures.toChainSymbol
 import org.http4k.client.WebsocketClient
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -192,14 +197,29 @@ class WithdrawalTest {
                 wallet.getWalletBalance(usdc),
             )
 
-            // when requested withdrawal amount > remaining amount, whatever is remaining is withdrawn
+            val remainingUsdcBalance = usdcDepositAmount - usdcWithdrawalAmount
+
+            // when requested withdrawal amount > remaining amount, should fail with Insufficient balance
             val pendingUsdcWithdrawal2 = apiClient.createWithdrawal(
                 wallet.signWithdraw(
                     usdc.name,
-                    (usdcDepositAmount - usdcWithdrawalAmount).inFundamentalUnits + BigInteger.ONE,
+                    remainingUsdcBalance.inFundamentalUnits + BigInteger.ONE,
                 ),
             ).withdrawal
             assertEquals(WithdrawalStatus.Pending, pendingUsdcWithdrawal2.status)
+            waitForFinalizedWithdrawal(pendingUsdcWithdrawal2.id)
+            val usdcWithdrawal2 = apiClient.getWithdrawal(pendingUsdcWithdrawal2.id).withdrawal
+            assertEquals(WithdrawalStatus.Failed, usdcWithdrawal2.status)
+            assertEquals("Insufficient Balance", usdcWithdrawal2.error)
+
+            // when requested withdrawal amount is 0, everything should be withdrawn
+            val pendingUsdcWithdrawal3 = apiClient.createWithdrawal(
+                wallet.signWithdraw(
+                    usdc.name,
+                    BigInteger.ZERO,
+                ),
+            ).withdrawal
+            assertEquals(WithdrawalStatus.Pending, pendingUsdcWithdrawal3.status)
 
             waitForBalance(
                 apiClient,
@@ -208,16 +228,17 @@ class WithdrawalTest {
                     ExpectedBalance(btcDepositAmount * BigDecimal("2") - btcWithdrawalAmount),
                     ExpectedBalance(
                         usdc,
-                        total = usdcDepositAmount - usdcWithdrawalAmount,
+                        total = remainingUsdcBalance,
                         available = AssetAmount(usdc, "0"),
                     ),
                 ),
             )
 
-            waitForFinalizedWithdrawalWithForking(pendingUsdcWithdrawal2.id)
+            waitForFinalizedWithdrawalWithForking(pendingUsdcWithdrawal3.id)
 
-            val usdcWithdrawal2 = apiClient.getWithdrawal(pendingUsdcWithdrawal2.id).withdrawal
-            assertEquals(WithdrawalStatus.Complete, usdcWithdrawal2.status)
+            val usdcWithdrawal3 = apiClient.getWithdrawal(pendingUsdcWithdrawal3.id).withdrawal
+            assertEquals(WithdrawalStatus.Complete, usdcWithdrawal3.status)
+            assertEquals(remainingUsdcBalance.inFundamentalUnits, usdcWithdrawal3.amount)
 
             waitForBalance(
                 apiClient,
@@ -259,6 +280,173 @@ class WithdrawalTest {
             wallet.signWithdraw(usdc.name, amount.inFundamentalUnits).copy(amount = BigInteger.TWO),
         ).assertError(
             ApiError(ReasonCode.SignatureNotValid, "Invalid signature"),
+        )
+    }
+
+    @Test
+    fun `withdraw all while deposit in progress`() {
+        val apiClient = TestApiClient()
+        val usdc = apiClient.getConfiguration().chains.flatMap { it.symbols }.first { it.name == "USDC" }
+
+        val wsClient = WebsocketClient.blocking(apiClient.authToken)
+        wsClient.subscribeToBalances()
+        wsClient.assertBalancesMessageReceived()
+
+        val wallet = Wallet(apiClient)
+        Faucet.fund(wallet.address)
+
+        val initialDepositAmount = AssetAmount(usdc, "1001")
+        wallet.mintERC20(initialDepositAmount * BigDecimal("2"))
+
+        wallet.deposit(initialDepositAmount)
+        // available/total should match
+        waitForBalance(
+            apiClient,
+            wsClient,
+            listOf(
+                ExpectedBalance(initialDepositAmount),
+            ),
+        )
+
+        val pendingUsdcWithdrawal =
+            apiClient.createWithdrawal(wallet.signWithdraw(usdc.name, BigInteger.ZERO)).withdrawal
+        assertEquals(WithdrawalStatus.Pending, pendingUsdcWithdrawal.status)
+        waitForBalance(
+            apiClient,
+            wsClient,
+            listOf(
+                ExpectedBalance(initialDepositAmount.symbol, initialDepositAmount.amount, BigDecimal.ZERO),
+            ),
+        )
+        // submit a deposit
+        val newDepositAmount = AssetAmount(usdc, "100")
+        val txHash = wallet.asyncDepositERC20(newDepositAmount.symbol.name, newDepositAmount.inFundamentalUnits)
+        apiClient.createDeposit(CreateDepositApiRequest(Symbol(usdc.name), newDepositAmount.inFundamentalUnits, txHash))
+
+        waitForFinalizedWithdrawal(pendingUsdcWithdrawal.id)
+        val usdcWithdrawal = apiClient.getWithdrawal(pendingUsdcWithdrawal.id).withdrawal
+        assertEquals(WithdrawalStatus.Complete, usdcWithdrawal.status)
+        assertEquals(initialDepositAmount.inFundamentalUnits, usdcWithdrawal.amount)
+
+        // wait for 2 balance changes, one for the withdrawal completing on chain
+        // and one for the deposit being applied at the sequencer.
+        wsClient.apply {
+            assertMessagesReceived(2) { messages ->
+                assertEquals(messages.map { it.topic }.toSet(), setOf(SubscriptionTopic.Balances))
+            }
+        }
+
+        // verify the total/available balance is the new deposit amount only.
+        assertBalances(listOf(ExpectedBalance(newDepositAmount)), apiClient.getBalances().balances)
+    }
+
+    @Test
+    fun `withdraw all remain balance in contract less that amount from sequencer`() {
+        val apiClient = TestApiClient()
+        val usdc = apiClient.getConfiguration().chains.flatMap { it.symbols }.first { it.name == "USDC" }
+
+        val wsClient = WebsocketClient.blocking(apiClient.authToken)
+        wsClient.subscribeToBalances()
+        wsClient.assertBalancesMessageReceived()
+
+        val wallet = Wallet(apiClient)
+        Faucet.fund(wallet.address)
+
+        val initialDepositAmount = AssetAmount(usdc, "1000")
+        wallet.mintERC20(initialDepositAmount * BigDecimal("2"))
+
+        wallet.deposit(initialDepositAmount)
+        // available/total should match
+        waitForBalance(
+            apiClient,
+            wsClient,
+            listOf(
+                ExpectedBalance(initialDepositAmount),
+            ),
+        )
+
+        val usdcWithdrawalAmount = AssetAmount(usdc, "200")
+
+        val pendingUsdcWithdrawal =
+            apiClient.createWithdrawal(wallet.signWithdraw(usdc.name, usdcWithdrawalAmount.inFundamentalUnits)).withdrawal
+        assertEquals(WithdrawalStatus.Pending, pendingUsdcWithdrawal.status)
+
+        waitForBalance(
+            apiClient,
+            wsClient,
+            listOf(
+                ExpectedBalance(
+                    usdc,
+                    total = initialDepositAmount,
+                    available = initialDepositAmount - usdcWithdrawalAmount,
+                ),
+            ),
+        )
+
+        waitForFinalizedWithdrawal(pendingUsdcWithdrawal.id)
+
+        waitForBalance(
+            apiClient,
+            wsClient,
+            listOf(
+                ExpectedBalance(initialDepositAmount - usdcWithdrawalAmount),
+            ),
+        )
+
+        transaction {
+            WithdrawalEntity[pendingUsdcWithdrawal.id].status = WithdrawalStatus.Sequenced
+        }
+
+        waitForFinalizedWithdrawal(pendingUsdcWithdrawal.id)
+
+        waitForBalance(
+            apiClient,
+            wsClient,
+            listOf(
+                ExpectedBalance(
+                    usdc,
+                    initialDepositAmount.amount - usdcWithdrawalAmount.amount * BigDecimal(2),
+                    initialDepositAmount.amount - usdcWithdrawalAmount.amount,
+                ),
+            ),
+        )
+
+        val pendingUsdcWithdrawal2 = apiClient.createWithdrawal(
+            wallet.signWithdraw(
+                usdc.name,
+                BigInteger.ZERO,
+            ),
+        ).withdrawal
+        assertEquals(WithdrawalStatus.Pending, pendingUsdcWithdrawal2.status)
+
+        waitForBalance(
+            apiClient,
+            wsClient,
+            listOf(
+                ExpectedBalance(
+                    usdc,
+                    initialDepositAmount.amount - usdcWithdrawalAmount.amount * BigDecimal(2),
+                    BigDecimal.ZERO,
+                ),
+            ),
+        )
+
+        var usdcWithdrawal2 = apiClient.getWithdrawal(pendingUsdcWithdrawal2.id).withdrawal
+        assertEquals(AssetAmount(usdc, "800").inFundamentalUnits, usdcWithdrawal2.amount)
+
+        waitForFinalizedWithdrawal(pendingUsdcWithdrawal2.id)
+
+        usdcWithdrawal2 = apiClient.getWithdrawal(pendingUsdcWithdrawal2.id).withdrawal
+        assertEquals(WithdrawalStatus.Complete, usdcWithdrawal2.status)
+        // the returned amount after on chain tx is finished should be adjusted to what the contract actual transferred
+        assertEquals(AssetAmount(usdc, "600").inFundamentalUnits, usdcWithdrawal2.amount)
+
+        waitForBalance(
+            apiClient,
+            wsClient,
+            listOf(
+                ExpectedBalance(AssetAmount(usdc, "0")),
+            ),
         )
     }
 
