@@ -81,7 +81,9 @@ sealed class EIP712Transaction {
     @SerialName("order")
     data class Order(
         val sender: Address,
+        val baseChainId: ChainId,
         val baseToken: Address,
+        val quoteChainId: ChainId,
         val quoteToken: Address,
         val amount: OrderAmount,
         val price: BigIntegerJson,
@@ -95,7 +97,9 @@ sealed class EIP712Transaction {
 
         override fun getModel(): List<StructuredData.Entry> = listOf(
             StructuredData.Entry("sender", "address"),
+            StructuredData.Entry("baseChainId", "uint256"),
             StructuredData.Entry("baseToken", "address"),
+            StructuredData.Entry("quoteChainId", "uint256"),
             StructuredData.Entry("quoteToken", "address"),
             when (amount) {
                 is OrderAmount.Fixed -> StructuredData.Entry("amount", "int256")
@@ -108,7 +112,9 @@ sealed class EIP712Transaction {
         override fun getMessage(): Map<String, String> {
             return mapOf(
                 "sender" to sender.value,
+                "baseChainId" to baseChainId.value.toString(),
                 "baseToken" to baseToken.value,
+                "quoteChainId" to baseChainId.value.toString(),
                 "quoteToken" to quoteToken.value,
                 when (amount) {
                     is OrderAmount.Fixed -> "amount" to amount.value.toString()

@@ -354,7 +354,9 @@ class BotSessionCurrentWallet(
 
         val tx = EIP712Transaction.Order(
             walletAddress,
+            baseChainId = chain(market.baseSymbol),
             baseToken = contractAddress(market.baseSymbol) ?: Address.zero,
+            quoteChainId = chain(market.quoteSymbol),
             quoteToken = contractAddress(market.quoteSymbol) ?: Address.zero,
             amount = if (order.side == OrderSide.Buy) order.amount else order.amount.negate(),
             price = BigInteger.ZERO,

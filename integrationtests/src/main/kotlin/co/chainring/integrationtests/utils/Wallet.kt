@@ -8,7 +8,6 @@ import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.apps.api.model.UpdateOrderApiRequest
-import co.chainring.contracts.generated.Exchange
 import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.client.rest.ApiClient
@@ -191,12 +190,18 @@ class Wallet(
             verifyingChainId = this.currentChainId,
         )
 
+    private fun chainId(symbol: SymbolInfo) = chains.first {
+        it.symbols.contains(symbol)
+    }.id
+
     fun signOrder(request: CreateOrderApiRequest.Market): CreateOrderApiRequest.Market {
         val (baseSymbol, quoteSymbol) = marketSymbols(request.marketId)
 
         val tx = EIP712Transaction.Order(
             address,
+            baseChainId = chainId(baseSymbol),
             baseToken = baseSymbol.contractAddress ?: Address.zero,
+            quoteChainId = chainId(quoteSymbol),
             quoteToken = quoteSymbol.contractAddress ?: Address.zero,
             amount = if (request.side == OrderSide.Buy) request.amount else request.amount.negate(),
             price = BigInteger.ZERO,
@@ -237,7 +242,9 @@ class Wallet(
         val (baseSymbol, quoteSymbol) = marketSymbols(marketId)
         val tx = EIP712Transaction.Order(
             address,
+            baseChainId = chainId(baseSymbol),
             baseToken = baseSymbol.contractAddress ?: Address.zero,
+            quoteChainId = chainId(quoteSymbol),
             quoteToken = quoteSymbol.contractAddress ?: Address.zero,
             amount = if (side == OrderSide.Buy) amount else amount.negate(),
             price = price.toFundamentalUnits(quoteSymbol.decimals),

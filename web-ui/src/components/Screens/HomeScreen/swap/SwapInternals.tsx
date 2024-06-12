@@ -568,7 +568,9 @@ export function SwapInternals({
                 ],
                 Order: [
                   { name: 'sender', type: 'address' },
+                  { name: 'baseChainId', type: 'uint256' },
                   { name: 'baseToken', type: 'address' },
+                  { name: 'quoteChainId', type: 'uint256' },
                   { name: 'quoteToken', type: 'address' },
                   { name: 'percentage', type: 'int256' },
                   { name: 'price', type: 'uint256' },
@@ -579,7 +581,9 @@ export function SwapInternals({
               primaryType: 'Order',
               message: {
                 sender: walletAddress!,
+                baseChainId: BigInt(baseSymbol.chainId),
                 baseToken: baseSymbol.contractAddress ?? addressZero,
+                quoteChainId: BigInt(quoteSymbol.chainId),
                 quoteToken: quoteSymbol.contractAddress ?? addressZero,
                 percentage: BigInt(percentage),
                 price: isLimitOrder ? limitPrice : 0n,
@@ -596,7 +600,9 @@ export function SwapInternals({
                 ],
                 Order: [
                   { name: 'sender', type: 'address' },
+                  { name: 'baseChainId', type: 'uint256' },
                   { name: 'baseToken', type: 'address' },
+                  { name: 'quoteChainId', type: 'uint256' },
                   { name: 'quoteToken', type: 'address' },
                   { name: 'amount', type: 'int256' },
                   { name: 'price', type: 'uint256' },
@@ -607,7 +613,9 @@ export function SwapInternals({
               primaryType: 'Order',
               message: {
                 sender: walletAddress!,
+                baseChainId: BigInt(baseSymbol.chainId),
                 baseToken: baseSymbol.contractAddress ?? addressZero,
+                quoteChainId: BigInt(quoteSymbol.chainId),
                 quoteToken: quoteSymbol.contractAddress ?? addressZero,
                 amount: side == 'Buy' ? baseAmount : -baseAmount,
                 price: isLimitOrder ? limitPrice : 0n,
