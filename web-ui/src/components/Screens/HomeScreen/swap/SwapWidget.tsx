@@ -106,19 +106,23 @@ export function SwapWidget({
           <div className="space-y-4 rounded bg-darkBluishGray9 p-8">
             <div className="rounded bg-darkBluishGray8 p-4">
               <div className="mb-2 flex flex-row justify-between">
-                <span className="text-base text-darkBluishGray1">Sell</span>
-                {(sr.topLimit ?? BigInt(0)) > BigInt(0) && !sr.isLimitOrder && (
-                  <button
-                    className="rounded bg-darkBluishGray6 px-2 py-1 text-sm text-darkBluishGray2 hover:bg-blue5"
-                    onClick={() => {
-                      sr.side === 'Sell'
-                        ? sr.handleMaxBaseAmount()
-                        : sr.handleMaxQuoteAmount()
-                    }}
-                  >
-                    Max
-                  </button>
-                )}
+                <span className="text-base text-darkBluishGray1">
+                  Sell
+                  {(sr.topLimit ?? sr.topBalance?.available ?? BigInt(0)) >
+                    BigInt(0) &&
+                    !sr.isLimitOrder && (
+                      <button
+                        className="ml-2 rounded bg-darkBluishGray6 px-2 py-1 text-sm text-darkBluishGray2 hover:bg-blue5"
+                        onClick={() => {
+                          sr.side === 'Sell'
+                            ? sr.handleMaxBaseAmount()
+                            : sr.handleMaxQuoteAmount()
+                        }}
+                      >
+                        Max
+                      </button>
+                    )}
+                </span>
                 <div className="flex flex-row items-baseline space-x-2 text-sm">
                   {depositAmount(sr.topBalance, sr.topSymbol)}
                 </div>

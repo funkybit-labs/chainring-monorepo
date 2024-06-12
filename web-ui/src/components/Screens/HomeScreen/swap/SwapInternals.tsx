@@ -120,25 +120,6 @@ export function SwapInternals({
     }
   }, [markets])
 
-  useWebsocketSubscription({
-    topics: useMemo(() => [balancesTopic, ordersTopic], []),
-    handler: useCallback(
-      (message: Publishable) => {
-        if (message.type === 'Balances') {
-          setBalances(message.balances)
-        } else if (message.type === 'OrderUpdated') {
-          if (message.order.id === lastOrderId) {
-            setLastOrder(message.order)
-          }
-        }
-      },
-      [lastOrderId]
-    ),
-    onUnsubscribe: useCallback(() => {
-      setBalances([])
-    }, [])
-  })
-
   const [topBalance, bottomBalance] = useMemo(() => {
     const topBalance = balances.find(
       (balance) => balance.symbol === topSymbol.name
@@ -217,14 +198,6 @@ export function SwapInternals({
   }, [sellLimitPrice, side, market, quoteSymbol])
 
   const [orderBook, setOrderBook] = useState<OrderBook | undefined>(undefined)
-  useWebsocketSubscription({
-    topics: useMemo(() => [orderBookTopic(market.id)], [market.id]),
-    handler: useCallback((message: Publishable) => {
-      if (message.type === 'OrderBook') {
-        setOrderBook(message)
-      }
-    }, [])
-  })
 
   const [baseLimit, setBaseLimit] = useState<bigint | undefined>(undefined)
   const [quoteLimit, setQuoteLimit] = useState<bigint | undefined>(undefined)
@@ -234,14 +207,33 @@ export function SwapInternals({
   }, [baseLimit, quoteLimit, side])
 
   useWebsocketSubscription({
-    topics: useMemo(() => [limitsTopic(market.id)], [market.id]),
-    handler: useCallback((message: Publishable) => {
-      if (message.type === 'Limits') {
-        setBaseLimit(message.base)
-        setQuoteLimit(message.quote)
-      }
-    }, []),
+    topics: useMemo(() => {
+      return [
+        balancesTopic,
+        ordersTopic,
+        orderBookTopic(market.id),
+        limitsTopic(market.id)
+      ]
+    }, [market.id]),
+    handler: useCallback(
+      (message: Publishable) => {
+        if (message.type === 'OrderBook') {
+          setOrderBook(message)
+        } else if (message.type === 'Limits') {
+          setBaseLimit(message.base)
+          setQuoteLimit(message.quote)
+        } else if (message.type === 'Balances') {
+          setBalances(message.balances)
+        } else if (message.type === 'OrderUpdated') {
+          if (message.order.id === lastOrderId) {
+            setLastOrder(message.order)
+          }
+        }
+      },
+      [lastOrderId]
+    ),
     onUnsubscribe: useCallback(() => {
+      setBalances([])
       setBaseLimit(undefined)
       setQuoteLimit(undefined)
     }, [])
@@ -340,17 +332,35 @@ export function SwapInternals({
     limitPrice
   ])
 
+  function getEquilibriumPrice(
+    quoteAmount: bigint,
+    side: OrderSide,
+    market: Market,
+    orderBook: OrderBook,
+    baseDecimals: number
+  ): bigint {
+    let price = 0n
+    let nextPrice = getMarketPrice(side, 1n, market, orderBook)
+    while (price !== nextPrice) {
+      price = nextPrice
+      const amount = (quoteAmount * BigInt(Math.pow(10, baseDecimals))) / price
+      nextPrice = getMarketPrice(side, amount, market, orderBook)
+    }
+    return price
+  }
+
   useEffect(() => {
     if (quoteAmountManuallyChanged) {
       if (orderBook !== undefined) {
         const indicativePrice =
           isLimitOrder && limitPrice !== 0n
             ? limitPrice
-            : getMarketPrice(
+            : getEquilibriumPrice(
+                quoteAmount,
                 side,
-                (baseAmount ?? 1) || BigInt(1),
                 market,
-                orderBook
+                orderBook,
+                baseSymbol.decimals
               )
         if (indicativePrice === 0n) {
           setNoPriceFound(true)
@@ -369,7 +379,6 @@ export function SwapInternals({
     setBaseAmountInputValue,
     orderBook,
     market,
-    baseAmount,
     baseSymbol,
     side,
     isLimitOrder,
@@ -750,8 +759,8 @@ export function SwapInternals({
 
   const sellAssetsNeeded = useMemo(() => {
     return topSymbol.name === quoteSymbol.name
-      ? notional + fee - (quoteLimit || 0n)
-      : baseAmount - (baseLimit || 0n)
+      ? notional + fee - (quoteLimit ?? notional + fee)
+      : baseAmount - (baseLimit ?? baseAmount)
   }, [topSymbol, quoteSymbol, notional, fee, quoteLimit, baseAmount, baseLimit])
 
   function getSimulatedPrice(
