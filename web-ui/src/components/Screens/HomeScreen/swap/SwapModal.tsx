@@ -180,7 +180,7 @@ export function SwapModal({
                       : sr.handleBaseAmountChange
                   }
                   sellAssetsNeeded={sr.sellAssetsNeeded}
-                  showMax={(sr.topBalance?.available ?? BigInt(0)) > BigInt(0)}
+                  showMax={(sr.topLimit ?? BigInt(0)) > BigInt(0)}
                   onDeposit={() => {
                     openDepositModal(sr.topSymbol)
                   }}

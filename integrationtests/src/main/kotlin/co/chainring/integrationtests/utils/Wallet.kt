@@ -5,6 +5,7 @@ import co.chainring.apps.api.model.Chain
 import co.chainring.apps.api.model.CreateDepositApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
+import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.contracts.generated.Exchange
@@ -197,11 +198,10 @@ class Wallet(
             address,
             baseToken = baseSymbol.contractAddress ?: Address.zero,
             quoteToken = quoteSymbol.contractAddress ?: Address.zero,
-            amount = if (request.percentage == null) if (request.side == OrderSide.Buy) request.amount else request.amount.negate() else null,
+            amount = if (request.side == OrderSide.Buy) request.amount else request.amount.negate(),
             price = BigInteger.ZERO,
             nonce = BigInteger(1, request.nonce.toHexBytes()),
             signature = EvmSignature.emptySignature(),
-            percentage = request.percentage,
         )
         return request.copy(
             signature = blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId))),
@@ -211,7 +211,7 @@ class Wallet(
 
     fun signOrder(request: UpdateOrderApiRequest): UpdateOrderApiRequest =
         request.copy(
-            signature = limitOrderEip712TxSignature(request.marketId, request.amount, request.price, request.side, request.nonce),
+            signature = limitOrderEip712TxSignature(request.marketId, OrderAmount.Fixed(request.amount), request.price, request.side, request.nonce),
             verifyingChainId = this.currentChainId,
         )
 
@@ -233,7 +233,7 @@ class Wallet(
         exchangeContractByChainId.getValue(currentChainId).rollbackBatch().sendAsync()
     }
 
-    private fun limitOrderEip712TxSignature(marketId: MarketId, amount: BigInteger, price: BigDecimal, side: OrderSide, nonce: String): EvmSignature {
+    private fun limitOrderEip712TxSignature(marketId: MarketId, amount: OrderAmount, price: BigDecimal, side: OrderSide, nonce: String): EvmSignature {
         val (baseSymbol, quoteSymbol) = marketSymbols(marketId)
         val tx = EIP712Transaction.Order(
             address,

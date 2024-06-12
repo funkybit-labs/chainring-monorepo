@@ -157,7 +157,7 @@ class SettlementFailureTest : OrderBaseTest() {
             assertTradeCreatedMessageReceived(
                 order = marketBuyOrderApiResponse,
                 price = BigDecimal("17.55"),
-                amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount),
+                amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount.fixedAmount()),
                 fee = AssetAmount(quoteSymbol, "0.02808"),
                 settlementStatus = SettlementStatus.Pending,
             )
@@ -630,7 +630,7 @@ class SettlementFailureTest : OrderBaseTest() {
             assertTradeCreatedMessageReceived(
                 order = marketBuyOrderApiResponse,
                 price = BigDecimal("0.999"),
-                amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount),
+                amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount.fixedAmount()),
                 fee = AssetAmount(quoteSymbol, "0.0015984"),
                 settlementStatus = SettlementStatus.Pending,
             )

@@ -2,6 +2,7 @@ package co.chainring.integrationtests.api
 
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
+import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.RequestStatus
 import co.chainring.core.client.ws.subscribeToOrderBook
 import co.chainring.core.model.EvmSignature
@@ -77,7 +78,7 @@ class OrderPercentageSwapTest : OrderBaseTest() {
                             nonce = generateOrderNonce(),
                             marketId = market.id,
                             side = OrderSide.Buy,
-                            amount = AssetAmount(baseSymbol, it).inFundamentalUnits,
+                            amount = OrderAmount.Fixed(AssetAmount(baseSymbol, it).inFundamentalUnits),
                             price = BigDecimal("68500.000"),
                             signature = EvmSignature.emptySignature(),
                             verifyingChainId = ChainId.empty,
@@ -215,7 +216,7 @@ class OrderPercentageSwapTest : OrderBaseTest() {
                             nonce = generateOrderNonce(),
                             marketId = market.id,
                             side = OrderSide.Sell,
-                            amount = AssetAmount(baseSymbol, it).inFundamentalUnits,
+                            amount = OrderAmount.Fixed(AssetAmount(baseSymbol, it).inFundamentalUnits),
                             price = BigDecimal("68500.000"),
                             signature = EvmSignature.emptySignature(),
                             verifyingChainId = ChainId.empty,

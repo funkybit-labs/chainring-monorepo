@@ -3,6 +3,7 @@ package co.chainring.mocker.core
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
+import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.websocket.Balances
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
@@ -227,7 +228,7 @@ class Taker(
                     nonce = generateHexString(32),
                     marketId = market.id,
                     side = side,
-                    amount = amount,
+                    amount = OrderAmount.Fixed(amount),
                     signature = EvmSignature.emptySignature(),
                     verifyingChainId = ChainId.empty,
                 ))

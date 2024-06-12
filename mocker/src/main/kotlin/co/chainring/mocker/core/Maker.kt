@@ -5,6 +5,7 @@ import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
+import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.websocket.Balances
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
@@ -215,7 +216,7 @@ class Maker(
                     nonce = generateOrderNonce(),
                     marketId = marketId,
                     side = OrderSide.Sell,
-                    amount = offerAmounts[ix],
+                    amount = OrderAmount.Fixed(offerAmounts[ix]),
                     price = price,
                     signature = EvmSignature.emptySignature(),
                     verifyingChainId = ChainId.empty,
@@ -227,7 +228,7 @@ class Maker(
                     nonce = generateOrderNonce(),
                     marketId = marketId,
                     side = OrderSide.Buy,
-                    amount = bidAmounts[ix],
+                    amount = OrderAmount.Fixed(bidAmounts[ix]),
                     price = price,
                     signature = EvmSignature.emptySignature(),
                     verifyingChainId = ChainId.empty,
@@ -278,7 +279,7 @@ class Maker(
                         nonce = generateOrderNonce(),
                         marketId = marketId,
                         side = OrderSide.Sell,
-                        amount = amount,
+                        amount = OrderAmount.Fixed(amount),
                         price = price,
                         signature = EvmSignature.emptySignature(),
                         verifyingChainId = ChainId.empty,
@@ -295,7 +296,7 @@ class Maker(
                         nonce = generateOrderNonce(),
                         marketId = marketId,
                         side = OrderSide.Buy,
-                        amount = amount,
+                        amount = OrderAmount.Fixed(amount),
                         price = price,
                         signature = EvmSignature.emptySignature(),
                         verifyingChainId = ChainId.empty,

@@ -19,6 +19,7 @@ import co.chainring.apps.api.model.ListDepositsApiResponse
 import co.chainring.apps.api.model.ListWithdrawalsApiResponse
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
+import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.OrdersApiResponse
 import co.chainring.apps.api.model.RequestStatus
 import co.chainring.apps.api.model.UpdateOrderApiRequest
@@ -53,7 +54,6 @@ import org.junit.jupiter.api.Assertions
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
 import java.math.BigDecimal
-import java.math.BigInteger
 import java.net.HttpURLConnection
 import kotlin.test.DefaultAsserter.fail
 import kotlin.test.assertEquals
@@ -162,7 +162,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             nonce = generateOrderNonce(),
             marketId = market.id,
             side = side,
-            amount = amount.toFundamentalUnits(market.baseDecimals),
+            amount = OrderAmount.Fixed(amount.toFundamentalUnits(market.baseDecimals)),
             price = price,
             signature = EvmSignature.emptySignature(),
             verifyingChainId = ChainId.empty,
@@ -181,8 +181,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             nonce = generateOrderNonce(),
             marketId = market.id,
             side = side,
-            amount = amount?.toFundamentalUnits(market.baseDecimals) ?: BigInteger.ZERO,
-            percentage = percentage,
+            amount = amount?.let { OrderAmount.Fixed(it.toFundamentalUnits(market.baseDecimals)) } ?: OrderAmount.Percent(percentage!!),
             signature = EvmSignature.emptySignature(),
             verifyingChainId = ChainId.empty,
         ).let { wallet.signOrder(it) }
@@ -308,7 +307,7 @@ fun CreateOrderApiResponse.toCancelOrderRequest(wallet: Wallet): CancelOrderApiR
     CancelOrderApiRequest(
         orderId = this.orderId,
         marketId = this.order.marketId,
-        amount = this.order.amount,
+        amount = this.order.amount.fixedAmount(),
         side = this.order.side,
         nonce = generateOrderNonce(),
         signature = EvmSignature.emptySignature(),

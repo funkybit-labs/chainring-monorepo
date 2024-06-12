@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 @JvmInline
 value class Percentage(val value: Int) {
     init {
-        require(value in 0..MAX_VALUE) { "Invalid percentage" }
+        require(value in 1..MAX_VALUE) { "Invalid percentage" }
     }
 
     companion object {

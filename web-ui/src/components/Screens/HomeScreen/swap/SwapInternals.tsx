@@ -65,6 +65,7 @@ export type SwapRender = {
   percentOffMarket: number | undefined
   handleMaxBaseAmount: () => void
   handleMaxQuoteAmount: () => void
+  topLimit: bigint | undefined
 }
 
 export function SwapInternals({
@@ -227,6 +228,10 @@ export function SwapInternals({
 
   const [baseLimit, setBaseLimit] = useState<bigint | undefined>(undefined)
   const [quoteLimit, setQuoteLimit] = useState<bigint | undefined>(undefined)
+
+  const topLimit = useMemo(() => {
+    return side == 'Buy' ? quoteLimit : baseLimit
+  }, [baseLimit, quoteLimit, side])
 
   useWebsocketSubscription({
     topics: useMemo(() => [limitsTopic(market.id)], [market.id]),
@@ -617,7 +622,10 @@ export function SwapInternals({
             marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
             type: 'limit',
             side: side,
-            amount: baseAmount,
+            amount: {
+              type: 'fixed',
+              value: baseAmount
+            },
             price: new Decimal(formatUnits(limitPrice, quoteSymbol.decimals)),
             signature: signature,
             verifyingChainId: config.state.chainId
@@ -628,10 +636,17 @@ export function SwapInternals({
             marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
             type: 'market',
             side: side,
-            amount: percentage ? BigInt(0) : baseAmount,
+            amount: percentage
+              ? {
+                  type: 'percent',
+                  value: percentage
+                }
+              : {
+                  type: 'fixed',
+                  value: baseAmount
+                },
             signature: signature,
-            verifyingChainId: config.state.chainId,
-            percentage: percentage
+            verifyingChainId: config.state.chainId
           })
         }
         setLastOrderId(response.orderId)
@@ -806,6 +821,7 @@ export function SwapInternals({
     lastOrder,
     percentOffMarket,
     handleMaxBaseAmount,
-    handleMaxQuoteAmount
+    handleMaxQuoteAmount,
+    topLimit
   })
 }

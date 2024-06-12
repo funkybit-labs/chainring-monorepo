@@ -12,6 +12,7 @@ import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.Deposit
 import co.chainring.apps.api.model.DepositApiResponse
 import co.chainring.apps.api.model.Market
+import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.RequestProcessingError
 import co.chainring.apps.api.model.RequestStatus
@@ -27,7 +28,6 @@ import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.evm.TokenAddressAndChain
 import co.chainring.core.model.Address
-import co.chainring.core.model.Percentage
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
@@ -111,10 +111,9 @@ class ExchangeApiService(
             }?.also { ensurePriceIsMultipleOfTickSize(market, it) }
 
             val percentage = when (orderRequest) {
-                is CreateOrderApiRequest.Market -> orderRequest.percentage
+                is CreateOrderApiRequest.Market -> orderRequest.amount.percentage()
                 else -> null
             }
-            ensurePercentageOrAmountSet(percentage, orderRequest.amount)
 
             ensureOrderMarketIdMatchesBatchMarketId(orderRequest.marketId, batchOrdersRequest)
 
@@ -131,14 +130,13 @@ class ExchangeApiService(
                     },
                     nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
                     signature = orderRequest.signature,
-                    percentage = percentage,
                 ),
                 verifyingChainId = orderRequest.verifyingChainId,
             )
 
             SequencerClient.Order(
                 sequencerOrderId = orderId.toSequencerId().value,
-                amount = orderRequest.amount,
+                amount = orderRequest.amount.fixedAmount(),
                 price = price?.toString(),
                 wallet = walletAddress.toSequencerId().value,
                 orderType = toSequencerOrderType(orderRequest is CreateOrderApiRequest.Market, orderRequest.side),
@@ -146,7 +144,7 @@ class ExchangeApiService(
                 signature = orderRequest.signature,
                 orderId = orderId,
                 chainId = orderRequest.verifyingChainId,
-                percentage = percentage?.value,
+                percentage = percentage,
             )
         }
 
@@ -160,7 +158,7 @@ class ExchangeApiService(
                     walletAddress,
                     baseToken = baseSymbol.contractAddress ?: Address.zero,
                     quoteToken = quoteSymbol.contractAddress ?: Address.zero,
-                    amount = if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
+                    amount = OrderAmount.Fixed(if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate()),
                     price = orderRequest.price.toFundamentalUnits(quoteSymbol.decimals),
                     nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
                     signature = orderRequest.signature,
@@ -394,12 +392,6 @@ class ExchangeApiService(
     private fun ensureOrderMarketIdMatchesBatchMarketId(orderMarketId: MarketId, apiRequest: BatchOrdersApiRequest) {
         if (orderMarketId != apiRequest.marketId) {
             throw RequestProcessingError(processingError("Orders in a batch request have to be in the same market"))
-        }
-    }
-
-    private fun ensurePercentageOrAmountSet(percentage: Percentage?, amount: BigInteger) {
-        if (percentage == null && amount == BigInteger.ZERO) {
-            throw RequestProcessingError(processingError("Either amount or percentage must have a non zero value"))
         }
     }
 
