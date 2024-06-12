@@ -121,7 +121,9 @@ class ExchangeApiService(
                 walletAddress,
                 EIP712Transaction.Order(
                     walletAddress,
+                    baseChainId = baseSymbol.chainId.value,
                     baseToken = baseSymbol.contractAddress ?: Address.zero,
+                    quoteChainId = quoteSymbol.chainId.value,
                     quoteToken = quoteSymbol.contractAddress ?: Address.zero,
                     amount = if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
                     price = when (orderRequest) {
@@ -156,7 +158,9 @@ class ExchangeApiService(
                 walletAddress,
                 EIP712Transaction.Order(
                     walletAddress,
+                    baseChainId = baseSymbol.chainId.value,
                     baseToken = baseSymbol.contractAddress ?: Address.zero,
+                    quoteChainId = quoteSymbol.chainId.value,
                     quoteToken = quoteSymbol.contractAddress ?: Address.zero,
                     amount = OrderAmount.Fixed(if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate()),
                     price = orderRequest.price.toFundamentalUnits(quoteSymbol.decimals),
