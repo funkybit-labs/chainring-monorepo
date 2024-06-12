@@ -1,5 +1,6 @@
 package co.chainring.sequencer.core
 
+import co.chainring.core.model.Percentage
 import co.chainring.sequencer.proto.BalanceChange
 import co.chainring.sequencer.proto.BidOfferState
 import co.chainring.sequencer.proto.MarketCheckpoint
@@ -172,6 +173,9 @@ data class Market(
                 orderChanged {
                     this.guid = order.guid
                     this.disposition = orderResult.disposition
+                    if (order.hasPercentage() && order.percentage > 0) {
+                        this.newQuantity = order.amount
+                    }
                 },
             )
             if (orderResult.disposition == OrderDisposition.Accepted || orderResult.disposition == OrderDisposition.PartiallyFilled) {
@@ -409,12 +413,14 @@ data class Market(
                     break
                 }
             }
+            logger.debug { "handle crossing order $index ${levels[index].price}" }
             val orderBookLevelFill = orderBookLevel.fillOrder(remainingAmount)
             remainingAmount = orderBookLevelFill.remainingAmount
             executions.addAll(orderBookLevelFill.executions)
             if (remainingAmount == BigInteger.ZERO) {
                 break
             }
+            logger.debug { "moving to next level" }
             if (order.type == Order.Type.MarketBuy || order.type == Order.Type.LimitBuy) {
                 index += 1
                 if (index > maxOfferIx) {
@@ -706,7 +712,7 @@ data class Market(
                 break
             }
             val quantityAtLevel = levels[index].totalQuantity.min(remainingAmount)
-            totalPriceUnits += quantityAtLevel.toBigDecimal() * levels[index].price
+            totalPriceUnits += quantityAtLevel.toBigDecimal().setScale(18) * levels[index].price
             remainingAmount -= quantityAtLevel
             if (remainingAmount == BigInteger.ZERO) {
                 break
@@ -718,6 +724,36 @@ data class Market(
         }
         val availableQuantity = amount - remainingAmount
         return Pair(if (availableQuantity == BigInteger.ZERO) BigDecimal.ZERO else totalPriceUnits / availableQuantity.toBigDecimal(), availableQuantity)
+    }
+
+    private fun quantityForMarketBuy(notional: BigInteger): BigInteger {
+        var index = levelIx(bestOffer)
+
+        var remainingNotional = notional
+        var baseAmount = BigInteger.ZERO
+
+        while (index <= levels.size) {
+            val quantityAtLevel = levels[index].totalQuantity
+            if (quantityAtLevel > BigInteger.ZERO) {
+                val notionalAtLevel =
+                    remainingNotional.min(notional(quantityAtLevel, levels[index].price, baseDecimals, quoteDecimals))
+                if (notionalAtLevel == remainingNotional) {
+                    return baseAmount + quantityFromNotionalAndPrice(
+                        remainingNotional,
+                        levels[index].price,
+                        baseDecimals,
+                        quoteDecimals,
+                    )
+                }
+                baseAmount += quantityAtLevel
+                remainingNotional -= notionalAtLevel
+            }
+            index += 1
+            if (index > maxOfferIx) {
+                break
+            }
+        }
+        return baseAmount
     }
 
     // calculate how much liquidity is available for a market sell order (until stopAtLevelIx)
@@ -742,6 +778,17 @@ data class Market(
             }
         }
         return amount - remainingAmount
+    }
+
+    fun calculateAmountForPercentageSell(wallet: WalletAddress, walletBalance: BigInteger, percent: Int): BigInteger {
+        val baseAssetLimit = BigInteger.ZERO.max(walletBalance - baseAssetsRequired(wallet))
+        return clearingQuantityForMarketSell(baseAssetLimit) * percent.toBigInteger() / Percentage.MAX_VALUE.toBigInteger()
+    }
+
+    fun calculateAmountForPercentageBuy(wallet: WalletAddress, walletBalance: BigInteger, percent: Int, takerFeeRate: BigInteger): BigInteger {
+        val quoteAssetLimit = (BigInteger.ZERO.max(walletBalance - quoteAssetsRequired(wallet)) * percent.toBigInteger()) / Percentage.MAX_VALUE.toBigInteger()
+        val quoteAssetLimitAdjustedForFee = (quoteAssetLimit * FeeRate.MAX_VALUE.toBigInteger()) / (FeeRate.MAX_VALUE.toBigInteger() + takerFeeRate)
+        return quantityForMarketBuy(quoteAssetLimitAdjustedForFee)
     }
 
     // returns baseAsset and quoteAsset reserved by order

@@ -43,5 +43,8 @@ fun notionalPlusFee(amount: BigInteger, price: BigDecimal, baseDecimals: Int, qu
         notional + notionalFee(notional, feeRate)
     }
 
+fun quantityFromNotionalAndPrice(notional: BigInteger, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int): BigInteger =
+    (notional.toBigDecimal().setScale(18) / price).movePointRight(baseDecimals - quoteDecimals).toBigInteger()
+
 fun notionalPlusFee(amount: IntegerValue, price: DecimalValue, baseDecimals: Int, quoteDecimals: Int, feeRate: FeeRate): BigInteger =
     notionalPlusFee(amount.toBigInteger(), price.toBigDecimal(), baseDecimals, quoteDecimals, feeRate)

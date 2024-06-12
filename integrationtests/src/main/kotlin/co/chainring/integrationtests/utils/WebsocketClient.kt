@@ -64,7 +64,7 @@ fun WsClient.assertLimitOrderCreatedMessageReceived(expected: CreateOrderApiResp
     assertMessageReceived<OrderCreated>(SubscriptionTopic.Orders) { msg ->
         assertIs<Order.Limit>(msg.order)
         assertEquals(expected.orderId, msg.order.id)
-        assertEquals(expected.order.amount, msg.order.amount)
+        assertEquals(expected.order.amount.fixedAmount(), msg.order.amount)
         assertEquals(expected.order.side, msg.order.side)
         assertEquals(expected.order.marketId, msg.order.marketId)
         assertEquals(0, (expected.order as CreateOrderApiRequest.Limit).price.compareTo((msg.order as Order.Limit).price))
@@ -96,7 +96,7 @@ fun WsClient.assertMarketOrderCreatedMessageReceived(expected: CreateOrderApiRes
     assertMessageReceived<OrderCreated>(SubscriptionTopic.Orders) { msg ->
         assertIs<Order.Market>(msg.order)
         assertEquals(expected.orderId, msg.order.id)
-        assertEquals(expected.order.amount, msg.order.amount)
+        assertEquals(expected.order.amount.fixedAmount(), msg.order.amount)
         assertEquals(expected.order.side, msg.order.side)
         assertEquals(expected.order.marketId, msg.order.marketId)
         assertNotNull(msg.order.timing.createdAt)

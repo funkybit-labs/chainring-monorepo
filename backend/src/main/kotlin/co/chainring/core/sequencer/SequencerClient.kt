@@ -82,6 +82,7 @@ open class SequencerClient {
         val signature: EvmSignature?,
         val orderId: OrderId,
         val chainId: ChainId,
+        val percentage: Int?,
     )
 
     protected val channel: ManagedChannel = ManagedChannelBuilder.forAddress(
@@ -320,6 +321,7 @@ open class SequencerClient {
         this.signature = order.signature?.value ?: EvmSignature.emptySignature().value
         this.externalGuid = order.orderId.value
         this.chainId = order.chainId.value.toInt()
+        this.percentage = order.percentage ?: 0
     }
 
     private fun toCancelOrderDSL(orderId: OrderId) = cancelOrder {

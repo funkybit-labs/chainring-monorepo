@@ -1,6 +1,7 @@
 package co.chainring.apps.api.model
 
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.Percentage
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.ExecutionRole
@@ -13,6 +14,45 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
+import java.math.BigInteger
+
+@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@JsonClassDiscriminator("type")
+sealed class OrderAmount {
+    @Serializable
+    @SerialName("fixed")
+    data class Fixed(
+        val value: BigIntegerJson,
+    ) : OrderAmount()
+
+    @Serializable
+    @SerialName("percent")
+    data class Percent(
+        val value: Percentage,
+    ) : OrderAmount()
+
+    fun negate(): OrderAmount {
+        return when (this) {
+            is Fixed -> Fixed(this.value.negate())
+            else -> this
+        }
+    }
+
+    fun fixedAmount(): BigIntegerJson {
+        return when (this) {
+            is Fixed -> this.value
+            else -> BigInteger.ZERO
+        }
+    }
+
+    fun percentage(): Int? {
+        return when (this) {
+            is Percent -> this.value.value
+            else -> null
+        }
+    }
+}
 
 @Serializable
 @OptIn(ExperimentalSerializationApi::class)
@@ -21,7 +61,7 @@ sealed class CreateOrderApiRequest {
     abstract val nonce: String
     abstract val marketId: MarketId
     abstract val side: OrderSide
-    abstract val amount: BigIntegerJson
+    abstract val amount: OrderAmount
     abstract val signature: EvmSignature
     abstract val verifyingChainId: ChainId
 
@@ -31,7 +71,7 @@ sealed class CreateOrderApiRequest {
         override val nonce: String,
         override val marketId: MarketId,
         override val side: OrderSide,
-        override val amount: BigIntegerJson,
+        override val amount: OrderAmount,
         override val signature: EvmSignature,
         override val verifyingChainId: ChainId,
     ) : CreateOrderApiRequest()
@@ -42,7 +82,7 @@ sealed class CreateOrderApiRequest {
         override val nonce: String,
         override val marketId: MarketId,
         override val side: OrderSide,
-        override val amount: BigIntegerJson,
+        override val amount: OrderAmount,
         val price: BigDecimalJson,
         override val signature: EvmSignature,
         override val verifyingChainId: ChainId,

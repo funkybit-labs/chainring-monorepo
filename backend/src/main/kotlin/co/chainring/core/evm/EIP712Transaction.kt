@@ -1,6 +1,7 @@
 package co.chainring.core.evm
 
 import co.chainring.apps.api.model.BigIntegerJson
+import co.chainring.apps.api.model.OrderAmount
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
@@ -82,7 +83,7 @@ sealed class EIP712Transaction {
         val sender: Address,
         val baseToken: Address,
         val quoteToken: Address,
-        val amount: BigIntegerJson,
+        val amount: OrderAmount,
         val price: BigIntegerJson,
         val nonce: BigIntegerJson,
         override val signature: EvmSignature,
@@ -96,7 +97,10 @@ sealed class EIP712Transaction {
             StructuredData.Entry("sender", "address"),
             StructuredData.Entry("baseToken", "address"),
             StructuredData.Entry("quoteToken", "address"),
-            StructuredData.Entry("amount", "int256"),
+            when (amount) {
+                is OrderAmount.Fixed -> StructuredData.Entry("amount", "int256")
+                is OrderAmount.Percent -> StructuredData.Entry("percentage", "int256")
+            },
             StructuredData.Entry("price", "uint256"),
             StructuredData.Entry("nonce", "int256"),
         )
@@ -106,7 +110,10 @@ sealed class EIP712Transaction {
                 "sender" to sender.value,
                 "baseToken" to baseToken.value,
                 "quoteToken" to quoteToken.value,
-                "amount" to amount.toString(),
+                when (amount) {
+                    is OrderAmount.Fixed -> "amount" to amount.value.toString()
+                    is OrderAmount.Percent -> "percentage" to amount.value.value.toString()
+                },
                 "price" to price.toString(),
                 "nonce" to nonce.toString(),
             )

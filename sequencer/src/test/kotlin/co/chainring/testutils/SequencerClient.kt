@@ -60,6 +60,7 @@ class SequencerClient {
         price: BigDecimal?,
         wallet: WalletAddress,
         orderType: Order.Type,
+        percentage: Int = 0,
     ) =
         sequencer.processRequest(
             sequencerRequest {
@@ -74,6 +75,7 @@ class SequencerClient {
                             this.amount = amount.toFundamentalUnits(market.baseDecimals).toIntegerValue()
                             this.price = price?.toDecimalValue() ?: BigDecimal.ZERO.toDecimalValue()
                             this.type = orderType
+                            this.percentage = percentage
                         },
                     )
                 }

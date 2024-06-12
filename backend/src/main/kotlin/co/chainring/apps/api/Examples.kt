@@ -8,6 +8,7 @@ import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.Deposit
 import co.chainring.apps.api.model.Order
+import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.RequestStatus
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.UpdateOrderApiResponse
@@ -34,7 +35,7 @@ object Examples {
         nonce = "123",
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
-        amount = BigInteger("100"),
+        amount = OrderAmount.Fixed(BigInteger("100")),
         signature = EvmSignature.emptySignature(),
         verifyingChainId = ChainId.empty,
     )
@@ -43,7 +44,7 @@ object Examples {
         nonce = "123",
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
-        amount = BigInteger("100"),
+        amount = OrderAmount.Fixed(BigInteger("100")),
         price = BigDecimal("100"),
         signature = EvmSignature.emptySignature(),
         verifyingChainId = ChainId.empty,

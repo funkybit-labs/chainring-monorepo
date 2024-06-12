@@ -5,6 +5,7 @@ import co.chainring.apps.api.model.Chain
 import co.chainring.apps.api.model.CreateDepositApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
+import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.contracts.generated.Exchange
@@ -210,7 +211,7 @@ class Wallet(
 
     fun signOrder(request: UpdateOrderApiRequest): UpdateOrderApiRequest =
         request.copy(
-            signature = limitOrderEip712TxSignature(request.marketId, request.amount, request.price, request.side, request.nonce),
+            signature = limitOrderEip712TxSignature(request.marketId, OrderAmount.Fixed(request.amount), request.price, request.side, request.nonce),
             verifyingChainId = this.currentChainId,
         )
 
@@ -232,7 +233,7 @@ class Wallet(
         exchangeContractByChainId.getValue(currentChainId).rollbackBatch().sendAsync()
     }
 
-    private fun limitOrderEip712TxSignature(marketId: MarketId, amount: BigInteger, price: BigDecimal, side: OrderSide, nonce: String): EvmSignature {
+    private fun limitOrderEip712TxSignature(marketId: MarketId, amount: OrderAmount, price: BigDecimal, side: OrderSide, nonce: String): EvmSignature {
         val (baseSymbol, quoteSymbol) = marketSymbols(marketId)
         val tx = EIP712Transaction.Order(
             address,
@@ -241,7 +242,7 @@ class Wallet(
             amount = if (side == OrderSide.Buy) amount else amount.negate(),
             price = price.toFundamentalUnits(quoteSymbol.decimals),
             nonce = BigInteger(1, nonce.toHexBytes()),
-            EvmSignature.emptySignature(),
+            signature = EvmSignature.emptySignature(),
         )
         return blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId)))
     }

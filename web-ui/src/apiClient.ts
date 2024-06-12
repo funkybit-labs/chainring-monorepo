@@ -83,12 +83,27 @@ export type ConfigurationApiResponse = z.infer<
 const OrderSideSchema = z.enum(['Buy', 'Sell'])
 export type OrderSide = z.infer<typeof OrderSideSchema>
 
+const FixedAmountSchema = z.object({
+  type: z.literal('fixed'),
+  value: z.coerce.bigint()
+})
+
+const PercentAmountSchema = z.object({
+  type: z.literal('percent'),
+  value: z.number()
+})
+
+const OrderAmountSchema = z.discriminatedUnion('type', [
+  FixedAmountSchema,
+  PercentAmountSchema
+])
+
 const CreateMarketOrderSchema = z.object({
   nonce: z.string(),
   type: z.literal('market'),
   marketId: z.string(),
   side: OrderSideSchema,
-  amount: z.coerce.bigint(),
+  amount: OrderAmountSchema,
   signature: z.string(),
   verifyingChainId: z.number()
 })
@@ -99,7 +114,7 @@ const CreateLimitOrderSchema = z.object({
   type: z.literal('limit'),
   marketId: z.string(),
   side: OrderSideSchema,
-  amount: z.bigint(),
+  amount: OrderAmountSchema,
   price: decimal(),
   signature: z.string(),
   verifyingChainId: z.number()

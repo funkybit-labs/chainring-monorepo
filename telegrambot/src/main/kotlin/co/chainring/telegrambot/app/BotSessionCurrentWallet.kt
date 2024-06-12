@@ -10,6 +10,7 @@ import co.chainring.apps.api.model.FaucetApiRequest
 import co.chainring.apps.api.model.FaucetApiResponse
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
+import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
@@ -314,7 +315,7 @@ class BotSessionCurrentWallet(
                     nonce = generateOrderNonce(),
                     marketId = market.id,
                     side = orderSide,
-                    amount = amount.toFundamentalUnits(decimals(market.baseSymbol)),
+                    amount = OrderAmount.Fixed(amount.toFundamentalUnits(decimals(market.baseSymbol))),
                     signature = EvmSignature.emptySignature(),
                     verifyingChainId = ChainId.empty,
                 ),
@@ -358,7 +359,7 @@ class BotSessionCurrentWallet(
             amount = if (order.side == OrderSide.Buy) order.amount else order.amount.negate(),
             price = BigInteger.ZERO,
             nonce = BigInteger(1, order.nonce.toHexBytes()),
-            EvmSignature.emptySignature(),
+            signature = EvmSignature.emptySignature(),
         )
 
         return order.copy(

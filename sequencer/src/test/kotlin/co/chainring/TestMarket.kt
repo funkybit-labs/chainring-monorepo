@@ -4,17 +4,21 @@ import co.chainring.sequencer.core.FeeRate
 import co.chainring.sequencer.core.FeeRates
 import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
+import co.chainring.sequencer.core.WalletAddress
+import co.chainring.sequencer.core.notionalPlusFee
 import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderBatch
+import co.chainring.testutils.toFundamentalUnits
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class TestMarket {
     private val tickSize = BigDecimal("0.05")
@@ -496,6 +500,101 @@ class TestMarket {
             expectedDisposition,
             response.ordersChanged.first { it.guid == guid }.disposition,
         )
+    }
+
+    @Test
+    fun testPercentageCalculations() {
+        addOrder(1L, Order.Type.LimitBuy, "50", "17.550")
+        // buy 50% of limit of 20
+        assertEquals(BigInteger("10"), market.calculateAmountForPercentageSell(WalletAddress(2L), BigInteger("20"), 50))
+        // buy 100% of limit of 20
+        assertEquals(BigInteger("20"), market.calculateAmountForPercentageSell(WalletAddress(2L), BigInteger("20"), 100))
+        // buy 100% of limit of 60 (only 50 available)
+        assertEquals(BigInteger("50"), market.calculateAmountForPercentageSell(WalletAddress(2L), BigInteger("60"), 100))
+        addOrder(2L, Order.Type.LimitBuy, "50", "17.550")
+        // buy 100% of limit of 60 - should get all since enough at different levels
+        assertEquals(BigInteger("60"), market.calculateAmountForPercentageSell(WalletAddress(2L), BigInteger("60"), 100))
+
+        // add some limit sells
+        addOrder(3L, Order.Type.LimitSell, BigDecimal("20").toFundamentalUnits(market.baseDecimals).toString(), "20.000")
+        addOrder(4L, Order.Type.LimitSell, BigDecimal("20").toFundamentalUnits(market.baseDecimals).toString(), "21.000")
+        val feeRate = FeeRate.fromPercents(2.0)
+
+        // this should be filled from first level
+        var quoteLimit = BigDecimal("200").toFundamentalUnits(market.quoteDecimals)
+        var expectedAmount = BigDecimal("9.803921568627450980").toFundamentalUnits(market.baseDecimals)
+        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 100, feeRate.value.toBigInteger()))
+        assertTrue(quoteLimit > notionalPlusFee(expectedAmount, BigDecimal("20"), market.baseDecimals, market.quoteDecimals, feeRate))
+        // just some tiny dust left.
+        assertEquals(BigInteger("8"), quoteLimit - notionalPlusFee(expectedAmount, BigDecimal("20"), market.baseDecimals, market.quoteDecimals, feeRate))
+
+        expectedAmount = BigDecimal("4.901960784313725490").toFundamentalUnits(market.baseDecimals)
+        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 50, feeRate.value.toBigInteger()))
+        assertTrue(quoteLimit / BigInteger.TWO > notionalPlusFee(expectedAmount, BigDecimal("20"), market.baseDecimals, market.quoteDecimals, feeRate))
+        // just some tiny dust left plus the other half.
+        assertEquals(BigInteger("4"), quoteLimit / BigInteger.TWO - notionalPlusFee(expectedAmount, BigDecimal("20"), market.baseDecimals, market.quoteDecimals, feeRate))
+
+        // this should require both levels
+        quoteLimit = BigDecimal("500").toFundamentalUnits(market.quoteDecimals)
+        expectedAmount = BigDecimal("24.295051353874883286").toFundamentalUnits(market.baseDecimals)
+        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 100, feeRate.value.toBigInteger()))
+        val expectedNotional = notionalPlusFee(BigDecimal("20").toFundamentalUnits(market.baseDecimals), BigDecimal("20"), market.baseDecimals, market.quoteDecimals, feeRate) +
+            notionalPlusFee(BigDecimal("4.295051353874883286").toFundamentalUnits(market.baseDecimals), BigDecimal("21"), market.baseDecimals, market.quoteDecimals, feeRate)
+        assertTrue(quoteLimit > expectedNotional)
+        // just some tiny dust left.
+        assertEquals(BigInteger("14"), quoteLimit - expectedNotional)
+    }
+
+    @Test
+    fun `testPercentageCalculations quote and base have different decimals`() {
+        market = Market(
+            id = MarketId("BTC/USDC"),
+            tickSize = BigDecimal("10"),
+            initialMarketPrice = BigDecimal("69005"),
+            maxLevels = 1000,
+            maxOrdersPerLevel = 100,
+            baseDecimals = 18,
+            quoteDecimals = 6,
+        )
+        addOrder(1L, Order.Type.LimitBuy, "50", "69000")
+        // buy 50% of limit of 20
+        assertEquals(BigInteger("10"), market.calculateAmountForPercentageSell(WalletAddress(2L), BigInteger("20"), 50))
+        // buy 100% of limit of 20
+        assertEquals(BigInteger("20"), market.calculateAmountForPercentageSell(WalletAddress(2L), BigInteger("20"), 100))
+        // buy 100% of limit of 60 (only 50 available)
+        assertEquals(BigInteger("50"), market.calculateAmountForPercentageSell(WalletAddress(2L), BigInteger("60"), 100))
+        addOrder(2L, Order.Type.LimitBuy, "50", "69000")
+        // buy 100% of limit of 60 - should get all since enough at different levels
+        assertEquals(BigInteger("60"), market.calculateAmountForPercentageSell(WalletAddress(2L), BigInteger("60"), 100))
+
+        // add some limit sells
+        addOrder(3L, Order.Type.LimitSell, BigDecimal("20").toFundamentalUnits(market.baseDecimals).toString(), "70000.000")
+        addOrder(4L, Order.Type.LimitSell, BigDecimal("20").toFundamentalUnits(market.baseDecimals).toString(), "71000.000")
+        val feeRate = FeeRate.fromPercents(2.0)
+
+        // this should be filled from first level
+        var quoteLimit = BigDecimal("700000").toFundamentalUnits(market.quoteDecimals)
+        var expectedAmount = BigDecimal("9.803921568614285714").toFundamentalUnits(market.baseDecimals)
+        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 100, feeRate.value.toBigInteger()))
+        assertTrue(quoteLimit > notionalPlusFee(expectedAmount, BigDecimal("70000"), market.baseDecimals, market.quoteDecimals, feeRate))
+        // just some tiny dust left.
+        assertEquals(BigInteger("2"), quoteLimit - notionalPlusFee(expectedAmount, BigDecimal("70000"), market.baseDecimals, market.quoteDecimals, feeRate))
+
+        expectedAmount = BigDecimal("4.901960784300000000").toFundamentalUnits(market.baseDecimals)
+        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 50, feeRate.value.toBigInteger()))
+        assertTrue(quoteLimit / BigInteger.TWO > notionalPlusFee(expectedAmount, BigDecimal("70000"), market.baseDecimals, market.quoteDecimals, feeRate))
+        // just some tiny dust left plus the other half.
+        assertEquals(BigInteger("1"), quoteLimit / BigInteger.TWO - notionalPlusFee(expectedAmount, BigDecimal("70000"), market.baseDecimals, market.quoteDecimals, feeRate))
+
+        // this should require both levels
+        quoteLimit = BigDecimal("2000000").toFundamentalUnits(market.quoteDecimals)
+        expectedAmount = BigDecimal("27.898370615845070422").toFundamentalUnits(market.baseDecimals)
+        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 100, feeRate.value.toBigInteger()))
+        val expectedNotional = notionalPlusFee(BigDecimal("20").toFundamentalUnits(market.baseDecimals), BigDecimal("70000"), market.baseDecimals, market.quoteDecimals, feeRate) +
+            notionalPlusFee(BigDecimal("7.898370615845070422").toFundamentalUnits(market.baseDecimals), BigDecimal("71000"), market.baseDecimals, market.quoteDecimals, feeRate)
+        assertTrue(quoteLimit > expectedNotional)
+        // just some tiny dust left.
+        assertEquals(BigInteger("2"), quoteLimit - expectedNotional)
     }
 
     private fun updateOrder(guid: Long, orderType: Order.Type, amount: String, price: String, expectedDisposition: OrderDisposition = OrderDisposition.Accepted, counterOrderGuid: Long? = null) {

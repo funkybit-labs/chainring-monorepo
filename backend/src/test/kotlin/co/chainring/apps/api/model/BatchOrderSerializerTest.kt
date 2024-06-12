@@ -19,7 +19,7 @@ class BatchOrderSerializerTest {
         nonce = "123",
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
-        amount = BigInteger("100000"),
+        amount = OrderAmount.Fixed(BigInteger("100000")),
         signature = EvmSignature.emptySignature(),
         verifyingChainId = ChainId.empty,
     )

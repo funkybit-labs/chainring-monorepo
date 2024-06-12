@@ -27,6 +27,7 @@ import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.TradeCreated
 import co.chainring.sequencer.proto.balanceChange
+import co.chainring.sequencer.proto.copy
 import co.chainring.sequencer.proto.marketCreated
 import co.chainring.sequencer.proto.sequencerResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -133,9 +134,10 @@ class SequencerApp(
                 if (market == null) {
                     error = SequencerError.UnknownMarket
                 } else {
-                    error = checkLimits(market, orderBatch)
+                    val adjustedOrderBatch = adjustBatchForPercentageMarketOrders(market, orderBatch)
+                    error = checkLimits(market, adjustedOrderBatch)
                     if (error == null) {
-                        val result = market.applyOrderBatch(orderBatch, state.feeRates)
+                        val result = market.applyOrderBatch(adjustedOrderBatch, state.feeRates)
                         ordersChanged = result.ordersChanged
                         ordersChangeRejected = result.ordersChangeRejected
                         trades = result.createdTrades
@@ -310,6 +312,39 @@ class SequencerApp(
         }
     }
 
+    private fun adjustBatchForPercentageMarketOrders(market: Market, orderBatch: OrderBatch): OrderBatch {
+        return if (orderBatch.ordersToAddList.any { isOrderWithPercentage(it) }) {
+            orderBatch.copy {
+                this.ordersToAdd.clear()
+                this.ordersToAdd.addAll(
+                    orderBatch.ordersToAddList.map { order ->
+                        if (isOrderWithPercentage(order)) {
+                            order.copy {
+                                this.amount = if (order.type == Order.Type.MarketSell) {
+                                    calculateAmountForPercentageSell(
+                                        market,
+                                        orderBatch.wallet.toWalletAddress(),
+                                        order.percentage,
+                                    ).toIntegerValue()
+                                } else {
+                                    calculateAmountForPercentageBuy(
+                                        market,
+                                        orderBatch.wallet.toWalletAddress(),
+                                        order.percentage,
+                                    ).toIntegerValue()
+                                }
+                            }
+                        } else {
+                            order
+                        }
+                    },
+                )
+            }
+        } else {
+            orderBatch
+        }
+    }
+
     private fun autoReduce(walletsAndAssets: Collection<Pair<WalletAddress, Asset>>): List<OrderChanged> {
         return walletsAndAssets.flatMap { (walletAddress, asset) ->
             state.consumed[walletAddress]?.get(asset)?.flatMap { (marketId, amount) ->
@@ -322,6 +357,8 @@ class SequencerApp(
             } ?: emptyList()
         }
     }
+
+    private fun isOrderWithPercentage(order: Order) = order.hasPercentage() && order.percentage != 0 && (order.type == Order.Type.MarketSell || order.type == Order.Type.MarketBuy)
 
     private fun checkLimits(market: Market, orderBatch: OrderBatch): SequencerError? {
         // compute cumulative assets required change from applying all orders in order batch
@@ -396,6 +433,23 @@ class SequencerApp(
         }
 
         return null
+    }
+
+    private fun calculateAmountForPercentageSell(market: Market, wallet: WalletAddress, percent: Int): BigInteger {
+        return market.calculateAmountForPercentageSell(
+            wallet,
+            state.balances[wallet]?.get(market.id.baseAsset()) ?: BigInteger.ZERO,
+            percent,
+        )
+    }
+
+    private fun calculateAmountForPercentageBuy(market: Market, wallet: WalletAddress, percent: Int): BigInteger {
+        return market.calculateAmountForPercentageBuy(
+            wallet,
+            state.balances[wallet]?.get(market.id.quoteAsset()) ?: BigInteger.ZERO,
+            percent,
+            state.feeRates.taker.value.toBigInteger(),
+        )
     }
 
     private fun calculateLimitBuyOrderNotionalPlusFee(order: Order, market: Market): BigInteger {

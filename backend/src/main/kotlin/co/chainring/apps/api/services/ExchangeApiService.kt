@@ -12,6 +12,7 @@ import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.Deposit
 import co.chainring.apps.api.model.DepositApiResponse
 import co.chainring.apps.api.model.Market
+import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.RequestProcessingError
 import co.chainring.apps.api.model.RequestStatus
@@ -109,6 +110,11 @@ class ExchangeApiService(
                 else -> null
             }?.also { ensurePriceIsMultipleOfTickSize(market, it) }
 
+            val percentage = when (orderRequest) {
+                is CreateOrderApiRequest.Market -> orderRequest.amount.percentage()
+                else -> null
+            }
+
             ensureOrderMarketIdMatchesBatchMarketId(orderRequest.marketId, batchOrdersRequest)
 
             verifyEIP712Signature(
@@ -130,7 +136,7 @@ class ExchangeApiService(
 
             SequencerClient.Order(
                 sequencerOrderId = orderId.toSequencerId().value,
-                amount = orderRequest.amount,
+                amount = orderRequest.amount.fixedAmount(),
                 price = price?.toString(),
                 wallet = walletAddress.toSequencerId().value,
                 orderType = toSequencerOrderType(orderRequest is CreateOrderApiRequest.Market, orderRequest.side),
@@ -138,6 +144,7 @@ class ExchangeApiService(
                 signature = orderRequest.signature,
                 orderId = orderId,
                 chainId = orderRequest.verifyingChainId,
+                percentage = percentage,
             )
         }
 
@@ -151,7 +158,7 @@ class ExchangeApiService(
                     walletAddress,
                     baseToken = baseSymbol.contractAddress ?: Address.zero,
                     quoteToken = quoteSymbol.contractAddress ?: Address.zero,
-                    amount = if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
+                    amount = OrderAmount.Fixed(if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate()),
                     price = orderRequest.price.toFundamentalUnits(quoteSymbol.decimals),
                     nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
                     signature = orderRequest.signature,
@@ -169,6 +176,7 @@ class ExchangeApiService(
                 signature = orderRequest.signature,
                 orderId = orderRequest.orderId,
                 chainId = orderRequest.verifyingChainId,
+                percentage = null,
             )
         }
 

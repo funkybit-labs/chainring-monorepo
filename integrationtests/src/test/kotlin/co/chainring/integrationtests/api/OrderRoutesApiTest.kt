@@ -5,6 +5,7 @@ import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.Order
+import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.RequestStatus
 import co.chainring.apps.api.model.UpdateOrderApiRequest
@@ -218,7 +219,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     nonce = generateOrderNonce(),
                     marketId = usdcDaiMarket.id,
                     side = OrderSide.Buy,
-                    amount = BigDecimal("1").inFundamentalUnits(usdc),
+                    amount = OrderAmount.Fixed(BigDecimal("1").inFundamentalUnits(usdc)),
                     price = BigDecimal("2.015"),
                     signature = EvmSignature.emptySignature(),
                     verifyingChainId = ChainId.empty,
@@ -523,7 +524,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
             assertTradeCreatedMessageReceived(
                 order = marketBuyOrderApiResponse,
                 price = updatedLimitSellOrderApiResponse.order.price,
-                amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount),
+                amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount.fixedAmount()),
                 fee = AssetAmount(quoteSymbol, "0.0001516671"),
                 settlementStatus = SettlementStatus.Pending,
             )
@@ -854,7 +855,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     assertEquals(marketSellOrderApiResponse.orderId, order.id)
                     assertEquals(marketSellOrderApiResponse.order.marketId, order.marketId)
                     assertEquals(marketSellOrderApiResponse.order.side, order.side)
-                    assertEquals(marketSellOrderApiResponse.order.amount, order.amount)
+                    assertEquals(marketSellOrderApiResponse.order.amount.fixedAmount(), order.amount)
                     assertEquals(OrderStatus.Partial, order.status)
                 }
                 msg.orders[1].also { order ->
@@ -862,7 +863,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     assertEquals(marketBuyOrderApiResponse.orderId, order.id)
                     assertEquals(marketBuyOrderApiResponse.order.marketId, order.marketId)
                     assertEquals(marketBuyOrderApiResponse.order.side, order.side)
-                    assertEquals(marketBuyOrderApiResponse.order.amount, order.amount)
+                    assertEquals(marketBuyOrderApiResponse.order.amount.fixedAmount(), order.amount)
                     assertEquals(OrderStatus.Filled, order.status)
                 }
             }
@@ -884,7 +885,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     assertEquals(marketBuyOrderApiResponse.order.marketId, marketId)
                     assertEquals(marketBuyOrderApiResponse.order.side, side)
                     assertAmount(updatedLimitSellOrderApiResponse.order.price.ofAsset(quoteSymbol), price)
-                    assertAmount(AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount), amount)
+                    assertAmount(AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount.fixedAmount()), amount)
                     assertFee(AssetAmount(quoteSymbol, "0.0001516671"), feeAmount, feeSymbol)
                     assertEquals(SettlementStatus.Completed, settlementStatus)
                 }
@@ -964,7 +965,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                             nonce = generateOrderNonce(),
                             marketId = market.id,
                             side = OrderSide.Sell,
-                            amount = AssetAmount(baseSymbol, it).inFundamentalUnits,
+                            amount = OrderAmount.Fixed(AssetAmount(baseSymbol, it).inFundamentalUnits),
                             price = BigDecimal("68400.000"),
                             signature = EvmSignature.emptySignature(),
                             verifyingChainId = ChainId.empty,
@@ -989,7 +990,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                             nonce = generateOrderNonce(),
                             marketId = market.id,
                             side = OrderSide.Sell,
-                            amount = AssetAmount(baseSymbol, it).inFundamentalUnits,
+                            amount = OrderAmount.Fixed(AssetAmount(baseSymbol, it).inFundamentalUnits),
                             price = BigDecimal("68400.000"),
                             signature = EvmSignature.emptySignature(),
                             verifyingChainId = ChainId.empty,
@@ -1244,7 +1245,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
             assertTradeCreatedMessageReceived(
                 order = marketBuyOrderApiResponse,
                 price = (limitSellOrderApiResponse.order as CreateOrderApiRequest.Limit).price,
-                amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount),
+                amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount.fixedAmount()),
                 fee = AssetAmount(quoteSymbol, "0.001002"),
                 settlementStatus = SettlementStatus.Pending,
             )
@@ -1517,7 +1518,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                             nonce = generateOrderNonce(),
                             marketId = market.id,
                             side = OrderSide.Sell,
-                            amount = AssetAmount(baseSymbol, it).inFundamentalUnits,
+                            amount = OrderAmount.Fixed(AssetAmount(baseSymbol, it).inFundamentalUnits),
                             price = BigDecimal("1.001"),
                             signature = EvmSignature.emptySignature(),
                             verifyingChainId = ChainId.empty,
@@ -1542,7 +1543,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                             nonce = generateOrderNonce(),
                             marketId = market.id,
                             side = OrderSide.Sell,
-                            amount = AssetAmount(baseSymbol, it).inFundamentalUnits,
+                            amount = OrderAmount.Fixed(AssetAmount(baseSymbol, it).inFundamentalUnits),
                             price = BigDecimal("1.001"),
                             signature = EvmSignature.emptySignature(),
                             verifyingChainId = ChainId.empty,

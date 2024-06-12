@@ -19,6 +19,7 @@ import co.chainring.apps.api.model.ListDepositsApiResponse
 import co.chainring.apps.api.model.ListWithdrawalsApiResponse
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
+import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.OrdersApiResponse
 import co.chainring.apps.api.model.RequestStatus
 import co.chainring.apps.api.model.UpdateOrderApiRequest
@@ -32,6 +33,7 @@ import co.chainring.core.client.rest.applicationJson
 import co.chainring.core.client.rest.httpClient
 import co.chainring.core.client.rest.json
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.Percentage
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.FeeRates
@@ -160,7 +162,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             nonce = generateOrderNonce(),
             marketId = market.id,
             side = side,
-            amount = amount.toFundamentalUnits(market.baseDecimals),
+            amount = OrderAmount.Fixed(amount.toFundamentalUnits(market.baseDecimals)),
             price = price,
             signature = EvmSignature.emptySignature(),
             verifyingChainId = ChainId.empty,
@@ -174,12 +176,12 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
         return response
     }
 
-    fun createMarketOrder(market: Market, side: OrderSide, amount: BigDecimal, wallet: Wallet): CreateOrderApiResponse {
+    fun createMarketOrder(market: Market, side: OrderSide, amount: BigDecimal?, wallet: Wallet, percentage: Percentage? = null): CreateOrderApiResponse {
         val request = CreateOrderApiRequest.Market(
             nonce = generateOrderNonce(),
             marketId = market.id,
             side = side,
-            amount = amount.toFundamentalUnits(market.baseDecimals),
+            amount = amount?.let { OrderAmount.Fixed(it.toFundamentalUnits(market.baseDecimals)) } ?: OrderAmount.Percent(percentage!!),
             signature = EvmSignature.emptySignature(),
             verifyingChainId = ChainId.empty,
         ).let { wallet.signOrder(it) }
@@ -305,7 +307,7 @@ fun CreateOrderApiResponse.toCancelOrderRequest(wallet: Wallet): CancelOrderApiR
     CancelOrderApiRequest(
         orderId = this.orderId,
         marketId = this.order.marketId,
-        amount = this.order.amount,
+        amount = this.order.amount.fixedAmount(),
         side = this.order.side,
         nonce = generateOrderNonce(),
         signature = EvmSignature.emptySignature(),

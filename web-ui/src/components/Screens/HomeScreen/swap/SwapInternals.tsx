@@ -12,7 +12,11 @@ import {
   Publishable
 } from 'websocketMessages'
 import { Address, formatUnits, parseUnits } from 'viem'
-import { calculateFee, calculateNotional } from 'utils'
+import {
+  calculateFee,
+  calculateNotional,
+  calculateNotionalMinusFee
+} from 'utils'
 import {
   bigintToScaledDecimal,
   getMarketPrice,
@@ -59,6 +63,9 @@ export type SwapRender = {
   quoteDecimals: number
   lastOrder: Order | undefined
   percentOffMarket: number | undefined
+  handleMaxBaseAmount: () => void
+  handleMaxQuoteAmount: () => void
+  topLimit: bigint | undefined
 }
 
 export function SwapInternals({
@@ -91,6 +98,7 @@ export function SwapInternals({
   const [balances, setBalances] = useState<Balance[]>(() => [])
   const [lastOrderId, setLastOrderId] = useState<string | undefined>()
   const [lastOrder, setLastOrder] = useState<Order>()
+  const [percentage, setPercentage] = useState<number | null>(null)
 
   useEffect(() => {
     const selectedMarket = window.sessionStorage.getItem('market')
@@ -221,6 +229,10 @@ export function SwapInternals({
   const [baseLimit, setBaseLimit] = useState<bigint | undefined>(undefined)
   const [quoteLimit, setQuoteLimit] = useState<bigint | undefined>(undefined)
 
+  const topLimit = useMemo(() => {
+    return side == 'Buy' ? quoteLimit : baseLimit
+  }, [baseLimit, quoteLimit, side])
+
   useWebsocketSubscription({
     topics: useMemo(() => [limitsTopic(market.id)], [market.id]),
     handler: useCallback((message: Publishable) => {
@@ -270,7 +282,30 @@ export function SwapInternals({
     setQuoteAmountManuallyChanged(false)
     setBaseAmountManuallyChanged(true)
     setBaseAmountInputValue(e.target.value)
+    setPercentage(null)
+    mutation.reset()
+  }
 
+  function handleMaxBaseAmount() {
+    setQuoteAmountManuallyChanged(false)
+    setBaseAmountManuallyChanged(true)
+    setBaseAmountInputValue(
+      formatUnits(baseLimit ?? BigInt(0), baseSymbol.decimals)
+    )
+    setPercentage(100)
+    mutation.reset()
+  }
+
+  function handleMaxQuoteAmount() {
+    setQuoteAmountManuallyChanged(true)
+    setBaseAmountManuallyChanged(false)
+    setQuoteAmountInputValue(
+      formatUnits(
+        calculateNotionalMinusFee(quoteLimit ?? BigInt(0), feeRates.taker),
+        quoteSymbol.decimals
+      )
+    )
+    setPercentage(100)
     mutation.reset()
   }
 
@@ -345,6 +380,7 @@ export function SwapInternals({
     setBaseAmountManuallyChanged(false)
     setQuoteAmountManuallyChanged(true)
     setQuoteAmountInputValue(e.target.value)
+    setPercentage(null)
     mutation.reset()
   }
 
@@ -521,34 +557,63 @@ export function SwapInternals({
       setLastOrderId(undefined)
       try {
         const nonce = generateOrderNonce()
-        const signature = await signTypedDataAsync({
-          types: {
-            EIP712Domain: [
-              { name: 'name', type: 'string' },
-              { name: 'version', type: 'string' },
-              { name: 'chainId', type: 'uint256' },
-              { name: 'verifyingContract', type: 'address' }
-            ],
-            Order: [
-              { name: 'sender', type: 'address' },
-              { name: 'baseToken', type: 'address' },
-              { name: 'quoteToken', type: 'address' },
-              { name: 'amount', type: 'int256' },
-              { name: 'price', type: 'uint256' },
-              { name: 'nonce', type: 'int256' }
-            ]
-          },
-          domain: getDomain(exchangeContractAddress!, config.state.chainId),
-          primaryType: 'Order',
-          message: {
-            sender: walletAddress!,
-            baseToken: baseSymbol.contractAddress ?? addressZero,
-            quoteToken: quoteSymbol.contractAddress ?? addressZero,
-            amount: side == 'Buy' ? baseAmount : -baseAmount,
-            price: isLimitOrder ? limitPrice : 0n,
-            nonce: BigInt('0x' + nonce)
-          }
-        })
+        const signature = percentage
+          ? await signTypedDataAsync({
+              types: {
+                EIP712Domain: [
+                  { name: 'name', type: 'string' },
+                  { name: 'version', type: 'string' },
+                  { name: 'chainId', type: 'uint256' },
+                  { name: 'verifyingContract', type: 'address' }
+                ],
+                Order: [
+                  { name: 'sender', type: 'address' },
+                  { name: 'baseToken', type: 'address' },
+                  { name: 'quoteToken', type: 'address' },
+                  { name: 'percentage', type: 'int256' },
+                  { name: 'price', type: 'uint256' },
+                  { name: 'nonce', type: 'int256' }
+                ]
+              },
+              domain: getDomain(exchangeContractAddress!, config.state.chainId),
+              primaryType: 'Order',
+              message: {
+                sender: walletAddress!,
+                baseToken: baseSymbol.contractAddress ?? addressZero,
+                quoteToken: quoteSymbol.contractAddress ?? addressZero,
+                percentage: BigInt(percentage),
+                price: isLimitOrder ? limitPrice : 0n,
+                nonce: BigInt('0x' + nonce)
+              }
+            })
+          : await signTypedDataAsync({
+              types: {
+                EIP712Domain: [
+                  { name: 'name', type: 'string' },
+                  { name: 'version', type: 'string' },
+                  { name: 'chainId', type: 'uint256' },
+                  { name: 'verifyingContract', type: 'address' }
+                ],
+                Order: [
+                  { name: 'sender', type: 'address' },
+                  { name: 'baseToken', type: 'address' },
+                  { name: 'quoteToken', type: 'address' },
+                  { name: 'amount', type: 'int256' },
+                  { name: 'price', type: 'uint256' },
+                  { name: 'nonce', type: 'int256' }
+                ]
+              },
+              domain: getDomain(exchangeContractAddress!, config.state.chainId),
+              primaryType: 'Order',
+              message: {
+                sender: walletAddress!,
+                baseToken: baseSymbol.contractAddress ?? addressZero,
+                quoteToken: quoteSymbol.contractAddress ?? addressZero,
+                amount: side == 'Buy' ? baseAmount : -baseAmount,
+                price: isLimitOrder ? limitPrice : 0n,
+                nonce: BigInt('0x' + nonce)
+              }
+            })
 
         let response
         if (isLimitOrder) {
@@ -557,7 +622,10 @@ export function SwapInternals({
             marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
             type: 'limit',
             side: side,
-            amount: baseAmount,
+            amount: {
+              type: 'fixed',
+              value: baseAmount
+            },
             price: new Decimal(formatUnits(limitPrice, quoteSymbol.decimals)),
             signature: signature,
             verifyingChainId: config.state.chainId
@@ -568,7 +636,15 @@ export function SwapInternals({
             marketId: `${baseSymbol.name}/${quoteSymbol.name}`,
             type: 'market',
             side: side,
-            amount: baseAmount,
+            amount: percentage
+              ? {
+                  type: 'percent',
+                  value: percentage
+                }
+              : {
+                  type: 'fixed',
+                  value: baseAmount
+                },
             signature: signature,
             verifyingChainId: config.state.chainId
           })
@@ -743,6 +819,9 @@ export function SwapInternals({
     getMarketPrice: getSimulatedPrice,
     quoteDecimals: market.quoteDecimalPlaces,
     lastOrder,
-    percentOffMarket
+    percentOffMarket,
+    handleMaxBaseAmount,
+    handleMaxQuoteAmount,
+    topLimit
   })
 }

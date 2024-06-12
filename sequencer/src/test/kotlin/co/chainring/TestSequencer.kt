@@ -4,6 +4,7 @@ import co.chainring.core.model.db.FeeRates
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.WalletAddress
+import co.chainring.sequencer.core.toBigInteger
 import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toOrderGuid
 import co.chainring.sequencer.core.toWalletAddress
@@ -20,13 +21,26 @@ import co.chainring.testutils.SequencerClient
 import co.chainring.testutils.assertBalanceChanges
 import co.chainring.testutils.assertTrades
 import co.chainring.testutils.fromFundamentalUnits
+import co.chainring.testutils.toFundamentalUnits
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
 import java.math.BigDecimal
 import java.util.UUID
 import kotlin.random.Random
 
 class TestSequencer {
+
+    companion object {
+        @JvmStatic
+        fun percentages() = listOf(
+            Arguments.of(0),
+            Arguments.of(100),
+        )
+    }
+
     @Test
     fun `Test basic order matching`() {
         val sequencer = SequencerClient()
@@ -139,8 +153,9 @@ class TestSequencer {
         sequencer.withdrawal(taker, eth1, BigDecimal.ZERO, expectedAmount = BigDecimal("8.532"))
     }
 
-    @Test
-    fun `Test a market order that executes against multiple orders at multiple levels`() {
+    @ParameterizedTest
+    @MethodSource("percentages")
+    fun `Test a market order that executes against multiple orders at multiple levels`(percentage: Int) {
         val sequencer = SequencerClient()
         val market = sequencer.createMarket(MarketId("BTC2/ETH2"))
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
@@ -159,9 +174,9 @@ class TestSequencer {
         val sell5Order = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.2"), BigDecimal("17.700"), lp1, Order.Type.LimitSell)
         val sell6Order = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.2"), BigDecimal("17.700"), lp2, Order.Type.LimitSell)
 
-        // clearing price would be (0.02 * 17.55 + 0.15 * 17.6) / 0.17 = 17.594
-        // notional is 0.17 * 17.594 = 2.99098, fee would be notional * 0.02 = 0.0598196
-        sequencer.deposit(tkr, market.quoteAsset, BigDecimal("2.99098") + BigDecimal("0.0598196"))
+        // clearing price would be (0.02 * 17.55 + 0.15 * 17.6) / 0.17 = 17.59412
+        // notional is 0.17 * 17.595 = 2.9910004, fee would be notional * 0.02 = 0.059820008
+        sequencer.deposit(tkr, market.quoteAsset, BigDecimal("2.9910004") + BigDecimal("0.059820008"))
 
         sequencer.addOrder(market, BigDecimal("0.17"), null, tkr, Order.Type.MarketBuy).also { response ->
             assertEquals(5, response.ordersChangedCount)
@@ -237,10 +252,13 @@ class TestSequencer {
         // clearing price would be (0.05 * 17.6 + 0.4 * 17.7) / 0.45 = 17.689
         // notional is 0.45 * 17.689 = 7.96005, fee would be notional * 0,02 = 0.159201
         sequencer.deposit(tkr, market.quoteAsset, BigDecimal("7.96005") + BigDecimal("0.159201"))
-        sequencer.addOrder(market, BigDecimal("0.45"), null, tkr, Order.Type.MarketBuy).also { response ->
+        sequencer.addOrder(market, if (percentage == 0) BigDecimal("0.45") else BigDecimal.ZERO, null, tkr, Order.Type.MarketBuy, percentage = percentage).also { response ->
             assertEquals(4, response.ordersChangedCount)
             val takerOrder = response.ordersChangedList[0].also {
                 assertEquals(OrderDisposition.Filled, it.disposition)
+                if (percentage == 100) {
+                    assertEquals(BigDecimal("0.45").toFundamentalUnits(market.baseDecimals), it.newQuantity.toBigInteger())
+                }
             }
             assertEquals(OrderDisposition.Filled, response.ordersChangedList[1].disposition)
             assertEquals(OrderDisposition.Filled, response.ordersChangedList[2].disposition)
@@ -275,6 +293,35 @@ class TestSequencer {
                     ),
                 ),
             )
+        }
+    }
+
+    @Test
+    fun `Test market order that executes against multiple orders at multiple levels`() {
+        val sequencer = SequencerClient()
+        val market = sequencer.createMarket(MarketId("BTC20/ETH20"))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+
+        val lp1 = generateWalletAddress()
+        val lp2 = generateWalletAddress()
+        val tkr = generateWalletAddress()
+
+        sequencer.deposit(lp1, market.baseAsset, BigDecimal("1"))
+        sequencer.deposit(lp2, market.baseAsset, BigDecimal("1"))
+
+        sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.197628458498023700"), BigDecimal("17.750"), lp1, Order.Type.LimitSell)
+        sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.790513833992094800"), BigDecimal("18.000"), lp2, Order.Type.LimitSell)
+
+        sequencer.deposit(tkr, market.quoteAsset, BigDecimal("10"))
+
+        sequencer.addOrder(market, BigDecimal.ZERO, null, tkr, Order.Type.MarketBuy, percentage = 100).also { response ->
+            assertEquals(3, response.ordersChangedCount)
+            response.ordersChangedList[0].also {
+                assertEquals(OrderDisposition.Filled, it.disposition)
+                assertEquals(BigDecimal("0.54740714").toFundamentalUnits(market.baseDecimals), it.newQuantity.toBigInteger())
+            }
+            assertEquals(OrderDisposition.Filled, response.ordersChangedList[1].disposition)
+            assertEquals(OrderDisposition.PartiallyFilled, response.ordersChangedList[2].disposition)
         }
     }
 
