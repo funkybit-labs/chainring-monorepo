@@ -2,11 +2,14 @@ package co.chainring.apps.api.model
 
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Symbol
+import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
+import co.chainring.core.utils.toFundamentalUnits
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
+import java.math.BigDecimal
 
 @Serializable
 data class CreateWithdrawalApiRequest(
@@ -14,7 +17,10 @@ data class CreateWithdrawalApiRequest(
     val amount: BigIntegerJson,
     val nonce: Long,
     val signature: EvmSignature,
-)
+) {
+    constructor(symbol: SymbolEntity, amount: BigDecimal, nonce: Long, signature: EvmSignature) :
+        this(Symbol(symbol.name), amount.toFundamentalUnits(symbol.decimals), nonce, signature)
+}
 
 @Serializable
 data class Withdrawal(

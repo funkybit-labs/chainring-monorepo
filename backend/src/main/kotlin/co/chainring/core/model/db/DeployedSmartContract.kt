@@ -1,5 +1,6 @@
 package co.chainring.core.model.db
 
+import co.chainring.core.blockchain.ContractType
 import co.chainring.core.model.Address
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
@@ -71,6 +72,9 @@ class DeployedSmartContractEntity(guid: EntityID<ContractId>) : GUIDEntity<Contr
                 }
                 .orderBy(DeployedSmartContractTable.createdAt to SortOrder.DESC)
                 .firstOrNull()
+
+        fun latestExchangeContractAddress(chainId: ChainId): Address? =
+            findLastDeployedContractByNameAndChain(ContractType.Exchange.name, chainId)?.proxyAddress
 
         fun validContracts(chainId: ChainId): List<DeployedSmartContractEntity> =
             DeployedSmartContractEntity

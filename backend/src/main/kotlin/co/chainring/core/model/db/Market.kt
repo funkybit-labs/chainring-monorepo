@@ -6,6 +6,8 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.dao.with
 import org.jetbrains.exposed.sql.SizedIterable
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import java.math.BigDecimal
 
@@ -50,6 +52,12 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
                 .notForUpdate()
                 .let { wrapRows(it) }
                 .with(MarketEntity::baseSymbol, MarketEntity::quoteSymbol)
+
+        fun findBySymbols(symbol1: SymbolEntity, symbol2: SymbolEntity): MarketEntity? =
+            MarketEntity.find {
+                (MarketTable.baseSymbolGuid.eq(symbol1.guid).and(MarketTable.quoteSymbolGuid.eq(symbol2.guid)))
+                    .or(MarketTable.baseSymbolGuid.eq(symbol2.guid).and(MarketTable.quoteSymbolGuid.eq(symbol1.guid)))
+            }.singleOrNull()
     }
 
     var baseSymbolGuid by MarketTable.baseSymbolGuid

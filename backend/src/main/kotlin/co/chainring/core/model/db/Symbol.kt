@@ -1,6 +1,7 @@
 package co.chainring.core.model.db
 
 import co.chainring.core.model.Address
+import co.chainring.core.model.Symbol
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
@@ -75,6 +76,11 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
                 .find { SymbolTable.name.eq(name) }
                 .single()
 
+        fun forName(name: Symbol): SymbolEntity =
+            SymbolEntity
+                .find { SymbolTable.name.eq(name.value) }
+                .single()
+
         fun forChainAndContractAddress(chainId: ChainId, contractAddress: Address?) =
             SymbolEntity
                 .find { SymbolTable.chainId.eq(chainId).and(contractAddress?.let { SymbolTable.contractAddress.eq(it.value) } ?: SymbolTable.contractAddress.isNull()) }
@@ -91,4 +97,15 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
     var description by SymbolTable.description
     var createdAt by SymbolTable.createdAt
     var createdBy by SymbolTable.createdBy
+
+    fun swapOptions(): List<SymbolEntity> =
+        MarketEntity.all().mapNotNull {
+            if (it.baseSymbol == this) {
+                it.quoteSymbol
+            } else if (it.quoteSymbol == this) {
+                it.baseSymbol
+            } else {
+                null
+            }
+        }
 }

@@ -37,6 +37,7 @@ import co.chainring.core.model.db.migrations.V40_OrderIndexes
 import co.chainring.core.model.db.migrations.V41_AddActualAmountToWithdrawalTable
 import co.chainring.core.model.db.migrations.V42_ChainConfiguration
 import co.chainring.core.model.db.migrations.V43_AddFsmSessionStateToTelegramBotUser
+import co.chainring.core.model.db.migrations.V44_AddSentToSequencerStatusToDeposit
 import co.chainring.core.model.db.migrations.V4_AddDecimalsToERC20Token
 import co.chainring.core.model.db.migrations.V5_ChainTable
 import co.chainring.core.model.db.migrations.V6_MarketTable
@@ -88,4 +89,5 @@ val migrations = listOf(
     V41_AddActualAmountToWithdrawalTable(),
     V42_ChainConfiguration(),
     V43_AddFsmSessionStateToTelegramBotUser(),
+    V44_AddSentToSequencerStatusToDeposit(),
 )

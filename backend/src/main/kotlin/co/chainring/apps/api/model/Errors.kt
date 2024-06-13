@@ -39,7 +39,11 @@ enum class ReasonCode {
 
 val jsonWithDefaults = Json { encodeDefaults = true }
 
-class RequestProcessingError(val errorResponse: Response) : Exception("Error during API request processing")
+class RequestProcessingError(val httpStatus: Status, val error: ApiError) : Exception("Error during API request processing") {
+    constructor(httpStatus: Status, reason: ReasonCode, message: String) : this(httpStatus, ApiError(reason, message))
+    constructor(reason: ReasonCode, message: String) : this(Status.UNPROCESSABLE_ENTITY, reason, message)
+    constructor(message: String) : this(Status.UNPROCESSABLE_ENTITY, ReasonCode.ProcessingError, message)
+}
 
 fun errorResponse(
     status: Status,
@@ -52,8 +56,6 @@ fun errorResponse(
 fun notFoundError(reason: ReasonCode, message: String): Response = errorResponse(Status.NOT_FOUND, ApiError(reason, message))
 
 fun processingError(message: String): Response = errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.ProcessingError, message))
-
-val invalidEIP712SignatureError: Response = errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.SignatureNotValid, "Invalid signature"))
 
 fun unexpectedError(): Response = errorResponse(Status.INTERNAL_SERVER_ERROR, ApiError(ReasonCode.UnexpectedError, "Unexpected Error"))
 

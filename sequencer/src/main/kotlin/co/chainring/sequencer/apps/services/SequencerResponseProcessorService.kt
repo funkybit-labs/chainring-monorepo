@@ -65,25 +65,23 @@ object SequencerResponseProcessorService {
         when (request.type) {
             SequencerRequest.Type.ApplyBalanceBatch -> {
                 request.balanceBatch!!.withdrawalsList.forEach { withdrawal ->
-                    WithdrawalEntity.findById(withdrawal.externalGuid.withdrawalId())?.let { withdrawalEntity ->
-                        val balanceChange = response.balancesChangedList.firstOrNull { it.wallet == withdrawal.wallet }
-                        if (balanceChange == null) {
-                            withdrawalEntity.update(WithdrawalStatus.Failed, error(response, "Insufficient Balance"))
-                        } else {
-                            handleSequencerResponse(request = request, response = response, ordersBeingUpdated = listOf())
-                            withdrawalEntity.update(WithdrawalStatus.Sequenced, null, actualAmount = balanceChange.delta.toBigInteger().negate())
-                        }
+                    val withdrawalEntity = WithdrawalEntity.findById(withdrawal.externalGuid.withdrawalId())!!
+                    val balanceChange = response.balancesChangedList.firstOrNull { it.wallet == withdrawal.wallet }
+                    if (balanceChange == null) {
+                        withdrawalEntity.update(WithdrawalStatus.Failed, error(response, "Insufficient Balance"))
+                    } else {
+                        handleSequencerResponse(request = request, response = response, ordersBeingUpdated = listOf())
+                        withdrawalEntity.update(WithdrawalStatus.Sequenced, null, actualAmount = balanceChange.delta.toBigInteger().negate())
                     }
                 }
 
                 request.balanceBatch!!.depositsList.forEach { deposit ->
+                    val depositEntity = DepositEntity.findById(deposit.externalGuid.depositId())!!
                     if (response.balancesChangedList.firstOrNull { it.wallet == deposit.wallet } == null) {
-                        DepositEntity.findById(deposit.externalGuid.depositId())
-                            ?.update(DepositStatus.Failed, error(response))
+                        depositEntity.update(DepositStatus.Failed, error(response))
                     } else {
-                        DepositEntity.findById(deposit.externalGuid.depositId())?.let {
-                            handleSequencerResponse(request = request, response = response, ordersBeingUpdated = listOf())
-                        }
+                        handleSequencerResponse(request = request, response = response, ordersBeingUpdated = listOf())
+                        depositEntity.update(DepositStatus.Complete, error = null)
                     }
                 }
 

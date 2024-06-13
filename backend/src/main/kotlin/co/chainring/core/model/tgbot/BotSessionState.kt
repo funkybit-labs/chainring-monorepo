@@ -1,11 +1,11 @@
 package co.chainring.core.model.tgbot
 
 import co.chainring.apps.api.model.BigDecimalJson
-import co.chainring.core.model.Symbol
 import co.chainring.core.model.TxHash
-import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.OrderId
+import co.chainring.core.model.db.SymbolEntity
+import co.chainring.core.model.db.SymbolId
 import co.chainring.core.model.db.WithdrawalId
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -30,7 +30,12 @@ sealed class BotSessionState {
 
     @Serializable
     @SerialName("AirdropPending")
-    data class AirdropPending(val symbol: Symbol, val amount: BigDecimalJson, val chainId: ChainId, val txHash: TxHash) : BotSessionState()
+    data class AirdropPending(val symbolId: SymbolId, val amount: BigDecimalJson, val txHash: TxHash) : BotSessionState() {
+        constructor(symbol: SymbolEntity, amount: BigDecimalJson, txHash: TxHash) : this(symbol.id.value, amount, txHash)
+
+        val symbol: SymbolEntity
+            get() = SymbolEntity[symbolId]
+    }
 
     @Serializable
     @SerialName("DepositSymbolSelection")
@@ -38,11 +43,21 @@ sealed class BotSessionState {
 
     @Serializable
     @SerialName("DepositAmountEntry")
-    data class DepositAmountEntry(val symbol: Symbol) : BotSessionState()
+    data class DepositAmountEntry(val symbolId: SymbolId) : BotSessionState() {
+        constructor(symbol: SymbolEntity) : this(symbol.id.value)
+
+        val symbol: SymbolEntity
+            get() = SymbolEntity[symbolId]
+    }
 
     @Serializable
     @SerialName("DepositConfirmation")
-    data class DepositConfirmation(val symbol: Symbol, val amount: BigDecimalJson) : BotSessionState()
+    data class DepositConfirmation(val symbolId: SymbolId, val amount: BigDecimalJson) : BotSessionState() {
+        constructor(symbol: SymbolEntity, amount: BigDecimalJson) : this(symbol.id.value, amount)
+
+        val symbol: SymbolEntity
+            get() = SymbolEntity[symbolId]
+    }
 
     @Serializable
     @SerialName("DepositPending")
@@ -54,11 +69,21 @@ sealed class BotSessionState {
 
     @Serializable
     @SerialName("WithdrawalAmountEntry")
-    data class WithdrawalAmountEntry(val symbol: Symbol) : BotSessionState()
+    data class WithdrawalAmountEntry(val symbolId: SymbolId) : BotSessionState() {
+        constructor(symbol: SymbolEntity) : this(symbol.id.value)
+
+        val symbol: SymbolEntity
+            get() = SymbolEntity[symbolId]
+    }
 
     @Serializable
     @SerialName("WithdrawalConfirmation")
-    data class WithdrawalConfirmation(val symbol: Symbol, val amount: BigDecimalJson) : BotSessionState()
+    data class WithdrawalConfirmation(val symbolId: SymbolId, val amount: BigDecimalJson) : BotSessionState() {
+        constructor(symbol: SymbolEntity, amount: BigDecimalJson) : this(symbol.id.value, amount)
+
+        val symbol: SymbolEntity
+            get() = SymbolEntity[symbolId]
+    }
 
     @Serializable
     @SerialName("WithdrawalPending")
@@ -70,15 +95,36 @@ sealed class BotSessionState {
 
     @Serializable
     @SerialName("SwapToSymbolSelection")
-    data class SwapToSymbolSelection(val from: Symbol) : BotSessionState()
+    data class SwapToSymbolSelection(val fromSymbolId: SymbolId) : BotSessionState() {
+        constructor(fromSymbol: SymbolEntity) : this(fromSymbol.id.value)
+
+        val fromSymbol: SymbolEntity
+            get() = SymbolEntity[fromSymbolId]
+    }
 
     @Serializable
     @SerialName("SwapAmountEntry")
-    data class SwapAmountEntry(val from: Symbol, val to: Symbol) : BotSessionState()
+    data class SwapAmountEntry(val fromSymbolId: SymbolId, val toSymbolId: SymbolId) : BotSessionState() {
+        constructor(fromSymbol: SymbolEntity, toSymbol: SymbolEntity) : this(fromSymbol.id.value, toSymbol.id.value)
+
+        val fromSymbol: SymbolEntity
+            get() = SymbolEntity[fromSymbolId]
+
+        val toSymbol: SymbolEntity
+            get() = SymbolEntity[toSymbolId]
+    }
 
     @Serializable
     @SerialName("SwapConfirmation")
-    data class SwapConfirmation(val from: Symbol, val to: Symbol, val amount: BigDecimalJson) : BotSessionState()
+    data class SwapConfirmation(val fromSymbolId: SymbolId, val toSymbolId: SymbolId, val amount: BigDecimalJson) : BotSessionState() {
+        constructor(fromSymbol: SymbolEntity, toSymbol: SymbolEntity, amount: BigDecimalJson) : this(fromSymbol.id.value, toSymbol.id.value, amount)
+
+        val fromSymbol: SymbolEntity
+            get() = SymbolEntity[fromSymbolId]
+
+        val toSymbol: SymbolEntity
+            get() = SymbolEntity[toSymbolId]
+    }
 
     @Serializable
     @SerialName("SwapPending")
