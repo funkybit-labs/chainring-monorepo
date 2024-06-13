@@ -1,47 +1,61 @@
-package co.chainring.telegrambot.app
+package co.chainring.apps.telegrambot
 
+import co.chainring.apps.BaseApp
 import co.chainring.apps.api.services.ExchangeApiService
+import co.chainring.apps.telegrambot.model.Input
+import co.chainring.apps.telegrambot.model.Output
 import co.chainring.core.blockchain.ChainManager
+import co.chainring.core.db.DbConfig
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.TelegramBotUserEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
-import co.chainring.core.model.tgbot.BotSessionState
-import co.chainring.core.model.tgbot.TelegramMessageId
+import co.chainring.core.model.telegrambot.SessionState
+import co.chainring.core.model.telegrambot.TelegramMessageId
+import co.chainring.core.sequencer.SequencerClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction
 import kotlin.concurrent.thread
 
-class Bot(private val client: TelegramClient, exchangeApiService: ExchangeApiService) {
-    private val logger = KotlinLogging.logger { }
+private val botToken = System.getenv("TELEGRAM_BOT_TOKEN") ?: "7230554779:AAFo2lE3E_UHst7lKkiZxXJHwDeKmP6Hcn8"
+val faucetSupported = System.getenv("FAUCET_SUPPORTED")?.toBoolean() ?: true
+
+class BotApp : BaseApp(dbConfig = DbConfig()) {
+    override val logger = KotlinLogging.logger { }
+    private val client = TelegramClient(botToken)
+    private val exchangeApiService = ExchangeApiService(SequencerClient())
 
     interface OutputChannel {
-        fun sendMessage(cmd: BotOutput.SendMessage): TelegramMessageId
-        fun deleteMessage(cmd: BotOutput.DeleteMessage)
+        fun sendMessage(cmd: Output.SendMessage): TelegramMessageId
+        fun deleteMessage(cmd: Output.DeleteMessage)
     }
 
     interface TelegramClient : OutputChannel {
-        fun startPolling(inputHandler: (BotInput) -> Unit)
+        fun startPolling(inputHandler: (Input) -> Unit)
         fun stopPolling()
     }
 
-    private val inputHandler = BotInputHandler(client, exchangeApiService)
+    private val inputHandler = InputHandler(client, exchangeApiService)
 
     private var stopRequested = false
 
-    fun start() {
+    override fun start() {
+        logger.info { "Starting" }
+        super.start()
         client.startPolling(inputHandler = { input ->
             transaction {
                 inputHandler.handle(input)
             }
         })
         pendingSessionsRefresherThread.start()
+        logger.info { "Started" }
     }
 
-    fun stop() {
+    override fun stop() {
+        logger.info { "Stopping" }
         stopRequested = true
         client.stopPolling()
         pendingSessionsRefresherThread.join(1000)
@@ -49,36 +63,57 @@ class Bot(private val client: TelegramClient, exchangeApiService: ExchangeApiSer
             pendingSessionsRefresherThread.interrupt()
             pendingSessionsRefresherThread.join()
         }
+        logger.info { "Stopped" }
     }
 
     private val pendingSessionsRefresherThread = thread(start = false, isDaemon = false) {
         fun refresh(user: TelegramBotUserEntity) {
             when (val sessionState = user.sessionState) {
-                is BotSessionState.AirdropPending -> {
+                is SessionState.AirdropPending -> {
                     val txReceipt = ChainManager
                         .getBlockchainClient(sessionState.symbol.chainId.value)
                         .getTransactionReceipt(sessionState.txHash)
 
                     if (txReceipt != null) {
-                        inputHandler.handle(BotInput.AirdropTxReceipt(user.telegramUserId, txReceipt))
+                        inputHandler.handle(
+                            Input.AirdropTxReceipt(
+                                user.telegramUserId,
+                                txReceipt,
+                            ),
+                        )
                     }
                 }
-                is BotSessionState.DepositPending -> {
+                is SessionState.DepositPending -> {
                     val deposit = DepositEntity[sessionState.depositId]
                     if (deposit.status == DepositStatus.Complete || deposit.status == DepositStatus.Failed) {
-                        inputHandler.handle(BotInput.DepositCompleted(user.telegramUserId, deposit))
+                        inputHandler.handle(
+                            Input.DepositCompleted(
+                                user.telegramUserId,
+                                deposit,
+                            ),
+                        )
                     }
                 }
-                is BotSessionState.WithdrawalPending -> {
+                is SessionState.WithdrawalPending -> {
                     val withdrawal = WithdrawalEntity[sessionState.withdrawalId]
                     if (withdrawal.status == WithdrawalStatus.Complete || withdrawal.status == WithdrawalStatus.Failed) {
-                        inputHandler.handle(BotInput.WithdrawalCompleted(user.telegramUserId, withdrawal))
+                        inputHandler.handle(
+                            Input.WithdrawalCompleted(
+                                user.telegramUserId,
+                                withdrawal,
+                            ),
+                        )
                     }
                 }
-                is BotSessionState.SwapPending -> {
+                is SessionState.SwapPending -> {
                     val order = OrderEntity[sessionState.orderId]
                     if (order.status.isFinal()) {
-                        inputHandler.handle(BotInput.SwapCompleted(user.telegramUserId, order))
+                        inputHandler.handle(
+                            Input.SwapCompleted(
+                                user.telegramUserId,
+                                order,
+                            ),
+                        )
                     }
                 }
                 else -> {}

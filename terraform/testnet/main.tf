@@ -30,6 +30,7 @@ module "api" {
   source                                  = "../modules/ecs_task"
   name_prefix                             = local.name_prefix
   task_name                               = "api"
+  include_command                         = true
   image                                   = "backend"
   ecs_cluster_id                          = module.ecs.cluster.id
   app_ecs_task_role                       = module.ecs.app_ecs_task_role
@@ -50,6 +51,7 @@ module "ring" {
   source                                  = "../modules/ecs_task"
   name_prefix                             = local.name_prefix
   task_name                               = "ring"
+  include_command                         = true
   image                                   = "backend"
   ecs_cluster_id                          = module.ecs.cluster.id
   app_ecs_task_role                       = module.ecs.app_ecs_task_role

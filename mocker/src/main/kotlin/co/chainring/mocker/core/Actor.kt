@@ -6,9 +6,9 @@ import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
-import co.chainring.core.client.rest.ApiClient
-import co.chainring.core.client.ws.subscribe
-import co.chainring.core.client.ws.unsubscribe
+import co.chainring.integrationtests.utils.ApiClient
+import co.chainring.integrationtests.utils.subscribe
+import co.chainring.integrationtests.utils.unsubscribe
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.ChainId

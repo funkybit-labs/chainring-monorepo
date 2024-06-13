@@ -1,7 +1,10 @@
-package co.chainring.telegrambot.app
+package co.chainring.apps.telegrambot
 
-import co.chainring.core.model.tgbot.TelegramMessageId
-import co.chainring.core.model.tgbot.TelegramUserId
+import co.chainring.apps.telegrambot.model.CallbackData
+import co.chainring.apps.telegrambot.model.Input
+import co.chainring.apps.telegrambot.model.Output
+import co.chainring.core.model.telegrambot.TelegramMessageId
+import co.chainring.core.model.telegrambot.TelegramUserId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient
 import org.telegram.telegrambots.longpolling.TelegramBotsLongPollingApplication
@@ -13,12 +16,12 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow
 
-class BotTelegramClient(private val token: String) : Bot.TelegramClient {
+class TelegramClient(private val token: String) : BotApp.TelegramClient {
     private val app = TelegramBotsLongPollingApplication()
     private val telegramClient = OkHttpTelegramClient(token)
     private val logger = KotlinLogging.logger { }
 
-    override fun startPolling(inputHandler: (BotInput) -> Unit) {
+    override fun startPolling(inputHandler: (Input) -> Unit) {
         app.registerBot(
             token,
             object : LongPollingSingleThreadUpdateConsumer {
@@ -33,7 +36,7 @@ class BotTelegramClient(private val token: String) : Bot.TelegramClient {
                         val input = updateToBotInput(update)
                         if (input == null) {
                             if (chatId != null) {
-                                sendMessage(BotOutput.SendMessage(TelegramUserId(chatId), text = "Unsupported command"))
+                                sendMessage(Output.SendMessage(TelegramUserId(chatId), text = "Unsupported command"))
                             }
                         } else {
                             inputHandler(input)
@@ -42,7 +45,7 @@ class BotTelegramClient(private val token: String) : Bot.TelegramClient {
                         logger.error(e) { "Error while processing telegram update ${update.updateId} " }
 
                         if (chatId != null) {
-                            sendMessage(BotOutput.SendMessage(TelegramUserId(chatId), text = "Something went wrong while processing your request, please try again later"))
+                            sendMessage(Output.SendMessage(TelegramUserId(chatId), text = "Something went wrong while processing your request, please try again later"))
                         }
                     }
                 }
@@ -54,7 +57,7 @@ class BotTelegramClient(private val token: String) : Bot.TelegramClient {
         app.stop()
     }
 
-    override fun sendMessage(cmd: BotOutput.SendMessage): TelegramMessageId {
+    override fun sendMessage(cmd: Output.SendMessage): TelegramMessageId {
         logger.debug { "Sending message $cmd" }
 
         val sentMessageId = telegramClient.execute(
@@ -64,7 +67,7 @@ class BotTelegramClient(private val token: String) : Bot.TelegramClient {
                 .parseMode(cmd.parseMode)
                 .replyMarkup(
                     when (cmd.keyboard) {
-                        is BotOutput.SendMessage.Keyboard.Inline -> {
+                        is Output.SendMessage.Keyboard.Inline -> {
                             InlineKeyboardMarkup(
                                 cmd.keyboard.items.map { row ->
                                     InlineKeyboardRow(
@@ -89,7 +92,7 @@ class BotTelegramClient(private val token: String) : Bot.TelegramClient {
         return sentMessageId
     }
 
-    override fun deleteMessage(cmd: BotOutput.DeleteMessage) {
+    override fun deleteMessage(cmd: Output.DeleteMessage) {
         logger.debug { "Deleting message $cmd" }
 
         telegramClient.execute(
@@ -100,15 +103,15 @@ class BotTelegramClient(private val token: String) : Bot.TelegramClient {
         )
     }
 
-    private fun updateToBotInput(update: Update): BotInput? {
+    private fun updateToBotInput(update: Update): Input? {
         val message = update.message
         val callbackQuery = update.callbackQuery
 
         return if (message != null && message.hasText()) {
             if (message.text == "/start") {
-                BotInput.Start(TelegramUserId(message.from.id))
+                Input.Start(TelegramUserId(message.from.id))
             } else {
-                BotInput.Text(
+                Input.Text(
                     TelegramUserId(message.from.id),
                     message.text,
                     TelegramMessageId(message.messageId),
@@ -120,19 +123,19 @@ class BotTelegramClient(private val token: String) : Bot.TelegramClient {
                 ?.let { callbackData ->
                     val from = TelegramUserId(callbackQuery.from.id)
                     when (callbackData) {
-                        is CallbackData.Airdrop -> BotInput.Airdrop(from)
-                        is CallbackData.SymbolSelected -> BotInput.SymbolSelected(from, callbackData.symbol)
-                        is CallbackData.Confirm -> BotInput.Confirm(from)
-                        is CallbackData.Cancel -> BotInput.Cancel(from)
-                        is CallbackData.Deposit -> BotInput.Deposit(from)
-                        is CallbackData.ChangeAmount -> BotInput.ChangeAmount(from)
-                        is CallbackData.Withdraw -> BotInput.Withdraw(from)
-                        is CallbackData.Swap -> BotInput.Swap(from)
-                        is CallbackData.Settings -> BotInput.Settings(from)
-                        is CallbackData.ImportWallet -> BotInput.ImportWallet(from)
-                        is CallbackData.SwitchWallet -> BotInput.SwitchWallet(from)
-                        is CallbackData.WalletSelected -> BotInput.WalletSelected(from, callbackData.abbreviatedAddress)
-                        is CallbackData.ExportPrivateKey -> BotInput.ExportPrivateKey(from)
+                        is CallbackData.Airdrop -> Input.Airdrop(from)
+                        is CallbackData.SymbolSelected -> Input.SymbolSelected(from, callbackData.symbol)
+                        is CallbackData.Confirm -> Input.Confirm(from)
+                        is CallbackData.Cancel -> Input.Cancel(from)
+                        is CallbackData.Deposit -> Input.Deposit(from)
+                        is CallbackData.ChangeAmount -> Input.ChangeAmount(from)
+                        is CallbackData.Withdraw -> Input.Withdraw(from)
+                        is CallbackData.Swap -> Input.Swap(from)
+                        is CallbackData.Settings -> Input.Settings(from)
+                        is CallbackData.ImportWallet -> Input.ImportWallet(from)
+                        is CallbackData.SwitchWallet -> Input.SwitchWallet(from)
+                        is CallbackData.WalletSelected -> Input.WalletSelected(from, callbackData.abbreviatedAddress)
+                        is CallbackData.ExportPrivateKey -> Input.ExportPrivateKey(from)
                     }
                 }
         } else {

@@ -1,4 +1,4 @@
-package co.chainring.telegrambot.app
+package co.chainring.apps.telegrambot.model
 
 import co.chainring.apps.api.model.ApiError
 import co.chainring.core.model.Address
@@ -6,10 +6,11 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.abbreviated
 import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BalanceType
+import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.TelegramBotUserEntity
-import co.chainring.core.model.tgbot.TelegramMessageId
-import co.chainring.core.model.tgbot.TelegramUserId
+import co.chainring.core.model.telegrambot.TelegramMessageId
+import co.chainring.core.model.telegrambot.TelegramUserId
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chanring.core.model.EncryptedString
 import org.web3j.protocol.core.methods.response.TransactionReceipt
@@ -18,13 +19,13 @@ import java.math.BigInteger
 import java.math.RoundingMode
 import kotlin.math.max
 
-sealed class BotOutput {
+sealed class Output {
     data class SendMessage(
         val recipient: TelegramUserId,
         val text: String,
         val parseMode: String = "markdown",
         val keyboard: Keyboard? = null,
-    ) : BotOutput() {
+    ) : Output() {
         sealed class Keyboard {
             data class Inline(
                 val items: List<List<CallbackButton>>,
@@ -40,20 +41,20 @@ sealed class BotOutput {
     data class DeleteMessage(
         val chatId: String,
         val messageId: TelegramMessageId,
-    ) : BotOutput()
+    ) : Output()
 }
 
-object BotMessage {
+object OutputMessage {
     fun mainMenu(
         recipient: TelegramBotUserEntity,
         currentWallet: Address,
         walletOnChainBalances: List<Pair<SymbolEntity, BigDecimal>>,
         exchangeBalances: List<BalanceEntity>,
         airdropSupported: Boolean,
-    ): BotOutput.SendMessage {
+    ): Output.SendMessage {
         val nonZeroWalletBalances = walletOnChainBalances.filter { it.second > BigDecimal.ZERO }
         val nonZeroExchangeAvailableBalances = exchangeBalances.filter { it.type == BalanceType.Available && it.balance > BigInteger.ZERO }
-        return BotOutput.SendMessage(
+        return Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "-- Current Wallet --" +
                 "\n<code>${currentWallet.value}</code>" +
@@ -68,13 +69,18 @@ object BotMessage {
                 if (nonZeroExchangeAvailableBalances.isNotEmpty()) {
                     "\n\n-- Available Balances --" +
                         nonZeroExchangeAvailableBalances.joinToString { eb ->
-                            "\n${eb.symbol.name}: <b>${formatAmount(eb.balance, eb.symbol)}</b>"
+                            "\n${eb.symbol.name}: <b>${
+                                formatAmount(
+                                    eb.balance,
+                                    eb.symbol,
+                                )
+                            }</b>"
                         }
                 } else {
                     ""
                 },
             parseMode = "HTML",
-            keyboard = BotOutput.SendMessage.Keyboard.Inline(
+            keyboard = Output.SendMessage.Keyboard.Inline(
                 listOfNotNull(
                     if (airdropSupported) {
                         listOf(
@@ -108,8 +114,8 @@ object BotMessage {
         data class SwapTo(val from: SymbolEntity) : SelectSymbolPurpose()
     }
 
-    private fun selectSymbol(recipient: TelegramBotUserEntity, symbols: List<SymbolEntity>, purpose: SelectSymbolPurpose): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    private fun selectSymbol(recipient: TelegramBotUserEntity, symbols: List<SymbolEntity>, purpose: SelectSymbolPurpose): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "Please select a token to ${
                 when (purpose) {
@@ -120,7 +126,7 @@ object BotMessage {
                     is SelectSymbolPurpose.SwapTo -> "swap your ${purpose.from.name} to"
                 }
             }:",
-            keyboard = BotOutput.SendMessage.Keyboard.Inline(
+            keyboard = Output.SendMessage.Keyboard.Inline(
                 symbols.chunked(2).map { chunk ->
                     chunk.map { symbol ->
                         callbackButton(
@@ -136,238 +142,250 @@ object BotMessage {
             ),
         )
 
-    fun selectSymbolToAirdrop(recipient: TelegramBotUserEntity, symbols: List<SymbolEntity>): BotOutput.SendMessage =
+    fun selectSymbolToAirdrop(recipient: TelegramBotUserEntity, symbols: List<SymbolEntity>): Output.SendMessage =
         selectSymbol(recipient, symbols, SelectSymbolPurpose.Airdrop)
 
-    fun selectSymbolToDeposit(recipient: TelegramBotUserEntity, symbols: List<SymbolEntity>): BotOutput.SendMessage =
+    fun selectSymbolToDeposit(recipient: TelegramBotUserEntity, symbols: List<SymbolEntity>): Output.SendMessage =
         selectSymbol(recipient, symbols, SelectSymbolPurpose.Deposit)
 
-    fun selectSymbolToWithdraw(recipient: TelegramBotUserEntity, symbols: List<SymbolEntity>): BotOutput.SendMessage =
+    fun selectSymbolToWithdraw(recipient: TelegramBotUserEntity, symbols: List<SymbolEntity>): Output.SendMessage =
         selectSymbol(recipient, symbols, SelectSymbolPurpose.Withdraw)
 
-    fun selectSymbolToSwapFrom(recipient: TelegramBotUserEntity, symbols: List<SymbolEntity>): BotOutput.SendMessage =
+    fun selectSymbolToSwapFrom(recipient: TelegramBotUserEntity, symbols: List<SymbolEntity>): Output.SendMessage =
         selectSymbol(recipient, symbols, SelectSymbolPurpose.SwapFrom)
 
-    fun selectSymbolToSwapTo(recipient: TelegramBotUserEntity, symbols: List<SymbolEntity>, from: SymbolEntity): BotOutput.SendMessage =
+    fun selectSymbolToSwapTo(recipient: TelegramBotUserEntity, symbols: List<SymbolEntity>, from: SymbolEntity): Output.SendMessage =
         selectSymbol(recipient, symbols, SelectSymbolPurpose.SwapTo(from))
 
-    fun airdropRequested(recipient: TelegramBotUserEntity, symbol: SymbolEntity, amount: BigDecimal): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun airdropRequested(recipient: TelegramBotUserEntity, symbol: SymbolEntity, amount: BigDecimal): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
-            text = "✅ Airdropping ${formatAmountWithSymbol(amount, symbol)} to your wallet",
+            text = "✅ Airdropping ${ formatAmountWithSymbol(amount, symbol) } to your wallet",
         )
 
-    fun airdropSucceeded(recipient: TelegramBotUserEntity, symbol: SymbolEntity, amount: BigDecimal): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun airdropSucceeded(recipient: TelegramBotUserEntity, symbol: SymbolEntity, amount: BigDecimal): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
-            text = "✅ ${formatAmountWithSymbol(amount, symbol)} was airdropped to your wallet",
+            text = "✅ ${ formatAmountWithSymbol(amount, symbol) } was airdropped to your wallet",
         )
 
-    fun airdropTxFailed(recipient: TelegramBotUserEntity, receipt: TransactionReceipt): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun airdropTxFailed(recipient: TelegramBotUserEntity, receipt: TransactionReceipt): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "❌ Airdrop transaction ${receipt.transactionHash} has failed",
         )
 
-    fun noBalanceInWallet(recipient: TelegramBotUserEntity, symbol: Symbol): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun noBalanceInWallet(recipient: TelegramBotUserEntity, symbol: Symbol): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "You dont have any ${symbol.value} in your wallet",
         )
 
-    fun enterDepositAmount(recipient: TelegramBotUserEntity, symbol: SymbolEntity, available: BigDecimal): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun enterDepositAmount(recipient: TelegramBotUserEntity, symbol: SymbolEntity, available: BigDecimal): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
-            text = "You have ${formatAmountWithSymbol(available, symbol)} in your wallet. How much would you like to deposit?",
+            text = "You have ${ formatAmountWithSymbol(available, symbol) } in your wallet. How much would you like to deposit?",
         )
 
-    fun depositAmountTooLarge(recipient: TelegramBotUserEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun depositAmountTooLarge(recipient: TelegramBotUserEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "❌ The amount you've entered exceeds your wallet balance",
         )
 
-    fun depositConfirmation(recipient: TelegramBotUserEntity, symbol: SymbolEntity, amount: BigDecimal): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun depositConfirmation(recipient: TelegramBotUserEntity, symbol: SymbolEntity, amount: BigDecimal): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
-            text = "You are about to deposit ${formatAmountWithSymbol(amount, symbol)}. Would you like to proceed?",
-            keyboard = BotOutput.SendMessage.Keyboard.Inline(
+            text = "You are about to deposit ${ formatAmountWithSymbol(amount, symbol) }. Would you like to proceed?",
+            keyboard = Output.SendMessage.Keyboard.Inline(
                 listOf(
                     listOf(
                         callbackButton("Confirm", CallbackData.Confirm),
                         callbackButton("Cancel", CallbackData.Cancel),
                     ),
                     listOf(
-                        callbackButton("Change amount", CallbackData.ChangeAmount),
+                        callbackButton(
+                            "Change amount",
+                            CallbackData.ChangeAmount,
+                        ),
                     ),
                 ),
             ),
         )
 
-    fun invalidNumber(recipient: TelegramBotUserEntity, text: String): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun invalidNumber(recipient: TelegramBotUserEntity, text: String): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "❌ $text is not a valid number, please try again",
         )
 
-    fun amountHasToBePositive(recipient: TelegramBotUserEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun amountHasToBePositive(recipient: TelegramBotUserEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "❌ Amount has to be greater than zero, please try again",
         )
 
-    fun depositInProgress(recipient: TelegramBotUserEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun depositInProgress(recipient: TelegramBotUserEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "✅ Deposit in progress",
         )
 
-    fun depositFailed(recipient: TelegramBotUserEntity, symbol: SymbolEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun depositFailed(recipient: TelegramBotUserEntity, symbol: SymbolEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "❌ Deposit of ${symbol.name} has failed",
         )
 
-    fun depositSucceeded(recipient: TelegramBotUserEntity, symbol: SymbolEntity, amount: BigDecimal, availableBalance: BigDecimal): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun depositSucceeded(recipient: TelegramBotUserEntity, deposit: DepositEntity, availableBalance: BigDecimal): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
-            text = "✅ Deposit of ${formatAmountWithSymbol(amount, symbol)} has completed. Your available balance is: ${formatAmountWithSymbol(availableBalance, symbol)}",
+            text = "✅ Deposit of ${ formatAmountWithSymbol(deposit.amount.fromFundamentalUnits(deposit.symbol.decimals), deposit.symbol) } has completed. Your available balance is: ${ formatAmountWithSymbol(availableBalance, deposit.symbol) }",
         )
 
-    fun noBalanceAvailable(recipient: TelegramBotUserEntity, symbol: SymbolEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun noBalanceAvailable(recipient: TelegramBotUserEntity, symbol: SymbolEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "You dont have any ${symbol.name} available",
         )
 
-    fun enterWithdrawalAmount(recipient: TelegramBotUserEntity, symbol: SymbolEntity, available: BigDecimal): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun enterWithdrawalAmount(recipient: TelegramBotUserEntity, symbol: SymbolEntity, available: BigDecimal): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
-            text = "You have ${formatAmountWithSymbol(available, symbol)} available. How much would you like to withdraw?",
+            text = "You have ${ formatAmountWithSymbol(available, symbol) } available. How much would you like to withdraw?",
         )
 
-    fun withdrawalAmountTooLarge(recipient: TelegramBotUserEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun withdrawalAmountTooLarge(recipient: TelegramBotUserEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "❌ The amount you've entered exceeds your available balance",
         )
 
-    fun withdrawalConfirmation(recipient: TelegramBotUserEntity, symbol: SymbolEntity, amount: BigDecimal): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun withdrawalConfirmation(recipient: TelegramBotUserEntity, symbol: SymbolEntity, amount: BigDecimal): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
-            text = "You are about to withdraw ${formatAmountWithSymbol(amount, symbol)}. Would you like to proceed?",
-            keyboard = BotOutput.SendMessage.Keyboard.Inline(
+            text = "You are about to withdraw ${ formatAmountWithSymbol(amount, symbol) }. Would you like to proceed?",
+            keyboard = Output.SendMessage.Keyboard.Inline(
                 listOf(
                     listOf(
                         callbackButton("Confirm", CallbackData.Confirm),
                         callbackButton("Cancel", CallbackData.Cancel),
                     ),
                     listOf(
-                        callbackButton("Change amount", CallbackData.ChangeAmount),
+                        callbackButton(
+                            "Change amount",
+                            CallbackData.ChangeAmount,
+                        ),
                     ),
                 ),
             ),
         )
 
-    fun withdrawalFailed(recipient: TelegramBotUserEntity, apiError: ApiError?): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun withdrawalFailed(recipient: TelegramBotUserEntity, apiError: ApiError?): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "❌ Withdrawal failed (${apiError?.displayMessage ?: "Unknown Error"})",
         )
 
-    fun withdrawalInProgress(recipient: TelegramBotUserEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun withdrawalInProgress(recipient: TelegramBotUserEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "✅ Withdrawal in progress",
         )
 
-    fun withdrawalSucceeded(recipient: TelegramBotUserEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun withdrawalSucceeded(recipient: TelegramBotUserEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "✅ Withdrawal succeeded",
         )
 
-    fun enterSwapAmount(recipient: TelegramBotUserEntity, from: SymbolEntity, available: BigDecimal, to: SymbolEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun enterSwapAmount(recipient: TelegramBotUserEntity, from: SymbolEntity, available: BigDecimal, to: SymbolEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
-            text = "You have ${formatAmountWithSymbol(available, from)} available. How much are you willing to swap to ${to.name}?",
+            text = "You have ${ formatAmountWithSymbol(available, from) } available. How much are you willing to swap to ${to.name}?",
         )
 
-    fun swapAmountTooLarge(recipient: TelegramBotUserEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun swapAmountTooLarge(recipient: TelegramBotUserEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "❌ The amount you've entered exceeds your available balance",
         )
 
-    fun swapEstimateError(recipient: TelegramBotUserEntity, error: SwapEstimateError): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun swapEstimateError(recipient: TelegramBotUserEntity, error: SwapEstimateError): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "❌ ${error.message ?: "Something went wrong"}",
         )
 
-    fun swapConfirmation(recipient: TelegramBotUserEntity, estimation: SwapEstimation): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun swapConfirmation(recipient: TelegramBotUserEntity, estimation: SwapEstimation): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
-            text = "By swapping ${formatAmountWithSymbol(estimation.fromAmount, estimation.from)} " +
-                "you will get ${formatAmountWithSymbol(estimation.toAmount, estimation.to)} at the price of " +
-                "1 ${estimation.from.name} ≈ ${formatAmountWithSymbol(estimation.price, estimation.to)}. " +
+            text = "By swapping ${ formatAmountWithSymbol(estimation.fromAmount, estimation.from) } " +
+                "you will get ${ formatAmountWithSymbol(estimation.toAmount, estimation.to) } at the price of " +
+                "1 ${estimation.from.name} ≈ ${ formatAmountWithSymbol(estimation.price, estimation.to) }. " +
                 "Would you like to proceed?",
-            keyboard = BotOutput.SendMessage.Keyboard.Inline(
+            keyboard = Output.SendMessage.Keyboard.Inline(
                 listOf(
                     listOf(
                         callbackButton("Confirm", CallbackData.Confirm),
                         callbackButton("Cancel", CallbackData.Cancel),
                     ),
                     listOf(
-                        callbackButton("Change amount", CallbackData.ChangeAmount),
+                        callbackButton(
+                            "Change amount",
+                            CallbackData.ChangeAmount,
+                        ),
                     ),
                 ),
             ),
         )
 
-    fun submittingSwap(recipient: TelegramBotUserEntity, estimation: SwapEstimation): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun submittingSwap(recipient: TelegramBotUserEntity, estimation: SwapEstimation): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
-            text = "Swapping ${formatAmountWithSymbol(estimation.fromAmount, estimation.from)} " +
-                "to ${formatAmountWithSymbol(estimation.toAmount, estimation.to)} at the price of " +
-                "1 ${estimation.from.name} ≈ ${formatAmountWithSymbol(estimation.price, estimation.to)}",
+            text = "Swapping ${ formatAmountWithSymbol(estimation.fromAmount, estimation.from) } " +
+                "to ${ formatAmountWithSymbol(estimation.toAmount, estimation.to) } at the price of " +
+                "1 ${estimation.from.name} ≈ ${ formatAmountWithSymbol(estimation.price, estimation.to) }",
         )
 
-    fun swapFailed(recipient: TelegramBotUserEntity, apiError: ApiError?): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun swapFailed(recipient: TelegramBotUserEntity, apiError: ApiError?): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "❌ Swap failed (${apiError?.displayMessage ?: "Unknown Error"})",
         )
 
-    fun swapSucceeded(recipient: TelegramBotUserEntity, full: Boolean): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun swapSucceeded(recipient: TelegramBotUserEntity, full: Boolean): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "✅ Swap succeeded${if (!full) " (partial fill)" else ""}",
         )
 
-    fun swapRejected(recipient: TelegramBotUserEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun swapRejected(recipient: TelegramBotUserEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "❌ Swap rejected",
         )
 
-    fun invalidCommand(recipient: TelegramBotUserEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun invalidCommand(recipient: TelegramBotUserEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "❌ Invalid command",
         )
 
-    fun settings(recipient: TelegramBotUserEntity, currentWallet: Address): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun settings(recipient: TelegramBotUserEntity, currentWallet: Address): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "-- Current Wallet --" +
                 "\n<code>${currentWallet.value}</code>" +
                 "\n\nUse this menu to change or view settings",
             parseMode = "HTML",
-            keyboard = BotOutput.SendMessage.Keyboard.Inline(
+            keyboard = Output.SendMessage.Keyboard.Inline(
                 listOf(
                     listOf(
-                        callbackButton("Switch wallet", CallbackData.SwitchWallet),
+                        callbackButton(
+                            "Switch wallet",
+                            CallbackData.SwitchWallet,
+                        ),
                     ),
                     listOf(
                         // TODO: CHAIN-170
@@ -376,27 +394,39 @@ object BotMessage {
                         // submit to our backend. This way the private key does not flow through telegram servers or appear in
                         // the chat window. Same applies for viewing the private key below. For now they would paste it into
                         // the reply box here.
-                        callbackButton("Import wallet", CallbackData.ImportWallet),
+                        callbackButton(
+                            "Import wallet",
+                            CallbackData.ImportWallet,
+                        ),
                     ),
                     listOf(
-                        callbackButton("Export private key", CallbackData.ExportPrivateKey),
+                        callbackButton(
+                            "Export private key",
+                            CallbackData.ExportPrivateKey,
+                        ),
                     ),
                     listOf(
-                        callbackButton("Back to main menu", CallbackData.Cancel),
+                        callbackButton(
+                            "Back to main menu",
+                            CallbackData.Cancel,
+                        ),
                     ),
                 ),
             ),
         )
 
-    fun selectWalletToSwitchTo(recipient: TelegramBotUserEntity, wallets: List<Address>, currentWallet: Address): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun selectWalletToSwitchTo(recipient: TelegramBotUserEntity, wallets: List<Address>, currentWallet: Address): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "Please select a wallet to switch to:",
-            keyboard = BotOutput.SendMessage.Keyboard.Inline(
+            keyboard = Output.SendMessage.Keyboard.Inline(
                 wallets.map { address ->
                     val abbreviateAddress = address.abbreviated()
                     listOf(
-                        callbackButton("${if (address == currentWallet) "✔ " else ""}$abbreviateAddress", CallbackData.WalletSelected(abbreviateAddress)),
+                        callbackButton(
+                            "${if (address == currentWallet) "✔ " else ""}$abbreviateAddress",
+                            CallbackData.WalletSelected(abbreviateAddress),
+                        ),
                     )
                 } + listOf(
                     listOf(
@@ -406,36 +436,36 @@ object BotMessage {
             ),
         )
 
-    fun switchedToWallet(recipient: TelegramBotUserEntity, wallet: Address): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun switchedToWallet(recipient: TelegramBotUserEntity, wallet: Address): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "Switched to wallet ${wallet.value}",
         )
 
-    fun importWalletPrivateKeyEntryPrompt(recipient: TelegramBotUserEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun importWalletPrivateKeyEntryPrompt(recipient: TelegramBotUserEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "To import your existing wallet please send your private key in the next message or /cancel to abort",
         )
 
-    fun importWalletSuccess(recipient: TelegramBotUserEntity, newWallet: Address): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun importWalletSuccess(recipient: TelegramBotUserEntity, newWallet: Address): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "✅ Your private key has been imported. Your wallet address is ${newWallet.value}",
         )
 
-    fun importWalletFailure(recipient: TelegramBotUserEntity): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun importWalletFailure(recipient: TelegramBotUserEntity): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "❌ Failed to import key",
         )
 
-    fun showPrivateKey(recipient: TelegramBotUserEntity, privateKey: EncryptedString): BotOutput.SendMessage =
-        BotOutput.SendMessage(
+    fun showPrivateKey(recipient: TelegramBotUserEntity, privateKey: EncryptedString): Output.SendMessage =
+        Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "<code>${privateKey.decrypt()}</code>",
             parseMode = "HTML",
-            keyboard = BotOutput.SendMessage.Keyboard.Inline(
+            keyboard = Output.SendMessage.Keyboard.Inline(
                 listOf(
                     listOf(
                         callbackButton("Back to settings", CallbackData.Cancel),
@@ -453,6 +483,9 @@ object BotMessage {
     private fun formatAmount(amount: BigDecimal): String =
         amount.setScale(max(4, amount.scale() - amount.precision() + 4), RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
 
-    private fun callbackButton(text: String, callbackData: CallbackData): BotOutput.SendMessage.Keyboard.Inline.CallbackButton =
-        BotOutput.SendMessage.Keyboard.Inline.CallbackButton(text = text, data = callbackData)
+    private fun callbackButton(text: String, callbackData: CallbackData): Output.SendMessage.Keyboard.Inline.CallbackButton =
+        Output.SendMessage.Keyboard.Inline.CallbackButton(
+            text = text,
+            data = callbackData,
+        )
 }

@@ -1,4 +1,4 @@
-package co.chainring.core.client.rest
+package co.chainring.integrationtests.utils
 
 import arrow.core.Either
 import arrow.core.raise.either

@@ -2,9 +2,9 @@ package co.chainring.core.model.db
 
 import co.chainring.core.db.executeRaw
 import co.chainring.core.model.Address
-import co.chainring.core.model.tgbot.BotSessionState
-import co.chainring.core.model.tgbot.TelegramMessageId
-import co.chainring.core.model.tgbot.TelegramUserId
+import co.chainring.core.model.telegrambot.SessionState
+import co.chainring.core.model.telegrambot.TelegramMessageId
+import co.chainring.core.model.telegrambot.TelegramUserId
 import co.chanring.core.model.encrypt
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
@@ -32,7 +32,7 @@ object TelegramBotUserTable : GUIDTable<TelegramBotUserId>("telegram_bot_user", 
     val updatedAt = timestamp("updated_at")
     val telegramUserId = long("telegram_user_id").uniqueIndex()
     val messageIdsForDeletion = array<Int>("message_ids_for_deletion").default(emptyList())
-    val sessionState = jsonb<BotSessionState>("session_state", KotlinxSerialization.json).default(BotSessionState.Initial)
+    val sessionState = jsonb<SessionState>("session_state", KotlinxSerialization.json).default(SessionState.Initial)
 }
 
 class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<TelegramBotUserId>(guid) {
@@ -94,7 +94,7 @@ class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<Tele
     fun currentWallet(): TelegramBotUserWalletEntity =
         wallets.first { it.isCurrent }
 
-    fun updateSessionState(newState: BotSessionState) {
+    fun updateSessionState(newState: SessionState) {
         sessionState = newState
         updatedAt = Clock.System.now()
     }
