@@ -2,6 +2,7 @@ package co.chainring
 
 import co.chainring.apps.api.ApiApp
 import co.chainring.apps.ring.RingApp
+import co.chainring.apps.telegrambot.BotApp
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.system.exitProcess
 
@@ -15,9 +16,11 @@ fun main(args: Array<String>) {
         when (appName) {
             "api" -> ApiApp().start()
             "ring" -> RingApp().start()
+            "telegrambot" -> BotApp().start()
             else -> {
                 RingApp().start()
                 ApiApp().start()
+                BotApp().start()
             }
         }
     } catch (e: Throwable) {

@@ -14,12 +14,6 @@ import co.chainring.apps.api.model.websocket.LastTradeDirection
 import co.chainring.apps.api.model.websocket.OHLC
 import co.chainring.apps.api.model.websocket.OrderBook
 import co.chainring.apps.api.model.websocket.OrderBookEntry
-import co.chainring.core.client.ws.blocking
-import co.chainring.core.client.ws.subscribeToBalances
-import co.chainring.core.client.ws.subscribeToLimits
-import co.chainring.core.client.ws.subscribeToOrderBook
-import co.chainring.core.client.ws.subscribeToOrders
-import co.chainring.core.client.ws.subscribeToTrades
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.ExecutionRole
@@ -55,8 +49,14 @@ import co.chainring.integrationtests.utils.assertPricesMessageReceived
 import co.chainring.integrationtests.utils.assertTradeCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertTradeUpdatedMessageReceived
 import co.chainring.integrationtests.utils.assertTradesMessageReceived
+import co.chainring.integrationtests.utils.blocking
 import co.chainring.integrationtests.utils.inFundamentalUnits
 import co.chainring.integrationtests.utils.ofAsset
+import co.chainring.integrationtests.utils.subscribeToBalances
+import co.chainring.integrationtests.utils.subscribeToLimits
+import co.chainring.integrationtests.utils.subscribeToOrderBook
+import co.chainring.integrationtests.utils.subscribeToOrders
+import co.chainring.integrationtests.utils.subscribeToTrades
 import co.chainring.integrationtests.utils.sum
 import co.chainring.integrationtests.utils.toCancelOrderRequest
 import kotlinx.datetime.Clock

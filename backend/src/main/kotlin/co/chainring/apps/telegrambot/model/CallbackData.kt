@@ -1,4 +1,4 @@
-package co.chainring.telegrambot.app
+package co.chainring.apps.telegrambot.model
 
 import co.chainring.core.model.Symbol
 

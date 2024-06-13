@@ -10,7 +10,6 @@ import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
-import co.chainring.core.client.rest.ApiClient
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.evm.TokenAddressAndChain

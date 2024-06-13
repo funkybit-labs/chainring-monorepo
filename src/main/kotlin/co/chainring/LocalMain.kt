@@ -2,6 +2,7 @@ package co.chainring
 
 import co.chainring.apps.api.ApiApp
 import co.chainring.apps.ring.RingApp
+import co.chainring.apps.telegrambot.BotApp
 import co.chainring.tasks.blockchainClients
 import co.chainring.tasks.fixtures.getFixtures
 import co.chainring.tasks.migrateDatabase
@@ -28,6 +29,7 @@ fun main(args: Array<String>) {
             try {
                 RingApp().start()
                 ApiApp().start()
+                BotApp().start()
             } catch (e: Throwable) {
                 logger.error(e) { "Failed to start" }
                 exitProcess(1)

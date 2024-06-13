@@ -2,7 +2,7 @@ package co.chainring.mocker
 
 import co.chainring.apps.api.middleware.HttpTransactionLogger
 import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
-import co.chainring.core.client.rest.ApiClient
+import co.chainring.integrationtests.utils.ApiClient
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.utils.TraceRecorder
 import co.chainring.mocker.core.DeterministicHarmonicPriceMovement

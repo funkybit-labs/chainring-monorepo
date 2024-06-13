@@ -25,13 +25,6 @@ import co.chainring.apps.api.model.RequestStatus
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.WithdrawalApiResponse
-import co.chainring.core.client.rest.AbnormalApiResponseException
-import co.chainring.core.client.rest.ApiCallFailure
-import co.chainring.core.client.rest.ApiClient
-import co.chainring.core.client.rest.apiServerRootUrl
-import co.chainring.core.client.rest.applicationJson
-import co.chainring.core.client.rest.httpClient
-import co.chainring.core.client.rest.json
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Percentage
 import co.chainring.core.model.db.ChainId

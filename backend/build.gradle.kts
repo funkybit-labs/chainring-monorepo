@@ -75,6 +75,9 @@ dependencies {
     implementation("com.google.protobuf:protobuf-kotlin:$protobufKotlinVersion")
     implementation("io.grpc:grpc-netty:$grpcProtobufVersion")
     implementation(project(":sequencercommon"))
+
+    implementation("org.telegram:telegrambots-longpolling:7.2.1")
+    implementation("org.telegram:telegrambots-client:7.2.1")
 }
 
 tasks.test {
