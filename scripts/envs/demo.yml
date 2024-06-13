@@ -76,7 +76,7 @@ services:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-d567d2ec-6ebb-4c6d-b48a-529eb09febfb-KMOVrv
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   telegrambot:
-    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/telegrambot
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
     count: 1
     environment: telegrambot
     no_rolling_upgrade: "true"
