@@ -30,6 +30,7 @@ value class DepositId(override val value: String) : EntityId {
 enum class DepositStatus {
     Pending,
     Confirmed,
+    SentToSequencer,
     Complete,
     Failed,
     ;

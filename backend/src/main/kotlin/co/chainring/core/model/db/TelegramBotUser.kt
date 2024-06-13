@@ -1,9 +1,11 @@
 package co.chainring.core.model.db
 
 import co.chainring.core.db.executeRaw
+import co.chainring.core.model.Address
 import co.chainring.core.model.tgbot.BotSessionState
 import co.chainring.core.model.tgbot.TelegramMessageId
 import co.chainring.core.model.tgbot.TelegramUserId
+import co.chanring.core.model.encrypt
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.http4k.format.KotlinxSerialization
@@ -12,6 +14,7 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.transactions.TransactionManager
+import org.web3j.crypto.Keys
 
 @Serializable
 @JvmInline
@@ -41,6 +44,16 @@ class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<Tele
                     this.createdAt = Clock.System.now()
                     this.updatedAt = this.createdAt
                     this.createdBy = "telegramBot"
+                }.also { user ->
+                    user.flush()
+                    val privateKey = Keys.createEcKeyPair().privateKey.toString(16)
+                    val wallet = TelegramBotUserWalletEntity.create(
+                        WalletEntity.getOrCreate(Address.fromPrivateKey(privateKey)),
+                        user,
+                        privateKey.encrypt(),
+                        isCurrent = true,
+                    )
+                    wallet.flush()
                 }
         }
 
@@ -78,8 +91,22 @@ class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<Tele
 
     var sessionState by TelegramBotUserTable.sessionState
 
+    fun currentWallet(): TelegramBotUserWalletEntity =
+        wallets.first { it.isCurrent }
+
     fun updateSessionState(newState: BotSessionState) {
         sessionState = newState
         updatedAt = Clock.System.now()
+    }
+
+    fun addWallet(privateKey: String): TelegramBotUserWalletEntity {
+        return TelegramBotUserWalletEntity.create(
+            WalletEntity.getOrCreate(Address.fromPrivateKey(privateKey)),
+            this,
+            privateKey.encrypt(),
+            isCurrent = false,
+        ).also {
+            it.flush()
+        }
     }
 }

@@ -4,15 +4,21 @@ import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.DepositStatus
+import co.chainring.core.model.db.SymbolEntity
+import co.chainring.core.utils.toFundamentalUnits
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
+import java.math.BigDecimal
 
 @Serializable
 data class CreateDepositApiRequest(
     val symbol: Symbol,
     val amount: BigIntegerJson,
     val txHash: TxHash,
-)
+) {
+    constructor(symbol: SymbolEntity, amount: BigDecimal, txHash: TxHash) :
+        this(Symbol(symbol.name), amount.toFundamentalUnits(symbol.decimals), txHash)
+}
 
 @Serializable
 data class Deposit(
@@ -31,7 +37,7 @@ data class Deposit(
                 Symbol(entity.symbol.name),
                 entity.amount,
                 when (entity.status) {
-                    DepositStatus.Pending, DepositStatus.Confirmed -> Status.Pending
+                    DepositStatus.Pending, DepositStatus.Confirmed, DepositStatus.SentToSequencer -> Status.Pending
                     DepositStatus.Complete -> Status.Complete
                     DepositStatus.Failed -> Status.Failed
                 },

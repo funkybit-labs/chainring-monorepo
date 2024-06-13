@@ -20,9 +20,6 @@ import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.Withdrawal
 import co.chainring.apps.api.model.WithdrawalApiResponse
-import co.chainring.apps.api.model.invalidEIP712SignatureError
-import co.chainring.apps.api.model.processingError
-import co.chainring.core.blockchain.ContractType
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.evm.EIP712Transaction
@@ -54,7 +51,7 @@ import java.math.BigDecimal
 import java.math.BigInteger
 
 class ExchangeApiService(
-    val sequencerClient: SequencerClient,
+    private val sequencerClient: SequencerClient,
 ) {
     private val symbolMap = mutableMapOf<Symbol, SymbolEntity>()
     private val marketMap = mutableMapOf<MarketId, Market>()
@@ -208,8 +205,8 @@ class ExchangeApiService(
 
         when (response.error) {
             SequencerError.None -> {}
-            SequencerError.ExceedsLimit -> throw RequestProcessingError(processingError("Order exceeds limit"))
-            else -> throw RequestProcessingError(processingError("Unable to process request - ${response.error}"))
+            SequencerError.ExceedsLimit -> throw RequestProcessingError("Order exceeds limit")
+            else -> throw RequestProcessingError("Unable to process request - ${response.error}")
         }
 
         val failedUpdatesOrCancels = response.ordersChangeRejectedList.associateBy { it.guid }
@@ -294,26 +291,23 @@ class ExchangeApiService(
     }
 
     fun deposit(walletAddress: Address, apiRequest: CreateDepositApiRequest): DepositApiResponse =
-        try {
-            transaction {
-                (
-                    DepositEntity.findByTxHash(apiRequest.txHash)
-                        ?: DepositEntity.create(
-                            wallet = WalletEntity.getOrCreate(walletAddress),
-                            symbol = getSymbolEntity(apiRequest.symbol),
-                            amount = apiRequest.amount,
-                            blockNumber = BigInteger.ZERO,
-                            transactionHash = apiRequest.txHash,
-                        ).also { it.refresh(flush = true) }
-                    ).let {
-                    it.refresh(flush = true)
-                    DepositApiResponse(Deposit.fromEntity(it))
-                }
+        transaction {
+            val deposit = try {
+                val deposit = DepositEntity.findByTxHash(apiRequest.txHash)
+                    ?: DepositEntity.create(
+                        wallet = WalletEntity.getOrCreate(walletAddress),
+                        symbol = getSymbolEntity(apiRequest.symbol),
+                        amount = apiRequest.amount,
+                        blockNumber = BigInteger.ZERO,
+                        transactionHash = apiRequest.txHash,
+                    )
+                deposit.refresh(flush = true)
+                deposit
+            } catch (e: Exception) {
+                DepositEntity.findByTxHash(apiRequest.txHash) ?: throw e
             }
-        } catch (e: Exception) {
-            transaction {
-                DepositEntity.findByTxHash(apiRequest.txHash)?.let { DepositApiResponse(Deposit.fromEntity(it)) }
-            } ?: throw e
+
+            DepositApiResponse(Deposit.fromEntity(deposit))
         }
 
     fun cancelOrder(walletAddress: Address, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {
@@ -389,13 +383,13 @@ class ExchangeApiService(
 
     private fun ensurePriceIsMultipleOfTickSize(market: Market, price: BigDecimal) {
         if (BigDecimal.ZERO.compareTo(price.remainder(market.tickSize)) != 0) {
-            throw RequestProcessingError(processingError("Order price is not a multiple of tick size"))
+            throw RequestProcessingError("Order price is not a multiple of tick size")
         }
     }
 
     private fun ensureOrderMarketIdMatchesBatchMarketId(orderMarketId: MarketId, apiRequest: BatchOrdersApiRequest) {
         if (orderMarketId != apiRequest.marketId) {
-            throw RequestProcessingError(processingError("Orders in a batch request have to be in the same market"))
+            throw RequestProcessingError("Orders in a batch request have to be in the same market")
         }
     }
 
@@ -403,11 +397,9 @@ class ExchangeApiService(
 
     private fun verifyEIP712Signature(walletAddress: Address, tx: EIP712Transaction, verifyingChainId: ChainId) {
         val verifyingContract = exchangeContractsByChain[verifyingChainId] ?: transaction {
-            DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(ContractType.Exchange.name, verifyingChainId)?.proxyAddress?.also {
+            DeployedSmartContractEntity.latestExchangeContractAddress(verifyingChainId)?.also {
                 exchangeContractsByChain[verifyingChainId] = it
-            } ?: throw RequestProcessingError(
-                processingError("Exchange contract not found for $verifyingChainId"),
-            )
+            } ?: throw RequestProcessingError("Exchange contract not found for $verifyingChainId")
         }
 
         runCatching {
@@ -418,10 +410,10 @@ class ExchangeApiService(
             )
         }.onFailure {
             logger.warn(it) { "Exception verifying EIP712 signature" }
-            throw RequestProcessingError(invalidEIP712SignatureError)
+            throw RequestProcessingError(ReasonCode.SignatureNotValid, "Invalid signature")
         }.getOrDefault(false).also { isValidSignature ->
             if (!isValidSignature) {
-                throw RequestProcessingError(invalidEIP712SignatureError)
+                throw RequestProcessingError(ReasonCode.SignatureNotValid, "Invalid signature")
             }
         }
     }

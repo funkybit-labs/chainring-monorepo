@@ -8,11 +8,14 @@ import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.toEvmSignature
+import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.toHex
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.reactivex.Flowable
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
@@ -36,6 +39,7 @@ import org.web3j.protocol.http.HttpService
 import org.web3j.tx.RawTransactionManager
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import org.web3j.utils.Async
+import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.jvm.optionals.getOrNull
 
@@ -289,11 +293,27 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         return (signature.r + signature.s + signature.v).toHex().toEvmSignature()
     }
 
-    fun getNativeBalance(address: Address) = web3j.ethGetBalance(address.value, DefaultBlockParameter.valueOf("latest")).send().balance
+    fun getBalance(walletAddress: Address, symbol: SymbolEntity): BigDecimal =
+        runBlocking { asyncGetBalance(walletAddress, symbol) }
 
-    fun getERC20Balance(erc20Address: Address, walletAddress: Address): BigInteger {
-        return loadERC20(erc20Address).balanceOf(walletAddress.value).send()
-    }
+    suspend fun asyncGetBalance(walletAddress: Address, symbol: SymbolEntity): BigDecimal =
+        (
+            symbol.contractAddress
+                ?.let { contractAddress -> asyncGetERC20Balance(contractAddress, walletAddress) }
+                ?: asyncGetNativeBalance(walletAddress)
+            ).fromFundamentalUnits(symbol.decimals)
+
+    fun getNativeBalance(address: Address): BigInteger =
+        runBlocking { asyncGetNativeBalance(address) }
+
+    suspend fun asyncGetNativeBalance(address: Address): BigInteger =
+        web3j.ethGetBalance(address.value, DefaultBlockParameter.valueOf("latest")).sendAsync().await().balance
+
+    fun getERC20Balance(erc20Address: Address, walletAddress: Address): BigInteger =
+        runBlocking { asyncGetERC20Balance(erc20Address, walletAddress) }
+
+    suspend fun asyncGetERC20Balance(erc20Address: Address, walletAddress: Address): BigInteger =
+        loadERC20(erc20Address).balanceOf(walletAddress.value).sendAsync().await()
 
     fun sendTransaction(address: Address, data: String, amount: BigInteger): TxHash =
         transactionManager.sendTransaction(

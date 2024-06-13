@@ -130,7 +130,8 @@ private val principalRequestContextKey =
     RequestContextKey.optional<Address>(requestContexts)
 
 val Request.principal: Address
-    get() = principalRequestContextKey(this) ?: throw RequestProcessingError(unauthorizedResponse("Unauthorized"))
+    get() = principalRequestContextKey(this)
+        ?: throw RequestProcessingError(Status.UNAUTHORIZED, ApiError(ReasonCode.AuthenticationError, "Unauthorized"))
 
 private fun unauthorizedResponse(message: String) = errorResponse(
     Status.UNAUTHORIZED,
