@@ -114,7 +114,7 @@ sealed class EIP712Transaction {
                 "sender" to sender.value,
                 "baseChainId" to baseChainId.value.toString(),
                 "baseToken" to baseToken.value,
-                "quoteChainId" to baseChainId.value.toString(),
+                "quoteChainId" to quoteChainId.value.toString(),
                 "quoteToken" to quoteToken.value,
                 when (amount) {
                     is OrderAmount.Fixed -> "amount" to amount.value.toString()
