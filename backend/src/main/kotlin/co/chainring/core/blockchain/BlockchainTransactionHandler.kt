@@ -126,7 +126,6 @@ class BlockchainTransactionHandler(
     }
 
     private fun syncSettlementWithBlockchain(inProgressSettlementBatch: ChainSettlementBatchEntity) {
-        val blockNumber = blockchainClient.getBlockNumber()
         when (inProgressSettlementBatch.status) {
             SettlementBatchStatus.Preparing -> {
                 when (inProgressSettlementBatch.prepararationTx.status) {
@@ -138,7 +137,7 @@ class BlockchainTransactionHandler(
                             // check if in mempool and if so update txHash and mark tx submitted
                             val txHash = getTxHash(inProgressSettlementBatch.prepararationTx.transactionData)
                             blockchainClient.getTransactionByHash(txHash.value)?.let {
-                                inProgressSettlementBatch.prepararationTx.markAsSubmitted(txHash, blockNumber)
+                                inProgressSettlementBatch.prepararationTx.markAsSubmitted(txHash, it.blockNumber)
                             }
                         }
                     }
@@ -155,7 +154,7 @@ class BlockchainTransactionHandler(
                             } else {
                                 val txHash = getTxHash(submissionTx.transactionData)
                                 blockchainClient.getTransactionByHash(txHash.value)?.let {
-                                    submissionTx.markAsSubmitted(txHash, blockNumber)
+                                    submissionTx.markAsSubmitted(txHash, it.blockNumber)
                                 }
                             }
                         }
@@ -170,8 +169,6 @@ class BlockchainTransactionHandler(
     }
 
     private fun syncWithdrawalWithBlockchain(settlingWithdrawals: List<WithdrawalEntity>) {
-        val blockNumber = blockchainClient.getBlockNumber()
-
         val blockchainTx: BlockchainTransactionEntity = settlingWithdrawals.first().blockchainTransaction!!
         when (blockchainTx.status) {
             BlockchainTransactionStatus.Pending -> {
@@ -181,7 +178,7 @@ class BlockchainTransactionHandler(
                     // check if in mempool and if so update txHash and mark tx submitted
                     val txHash = getTxHash(blockchainTx.transactionData)
                     blockchainClient.getTransactionByHash(txHash.value)?.let {
-                        blockchainTx.markAsSubmitted(txHash, blockNumber)
+                        blockchainTx.markAsSubmitted(txHash, it.blockNumber)
                     }
                 }
             }
