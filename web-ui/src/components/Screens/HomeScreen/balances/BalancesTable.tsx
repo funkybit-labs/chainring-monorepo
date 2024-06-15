@@ -122,6 +122,7 @@ export function BalancesTable({
               <div className="mb-4 inline-block space-x-4 justify-self-end text-xs">
                 <Button
                   style={'normal'}
+                  width={'normal'}
                   caption={() => (
                     <span className="whitespace-nowrap">
                       <span className="mr-4 hidden narrow:inline">Deposit</span>
@@ -133,6 +134,7 @@ export function BalancesTable({
                 />
                 <Button
                   style={'normal'}
+                  width={'normal'}
                   caption={() => (
                     <span className="whitespace-nowrap">
                       <span className="mr-4 hidden narrow:inline">
