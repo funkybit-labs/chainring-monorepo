@@ -151,7 +151,7 @@ function OrderBookChart({
   height: number
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const svg = d3.select(svgRef.current)
+  const svg = d3.select(svgRef.current).attr('shape-rendering', 'crispEdges')
 
   const tickDecimals = tickSize.decimalPlaces()
   console.log('tickDecimals', tickDecimals)
@@ -168,13 +168,83 @@ function OrderBookChart({
   const margin = {
     top: 20,
     bottom: 0,
-    left: maxLabelWidth + 10, // FIXME here was 1.5
+    left: maxLabelWidth + 10,
     right: 0
   }
   const innerWidth = width - margin.left - margin.right
   const innerHeight = height - margin.top - margin.bottom
 
   const yScale = d3.scaleLinear()
+
+  const lastMousePointerLocation = useRef({ mouseX: 0, mouseY: 0 })
+  const updateMouseProjections = useCallback(
+    (mouseX: number, mouseY: number) => {
+      lastMousePointerLocation.current = { mouseX: mouseX, mouseY: mouseY } // save position for passive update
+
+      const tickSizeNumber = tickSize.toNumber()
+      const price = yScale.invert(mouseY - margin.top)
+
+      const levelPrice = new Decimal(Math.round(price / tickSizeNumber)).mul(
+        tickSizeNumber
+      )
+
+      let levelAmount = 0
+      let totalAmount = 0
+
+      if (levelPrice >= new Decimal(orderBook.last.price)) {
+        const level = orderBook.sell.find((d) =>
+          new Decimal(d.price).eq(levelPrice)
+        )
+        levelAmount = level ? level.size : 0
+
+        const levels = orderBook.sell.filter((d) =>
+          new Decimal(d.price).lte(levelPrice)
+        )
+        totalAmount = levels.reduce((acc, d) => acc + d.size, 0)
+      }
+      if (levelPrice <= new Decimal(orderBook.last.price)) {
+        const level = orderBook.buy.find((d) =>
+          new Decimal(d.price).eq(levelPrice)
+        )
+        levelAmount = level ? level.size : 0
+
+        const levels = orderBook.buy.filter((d) =>
+          new Decimal(d.price).gte(levelPrice)
+        )
+        totalAmount = levels.reduce((acc, d) => acc + d.size, 0)
+      }
+
+      const tempText = svg
+        .select('.y-axis-mouse-projection')
+        .append('text')
+        .style('visibility', 'hidden')
+        .text(levelAmount.toFixed(tickDecimals + 1))
+      const maxLabelWidth = (tempText.node()?.getBBox().width ?? 35) * 0.95 + 7
+      tempText.remove()
+
+      const tooltip = svg
+        .select('.y-axis-mouse-projection')
+        .classed('hidden', mouseY < margin.top)
+        .attr(
+          'transform',
+          `translate(0,${yScale(levelPrice.toNumber()) + margin.top})`
+        )
+      tooltip.select('rect').attr('x', `${innerWidth - maxLabelWidth - 6}`)
+      tooltip
+        .select('text#line1')
+        .text('Price ' + levelPrice.toFixed(tickDecimals))
+        .attr('transform', `translate(${innerWidth - maxLabelWidth},-8)`)
+      tooltip
+        .select('text#line2')
+        .text('Amount ' + levelAmount.toFixed(tickDecimals + 1))
+        .attr('transform', `translate(${innerWidth - maxLabelWidth},4)`)
+      tooltip
+        .select('text#line3')
+        .text('Total ' + totalAmount.toFixed(tickDecimals + 1))
+        .attr('transform', `translate(${innerWidth - maxLabelWidth},16)`)
+    },
+    [innerWidth, margin.top, orderBook, svg, tickDecimals, tickSize, yScale]
+  )
 
   const drawChart = useCallback(() => {
     const prices = orderBook.buy
@@ -312,83 +382,25 @@ function OrderBookChart({
       .attr('width', (d) => xScale(d.sellSize.toNumber()))
       .attr('fill', '#FF5A50')
 
-    // redraw mouse projection since the scale has been adjusted
-    // updateMouseProjections(
-    //   lastMousePointerLocation.current.mouseX,
-    //   lastMousePointerLocation.current.mouseY
-    // )
-  }, [innerHeight, innerWidth, orderBook, svg, tickDecimals, tickSize, yScale])
+    // redraw mouse projection to stick to ticks after scale has been adjusted
+    updateMouseProjections(
+      lastMousePointerLocation.current.mouseX,
+      lastMousePointerLocation.current.mouseY
+    )
+  }, [
+    innerHeight,
+    innerWidth,
+    orderBook,
+    svg,
+    tickDecimals,
+    tickSize,
+    updateMouseProjections,
+    yScale
+  ])
 
   useEffect(() => {
     drawChart()
   }, [orderBook, width, height, drawChart])
-
-  const lastMousePointerLocation = useRef({ mouseX: 0, mouseY: 0 })
-  function updateMouseProjections(mouseX: number, mouseY: number) {
-    lastMousePointerLocation.current = { mouseX: mouseX, mouseY: mouseY } // save position for passive update
-
-    const tickSizeNumber = tickSize.toNumber()
-    const price = yScale.invert(mouseY - margin.top)
-
-    const levelPrice = new Decimal(Math.round(price / tickSizeNumber)).mul(
-      tickSizeNumber
-    )
-
-    let levelAmount = 0
-    let totalAmount = 0
-
-    if (levelPrice >= new Decimal(orderBook.last.price)) {
-      const level = orderBook.sell.find((d) =>
-        new Decimal(d.price).eq(levelPrice)
-      )
-      levelAmount = level ? level.size : 0
-
-      const levels = orderBook.sell.filter((d) =>
-        new Decimal(d.price).lte(levelPrice)
-      )
-      totalAmount = levels.reduce((acc, d) => acc + d.size, 0)
-    }
-    if (levelPrice <= new Decimal(orderBook.last.price)) {
-      const level = orderBook.buy.find((d) =>
-        new Decimal(d.price).eq(levelPrice)
-      )
-      levelAmount = level ? level.size : 0
-
-      const levels = orderBook.buy.filter((d) =>
-        new Decimal(d.price).gte(levelPrice)
-      )
-      totalAmount = levels.reduce((acc, d) => acc + d.size, 0)
-    }
-
-    const tempText = svg
-      .select('.y-axis-mouse-projection')
-      .append('text')
-      .style('visibility', 'hidden')
-      .text(levelAmount.toFixed(tickDecimals + 1))
-    const maxLabelWidth = (tempText.node()?.getBBox().width ?? 35) * 0.95 + 7
-    tempText.remove()
-
-    const tooltip = svg
-      .select('.y-axis-mouse-projection')
-      .classed('hidden', mouseY < margin.top)
-      .attr(
-        'transform',
-        `translate(0,${yScale(levelPrice.toNumber()) + margin.top})`
-      )
-    tooltip.select('rect').attr('x', `${innerWidth - maxLabelWidth - 6}`)
-    tooltip
-      .select('text#line1')
-      .text('Price ' + levelPrice.toFixed(tickDecimals))
-      .attr('transform', `translate(${innerWidth - maxLabelWidth},-8)`)
-    tooltip
-      .select('text#line2')
-      .text('Amount ' + levelAmount.toFixed(tickDecimals + 1))
-      .attr('transform', `translate(${innerWidth - maxLabelWidth},4)`)
-    tooltip
-      .select('text#line3')
-      .text('Total ' + totalAmount.toFixed(tickDecimals + 1))
-      .attr('transform', `translate(${innerWidth - maxLabelWidth},16)`)
-  }
 
   function hideMouseProjections() {
     svg.select('.x-axis-mouse-projection').classed('hidden', true)
