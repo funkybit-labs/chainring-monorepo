@@ -30,15 +30,23 @@ import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.math.BigDecimal
 import java.math.BigInteger
-import kotlin.math.max
+import java.math.RoundingMode
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.exp
+import kotlin.math.ln
+import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.sqrt
+import kotlin.random.Random
+import org.knowm.xchart.SwingWrapper
+import org.knowm.xchart.XYChartBuilder
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
 
 class Maker(
     marketIds: List<MarketId>,
-    private val tightness: Int,
-    private val skew: Int,
+    private val levelsSpreadPercents: BigDecimal,
     private val levels: Int,
     nativeAssets: Map<String, BigInteger>,
     assets: Map<String, BigInteger>,
@@ -46,7 +54,7 @@ class Maker(
 ) : Actor(marketIds, nativeAssets, assets, keyPair) {
     override val id: String = "mm_${Address(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
     override val logger: KLogger = KotlinLogging.logger {}
-    private var currentOrders = mutableMapOf<MarketId,MutableSet<Order.Limit>>()
+    private var currentOrders = mutableMapOf<MarketId, MutableSet<Order.Limit>>()
     private var quotesCreated = false
 
     override val websocketSubscriptionTopics: List<SubscriptionTopic> =
@@ -69,6 +77,7 @@ class Maker(
                 logger.info { "$id: received trade created" }
                 pendingTrades.add(message.trade)
             }
+
             is TradeUpdated -> {
                 logger.info { "$id: received trade update" }
                 val trade = message.trade
@@ -79,6 +88,7 @@ class Maker(
                     settledTrades.add(trade)
                 }
             }
+
             is Trades -> {
                 logger.info { "$id: received ${message.trades.size} trade updates" }
                 message.trades.forEach { trade ->
@@ -90,12 +100,14 @@ class Maker(
                     }
                 }
             }
+
             is Balances -> {
                 message.balances.forEach {
                     balances[it.symbol.value] = it.available
                 }
                 logger.info { "$id: received balance update ${message.balances}" }
             }
+
             is Orders, is OrderCreated, is OrderUpdated -> {
                 val orders = when (message) {
                     is Orders -> message.orders
@@ -147,6 +159,7 @@ class Maker(
                     }
                 }
             }
+
             is Prices -> {
                 if (message.full) {
                     logger.info { "$id: full price update for ${message.market}" }
@@ -165,49 +178,48 @@ class Maker(
                     }
                 }
             }
+
             else -> {}
         }
     }
 
-    private fun offerAndBidPrices(market: Market, levels: Int, curPrice: BigDecimal): Pair<List<BigDecimal>, List<BigDecimal>> {
-        val curPriceRounded = curPrice.divide(market.tickSize).toBigInteger().toBigDecimal().times(market.tickSize)
-        val offerPrices = (1..levels).map { n ->
-            curPriceRounded + market.tickSize * (n * tightness + skew * n).toBigDecimal()
-        }
-        val bidPrices = (1..levels).mapNotNull { n ->
-            val p = curPriceRounded - market.tickSize * (n * tightness + skew * n).toBigDecimal()
-            if (p >= market.tickSize) p else null
-        }
-        return Pair(offerPrices, bidPrices)
-    }
-
     private fun offerAndBidAmounts(market: Market, offerPrices: List<BigDecimal>, bidPrices: List<BigDecimal>): Pair<List<BigInteger>, List<BigInteger>> {
         val marketId = market.id
-        // don't try to use all of available inventory
-        val useFraction = 0.5.toBigDecimal()
-        val baseInventory = (balances.getOrDefault(marketId.baseSymbol(), BigInteger.ZERO).toBigDecimal() * useFraction).toBigInteger()
-        val quoteInventory = (balances.getOrDefault(marketId.quoteSymbol(), BigInteger.ZERO).toBigDecimal() * useFraction).toBigInteger()
-        val levels = max(offerPrices.size, bidPrices.size)
-        val unscaledAmounts = (1..levels).map { it.toDouble().pow(2.0) }
-        val totalAmount = unscaledAmounts.sum()
+
+        // don't try to use all of the available inventory
+        val useBalanceFraction = 0.5.toBigDecimal()
+        val baseInventory = (balances.getOrDefault(marketId.baseSymbol(), BigInteger.ZERO).toBigDecimal() * useBalanceFraction).toBigInteger()
+        val quoteInventory = (balances.getOrDefault(marketId.quoteSymbol(), BigInteger.ZERO).toBigDecimal() * useBalanceFraction).toBigInteger()
+
+        val marketToPeakStdDevFactor = 10.0
+        val peakToOuterStdDevFactor = 2.0
+
         return Pair(
-            List(offerPrices.size) { ix -> (baseInventory.toBigDecimal() * (unscaledAmounts[ix] / totalAmount).toBigDecimal()).toBigInteger() },
-            bidPrices.mapIndexed { ix, price ->
-                val notional =
-                    (quoteInventory.toBigDecimal() * (unscaledAmounts[ix] / totalAmount).toBigDecimal()).toBigInteger()
-                (notional.toBigDecimal() / price).movePointLeft(market.quoteDecimals).movePointRight(market.baseDecimals)
-                    .toBigInteger()
-            }.toList()
+            generateAsymmetricGaussianAmounts(
+                offerPrices,
+                baseInventory,
+                biasFactor = 0.99,
+                leftStdDevFactor = marketToPeakStdDevFactor,
+                rightStdDevFactor = peakToOuterStdDevFactor
+            ),
+            generateAsymmetricGaussianAmounts(
+                bidPrices,
+                quoteInventory,
+                biasFactor = 1.01,
+                leftStdDevFactor = peakToOuterStdDevFactor,
+                rightStdDevFactor = marketToPeakStdDevFactor
+            ).mapIndexed { index, amount ->
+                // convert to base
+                (amount.toBigDecimal() / bidPrices[index]).movePointLeft(market.quoteDecimals).movePointRight(market.baseDecimals).toBigInteger()
+            },
         )
     }
 
     private fun adjustQuotes(market: Market, curPrice: BigDecimal) {
         logger.debug { "$id: adjusting quotes in market ${market.id}, current price: $curPrice" }
         val marketId = market.id
-        val currentOffers = currentOrders[marketId]?.filter { it.side == OrderSide.Sell } ?: emptyList()
-        val currentBids = currentOrders[marketId]?.filter { it.side == OrderSide.Buy } ?: emptyList()
-        val ordersToCancel = currentOffers + currentBids
-        val (offerPrices, bidPrices) = offerAndBidPrices(market, levels, curPrice)
+        val ordersToCancel = currentOrders[marketId] ?: emptyList()
+        val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpreadPercents, curPrice)
         val (offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
 
         val createOrders = offerPrices.mapIndexed { ix, price ->
@@ -268,22 +280,25 @@ class Maker(
         logger.debug { "$id: creating quotes in market $marketId, current price: $curPrice" }
         markets.find { it.id == marketId }?.let { market ->
             apiClient.cancelOpenOrders()
+            currentOrders[marketId] = mutableSetOf()
 
-            val (offerPrices, bidPrices) = offerAndBidPrices(market, levels, curPrice)
+            val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpreadPercents, curPrice)
             val (offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
 
             offerPrices.forEachIndexed { ix, price ->
                 val amount = offerAmounts[ix]
                 apiClient.tryCreateOrder(
-                    wallet.signOrder(CreateOrderApiRequest.Limit(
-                        nonce = generateOrderNonce(),
-                        marketId = marketId,
-                        side = OrderSide.Sell,
-                        amount = OrderAmount.Fixed(amount),
-                        price = price,
-                        signature = EvmSignature.emptySignature(),
-                        verifyingChainId = ChainId.empty,
-                    ))
+                    wallet.signOrder(
+                        CreateOrderApiRequest.Limit(
+                            nonce = generateOrderNonce(),
+                            marketId = marketId,
+                            side = OrderSide.Sell,
+                            amount = OrderAmount.Fixed(amount),
+                            price = price,
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        )
+                    )
                 ).onLeft { e: ApiCallFailure ->
                     logger.warn { "$id failed to create Sell order in $marketId market with: $e" }
                 }
@@ -292,22 +307,102 @@ class Maker(
             bidPrices.forEachIndexed { ix, price ->
                 val amount = bidAmounts[ix]
                 apiClient.tryCreateOrder(
-                    wallet.signOrder(CreateOrderApiRequest.Limit(
-                        nonce = generateOrderNonce(),
-                        marketId = marketId,
-                        side = OrderSide.Buy,
-                        amount = OrderAmount.Fixed(amount),
-                        price = price,
-                        signature = EvmSignature.emptySignature(),
-                        verifyingChainId = ChainId.empty,
-                    ))
+                    wallet.signOrder(
+                        CreateOrderApiRequest.Limit(
+                            nonce = generateOrderNonce(),
+                            marketId = marketId,
+                            side = OrderSide.Buy,
+                            amount = OrderAmount.Fixed(amount),
+                            price = price,
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        )
+                    )
                 ).onLeft { e: ApiCallFailure ->
                     logger.warn { "$id failed to create Buy order in $marketId market with: $e" }
                 }
             }
-
-            currentOrders[marketId] = mutableSetOf()
-
         } ?: throw RuntimeException("Market $marketId not found")
     }
+
+    companion object {
+        fun offerAndBidPrices(tickSize: BigDecimal, levels: Int, levelsSpreadPercents: BigDecimal, curPrice: BigDecimal): Pair<List<BigDecimal>, List<BigDecimal>> {
+            val curPriceRounded = curPrice.roundToTickSize(tickSize)
+            val adjustedLevels = min((curPrice * levelsSpreadPercents / tickSize ).setScale(0, RoundingMode.DOWN).toInt(), levels)
+
+            val offerPrices = generateUniquePrices(adjustedLevels, curPriceRounded + tickSize, curPrice * levelsSpreadPercents, tickSize, true)
+            val bidPrices = generateUniquePrices(adjustedLevels, curPriceRounded - tickSize, curPrice * levelsSpreadPercents, tickSize, false)
+
+            return Pair(offerPrices, bidPrices)
+        }
+
+        private fun generateUniquePrices(levels: Int, curPriceRounded: BigDecimal, halfSpreadRange: BigDecimal, tickSize: BigDecimal, isOffer: Boolean): List<BigDecimal> {
+            val prices = mutableSetOf<BigDecimal>()
+
+            while (prices.size < levels) {
+                val newPrice = if (isOffer) {
+                    curPriceRounded + (nextHalfGaussianZeroToOne() * halfSpreadRange).roundToTickSize(tickSize)
+                } else {
+                    curPriceRounded - (nextHalfGaussianZeroToOne() * halfSpreadRange).roundToTickSize(tickSize)
+                }
+                prices.add(newPrice)
+            }
+
+            return prices.sorted()
+        }
+
+        fun generateAsymmetricGaussianAmounts(prices: List<BigDecimal>, totalAmount: BigInteger, biasFactor: Double, leftStdDevFactor: Double, rightStdDevFactor: Double): List<BigInteger> {
+            val averagePrice = prices.map { it.toDouble() }.average()
+            val mean = averagePrice * biasFactor // adjust the mean to move the peak
+            val range = (prices.maxOrNull()!! - prices.minOrNull()!!).toDouble()
+            val leftStdDev = range / leftStdDevFactor
+            val rightStdDev = range / rightStdDevFactor
+
+            val amounts = prices.map { price ->
+                val x = price.toDouble()
+                val stdDev = if (x < mean) leftStdDev else rightStdDev
+                val exponent = -(x - mean).pow(2) / (2 * stdDev.pow(2))
+                exp(exponent)
+            }.map {it + Random.nextDouble(-it, it) * 0.2}
+            val unscaledSum = amounts.sum()
+
+            return amounts
+                .map { it / unscaledSum * totalAmount.toDouble() }
+                .map { it.toBigDecimal().toBigInteger() }
+        }
+
+        private fun nextHalfGaussianZeroToOne(): BigDecimal {
+            val u = Random.nextDouble()
+            val v = Random.nextDouble()
+            val gaussian = sqrt(-2.0 * ln(u)) * cos(2.0 * PI * v)
+            // Transform to range [-1, 1]
+            val transformed = gaussian / 6
+            // Clamp to [0, 1]
+            return transformed.coerceIn(0.0, 1.0).toBigDecimal()
+        }
+
+        private fun BigDecimal.roundToTickSize(tickSize: BigDecimal): BigDecimal {
+            return this.divide(tickSize, RoundingMode.HALF_UP).toBigInteger().toBigDecimal().times(tickSize)
+        }
+    }
+}
+
+fun main() {
+    val initialPrice = BigDecimal(17.5)
+    val marketToPeakStdDevFactor = 10.0
+    val peakToOuterStdDevFactor = 2.0
+
+    val (offerPrices, bidPrices) = Maker.offerAndBidPrices(BigDecimal("0.05"), 20, BigDecimal("0.1"), initialPrice)
+    val offerAmounts =  Maker.generateAsymmetricGaussianAmounts(offerPrices, BigInteger("10000"), biasFactor = 0.99, marketToPeakStdDevFactor, peakToOuterStdDevFactor)
+    val bidAmounts =  Maker.generateAsymmetricGaussianAmounts(bidPrices, BigInteger("10000"), biasFactor = 1.01, peakToOuterStdDevFactor, marketToPeakStdDevFactor)
+
+    val chart = XYChartBuilder().width(1200).height(600)
+        .xAxisTitle("Price")
+        .yAxisTitle("Amount").build()
+
+    chart.addSeries("offers", offerPrices, offerAmounts)
+    chart.addSeries("bids", bidPrices, bidAmounts)
+
+    SwingWrapper(chart).displayChart()
+
 }

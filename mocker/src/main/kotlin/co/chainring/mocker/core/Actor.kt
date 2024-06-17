@@ -120,6 +120,7 @@ abstract class Actor(
             try {
                 val config = apiClient.getConfiguration()
                 val initialBalances = apiClient.getBalances().balances
+                val gasFeesAmount = BigDecimal("0.1").movePointRight(18).toBigInteger()
 
                 synchronized(Actor::class) {
                     val nativeAmountByChainId = nativeAssets.map { chainIdBySymbol.getValue(it.key) to it.value }.toMap()
@@ -127,18 +128,17 @@ abstract class Actor(
                     chainIds.forEach { chainId ->
                         when (val nativeAmount = nativeAmountByChainId[chainId]) {
                             null -> {
-                                // put some balance to pay gas, but do not deposit
-                                Faucet.fund(wallet.address, BigDecimal.ONE.movePointRight(18).toBigInteger(), chainId)
+                                // put some balance enough to pay gas, but do not deposit
+                                Faucet.fund(wallet.address, gasFeesAmount, chainId)
                             }
                             else -> {
-                                val desiredAmount = nativeAmount * BigInteger.TWO
-                                Faucet.fund(wallet.address, desiredAmount * BigInteger.TWO, chainId)
+                                Faucet.fund(wallet.address, nativeAmount + gasFeesAmount, chainId)
 
                                 val nativeSymbol = config.chains.first { it.id == chainId }.symbols.first { it.contractAddress == null }
                                 val availableAmount =
                                     initialBalances.find { it.symbol.value == nativeSymbol.name }?.available
                                         ?: BigInteger.ZERO
-                                val deltaAmount = desiredAmount - availableAmount
+                                val deltaAmount = nativeAmount - availableAmount
 
                                 if (deltaAmount > BigInteger.ZERO) {
                                     logger.debug { "Funding ${wallet.address} with ${deltaAmount * BigInteger.TWO} on chain $chainId" }

@@ -103,7 +103,7 @@ export function SwapWidget({
 
       return (
         <>
-          <div className="space-y-4 rounded bg-darkBluishGray9 p-8">
+          <div className="space-y-4 rounded-lg bg-darkBluishGray9 p-8">
             <div className="rounded bg-darkBluishGray8 p-4">
               <div className="mb-2 flex flex-row justify-between">
                 <span className="text-base text-darkBluishGray1">

@@ -7,7 +7,7 @@
 .svg-disabled-overlay {
 }
 .svg-disabled-overlay rect {
-  fill: #1B222B;
+  fill: #253447; /*darkBluishGray9*/
   opacity: 0.8;
 }
 .x-axis .domain {
@@ -21,11 +21,11 @@
 }
 
 .x-axis line {
-  stroke: #313D4E;
+  stroke: #314965; /*darkBluishGray7*/
   stroke-dasharray: 5 10;
 }
 .y-axis-grid line {
-  stroke: #313D4E;
+  stroke: #314965; /*darkBluishGray7*/
   stroke-dasharray: 5 10;
 }
 .y-axis-grid text {
@@ -33,7 +33,7 @@
 }
 .y-axis-ohlc {}
 .y-axis-bg {
-  fill: #253447;
+  fill: #253447; /*darkBluishGray9*/
 }
 
 .y-axis-current-price {
@@ -50,7 +50,7 @@
 }
 
 .y-axis-mouse-projection {
-  fill: #313D4E;
+  fill: #314965; /*darkBluishGray7*/
 }
 .y-axis-mouse-projection rect {
   stroke-width: 0;
@@ -66,7 +66,7 @@
 }
 
 .x-axis-mouse-projection {
-  fill: #313D4E;
+  fill: #314965; /*darkBluishGray7*/
 }
 .x-axis-mouse-projection text {
   fill: #BABEC5;
@@ -76,6 +76,14 @@
   stroke: #BABEC5;
   stroke-width: 0.5;
   stroke-dasharray: 2 2;
+}
+
+
+.y-axis-order-book-last-price {
+  fill: #253447; /*darkBluishGray9*/
+}
+.y-axis-order-book-last-price text {
+  font-family: sans-serif;
 }
 
 svg text {
