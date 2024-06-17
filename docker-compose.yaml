@@ -43,7 +43,7 @@ services:
     restart: always
     volumes:
       - type: tmpfs
-        target: /var/lib/postgresql/data:rw
+        target: /var/lib/postgresql/data
         tmpfs:
           size: 4294967296
     environment:
@@ -58,7 +58,7 @@ services:
     restart: always
     volumes:
       - type: tmpfs
-        target: /var/lib/postgresql/data:rw
+        target: /var/lib/postgresql/data
         tmpfs:
           size: 4294967296
     environment:
