@@ -21,7 +21,7 @@ IdentityFile ~/.ssh/baregate_id_rsa
 
 ## Stop services
 ```
-python3 ecs-deploy.py stop --env demo --services mocker,api,telegrambot,sequencer
+python3 ecs-deploy.py stop --env demo --services mocker,api,telegrambot,ring,sequencer
 ```
 
 ## Truncate data
@@ -61,8 +61,9 @@ and then truncate db tables using favourite SQL editor. In this way OHLC records
 ```
 
 ## Start & seed
-Start sequencer
+Start ring and sequencer
 ```
+python3 ecs-deploy.py start --env demo --services ring
 python3 ecs-deploy.py start --env demo --services sequencer
 ```
 
