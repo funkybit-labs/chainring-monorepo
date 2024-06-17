@@ -18,7 +18,6 @@ import Decimal from 'decimal.js'
 import { useGesture } from '@use-gesture/react'
 import TradingSymbol from 'tradingSymbol'
 import SymbolIcon from 'components/common/SymbolIcon'
-import { Writeable, ZodEnum, ZodString } from 'zod'
 
 interface OrderBookChartEntry {
   price: Decimal
@@ -34,7 +33,7 @@ export function OrderBookWidget({
   side: OrderSide
 }) {
   const [rawOrderBook, setRawOrderBook] = useState<OrderBook>()
-  const [ref, { width, height }] = useMeasure()
+  const [ref, { width }] = useMeasure()
 
   useWebsocketSubscription({
     topics: useMemo(() => [orderBookTopic(market.id)], [market.id]),
@@ -88,7 +87,7 @@ export function OrderBookWidget({
   const tickSize: undefined | Decimal = useMemo(() => {
     if (side === 'Sell') {
       if (rawOrderBook) {
-        let lastPrice = parseFloat(rawOrderBook.last.price)
+        const lastPrice = parseFloat(rawOrderBook.last.price)
         return new Decimal(
           1 / lastPrice - 1 / (lastPrice + market.tickSize.toNumber())
         )
@@ -98,7 +97,7 @@ export function OrderBookWidget({
     } else {
       return market.tickSize
     }
-  }, [market.id, rawOrderBook, side])
+  }, [market.tickSize, rawOrderBook, side])
 
   return (
     <Widget
@@ -114,7 +113,7 @@ export function OrderBookWidget({
               quantitySymbol={
                 side === 'Sell' ? market.quoteSymbol : market.baseSymbol
               }
-              data={orderBook}
+              orderBook={orderBook}
               width={Math.max(width - 40, 0)}
               height={465}
             />
@@ -139,37 +138,37 @@ function directionStyle(direction: Direction) {
 }
 
 function OrderBookChart({
+  orderBook,
   tickSize,
   quantitySymbol,
-  data,
   width,
   height
 }: {
+  orderBook: OrderBook
   tickSize: Decimal
   quantitySymbol: TradingSymbol | undefined
-  data: OrderBook
   width: number
   height: number
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
   const svg = d3.select(svgRef.current)
 
-  // measure max possible label width using level prices to determine left margin
+  const tickDecimals = tickSize.decimalPlaces()
+  console.log('tickDecimals', tickDecimals)
+
+  // measure actual last price label width to determine left margin
   const tempText = svg
     .select('.y-axis')
     .append('text')
     .style('visibility', 'hidden')
-  const maxLabelWidth =
-    d3.max(data.sell.concat(data.buy), (d) => {
-      tempText.text(d.price)
-      return tempText.node()?.getBBox().width
-    }) ?? 50
+    .text(orderBook.last.price)
+  const maxLabelWidth = tempText.node()?.getBBox().width ?? 35
   tempText.remove()
 
   const margin = {
     top: 20,
     bottom: 0,
-    left: maxLabelWidth * 1.5,
+    left: maxLabelWidth + 10, // FIXME here was 1.5
     right: 0
   }
   const innerWidth = width - margin.left - margin.right
@@ -177,11 +176,14 @@ function OrderBookChart({
 
   const yScale = d3.scaleLinear()
 
-  function drawChart() {
-    const prices = data.buy
+  const drawChart = useCallback(() => {
+    const prices = orderBook.buy
       .map((d) => parseFloat(d.price))
-      .concat(data.sell.map((d) => parseFloat(d.price)))
-    const maxAmount = d3.max(data.buy.concat(data.sell), (d) => d.size)!
+      .concat(orderBook.sell.map((d) => parseFloat(d.price)))
+    const maxAmount = d3.max(
+      orderBook.buy.concat(orderBook.sell),
+      (d) => d.size
+    )!
 
     const xScale = d3
       .scaleLinear()
@@ -195,39 +197,42 @@ function OrderBookChart({
       ])
       .range([innerHeight, 0])
 
-    let xAxis = d3
+    const xAxis = d3
       .axisTop(xScale)
       .tickSizeOuter(0)
       .tickSizeInner(-innerHeight)
       .tickPadding(5)
       .tickValues(xScale.ticks(5).filter((tick) => tick !== 0)) // Filter out the '0' tick
 
-    let yAxis = d3
+    const yAxis = d3
       .axisLeft(yScale)
       .tickSizeOuter(0)
       .tickSizeInner(0)
       .tickPadding(10)
       .ticks(7)
       .tickFormat((d: d3.NumberValue) => {
-        return d.valueOf().toFixed(4)
+        return d.valueOf().toFixed(tickDecimals)
       })
 
-    // @ts-ignore
+    // @ts-expect-error @definitelytyped/no-unnecessary-generics
     svg.select('.x-axis').call(xAxis)
-    // @ts-ignore
+    // @ts-expect-error @definitelytyped/no-unnecessary-generics
     svg.select('.y-axis').call(yAxis)
 
     // update last price tracker
-    const lastPriceStyle = directionStyle(data.last.direction)
-    let lastPriceGroup = svg
+    const lastPriceStyle = directionStyle(orderBook.last.direction)
+    const lastPriceGroup = svg
       .select('.y-axis-order-book-last-price')
-      .classed('hidden', !data.last.price)
+      .classed('hidden', !orderBook.last.price)
       .transition()
       .duration(150)
-      .attr('transform', `translate(0,${yScale(parseFloat(data.last.price))})`)
+      .attr(
+        'transform',
+        `translate(0,${yScale(parseFloat(orderBook.last.price))})`
+      )
     lastPriceGroup
       .select('text')
-      .text(data.last.price)
+      .text(orderBook.last.price)
       .attr('fill', lastPriceStyle.textColor)
 
     // draw levels
@@ -237,13 +242,13 @@ function OrderBookChart({
       yScale
     )
 
-    const minBuyPrice = data.buy.reduce(
+    const minBuyPrice = orderBook.buy.reduce(
       (min, d) => Decimal.min(min, new Decimal(d.price)),
-      new Decimal(data.last.price)
+      new Decimal(orderBook.last.price)
     )
-    const maxSellPrice = data.sell.reduce(
+    const maxSellPrice = orderBook.sell.reduce(
       (max, d) => Decimal.max(max, new Decimal(d.price)),
-      new Decimal(data.last.price)
+      new Decimal(orderBook.last.price)
     )
     let price = minBuyPrice
     const allPriceLevels: Decimal[] = []
@@ -254,11 +259,13 @@ function OrderBookChart({
 
     // Create full data set with buy and sell amounts
     const fullData: OrderBookChartEntry[] = allPriceLevels.map((price) => {
-      const buyEntry = data.buy.find((d) => new Decimal(d.price).eq(price)) || {
+      const buyEntry = orderBook.buy.find((d) =>
+        new Decimal(d.price).eq(price)
+      ) || {
         price,
         size: 0
       }
-      const sellEntry = data.sell.find((d) =>
+      const sellEntry = orderBook.sell.find((d) =>
         new Decimal(d.price).eq(price)
       ) || {
         price,
@@ -274,26 +281,31 @@ function OrderBookChart({
     const bars = svg
       .selectAll('.order-book')
       .selectAll('.order-bar')
-      .data(fullData, (d) => (d as OrderBookChartEntry).price.toFixed(10))
+      .data(fullData, (d) =>
+        (d as OrderBookChartEntry).price.toFixed(tickDecimals + 1)
+      )
 
     bars.exit().remove()
 
     const barsEnter = bars.enter().append('g').attr('class', 'order-bar')
-    barsEnter.append('rect').attr('class', 'buy')
-    barsEnter.append('rect').attr('class', 'sell')
     barsEnter
+      .append('rect')
+      .attr('class', 'buy')
       .merge(bars.select('.buy'))
       .transition()
-      .duration(100)
+      .duration(50)
       .attr('x', 0)
       .attr('y', (d) => yScale(d.price.toNumber()) - barHeight / 2)
       .attr('height', barHeight)
       .attr('width', (d) => xScale(d.buySize.toNumber()))
       .attr('fill', '#39CF63')
+
     barsEnter
+      .append('rect')
+      .attr('class', 'sell')
       .merge(bars.select('.sell'))
       .transition()
-      .duration(100)
+      .duration(50)
       .attr('x', (d) => xScale(d.buySize.toNumber())) // Position sell bars after buy bars
       .attr('y', (d) => yScale(d.price.toNumber()) - barHeight / 2)
       .attr('height', barHeight)
@@ -301,21 +313,21 @@ function OrderBookChart({
       .attr('fill', '#FF5A50')
 
     // redraw mouse projection since the scale has been adjusted
-    updateMouseProjections(
-      lastMousePointerLocation.current.mouseX,
-      lastMousePointerLocation.current.mouseY
-    )
-  }
+    // updateMouseProjections(
+    //   lastMousePointerLocation.current.mouseX,
+    //   lastMousePointerLocation.current.mouseY
+    // )
+  }, [innerHeight, innerWidth, orderBook, svg, tickDecimals, tickSize, yScale])
 
   useEffect(() => {
     drawChart()
-  }, [data, width, height])
+  }, [orderBook, width, height, drawChart])
 
   const lastMousePointerLocation = useRef({ mouseX: 0, mouseY: 0 })
   function updateMouseProjections(mouseX: number, mouseY: number) {
     lastMousePointerLocation.current = { mouseX: mouseX, mouseY: mouseY } // save position for passive update
 
-    let tickSizeNumber = tickSize.toNumber()
+    const tickSizeNumber = tickSize.toNumber()
     const price = yScale.invert(mouseY - margin.top)
 
     const levelPrice = new Decimal(Math.round(price / tickSizeNumber)).mul(
@@ -325,24 +337,36 @@ function OrderBookChart({
     let levelAmount = 0
     let totalAmount = 0
 
-    if (levelPrice >= new Decimal(data.last.price)) {
-      const level = data.sell.find((d) => new Decimal(d.price).eq(levelPrice))
+    if (levelPrice >= new Decimal(orderBook.last.price)) {
+      const level = orderBook.sell.find((d) =>
+        new Decimal(d.price).eq(levelPrice)
+      )
       levelAmount = level ? level.size : 0
 
-      const levels = data.sell.filter((d) =>
+      const levels = orderBook.sell.filter((d) =>
         new Decimal(d.price).lte(levelPrice)
       )
       totalAmount = levels.reduce((acc, d) => acc + d.size, 0)
     }
-    if (levelPrice <= new Decimal(data.last.price)) {
-      const level = data.buy.find((d) => new Decimal(d.price).eq(levelPrice))
+    if (levelPrice <= new Decimal(orderBook.last.price)) {
+      const level = orderBook.buy.find((d) =>
+        new Decimal(d.price).eq(levelPrice)
+      )
       levelAmount = level ? level.size : 0
 
-      const levels = data.buy.filter((d) =>
+      const levels = orderBook.buy.filter((d) =>
         new Decimal(d.price).gte(levelPrice)
       )
       totalAmount = levels.reduce((acc, d) => acc + d.size, 0)
     }
+
+    const tempText = svg
+      .select('.y-axis-mouse-projection')
+      .append('text')
+      .style('visibility', 'hidden')
+      .text(levelAmount.toFixed(tickDecimals + 1))
+    const maxLabelWidth = (tempText.node()?.getBBox().width ?? 35) * 0.95 + 7
+    tempText.remove()
 
     const tooltip = svg
       .select('.y-axis-mouse-projection')
@@ -351,15 +375,19 @@ function OrderBookChart({
         'transform',
         `translate(0,${yScale(levelPrice.toNumber()) + margin.top})`
       )
+    tooltip.select('rect').attr('x', `${innerWidth - maxLabelWidth - 6}`)
     tooltip
       .select('text#line1')
-      .text('Price ' + levelPrice.toFixed(tickSize.decimalPlaces()))
+      .text('Price ' + levelPrice.toFixed(tickDecimals))
+      .attr('transform', `translate(${innerWidth - maxLabelWidth},-8)`)
     tooltip
       .select('text#line2')
-      .text('Amount ' + levelAmount.toFixed(tickSize.decimalPlaces()))
+      .text('Amount ' + levelAmount.toFixed(tickDecimals + 1))
+      .attr('transform', `translate(${innerWidth - maxLabelWidth},4)`)
     tooltip
       .select('text#line3')
-      .text('Total ' + totalAmount.toFixed(tickSize.decimalPlaces()))
+      .text('Total ' + totalAmount.toFixed(tickDecimals + 1))
+      .attr('transform', `translate(${innerWidth - maxLabelWidth},16)`)
   }
 
   function hideMouseProjections() {
@@ -431,16 +459,10 @@ function OrderBookChart({
           </g>
           <g className="y-axis-mouse-projection hidden text-xs">
             <line x1={margin.left} x2={innerWidth} y1="0" y2="0" />
-            <rect x={innerWidth - 44} y="-22" width="150" height="44" rx="3" />
-            <text id="line1" transform={`translate(${innerWidth - 40},-8)`}>
-              line 1
-            </text>
-            <text id="line2" transform={`translate(${innerWidth - 40},4)`}>
-              line 2
-            </text>
-            <text id="line3" transform={`translate(${innerWidth - 40},16)`}>
-              line 3
-            </text>
+            <rect x={innerWidth - 44} y="-22" width="300" height="44" rx="3" />
+            <text id="line1" />
+            <text id="line2" />
+            <text id="line3" />
           </g>
         </g>
       </svg>

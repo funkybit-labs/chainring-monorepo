@@ -86,6 +86,8 @@
   font-family: sans-serif;
 }
 
+.order-book{}
+
 svg text {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
