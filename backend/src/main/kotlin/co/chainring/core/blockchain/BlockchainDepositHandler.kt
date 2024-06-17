@@ -8,6 +8,7 @@ import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BalanceType
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
+import co.chainring.core.model.db.DepositTable
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.sequencer.SequencerClient
@@ -16,7 +17,9 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.reactivex.Flowable
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import org.web3j.crypto.Keys
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.DefaultBlockParameterName
@@ -134,7 +137,7 @@ class BlockchainDepositHandler(
         }
 
         if (confirmedDeposits.isNotEmpty()) {
-            confirmedDeposits.forEach(::sendToSequencerAndComplete)
+            confirmedDeposits.forEach(::sendToSequencer)
         }
     }
 
@@ -164,12 +167,20 @@ class BlockchainDepositHandler(
         }
     }
 
-    private fun sendToSequencerAndComplete(deposit: DepositEntity) {
+    private fun sendToSequencer(deposit: DepositEntity) {
         try {
             runBlocking {
                 sequencerClient.deposit(deposit.wallet.sequencerId.value, Asset(deposit.symbol.name), deposit.amount, deposit.guid.value)
             }
-            deposit.update(DepositStatus.Complete)
+            // Updating like this in case SequencerResponseProcessor sets status to Complete before we commit this transaction
+            DepositTable.update(
+                where = {
+                    DepositTable.guid.eq(deposit.guid).and(DepositTable.status.eq(DepositStatus.Confirmed))
+                },
+                body = {
+                    it[status] = DepositStatus.SentToSequencer
+                },
+            )
         } catch (e: Exception) {
             logger.error(e) { "Failed to notify Sequencer about deposit ${deposit.guid}" }
         }

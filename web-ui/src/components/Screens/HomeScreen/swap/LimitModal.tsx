@@ -6,13 +6,10 @@ import { Address, formatUnits } from 'viem'
 import { SymbolSelector } from 'components/Screens/HomeScreen/SymbolSelector'
 import AmountInput from 'components/common/AmountInput'
 import { classNames } from 'utils'
-import { useWeb3Modal } from '@web3modal/wagmi/react'
 
-import { useConfig, useSwitchChain } from 'wagmi'
+import { useConfig } from 'wagmi'
 import SwapIcon from 'assets/Swap.svg'
 import SubmitButton from 'components/common/SubmitButton'
-import { Button } from 'components/common/Button'
-import { allChains } from 'wagmiConfig'
 import DepositModal from 'components/Screens/HomeScreen/DepositModal'
 import { useMeasure } from 'react-use'
 import {
@@ -22,6 +19,8 @@ import {
 import { bigintToScaledDecimal, scaledDecimalToBigint } from 'utils/pricesUtils'
 import Decimal from 'decimal.js'
 import { ExpandableValue } from 'components/common/ExpandableNumber'
+import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
+import { useSwitchToEthChain } from 'utils/switchToEthChain'
 
 export function LimitModal({
   markets,
@@ -49,33 +48,13 @@ export function LimitModal({
   const [depositSymbol, setDepositSymbol] = useState<TradingSymbol | null>(null)
   const [showDepositModal, setShowDepositModal] = useState<boolean>(false)
   const config = useConfig()
-  const [switchToChainId, setSwitchToChainId] = useState<number | null>(null)
-  const { switchChain } = useSwitchChain()
-
-  useEffect(() => {
-    if (switchToChainId) {
-      const chain = allChains.find((c) => c.id == switchToChainId)
-      chain &&
-        switchChain({
-          addEthereumChainParameter: {
-            chainName: chain.name,
-            nativeCurrency: chain.nativeCurrency,
-            rpcUrls: chain.rpcUrls.default.http,
-            blockExplorerUrls: chain.blockExplorers
-              ? [chain.blockExplorers.default.url]
-              : undefined
-          },
-          chainId: chain.id
-        })
-    }
-    setSwitchToChainId(null)
-  }, [switchToChainId, switchChain])
+  const switchToEthChain = useSwitchToEthChain()
 
   function openDepositModal(symbol: TradingSymbol) {
     setDepositSymbol(symbol)
     setShowDepositModal(true)
     if (symbol.chainId != config.state.chainId) {
-      setSwitchToChainId(symbol.chainId)
+      switchToEthChain(symbol.chainId)
     }
   }
 
@@ -90,7 +69,6 @@ export function LimitModal({
     Renderer: function (sr: SwapRender) {
       const sellAmountInputRef = useRef<HTMLInputElement>(null)
       const config = useConfig()
-      const { open: openWalletConnectModal } = useWeb3Modal()
       const [marketPriceInverted, setMarketPriceInverted] = useState(false)
 
       const marketPrice = useMemo(() => {
@@ -156,7 +134,10 @@ export function LimitModal({
               <div className="mb-2 flex flex-row justify-between">
                 <span className="text-base text-darkBluishGray1">Sell</span>
                 <div className="flex flex-row items-baseline space-x-2 text-sm">
-                  {depositAmount(sr.topBalance, sr.topSymbol)}
+                  {depositAmount(
+                    exchangeContractAddress && sr.topBalance,
+                    sr.topSymbol
+                  )}
                   {walletAddress && exchangeContractAddress && (
                     <button
                       className="rounded bg-darkBluishGray6 px-2 py-1 text-darkBluishGray2 hover:bg-blue5"
@@ -267,7 +248,10 @@ export function LimitModal({
               <div className="mb-2 flex flex-row justify-between">
                 <span className="text-base text-darkBluishGray1">Buy</span>
                 <div className="flex flex-row space-x-2 align-middle text-sm">
-                  {depositAmount(sr.bottomBalance, sr.bottomSymbol)}
+                  {depositAmount(
+                    exchangeContractAddress && sr.bottomBalance,
+                    sr.bottomSymbol
+                  )}
                 </div>
               </div>
               <div>
@@ -387,15 +371,9 @@ export function LimitModal({
                   />
                 </>
               ) : (
-                <div className="mt-4">
-                  <Button
-                    caption={() => <>Connect Wallet</>}
-                    onClick={() => openWalletConnectModal({ view: 'Connect' })}
-                    disabled={false}
-                    primary={true}
-                    style={'full'}
-                  />
-                </div>
+                <ConnectWallet
+                  onSwitchToChain={(chainId) => switchToEthChain(chainId)}
+                />
               )}
             </div>
           </div>

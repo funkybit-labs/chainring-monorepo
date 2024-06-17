@@ -11,12 +11,12 @@ import { ordersTopic, Publishable, tradesTopic } from 'websocketMessages'
 import { CancelOrderModal } from 'components/Screens/HomeScreen/CancelOrderModal'
 import { Status } from 'components/common/Status'
 import Trash from 'assets/Trash.svg'
-import { Button } from 'components/common/Button'
-import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { SymbolAndChain } from 'components/common/SymbolAndChain'
 import Decimal from 'decimal.js'
 import { scaledDecimalToBigint } from 'utils/pricesUtils'
 import { ExpandableValue } from 'components/common/ExpandableNumber'
+import { useSwitchToEthChain } from 'utils/switchToEthChain'
+import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 
 type Tab = 'Orders' | 'Trade History'
 
@@ -34,7 +34,7 @@ export default function OrdersAndTradesWidget({
   const [showCancelModal, setShowCancelModal] = useState<boolean>(false)
   const [trades, setTrades] = useState<Trade[]>(() => [])
   const [selectedTab, setSelectedTab] = useState<Tab>('Orders')
-  const { open: openWalletConnectModal } = useWeb3Modal()
+  const switchToEthChain = useSwitchToEthChain()
 
   useWebsocketSubscription({
     topics: useMemo(() => [ordersTopic, tradesTopic], []),
@@ -398,12 +398,8 @@ export default function OrdersAndTradesWidget({
                   {selectedTab === 'Orders' ? 'orders' : 'trade history'},
                   connect your wallet.
                 </div>
-                <Button
-                  primary={true}
-                  caption={() => <>Connect Wallet</>}
-                  style={'normal'}
-                  disabled={false}
-                  onClick={() => openWalletConnectModal({ view: 'Connect' })}
+                <ConnectWallet
+                  onSwitchToChain={(chainId) => switchToEthChain(chainId)}
                 />
               </div>
             )}

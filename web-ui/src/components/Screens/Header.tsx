@@ -8,6 +8,7 @@ import Markets from 'markets'
 import Menu from 'assets/Menu.svg'
 import { FaucetModal } from 'components/Screens/HomeScreen/faucet/FaucetModal'
 import faucetIcon from 'assets/faucet.svg'
+import { useValidChain } from 'hooks/useValidChain'
 
 export type Tab = 'Swap' | 'Limit' | 'Dashboard'
 
@@ -50,12 +51,16 @@ export function Header({
     }
   }, [showMenu])
 
+  const validChain = useValidChain()
+
   function walletConnector() {
     return (
-      <span className="ml-5 whitespace-nowrap">
+      <div className="ml-5 whitespace-nowrap">
         {account.isConnected ? (
           <Button
-            style={'normal'}
+            style={validChain ? 'normal' : 'warning'}
+            width={'normal'}
+            tooltip={validChain ? undefined : 'INVALID CHAIN'}
             caption={() => (
               <span>
                 {icon && (
@@ -75,6 +80,7 @@ export function Header({
         ) : tab === 'Dashboard' ? (
           <Button
             style={'normal'}
+            width={'normal'}
             caption={() => <>Connect Wallet</>}
             onClick={() => openWalletConnectModal({ view: 'Connect' })}
             primary={true}
@@ -83,7 +89,7 @@ export function Header({
         ) : (
           <div className="w-[152px]" />
         )}
-      </span>
+      </div>
     )
   }
 
@@ -93,6 +99,7 @@ export function Header({
         {faucetEnabled && account.isConnected ? (
           <Button
             style={'normal'}
+            width={'normal'}
             caption={() => (
               <span className="flex">
                 <img className="h-5 pr-2" src={faucetIcon} alt="Faucet" />

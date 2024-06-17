@@ -17,7 +17,7 @@ object RequestProcessingExceptionHandler {
                     next(request)
                 } catch (e: Exception) {
                     when (e) {
-                        is RequestProcessingError -> e.errorResponse
+                        is RequestProcessingError -> errorResponse(e.httpStatus, e.error)
                         else -> {
                             logger.error(e) { "Exception during request processing. Request: ${request.method.name} ${request.uri}" }
                             errorResponse(

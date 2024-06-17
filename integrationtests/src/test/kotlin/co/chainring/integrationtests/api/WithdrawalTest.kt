@@ -4,8 +4,6 @@ import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.CreateDepositApiRequest
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
-import co.chainring.core.client.ws.blocking
-import co.chainring.core.client.ws.subscribeToBalances
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.WithdrawalEntity
@@ -23,6 +21,8 @@ import co.chainring.integrationtests.utils.assertBalances
 import co.chainring.integrationtests.utils.assertBalancesMessageReceived
 import co.chainring.integrationtests.utils.assertError
 import co.chainring.integrationtests.utils.assertMessagesReceived
+import co.chainring.integrationtests.utils.blocking
+import co.chainring.integrationtests.utils.subscribeToBalances
 import co.chainring.tasks.fixtures.toChainSymbol
 import org.http4k.client.WebsocketClient
 import org.jetbrains.exposed.sql.transactions.transaction

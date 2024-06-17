@@ -30,11 +30,11 @@ object ChainSettlementBatchTable : GUIDTable<ChainSettlementBatchId>("chain_sett
         { value -> SettlementBatchStatus.valueOf(value as String) },
         { PGEnum("SettlementBatchStatus", it) },
     ).index()
-    val chainId = reference("chain_id", ChainTable)
+    val chainId = reference("chain_id", ChainTable).index()
     val settlementBatchGuid = reference(
         "settlement_batch_guid",
         SettlementBatchTable,
-    )
+    ).index()
     val preparationTxGuid = reference(
         "preparation_tx_guid",
         BlockchainTransactionTable,

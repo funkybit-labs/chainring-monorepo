@@ -82,6 +82,9 @@ object ChainManager {
 
     fun getBlockchainClients() = blockchainClientsByChainId.values.toList()
 
+    fun getBlockchainClient(chainId: ChainId): BlockchainClient =
+        blockchainClientsByChainId.getValue(chainId)
+
     fun getBlockchainClient(chainId: ChainId, privateKeyHex: String) = BlockchainClient(
         blockchainClientsByChainId.getValue(chainId).config.copy(privateKeyHex = privateKeyHex),
     )

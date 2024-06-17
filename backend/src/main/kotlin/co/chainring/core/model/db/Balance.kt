@@ -8,6 +8,7 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.dao.with
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
@@ -165,19 +166,25 @@ class BalanceEntity(guid: EntityID<BalanceId>) : GUIDEntity<BalanceId>(guid) {
             }
         }
 
-        fun getBalances(walletIds: List<WalletId>, symbolIds: List<SymbolId>, balanceType: BalanceType): List<BalanceEntity> {
+        fun getBalances(walletIds: List<WalletId>, symbolIds: List<SymbolId>, type: BalanceType): List<BalanceEntity> {
             return BalanceEntity.find {
                 BalanceTable.walletGuid.inList(walletIds) and
                     BalanceTable.symbolGuid.inList(symbolIds) and
-                    BalanceTable.type.eq(balanceType)
-            }.toList()
+                    BalanceTable.type.eq(type)
+            }.with(BalanceEntity::symbol).toList()
         }
 
-        fun getBalancesForWallet(walletEntity: WalletEntity): List<BalanceEntity> {
-            return BalanceEntity.find {
-                BalanceTable.walletGuid.eq(walletEntity.guid)
-            }.toList()
-        }
+        fun getBalancesForWallet(wallet: WalletEntity): List<BalanceEntity> =
+            BalanceEntity.find {
+                BalanceTable.walletGuid.eq(wallet.guid)
+            }.with(BalanceEntity::symbol).toList()
+
+        fun findForWalletAndSymbol(wallet: WalletEntity, symbol: SymbolEntity, type: BalanceType): BalanceEntity? =
+            BalanceEntity.find {
+                BalanceTable.walletGuid.eq(wallet.guid)
+                    .and(BalanceTable.symbolGuid.eq(symbol.guid))
+                    .and(BalanceTable.type.eq(type))
+            }.singleOrNull()
     }
 
     var createdAt by BalanceTable.createdAt

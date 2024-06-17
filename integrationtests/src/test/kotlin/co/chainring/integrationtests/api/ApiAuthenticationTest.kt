@@ -3,12 +3,12 @@ package co.chainring.integrationtests.api
 import arrow.core.Either
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ReasonCode
-import co.chainring.core.client.rest.ApiCallFailure
-import co.chainring.core.client.rest.ApiClient
-import co.chainring.core.client.rest.empty
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
+import co.chainring.integrationtests.utils.ApiCallFailure
+import co.chainring.integrationtests.utils.ApiClient
 import co.chainring.integrationtests.utils.assertError
 import co.chainring.integrationtests.utils.assertSuccess
+import co.chainring.integrationtests.utils.empty
 import kotlinx.datetime.Clock
 import okhttp3.Headers
 import okhttp3.Headers.Companion.toHeaders

@@ -9,8 +9,8 @@ import Spinner from 'components/common/Spinner'
 import { BalancesTable } from 'components/Screens/HomeScreen/balances/BalancesTable'
 import { WithdrawalsTable } from 'components/Screens/HomeScreen/balances/WithdrawalsTable'
 import { DepositsTable } from 'components/Screens/HomeScreen/balances/DepositsTable'
-import { Button } from 'components/common/Button'
-import { useWeb3Modal } from '@web3modal/wagmi/react'
+import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
+import { useSwitchToEthChain } from 'utils/switchToEthChain'
 
 export const withdrawalsQueryKey = ['withdrawals']
 export const depositsQueryKey = ['deposits']
@@ -27,7 +27,6 @@ export default function BalancesWidget({
   symbols: TradingSymbols
 }) {
   const [selectedTab, setSelectedTab] = useState<Tab>('Available')
-  const { open: openWalletConnectModal } = useWeb3Modal()
 
   const depositsQuery = useQuery({
     queryKey: depositsQueryKey,
@@ -56,6 +55,8 @@ export default function BalancesWidget({
           (w) => w.status == 'Pending'
         ).length
   }, [withdrawalsQuery.data, walletAddress])
+
+  const switchToEthChain = useSwitchToEthChain()
 
   return (
     <Widget
@@ -149,12 +150,8 @@ export default function BalancesWidget({
                       : 'withdrawals'}
                   , connect your wallet.
                 </div>
-                <Button
-                  primary={true}
-                  caption={() => <>Connect Wallet</>}
-                  style={'normal'}
-                  disabled={false}
-                  onClick={() => openWalletConnectModal({ view: 'Connect' })}
+                <ConnectWallet
+                  onSwitchToChain={(chainId) => switchToEthChain(chainId)}
                 />
               </div>
             )}

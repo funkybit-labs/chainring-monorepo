@@ -2,13 +2,6 @@ package co.chainring.integrationtests.testutils
 
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.SymbolInfo
-import co.chainring.core.client.ws.blocking
-import co.chainring.core.client.ws.subscribeToBalances
-import co.chainring.core.client.ws.subscribeToLimits
-import co.chainring.core.client.ws.subscribeToOrderBook
-import co.chainring.core.client.ws.subscribeToOrders
-import co.chainring.core.client.ws.subscribeToPrices
-import co.chainring.core.client.ws.subscribeToTrades
 import co.chainring.core.model.db.BlockchainTransactionStatus
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.ChainSettlementBatchEntity
@@ -35,6 +28,13 @@ import co.chainring.integrationtests.utils.assertOrderBookMessageReceived
 import co.chainring.integrationtests.utils.assertOrdersMessageReceived
 import co.chainring.integrationtests.utils.assertPricesMessageReceived
 import co.chainring.integrationtests.utils.assertTradesMessageReceived
+import co.chainring.integrationtests.utils.blocking
+import co.chainring.integrationtests.utils.subscribeToBalances
+import co.chainring.integrationtests.utils.subscribeToLimits
+import co.chainring.integrationtests.utils.subscribeToOrderBook
+import co.chainring.integrationtests.utils.subscribeToOrders
+import co.chainring.integrationtests.utils.subscribeToPrices
+import co.chainring.integrationtests.utils.subscribeToTrades
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.WsClient
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq

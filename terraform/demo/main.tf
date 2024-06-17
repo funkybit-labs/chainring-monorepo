@@ -28,6 +28,7 @@ module "api" {
   source            = "../modules/ecs_task"
   name_prefix       = local.name_prefix
   task_name         = "api"
+  include_command   = true
   image             = "backend"
   cpu               = 2048
   memory            = 4096
@@ -52,6 +53,7 @@ module "ring" {
   source                                  = "../modules/ecs_task"
   name_prefix                             = local.name_prefix
   task_name                               = "ring"
+  include_command                         = true
   image                                   = "backend"
   cpu                                     = 2048
   memory                                  = 4096
@@ -69,7 +71,8 @@ module "telegrambot" {
   source                                  = "../modules/ecs_task"
   name_prefix                             = local.name_prefix
   task_name                               = "telegrambot"
-  image                                   = "telegrambot"
+  include_command                         = true
+  image                                   = "backend"
   cpu                                     = 2048
   memory                                  = 4096
   ecs_cluster_id                          = module.ecs.cluster.id

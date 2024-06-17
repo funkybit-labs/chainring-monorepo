@@ -4,7 +4,6 @@ import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.RequestStatus
-import co.chainring.core.client.ws.subscribeToOrderBook
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Percentage
 import co.chainring.core.model.db.ChainId
@@ -24,6 +23,7 @@ import co.chainring.integrationtests.utils.assertOrderUpdatedMessageReceived
 import co.chainring.integrationtests.utils.assertTradeCreatedMessageReceived
 import co.chainring.integrationtests.utils.inFundamentalUnits
 import co.chainring.integrationtests.utils.ofAsset
+import co.chainring.integrationtests.utils.subscribeToOrderBook
 import co.chainring.integrationtests.utils.sum
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.extension.ExtendWith
