@@ -5,7 +5,6 @@ import {
   Direction,
   LastTrade,
   OrderBook,
-  OrderBookEntry,
   orderBookTopic,
   Publishable
 } from 'websocketMessages'
@@ -20,6 +19,7 @@ import TradingSymbol from 'tradingSymbol'
 import SymbolIcon from 'components/common/SymbolIcon'
 
 interface OrderBookChartEntry {
+  tickSize: Decimal
   price: Decimal
   buySize: Decimal
   sellSize: Decimal
@@ -44,58 +44,113 @@ export function OrderBookWidget({
     }, [])
   })
 
-  function invertPrices(entries: OrderBookEntry[]): OrderBookEntry[] {
-    return entries.map((entry) => {
-      const price = parseFloat(entry.price)
-      const [integerPart] = entry.price.split('.')
-      return {
-        price: (1.0 / price).toFixed(4 + integerPart.length),
-        size: entry.size * price
-      }
-    })
-  }
-
-  function invertLast(last: LastTrade): LastTrade {
-    return {
-      price: (1.0 / parseFloat(last.price)).toFixed(6),
-      direction:
-        last.direction === 'Up'
-          ? 'Down'
-          : last.direction === 'Down'
-            ? 'Up'
-            : 'Unchanged'
-    }
-  }
-
-  const orderBook = useMemo(() => {
-    if (side === 'Sell') {
-      if (rawOrderBook) {
+  const orderBookChartEntries: OrderBookChartEntry[] = useMemo(() => {
+    function invertChartEntryPrices(
+      entries: OrderBookChartEntry[]
+    ): OrderBookChartEntry[] {
+      return entries.map((entry) => {
         return {
-          type: rawOrderBook.type,
-          buy: invertPrices(rawOrderBook.sell).toReversed(),
-          sell: invertPrices(rawOrderBook.buy).toReversed(),
-          last: invertLast(rawOrderBook.last)
+          tickSize: invertTickSize(market.tickSize, entry.price),
+          price: new Decimal(1)
+            .div(entry.price)
+            .toDecimalPlaces(4 + entry.price.toFixed(0).length),
+          buySize: entry.sellSize.mul(entry.price),
+          sellSize: entry.buySize.mul(entry.price)
         }
-      } else {
-        return rawOrderBook
-      }
-    } else {
-      return rawOrderBook
+      })
     }
-  }, [rawOrderBook, side])
 
-  const tickSize: undefined | Decimal = useMemo(() => {
-    if (side === 'Sell') {
-      if (rawOrderBook) {
-        const lastPrice = parseFloat(rawOrderBook.last.price)
-        return new Decimal(
-          1 / lastPrice - 1 / (lastPrice + market.tickSize.toNumber())
-        )
+    function invertTickSize(tickSize: Decimal, price: Decimal): Decimal {
+      const currentReciprocalPrice = new Decimal(1).div(price)
+      const nextReciprocalPrice = new Decimal(1).div(price.plus(tickSize))
+      return new Decimal(
+        currentReciprocalPrice.minus(nextReciprocalPrice)
+      ).toDecimalPlaces(10)
+      // Inverted tick size used to calculate order book bar height on the reciprocal scale. Therefore high precision is required.
+    }
+
+    if (rawOrderBook) {
+      // find out min and max price
+      let minBuyPrice = rawOrderBook.buy.reduce(
+        (min, d) => Decimal.min(min, new Decimal(d.price)),
+        new Decimal(rawOrderBook.last.price)
+      )
+      let maxSellPrice = rawOrderBook.sell.reduce(
+        (max, d) => Decimal.max(max, new Decimal(d.price)),
+        new Decimal(rawOrderBook.last.price)
+      )
+
+      // add 2 ticks on both sides as buffer area
+      minBuyPrice = minBuyPrice.minus(market.tickSize.mul(new Decimal(2)))
+      maxSellPrice = maxSellPrice.plus(market.tickSize.mul(new Decimal(2)))
+
+      let price = minBuyPrice
+      const allPriceLevels: Decimal[] = []
+      while (price.lessThanOrEqualTo(maxSellPrice)) {
+        allPriceLevels.push(price)
+        price = price.plus(market.tickSize)
+      }
+
+      // inflate order book to have a record for every level
+      // this is needed for an inverted order book where the scale becomes non-linear (1/price)
+      const allLevelAmounts: OrderBookChartEntry[] = allPriceLevels.map(
+        (price) => {
+          const buyEntry = rawOrderBook.buy.find((d) =>
+            new Decimal(d.price).eq(price)
+          ) || {
+            price,
+            size: 0
+          }
+          const sellEntry = rawOrderBook.sell.find((d) =>
+            new Decimal(d.price).eq(price)
+          ) || {
+            price,
+            size: 0
+          }
+          return {
+            tickSize: market.tickSize,
+            price: price,
+            buySize: new Decimal(buyEntry.size),
+            sellSize: new Decimal(sellEntry.size)
+          }
+        }
+      )
+
+      // and invert prices when needed
+      if (side === 'Sell') {
+        return invertChartEntryPrices(allLevelAmounts)
       } else {
-        return market.tickSize
+        return allLevelAmounts
       }
     } else {
-      return market.tickSize
+      return []
+    }
+  }, [market.tickSize, rawOrderBook, side])
+
+  const orderBookLastTrade: LastTrade | undefined = useMemo(() => {
+    function invertLast(last: LastTrade): LastTrade {
+      const lastPrice = parseFloat(last.price)
+      return {
+        price: (1.0 / lastPrice).toFixed(
+          market.tickSize.decimalPlaces() + lastPrice.toFixed(0).length + 1
+        ),
+        direction:
+          last.direction === 'Up'
+            ? 'Down'
+            : last.direction === 'Down'
+              ? 'Up'
+              : 'Unchanged'
+      }
+    }
+
+    if (rawOrderBook) {
+      if (side === 'Sell') {
+        return invertLast(rawOrderBook.last)
+      } else {
+        return rawOrderBook.last
+      }
+    } else {
+      return undefined
     }
   }, [market.tickSize, rawOrderBook, side])
 
@@ -104,16 +159,22 @@ export function OrderBookWidget({
       id="order-book"
       wrapperRef={ref}
       contents={
-        orderBook ? (
-          orderBook.buy.length === 0 && orderBook.sell.length === 0 ? (
+        rawOrderBook && orderBookChartEntries && orderBookLastTrade ? (
+          rawOrderBook.buy.length === 0 && rawOrderBook.sell.length === 0 ? (
             <div className="text-center">Empty</div>
           ) : (
             <OrderBookChart
-              tickSize={tickSize}
+              tickDecimals={
+                side === 'Sell'
+                  ? market.tickSize.decimalPlaces() +
+                    rawOrderBook.last.price.split('.')[0].length
+                  : market.tickSize.decimalPlaces()
+              }
               quantitySymbol={
                 side === 'Sell' ? market.quoteSymbol : market.baseSymbol
               }
-              orderBook={orderBook}
+              orderBook={orderBookChartEntries}
+              lastTrade={orderBookLastTrade}
               width={Math.max(width - 40, 0)}
               height={465}
             />
@@ -139,36 +200,39 @@ function directionStyle(direction: Direction) {
 
 function OrderBookChart({
   orderBook,
-  tickSize,
+  lastTrade,
+  tickDecimals,
   quantitySymbol,
   width,
   height
 }: {
-  orderBook: OrderBook
-  tickSize: Decimal
+  orderBook: OrderBookChartEntry[]
+  lastTrade: LastTrade
+  tickDecimals: number
   quantitySymbol: TradingSymbol | undefined
   width: number
   height: number
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
-  const svg = d3.select(svgRef.current).attr('shape-rendering', 'crispEdges')
 
-  const tickDecimals = tickSize.decimalPlaces()
-  console.log('tickDecimals', tickDecimals)
+  // Rendered order book levels are sub-pixel separated. It's caused by anti-aliasing and can be avoided by specifying `shape-rendering`
+  const svg = d3.select(svgRef.current) //.attr('shape-rendering', 'crispEdges')
 
-  // measure actual last price label width to determine left margin
-  const tempText = svg
+  // Add lastTrade.price to the hidden component on y-axis to measure actual width applied styles.
+  // The resulting measured width is used to calculate dynamically left margin.
+  // This way in an alternative to using fixed number of pixels per symbol.
+  const measuredText = svg
     .select('.y-axis')
     .append('text')
     .style('visibility', 'hidden')
-    .text(orderBook.last.price)
-  const maxLabelWidth = tempText.node()?.getBBox().width ?? 35
-  tempText.remove()
+    .text(lastTrade.price)
+  const lastPriceLabelWidth = measuredText.node()?.getBBox().width ?? 0
+  measuredText.remove()
 
   const margin = {
     top: 20,
     bottom: 0,
-    left: maxLabelWidth + 10,
+    left: lastPriceLabelWidth + 10,
     right: 0
   }
   const innerWidth = width - margin.left - margin.right
@@ -179,93 +243,94 @@ function OrderBookChart({
   const lastMousePointerLocation = useRef({ mouseX: 0, mouseY: 0 })
   const updateMouseProjections = useCallback(
     (mouseX: number, mouseY: number) => {
-      lastMousePointerLocation.current = { mouseX: mouseX, mouseY: mouseY } // save position for passive update
+      lastMousePointerLocation.current = { mouseX: mouseX, mouseY: mouseY } // save position for passive updates (y-axis domain change)
 
-      const tickSizeNumber = tickSize.toNumber()
-      const price = yScale.invert(mouseY - margin.top)
+      function findNearestPriceLevel(
+        entries: OrderBookChartEntry[],
+        mouseY: number,
+        yScale: d3.ScaleLinear<number, number>
+      ): OrderBookChartEntry {
+        const mousePrice = new Decimal(
+          yScale.invert(mouseY - margin.top).toFixed(10)
+        )
 
-      const levelPrice = new Decimal(Math.round(price / tickSizeNumber)).mul(
-        tickSizeNumber
+        return entries.reduce((nearest, current) => {
+          const nearestDistance = mousePrice.minus(nearest.price).abs()
+          const currentDistance = mousePrice.minus(current.price).abs()
+
+          return currentDistance.lessThan(nearestDistance) ? current : nearest
+        }, entries[0])
+      }
+
+      const nearestPriceLevel = findNearestPriceLevel(orderBook, mouseY, yScale)
+      const levelAmount = Decimal.max(
+        nearestPriceLevel.sellSize,
+        nearestPriceLevel.buySize
       )
 
-      let levelAmount = 0
-      let totalAmount = 0
-
-      if (levelPrice >= new Decimal(orderBook.last.price)) {
-        const level = orderBook.sell.find((d) =>
-          new Decimal(d.price).eq(levelPrice)
-        )
-        levelAmount = level ? level.size : 0
-
-        const levels = orderBook.sell.filter((d) =>
-          new Decimal(d.price).lte(levelPrice)
-        )
-        totalAmount = levels.reduce((acc, d) => acc + d.size, 0)
+      let totalAmount = new Decimal(0)
+      if (nearestPriceLevel.price.gt(new Decimal(lastTrade.price))) {
+        totalAmount = orderBook
+          .filter((d) => d.price.lte(nearestPriceLevel.price))
+          .reduce((acc, d) => acc.plus(d.sellSize), new Decimal(0))
       }
-      if (levelPrice <= new Decimal(orderBook.last.price)) {
-        const level = orderBook.buy.find((d) =>
-          new Decimal(d.price).eq(levelPrice)
-        )
-        levelAmount = level ? level.size : 0
-
-        const levels = orderBook.buy.filter((d) =>
-          new Decimal(d.price).gte(levelPrice)
-        )
-        totalAmount = levels.reduce((acc, d) => acc + d.size, 0)
+      if (nearestPriceLevel.price.lt(new Decimal(lastTrade.price))) {
+        totalAmount = orderBook
+          .filter((d) => d.price.gte(nearestPriceLevel.price))
+          .reduce((acc, d) => acc.plus(d.buySize), new Decimal(0))
       }
 
-      const tempText = svg
-        .select('.y-axis-mouse-projection')
+      const svgMouseProjection = svg.select('.y-axis-mouse-projection')
+      const formattedLevelAmount = levelAmount.toFixed(tickDecimals + 1)
+
+      // Add formatted level amount to the hidden component (styles are applied) to measure actual width.
+      // Component is removed after measurement is done. The resulting width is used below to position labels.
+      // This way is an alternative to using fixed number of pixels per symbol.
+      const measuredText = svgMouseProjection
         .append('text')
         .style('visibility', 'hidden')
-        .text(levelAmount.toFixed(tickDecimals + 1))
-      const maxLabelWidth = (tempText.node()?.getBBox().width ?? 35) * 0.95 + 7
-      tempText.remove()
+        .text(formattedLevelAmount)
+      const labelWidth = (measuredText.node()?.getBBox().width ?? 0) * 0.95 // take 95% of calculated width
+      measuredText.remove()
 
-      const tooltip = svg
-        .select('.y-axis-mouse-projection')
+      const tooltip = svgMouseProjection
         .classed('hidden', mouseY < margin.top)
         .attr(
           'transform',
-          `translate(0,${yScale(levelPrice.toNumber()) + margin.top})`
+          `translate(0,${
+            yScale(nearestPriceLevel.price.toNumber()) + margin.top
+          })`
         )
-      tooltip.select('rect').attr('x', `${innerWidth - maxLabelWidth - 6}`)
+      tooltip.select('rect').attr('x', `${innerWidth - labelWidth - 10}`)
       tooltip
         .select('text#line1')
-        .text('Price ' + levelPrice.toFixed(tickDecimals))
-        .attr('transform', `translate(${innerWidth - maxLabelWidth},-8)`)
+        .text('Price ' + nearestPriceLevel.price.toFixed(tickDecimals))
+        .attr('transform', `translate(${innerWidth - labelWidth - 4},-8)`)
       tooltip
         .select('text#line2')
         .text('Amount ' + levelAmount.toFixed(tickDecimals + 1))
-        .attr('transform', `translate(${innerWidth - maxLabelWidth},4)`)
+        .attr('transform', `translate(${innerWidth - labelWidth - 4},4)`)
       tooltip
         .select('text#line3')
         .text('Total ' + totalAmount.toFixed(tickDecimals + 1))
-        .attr('transform', `translate(${innerWidth - maxLabelWidth},16)`)
+        .attr('transform', `translate(${innerWidth - labelWidth - 4},16)`)
     },
-    [innerWidth, margin.top, orderBook, svg, tickDecimals, tickSize, yScale]
+    [innerWidth, lastTrade, margin.top, orderBook, svg, tickDecimals, yScale]
   )
 
   const drawChart = useCallback(() => {
-    const prices = orderBook.buy
-      .map((d) => parseFloat(d.price))
-      .concat(orderBook.sell.map((d) => parseFloat(d.price)))
-    const maxAmount = d3.max(
-      orderBook.buy.concat(orderBook.sell),
-      (d) => d.size
+    const minPrice = d3.min(orderBook, (d) => d.price.toNumber())!
+    const maxPrice = d3.max(orderBook, (d) => d.price.toNumber())!
+    const maxAmount = d3.max(orderBook, (d) =>
+      Decimal.max(d.buySize, d.sellSize).toNumber()
     )!
 
     const xScale = d3
       .scaleLinear()
-      .domain([0, maxAmount * 1.05])
+      .domain([0, maxAmount * 1.2]) // add 20% to x-scale's domain, it looks nicer
       .range([0, innerWidth])
 
-    yScale
-      .domain([
-        d3.min(prices)! - tickSize.toNumber() * 2,
-        d3.max(prices)! + tickSize.toNumber() * 2
-      ])
-      .range([innerHeight, 0])
+    yScale.domain([minPrice, maxPrice]).range([innerHeight, 0])
 
     const xAxis = d3
       .axisTop(xScale)
@@ -280,9 +345,7 @@ function OrderBookChart({
       .tickSizeInner(0)
       .tickPadding(10)
       .ticks(7)
-      .tickFormat((d: d3.NumberValue) => {
-        return d.valueOf().toFixed(tickDecimals)
-      })
+      .tickFormat((d: d3.NumberValue) => d.valueOf().toFixed(tickDecimals))
 
     // @ts-expect-error @definitelytyped/no-unnecessary-generics
     svg.select('.x-axis').call(xAxis)
@@ -290,97 +353,58 @@ function OrderBookChart({
     svg.select('.y-axis').call(yAxis)
 
     // update last price tracker
-    const lastPriceStyle = directionStyle(orderBook.last.direction)
+    const lastPriceStyle = directionStyle(lastTrade.direction)
     const lastPriceGroup = svg
       .select('.y-axis-order-book-last-price')
-      .classed('hidden', !orderBook.last.price)
+      .classed('hidden', !lastTrade.price)
       .transition()
       .duration(150)
-      .attr(
-        'transform',
-        `translate(0,${yScale(parseFloat(orderBook.last.price))})`
-      )
+      .attr('transform', `translate(0,${yScale(parseFloat(lastTrade.price))})`)
     lastPriceGroup
       .select('text')
-      .text(orderBook.last.price)
+      .text(lastTrade.price)
       .attr('fill', lastPriceStyle.textColor)
 
     // draw levels
-    const barHeight = absDistanceOnAxis(
-      tickSize.toNumber(),
-      tickSize.toNumber() * 2,
-      yScale
-    )
-
-    const minBuyPrice = orderBook.buy.reduce(
-      (min, d) => Decimal.min(min, new Decimal(d.price)),
-      new Decimal(orderBook.last.price)
-    )
-    const maxSellPrice = orderBook.sell.reduce(
-      (max, d) => Decimal.max(max, new Decimal(d.price)),
-      new Decimal(orderBook.last.price)
-    )
-    let price = minBuyPrice
-    const allPriceLevels: Decimal[] = []
-    while (price.lessThanOrEqualTo(maxSellPrice)) {
-      allPriceLevels.push(price)
-      price = price.plus(tickSize)
+    function barHeight(
+      from: number,
+      to: number,
+      scale: d3.ScaleLinear<number, number>
+    ): number {
+      return Math.abs(scale(from) - scale(to))
     }
-
-    // Create full data set with buy and sell amounts
-    const fullData: OrderBookChartEntry[] = allPriceLevels.map((price) => {
-      const buyEntry = orderBook.buy.find((d) =>
-        new Decimal(d.price).eq(price)
-      ) || {
-        price,
-        size: 0
-      }
-      const sellEntry = orderBook.sell.find((d) =>
-        new Decimal(d.price).eq(price)
-      ) || {
-        price,
-        size: 0
-      }
-      return {
-        price,
-        buySize: new Decimal(buyEntry.size),
-        sellSize: new Decimal(sellEntry.size)
-      }
-    })
 
     const bars = svg
       .selectAll('.order-book')
       .selectAll('.order-bar')
-      .data(fullData, (d) =>
-        (d as OrderBookChartEntry).price.toFixed(tickDecimals + 1)
-      )
-
+      .data(orderBook, (d) => (d as OrderBookChartEntry).price.toString())
     bars.exit().remove()
-
-    const barsEnter = bars.enter().append('g').attr('class', 'order-bar')
-    barsEnter
+    bars
+      .enter()
+      .append('g')
+      .attr('class', 'order-bar')
       .append('rect')
-      .attr('class', 'buy')
-      .merge(bars.select('.buy'))
+      .attr('class', 'bar')
+      .merge(bars.select('.bar'))
       .transition()
       .duration(50)
       .attr('x', 0)
-      .attr('y', (d) => yScale(d.price.toNumber()) - barHeight / 2)
-      .attr('height', barHeight)
-      .attr('width', (d) => xScale(d.buySize.toNumber()))
-      .attr('fill', '#39CF63')
-
-    barsEnter
-      .append('rect')
-      .attr('class', 'sell')
-      .merge(bars.select('.sell'))
-      .transition()
-      .duration(50)
-      .attr('x', (d) => xScale(d.buySize.toNumber())) // Position sell bars after buy bars
-      .attr('y', (d) => yScale(d.price.toNumber()) - barHeight / 2)
-      .attr('height', barHeight)
-      .attr('width', (d) => xScale(d.sellSize.toNumber()))
-      .attr('fill', '#FF5A50')
+      .attr(
+        'y',
+        (d) =>
+          yScale(d.price.toNumber()) -
+          barHeight(d.tickSize.toNumber(), d.tickSize.toNumber() * 2, yScale) /
+            2
+      )
+      .attr('height', (d) =>
+        barHeight(d.tickSize.toNumber(), d.tickSize.toNumber() * 2, yScale)
+      )
+      .attr('width', (d) =>
+        xScale(Decimal.max(d.buySize, d.sellSize).toNumber())
+      )
+      .attr('fill', (d) =>
+        d.buySize.greaterThan(d.sellSize) ? '#39CF63' : '#FF5A50'
+      )
 
     // redraw mouse projection to stick to ticks after scale has been adjusted
     updateMouseProjections(
@@ -390,22 +414,22 @@ function OrderBookChart({
   }, [
     innerHeight,
     innerWidth,
+    lastTrade,
     orderBook,
     svg,
     tickDecimals,
-    tickSize,
     updateMouseProjections,
     yScale
   ])
-
-  useEffect(() => {
-    drawChart()
-  }, [orderBook, width, height, drawChart])
 
   function hideMouseProjections() {
     svg.select('.x-axis-mouse-projection').classed('hidden', true)
     svg.select('.y-axis-mouse-projection').classed('hidden', true)
   }
+
+  useEffect(() => {
+    drawChart()
+  }, [orderBook, width, height, drawChart])
 
   // Add gesture handling
   const gestureBindings = useGesture(
@@ -485,12 +509,4 @@ function OrderBookChart({
       )}
     </div>
   )
-}
-
-function absDistanceOnAxis(
-  from: number,
-  to: number,
-  scale: d3.ScaleLinear<number, number>
-): number {
-  return Math.abs(scale(from) - scale(to))
 }
