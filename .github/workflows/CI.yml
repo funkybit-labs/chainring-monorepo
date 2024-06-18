@@ -24,10 +24,14 @@ jobs:
     name: Build web UI
     uses: ./.github/workflows/build-web-ui.yml
 
+  build_telegram_mini_app:
+    name: Build Telegram Mini App
+    uses: ./.github/workflows/build-telegram-mini-app.yml
+
   deprecate_contracts:
     name: Deprecate Contracts
     if: ${{ github.event_name == 'push' }}
-    needs: [ build_push_backend, build_frontend ]
+    needs: [ build_push_backend, build_frontend, build_telegram_mini_app ]
     permissions:
       id-token: write # needed for aws credentials
       contents: read
@@ -37,7 +41,7 @@ jobs:
   deploy_backend:
     name: Deploy Backend
     if: ${{ github.event_name == 'push' }}
-    needs: [ build_push_backend, build_frontend, deprecate_contracts ]
+    needs: [ build_push_backend, build_frontend, build_telegram_mini_app, deprecate_contracts ]
     permissions:
       id-token: write # needed for aws credentials
       contents: read
@@ -58,9 +62,20 @@ jobs:
     with:
       environment: test
 
+  deploy_telegram_mini_app:
+    name: Deploy Telegram Mini App
+    if: ${{ github.event_name == 'push' }}
+    needs: [ build_push_backend, build_telegram_mini_app ]
+    permissions:
+      id-token: write # needed for aws credentials
+      contents: read
+    uses: ./.github/workflows/deploy-telegram-mini-app.yml
+    with:
+      environment: test
+
   integration_tests:
     name: Run integration tests
-    needs: [ deploy_backend, deploy_web_ui ]
+    needs: [ deploy_backend, deploy_web_ui, deploy_telegram_mini_app ]
     if: ${{ github.event_name == 'push' }}
     permissions:
       id-token: write # needed for aws credentials

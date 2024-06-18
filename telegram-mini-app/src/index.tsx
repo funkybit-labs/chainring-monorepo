@@ -9,18 +9,18 @@ const root = createRoot(container)
 
 const App = () => {
   const showPopup = useShowPopup()
-  const [_, expand] = useExpand()
+  const [, expand] = useExpand()
 
   useEffect(() => {
     expand()
-  }, [])
+  }, [expand])
 
   const showPopupOnClick = async () => {
     await showPopup({ title: 'Hello', message: 'World' })
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-darkBluishGray10">
+    <div className="flex min-h-screen items-center justify-center bg-darkBluishGray10">
       <Button
         caption={() => 'Test'}
         disabled={false}

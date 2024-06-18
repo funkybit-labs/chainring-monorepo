@@ -230,6 +230,17 @@ module "web" {
   certificate_arn = data.aws_acm_certificate.chainring_us_east_1.arn
 }
 
+module "telegram_mini_app" {
+  source      = "../modules/telegram_mini_app"
+  name_prefix = local.name_prefix
+  zone        = data.terraform_remote_state.shared.outputs.zone
+  providers = {
+    aws.us_east_1 = aws.us_east_1
+  }
+  ci_role_arn     = data.terraform_remote_state.shared.outputs.ci_role_arn
+  certificate_arn = data.aws_acm_certificate.chainring_us_east_1.arn
+}
+
 module "baregate" {
   source           = "../modules/baregate"
   name_prefix      = local.name_prefix

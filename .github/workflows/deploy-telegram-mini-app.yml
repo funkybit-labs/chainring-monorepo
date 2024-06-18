@@ -1,4 +1,4 @@
-name: Deploy Web UI
+name: Deploy Telegram Mini App
 
 on:
   # Manual trigger from the UI
@@ -19,12 +19,12 @@ on:
 
 # only one running deploy job per environment
 concurrency:
-  group: web-ui-${{ inputs.environment }}
+  group: telegram-mini-app-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
-  deploy_web_ui:
-    name: Deploy Web UI
+  deploy_telegram_mini_app:
+    name: Deploy Telegram Mini App
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     permissions:
@@ -36,29 +36,29 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node-js-20
       - name: Install dependencies
-        working-directory: ./web-ui
+        working-directory: ./telegram-mini-app
         run: pnpm install
       - name: Lint
-        working-directory: ./web-ui
+        working-directory: ./telegram-mini-app
         run: pnpm run lint
       - name: Typecheck
-        working-directory: ./web-ui
+        working-directory: ./telegram-mini-app
         run: pnpm run typecheck
       - name: build
-        working-directory: ./web-ui
+        working-directory: ./telegram-mini-app
         run: pnpm run build --mode ${{ inputs.environment }}
       - name: Setup AWS
         uses: ./.github/actions/setup-aws
       - name: Deploy to ${{ inputs.environment }} environment
-        working-directory: ./web-ui
-        run: aws s3 sync dist/ s3://${{ inputs.environment }}-chainring-web/
+        working-directory: ./telegram-mini-app
+        run: aws s3 sync dist/ s3://${{ inputs.environment }}-chainring-telegram-mini-app/
       - name: Install jq
         uses: dcarbone/install-jq-action@v2
       - name: invalidate cloudfront cache
         shell: bash
         run: |
           aws cloudfront list-distributions --query DistributionList.Items[].ARN | jq -c -r '.[]' | while IFS= read -r arn; do
-            if [[ $(aws cloudfront list-tags-for-resource --resource $arn | jq -c -r '.Tags.Items[] | select(.Key == "app_and_env") | .Value') == "${{ inputs.environment }}-web-ui" ]]; then
+            if [[ $(aws cloudfront list-tags-for-resource --resource $arn | jq -c -r '.Tags.Items[] | select(.Key == "app_and_env") | .Value') == "${{ inputs.environment }}-telegram-mini-app" ]]; then
               aws cloudfront create-invalidation --distribution-id $(echo $arn | sed 's/.*\///') --paths "/*";
             fi
           done

@@ -1,0 +1,30 @@
+name: Build Telegram Mini App
+
+on:
+  # Manual trigger from the UI
+  workflow_dispatch:
+
+  # Call from another workflow (CI)
+  workflow_call:
+
+
+jobs:
+  build_frontend:
+    name: Build Telegram mini app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node-js-20
+      - name: Install dependencies
+        working-directory: ./telegram-mini-app
+        run: pnpm install
+      - name: Lint
+        working-directory: ./telegram-mini-app
+        run: pnpm run lint
+      - name: Typecheck
+        working-directory: ./telegram-mini-app
+        run: pnpm run typecheck
+      - name: Build
+        working-directory: ./telegram-mini-app
+        run: pnpm run build --mode test
