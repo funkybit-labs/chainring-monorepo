@@ -33,6 +33,9 @@ export function OrderBookWidget({
   side: OrderSide
 }) {
   const [rawOrderBook, setRawOrderBook] = useState<OrderBook>()
+  const [orderBookChartEntries, setOrderBookChartEntries] = useState<
+    OrderBookChartEntry[]
+  >([])
   const [ref, { width }] = useMeasure()
 
   useWebsocketSubscription({
@@ -44,16 +47,14 @@ export function OrderBookWidget({
     }, [])
   })
 
-  const orderBookChartEntries: OrderBookChartEntry[] = useMemo(() => {
+  useEffect(() => {
     function invertChartEntryPrices(
       entries: OrderBookChartEntry[]
     ): OrderBookChartEntry[] {
       return entries.map((entry) => {
         return {
           tickSize: invertTickSize(market.tickSize, entry.price),
-          price: new Decimal(1)
-            .div(entry.price)
-            .toDecimalPlaces(4 + entry.price.toFixed(0).length),
+          price: new Decimal(1).div(entry.price).toDecimalPlaces(15),
           buySize: entry.sellSize.mul(entry.price),
           sellSize: entry.buySize.mul(entry.price)
         }
@@ -65,7 +66,7 @@ export function OrderBookWidget({
       const nextReciprocalPrice = new Decimal(1).div(price.plus(tickSize))
       return new Decimal(
         currentReciprocalPrice.minus(nextReciprocalPrice)
-      ).toDecimalPlaces(10)
+      ).toDecimalPlaces(15)
       // Inverted tick size used to calculate order book bar height on the reciprocal scale. Therefore high precision is required.
     }
 
@@ -118,12 +119,12 @@ export function OrderBookWidget({
 
       // and invert prices when needed
       if (side === 'Sell') {
-        return invertChartEntryPrices(allLevelAmounts)
+        setOrderBookChartEntries(invertChartEntryPrices(allLevelAmounts))
       } else {
-        return allLevelAmounts
+        setOrderBookChartEntries(allLevelAmounts)
       }
     } else {
-      return []
+      setOrderBookChartEntries([])
     }
   }, [market.tickSize, rawOrderBook, side])
 
@@ -132,7 +133,11 @@ export function OrderBookWidget({
       const lastPrice = parseFloat(last.price)
       return {
         price: (1.0 / lastPrice).toFixed(
-          market.tickSize.decimalPlaces() + lastPrice.toFixed(0).length + 1
+          (market.tickSize.decimalPlaces() === 0
+            ? 5
+            : market.tickSize.decimalPlaces()) +
+            lastPrice.toFixed(0).length +
+            1
         ),
         direction:
           last.direction === 'Up'
@@ -150,7 +155,10 @@ export function OrderBookWidget({
         return rawOrderBook.last
       }
     } else {
-      return undefined
+      return {
+        price: '0.0',
+        direction: 'Unchanged'
+      }
     }
   }, [market.tickSize, rawOrderBook, side])
 
@@ -159,14 +167,18 @@ export function OrderBookWidget({
       id="order-book"
       wrapperRef={ref}
       contents={
-        rawOrderBook && orderBookChartEntries && orderBookLastTrade ? (
+        rawOrderBook &&
+        orderBookChartEntries.length != 0 &&
+        orderBookLastTrade ? (
           rawOrderBook.buy.length === 0 && rawOrderBook.sell.length === 0 ? (
             <div className="text-center">Empty</div>
           ) : (
             <OrderBookChart
               tickDecimals={
                 side === 'Sell'
-                  ? market.tickSize.decimalPlaces() +
+                  ? (market.tickSize.decimalPlaces() === 0
+                      ? 5
+                      : market.tickSize.decimalPlaces()) +
                     rawOrderBook.last.price.split('.')[0].length
                   : market.tickSize.decimalPlaces()
               }

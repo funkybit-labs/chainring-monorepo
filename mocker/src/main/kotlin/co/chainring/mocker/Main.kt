@@ -120,7 +120,7 @@ fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: Bi
 
     val maker = Maker(
         marketIds = listOf(market.id),
-        levels = 20, levelsSpreadPercents = BigDecimal("0.1"),
+        levels = 20, levelsSpread = 100,
         nativeAssets = when {
             baseAssetBtc && quoteAssetBtc -> listOf(baseAsset, quoteAsset).toMap()
             baseAssetBtc -> listOf(baseAsset).toMap()

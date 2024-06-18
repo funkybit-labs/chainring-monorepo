@@ -46,8 +46,8 @@ import org.web3j.crypto.Keys
 
 class Maker(
     marketIds: List<MarketId>,
-    private val levelsSpreadPercents: BigDecimal,
     private val levels: Int,
+    private val levelsSpread: Int,
     nativeAssets: Map<String, BigInteger>,
     assets: Map<String, BigInteger>,
     keyPair: ECKeyPair = Keys.createEcKeyPair()
@@ -165,7 +165,7 @@ class Maker(
                     logger.info { "$id: full price update for ${message.market}" }
                     if (!quotesCreated) {
                         markets.find { it.id == message.market }?.let {
-                            createQuotes(message.market, levels, message.ohlc.lastOrNull()?.close?.toBigDecimal() ?: BigDecimal.ONE)
+                            createQuotes(message.market, levels, levelsSpread, message.ohlc.lastOrNull()?.close?.toBigDecimal() ?: BigDecimal.ONE)
                             quotesCreated = true
                         }
                     }
@@ -191,21 +191,19 @@ class Maker(
         val baseInventory = (balances.getOrDefault(marketId.baseSymbol(), BigInteger.ZERO).toBigDecimal() * useBalanceFraction).toBigInteger()
         val quoteInventory = (balances.getOrDefault(marketId.quoteSymbol(), BigInteger.ZERO).toBigDecimal() * useBalanceFraction).toBigInteger()
 
-        val marketToPeakStdDevFactor = 10.0
+        val marketToPeakStdDevFactor = 6.0
         val peakToOuterStdDevFactor = 2.0
 
         return Pair(
             generateAsymmetricGaussianAmounts(
                 offerPrices,
                 baseInventory,
-                biasFactor = 0.99,
                 leftStdDevFactor = marketToPeakStdDevFactor,
                 rightStdDevFactor = peakToOuterStdDevFactor
             ),
             generateAsymmetricGaussianAmounts(
                 bidPrices,
                 quoteInventory,
-                biasFactor = 1.01,
                 leftStdDevFactor = peakToOuterStdDevFactor,
                 rightStdDevFactor = marketToPeakStdDevFactor
             ).mapIndexed { index, amount ->
@@ -219,7 +217,7 @@ class Maker(
         logger.debug { "$id: adjusting quotes in market ${market.id}, current price: $curPrice" }
         val marketId = market.id
         val ordersToCancel = currentOrders[marketId] ?: emptyList()
-        val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpreadPercents, curPrice)
+        val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpread, curPrice)
         val (offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
 
         val createOrders = offerPrices.mapIndexed { ix, price ->
@@ -276,13 +274,13 @@ class Maker(
         }
     }
 
-    private fun createQuotes(marketId: MarketId, levels: Int, curPrice: BigDecimal) {
+    private fun createQuotes(marketId: MarketId, levels: Int, levelsSpread: Int, curPrice: BigDecimal) {
         logger.debug { "$id: creating quotes in market $marketId, current price: $curPrice" }
         markets.find { it.id == marketId }?.let { market ->
             apiClient.cancelOpenOrders()
             currentOrders[marketId] = mutableSetOf()
 
-            val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpreadPercents, curPrice)
+            val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpread, curPrice)
             val (offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
 
             offerPrices.forEachIndexed { ix, price ->
@@ -326,12 +324,13 @@ class Maker(
     }
 
     companion object {
-        fun offerAndBidPrices(tickSize: BigDecimal, levels: Int, levelsSpreadPercents: BigDecimal, curPrice: BigDecimal): Pair<List<BigDecimal>, List<BigDecimal>> {
+        fun offerAndBidPrices(tickSize: BigDecimal, levels: Int, levelsSpread: Int, curPrice: BigDecimal): Pair<List<BigDecimal>, List<BigDecimal>> {
             val curPriceRounded = curPrice.roundToTickSize(tickSize)
-            val adjustedLevels = min((curPrice * levelsSpreadPercents / tickSize ).setScale(0, RoundingMode.DOWN).toInt(), levels)
+            val adjustedLevels = min(levelsSpread / 2, levels)
+            val halfLevelsSpread = tickSize.multiply((levelsSpread / 2.0).toBigDecimal())
 
-            val offerPrices = generateUniquePrices(adjustedLevels, curPriceRounded + tickSize, curPrice * levelsSpreadPercents, tickSize, true)
-            val bidPrices = generateUniquePrices(adjustedLevels, curPriceRounded - tickSize, curPrice * levelsSpreadPercents, tickSize, false)
+            val offerPrices = generateUniquePrices(adjustedLevels, curPriceRounded + tickSize, halfLevelsSpread, tickSize, true)
+            val bidPrices = generateUniquePrices(adjustedLevels, curPriceRounded - tickSize, halfLevelsSpread, tickSize, false)
 
             return Pair(offerPrices, bidPrices)
         }
@@ -351,17 +350,16 @@ class Maker(
             return prices.sorted()
         }
 
-        fun generateAsymmetricGaussianAmounts(prices: List<BigDecimal>, totalAmount: BigInteger, biasFactor: Double, leftStdDevFactor: Double, rightStdDevFactor: Double): List<BigInteger> {
+        fun generateAsymmetricGaussianAmounts(prices: List<BigDecimal>, totalAmount: BigInteger, leftStdDevFactor: Double, rightStdDevFactor: Double): List<BigInteger> {
             val averagePrice = prices.map { it.toDouble() }.average()
-            val mean = averagePrice * biasFactor // adjust the mean to move the peak
             val range = (prices.maxOrNull()!! - prices.minOrNull()!!).toDouble()
             val leftStdDev = range / leftStdDevFactor
             val rightStdDev = range / rightStdDevFactor
 
             val amounts = prices.map { price ->
                 val x = price.toDouble()
-                val stdDev = if (x < mean) leftStdDev else rightStdDev
-                val exponent = -(x - mean).pow(2) / (2 * stdDev.pow(2))
+                val stdDev = if (x < averagePrice) leftStdDev else rightStdDev
+                val exponent = -(x - averagePrice).pow(2) / (2 * stdDev.pow(2))
                 exp(exponent)
             }.map {it + Random.nextDouble(-it, it) * 0.2}
             val unscaledSum = amounts.sum()
@@ -388,13 +386,25 @@ class Maker(
 }
 
 fun main() {
-    val initialPrice = BigDecimal(17.5)
-    val marketToPeakStdDevFactor = 10.0
+//    BTC/BTC2
+    val tickSize = BigDecimal("0.001")
+    val initialPrice = BigDecimal(1.0005)
+    val marketToPeakStdDevFactor = 7.0
+
+//    BTC/ETH
+//    val tickSize = BigDecimal("0.05")
+//    val initialPrice = BigDecimal(17.5)
+//    val marketToPeakStdDevFactor = 7.0
+
+//    BTC/USDC
+//    val tickSize = BigDecimal("1")
+//    val initialPrice = BigDecimal(68390.500)
+//    val marketToPeakStdDevFactor = 7.0
     val peakToOuterStdDevFactor = 2.0
 
-    val (offerPrices, bidPrices) = Maker.offerAndBidPrices(BigDecimal("0.05"), 20, BigDecimal("0.1"), initialPrice)
-    val offerAmounts =  Maker.generateAsymmetricGaussianAmounts(offerPrices, BigInteger("10000"), biasFactor = 0.99, marketToPeakStdDevFactor, peakToOuterStdDevFactor)
-    val bidAmounts =  Maker.generateAsymmetricGaussianAmounts(bidPrices, BigInteger("10000"), biasFactor = 1.01, peakToOuterStdDevFactor, marketToPeakStdDevFactor)
+    val (offerPrices, bidPrices) = Maker.offerAndBidPrices(tickSize = tickSize, levels = 20, levelsSpread = 100, curPrice = initialPrice)
+    val offerAmounts =  Maker.generateAsymmetricGaussianAmounts(offerPrices, BigInteger("10000"), marketToPeakStdDevFactor, peakToOuterStdDevFactor)
+    val bidAmounts =  Maker.generateAsymmetricGaussianAmounts(bidPrices, BigInteger("10000"), peakToOuterStdDevFactor, marketToPeakStdDevFactor)
 
     val chart = XYChartBuilder().width(1200).height(600)
         .xAxisTitle("Price")
