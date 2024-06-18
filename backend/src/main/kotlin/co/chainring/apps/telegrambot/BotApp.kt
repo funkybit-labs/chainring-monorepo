@@ -20,7 +20,7 @@ import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction
 import kotlin.concurrent.thread
 
-private val botToken = System.getenv("TELEGRAM_BOT_TOKEN") ?: "7230554779:AAFo2lE3E_UHst7lKkiZxXJHwDeKmP6Hcn8"
+private val botToken = System.getenv("TELEGRAM_BOT_TOKEN") ?: ""
 val faucetSupported = System.getenv("FAUCET_SUPPORTED")?.toBoolean() ?: true
 
 class BotApp : BaseApp(dbConfig = DbConfig()) {
@@ -43,15 +43,19 @@ class BotApp : BaseApp(dbConfig = DbConfig()) {
     private var stopRequested = false
 
     override fun start() {
-        logger.info { "Starting" }
-        super.start()
-        client.startPolling(inputHandler = { input ->
-            transaction {
-                inputHandler.handle(input)
-            }
-        })
-        pendingSessionsRefresherThread.start()
-        logger.info { "Started" }
+        if (botToken.isEmpty()) {
+            logger.error { "No bot token provided" }
+        } else {
+            logger.info { "Starting" }
+            super.start()
+            client.startPolling(inputHandler = { input ->
+                transaction {
+                    inputHandler.handle(input)
+                }
+            })
+            pendingSessionsRefresherThread.start()
+            logger.info { "Started" }
+        }
     }
 
     override fun stop() {
