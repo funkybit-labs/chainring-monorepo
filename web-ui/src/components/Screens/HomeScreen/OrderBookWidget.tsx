@@ -47,13 +47,20 @@ export function OrderBookWidget({
     }, [])
   })
 
+  // change of market causes re-calculation of the inflated OrderBook before new OrderBook state is loaded.
+  // when tick size changes from 1 to 0.001 this causes massive chart update, therefore resetting state.
+  const tickSize = useMemo(() => {
+    setRawOrderBook(undefined)
+    return market.tickSize
+  }, [market])
+
   useEffect(() => {
     function invertChartEntryPrices(
       entries: OrderBookChartEntry[]
     ): OrderBookChartEntry[] {
       return entries.map((entry) => {
         return {
-          tickSize: invertTickSize(market.tickSize, entry.price),
+          tickSize: invertTickSize(tickSize, entry.price),
           price: new Decimal(1).div(entry.price).toDecimalPlaces(15),
           buySize: entry.sellSize.mul(entry.price),
           sellSize: entry.buySize.mul(entry.price)
@@ -67,7 +74,7 @@ export function OrderBookWidget({
       return new Decimal(
         currentReciprocalPrice.minus(nextReciprocalPrice)
       ).toDecimalPlaces(15)
-      // Inverted tick size used to calculate order book bar height on the reciprocal scale. Therefore high precision is required.
+      // Inverted tick size used to calculate order book bar height on the reciprocal scale. Therefore, high precision is required.
     }
 
     if (rawOrderBook) {
@@ -82,14 +89,14 @@ export function OrderBookWidget({
       )
 
       // add 2 ticks on both sides as buffer area
-      minBuyPrice = minBuyPrice.minus(market.tickSize.mul(new Decimal(2)))
-      maxSellPrice = maxSellPrice.plus(market.tickSize.mul(new Decimal(2)))
+      minBuyPrice = minBuyPrice.minus(tickSize.mul(new Decimal(2)))
+      maxSellPrice = maxSellPrice.plus(tickSize.mul(new Decimal(2)))
 
       let price = minBuyPrice
       const allPriceLevels: Decimal[] = []
       while (price.lessThanOrEqualTo(maxSellPrice)) {
         allPriceLevels.push(price)
-        price = price.plus(market.tickSize)
+        price = price.plus(tickSize)
       }
 
       // inflate order book to have a record for every level
@@ -109,7 +116,7 @@ export function OrderBookWidget({
             size: 0
           }
           return {
-            tickSize: market.tickSize,
+            tickSize: tickSize,
             price: price,
             buySize: new Decimal(buyEntry.size),
             sellSize: new Decimal(sellEntry.size)
@@ -126,16 +133,14 @@ export function OrderBookWidget({
     } else {
       setOrderBookChartEntries([])
     }
-  }, [market.tickSize, rawOrderBook, side])
+  }, [tickSize, rawOrderBook, side])
 
-  const orderBookLastTrade: LastTrade | undefined = useMemo(() => {
+  const orderBookLastTrade: LastTrade = useMemo(() => {
     function invertLast(last: LastTrade): LastTrade {
       const lastPrice = parseFloat(last.price)
       return {
         price: (1.0 / lastPrice).toFixed(
-          (market.tickSize.decimalPlaces() === 0
-            ? 5
-            : market.tickSize.decimalPlaces()) +
+          (tickSize.decimalPlaces() === 0 ? 5 : tickSize.decimalPlaces()) +
             lastPrice.toFixed(0).length +
             1
         ),
@@ -160,16 +165,14 @@ export function OrderBookWidget({
         direction: 'Unchanged'
       }
     }
-  }, [market.tickSize, rawOrderBook, side])
+  }, [tickSize, rawOrderBook, side])
 
   return (
     <Widget
       id="order-book"
       wrapperRef={ref}
       contents={
-        rawOrderBook &&
-        orderBookChartEntries.length != 0 &&
-        orderBookLastTrade ? (
+        rawOrderBook && orderBookChartEntries.length != 0 ? (
           rawOrderBook.buy.length === 0 && rawOrderBook.sell.length === 0 ? (
             <div className="text-center">Empty</div>
           ) : (
@@ -369,8 +372,8 @@ function OrderBookChart({
     const lastPriceGroup = svg
       .select('.y-axis-order-book-last-price')
       .classed('hidden', !lastTrade.price)
-      .transition()
-      .duration(150)
+      // .transition()
+      // .duration(50)
       .attr('transform', `translate(0,${yScale(parseFloat(lastTrade.price))})`)
     lastPriceGroup
       .select('text')
@@ -398,8 +401,8 @@ function OrderBookChart({
       .append('rect')
       .attr('class', 'bar')
       .merge(bars.select('.bar'))
-      .transition()
-      .duration(50)
+      // .transition()
+      // .duration(50)
       .attr('x', 0)
       .attr(
         'y',
@@ -411,9 +414,13 @@ function OrderBookChart({
       .attr('height', (d) =>
         barHeight(d.tickSize.toNumber(), d.tickSize.toNumber() * 2, yScale)
       )
-      .attr('width', (d) =>
-        xScale(Decimal.max(d.buySize, d.sellSize).toNumber())
-      )
+      .attr('width', (d) => {
+        const result = xScale(Decimal.max(d.buySize, d.sellSize).toNumber())
+        // Observed negative rect width and as a result errors in then console.
+        // It looks like viewport is reduced to single pixel when browser tab is inactive for some time
+        // and because of the left margin scale's pixel range is being inverted (e.g [0, -53])
+        return Math.max(result, 0)
+      })
       .attr('fill', (d) =>
         d.buySize.greaterThan(d.sellSize) ? '#39CF63' : '#FF5A50'
       )

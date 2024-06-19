@@ -421,8 +421,8 @@ function OHLCChart({
       svg
         .select('.y-axis-current-price')
         .classed('hidden', !lastPrice)
-        .transition()
-        .duration(150)
+        // .transition()
+        // .duration(150)
         .attr('transform', `translate(0,${lastPrice ? yScale(lastPrice) : 0})`)
         .select('text')
         .text(lastPrice ? lastPrice.toFixed(lastPriceDecimalPlaces) : '')
