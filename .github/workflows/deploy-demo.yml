@@ -35,3 +35,13 @@ jobs:
     uses: ./.github/workflows/deploy-web-ui.yml
     with:
       environment: demo
+
+  deploy_telegram_mini_app:
+    name: Deploy Telegram Mini App
+    needs: [ deploy_backend ]
+    permissions:
+      id-token: write # needed for aws credentials
+      contents: read
+    uses: ./.github/workflows/deploy-telegram-mini-app.yml
+    with:
+      environment: demo
