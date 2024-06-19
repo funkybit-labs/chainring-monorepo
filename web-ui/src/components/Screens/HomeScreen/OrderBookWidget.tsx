@@ -27,10 +27,12 @@ interface OrderBookChartEntry {
 
 export function OrderBookWidget({
   market,
-  side
+  side,
+  height
 }: {
   market: Market
   side: OrderSide
+  height: number
 }) {
   const [rawOrderBook, setRawOrderBook] = useState<OrderBook>()
   const [orderBookChartEntries, setOrderBookChartEntries] = useState<
@@ -196,8 +198,8 @@ export function OrderBookWidget({
               }
               orderBook={orderBookChartEntries}
               lastTrade={orderBookLastTrade}
-              width={Math.max(width - 40, 0)}
-              height={465}
+              width={Math.max(width - 32, 100)}
+              height={Math.max(height - 32, 400)}
             />
           )
         ) : (
@@ -477,7 +479,7 @@ function OrderBookChart({
   drawChart()
 
   return (
-    <div className="relative">
+    <div className="h-full">
       <svg
         ref={svgRef}
         width={width}
