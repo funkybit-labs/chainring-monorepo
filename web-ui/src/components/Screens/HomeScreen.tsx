@@ -96,7 +96,10 @@ function HomeScreenContent() {
     }
   }, [markets, selectedMarket])
 
-  const [ref, { width }] = useMeasure()
+  const [homeScreenRef, { width }] = useMeasure()
+  const [pricesRef, { height: pricesMeasuredHeight }] = useMeasure()
+  const [balancesRef, { height: balancesMeasuredHeight }] = useMeasure()
+  const [swapRef, { height: swapMeasuredHeight }] = useMeasure()
 
   const defaultSide = useMemo(() => {
     if (selectedMarket) {
@@ -127,7 +130,7 @@ function HomeScreenContent() {
       <div className="mx-4 flex min-h-screen justify-center py-24">
         <div
           className="my-auto min-w-[400px] laptop:max-w-[1800px]"
-          ref={ref as LegacyRef<HTMLDivElement>}
+          ref={homeScreenRef as LegacyRef<HTMLDivElement>}
         >
           {tab === 'Swap' && (
             <SwapModal
@@ -152,32 +155,43 @@ function HomeScreenContent() {
           {tab === 'Dashboard' && (
             <div className="grid grid-cols-1 gap-4 laptop:grid-cols-3">
               <div className="col-span-1 space-y-4 laptop:col-span-2">
-                <PricesWidget
-                  side={defaultSide}
-                  market={selectedMarket}
-                  onSideChanged={setOverriddenSide}
-                />
-                {symbols && width >= 1100 && (
-                  <BalancesWidget
-                    walletAddress={wallet.address}
-                    exchangeContractAddress={exchangeContract?.address}
-                    symbols={symbols}
+                <div ref={pricesRef as LegacyRef<HTMLDivElement>}>
+                  <PricesWidget
+                    side={defaultSide}
+                    market={selectedMarket}
+                    onSideChanged={setOverriddenSide}
                   />
+                </div>
+                {symbols && width >= 1100 && (
+                  <div ref={balancesRef as LegacyRef<HTMLDivElement>}>
+                    <BalancesWidget
+                      walletAddress={wallet.address}
+                      exchangeContractAddress={exchangeContract?.address}
+                      symbols={symbols}
+                    />
+                  </div>
                 )}
               </div>
               <div className="col-span-1 space-y-4">
-                <SwapWidget
-                  markets={markets}
-                  walletAddress={wallet.address}
-                  exchangeContractAddress={exchangeContract?.address}
-                  feeRates={feeRates}
-                  onMarketChange={setSelectedMarket}
-                  onSideChange={setSide}
-                />
+                <div ref={swapRef as LegacyRef<HTMLDivElement>}>
+                  <SwapWidget
+                    markets={markets}
+                    walletAddress={wallet.address}
+                    exchangeContractAddress={exchangeContract?.address}
+                    feeRates={feeRates}
+                    onMarketChange={setSelectedMarket}
+                    onSideChange={setSide}
+                  />
+                </div>
                 {width >= 1100 && (
                   <OrderBookWidget
                     market={selectedMarket}
                     side={overriddenSide ?? defaultSide}
+                    height={
+                      pricesMeasuredHeight +
+                      balancesMeasuredHeight -
+                      swapMeasuredHeight
+                    }
                   />
                 )}
               </div>
@@ -186,6 +200,7 @@ function HomeScreenContent() {
                   <OrderBookWidget
                     market={selectedMarket}
                     side={overriddenSide ?? defaultSide}
+                    height={500}
                   />
                   <BalancesWidget
                     walletAddress={wallet.address}
