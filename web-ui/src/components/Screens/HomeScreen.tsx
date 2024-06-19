@@ -2,7 +2,6 @@ import { apiClient, OrderSide } from 'apiClient'
 import { useAccount } from 'wagmi'
 import BalancesWidget from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import { Header, Tab } from 'components/Screens/Header'
-import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
 import React, { LegacyRef, useEffect, useMemo, useState } from 'react'
 import OrdersAndTradesWidget from 'components/Screens/HomeScreen/OrdersAndTradesWidget'
 import TradingSymbols from 'tradingSymbols'
@@ -16,6 +15,7 @@ import { useQuery } from '@tanstack/react-query'
 import Spinner from 'components/common/Spinner'
 import { WebsocketProvider } from 'contexts/websocket'
 import TradingSymbol from 'tradingSymbol'
+import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
 
 function WebsocketWrapper({ contents }: { contents: JSX.Element }) {
   const wallet = useAccount()

@@ -201,8 +201,8 @@ class Taker(
         logger.debug { "$id: baseBalance $baseBalance, quoteBalance: $quoteBalance" }
 
         marketPrices[market.id]?.let { price ->
-            val expectedMarketPrice = priceCorrectionFunction.nextValue(Clock.System.now())
-            val side = if (expectedMarketPrice > price.toDouble()) {
+            val desiredMarketPrice = priceCorrectionFunction.nextValue(Clock.System.now())
+            val side = if (desiredMarketPrice > price.toDouble()) {
                 OrderSide.Buy
             } else {
                 OrderSide.Sell
@@ -221,7 +221,7 @@ class Taker(
                 }
             }
 
-            logger.debug { "$id: going to create a market $side order in ${market.id} market (amount: $amount, market price: $price" }
+            logger.debug { "$id: going to create a market $side order in ${market.id} market (amount: $amount, market price: $price, desired market price: $desiredMarketPrice" }
 
             apiClient.createOrder(
                 wallet.signOrder(CreateOrderApiRequest.Market(

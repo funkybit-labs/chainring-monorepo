@@ -136,7 +136,7 @@ class MockerApp(
 
             // Adjust takers count
             while (params.takers.size < params.desiredTakersCount) {
-                params.takers.add(startTaker(market, params.initialBaseBalance, params.initialBaseBalance * params.priceBaseline, priceFunction))
+                params.takers.add(startTaker(market, params.initialBaseBalance * BigDecimal(2), params.initialBaseBalance * params.priceBaseline * BigDecimal(2), priceFunction))
             }
             while (params.takers.size > params.desiredTakersCount) {
                 params.takers.removeAt(params.takers.size - 1).stop()
