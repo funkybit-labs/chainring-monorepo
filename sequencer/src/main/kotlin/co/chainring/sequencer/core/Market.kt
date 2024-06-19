@@ -674,7 +674,7 @@ data class Market(
         } else if (order.type == Order.Type.MarketSell) {
             handleCrossingOrder(order)
         } else {
-            logger.debug { "Order ${order.guid}: Unknown order type ${order.type} rejected" }
+            logger.error { "Order ${order.guid}: Unknown order type ${order.type} rejected" }
             AddOrderResult(OrderDisposition.Rejected, noExecutions)
         }
     }
