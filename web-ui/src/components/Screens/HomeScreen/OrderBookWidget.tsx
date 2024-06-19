@@ -17,6 +17,7 @@ import Decimal from 'decimal.js'
 import { useGesture } from '@use-gesture/react'
 import TradingSymbol from 'tradingSymbol'
 import SymbolIcon from 'components/common/SymbolIcon'
+import usePageVisibility from 'hooks/usePageVisibility'
 
 interface OrderBookChartEntry {
   tickSize: Decimal
@@ -39,6 +40,7 @@ export function OrderBookWidget({
     OrderBookChartEntry[]
   >([])
   const [ref, { width }] = useMeasure()
+  const { isPageVisible } = usePageVisibility()
 
   useWebsocketSubscription({
     topics: useMemo(() => [orderBookTopic(market.id)], [market.id]),
@@ -200,6 +202,7 @@ export function OrderBookWidget({
               lastTrade={orderBookLastTrade}
               width={Math.max(width - 32, 100)}
               height={Math.max(height - 32, 400)}
+              renderAnimation={isPageVisible}
             />
           )
         ) : (
@@ -227,7 +230,8 @@ function OrderBookChart({
   tickDecimals,
   quantitySymbol,
   width,
-  height
+  height,
+  renderAnimation
 }: {
   orderBook: OrderBookChartEntry[]
   lastTrade: LastTrade
@@ -235,6 +239,7 @@ function OrderBookChart({
   quantitySymbol: TradingSymbol | undefined
   width: number
   height: number
+  renderAnimation: boolean
 }) {
   const svgRef = useRef<SVGSVGElement>(null)
 
@@ -377,12 +382,19 @@ function OrderBookChart({
 
     // update last price tracker
     const lastPriceStyle = directionStyle(lastTrade.direction)
-    const lastPriceGroup = svg
+    let lastPriceGroup = svg
       .select('.y-axis-order-book-last-price')
       .classed('hidden', !lastTrade.price)
-      // .transition()
-      // .duration(50)
-      .attr('transform', `translate(0,${yScale(parseFloat(lastTrade.price))})`)
+    if (renderAnimation) {
+      // @ts-expect-error Selection and Transition interfaces are compatible, casting only because of generic BaseType
+      lastPriceGroup = lastPriceGroup
+        .transition()
+        .duration(50) as typeof lastPriceGroup
+    }
+    lastPriceGroup.attr(
+      'transform',
+      `translate(0,${yScale(parseFloat(lastTrade.price))})`
+    )
     lastPriceGroup
       .select('text')
       .text(lastTrade.price)
@@ -402,15 +414,18 @@ function OrderBookChart({
       .selectAll('.order-bar')
       .data(orderBook, (d) => (d as OrderBookChartEntry).price.toString())
     bars.exit().remove()
-    bars
+    let barsUpdate = bars
       .enter()
       .append('g')
       .attr('class', 'order-bar')
       .append('rect')
       .attr('class', 'bar')
       .merge(bars.select('.bar'))
-      // .transition()
-      // .duration(50)
+    if (renderAnimation) {
+      // @ts-expect-error Selection and Transition interfaces are compatible, casting only because of generic BaseType
+      barsUpdate = barsUpdate.transition().duration(50) as typeof barsUpdate
+    }
+    barsUpdate
       .attr('x', 0)
       .attr(
         'y',
@@ -446,7 +461,8 @@ function OrderBookChart({
     svg,
     tickDecimals,
     updateMouseProjections,
-    yScale
+    yScale,
+    renderAnimation
   ])
 
   function hideMouseProjections() {
