@@ -167,6 +167,19 @@ export function OrderBookWidget({
     }
   }, [tickSize, rawOrderBook, side])
 
+  const tickDecimals = useMemo(() => {
+    if (side === 'Sell') {
+      const tickDecimals =
+        tickSize.decimalPlaces() === 0 ? 5 : tickSize.decimalPlaces()
+      const lastPriceDecimals = rawOrderBook
+        ? rawOrderBook.last.price.split('.')[0].length
+        : 0
+      return tickDecimals + lastPriceDecimals
+    } else {
+      return tickSize.decimalPlaces()
+    }
+  }, [tickSize, rawOrderBook, side])
+
   return (
     <Widget
       id="order-book"
@@ -177,14 +190,7 @@ export function OrderBookWidget({
             <div className="text-center">Empty</div>
           ) : (
             <OrderBookChart
-              tickDecimals={
-                side === 'Sell'
-                  ? (market.tickSize.decimalPlaces() === 0
-                      ? 5
-                      : market.tickSize.decimalPlaces()) +
-                    rawOrderBook.last.price.split('.')[0].length
-                  : market.tickSize.decimalPlaces()
-              }
+              tickDecimals={tickDecimals}
               quantitySymbol={
                 side === 'Sell' ? market.quoteSymbol : market.baseSymbol
               }

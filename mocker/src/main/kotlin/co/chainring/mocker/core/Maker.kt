@@ -386,33 +386,27 @@ class Maker(
 }
 
 fun main() {
-//    BTC/BTC2
-    val tickSize = BigDecimal("0.001")
-    val initialPrice = BigDecimal(1.0005)
-    val marketToPeakStdDevFactor = 7.0
+    listOf(
+        Triple(BigDecimal("0.001"), BigDecimal(1.0005), "BTC/BTC2"),
+        Triple(BigDecimal("0.05"), BigDecimal(17.5), "BTC/ETH"),
+        Triple(BigDecimal("1"), BigDecimal(68390.500), "BTC/USDC"),
+    ).forEach { (tickSize, initialPrice, market) ->
+        val peakToOuterStdDevFactor = 2.0
+        val marketToPeakStdDevFactor = 7.0
 
-//    BTC/ETH
-//    val tickSize = BigDecimal("0.05")
-//    val initialPrice = BigDecimal(17.5)
-//    val marketToPeakStdDevFactor = 7.0
+        val (offerPrices, bidPrices) = Maker.offerAndBidPrices(tickSize = tickSize, levels = 20, levelsSpread = 100, curPrice = initialPrice)
+        val offerAmounts =
+            Maker.generateAsymmetricGaussianAmounts(offerPrices, BigInteger("10000"), marketToPeakStdDevFactor, peakToOuterStdDevFactor)
+        val bidAmounts = Maker.generateAsymmetricGaussianAmounts(bidPrices, BigInteger("10000"), peakToOuterStdDevFactor, marketToPeakStdDevFactor)
 
-//    BTC/USDC
-//    val tickSize = BigDecimal("1")
-//    val initialPrice = BigDecimal(68390.500)
-//    val marketToPeakStdDevFactor = 7.0
-    val peakToOuterStdDevFactor = 2.0
+        val chart = XYChartBuilder().width(600).height(300)
+            .title(market)
+            .xAxisTitle("Price")
+            .yAxisTitle("Amount").build()
 
-    val (offerPrices, bidPrices) = Maker.offerAndBidPrices(tickSize = tickSize, levels = 20, levelsSpread = 100, curPrice = initialPrice)
-    val offerAmounts =  Maker.generateAsymmetricGaussianAmounts(offerPrices, BigInteger("10000"), marketToPeakStdDevFactor, peakToOuterStdDevFactor)
-    val bidAmounts =  Maker.generateAsymmetricGaussianAmounts(bidPrices, BigInteger("10000"), peakToOuterStdDevFactor, marketToPeakStdDevFactor)
+        chart.addSeries("offers", offerPrices, offerAmounts)
+        chart.addSeries("bids", bidPrices, bidAmounts)
 
-    val chart = XYChartBuilder().width(1200).height(600)
-        .xAxisTitle("Price")
-        .yAxisTitle("Amount").build()
-
-    chart.addSeries("offers", offerPrices, offerAmounts)
-    chart.addSeries("bids", bidPrices, bidAmounts)
-
-    SwingWrapper(chart).displayChart()
-
+        SwingWrapper(chart).displayChart()
+    }
 }
