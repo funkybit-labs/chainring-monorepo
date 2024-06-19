@@ -132,7 +132,21 @@ export function SwapModal({
               )}
             >
               <div className="mb-2 flex flex-row justify-between">
-                <span className="text-base text-darkBluishGray1">Sell</span>
+                <span className="text-base text-darkBluishGray1">
+                  Sell
+                  {(sr.topLimit ?? BigInt(0)) > BigInt(0) && (
+                    <button
+                      className="ml-2 rounded bg-darkBluishGray6 px-2 py-1 text-sm text-darkBluishGray2 hover:bg-blue5"
+                      onClick={() => {
+                        sr.side === 'Sell'
+                          ? sr.handleMaxBaseAmount()
+                          : sr.handleMaxQuoteAmount()
+                      }}
+                    >
+                      Max
+                    </button>
+                  )}
+                </span>
                 <div className="flex flex-row items-baseline space-x-2 text-sm">
                   {depositAmount(
                     exchangeContractAddress && sr.topBalance,
@@ -161,14 +175,8 @@ export function SwapModal({
                       : sr.handleBaseAmountChange
                   }
                   sellAssetsNeeded={sr.sellAssetsNeeded}
-                  showMax={(sr.topLimit ?? BigInt(0)) > BigInt(0)}
                   onDeposit={() => {
                     openDepositModal(sr.topSymbol)
-                  }}
-                  onMaxSelected={() => {
-                    sr.side === 'Sell'
-                      ? sr.handleMaxBaseAmount()
-                      : sr.handleMaxQuoteAmount()
                   }}
                   inputRef={sellAmountInputRef}
                 />
@@ -308,18 +316,14 @@ function SellAmountInput({
   disabled,
   onChange,
   sellAssetsNeeded,
-  showMax,
   onDeposit,
-  onMaxSelected,
   inputRef
 }: {
   value: string
   disabled: boolean
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   sellAssetsNeeded: bigint
-  showMax: boolean
   onDeposit: () => void
-  onMaxSelected: () => void
   inputRef: React.RefObject<HTMLInputElement>
 }) {
   const [divRef, { width: spanWidth }] = useMeasure<HTMLDivElement>()
@@ -363,16 +367,6 @@ function SellAmountInput({
               onClick={onDeposit}
             >
               Deposit
-            </button>
-          </>
-        )}
-        {sellAssetsNeeded <= 0n && showMax && (
-          <>
-            <button
-              className="ml-2 rounded bg-darkBluishGray6 px-2 py-1 text-sm text-darkBluishGray2 hover:bg-blue5"
-              onClick={onMaxSelected}
-            >
-              Max
             </button>
           </>
         )}

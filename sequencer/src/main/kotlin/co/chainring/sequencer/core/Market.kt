@@ -480,6 +480,7 @@ data class Market(
             if (order.type == Order.Type.LimitSell || order.type == Order.Type.LimitBuy) {
                 AddOrderResult(OrderDisposition.Accepted, noExecutions)
             } else {
+                logger.debug { "Order ${order.guid}: Market order rejected due to no match" }
                 AddOrderResult(OrderDisposition.Rejected, noExecutions)
             }
         }
@@ -583,6 +584,7 @@ data class Market(
         return if (order.type == Order.Type.LimitSell) {
             val levelIx = levelIx(order.price.toBigDecimal())
             if (levelIx > levels.lastIndex || levelIx < 0) {
+                logger.debug { "Order ${order.guid}: LimitSell level (ix $levelIx) overflow/underflow" }
                 AddOrderResult(OrderDisposition.Rejected, noExecutions)
             } else {
                 if (levels[levelIx].price <= bestBid) {
@@ -600,6 +602,7 @@ data class Market(
                         val adjustedOrder = order.copy { amount = remainingAmount.toIntegerValue() }
                         val disposition = createLimitSellOrder(levelIx, wallet, adjustedOrder, feeRates.maker)
                         val finalDisposition = if (crossingOrderResult.disposition == OrderDisposition.Accepted && disposition == OrderDisposition.Rejected) {
+                            logger.debug { "Order ${order.guid}: remaining LimitSell amount rejected" }
                             OrderDisposition.Rejected
                         } else {
                             crossingOrderResult.disposition
@@ -624,6 +627,7 @@ data class Market(
         } else if (order.type == Order.Type.LimitBuy) {
             val levelIx = levelIx(order.price.toBigDecimal())
             if (levelIx < 0 || levelIx > levels.lastIndex) {
+                logger.debug { "Order ${order.guid}: LimitBuy level (ix $levelIx) overflow/underflow" }
                 AddOrderResult(OrderDisposition.Rejected, noExecutions)
             } else {
                 if (levels[levelIx].price >= bestOffer) {
@@ -642,6 +646,7 @@ data class Market(
                         val disposition = createLimitBuyOrder(levelIx, wallet, adjustedOrder, feeRates.maker)
 
                         val finalDisposition = if (crossingOrderResult.disposition == OrderDisposition.Accepted && disposition == OrderDisposition.Rejected) {
+                            logger.debug { "Order ${order.guid}: remaining LimitBuy amount rejected" }
                             OrderDisposition.Rejected
                         } else {
                             crossingOrderResult.disposition
@@ -669,6 +674,7 @@ data class Market(
         } else if (order.type == Order.Type.MarketSell) {
             handleCrossingOrder(order)
         } else {
+            logger.error { "Order ${order.guid}: Unknown order type ${order.type} rejected" }
             AddOrderResult(OrderDisposition.Rejected, noExecutions)
         }
     }
@@ -682,6 +688,8 @@ data class Market(
             if (levels[levelIx].price > bestBid) {
                 bestBid = levels[levelIx].price
             }
+        } else {
+            logger.debug { "Limit Buy order rejected due to level exhaustion" }
         }
         return disposition
     }
@@ -695,6 +703,8 @@ data class Market(
             if (levels[levelIx].price < bestOffer) {
                 bestOffer = levels[levelIx].price
             }
+        } else {
+            logger.debug { "Limit Sell order rejected due to level exhaustion" }
         }
         return disposition
     }
