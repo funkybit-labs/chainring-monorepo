@@ -18,6 +18,7 @@ import { useMeasure } from 'react-use'
 import { useGesture } from '@use-gesture/react'
 import { MarketTitle } from 'components/Screens/HomeScreen/MarketTitle'
 import { OrderSide } from 'apiClient'
+import usePageVisibility from 'hooks/usePageVisibility'
 
 enum PricesInterval {
   PT1H = '1h',
@@ -136,6 +137,7 @@ export function PricesWidget({
   const [rawDailyChange, setRawDailyChange] = useState<number | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [side, setSide] = useState(requestedSide)
+  const { isPageVisible } = usePageVisibility()
 
   useEffect(() => {
     setSide(requestedSide)
@@ -274,6 +276,7 @@ export function PricesWidget({
               params={{
                 width: Math.max(width - 40, 0), // paddings
                 height: 500,
+                renderAnimation: isPageVisible,
                 interval: interval,
                 resetInterval: () => setPricesInterval(null),
                 duration: duration,
@@ -297,6 +300,7 @@ export function PricesWidget({
 type PricesParameters = {
   width: number
   height: number
+  renderAnimation: boolean
   interval: PricesInterval | null
   resetInterval: () => void
   duration: OHLCDuration
@@ -418,11 +422,16 @@ function OHLCChart({
       svg.select('.y-axis-grid').call(yAxisGrid.scale(yScale))
 
       // update current price tracker
-      svg
+      let lastPriceSelection = svg
         .select('.y-axis-current-price')
         .classed('hidden', !lastPrice)
-        // .transition()
-        // .duration(150)
+      if (params.renderAnimation) {
+        // @ts-expect-error Selection and Transition interfaces are compatible, casting only because of generic BaseType
+        lastPriceSelection = lastPriceSelection
+          .transition()
+          .duration(150) as typeof lastPriceSelection
+      }
+      lastPriceSelection
         .attr('transform', `translate(0,${lastPrice ? yScale(lastPrice) : 0})`)
         .select('text')
         .text(lastPrice ? lastPrice.toFixed(lastPriceDecimalPlaces) : '')
@@ -509,7 +518,8 @@ function OHLCChart({
       yAxisGrid,
       yScale,
       params.duration,
-      lastPriceDecimalPlaces
+      lastPriceDecimalPlaces,
+      params.renderAnimation
     ]
   )
 
