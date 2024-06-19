@@ -495,7 +495,7 @@ function OrderBookChart({
   drawChart()
 
   return (
-    <div className="h-full">
+    <div className="relative">
       <svg
         ref={svgRef}
         width={width}
