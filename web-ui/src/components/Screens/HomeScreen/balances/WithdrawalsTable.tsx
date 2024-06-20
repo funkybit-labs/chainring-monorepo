@@ -1,21 +1,24 @@
-import { Withdrawal } from 'apiClient'
+import { Chain, Withdrawal } from 'apiClient'
 import TradingSymbols from 'tradingSymbols'
 import { format } from 'date-fns'
 import { formatUnits } from 'viem'
 import React, { Fragment } from 'react'
 import { Status } from 'components/common/Status'
 import { SymbolAndChain } from 'components/common/SymbolAndChain'
-import { ExpandableValue } from 'components/common/ExpandableNumber'
+import { ExpandableValue } from 'components/common/ExpandableValue'
+import { TxHashDisplay } from 'components/common/HashValue'
 
 export function WithdrawalsTable({
   withdrawals,
-  symbols
+  symbols,
+  chains
 }: {
   withdrawals: Withdrawal[]
   symbols: TradingSymbols
+  chains: Chain[]
 }) {
   return (
-    <div className="grid max-h-72 auto-rows-max grid-cols-[max-content_max-content_1fr_max-content] items-center overflow-scroll">
+    <div className="grid max-h-72 auto-rows-max grid-cols-[max-content_max-content_1fr_max-content_max-content] items-center overflow-scroll">
       {withdrawals.map((withdrawal) => {
         const symbol = symbols.getByName(withdrawal.symbol)
 
@@ -36,6 +39,17 @@ export function WithdrawalsTable({
               <ExpandableValue
                 value={formatUnits(withdrawal.amount, symbol.decimals)}
               />
+            </div>
+            <div className="mb-4 mr-4 inline-block text-center align-text-top text-sm">
+              {withdrawal.txHash && (
+                <TxHashDisplay
+                  txHash={withdrawal.txHash}
+                  blockExplorerUrl={
+                    chains.find((chain) => chain.id == symbol.chainId)
+                      ?.blockExplorerUrl
+                  }
+                />
+              )}
             </div>
             <div className="mb-4 mr-4 inline-block text-center align-text-top text-sm">
               <Status status={withdrawal.status} />

@@ -1,5 +1,5 @@
 import { Address } from 'viem'
-import { apiClient } from 'apiClient'
+import { apiClient, Chain } from 'apiClient'
 import React, { useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import TradingSymbols from 'tradingSymbols'
@@ -20,11 +20,13 @@ type Tab = 'Available' | 'Deposits' | 'Withdrawals'
 export default function BalancesWidget({
   walletAddress,
   exchangeContractAddress,
-  symbols
+  symbols,
+  chains
 }: {
   walletAddress?: Address
   exchangeContractAddress?: Address
   symbols: TradingSymbols
+  chains: Chain[]
 }) {
   const [selectedTab, setSelectedTab] = useState<Tab>('Available')
 
@@ -127,6 +129,7 @@ export default function BalancesWidget({
                         <WithdrawalsTable
                           withdrawals={withdrawalsQuery.data.withdrawals}
                           symbols={symbols}
+                          chains={chains}
                         />
                       )
                     case 'Deposits':
@@ -134,6 +137,7 @@ export default function BalancesWidget({
                         <DepositsTable
                           deposits={depositsQuery.data.deposits}
                           symbols={symbols}
+                          chains={chains}
                         />
                       )
                   }

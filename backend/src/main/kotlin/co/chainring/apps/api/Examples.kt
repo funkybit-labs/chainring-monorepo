@@ -163,21 +163,22 @@ object Examples {
     )
 
     var withdrawal = Withdrawal(
-        WithdrawalId("id"),
-        Symbol("USDC"),
-        BigInteger("200000"),
-        WithdrawalStatus.Pending,
+        id = WithdrawalId("id"),
+        symbol = Symbol("USDC"),
+        amount = BigInteger("200000"),
+        status = WithdrawalStatus.Pending,
         error = null,
         createdAt = Clock.System.now(),
+        txHash = TxHash.emptyHash(),
     )
 
     var deposit = Deposit(
-        DepositId("id"),
-        Symbol("USDC"),
-        BigInteger("200000"),
-        Deposit.Status.Pending,
+        id = DepositId("id"),
+        symbol = Symbol("USDC"),
+        amount = BigInteger("200000"),
+        status = Deposit.Status.Pending,
         error = null,
         createdAt = Clock.System.now(),
-        TxHash.emptyHash(),
+        txHash = TxHash.emptyHash(),
     )
 }

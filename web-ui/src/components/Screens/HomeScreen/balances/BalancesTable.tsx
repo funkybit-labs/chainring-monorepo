@@ -24,7 +24,7 @@ import { useConfig, useSwitchChain } from 'wagmi'
 import { allChains } from 'wagmiConfig'
 import TradingSymbol from 'tradingSymbol'
 import { SymbolAndChain } from 'components/common/SymbolAndChain'
-import { ExpandableValue } from 'components/common/ExpandableNumber'
+import { ExpandableValue } from 'components/common/ExpandableValue'
 
 export function BalancesTable({
   walletAddress,

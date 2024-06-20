@@ -279,6 +279,7 @@ export type DepositStatus = z.infer<typeof DepositStatusSchema>
 const DepositSchema = z.object({
   id: z.string(),
   symbol: z.string(),
+  txHash: z.string(),
   amount: z.coerce.bigint(),
   status: DepositStatusSchema,
   error: z.string().nullable(),
@@ -312,6 +313,7 @@ export type WithdrawalStatus = z.infer<typeof WithdrawalStatusSchema>
 const WithdrawalSchema = z.object({
   id: z.string(),
   symbol: z.string(),
+  txHash: z.string().nullable(),
   amount: z.coerce.bigint(),
   status: WithdrawalStatusSchema,
   error: z.string().nullable(),

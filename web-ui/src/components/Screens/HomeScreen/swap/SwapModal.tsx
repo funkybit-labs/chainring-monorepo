@@ -18,7 +18,7 @@ import {
 } from 'components/Screens/HomeScreen/swap/SwapInternals'
 import { bigintToScaledDecimal, scaledDecimalToBigint } from 'utils/pricesUtils'
 import Decimal from 'decimal.js'
-import { ExpandableValue } from 'components/common/ExpandableNumber'
+import { ExpandableValue } from 'components/common/ExpandableValue'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 

@@ -1,21 +1,24 @@
-import { Deposit } from 'apiClient'
+import { Chain, Deposit } from 'apiClient'
 import TradingSymbols from 'tradingSymbols'
 import { format } from 'date-fns'
 import { formatUnits } from 'viem'
 import React, { Fragment } from 'react'
 import { Status } from 'components/common/Status'
 import { SymbolAndChain } from 'components/common/SymbolAndChain'
-import { ExpandableValue } from 'components/common/ExpandableNumber'
+import { ExpandableValue } from 'components/common/ExpandableValue'
+import { TxHashDisplay } from 'components/common/HashValue'
 
 export function DepositsTable({
   deposits,
-  symbols
+  symbols,
+  chains
 }: {
   deposits: Deposit[]
   symbols: TradingSymbols
+  chains: Chain[]
 }) {
   return (
-    <div className="grid max-h-72 auto-rows-max grid-cols-[max-content_max-content_1fr_max-content] items-center overflow-scroll">
+    <div className="grid max-h-72 auto-rows-max grid-cols-[max-content_max-content_1fr_max-content_max-content] items-center overflow-scroll">
       {deposits.map((deposit) => {
         const symbol = symbols.getByName(deposit.symbol)
 
@@ -35,6 +38,15 @@ export function DepositsTable({
             <div className="mb-4 inline-block w-full text-center align-text-top text-sm">
               <ExpandableValue
                 value={formatUnits(deposit.amount, symbol.decimals)}
+              />
+            </div>
+            <div className="mb-4 mr-4 inline-block text-center align-text-top text-sm">
+              <TxHashDisplay
+                txHash={deposit.txHash}
+                blockExplorerUrl={
+                  chains.find((chain) => chain.id == symbol.chainId)
+                    ?.blockExplorerUrl
+                }
               />
             </div>
             <div className="mb-4 mr-4 inline-block text-center align-text-top text-sm">

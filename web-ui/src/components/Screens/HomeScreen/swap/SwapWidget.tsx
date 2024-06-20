@@ -12,7 +12,7 @@ import {
   SwapInternals,
   SwapRender
 } from 'components/Screens/HomeScreen/swap/SwapInternals'
-import { ExpandableValue } from 'components/common/ExpandableNumber'
+import { ExpandableValue } from 'components/common/ExpandableValue'
 import { bigintToScaledDecimal, scaledDecimalToBigint } from 'utils/pricesUtils'
 import Decimal from 'decimal.js'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'

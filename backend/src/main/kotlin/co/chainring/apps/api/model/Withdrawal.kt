@@ -2,6 +2,7 @@ package co.chainring.apps.api.model
 
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Symbol
+import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalId
@@ -30,16 +31,18 @@ data class Withdrawal(
     val status: WithdrawalStatus,
     val error: String?,
     val createdAt: Instant,
+    val txHash: TxHash?,
 ) {
     companion object {
         fun fromEntity(entity: WithdrawalEntity): Withdrawal {
             return Withdrawal(
-                entity.id.value,
-                Symbol(entity.symbol.name),
-                entity.actualAmount ?: entity.amount,
-                entity.status,
-                entity.error,
-                entity.createdAt,
+                id = entity.id.value,
+                symbol = Symbol(entity.symbol.name),
+                amount = entity.actualAmount ?: entity.amount,
+                status = entity.status,
+                error = entity.error,
+                createdAt = entity.createdAt,
+                txHash = entity.blockchainTransaction?.txHash?.let { TxHash(it.value) },
             )
         }
     }

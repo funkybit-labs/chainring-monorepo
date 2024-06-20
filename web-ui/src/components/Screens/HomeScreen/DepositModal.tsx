@@ -18,7 +18,7 @@ import { depositsQueryKey } from 'components/Screens/HomeScreen/balances/Balance
 import { encodeFunctionData, EncodeFunctionDataParameters } from 'viem'
 import { isErrorFromAlias } from '@zodios/core'
 import TradingSymbol from 'tradingSymbol'
-import { ExpandableValue } from 'components/common/ExpandableNumber'
+import { ExpandableValue } from 'components/common/ExpandableValue'
 
 export default function DepositModal({
   exchangeContractAddress,

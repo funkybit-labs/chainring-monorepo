@@ -1,4 +1,4 @@
-import { apiClient, OrderSide } from 'apiClient'
+import { apiClient, Chain, OrderSide } from 'apiClient'
 import { useAccount } from 'wagmi'
 import BalancesWidget from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import { Header, Tab } from 'components/Screens/Header'
@@ -38,47 +38,51 @@ function HomeScreenContent() {
     (window.sessionStorage.getItem('tab') as Tab | null) ?? 'Swap'
   )
 
-  const { exchangeContract, markets, symbols, feeRates } = useMemo(() => {
-    const config = configQuery.data
-    const chainConfig = config?.chains.find(
-      (chain) => chain.id === (wallet.chainId || config.chains[0]?.id)
-    )
+  const { exchangeContract, chains, markets, symbols, feeRates } =
+    useMemo(() => {
+      const config = configQuery.data
+      const chainConfig = config?.chains.find(
+        (chain) => chain.id === (wallet.chainId || config.chains[0]?.id)
+      )
 
-    const exchangeContract = chainConfig?.contracts?.find(
-      (c) => c.name == 'Exchange'
-    )
+      const exchangeContract = chainConfig?.contracts?.find(
+        (c) => c.name == 'Exchange'
+      )
 
-    const symbols = config
-      ? new TradingSymbols(
-          config?.chains
-            .map((chain) =>
-              chain.symbols.map(
-                (symbol) =>
-                  new TradingSymbol(
-                    symbol.name,
-                    chain.name,
-                    symbol.description,
-                    symbol.contractAddress,
-                    symbol.decimals,
-                    chain.id
-                  )
+      const symbols = config
+        ? new TradingSymbols(
+            config?.chains
+              .map((chain) =>
+                chain.symbols.map(
+                  (symbol) =>
+                    new TradingSymbol(
+                      symbol.name,
+                      chain.name,
+                      symbol.description,
+                      symbol.contractAddress,
+                      symbol.decimals,
+                      chain.id
+                    )
+                )
               )
-            )
-            .reduce((accumulator, value) => accumulator.concat(value), [])
-        )
-      : null
-    const markets =
-      config && symbols ? new Markets(config.markets, symbols) : null
+              .reduce((accumulator, value) => accumulator.concat(value), [])
+          )
+        : null
+      const markets =
+        config && symbols ? new Markets(config.markets, symbols) : null
 
-    const feeRates = config && config.feeRates
+      const feeRates = config && config.feeRates
 
-    return {
-      exchangeContract,
-      markets,
-      symbols,
-      feeRates
-    }
-  }, [configQuery.data, wallet.chainId])
+      const chains: Chain[] = config?.chains ?? []
+
+      return {
+        exchangeContract,
+        chains,
+        markets,
+        symbols,
+        feeRates
+      }
+    }, [configQuery.data, wallet.chainId])
 
   useEffect(() => {
     if (markets !== null && selectedMarket == null) {
@@ -168,6 +172,7 @@ function HomeScreenContent() {
                       walletAddress={wallet.address}
                       exchangeContractAddress={exchangeContract?.address}
                       symbols={symbols}
+                      chains={chains}
                     />
                   </div>
                 )}
@@ -206,6 +211,7 @@ function HomeScreenContent() {
                     walletAddress={wallet.address}
                     exchangeContractAddress={exchangeContract?.address}
                     symbols={symbols}
+                    chains={chains}
                   />
                 </div>
               )}
