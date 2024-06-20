@@ -14,7 +14,7 @@ import Trash from 'assets/Trash.svg'
 import { SymbolAndChain } from 'components/common/SymbolAndChain'
 import Decimal from 'decimal.js'
 import { scaledDecimalToBigint } from 'utils/pricesUtils'
-import { ExpandableValue } from 'components/common/ExpandableNumber'
+import { ExpandableValue } from 'components/common/ExpandableValue'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 
