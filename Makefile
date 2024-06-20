@@ -36,10 +36,10 @@ db_seed:
 local_init: start_containers contracts db_migrate db_seed
 
 lint:
-	./gradlew lintKotlin && cd web-ui && pnpm run lint
+	./gradlew lintKotlin && (cd web-ui && pnpm run lint) && (cd telegram-mini-app && pnpm run lint)
 
 format:
-	./gradlew formatKotlin && (cd web-ui && pnpm run lint --fix) && (cd terraform && terraform fmt -recursive)
+	./gradlew formatKotlin && (cd web-ui && pnpm run lint --fix) && (cd telegram-mini-app && pnpm run lint --fix) && (cd terraform && terraform fmt -recursive)
 
 test:
 	./gradlew test
