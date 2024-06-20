@@ -1,35 +1,20 @@
 import { createRoot } from 'react-dom/client'
 import 'tailwindcss/tailwind.css'
-import React, { useEffect } from 'react'
-import { useExpand, useShowPopup } from '@vkruglikov/react-telegram-web-app'
-import { Button } from 'components/common/Button'
+import React, { useState } from 'react'
+import IntroScreen from 'components/IntroScreen'
+import MainScreen from 'components/MainScreen'
 
 const container = document.getElementById('root') as HTMLDivElement
 const root = createRoot(container)
 
 const App = () => {
-  const showPopup = useShowPopup()
-  const [, expand] = useExpand()
+  const [showIntro, setShowIntro] = useState(true)
 
-  useEffect(() => {
-    expand()
-  }, [expand])
-
-  const showPopupOnClick = async () => {
-    await showPopup({ title: 'Hello', message: 'World' })
+  if (showIntro) {
+    return <IntroScreen onStartButtonClick={() => setShowIntro(false)} />
+  } else {
+    return <MainScreen />
   }
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-darkBluishGray10">
-      <Button
-        caption={() => 'Test'}
-        disabled={false}
-        onClick={showPopupOnClick}
-        style="normal"
-        width="normal"
-      />
-    </div>
-  )
 }
 
 root.render(<App />)

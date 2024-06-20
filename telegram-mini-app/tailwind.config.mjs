@@ -31,23 +31,12 @@ export default {
       darkBluishGray1: "#95B2D4",
       lightBluishGray2: "#EBEEF4",
       lightBluishGray5: "#CDD1D7",
-      primary4: "#006FE3",
-      primary5: "#2D94FF",
+      primary4: "#FFA337",
+      primary5: "#FF8A00",
       blue5: "#426d9e",
-      olhcGreen: "#39CF63",
-      olhcRed: "#FF5A50",
-      orangeShadow: "#F7931ABF",
-
-      // status colors
-      statusOrange: "#FFA337",
-      statusYellow: "#FFEB82",
-      statusRed: "#FF7169",
-      statusBlue: "#2D94FF",
-      statusGreen: "#42C66B",
-    },
-    height: {
-      viewportStable: "var(--tg-viewport-stable-height)",
-      viewport: "var(--tg-viewport-height)",
+      white: "#FFF",
+      black: "#111",
+      transparent: "transparent",
     },
   },
   plugins: [
