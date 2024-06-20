@@ -6,7 +6,7 @@ import React, { Fragment } from 'react'
 import { Status } from 'components/common/Status'
 import { SymbolAndChain } from 'components/common/SymbolAndChain'
 import { ExpandableValue } from 'components/common/ExpandableValue'
-import { TxHashDisplay } from 'components/common/HashValue'
+import { TxHashDisplay } from 'components/common/TxHashDisplay'
 
 export function WithdrawalsTable({
   withdrawals,
