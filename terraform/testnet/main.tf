@@ -76,7 +76,7 @@ module "rds" {
   name_prefix    = local.name_prefix
   subnet_id_1    = module.vpc.private_subnet_id_1
   subnet_id_2    = module.vpc.private_subnet_id_2
-  instance_class = "db.t3.large"
+  instance_class = "db.r7g.xlarge"
   security_groups = [
     module.api.security_group_id, module.bastion.security_group.id, module.sequencer.security_group_id,
     module.ring.security_group_id
@@ -88,6 +88,17 @@ module "rds" {
 
 module "web" {
   source      = "../modules/web"
+  name_prefix = local.name_prefix
+  zone        = local.zone
+  providers = {
+    aws.us_east_1 = aws.us_east_1
+  }
+  ci_role_arn     = data.terraform_remote_state.shared.outputs.ci_role_arn
+  certificate_arn = data.aws_acm_certificate.chainring_finance_us_east_1.arn
+}
+
+module "telegram_mini_app" {
+  source      = "../modules/telegram_mini_app"
   name_prefix = local.name_prefix
   zone        = local.zone
   providers = {

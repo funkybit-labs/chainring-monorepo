@@ -1,12 +1,19 @@
 environment:
   backend:
     DB_HOST: testnet-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
-    EVM_NETWORK_URL: https://testnet-rpc.bitlayer.org
-    AUTH_TOKEN_VALIDITY_INTERVAL: P1D
+    EVM_CHAINS: Bitlayer,Base
+    EVM_NETWORK_URL_Bitlayer: https://testnet-rpc.bitlayer.org
+    EVM_NETWORK_URL_Base: https://sepolia.base.org
+    BLOCK_EXPLORER_NET_NAME_Bitlayer: Bitlayer Test
+    BLOCK_EXPLORER_NET_NAME_Base: Base Sepolia
+    BLOCK_EXPLORER_URL_Bitlayer: https://testnet.btrscan.com
+    BLOCK_EXPLORER_URL_Base: https://base-sepolia.blockscout.com
+    AUTH_TOKEN_VALIDITY_INTERVAL: P7D
     SEQUENCER_HOST_NAME: testnet-sequencer.chainring.co
     SEQUENCER_PORT: "5337"
     EVM_FEE_ACCOUNT_ADDRESS: "0x5E027795ec717ae1cAfa705F93720C02aB429b95"
-    DEFAULT_MAX_PRIORITY_FEE_PER_GAS_WEI: "100000000"
+    DEFAULT_MAX_PRIORITY_FEE_PER_GAS_WEI_Bitlayer: "100000000"
+    DEFAULT_MAX_PRIORITY_FEE_PER_GAS_WEI_Base: "100000"
     SLACK_ERROR_REPORTING_CHANNEL_ID: C0723AASGTH
     MAKER_FEE_RATE: "0.01"
     TAKER_FEE_RATE: "0.02"
@@ -22,7 +29,7 @@ services:
     is_essential: "true"
     environment: backend
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-45c44b9b-ac53-47ab-8997-6d5d799ce4bc-OY4iRs
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-c66acd9d-f00f-43b2-b65d-f260a5b0a8f9-xyU8ZN
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   ring:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
@@ -30,9 +37,9 @@ services:
     no_rolling_upgrade: "true"
     environment: backend
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-45c44b9b-ac53-47ab-8997-6d5d799ce4bc-OY4iRs
-      EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/api/EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY-3R6syW
-      EVM_SUBMITTER_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/api/EVM_SUBMITTER_PRIVATE_KEY-kEoDjh
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-c66acd9d-f00f-43b2-b65d-f260a5b0a8f9-xyU8ZN
+      EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/ring/EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY-2liWFE
+      EVM_SUBMITTER_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/ring/EVM_SUBMITTER_PRIVATE_KEY-UkdEuD
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   sequencer:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer
@@ -41,5 +48,5 @@ services:
     no_rolling_upgrade: "true"
     environment: sequencer
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-45c44b9b-ac53-47ab-8997-6d5d799ce4bc-OY4iRs
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-c66acd9d-f00f-43b2-b65d-f260a5b0a8f9-xyU8ZN
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
