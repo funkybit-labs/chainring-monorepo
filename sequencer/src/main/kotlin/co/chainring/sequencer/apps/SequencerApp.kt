@@ -43,7 +43,6 @@ import kotlin.concurrent.thread
 import kotlin.system.exitProcess
 import co.chainring.sequencer.core.inputQueue as defaultInputQueue
 import co.chainring.sequencer.core.outputQueue as defaultOutputQueue
-import kotlin.math.log
 
 class SequencerApp(
     val inputQueue: RollingChronicleQueue = defaultInputQueue,
@@ -501,10 +500,6 @@ class SequencerApp(
                         dc.wire()?.read()?.bytes { bytes ->
                             val request = SequencerRequest.parseFrom(bytes.toByteArray())
                             val response = processRequest(request, dc.index(), startTime)
-
-                            if (response.sequence == 85444079560476){
-                                logger.debug { "breakpoint" }
-                            }
 
                             if (strictReplayValidation && response.sequence <= lastSequenceNumberProcessedBeforeRestart) {
                                 // validate actual response matches expected while replaying requests
