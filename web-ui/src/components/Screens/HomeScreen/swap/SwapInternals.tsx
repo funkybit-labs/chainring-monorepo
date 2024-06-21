@@ -720,7 +720,7 @@ export function SwapInternals({
     if (side == 'Buy' && notional + fee > (quoteLimit || 0n)) return false
     if (side == 'Sell' && baseAmount > (baseLimit || 0n)) return false
 
-    if (noPriceFound) return false
+    if (noPriceFound && !isLimitOrder) return false
 
     return true
   }, [
