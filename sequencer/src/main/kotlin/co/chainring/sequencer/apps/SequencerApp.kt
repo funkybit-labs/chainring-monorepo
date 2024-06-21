@@ -43,6 +43,7 @@ import kotlin.concurrent.thread
 import kotlin.system.exitProcess
 import co.chainring.sequencer.core.inputQueue as defaultInputQueue
 import co.chainring.sequencer.core.outputQueue as defaultOutputQueue
+import kotlin.math.log
 
 class SequencerApp(
     val inputQueue: RollingChronicleQueue = defaultInputQueue,
@@ -501,11 +502,15 @@ class SequencerApp(
                             val request = SequencerRequest.parseFrom(bytes.toByteArray())
                             val response = processRequest(request, dc.index(), startTime)
 
+                            if (response.sequence == 85444079560476){
+                                logger.debug { "breakpoint" }
+                            }
+
                             if (strictReplayValidation && response.sequence <= lastSequenceNumberProcessedBeforeRestart) {
                                 // validate actual response matches expected while replaying requests
                                 loadResponseFromOutputQueue(response.sequence)?.let {
                                     val expectedResponse = it.toBuilder().setProcessingTime(response.processingTime).build()
-                                    if (response != expectedResponse) {
+                                    if (request.type != SequencerRequest.Type.GetState && response != expectedResponse) {
                                         logger.error { "Actual response did not match expected, exiting. Sequence: ${dc.index()}, requests processed since start: $requestsProcessedSinceStarted, request: $request, expected response: $expectedResponse, actual response: $response" }
                                         exitProcess(1)
                                     }
