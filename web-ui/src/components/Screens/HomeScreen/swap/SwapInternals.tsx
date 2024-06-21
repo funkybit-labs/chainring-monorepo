@@ -58,6 +58,8 @@ export type SwapRender = {
   buyLimitPriceInputValue: string
   buyLimitPrice: Decimal
   limitPrice: Decimal
+  limitPriceTooLow: boolean
+  limitPriceTooHigh: boolean
   setPriceFromMarketPrice: (incrementDivisor?: bigint) => void
   noPriceFound: boolean
   canSubmit: boolean
@@ -260,7 +262,7 @@ export function SwapInternals({
       limitPrice
         .mul(new Decimal(10).pow(market.quoteSymbol.decimals))
         .floor()
-        .toString()
+        .toFixed(0)
     )
   }, [limitPrice, market])
 
@@ -715,7 +717,12 @@ export function SwapInternals({
   const canSubmit = useMemo(() => {
     if (mutation.isPending) return false
     if (baseAmount <= 0n) return false
-    if (limitPrice.lte(new Decimal(0)) && isLimitOrder) return false
+    if (
+      isLimitOrder &&
+      (limitPrice.lt(market.minAllowedBidPrice) ||
+        limitPrice.gt(market.maxAllowedOfferPrice))
+    )
+      return false
 
     if (side == 'Buy' && notional + fee > (quoteLimit || 0n)) return false
     if (side == 'Sell' && baseAmount > (baseLimit || 0n)) return false
@@ -733,7 +740,9 @@ export function SwapInternals({
     quoteLimit,
     baseLimit,
     noPriceFound,
-    fee
+    fee,
+    market.minAllowedBidPrice,
+    market.maxAllowedOfferPrice
   ])
 
   const [buyAmountInputValue, sellAmountInputValue] = useMemo(() => {
@@ -834,6 +843,25 @@ export function SwapInternals({
     return
   }, [orderBook, side, baseAmount, market, buyLimitPrice, quoteSymbol])
 
+  const [limitPriceTooLow, limitPriceTooHigh] = useMemo(() => {
+    const limitPriceTooLow =
+      isLimitOrder &&
+      limitPrice.gt(new Decimal(0)) &&
+      limitPrice.lt(market.minAllowedBidPrice)
+    const limitPriceTooHigh =
+      isLimitOrder && limitPrice.gt(market.maxAllowedOfferPrice)
+
+    return side === 'Sell'
+      ? [limitPriceTooLow, limitPriceTooHigh]
+      : [limitPriceTooHigh, limitPriceTooLow]
+  }, [
+    isLimitOrder,
+    limitPrice,
+    market.minAllowedBidPrice,
+    market.maxAllowedOfferPrice,
+    side
+  ])
+
   return Renderer({
     topBalance,
     topSymbol,
@@ -858,6 +886,8 @@ export function SwapInternals({
     buyLimitPriceInputValue,
     buyLimitPrice,
     limitPrice,
+    limitPriceTooLow,
+    limitPriceTooHigh,
     setPriceFromMarketPrice,
     noPriceFound,
     canSubmit,

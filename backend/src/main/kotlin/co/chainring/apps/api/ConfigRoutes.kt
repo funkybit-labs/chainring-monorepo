@@ -81,6 +81,8 @@ object ConfigRoutes {
                                 quoteDecimals = 6,
                                 tickSize = "0.01".toBigDecimal(),
                                 lastPrice = "0.995".toBigDecimal(),
+                                minAllowedBidPrice = "0.01".toBigDecimal(),
+                                maxAllowedOfferPrice = "3.49".toBigDecimal(),
                             ),
                         ),
                         feeRates = FeeRates(
@@ -126,6 +128,8 @@ object ConfigRoutes {
                                     quoteDecimals = market.quoteSymbol.decimals.toInt(),
                                     tickSize = market.tickSize,
                                     lastPrice = market.lastPrice,
+                                    minAllowedBidPrice = market.minAllowedBidPrice,
+                                    maxAllowedOfferPrice = market.maxAllowedOfferPrice,
                                 )
                             }.sortedWith(compareBy({ it.baseSymbol.value }, { it.quoteSymbol.value })),
                             feeRates = FeeRates.fetch(),

@@ -359,6 +359,8 @@ class ExchangeApiService(
                         quoteDecimals = it.quoteSymbol.decimals.toInt(),
                         tickSize = it.tickSize,
                         lastPrice = it.lastPrice,
+                        minAllowedBidPrice = it.minAllowedBidPrice,
+                        maxAllowedOfferPrice = it.maxAllowedOfferPrice,
                     )
                 }
             }

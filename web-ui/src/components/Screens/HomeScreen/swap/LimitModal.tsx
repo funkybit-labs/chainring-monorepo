@@ -371,11 +371,19 @@ export function LimitModal({
                         }
                       } else if (sr.mutation.isSuccess) {
                         return '✓ Submitted'
+                      } else if (sr.limitPriceTooLow) {
+                        return 'Price Too Low'
+                      } else if (sr.limitPriceTooHigh) {
+                        return 'Price Too High'
                       } else {
                         return 'Swap'
                       }
                     }}
-                    status={sr.mutation.status}
+                    status={
+                      sr.limitPriceTooLow || sr.limitPriceTooHigh
+                        ? 'error'
+                        : sr.mutation.status
+                    }
                   />
                 </>
               ) : (
