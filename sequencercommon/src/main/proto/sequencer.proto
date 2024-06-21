@@ -38,6 +38,8 @@ message MarketCreated {
   DecimalValue tickSize = 2;
   uint32 baseDecimals = 3;
   uint32 quoteDecimals = 4;
+  DecimalValue maxAllowedOffer = 5;
+  DecimalValue minAllowedBid = 6;
 }
 
 message FeeRates {

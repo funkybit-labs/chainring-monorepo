@@ -14,6 +14,7 @@ import co.chainring.sequencer.core.sumBigIntegers
 import co.chainring.sequencer.core.toAsset
 import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
+import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.core.toOrderGuid
 import co.chainring.sequencer.core.toWalletAddress
@@ -94,6 +95,10 @@ class SequencerApp(
                                 this.tickSize = market.tickSize
                                 this.baseDecimals = market.baseDecimals
                                 this.quoteDecimals = market.quoteDecimals
+                                state.markets[marketId]?.levels?.let { levels ->
+                                    this.minAllowedBid = levels[0].price.toDecimalValue()
+                                    this.maxAllowedOffer = levels[levels.lastIndex - 1].price.toDecimalValue()
+                                }
                             },
                         )
                     }

@@ -134,6 +134,17 @@ object SequencerResponseProcessorService {
                 }
             }
 
+            SequencerRequest.Type.AddMarket -> {
+                if (response.error == SequencerError.None) {
+                    response.marketsCreatedList.forEach { marketCreated ->
+                        MarketEntity[MarketId(marketCreated.marketId)].let {
+                            it.minAllowedBidPrice = marketCreated.minAllowedBid.toBigDecimal()
+                            it.maxAllowedOfferPrice = marketCreated.maxAllowedOffer.toBigDecimal()
+                        }
+                    }
+                }
+            }
+
             else -> {}
         }
     }

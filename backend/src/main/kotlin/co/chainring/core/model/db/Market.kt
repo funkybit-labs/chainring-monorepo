@@ -29,6 +29,8 @@ object MarketTable : GUIDTable<MarketId>("market", ::MarketId) {
     val quoteSymbolGuid = reference("quote_symbol_guid", SymbolTable)
     val tickSize = decimal("tick_size", 30, 18)
     val lastPrice = decimal("last_price", 30, 18)
+    val minAllowedBidPrice = decimal("min_allowed_bid_price", 30, 18)
+    val maxAllowedOfferPrice = decimal("max_allowed_offer_price", 30, 18)
 }
 
 class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
@@ -43,6 +45,8 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
             this.quoteSymbolGuid = quoteSymbol.guid
             this.tickSize = tickSize
             this.lastPrice = lastPrice
+            this.minAllowedBidPrice = lastPrice
+            this.maxAllowedOfferPrice = lastPrice
         }
 
         override fun all(): SizedIterable<MarketEntity> =
@@ -64,6 +68,8 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
     var quoteSymbolGuid by MarketTable.quoteSymbolGuid
     var tickSize by MarketTable.tickSize
     var lastPrice by MarketTable.lastPrice
+    var minAllowedBidPrice by MarketTable.minAllowedBidPrice
+    var maxAllowedOfferPrice by MarketTable.maxAllowedOfferPrice
 
     var baseSymbol by SymbolEntity referencedOn MarketTable.baseSymbolGuid
     var quoteSymbol by SymbolEntity referencedOn MarketTable.quoteSymbolGuid

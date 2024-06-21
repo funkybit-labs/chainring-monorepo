@@ -48,4 +48,6 @@ data class Market(
     val quoteDecimals: Int,
     val tickSize: BigDecimalJson,
     val lastPrice: BigDecimalJson,
+    val minAllowedBidPrice: BigDecimalJson,
+    val maxAllowedOfferPrice: BigDecimalJson,
 )

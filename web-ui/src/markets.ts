@@ -10,13 +10,17 @@ export class Market {
   readonly tickSize: Decimal
   readonly quoteDecimalPlaces: number
   readonly lastPrice: Decimal
+  readonly minAllowedBidPrice: Decimal
+  readonly maxAllowedOfferPrice: Decimal
 
   constructor(
     id: string,
     baseSymbol: TradingSymbol,
     quoteSymbol: TradingSymbol,
     tickSize: Decimal,
-    lastPrice: Decimal
+    lastPrice: Decimal,
+    minAllowedBidPrice: Decimal,
+    maxAllowedOfferPrice: Decimal
   ) {
     this.id = id
     this.baseSymbol = baseSymbol
@@ -24,6 +28,8 @@ export class Market {
     this.tickSize = tickSize
     this.lastPrice = lastPrice
     this.quoteDecimalPlaces = this.tickSize.decimalPlaces() + 1
+    this.minAllowedBidPrice = minAllowedBidPrice
+    this.maxAllowedOfferPrice = maxAllowedOfferPrice
   }
 }
 
@@ -38,7 +44,9 @@ export default class Markets {
         symbols.getByName(m.baseSymbol),
         symbols.getByName(m.quoteSymbol),
         m.tickSize,
-        m.lastPrice
+        m.lastPrice,
+        m.minAllowedBidPrice,
+        m.maxAllowedOfferPrice
       )
     })
     this.marketById = new Map(this.markets.map((m) => [m.id, m]))
