@@ -505,7 +505,7 @@ class SequencerApp(
                                 // validate actual response matches expected while replaying requests
                                 loadResponseFromOutputQueue(response.sequence)?.let {
                                     val expectedResponse = it.toBuilder().setProcessingTime(response.processingTime).build()
-                                    if (response != expectedResponse) {
+                                    if (request.type != SequencerRequest.Type.GetState && response != expectedResponse) {
                                         logger.error { "Actual response did not match expected, exiting. Sequence: ${dc.index()}, requests processed since start: $requestsProcessedSinceStarted, request: $request, expected response: $expectedResponse, actual response: $response" }
                                         exitProcess(1)
                                     }
