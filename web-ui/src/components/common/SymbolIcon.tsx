@@ -5,16 +5,16 @@ import dai from 'assets/dai.svg'
 import generic from 'cryptocurrency-icons/svg/color/generic.svg'
 import botanix from 'assets/botanix.svg'
 import bitlayer from 'assets/bitlayer.svg'
+import base from 'assets/base.svg'
 import TradingSymbol from 'tradingSymbol'
 
 interface Props {
-  symbol: TradingSymbol | string
+  symbol: TradingSymbol
   className?: string
 }
 
 export default function SymbolIcon(props: Props) {
-  const symbolName =
-    typeof props.symbol === 'string' ? props.symbol : props.symbol.name
+  const symbolName = props.symbol.name
 
   const icon = (function () {
     if (symbolName.includes('BTC')) {
@@ -30,17 +30,24 @@ export default function SymbolIcon(props: Props) {
   })()
 
   const chainIcon = (function () {
-    if (symbolName.endsWith('2')) {
-      return botanix
-    } else {
-      return bitlayer
+    switch (props.symbol.chainName) {
+      case 'Botanix':
+        return botanix
+      case 'Bitlayer':
+        return bitlayer
+      case 'Base':
+        return base
     }
   })()
 
   return (
     <span className="relative mt-[-1px] min-w-8 p-1">
       <img src={icon} className={props.className || ''} alt={symbolName} />
-      <img src={chainIcon} className="absolute -bottom-1 right-1 size-4" />
+      <img
+        src={chainIcon}
+        className="absolute -bottom-1 right-1 size-4"
+        alt={props.symbol.chainName}
+      />
     </span>
   )
 }
