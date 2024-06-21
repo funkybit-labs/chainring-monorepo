@@ -1,4 +1,4 @@
-package co.chainring.core.model.telegrambot
+package co.chainring.core.model.telegram.bot
 
 import kotlinx.serialization.Serializable
 

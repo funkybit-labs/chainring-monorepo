@@ -35,6 +35,8 @@ enum class ReasonCode {
     RejectedBySequencer,
 
     ChainNotSupported,
+
+    SignupRequired,
 }
 
 val jsonWithDefaults = Json { encodeDefaults = true }
