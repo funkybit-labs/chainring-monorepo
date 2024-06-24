@@ -62,4 +62,4 @@ jobs:
           cd scripts
           test -d venv || python3 -m venv venv
           . ./venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
-          python3 ecs-deploy.py ${{ inputs.action }} --env ${{ inputs.environment }} --services ring,api,sequencer,${{ inputs.environment != 'demo' && ',mocker' || '' }}${{ inputs.environment != 'testnet' && ',telegrambot' || '' }} --tag ${{ inputs.tag }}
+          python3 ecs-deploy.py ${{ inputs.action }} --env ${{ inputs.environment }} --services ring,api,sequencer${{ inputs.environment != 'demo' && ',mocker' || '' }}${{ inputs.environment != 'testnet' && ',telegrambot' || '' }} --tag ${{ inputs.tag }}
