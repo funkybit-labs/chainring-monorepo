@@ -5,7 +5,6 @@ import co.chainring.core.model.db.GUIDEntity
 import co.chainring.core.model.db.GUIDTable
 import co.chainring.core.model.telegram.TelegramUserId
 import co.chainring.core.utils.crPoints
-import co.chainring.core.utils.setScale
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
@@ -29,7 +28,7 @@ value class TelegramMiniAppUserId(override val value: String) : EntityId {
 object TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_mini_app_user", ::TelegramMiniAppUserId) {
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
-    val updatedAt = timestamp("updated_at")
+    val updatedAt = timestamp("updated_at").nullable()
     val telegramUserId = long("telegram_user_id").uniqueIndex()
 }
 

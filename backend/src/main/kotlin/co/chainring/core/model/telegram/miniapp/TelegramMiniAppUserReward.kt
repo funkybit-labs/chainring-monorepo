@@ -31,7 +31,7 @@ enum class TelegramMiniAppUserRewardType {
 object TelegramMiniAppUserRewardTable : GUIDTable<TelegramMiniAppUserRewardId>("telegram_mini_app_user_reward", ::TelegramMiniAppUserRewardId) {
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
-    val updatedAt = timestamp("updated_at")
+    val updatedAt = timestamp("updated_at").nullable()
     val userGuid = reference("user_guid", TelegramMiniAppUserTable).index()
     val amount = decimal("amount", 30, 18)
     val type = customEnumeration(

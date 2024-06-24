@@ -15,7 +15,7 @@ class V47_TelegramMiniAppUser : Migration() {
     object V47_TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_mini_app_user", ::TelegramMiniAppUserId) {
         val createdAt = timestamp("created_at")
         val createdBy = varchar("created_by", 10485760)
-        val updatedAt = timestamp("updated_at")
+        val updatedAt = timestamp("updated_at").nullable()
         val telegramUserId = long("telegram_user_id").uniqueIndex()
     }
 
@@ -27,7 +27,7 @@ class V47_TelegramMiniAppUser : Migration() {
     object V47_TelegramMiniAppUserRewardTable : GUIDTable<TelegramMiniAppUserRewardId>("telegram_mini_app_user_reward", ::TelegramMiniAppUserRewardId) {
         val createdAt = timestamp("created_at")
         val createdBy = varchar("created_by", 10485760)
-        val updatedAt = timestamp("updated_at")
+        val updatedAt = timestamp("updated_at").nullable()
         val userGuid = reference("user_guid", V47_TelegramMiniAppUserTable).index()
         val amount = decimal("amount", 30, 18)
         val type = customEnumeration(

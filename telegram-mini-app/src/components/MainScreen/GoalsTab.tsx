@@ -113,7 +113,7 @@ function GoalRow({ goal }: { goal: UserGoal }) {
           className="my-0.5"
           caption={() => (
             <div className="whitespace-nowrap px-1 font-semibold">
-              {status == 'rewardReady' ? 'Claim reward' : 'GO'}
+              {status == 'rewardReady' ? 'Claim' : 'GO'}
             </div>
           )}
           onClick={() => {
