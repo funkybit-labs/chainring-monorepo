@@ -292,20 +292,14 @@ class ExchangeApiService(
 
     fun deposit(walletAddress: Address, apiRequest: CreateDepositApiRequest): DepositApiResponse =
         transaction {
-            val deposit = try {
-                val deposit = DepositEntity.findByTxHash(apiRequest.txHash)
-                    ?: DepositEntity.create(
-                        wallet = WalletEntity.getOrCreate(walletAddress),
-                        symbol = getSymbolEntity(apiRequest.symbol),
-                        amount = apiRequest.amount,
-                        blockNumber = BigInteger.ZERO,
-                        transactionHash = apiRequest.txHash,
-                    )
-                deposit.refresh(flush = true)
-                deposit
-            } catch (e: Exception) {
-                DepositEntity.findByTxHash(apiRequest.txHash) ?: throw e
-            }
+            val deposit =
+                DepositEntity.upsert(
+                    wallet = WalletEntity.getOrCreate(walletAddress),
+                    symbol = getSymbolEntity(apiRequest.symbol),
+                    amount = apiRequest.amount,
+                    blockNumber = BigInteger.ZERO,
+                    transactionHash = apiRequest.txHash,
+                ) ?: throw RuntimeException("Unable to create deposit")
 
             DepositApiResponse(Deposit.fromEntity(deposit))
         }
