@@ -1,8 +1,9 @@
 import LogoHSvg from 'assets/logo-h.svg'
 import CRSvg from 'assets/cr.svg'
 import MillisecondsSvg from 'assets/milliseconds.svg'
+import { User } from 'apiClient'
 
-export default function HomeTab() {
+export default function HomeTab({ user }: { user: User }) {
   return (
     <div className="flex min-h-full flex-col">
       <div>
@@ -20,10 +21,10 @@ export default function HomeTab() {
         <div className="flex flex-col items-center justify-center">
           <div className="flex items-center gap-4 rounded-lg bg-darkBluishGray9 px-5 py-4 text-2xl font-bold text-white">
             <img src={CRSvg} className="size-[40px]" />
-            1,019,012.063 CR
+            {user.balance.toString()} CR
           </div>
           <div className="mt-2 text-center text-sm text-darkBluishGray2">
-            Accumulated from referral link
+            Your balance
           </div>
         </div>
       </div>

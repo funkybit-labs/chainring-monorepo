@@ -5,7 +5,7 @@ import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.GUIDTable
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.PGEnum
-import co.chainring.core.model.db.TelegramBotUserId
+import co.chainring.core.model.telegram.bot.TelegramBotUserId
 import org.http4k.format.KotlinxSerialization
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.json.jsonb

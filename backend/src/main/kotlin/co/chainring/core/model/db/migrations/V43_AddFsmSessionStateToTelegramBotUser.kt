@@ -2,7 +2,7 @@ package co.chainring.core.model.db.migrations
 
 import co.chainring.core.db.Migration
 import co.chainring.core.model.db.GUIDTable
-import co.chainring.core.model.db.TelegramBotUserId
+import co.chainring.core.model.telegram.bot.TelegramBotUserId
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

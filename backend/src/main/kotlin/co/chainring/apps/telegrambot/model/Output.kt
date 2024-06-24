@@ -8,9 +8,9 @@ import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BalanceType
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.SymbolEntity
-import co.chainring.core.model.db.TelegramBotUserEntity
-import co.chainring.core.model.telegrambot.TelegramMessageId
-import co.chainring.core.model.telegrambot.TelegramUserId
+import co.chainring.core.model.telegram.TelegramUserId
+import co.chainring.core.model.telegram.bot.TelegramBotUserEntity
+import co.chainring.core.model.telegram.bot.TelegramMessageId
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chanring.core.model.EncryptedString
 import org.web3j.protocol.core.methods.response.TransactionReceipt

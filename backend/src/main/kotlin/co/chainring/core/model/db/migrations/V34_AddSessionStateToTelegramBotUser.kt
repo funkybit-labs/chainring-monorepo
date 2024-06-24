@@ -4,8 +4,8 @@ import co.chainring.core.db.Migration
 import co.chainring.core.model.db.GUIDTable
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.PGEnum
-import co.chainring.core.model.db.TelegramBotUserId
 import co.chainring.core.model.db.enumDeclaration
+import co.chainring.core.model.telegram.bot.TelegramBotUserId
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.transactions.transaction

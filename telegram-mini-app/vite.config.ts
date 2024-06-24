@@ -9,7 +9,10 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 // https://vitejs.dev/config https://vitest.dev/config
 export default defineConfig({
   server: {
-    port: 3001
+    port: 3001,
+    proxy: {
+      '/tma/v1': 'http://localhost:9000'
+    }
   },
   plugins: [react(), tsconfigPaths(), nodePolyfills()],
   test: {

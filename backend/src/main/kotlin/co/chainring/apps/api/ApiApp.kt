@@ -123,6 +123,14 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                             routes += FaucetRoutes(ChainManager.getBlockchainClients()).routes
                         }
                     },
+                "/tma/v1" bind
+                    contract {
+                        routes += listOf(
+                            TelegramMiniAppRoutes.getUser,
+                            TelegramMiniAppRoutes.signUp,
+                            TelegramMiniAppRoutes.claimReward,
+                        )
+                    },
             ),
         )
 

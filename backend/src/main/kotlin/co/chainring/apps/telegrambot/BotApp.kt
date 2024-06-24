@@ -9,11 +9,11 @@ import co.chainring.core.db.DbConfig
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
 import co.chainring.core.model.db.OrderEntity
-import co.chainring.core.model.db.TelegramBotUserEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
-import co.chainring.core.model.telegrambot.SessionState
-import co.chainring.core.model.telegrambot.TelegramMessageId
+import co.chainring.core.model.telegram.bot.SessionState
+import co.chainring.core.model.telegram.bot.TelegramBotUserEntity
+import co.chainring.core.model.telegram.bot.TelegramMessageId
 import co.chainring.core.sequencer.SequencerClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
