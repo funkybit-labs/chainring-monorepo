@@ -16,7 +16,6 @@ import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.max
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.stringLiteral
-import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.upsert
 import org.jetbrains.exposed.sql.vendors.ForUpdateOption
 import java.math.BigInteger
@@ -134,28 +133,26 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
             blockNumber: BigInteger,
             transactionHash: TxHash,
         ): DepositEntity? {
-            TransactionManager.current().exec(
-                DepositTable.upsert(
-                    DepositTable.transactionHash,
-                    onUpdate = listOf(
-                        DepositTable.walletGuid to stringLiteral(wallet.guid.value.value),
-                        DepositTable.symbolGuid to stringLiteral(symbol.guid.value.value),
-                        DepositTable.amount to decimalLiteral(amount.toBigDecimal()),
-                        DepositTable.blockNumber to decimalLiteral(blockNumber.toBigDecimal()),
-                        DepositTable.transactionHash to stringLiteral(transactionHash.value),
-                    ),
-                ) {
-                    it[DepositTable.guid] = DepositId.generate()
-                    it[createdAt] = Clock.System.now()
-                    it[createdBy] = wallet.address.value
-                    it[status] = DepositStatus.Pending
-                    it[walletGuid] = wallet.guid
-                    it[symbolGuid] = symbol.guid
-                    it[DepositTable.amount] = amount.toBigDecimal()
-                    it[DepositTable.blockNumber] = blockNumber.toBigDecimal()
-                    it[DepositTable.transactionHash] = transactionHash.value
-                },
-            )
+            DepositTable.upsert(
+                DepositTable.transactionHash,
+                onUpdate = listOf(
+                    DepositTable.walletGuid to stringLiteral(wallet.guid.value.value),
+                    DepositTable.symbolGuid to stringLiteral(symbol.guid.value.value),
+                    DepositTable.amount to decimalLiteral(amount.toBigDecimal()),
+                    DepositTable.blockNumber to decimalLiteral(blockNumber.toBigDecimal()),
+                    DepositTable.transactionHash to stringLiteral(transactionHash.value),
+                ),
+            ) {
+                it[DepositTable.guid] = DepositId.generate()
+                it[createdAt] = Clock.System.now()
+                it[createdBy] = wallet.address.value
+                it[status] = DepositStatus.Pending
+                it[walletGuid] = wallet.guid
+                it[symbolGuid] = symbol.guid
+                it[DepositTable.amount] = amount.toBigDecimal()
+                it[DepositTable.blockNumber] = blockNumber.toBigDecimal()
+                it[DepositTable.transactionHash] = transactionHash.value
+            }
 
             return findByTxHash(transactionHash)
         }

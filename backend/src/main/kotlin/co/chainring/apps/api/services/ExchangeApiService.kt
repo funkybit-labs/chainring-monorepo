@@ -29,6 +29,7 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.DepositEntity
+import co.chainring.core.model.db.DepositException
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
@@ -299,7 +300,7 @@ class ExchangeApiService(
                     amount = apiRequest.amount,
                     blockNumber = BigInteger.ZERO,
                     transactionHash = apiRequest.txHash,
-                ) ?: throw RuntimeException("Unable to create deposit")
+                ) ?: throw DepositException("Unable to create deposit")
 
             DepositApiResponse(Deposit.fromEntity(deposit))
         }
