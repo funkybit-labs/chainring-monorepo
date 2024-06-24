@@ -96,7 +96,7 @@ class BlockchainDepositHandler(
                         transaction {
                             val deposit = DepositEntity.findByTxHash(txHash)
                             if (deposit == null) {
-                                DepositEntity.create(
+                                DepositEntity.upsert(
                                     wallet = WalletEntity.getOrCreate(Address(Keys.toChecksumAddress(depositEventResponse.from))),
                                     symbol = SymbolEntity.forChainAndContractAddress(
                                         chainId,
