@@ -55,6 +55,7 @@ application {
     mainClass = "co.chainring.mocker.MockerAppMainKt"
 }
 
+val buildNumber = System.getenv("BUILD_NUMBER") ?: "1"
 jib {
     container.mainClass = "co.chainring.mocker.MockerAppMainKt"
 
@@ -70,7 +71,7 @@ jib {
     to {
         image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/mocker"
         credHelper.helper = "ecr-login"
-        tags = setOf("latest")
+        tags = setOf("${version}-${buildNumber}")
     }
 
     container {
