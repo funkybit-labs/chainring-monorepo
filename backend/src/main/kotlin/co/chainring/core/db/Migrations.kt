@@ -40,7 +40,7 @@ import co.chainring.core.model.db.migrations.V43_AddFsmSessionStateToTelegramBot
 import co.chainring.core.model.db.migrations.V44_AddSentToSequencerStatusToDeposit
 import co.chainring.core.model.db.migrations.V45_ChainSettlementBatchIndexes
 import co.chainring.core.model.db.migrations.V46_MarketMinMaxPrice
-import co.chainring.core.model.db.migrations.V46_TelegramMiniAppUser
+import co.chainring.core.model.db.migrations.V47_TelegramMiniAppUser
 import co.chainring.core.model.db.migrations.V4_AddDecimalsToERC20Token
 import co.chainring.core.model.db.migrations.V5_ChainTable
 import co.chainring.core.model.db.migrations.V6_MarketTable
@@ -95,5 +95,5 @@ val migrations = listOf(
     V44_AddSentToSequencerStatusToDeposit(),
     V45_ChainSettlementBatchIndexes(),
     V46_MarketMinMaxPrice(),
-    V46_TelegramMiniAppUser(),
+    V47_TelegramMiniAppUser(),
 )
