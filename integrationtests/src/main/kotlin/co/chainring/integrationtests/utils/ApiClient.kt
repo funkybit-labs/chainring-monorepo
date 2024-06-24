@@ -400,7 +400,7 @@ fun Response.toErrorOrUnit(expectedStatusCode: Int): Either<ApiCallFailure, Unit
     }
 }
 
-private fun Request.addHeaders(headers: Headers): Request =
+fun Request.addHeaders(headers: Headers): Request =
     this
         .newBuilder()
         .headers(

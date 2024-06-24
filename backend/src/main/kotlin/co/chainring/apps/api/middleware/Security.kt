@@ -185,6 +185,7 @@ val telegramMiniAppSecurity = object : Security {
     override val filter = Filter { next -> wrapWithAuthentication(next) }
 
     private val botToken = System.getenv("TELEGRAM_BOT_TOKEN")
+        ?: "123:456" // dummy value, used by integration tests
 
     private fun wrapWithAuthentication(httpHandler: HttpHandler): HttpHandler = { request ->
         authenticate(request).fold(

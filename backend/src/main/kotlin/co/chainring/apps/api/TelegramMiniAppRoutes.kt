@@ -13,7 +13,6 @@ import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGoal
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.Tag
-import org.http4k.contract.div
 import org.http4k.contract.meta
 import org.http4k.core.Body
 import org.http4k.core.Method
@@ -82,7 +81,7 @@ object TelegramMiniAppRoutes {
                 val user = request.telegramMiniAppPrincipal.maybeUser
                     ?: TelegramMiniAppUserEntity.create(request.telegramMiniAppPrincipal.userData.userId)
 
-                Response(Status.OK).with(
+                Response(Status.CREATED).with(
                     responseBody of GetUserApiResponse.fromEntity(user),
                 )
             }

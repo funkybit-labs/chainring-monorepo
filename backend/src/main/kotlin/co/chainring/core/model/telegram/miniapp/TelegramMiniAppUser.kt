@@ -3,13 +3,17 @@ package co.chainring.core.model.telegram.miniapp
 import co.chainring.core.model.db.EntityId
 import co.chainring.core.model.db.GUIDEntity
 import co.chainring.core.model.db.GUIDTable
-import co.chainring.core.model.db.SettlementBatchEntity.Companion.referrersOn
 import co.chainring.core.model.telegram.TelegramUserId
+import co.chainring.core.utils.crPoints
+import co.chainring.core.utils.setScale
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.alias
+import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.sum
 import java.math.BigDecimal
 
 @Serializable
@@ -57,11 +61,26 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
     )
     val rewards by TelegramMiniAppUserRewardEntity referrersOn TelegramMiniAppUserRewardTable.userGuid
 
-    fun pointsBalance(): BigDecimal =
-        rewards.sumOf { it.amount }
+    fun pointsBalance(): BigDecimal {
+        val sumColumn = TelegramMiniAppUserRewardTable.amount.sum().alias("amount_sum")
+        return TelegramMiniAppUserRewardTable
+            .select(sumColumn)
+            .where { TelegramMiniAppUserRewardTable.userGuid.eq(guid) }
+            .map {
+                it[sumColumn]?.setScale(18)
+            }
+            .firstOrNull() ?: "0".crPoints()
+    }
 
     fun achievedGoals(): Set<TelegramMiniAppGoal.Id> =
-        rewards.mapNotNull { it.goalId }.toSet()
+        TelegramMiniAppUserRewardTable
+            .select(TelegramMiniAppUserRewardTable.goalId)
+            .where { TelegramMiniAppUserRewardTable.userGuid.eq(guid) }
+            .andWhere { TelegramMiniAppUserRewardTable.goalId.isNotNull() }
+            .distinct()
+            .mapNotNull {
+                it[TelegramMiniAppUserRewardTable.goalId]?.let { id -> TelegramMiniAppGoal.Id.valueOf(id) }
+            }.toSet()
 
     fun grantReward(goalId: TelegramMiniAppGoal.Id) {
         val goal = TelegramMiniAppGoal.allPossible.first { it.id == goalId }
