@@ -1,5 +1,6 @@
 package co.chainring.core.model.db
 
+import co.chainring.apps.api.FaucetMode
 import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
 import kotlinx.datetime.Clock
@@ -7,8 +8,6 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.web3j.crypto.Keys
@@ -107,5 +106,13 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
             } else {
                 null
             }
+        }
+
+    fun faucetSupported(faucetMode: FaucetMode): Boolean =
+        when (faucetMode) {
+            FaucetMode.Off -> false
+            FaucetMode.AllSymbols -> true
+            FaucetMode.OnlyNative -> contractAddress == null
+            FaucetMode.OnlyERC20 -> contractAddress != null
         }
 }

@@ -26,11 +26,10 @@ import org.http4k.format.KotlinxSerialization.auto
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.math.BigDecimal
 
-class FaucetRoutes(blockchainClients: Collection<BlockchainClient>) {
+class FaucetRoutes(private val faucetMode: FaucetMode, blockchainClients: Collection<BlockchainClient>) {
     private val logger = KotlinLogging.logger { }
-    private val nativeFaucetEnabled = System.getenv("NATIVE_FAUCET_ENABLED")?.toBoolean() ?: true
 
-    private val faucet: ContractRoute = run {
+    val faucet: ContractRoute = run {
         val requestBody = Body.auto<FaucetApiRequest>().toLens()
         val responseBody = Body.auto<FaucetApiResponse>().toLens()
 
@@ -65,15 +64,13 @@ class FaucetRoutes(blockchainClients: Collection<BlockchainClient>) {
                     logger.debug { "Sending $amount ${symbol.name} on chain ${symbol.chainId.value} to ${payload.address.value}" }
 
                     val amountInFundamentalUnits = amount.movePointRight(symbol.decimals.toInt()).toBigInteger()
-                    val txHash = when (val tokenContractAddress = symbol.contractAddress) {
-                        null -> {
-                            if (nativeFaucetEnabled) {
-                                blockchainClient.asyncDepositNative(payload.address, amountInFundamentalUnits)
-                            } else {
-                                throw RequestProcessingError(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.ProcessingError, "Native faucet is disabled"))
-                            }
+                    val txHash = if (symbol.faucetSupported(faucetMode)) {
+                        when (val tokenContractAddress = symbol.contractAddress) {
+                            null -> blockchainClient.asyncDepositNative(payload.address, amountInFundamentalUnits)
+                            else -> blockchainClient.asyncMintERC20(tokenContractAddress, payload.address, amountInFundamentalUnits)
                         }
-                        else -> blockchainClient.asyncMintERC20(tokenContractAddress, payload.address, amountInFundamentalUnits)
+                    } else {
+                        throw RequestProcessingError(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.ProcessingError, "Native faucet is disabled"))
                     }
 
                     Response(Status.OK).with(
@@ -88,6 +85,4 @@ class FaucetRoutes(blockchainClients: Collection<BlockchainClient>) {
             }
         }
     }
-
-    val routes = listOf(faucet)
 }

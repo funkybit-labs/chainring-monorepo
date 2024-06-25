@@ -40,7 +40,8 @@ const SymbolSchema = z.object({
   name: z.string(),
   description: z.string(),
   contractAddress: AddressSchema.nullable(),
-  decimals: z.number()
+  decimals: z.number(),
+  faucetSupported: z.boolean()
 })
 
 export type SymbolType = z.infer<typeof SymbolSchema>

@@ -43,6 +43,13 @@ data class ApiAppConfig(
 
 val requestContexts = RequestContexts()
 
+enum class FaucetMode {
+    Off,
+    OnlyNative,
+    OnlyERC20,
+    AllSymbols,
+}
+
 class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     override val logger = KotlinLogging.logger {}
 
@@ -59,17 +66,21 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     )
 
     private val enableTestRoutes = System.getenv("ENABLE_TEST_ROUTES")?.toBoolean() ?: true
-    private val enableFaucetRoutes = System.getenv("ENABLE_FAUCET_ROUTES")?.toBoolean() ?: true
+    private val faucetMode = System.getenv("FAUCET_MODE")
+        ?.let { FaucetMode.valueOf(it) }
+        ?: FaucetMode.AllSymbols
 
     private val sequencerClient = SequencerClient()
     private val broadcaster = Broadcaster(db)
 
     private val exchangeApiService = ExchangeApiService(sequencerClient)
 
+    private val configRoutes = ConfigRoutes(faucetMode)
     private val depositRoutes = DepositRoutes(exchangeApiService)
     private val withdrawalRoutes = WithdrawalRoutes(exchangeApiService)
     private val balanceRoutes = BalanceRoutes()
     private val orderRoutes = OrderRoutes(exchangeApiService)
+    private val faucetRoutes = FaucetRoutes(faucetMode, ChainManager.getBlockchainClients())
 
     private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
         .then(ServerFilters.Cors(corsPolicy))
@@ -98,7 +109,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                         )
                         descriptionPath = "/openapi.json"
                         routes += listOf(
-                            ConfigRoutes.getConfiguration(),
+                            configRoutes.getConfiguration,
                             orderRoutes.createOrder(),
                             orderRoutes.updateOrder(),
                             orderRoutes.cancelOrder(),
@@ -119,8 +130,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                         if (enableTestRoutes) {
                             routes += TestRoutes(sequencerClient).routes
                         }
-                        if (enableFaucetRoutes) {
-                            routes += FaucetRoutes(ChainManager.getBlockchainClients()).routes
+                        if (faucetMode != FaucetMode.Off) {
+                            routes += faucetRoutes.faucet
                         }
                     },
                 "/tma/v1" bind

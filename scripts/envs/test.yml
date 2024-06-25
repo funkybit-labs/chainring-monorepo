@@ -8,8 +8,8 @@ environment:
     SEQUENCER_HOST_NAME: test-sequencer.chainring.co
     SEQUENCER_PORT: "5337"
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
-    ENABLE_FAUCET_ROUTES: "true"
-    NATIVE_FAUCET_ENABLED: "true"
+    ENABLE_TEST_ROUTES: "true"
+    FAUCET_MODE: AllSymbols
   sequencer:
     QUEUE_HOME: "/data/queues/test"
     CHECKPOINTS_ENABLED: "false"
