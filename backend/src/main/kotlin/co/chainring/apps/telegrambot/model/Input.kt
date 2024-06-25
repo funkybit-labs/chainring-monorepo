@@ -4,8 +4,8 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.WithdrawalEntity
-import co.chainring.core.model.telegrambot.TelegramMessageId
-import co.chainring.core.model.telegrambot.TelegramUserId
+import co.chainring.core.model.telegram.TelegramUserId
+import co.chainring.core.model.telegram.bot.TelegramMessageId
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 
 sealed class Input {

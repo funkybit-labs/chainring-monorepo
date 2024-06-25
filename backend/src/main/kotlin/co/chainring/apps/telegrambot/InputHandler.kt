@@ -16,11 +16,11 @@ import co.chainring.core.model.abbreviated
 import co.chainring.core.model.db.DepositStatus
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.SymbolEntity
-import co.chainring.core.model.db.TelegramBotUserEntity
-import co.chainring.core.model.db.TelegramBotUserWalletEntity
 import co.chainring.core.model.db.WithdrawalStatus
-import co.chainring.core.model.telegrambot.SessionState
-import co.chainring.core.model.telegrambot.TelegramMessageId
+import co.chainring.core.model.telegram.bot.SessionState
+import co.chainring.core.model.telegram.bot.TelegramBotUserEntity
+import co.chainring.core.model.telegram.bot.TelegramBotUserWalletEntity
+import co.chainring.core.model.telegram.bot.TelegramMessageId
 import co.chainring.core.utils.setScale
 import co.chainring.core.utils.toFundamentalUnits
 import io.github.oshai.kotlinlogging.KotlinLogging

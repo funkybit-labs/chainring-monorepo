@@ -25,3 +25,6 @@ fun BigDecimal.setScale(decimals: UByte): BigDecimal =
 
 fun BigDecimal.setScale(decimals: UByte, roundingMode: RoundingMode): BigDecimal =
     this.setScale(decimals.toInt(), roundingMode)
+
+fun String.crPoints(): BigDecimal =
+    BigDecimal(this).setScale(18)

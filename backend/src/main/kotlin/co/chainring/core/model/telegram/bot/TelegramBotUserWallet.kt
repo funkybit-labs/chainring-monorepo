@@ -1,4 +1,4 @@
-package co.chainring.core.model.db
+package co.chainring.core.model.telegram.bot
 
 import co.chainring.apps.api.model.OrderAmount
 import co.chainring.core.blockchain.BlockchainClient
@@ -9,6 +9,18 @@ import co.chainring.core.evm.TokenAddressAndChain
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.TxHash
+import co.chainring.core.model.db.BalanceEntity
+import co.chainring.core.model.db.BalanceType
+import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.DeployedSmartContractEntity
+import co.chainring.core.model.db.EntityId
+import co.chainring.core.model.db.GUIDEntity
+import co.chainring.core.model.db.GUIDTable
+import co.chainring.core.model.db.MarketEntity
+import co.chainring.core.model.db.OrderSide
+import co.chainring.core.model.db.SymbolEntity
+import co.chainring.core.model.db.WalletEntity
+import co.chainring.core.model.db.WalletTable
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
@@ -44,7 +56,9 @@ object TelegramBotUserWalletTable : GUIDTable<TelegramBotUserWalletId>("telegram
 }
 
 class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUIDEntity<TelegramBotUserWalletId>(guid) {
-    companion object : EntityClass<TelegramBotUserWalletId, TelegramBotUserWalletEntity>(TelegramBotUserWalletTable) {
+    companion object : EntityClass<TelegramBotUserWalletId, TelegramBotUserWalletEntity>(
+        TelegramBotUserWalletTable,
+    ) {
         fun create(
             wallet: WalletEntity,
             telegramBotUser: TelegramBotUserEntity,
@@ -80,7 +94,13 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
         BalanceEntity.getBalancesForWallet(wallet)
 
     fun exchangeAvailableBalance(symbol: SymbolEntity): BigDecimal =
-        (BalanceEntity.findForWalletAndSymbol(wallet, symbol, BalanceType.Available)?.balance ?: BigInteger.ZERO)
+        (
+            BalanceEntity.findForWalletAndSymbol(
+                wallet,
+                symbol,
+                BalanceType.Available,
+            )?.balance ?: BigInteger.ZERO
+            )
             .fromFundamentalUnits(symbol.decimals)
 
     fun onChainBalances(symbols: List<SymbolEntity>): List<Pair<SymbolEntity, BigDecimal>> =
@@ -101,7 +121,9 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
 
     fun deposit(amount: BigDecimal, symbol: SymbolEntity): TxHash? {
         val blockchainClient = blockchainClient(symbol.chainId.value)
-        val exchangeContractAddress = DeployedSmartContractEntity.latestExchangeContractAddress(blockchainClient.chainId)!!
+        val exchangeContractAddress = DeployedSmartContractEntity.latestExchangeContractAddress(
+            blockchainClient.chainId,
+        )!!
         val bigIntAmount = amount.toFundamentalUnits(symbol.decimals)
         val tokenAddress = symbol.contractAddress
         return if (tokenAddress != null) {
@@ -130,7 +152,9 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
 
     fun signWithdrawal(amount: BigDecimal, symbol: SymbolEntity, nonce: Long): EvmSignature {
         val blockchainClient = blockchainClient(symbol.chainId.value)
-        val exchangeContractAddress = DeployedSmartContractEntity.latestExchangeContractAddress(blockchainClient.chainId)!!
+        val exchangeContractAddress = DeployedSmartContractEntity.latestExchangeContractAddress(
+            blockchainClient.chainId,
+        )!!
         val bigIntAmount = amount.toFundamentalUnits(symbol.decimals)
         val tx = EIP712Transaction.WithdrawTx(
             wallet.address,
@@ -145,7 +169,9 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
 
     fun signOrder(market: MarketEntity, side: OrderSide, amount: OrderAmount, nonce: String): Pair<EvmSignature, ChainId> {
         val blockchainClient = blockchainClient(market.baseSymbol.chainId.value)
-        val exchangeContractAddress = DeployedSmartContractEntity.latestExchangeContractAddress(blockchainClient.chainId)!!
+        val exchangeContractAddress = DeployedSmartContractEntity.latestExchangeContractAddress(
+            blockchainClient.chainId,
+        )!!
 
         val tx = EIP712Transaction.Order(
             wallet.address,

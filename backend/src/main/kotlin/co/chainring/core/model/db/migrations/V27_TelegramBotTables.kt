@@ -3,10 +3,9 @@ package co.chainring.core.model.db.migrations
 import co.chainring.core.db.Migration
 import co.chainring.core.model.db.GUIDTable
 import co.chainring.core.model.db.MarketId
-import co.chainring.core.model.db.TelegramBotUserId
-import co.chainring.core.model.db.TelegramBotUserTable.nullable
-import co.chainring.core.model.db.TelegramBotUserWalletId
 import co.chainring.core.model.db.WalletId
+import co.chainring.core.model.telegram.bot.TelegramBotUserId
+import co.chainring.core.model.telegram.bot.TelegramBotUserWalletId
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.transactions.transaction

@@ -29,6 +29,7 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.DepositEntity
+import co.chainring.core.model.db.DepositException
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
@@ -292,20 +293,14 @@ class ExchangeApiService(
 
     fun deposit(walletAddress: Address, apiRequest: CreateDepositApiRequest): DepositApiResponse =
         transaction {
-            val deposit = try {
-                val deposit = DepositEntity.findByTxHash(apiRequest.txHash)
-                    ?: DepositEntity.create(
-                        wallet = WalletEntity.getOrCreate(walletAddress),
-                        symbol = getSymbolEntity(apiRequest.symbol),
-                        amount = apiRequest.amount,
-                        blockNumber = BigInteger.ZERO,
-                        transactionHash = apiRequest.txHash,
-                    )
-                deposit.refresh(flush = true)
-                deposit
-            } catch (e: Exception) {
-                DepositEntity.findByTxHash(apiRequest.txHash) ?: throw e
-            }
+            val deposit =
+                DepositEntity.upsert(
+                    wallet = WalletEntity.getOrCreate(walletAddress),
+                    symbol = getSymbolEntity(apiRequest.symbol),
+                    amount = apiRequest.amount,
+                    blockNumber = BigInteger.ZERO,
+                    transactionHash = apiRequest.txHash,
+                ) ?: throw DepositException("Unable to create deposit")
 
             DepositApiResponse(Deposit.fromEntity(deposit))
         }

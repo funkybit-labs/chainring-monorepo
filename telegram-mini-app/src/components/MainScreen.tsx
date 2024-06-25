@@ -4,10 +4,11 @@ import GoalsTab from 'components/MainScreen/GoalsTab'
 import FriendsTab from 'components/MainScreen/FriendsTab'
 import { ReactElement, useState } from 'react'
 import { classNames } from 'utils'
+import { User } from 'apiClient'
 
 type TabId = 'home' | 'goals' | 'friends'
 
-export default function MainScreen() {
+export default function MainScreen({ user }: { user: User }) {
   const [activeTab, setActiveTab] = useState<TabId>('home')
 
   return (
@@ -15,9 +16,9 @@ export default function MainScreen() {
       {(() => {
         switch (activeTab) {
           case 'home':
-            return <HomeTab />
+            return <HomeTab user={user} />
           case 'goals':
-            return <GoalsTab />
+            return <GoalsTab user={user} />
           case 'friends':
             return <FriendsTab />
         }

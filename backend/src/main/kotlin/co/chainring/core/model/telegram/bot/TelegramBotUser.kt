@@ -1,10 +1,12 @@
-package co.chainring.core.model.db
+package co.chainring.core.model.telegram.bot
 
 import co.chainring.core.db.executeRaw
 import co.chainring.core.model.Address
-import co.chainring.core.model.telegrambot.SessionState
-import co.chainring.core.model.telegrambot.TelegramMessageId
-import co.chainring.core.model.telegrambot.TelegramUserId
+import co.chainring.core.model.db.EntityId
+import co.chainring.core.model.db.GUIDEntity
+import co.chainring.core.model.db.GUIDTable
+import co.chainring.core.model.db.WalletEntity
+import co.chainring.core.model.telegram.TelegramUserId
 import co.chanring.core.model.encrypt
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
@@ -32,14 +34,22 @@ object TelegramBotUserTable : GUIDTable<TelegramBotUserId>("telegram_bot_user", 
     val updatedAt = timestamp("updated_at")
     val telegramUserId = long("telegram_user_id").uniqueIndex()
     val messageIdsForDeletion = array<Int>("message_ids_for_deletion").default(emptyList())
-    val sessionState = jsonb<SessionState>("session_state", KotlinxSerialization.json).default(SessionState.Initial)
+    val sessionState = jsonb<SessionState>("session_state", KotlinxSerialization.json).default(
+        SessionState.Initial,
+    )
 }
 
 class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<TelegramBotUserId>(guid) {
-    companion object : EntityClass<TelegramBotUserId, TelegramBotUserEntity>(TelegramBotUserTable) {
+    companion object : EntityClass<TelegramBotUserId, TelegramBotUserEntity>(
+        TelegramBotUserTable,
+    ) {
         fun getOrCreate(telegramUserId: TelegramUserId): TelegramBotUserEntity {
             return getByTelegramUserId(telegramUserId)
-                ?: TelegramBotUserEntity.new(TelegramBotUserId.generate(telegramUserId)) {
+                ?: TelegramBotUserEntity.new(
+                    TelegramBotUserId.generate(
+                        telegramUserId,
+                    ),
+                ) {
                     this.telegramUserId = telegramUserId
                     this.createdAt = Clock.System.now()
                     this.updatedAt = this.createdAt
@@ -48,7 +58,11 @@ class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<Tele
                     user.flush()
                     val privateKey = Keys.createEcKeyPair().privateKey.toString(16)
                     val wallet = TelegramBotUserWalletEntity.create(
-                        WalletEntity.getOrCreate(Address.fromPrivateKey(privateKey)),
+                        WalletEntity.getOrCreate(
+                            Address.fromPrivateKey(
+                                privateKey,
+                            ),
+                        ),
                         user,
                         privateKey.encrypt(),
                         isCurrent = true,

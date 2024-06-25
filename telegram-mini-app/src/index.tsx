@@ -1,20 +1,20 @@
 import { createRoot } from 'react-dom/client'
 import 'tailwindcss/tailwind.css'
-import React, { useState } from 'react'
-import IntroScreen from 'components/IntroScreen'
-import MainScreen from 'components/MainScreen'
+import React from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import EntryPoint from 'components/EntryPoint'
 
 const container = document.getElementById('root') as HTMLDivElement
 const root = createRoot(container)
 
-const App = () => {
-  const [showIntro, setShowIntro] = useState(true)
+const queryClient = new QueryClient()
 
-  if (showIntro) {
-    return <IntroScreen onStartButtonClick={() => setShowIntro(false)} />
-  } else {
-    return <MainScreen />
-  }
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <EntryPoint />
+    </QueryClientProvider>
+  )
 }
 
 root.render(<App />)

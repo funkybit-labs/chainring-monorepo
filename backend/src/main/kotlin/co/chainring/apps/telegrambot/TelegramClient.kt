@@ -3,8 +3,8 @@ package co.chainring.apps.telegrambot
 import co.chainring.apps.telegrambot.model.CallbackData
 import co.chainring.apps.telegrambot.model.Input
 import co.chainring.apps.telegrambot.model.Output
-import co.chainring.core.model.telegrambot.TelegramMessageId
-import co.chainring.core.model.telegrambot.TelegramUserId
+import co.chainring.core.model.telegram.TelegramUserId
+import co.chainring.core.model.telegram.bot.TelegramMessageId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient
 import org.telegram.telegrambots.longpolling.TelegramBotsLongPollingApplication
