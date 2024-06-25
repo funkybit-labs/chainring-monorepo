@@ -168,7 +168,7 @@ class SettlementCoordinator(
         val now = Clock.System.now()
         val earliestTradeTimestamp = tradesToPrepare.minBy { it.createdAt }.createdAt
         if (tradesToPrepare.size < batchMinTrades && earliestTradeTimestamp + batchMaxIntervalMs.milliseconds > now) {
-            logger.debug { "Skipping create next settlement batch. Pending trades ${tradesToPrepare.size}, last batch was ${(now - earliestTradeTimestamp).inWholeMilliseconds}ms ago" }
+            logger.debug { "Skipping create trade settlement batch. ${tradesToPrepare.size} pending trades, max age ${(now - earliestTradeTimestamp).inWholeMilliseconds}ms" }
             return null
         }
 

@@ -633,7 +633,7 @@ class BlockchainTransactionHandler(
         val now = Clock.System.now()
         val earliestSequencedWithdrawal = sequencedWithdrawals.minBy { it.createdAt }.createdAt
         if (sequencedWithdrawals.size < batchMinWithdrawals && earliestSequencedWithdrawal + batchMaxIntervalMs.milliseconds > now) {
-            logger.debug { "Skipping create next withdrawal batch. Sequenced withdrawals ${sequencedWithdrawals.size}, last batch was ${(now - earliestSequencedWithdrawal).inWholeMilliseconds}ms ago" }
+            logger.debug { "Skipping create withdrawal batch. ${sequencedWithdrawals.size} pending withdrawals, max age ${(now - earliestSequencedWithdrawal).inWholeMilliseconds}ms" }
             return false
         }
 
