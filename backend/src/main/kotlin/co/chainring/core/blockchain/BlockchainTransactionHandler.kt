@@ -294,7 +294,11 @@ class BlockchainTransactionHandler(
                                     }
                                     TradeEntity.markAsFailedSettling(failedTrades.map { it.tradeHashes.map { it.toHex() } }.flatten().toSet(), "Insufficient Balance")
                                 }
-                                inProgressBatch.markAsPrepared()
+                                if (failedTrades.isEmpty() && blockchainClient.batchHash() != inProgressBatch.prepararationTx.batchHash) {
+                                    inProgressBatch.markAsFailed("Batch hash mismatch")
+                                } else {
+                                    inProgressBatch.markAsPrepared()
+                                }
                             } else {
                                 inProgressBatch.markAsFailed(error)
                             }
