@@ -29,6 +29,7 @@ import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.proto.SequencerError
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.crypto.Hash.sha3
 import org.web3j.crypto.RawTransaction
@@ -37,6 +38,7 @@ import org.web3j.tx.Contract
 import org.web3j.utils.Numeric
 import java.math.BigInteger
 import kotlin.concurrent.thread
+import kotlin.time.Duration.Companion.milliseconds
 import org.jetbrains.exposed.sql.transactions.transaction as dbTransaction
 
 class BlockchainTransactionHandler(
@@ -47,6 +49,8 @@ class BlockchainTransactionHandler(
     private val inactivePollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_TX_HANDLER_INACTIVE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
     private val failurePollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_TX_HANDLER_FAILURE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 2000L,
     private val maxUnseenBlocksForFork: Int = System.getenv("BLOCKCHAIN_TX_HANDLER_MAX_UNSEEN_BLOCKS_FOR_FORK")?.toIntOrNull() ?: 6,
+    private val batchMinWithdrawals: Int = System.getenv("WITHDRAWAL_SETTLEMENT_BATCH_MIN_WITHDRAWALS")?.toIntOrNull() ?: 1,
+    private val batchMaxIntervalMs: Long = System.getenv("WITHDRAWAL_SETTLEMENT_BATCH_MAX_WAIT_MS")?.toLongOrNull() ?: 1000L,
 ) {
     private val chainId = blockchainClient.chainId
     private var workerThread: Thread? = null
@@ -61,8 +65,8 @@ class BlockchainTransactionHandler(
 
                 try {
                     if (tryAcquireAdvisoryLock(chainId.value.toLong())) {
-                        // this is primarily to handle cases where we sent something on chain but process exited
-                        // before tx that updated the blockchain entity was committed,so looks like it was not sent onchain yet.
+                        // this is primarily to handle cases where we sent something on-chain but process exited
+                        // before tx that updated the blockchain entity was committed, so looks like it was not sent on-chain yet.
                         val withdrawalsSettling = WithdrawalEntity.findSettling(chainId)
                         if (withdrawalsSettling.isNotEmpty()) {
                             syncWithdrawalWithBlockchain(withdrawalsSettling)
@@ -622,38 +626,46 @@ class BlockchainTransactionHandler(
 
     private fun createNextWithdrawalBatch(): Boolean {
         val sequencedWithdrawals = WithdrawalEntity.findSequenced(blockchainClient.chainId, 50)
-        return if (sequencedWithdrawals.isNotEmpty()) {
-            val transactionDataByWithdrawal = mutableMapOf<WithdrawalId, EIP712Transaction>()
-            val withdrawals = sequencedWithdrawals.map { withdrawal ->
-                (
-                    withdrawal.transactionData ?: run {
-                        withdrawal.toEip712Transaction().also {
-                            transactionDataByWithdrawal[withdrawal.guid.value] = it
-                        }
-                    }
-                    ).getTxData(withdrawal.sequenceId.toLong())
-            }
-            val batchHash = sha3(withdrawals.map { sha3(it) }.reduce { a, b -> a + b }).toHex(false)
-            logger.debug { "calculated withdrawal hash = $batchHash" }
-            val transactionData = BlockchainTransactionData(
-                data = blockchainClient.exchangeContract.submitWithdrawals(
-                    withdrawals,
-                ).encodeFunctionCall(),
-                to = Address(blockchainClient.exchangeContract.contractAddress),
-                value = BigInteger.ZERO,
-            )
-            val transaction = BlockchainTransactionEntity.create(
-                chainId = chainId,
-                transactionData = transactionData,
-                batchHash = batchHash,
-            )
-            transaction.flush()
-            WithdrawalEntity.updateToSettling(sequencedWithdrawals, transaction, transactionDataByWithdrawal)
-            submitToBlockchain(transaction)
-            true
-        } else {
-            false
+        if (sequencedWithdrawals.isEmpty()) {
+            return false
         }
+
+        val now = Clock.System.now()
+        val earliestSequencedWithdrawal = sequencedWithdrawals.minBy { it.createdAt }.createdAt
+        if (sequencedWithdrawals.size < batchMinWithdrawals && earliestSequencedWithdrawal + batchMaxIntervalMs.milliseconds > now) {
+            logger.debug { "Skipping create withdrawal batch. ${sequencedWithdrawals.size} pending withdrawals, max age ${(now - earliestSequencedWithdrawal).inWholeMilliseconds}ms" }
+            return false
+        }
+
+        val transactionDataByWithdrawal = mutableMapOf<WithdrawalId, EIP712Transaction>()
+        val withdrawals = sequencedWithdrawals.map { withdrawal ->
+            (
+                withdrawal.transactionData ?: run {
+                    withdrawal.toEip712Transaction().also {
+                        transactionDataByWithdrawal[withdrawal.guid.value] = it
+                    }
+                }
+                ).getTxData(withdrawal.sequenceId)
+        }
+        val batchHash = sha3(withdrawals.map { sha3(it) }.reduce { a, b -> a + b }).toHex(false)
+        logger.debug { "calculated withdrawal hash = $batchHash" }
+        val transactionData = BlockchainTransactionData(
+            data = blockchainClient.exchangeContract.submitWithdrawals(
+                withdrawals,
+            ).encodeFunctionCall(),
+            to = Address(blockchainClient.exchangeContract.contractAddress),
+            value = BigInteger.ZERO,
+        )
+        val transaction = BlockchainTransactionEntity.create(
+            chainId = chainId,
+            transactionData = transactionData,
+            batchHash = batchHash,
+        )
+        transaction.flush()
+        WithdrawalEntity.updateToSettling(sequencedWithdrawals, transaction, transactionDataByWithdrawal)
+        submitToBlockchain(transaction)
+
+        return true
     }
 
     private fun onWithdrawalComplete(withdrawalEntity: WithdrawalEntity, error: String?, withdrawAmount: BigInteger?) {

@@ -36,10 +36,12 @@ import co.chainring.sequencer.core.sumBigIntegers
 import co.chainring.sequencer.proto.SequencerError
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
 import org.web3j.abi.DefaultFunctionEncoder
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.concurrent.thread
+import kotlin.time.Duration.Companion.milliseconds
 import org.jetbrains.exposed.sql.transactions.transaction as dbTransaction
 
 class SettlementCoordinator(
@@ -48,6 +50,8 @@ class SettlementCoordinator(
     private val activePollingIntervalInMs: Long = System.getenv("SETTLEMENT_COORDINATOR_ACTIVE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 100L,
     private val inactivePollingIntervalInMs: Long = System.getenv("SETTLEMENT_COORDINATOR_INACTIVE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
     private val failurePollingIntervalMs: Long = System.getenv("SETTLEMENT_COORDINATOR_FAILURE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 2000L,
+    private val batchMinTrades: Int = System.getenv("TRADE_SETTLEMENT_BATCH_MIN_TRADES")?.toIntOrNull() ?: 1,
+    private val batchMaxIntervalMs: Long = System.getenv("TRADE_SETTLEMENT_BATCH_MAX_WAIT_TIME_MS")?.toLongOrNull() ?: 100L,
 ) {
     private val marketMap = mutableMapOf<MarketId, MarketEntity>()
     private val symbolMap = mutableMapOf<SymbolId, SymbolEntity>()
@@ -161,6 +165,13 @@ class SettlementCoordinator(
             return null
         }
 
+        val now = Clock.System.now()
+        val earliestTradeTimestamp = tradesToPrepare.minBy { it.createdAt }.createdAt
+        if (tradesToPrepare.size < batchMinTrades && earliestTradeTimestamp + batchMaxIntervalMs.milliseconds > now) {
+            logger.debug { "Skipping create trade settlement batch. ${tradesToPrepare.size} pending trades, max age ${(now - earliestTradeTimestamp).inWholeMilliseconds}ms" }
+            return null
+        }
+
         return SettlementBatchEntity.create().also {
             TradeEntity.markAsSettling(tradesToPrepare.map { it.guid.value }, it)
             getBatchSettlements(tradesToPrepare).forEach { (chainId, batchSettlement) ->
@@ -247,8 +258,7 @@ class SettlementCoordinator(
         return chainIds.mapNotNull { chainId ->
             val wallets = mutableSetOf<Address>()
             val tradeGuids = mutableMapOf<Address, MutableSet<ByteArray>>()
-            val increments = mutableMapOf<SymbolId, MutableMap<Address, BigInteger>>()
-            val decrements = mutableMapOf<SymbolId, MutableMap<Address, BigInteger>>()
+            val balanceAdjustments = mutableMapOf<SymbolId, MutableMap<Address, BigInteger>>()
             val feeAmounts = mutableMapOf<SymbolId, BigInteger>()
             val netAmounts = mutableMapOf<SymbolId, BigInteger>()
             executions.filter { isForChain(it.trade.marketGuid.value, chainId) }.forEach {
@@ -265,8 +275,7 @@ class SettlementCoordinator(
                 when (it.order.side) {
                     OrderSide.Buy -> {
                         if (baseSymbolChainId == chainId) {
-                            increments.getOrPut(baseSymbolId) { mutableMapOf() }
-                                .merge(walletAddress, it.trade.amount, ::sumBigIntegers)
+                            balanceAdjustments.getOrPut(baseSymbolId) { mutableMapOf() }.merge(walletAddress, it.trade.amount, ::sumBigIntegers)
                             netAmounts.merge(baseSymbolId, it.trade.amount, ::sumBigIntegers)
                         }
                         if (quoteSymbolChainId == chainId) {
@@ -277,16 +286,14 @@ class SettlementCoordinator(
                                 quoteSymbolEntity.decimals.toInt(),
                                 it.feeAmount,
                             )
-                            decrements.getOrPut(quoteSymbolId) { mutableMapOf() }
-                                .merge(walletAddress, notionalWithFee, ::sumBigIntegers)
+                            balanceAdjustments.getOrPut(quoteSymbolId) { mutableMapOf() }.merge(walletAddress, notionalWithFee.negate(), ::sumBigIntegers)
                             netAmounts.merge(quoteSymbolId, notionalWithFee.negate(), ::sumBigIntegers)
                         }
                     }
 
                     OrderSide.Sell -> {
                         if (baseSymbolChainId == chainId) {
-                            decrements.getOrPut(baseSymbolId) { mutableMapOf() }
-                                .merge(walletAddress, it.trade.amount, ::sumBigIntegers)
+                            balanceAdjustments.getOrPut(baseSymbolId) { mutableMapOf() }.merge(walletAddress, it.trade.amount.negate(), ::sumBigIntegers)
                             netAmounts.merge(baseSymbolId, it.trade.amount.negate(), ::sumBigIntegers)
                         }
                         if (quoteSymbolChainId == chainId) {
@@ -297,8 +304,7 @@ class SettlementCoordinator(
                                 quoteSymbolEntity.decimals.toInt(),
                                 it.feeAmount.negate(),
                             )
-                            increments.getOrPut(quoteSymbolId) { mutableMapOf() }
-                                .merge(walletAddress, notionalWithFee, ::sumBigIntegers)
+                            balanceAdjustments.getOrPut(quoteSymbolId) { mutableMapOf() }.merge(walletAddress, notionalWithFee, ::sumBigIntegers)
                             netAmounts.merge(quoteSymbolId, notionalWithFee, ::sumBigIntegers)
                         }
                     }
@@ -313,8 +319,7 @@ class SettlementCoordinator(
                     "some values are not netting to zero - " +
                         "net=<$netAmounts> " +
                         "trades=${trades.map { it.guid.value }}" +
-                        "incs=<$increments> " +
-                        "decs=<$decrements> " +
+                        "adj=<$balanceAdjustments> " +
                         "fees=<$feeAmounts>, "
                 }
                 if (trades.size > 1) {
@@ -335,14 +340,14 @@ class SettlementCoordinator(
                             tradeGuids.getValue(walletAddress).toList(),
                         )
                     },
-                    (increments.keys + decrements.keys).map { symbolId ->
+                    (balanceAdjustments.keys).map { symbolId ->
                         TokenAdjustmentList(
-                            (symbolMap.getValue(symbolId).contractAddress ?: Address.zero).value,
-                            increments.getValue(symbolId)
+                            token = (symbolMap.getValue(symbolId).contractAddress ?: Address.zero).value,
+                            increments = balanceAdjustments.getValue(symbolId).filter { it.value > BigInteger.ZERO }
                                 .map { Adjustment(walletAddresses.indexOf(it.key).toBigInteger(), it.value) },
-                            decrements.getValue(symbolId)
-                                .map { Adjustment(walletAddresses.indexOf(it.key).toBigInteger(), it.value) },
-                            feeAmounts.getOrDefault(symbolId, BigInteger.ZERO),
+                            decrements = balanceAdjustments.getValue(symbolId).filter { it.value < BigInteger.ZERO }
+                                .map { Adjustment(walletAddresses.indexOf(it.key).toBigInteger(), it.value.abs()) },
+                            feeAmount = feeAmounts.getOrDefault(symbolId, BigInteger.ZERO),
                         )
                     },
                 )
