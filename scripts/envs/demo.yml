@@ -11,6 +11,7 @@ environment:
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
     MAKER_FEE_RATE: "0.01"
     TAKER_FEE_RATE: "0.02"
+    FAUCET_MODE: AllSymbols
   sequencer:
     QUEUE_HOME: "/data/queues/demo"
     CHECKPOINTS_ENABLED: "true"

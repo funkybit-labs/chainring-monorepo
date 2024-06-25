@@ -27,11 +27,17 @@ export function FaucetModal({
     symbols.length > 0 ? symbols[0] : null
   )
 
+  function onSymbolSelected(symbol: TradingSymbol) {
+    setSelectedSymbol(symbol)
+    setSubmitPhase(null)
+    mutation.reset()
+  }
+
   const mutation = useMutation({
     mutationFn: async () => {
       try {
         return await apiClient.faucet({
-          chainId: selectedSymbol!.chainId,
+          symbol: selectedSymbol!.name,
           address: walletAddress
         })
       } catch (error) {
@@ -74,12 +80,12 @@ export function FaucetModal({
       <div className="w-full overflow-y-auto text-sm text-white ">
         <div className="mb-4 flex flex-col gap-2">
           <div>
-            Obtain Testnet Tokens and try our product. We will send you 0.1 of
+            Obtain Testnet Tokens and try our product. We will send you 1.0 of
             the selected token to you connected wallet&apos;s address. Testnet
             tokens have no financial value and cannot be traded at a real price.
           </div>
 
-          <Listbox value={selectedSymbol} onChange={setSelectedSymbol}>
+          <Listbox value={selectedSymbol} onChange={onSymbolSelected}>
             <div className="relative">
               <Listbox.Button className="relative w-full cursor-default rounded-md bg-darkBluishGray7 py-2 pl-3 pr-10 text-left transition-colors duration-300 ease-in-out hover:bg-darkBluishGray6 hover:text-white">
                 <FaucetChain symbol={selectedSymbol!} />
@@ -119,7 +125,7 @@ export function FaucetModal({
           </div>
           <div className="mt-2">
             <div className="mr-2 text-darkBluishGray1">Amount:</div>
-            <div>0.1 {selectedSymbol?.name}</div>
+            <div>1.0 {selectedSymbol?.name}</div>
           </div>
 
           {phase == 'sent' ? (

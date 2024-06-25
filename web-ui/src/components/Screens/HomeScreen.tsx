@@ -61,7 +61,8 @@ function HomeScreenContent() {
                       symbol.description,
                       symbol.contractAddress,
                       symbol.decimals,
-                      chain.id
+                      chain.id,
+                      symbol.faucetSupported
                     )
                 )
               )

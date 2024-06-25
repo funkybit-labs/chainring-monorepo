@@ -37,6 +37,7 @@ data class SymbolInfo(
     val description: String,
     val contractAddress: Address?,
     val decimals: UByte,
+    val faucetSupported: Boolean,
 )
 
 @Serializable
