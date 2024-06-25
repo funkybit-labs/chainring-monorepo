@@ -3,6 +3,7 @@ package co.chainring.core.blockchain
 import co.chainring.contracts.generated.ERC1967Proxy
 import co.chainring.contracts.generated.ERC20
 import co.chainring.contracts.generated.Exchange
+import co.chainring.contracts.generated.MockERC20
 import co.chainring.contracts.generated.UUPSUpgradeable
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
@@ -331,4 +332,18 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
     fun lastSettlementBatchHash(): String = exchangeContract.lastSettlementBatchHash().send().toHex(false)
 
     fun lastWithdrawalBatchHash(): String = exchangeContract.lastWithdrawalBatchHash().send().toHex(false)
+
+    fun asyncMintERC20(
+        tokenContractAddress: Address,
+        receiver: Address,
+        amount: BigInteger,
+    ): TxHash =
+        sendTransaction(
+            tokenContractAddress,
+            MockERC20
+                .load(tokenContractAddress.value, web3j, transactionManager, gasProvider)
+                .mint(receiver.value, amount)
+                .encodeFunctionCall(),
+            BigInteger.ZERO,
+        )
 }

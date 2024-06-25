@@ -7,6 +7,7 @@ export default class TradingSymbol {
   contractAddress: AddressType | null
   decimals: number
   chainId: number
+  faucetSupported: boolean
 
   constructor(
     name: string,
@@ -14,7 +15,8 @@ export default class TradingSymbol {
     description: string,
     contactAddress: AddressType | null,
     decimals: number,
-    chainId: number
+    chainId: number,
+    faucetSupported: boolean
   ) {
     this.name = name
     this.chainName = chainName
@@ -22,5 +24,6 @@ export default class TradingSymbol {
     this.contractAddress = contactAddress
     this.decimals = decimals
     this.chainId = chainId
+    this.faucetSupported = faucetSupported
   }
 }

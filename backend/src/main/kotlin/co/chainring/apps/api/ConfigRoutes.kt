@@ -5,6 +5,7 @@ import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.DeployedContract
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.SymbolInfo
+import co.chainring.apps.telegrambot.faucetSupported
 import co.chainring.core.model.Address
 import co.chainring.core.model.FeeRate
 import co.chainring.core.model.Symbol
@@ -29,13 +30,13 @@ import org.http4k.format.KotlinxSerialization.auto
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.transactions.transaction
 
-object ConfigRoutes {
+class ConfigRoutes(private val faucetMode: FaucetMode) {
     private val logger = KotlinLogging.logger {}
 
-    fun getConfiguration(): ContractRoute {
+    val getConfiguration: ContractRoute = run {
         val responseBody = Body.auto<ConfigurationApiResponse>().toLens()
 
-        return "config" meta {
+        "config" meta {
             operationId = "config"
             summary = "Get configuration"
             tags += listOf(Tag("configuration"))
@@ -59,12 +60,14 @@ object ConfigRoutes {
                                         description = "Ethereum",
                                         contractAddress = null,
                                         decimals = 18u,
+                                        faucetSupported = false,
                                     ),
                                     SymbolInfo(
                                         name = "USDC",
                                         description = "USD Coin",
                                         contractAddress = Address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
                                         decimals = 18u,
+                                        faucetSupported = false,
                                     ),
                                 ),
                                 jsonRpcUrl = "https://demo-anvil.chainring.co",
@@ -112,6 +115,7 @@ object ConfigRoutes {
                                             description = it.description,
                                             contractAddress = it.contractAddress,
                                             decimals = it.decimals,
+                                            faucetSupported = it.faucetSupported(faucetMode),
                                         )
                                     },
                                     jsonRpcUrl = chain.jsonRpcUrl,

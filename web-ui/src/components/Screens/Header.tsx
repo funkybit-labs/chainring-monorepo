@@ -3,7 +3,7 @@ import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { useAccount } from 'wagmi'
 import { addressDisplay, classNames, uniqueFilter } from 'utils'
 import { Button } from 'components/common/Button'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Markets from 'markets'
 import Menu from 'assets/Menu.svg'
 import { FaucetModal } from 'components/Screens/HomeScreen/faucet/FaucetModal'
@@ -27,7 +27,6 @@ export function Header({
   const [icon, setIcon] = useState<string>()
   const [showMenu, setShowMenu] = useState(false)
   const [showFaucetModal, setShowFaucetModal] = useState<boolean>(false)
-  const faucetEnabled = import.meta.env.ENV_FAUCET_ENABLED === 'true'
   const [tab, setTab] = useState<Tab>(initialTab)
 
   useEffect(() => {
@@ -52,6 +51,13 @@ export function Header({
   }, [showMenu])
 
   const validChain = useValidChain()
+
+  const faucetSymbols = useMemo(() => {
+    return markets
+      .flatMap((m) => [m.baseSymbol, m.quoteSymbol])
+      .filter((s) => s.faucetSupported)
+      .filter(uniqueFilter)
+  }, [markets])
 
   function walletConnector() {
     return (
@@ -96,7 +102,7 @@ export function Header({
   function faucetButton({ onClick }: { onClick: () => void }) {
     return (
       <span className="mx-5 whitespace-nowrap">
-        {faucetEnabled && account.isConnected ? (
+        {faucetSymbols.length > 0 && account.isConnected ? (
           <Button
             style={'normal'}
             width={'normal'}
@@ -203,15 +209,12 @@ export function Header({
           </div>
         </>
       )}
-      {faucetEnabled && account.isConnected && showFaucetModal && (
+      {faucetSymbols.length > 0 && account.isConnected && showFaucetModal && (
         <div className="fixed">
           <FaucetModal
             isOpen={showFaucetModal}
             walletAddress={account.address!}
-            symbols={markets
-              .flatMap((m) => [m.baseSymbol, m.quoteSymbol])
-              .filter((s) => s.contractAddress == null)
-              .filter(uniqueFilter)}
+            symbols={faucetSymbols}
             close={() => setShowFaucetModal(false)}
           />
         </div>

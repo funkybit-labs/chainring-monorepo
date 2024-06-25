@@ -7,10 +7,13 @@ import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.db.DbConfig
 import co.chainring.core.db.connect
 import co.chainring.core.model.Address
+import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.SymbolId
 import co.chainring.tasks.fixtures.Fixtures
+import org.awaitility.kotlin.await
+import org.awaitility.kotlin.withAlias
 import java.math.BigInteger
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.TransactionManager
@@ -19,6 +22,7 @@ import org.web3j.crypto.Keys
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.methods.response.VoidResponse
 import org.web3j.utils.Numeric
+import java.time.Duration
 
 data class SymbolContractAddress(
     val symbolId: SymbolId,
@@ -55,8 +59,8 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
         }
     }
 
-    fixtures.wallets.forEach { wallet ->
-        wallet.balances.forEach { (symbolId, balance) ->
+    val txHashes = fixtures.wallets.flatMap { wallet ->
+        wallet.balances.mapNotNull { (symbolId, balance) ->
             val symbol = fixtures.symbols.first { it.id == symbolId }
             val blockchainClient = blockchainClient(symbol.chainId)
 
@@ -64,25 +68,46 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
 
             if (symbol.isNative) {
                 blockchainClient.setNativeBalance(wallet.address, balance)
+                null
             } else {
                 val symbolContractAddress = symbolContractAddresses.first { it.symbolId == symbolId }.address
                 val currentBalance = blockchainClient.getERC20Balance(symbolContractAddress, wallet.address)
                 if (currentBalance < balance) {
-                    blockchainClient.mintERC20(
-                        symbolContractAddress,
-                        wallet.address,
-                        balance - currentBalance
+                    Pair(
+                        symbol.chainId,
+                        blockchainClient.asyncMintERC20(
+                            symbolContractAddress,
+                            wallet.address,
+                            balance - currentBalance
+                        )
                     )
                 } else if (currentBalance > balance) {
-                    blockchainClient.burnERC20(
-                        symbolContractAddress,
-                        wallet.address,
-                        currentBalance - balance
+                    Pair(
+                        symbol.chainId,
+                        blockchainClient.asyncBurnERC20(
+                            symbolContractAddress,
+                            wallet.address,
+                            currentBalance - balance
+                        )
                     )
+                } else {
+                    null
                 }
             }
         }
     }
+
+    await
+        .withAlias("Waiting for transactions confirmations")
+        .pollInSameThread()
+        .pollDelay(Duration.ofMillis(100))
+        .pollInterval(Duration.ofMillis(100))
+        .atMost(Duration.ofMillis(10000L))
+        .until {
+            txHashes.all { (chainId, txHash) ->
+                blockchainClient(chainId).getTransactionReceipt(txHash)?.isStatusOK ?: false
+            }
+        }
 
     return symbolContractAddresses
 }
@@ -100,31 +125,19 @@ class FixturesBlockchainClient(config: BlockchainClientConfig) : BlockchainClien
         return Address(Keys.toChecksumAddress(contract.contractAddress))
     }
 
-    fun mintERC20(
+    fun asyncBurnERC20(
         tokenContractAddress: Address,
         receiver: Address,
         amount: BigInteger
-    ) {
-        MockERC20.load(
-            tokenContractAddress.value,
-            web3j,
-            transactionManager,
-            gasProvider
-        ).mint(receiver.value, amount).send()
-    }
-
-    fun burnERC20(
-        tokenContractAddress: Address,
-        receiver: Address,
-        amount: BigInteger
-    ) {
-        MockERC20.load(
-            tokenContractAddress.value,
-            web3j,
-            transactionManager,
-            gasProvider
-        ).burn(receiver.value, amount).send()
-    }
+    ): TxHash =
+        sendTransaction(
+            tokenContractAddress,
+            MockERC20
+                .load(tokenContractAddress.value, web3j, transactionManager, gasProvider)
+                .burn(receiver.value, amount)
+                .encodeFunctionCall(),
+            BigInteger.ZERO,
+        )
 
     fun setNativeBalance(address: Address, amount: BigInteger) =
         Request(
