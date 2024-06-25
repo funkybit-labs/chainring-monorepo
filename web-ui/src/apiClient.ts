@@ -332,7 +332,7 @@ const ListWithdrawalsApiResponseSchema = z.object({
 })
 
 const FaucetRequestSchema = z.object({
-  chainId: z.number(),
+  symbol: z.string(),
   address: AddressSchema
 })
 export type FaucetRequest = z.infer<typeof FaucetRequestSchema>

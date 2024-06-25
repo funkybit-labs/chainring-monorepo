@@ -63,6 +63,10 @@ class Wallet(
         return blockchainClientsByChainId.getValue(currentChainId)
     }
 
+    fun getWalletERC20Balance(symbol: Symbol): BigInteger {
+        return loadErc20Contract(symbol.value).balanceOf(address.value).send()
+    }
+
     fun getWalletERC20Balance(symbol: String): BigInteger {
         return loadErc20Contract(symbol).balanceOf(address.value).send()
     }

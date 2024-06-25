@@ -102,7 +102,7 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
         ),
         Contract(
             nameInBuildDir = "MockERC20.sol",
-            generateJavaWrapper = false,
+            generateJavaWrapper = true,
             generateTypescriptAbi = false,
             generateJavaTestWrapper = true,
             generateJavaWrapperForFixtures = true

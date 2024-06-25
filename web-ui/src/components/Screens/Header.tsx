@@ -28,6 +28,8 @@ export function Header({
   const [showMenu, setShowMenu] = useState(false)
   const [showFaucetModal, setShowFaucetModal] = useState<boolean>(false)
   const faucetEnabled = import.meta.env.ENV_FAUCET_ENABLED === 'true'
+  const nativeFaucetEnabled =
+    import.meta.env.ENV_NATIVE_FAUCET_ENABLED === 'true'
   const [tab, setTab] = useState<Tab>(initialTab)
 
   useEffect(() => {
@@ -210,7 +212,7 @@ export function Header({
             walletAddress={account.address!}
             symbols={markets
               .flatMap((m) => [m.baseSymbol, m.quoteSymbol])
-              .filter((s) => s.contractAddress == null)
+              .filter((s) => s.contractAddress != null || nativeFaucetEnabled)
               .filter(uniqueFilter)}
             close={() => setShowFaucetModal(false)}
           />
