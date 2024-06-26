@@ -110,6 +110,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                         descriptionPath = "/openapi.json"
                         routes += listOf(
                             configRoutes.getConfiguration,
+                            configRoutes.getAccountConfiguration,
+                            configRoutes.markSymbolAsAdded,
                             orderRoutes.createOrder(),
                             orderRoutes.updateOrder(),
                             orderRoutes.cancelOrder(),

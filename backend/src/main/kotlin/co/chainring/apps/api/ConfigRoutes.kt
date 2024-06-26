@@ -1,11 +1,13 @@
 package co.chainring.apps.api
 
+import co.chainring.apps.api.middleware.principal
+import co.chainring.apps.api.middleware.signedTokenSecurity
+import co.chainring.apps.api.model.AccountConfigurationApiResponse
 import co.chainring.apps.api.model.Chain
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.DeployedContract
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.SymbolInfo
-import co.chainring.apps.telegrambot.faucetSupported
 import co.chainring.core.model.Address
 import co.chainring.core.model.FeeRate
 import co.chainring.core.model.Symbol
@@ -17,9 +19,11 @@ import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.SymbolEntity
+import co.chainring.core.model.db.WalletEntity
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.Tag
+import org.http4k.contract.div
 import org.http4k.contract.meta
 import org.http4k.core.Body
 import org.http4k.core.Method
@@ -27,6 +31,8 @@ import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.core.with
 import org.http4k.format.KotlinxSerialization.auto
+import org.http4k.lens.Path
+import org.http4k.lens.string
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.transactions.transaction
 
@@ -61,6 +67,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                         contractAddress = null,
                                         decimals = 18u,
                                         faucetSupported = false,
+                                        iconUrl = "https://icons/eth.svg",
                                     ),
                                     SymbolInfo(
                                         name = "USDC",
@@ -68,6 +75,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                         contractAddress = Address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
                                         decimals = 18u,
                                         faucetSupported = false,
+                                        iconUrl = "https://icons/usdc.svg",
                                     ),
                                 ),
                                 jsonRpcUrl = "https://demo-anvil.chainring.co",
@@ -116,6 +124,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                             contractAddress = it.contractAddress,
                                             decimals = it.decimals,
                                             faucetSupported = it.faucetSupported(faucetMode),
+                                            iconUrl = it.iconUrl,
                                         )
                                     },
                                     jsonRpcUrl = chain.jsonRpcUrl,
@@ -139,6 +148,76 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                             feeRates = FeeRates.fetch(),
                         ),
                 )
+            }
+        }
+    }
+
+    val getAccountConfiguration: ContractRoute = run {
+        val responseBody = Body.auto<AccountConfigurationApiResponse>().toLens()
+
+        "account-config" meta {
+            operationId = "account-config"
+            summary = "Get account configuration"
+            security = signedTokenSecurity
+            tags += listOf(Tag("configuration"))
+            returning(
+                Status.OK,
+                responseBody to
+                    AccountConfigurationApiResponse(
+                        newSymbols = listOf(
+                            SymbolInfo(
+                                name = "RING",
+                                description = "ChainRing Token",
+                                contractAddress = Address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
+                                decimals = 18u,
+                                faucetSupported = true,
+                                iconUrl = "https://icons/ring.svg",
+                            ),
+                        ),
+                    ),
+            )
+        } bindContract Method.GET to { request ->
+            transaction {
+                Response(Status.OK).with(
+                    responseBody of
+                        AccountConfigurationApiResponse(
+                            newSymbols = SymbolEntity.symbolsToAddToWallet(request.principal).map {
+                                SymbolInfo(
+                                    it.name,
+                                    it.description,
+                                    it.contractAddress,
+                                    it.decimals,
+                                    it.faucetSupported(faucetMode),
+                                    it.iconUrl,
+                                )
+                            },
+                        ),
+                )
+            }
+        }
+    }
+
+    private val symbolNamePathParam = Path.string().of("symbolName", "Symbol Name")
+
+    val markSymbolAsAdded: ContractRoute = run {
+        "account-config" / symbolNamePathParam meta {
+            operationId = "symbol-added"
+            summary = "Mark symbol as added"
+            security = signedTokenSecurity
+            tags += listOf(Tag("configuration"))
+            returning(
+                Status.NO_CONTENT,
+            )
+        } bindContract Method.POST to { symbolName ->
+            { request ->
+                transaction {
+                    WalletEntity.getOrCreate(request.principal).let {
+                        if (!it.addedSymbols.contains(symbolName)) {
+                            it.addedSymbols += symbolName
+                        }
+                    }
+                    Response(Status.NO_CONTENT)
+                }
             }
         }
     }

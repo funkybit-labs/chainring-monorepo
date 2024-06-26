@@ -15,6 +15,11 @@ data class ConfigurationApiResponse(
 )
 
 @Serializable
+data class AccountConfigurationApiResponse(
+    val newSymbols: List<SymbolInfo>,
+)
+
+@Serializable
 data class Chain(
     val id: ChainId,
     val name: String,
@@ -38,6 +43,7 @@ data class SymbolInfo(
     val contractAddress: Address?,
     val decimals: UByte,
     val faucetSupported: Boolean,
+    val iconUrl: String?,
 )
 
 @Serializable
