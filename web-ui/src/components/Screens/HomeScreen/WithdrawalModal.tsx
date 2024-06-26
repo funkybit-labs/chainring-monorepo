@@ -143,7 +143,7 @@ export default function WithdrawalModal({
       isOpen={isOpen}
       close={close}
       onClosed={onClosed}
-      title={`Withdraw ${symbol.name}`}
+      title={`Withdraw ${symbol.displayName()}`}
     >
       <div className="max-h-52 overflow-y-auto">
         <ModalAsyncContent

@@ -22,8 +22,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class OrderBookTest : TestWithDb() {
-    private val btcEthMarket = MarketId("BTC/ETH")
-    private val ethUsdcMarket = MarketId("ETH/USDC")
+    private val btcEthMarket = MarketId("BTC:123/ETH:123")
+    private val ethUsdcMarket = MarketId("ETH:123/USDC:123")
     private lateinit var wallets: List<WalletEntity>
 
     @BeforeEach

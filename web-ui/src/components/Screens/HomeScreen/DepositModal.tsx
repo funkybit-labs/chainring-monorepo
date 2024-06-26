@@ -155,7 +155,7 @@ export default function DepositModal({
       isOpen={isOpen}
       close={close}
       onClosed={onClosed}
-      title={`Deposit ${symbol.name}`}
+      title={`Deposit ${symbol.displayName()}`}
     >
       <div className="max-h-52 overflow-y-auto">
         <ModalAsyncContent

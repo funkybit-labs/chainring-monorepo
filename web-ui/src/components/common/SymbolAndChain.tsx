@@ -16,7 +16,7 @@ export function SymbolAndChain({ symbol, noIcon }: Props) {
         />
       )}
       <span className="leading-none">
-        {symbol.name}
+        {symbol.displayName()}
         {noIcon ? (
           <> ({symbol.chainName})</>
         ) : (

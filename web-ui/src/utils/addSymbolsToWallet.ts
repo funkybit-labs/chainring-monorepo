@@ -3,6 +3,7 @@ import { apiClient } from 'apiClient'
 export async function addNewSymbolsToWallet() {
   const config = await apiClient.getAccountConfiguration()
   config.newSymbols?.map(async (sym) => {
+    const [symbolName, chainId] = sym.name.split(':')
     if (
       await window.ethereum?.request({
         method: 'wallet_watchAsset',
@@ -10,10 +11,10 @@ export async function addNewSymbolsToWallet() {
           type: 'ERC20',
           options: {
             address: sym.contractAddress,
-            // TODO: CHAIN-345 - improve cross-chain symbology
-            symbol: sym.name.replace(new RegExp('[0-9]+$', ''), ''),
+            symbol: symbolName,
             decimals: sym.decimals,
-            image: sym.iconUrl
+            image: sym.iconUrl,
+            chainId: chainId
           }
         }
       })

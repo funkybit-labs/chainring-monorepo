@@ -61,7 +61,7 @@ class FaucetRoutes(private val faucetMode: FaucetMode, blockchainClients: Collec
                 else -> {
                     val amount = BigDecimal("1")
 
-                    logger.debug { "Sending $amount ${symbol.name} on chain ${symbol.chainId.value} to ${payload.address.value}" }
+                    logger.debug { "Sending $amount ${symbol.name} to ${payload.address.value}" }
 
                     val amountInFundamentalUnits = amount.movePointRight(symbol.decimals.toInt()).toBigInteger()
                     val txHash = if (symbol.faucetSupported(faucetMode)) {
