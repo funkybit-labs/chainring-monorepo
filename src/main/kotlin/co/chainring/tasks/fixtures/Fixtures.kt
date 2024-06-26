@@ -29,7 +29,8 @@ data class Fixtures(
         val description: String,
         val chainId: ChainId,
         val isNative: Boolean,
-        val decimals: Int
+        val decimals: Int,
+        val withdrawalFee: BigDecimal
     ) {
         val id: SymbolId = SymbolId(chainId, name)
     }
@@ -58,11 +59,11 @@ fun getFixtures(chainringChainClients: List<BlockchainClient>) = Fixtures(
     symbols = chainringChainClients.map { client ->
         listOf(
             // BTC is the native token since we would be on Bitcoin L2
-            Fixtures.Symbol(name = "BTC".toChainSymbol(client.chainId), description = "Bitcoin", chainId = client.chainId, isNative = true, 18),
+            Fixtures.Symbol(name = "BTC".toChainSymbol(client.chainId), description = "Bitcoin", chainId = client.chainId, isNative = true, 18, BigDecimal("0.00002")),
             // ETH is bridged and represented by an ERC20 token
-            Fixtures.Symbol(name = "ETH".toChainSymbol(client.chainId), description = "Ethereum", chainId = client.chainId, isNative = false, 18),
-            Fixtures.Symbol(name = "USDC".toChainSymbol(client.chainId), description = "USD Coin", chainId = client.chainId, isNative = false, 6),
-            Fixtures.Symbol(name = "DAI".toChainSymbol(client.chainId), description = "Dai", chainId = client.chainId, isNative = false, 18)
+            Fixtures.Symbol(name = "ETH".toChainSymbol(client.chainId), description = "Ethereum", chainId = client.chainId, isNative = false, 18, BigDecimal("0.0003")),
+            Fixtures.Symbol(name = "USDC".toChainSymbol(client.chainId), description = "USD Coin", chainId = client.chainId, isNative = false, 6, BigDecimal("1")),
+            Fixtures.Symbol(name = "DAI".toChainSymbol(client.chainId), description = "Dai", chainId = client.chainId, isNative = false, 18, BigDecimal("1"))
         )
     }.flatten(),
     markets = chainringChainClients.map { client ->

@@ -1,5 +1,6 @@
 package co.chainring
 
+import co.chainring.core.model.Symbol
 import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
 import co.chainring.sequencer.apps.SequencerApp
@@ -34,6 +35,9 @@ import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderBatch
 import co.chainring.sequencer.proto.setFeeRatesRequest
+import co.chainring.sequencer.proto.setWithdrawalFeesRequest
+import co.chainring.sequencer.proto.withdrawal
+import co.chainring.sequencer.proto.withdrawalFee
 import co.chainring.testutils.inSats
 import co.chainring.testutils.inWei
 import io.grpc.ManagedChannelBuilder
@@ -140,6 +144,29 @@ class TestSequencerCheckpoints {
                 ).success,
             )
 
+            val btcWithdrawalFee = BigDecimal("0.00002").inSats().toIntegerValue()
+            val ethWithdrawalFee = BigDecimal("0.001").inWei().toIntegerValue()
+            gateway.setWithdrawalFees(
+                setWithdrawalFeesRequest {
+                    this.guid = UUID.randomUUID().toString()
+                    this.withdrawalFees.addAll(
+                        listOf(
+                            withdrawalFee {
+                                this.asset = btcEthMarketId.baseAsset().value
+                                this.value = btcWithdrawalFee
+                            },
+                            withdrawalFee {
+                                this.asset = btcEthMarketId.quoteAsset().value
+                                this.value = ethWithdrawalFee
+                            },
+                        ),
+                    )
+                },
+            ).also {
+                assertTrue(it.success)
+                assertEquals(it.sequencerResponse.withdrawalFeesSetList.size, 2)
+            }
+
             // set balances
             assertTrue(
                 gateway.applyBalanceBatch(
@@ -150,17 +177,17 @@ class TestSequencerCheckpoints {
                                 deposit {
                                     this.asset = btcEthMarketId.baseAsset().value
                                     this.wallet = wallet1.value
-                                    this.amount = BigDecimal("1").inSats().toIntegerValue()
+                                    this.amount = BigDecimal("1.01").inSats().toIntegerValue()
                                 },
                                 deposit {
                                     this.asset = btcEthMarketId.quoteAsset().value
                                     this.wallet = wallet1.value
-                                    this.amount = BigDecimal("1").inWei().toIntegerValue()
+                                    this.amount = BigDecimal("1.02").inWei().toIntegerValue()
                                 },
                                 deposit {
                                     this.asset = btcEthMarketId.quoteAsset().value
                                     this.wallet = wallet2.value
-                                    this.amount = BigDecimal("1").inWei().toIntegerValue()
+                                    this.amount = BigDecimal("1.03").inWei().toIntegerValue()
                                 },
                             ),
                         )
@@ -234,6 +261,50 @@ class TestSequencerCheckpoints {
             sequencerApp.stop()
             sequencerApp.start()
 
+            gateway.applyBalanceBatch(
+                balanceBatch {
+                    this.guid = UUID.randomUUID().toString()
+                    this.withdrawals.addAll(
+                        listOf(
+                            withdrawal {
+                                this.asset = btcEthMarketId.baseAsset().value
+                                this.wallet = wallet1.value
+                                this.amount = BigDecimal("0.01").inSats().toIntegerValue()
+                                this.externalGuid = "guid1"
+                            },
+                            withdrawal {
+                                this.asset = btcEthMarketId.quoteAsset().value
+                                this.wallet = wallet1.value
+                                this.amount = BigDecimal("0.02").inWei().toIntegerValue()
+                                this.externalGuid = "guid2"
+                            },
+                            withdrawal {
+                                this.asset = btcEthMarketId.quoteAsset().value
+                                this.wallet = wallet2.value
+                                this.amount = BigDecimal("0.03").inWei().toIntegerValue()
+                                this.externalGuid = "guid3"
+                            },
+                        ),
+                    )
+                },
+            ).also {
+                assertTrue(it.success)
+                assertEquals(it.sequencerResponse.withdrawalsCreatedList.size, 3)
+
+                it.sequencerResponse.withdrawalsCreatedList[0].also { withdrawal ->
+                    assertEquals("guid1", withdrawal.externalGuid)
+                    assertEquals(btcWithdrawalFee, withdrawal.fee)
+                }
+                it.sequencerResponse.withdrawalsCreatedList[1].also { withdrawal ->
+                    assertEquals("guid2", withdrawal.externalGuid)
+                    assertEquals(ethWithdrawalFee, withdrawal.fee)
+                }
+                it.sequencerResponse.withdrawalsCreatedList[2].also { withdrawal ->
+                    assertEquals("guid3", withdrawal.externalGuid)
+                    assertEquals(ethWithdrawalFee, withdrawal.fee)
+                }
+            }
+
             // market buy, should be matched
             gateway.applyOrderBatch(
                 orderBatch {
@@ -278,7 +349,7 @@ class TestSequencerCheckpoints {
 
             assertQueueFilesCount(inputQueue, 2)
             assertCheckpointsCount(checkpointsPath, 1)
-            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 7)
+            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 9)
 
             currentTime.addAndGet(60.seconds.inWholeMilliseconds)
 
@@ -328,7 +399,7 @@ class TestSequencerCheckpoints {
             }
 
             assertCheckpointsCount(checkpointsPath, 2)
-            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 9)
+            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 11)
         } finally {
             gatewayApp.stop()
             sequencerApp.stop()
@@ -726,6 +797,9 @@ class TestSequencerCheckpoints {
         verifySerialization(
             SequencerState(
                 feeRates = feeRates,
+                withdrawalFees = mutableMapOf(
+                    Symbol("BTC") to BigInteger.TEN,
+                ),
                 balances = mutableMapOf(
                     wallet1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),

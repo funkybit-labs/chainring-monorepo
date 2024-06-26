@@ -1,5 +1,6 @@
 package co.chainring.sequencer.apps
 
+import co.chainring.core.model.Symbol
 import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.core.FeeRate
 import co.chainring.sequencer.core.FeeRates
@@ -31,6 +32,7 @@ import co.chainring.sequencer.proto.balanceChange
 import co.chainring.sequencer.proto.copy
 import co.chainring.sequencer.proto.marketCreated
 import co.chainring.sequencer.proto.sequencerResponse
+import co.chainring.sequencer.proto.withdrawalCreated
 import io.github.oshai.kotlinlogging.KotlinLogging
 import net.openhft.chronicle.queue.ExcerptTailer
 import net.openhft.chronicle.queue.TailerDirection
@@ -126,6 +128,29 @@ class SequencerApp(
                     }
                 }
             }
+
+            SequencerRequest.Type.SetWithdrawalFees -> {
+                var error: SequencerError? = null
+
+                val withdrawalFees = request.withdrawalFeesList
+                if (withdrawalFees.isEmpty()) {
+                    error = SequencerError.InvalidWithdrawalFee
+                } else {
+                    withdrawalFees.forEach {
+                        state.withdrawalFees[Symbol(it.asset)] = it.value.toBigInteger()
+                    }
+                }
+
+                sequencerResponse {
+                    this.guid = request.guid
+                    this.sequence = sequence
+                    this.processingTime = System.nanoTime() - startTime
+                    error?.let { this.error = it } ?: run {
+                        this.withdrawalFeesSet.addAll(withdrawalFees)
+                    }
+                }
+            }
+
             SequencerRequest.Type.ApplyOrderBatch -> {
                 var ordersChanged: List<OrderChanged> = emptyList()
                 var ordersChangeRejected: List<OrderChangeRejected> = emptyList()
@@ -198,16 +223,19 @@ class SequencerApp(
                     balancesChanged.merge(Pair(wallet, asset), amount, ::sumBigIntegers)
                 }
 
+                val withdrawalsCreated = mutableMapOf<String, BigInteger>()
                 balanceBatch.withdrawalsList.forEach { withdrawal ->
+                    val withdrawalFee = state.withdrawalFees[Symbol(withdrawal.asset)] ?: BigInteger.ZERO
                     state.balances[withdrawal.wallet.toWalletAddress()]?.let { balanceByAsset ->
                         val asset = withdrawal.asset.toAsset()
                         val requestedAmount = withdrawal.amount.toBigInteger()
                         val balance = balanceByAsset[withdrawal.asset.toAsset()] ?: BigInteger.ZERO
                         val withdrawalAmount = if (requestedAmount == BigInteger.ZERO) balance else requestedAmount
-                        if (withdrawalAmount > BigInteger.ZERO && withdrawalAmount <= balance) {
+                        if (withdrawalAmount > withdrawalFee && withdrawalAmount <= balance) {
                             val wallet = withdrawal.wallet.toWalletAddress()
                             balanceByAsset.merge(asset, -withdrawalAmount, ::sumBigIntegers)
                             balancesChanged.merge(Pair(wallet, asset), -withdrawalAmount, ::sumBigIntegers)
+                            withdrawalsCreated[withdrawal.externalGuid] = withdrawalFee
                         }
                     }
                 }
@@ -270,6 +298,14 @@ class SequencerApp(
                         },
                     )
                     this.ordersChanged.addAll(autoReduce(balancesChanged.keys))
+                    this.withdrawalsCreated.addAll(
+                        withdrawalsCreated.map {
+                            withdrawalCreated {
+                                this.externalGuid = it.key
+                                this.fee = it.value.toIntegerValue()
+                            }
+                        },
+                    )
                 }
             }
             SequencerRequest.Type.Reset -> {

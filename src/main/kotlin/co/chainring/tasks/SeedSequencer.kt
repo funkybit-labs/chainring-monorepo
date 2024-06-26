@@ -1,6 +1,9 @@
 package co.chainring.tasks
 
+import co.chainring.core.model.Symbol
+import co.chainring.core.model.WithdrawalFee
 import co.chainring.core.sequencer.SequencerClient
+import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.tasks.fixtures.Fixtures
 import kotlinx.coroutines.runBlocking
 
@@ -13,6 +16,10 @@ fun seedSequencer(fixtures: Fixtures) {
                 throw RuntimeException("Failed to set fee rates in sequencer: ${response.error}")
             }
         }
+
+        sequencerClient.setWithdrawalFees(
+            fixtures.symbols.map { WithdrawalFee(Symbol(it.name), it.withdrawalFee.toFundamentalUnits(it.decimals)) }
+        )
 
         fixtures.markets.forEach { market ->
             val baseSymbol = fixtures.symbols.first { it.id == market.baseSymbol }

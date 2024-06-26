@@ -11,6 +11,7 @@ import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerRequestKt
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.SetFeeRatesRequest
+import co.chainring.sequencer.proto.SetWithdrawalFeesRequest
 import co.chainring.sequencer.proto.gatewayResponse
 import co.chainring.sequencer.proto.sequenced
 import co.chainring.sequencer.proto.sequencerRequest
@@ -170,6 +171,14 @@ class GatewayApp(
                 this.guid = request.guid
                 this.type = SequencerRequest.Type.SetFeeRates
                 this.feeRates = request.feeRates
+            }
+        }
+
+        override suspend fun setWithdrawalFees(request: SetWithdrawalFeesRequest): GatewayResponse {
+            return toSequencer {
+                this.guid = request.guid
+                this.type = SequencerRequest.Type.SetWithdrawalFees
+                this.withdrawalFees.addAll(request.withdrawalFeesList)
             }
         }
     }

@@ -4,6 +4,8 @@ import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.core.model.FeeRate
 import co.chainring.core.model.SequencerWalletId
+import co.chainring.core.model.Symbol
+import co.chainring.core.model.WithdrawalFee
 import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.sequencer.SequencerClient
@@ -23,6 +25,7 @@ import org.http4k.core.with
 import org.http4k.format.KotlinxSerialization.auto
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.lang.RuntimeException
+import java.math.BigInteger
 
 class TestRoutes(
     private val sequencerClient: SequencerClient,
@@ -43,6 +46,11 @@ class TestRoutes(
         data class SetFeeRatesInSequencer(
             val maker: FeeRate,
             val taker: FeeRate,
+        )
+
+        @Serializable
+        data class SetWithdrawalFeesInSequencer(
+            val withdrawalFees: List<WithdrawalFee>,
         )
 
         @Serializable
@@ -321,10 +329,42 @@ class TestRoutes(
         }
     }
 
+    private val setWithdrawalFeesInSequencer: ContractRoute = run {
+        val requestBody = Body.auto<SetWithdrawalFeesInSequencer>().toLens()
+
+        "sequencer-withdrawal-fees" meta {
+            operationId = "sequencer-withdrawal-fees"
+            summary = "Set withdrawal fees in Sequencer"
+            tags += listOf(Tag("test"))
+            receiving(
+                requestBody to SetWithdrawalFeesInSequencer(
+                    withdrawalFees = listOf(
+                        WithdrawalFee(Symbol("BTC"), BigInteger.ONE),
+                    ),
+                ),
+            )
+            returning(
+                Status.CREATED,
+            )
+        } bindContract Method.PUT to { request ->
+            val payload = requestBody(request)
+            runBlocking {
+                val sequencerResponse = sequencerClient.setWithdrawalFees(
+                    payload.withdrawalFees,
+                )
+                if (sequencerResponse.hasError()) {
+                    throw RuntimeException("Failed to set withdrawal fees in sequencer, error: ${sequencerResponse.error}")
+                }
+            }
+            Response(Status.OK)
+        }
+    }
+
     val routes = listOf(
         createMarketInSequencer,
         setFeeRatesInSequencer,
         resetSequencer,
         getSequencerState,
+        setWithdrawalFeesInSequencer,
     )
 }

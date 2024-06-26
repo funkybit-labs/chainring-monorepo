@@ -7,6 +7,7 @@ import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.SequencerOrderId
 import co.chainring.core.model.SequencerWalletId
+import co.chainring.core.model.WithdrawalFee
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.FeeRates
@@ -30,6 +31,7 @@ import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderBatch
 import co.chainring.sequencer.proto.resetRequest
 import co.chainring.sequencer.proto.setFeeRatesRequest
+import co.chainring.sequencer.proto.setWithdrawalFeesRequest
 import co.chainring.sequencer.proto.withdrawal
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.grpc.ManagedChannel
@@ -153,6 +155,27 @@ open class SequencerClient {
                         this.maker = feeRates.maker.value
                         this.taker = feeRates.taker.value
                     }
+                },
+            )
+        }.also {
+            Tracer.newSpan(ServerSpans.gtw, it.processingTime)
+            Tracer.newSpan(ServerSpans.sqr, it.sequencerResponse.processingTime)
+        }.sequencerResponse
+    }
+
+    suspend fun setWithdrawalFees(withdrawalFees: List<WithdrawalFee>): SequencerResponse {
+        return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
+            stub.setWithdrawalFees(
+                setWithdrawalFeesRequest {
+                    this.guid = UUID.randomUUID().toString()
+                    this.withdrawalFees.addAll(
+                        withdrawalFees.map {
+                            co.chainring.sequencer.proto.withdrawalFee {
+                                this.asset = it.asset.value
+                                this.value = it.fee.toIntegerValue()
+                            }
+                        },
+                    )
                 },
             )
         }.also {

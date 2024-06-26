@@ -8,6 +8,8 @@ import co.chainring.apps.ring.RingAppConfig
 import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.db.DbConfig
+import co.chainring.core.model.Symbol
+import co.chainring.core.model.WithdrawalFee
 import co.chainring.core.model.db.BalanceLogTable
 import co.chainring.core.model.db.BalanceTable
 import co.chainring.core.model.db.BlockchainTransactionTable
@@ -29,6 +31,7 @@ import co.chainring.core.model.telegram.bot.TelegramBotUserTable
 import co.chainring.core.model.telegram.bot.TelegramBotUserWalletTable
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserRewardTable
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserTable
+import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.TestBlockchainClient
 import co.chainring.sequencer.apps.GatewayApp
@@ -167,6 +170,12 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             .get("fixtures", Fixtures::class.java)
 
         TestApiClient.setFeeRatesInSequencer(fixtures.feeRates)
+
+        TestApiClient.setWithdrawalFeesInSequencer(
+            fixtures.symbols.map {
+                WithdrawalFee(Symbol(it.name), it.withdrawalFee.toFundamentalUnits(it.decimals))
+            },
+        )
 
         fixtures.markets.forEach { market ->
             val baseSymbol = fixtures.symbols.first { it.id == market.baseSymbol }

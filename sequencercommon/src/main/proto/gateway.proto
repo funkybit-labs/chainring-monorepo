@@ -4,6 +4,7 @@ import "balance.proto";
 import "order.proto";
 import "market.proto";
 import "sequencer.proto";
+import "checkpoint.proto";
 
 option java_multiple_files = true;
 option java_package = "co.chainring.sequencer.proto";
@@ -28,6 +29,11 @@ message SetFeeRatesRequest {
   FeeRates feeRates = 2;
 }
 
+message SetWithdrawalFeesRequest {
+  string guid = 1;
+  repeated WithdrawalFee withdrawalFees = 2;
+}
+
 service Gateway {
   rpc AddMarket (Market) returns (GatewayResponse);
   rpc SetFeeRates (SetFeeRatesRequest) returns (GatewayResponse);
@@ -35,4 +41,5 @@ service Gateway {
   rpc ApplyOrderBatch (OrderBatch) returns (GatewayResponse);
   rpc Reset (ResetRequest) returns (GatewayResponse);
   rpc GetState (GetStateRequest) returns (GatewayResponse);
+  rpc SetWithdrawalFees (SetWithdrawalFeesRequest) returns (GatewayResponse);
 }
