@@ -22,20 +22,21 @@ class DepositTest {
     fun testERC20Deposits() {
         val apiClient = TestApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
         val wallet = Wallet(apiClient)
-        val symbolInfo = wallet.chains.first { it.id == wallet.currentChainId }.symbols.first { it.name == "USDC" }
+        val usdc = "USDC:${wallet.currentChainId}"
+        val symbolInfo = wallet.chains.first { it.id == wallet.currentChainId }.symbols.first { it.name == usdc }
 
         // mint some USDC
-        val startingUsdcWalletBalance = wallet.getWalletERC20Balance("USDC")
+        val startingUsdcWalletBalance = wallet.getWalletERC20Balance(usdc)
         val mintAmount = BigDecimal("20").toFundamentalUnits(symbolInfo.decimals.toInt())
-        wallet.mintERC20("USDC", mintAmount)
-        assertEquals(wallet.getWalletERC20Balance("USDC"), startingUsdcWalletBalance + mintAmount)
+        wallet.mintERC20(usdc, mintAmount)
+        assertEquals(wallet.getWalletERC20Balance(usdc), startingUsdcWalletBalance + mintAmount)
 
-        val startingUsdcExchangeBalance = wallet.getExchangeERC20Balance("USDC")
+        val startingUsdcExchangeBalance = wallet.getExchangeERC20Balance(usdc)
         val depositAmount = BigDecimal("15").toFundamentalUnits(symbolInfo.decimals.toInt())
 
         wallet.deposit(AssetAmount(symbolInfo, depositAmount))
-        assertEquals(wallet.getExchangeERC20Balance("USDC"), startingUsdcExchangeBalance + depositAmount)
-        assertEquals(wallet.getWalletERC20Balance("USDC"), startingUsdcWalletBalance + mintAmount - depositAmount)
+        assertEquals(wallet.getExchangeERC20Balance(usdc), startingUsdcExchangeBalance + depositAmount)
+        assertEquals(wallet.getWalletERC20Balance(usdc), startingUsdcWalletBalance + mintAmount - depositAmount)
     }
 
     @Test

@@ -264,7 +264,7 @@ class Wallet(
     private fun loadErc20Contract(symbol: String) = blockchainClientsByChainId.getValue(currentChainId).loadERC20Mock(erc20TokenAddress(symbol)!!)
 
     private fun erc20TokenAddress(symbol: String) =
-        chains.first { it.id == currentChainId }.symbols.firstOrNull { it.name == symbol && it.contractAddress != null }?.contractAddress?.value
+        chains.first { it.id == currentChainId }.symbols.firstOrNull { (it.name == symbol || it.name == "$symbol:$currentChainId") && it.contractAddress != null }?.contractAddress?.value
 
     private fun marketSymbols(marketId: MarketId): Pair<SymbolInfo, SymbolInfo> =
         marketId

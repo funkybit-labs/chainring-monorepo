@@ -41,7 +41,7 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
             when(val symbolEntity = SymbolEntity.findById(SymbolId(symbol.chainId, symbol.name))) {
                 null -> {
                     SymbolEntity.create(
-                        symbol.name,
+                        symbol.name.replace(Regex(":.*"), ""),
                         symbol.chainId,
                         contractAddress = contractAddress,
                         decimals = symbol.decimals.toUByte(),

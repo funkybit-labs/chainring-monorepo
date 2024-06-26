@@ -25,10 +25,10 @@ class OrderBookTest {
 
     private fun `test order book over websocket`(auth: String?) {
         val client = WebsocketClient.blocking(auth)
-        client.subscribeToOrderBook(MarketId("BTC/ETH"))
+        client.subscribeToOrderBook(MarketId("BTC:1337/ETH:1337"))
 
-        client.assertOrderBookMessageReceived(MarketId("BTC/ETH")) { msg ->
-            assertEquals("BTC/ETH", msg.marketId.value)
+        client.assertOrderBookMessageReceived(MarketId("BTC:1337/ETH:1337")) { msg ->
+            assertEquals("BTC:1337/ETH:1337", msg.marketId.value)
         }
 
         client.close()

@@ -48,7 +48,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
         } else {
             val contractAddress = symbolEntities.firstOrNull { it.id.value == symbol.id }?.contractAddress ?: run {
                 val contractAddress = blockchainClient(symbol.chainId).deployMockERC20(
-                    symbol.name,
+                    symbol.name.replace(Regex(":.*"), ""),
                     symbol.decimals.toBigInteger()
                 )
                 println("Deployed MockERC20 contract for ${symbol.name} to address $contractAddress")

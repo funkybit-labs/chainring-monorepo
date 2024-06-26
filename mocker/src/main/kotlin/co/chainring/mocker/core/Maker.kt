@@ -387,9 +387,9 @@ class Maker(
 
 fun main() {
     listOf(
-        Triple(BigDecimal("0.001"), BigDecimal(1.0005), "BTC/BTC2"),
-        Triple(BigDecimal("0.05"), BigDecimal(17.5), "BTC/ETH"),
-        Triple(BigDecimal("1"), BigDecimal(68390.500), "BTC/USDC"),
+        Triple(BigDecimal("0.001"), BigDecimal(1.0005), "BTC:1337/BTC:1338"),
+        Triple(BigDecimal("0.05"), BigDecimal(17.5), "BTC:1337/ETH:1337"),
+        Triple(BigDecimal("1"), BigDecimal(68390.500), "BTC:1337/USDC:1337"),
     ).forEach { (tickSize, initialPrice, market) ->
         val peakToOuterStdDevFactor = 2.0
         val marketToPeakStdDevFactor = 7.0

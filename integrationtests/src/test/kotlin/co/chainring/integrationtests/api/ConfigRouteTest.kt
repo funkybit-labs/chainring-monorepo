@@ -34,11 +34,11 @@ class ConfigRouteTest {
             val exchangeContract = client.loadExchangeContract(chainConfig.contracts[0].address)
             assertEquals(exchangeContract.version.send().toInt(), 1)
 
-            assertNotNull(chainConfig.symbols.firstOrNull { it.name == "ETH".toChainSymbol(index) })
-            assertNotNull(chainConfig.symbols.firstOrNull { it.name == "USDC".toChainSymbol(index) })
+            assertNotNull(chainConfig.symbols.firstOrNull { it.name == "ETH".toChainSymbol(chainConfig.id) })
+            assertNotNull(chainConfig.symbols.firstOrNull { it.name == "USDC".toChainSymbol(chainConfig.id) })
 
             val nativeToken = chainConfig.symbols.first { it.contractAddress == null }
-            assertEquals("BTC".toChainSymbol(index), nativeToken.name)
+            assertEquals("BTC".toChainSymbol(chainConfig.id), nativeToken.name)
             assertEquals(18.toUByte(), nativeToken.decimals)
         }
 

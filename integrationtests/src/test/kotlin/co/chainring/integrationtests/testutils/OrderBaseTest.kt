@@ -69,20 +69,20 @@ open class OrderBaseTest {
         @BeforeAll
         fun loadSymbols() {
             val config = TestApiClient.getConfiguration()
-            usdcDaiMarket = config.markets.first { it.id.value == "USDC/DAI" }
-            btcEthMarket = config.markets.first { it.id.value == "BTC/ETH" }
-            btc2Eth2Market = config.markets.first { it.id.value == "BTC2/ETH2" }
-            btcUsdcMarket = config.markets.first { it.id.value == "BTC/USDC" }
-            btc2Usdc2Market = config.markets.first { it.id.value == "BTC2/USDC2" }
-            btcbtc2Market = config.markets.first { it.id.value == "BTC/BTC2" }
+            usdcDaiMarket = config.markets.first { it.id.value == "USDC:1337/DAI:1337" }
+            btcEthMarket = config.markets.first { it.id.value == "BTC:1337/ETH:1337" }
+            btc2Eth2Market = config.markets.first { it.id.value == "BTC:1338/ETH:1338" }
+            btcUsdcMarket = config.markets.first { it.id.value == "BTC:1337/USDC:1337" }
+            btc2Usdc2Market = config.markets.first { it.id.value == "BTC:1338/USDC:1338" }
+            btcbtc2Market = config.markets.first { it.id.value == "BTC:1337/BTC:1338" }
             symbols = config.chains.flatMap { it.symbols }.associateBy { it.name }
-            btc = symbols.getValue("BTC")
-            btc2 = symbols.getValue("BTC2")
-            eth = symbols.getValue("ETH")
-            eth2 = symbols.getValue("ETH2")
-            usdc = symbols.getValue("USDC")
-            usdc2 = symbols.getValue("USDC2")
-            dai = symbols.getValue("DAI")
+            btc = symbols.getValue("BTC:1337")
+            btc2 = symbols.getValue("BTC:1338")
+            eth = symbols.getValue("ETH:1337")
+            eth2 = symbols.getValue("ETH:1338")
+            usdc = symbols.getValue("USDC:1337")
+            usdc2 = symbols.getValue("USDC:1338")
+            dai = symbols.getValue("DAI:1337")
             chainIdBySymbol = config.chains.map { chain -> chain.symbols.map { it.name to chain.id } }.flatten().toMap()
         }
 

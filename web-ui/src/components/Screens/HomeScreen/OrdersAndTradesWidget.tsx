@@ -211,7 +211,7 @@ export default function OrdersAndTradesWidget({
           <ExpandableValue
             value={formatUnits(amount, market.baseSymbol.decimals)}
           />{' '}
-          {market.baseSymbol.name}
+          {market.baseSymbol.displayName()}
           {' ('}
           {market.baseSymbol.chainName}
           {')'}
@@ -237,7 +237,7 @@ export default function OrdersAndTradesWidget({
             <ExpandableValue
               value={formatUnits(amount, market.baseSymbol.decimals)}
             />{' '}
-            {market.baseSymbol.name}
+            {market.baseSymbol.displayName()}
             {' ('}
             {market.baseSymbol.chainName}
             {')'}

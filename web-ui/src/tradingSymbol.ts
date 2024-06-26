@@ -26,4 +26,8 @@ export default class TradingSymbol {
     this.chainId = chainId
     this.faucetSupported = faucetSupported
   }
+
+  displayName = () => {
+    return this.name.replace(new RegExp(':.*', ''), '')
+  }
 }

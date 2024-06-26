@@ -18,7 +18,7 @@ import org.web3j.crypto.Keys
 @Serializable
 @JvmInline
 value class SymbolId(override val value: String) : EntityId {
-    constructor(chainId: ChainId, name: String) : this("s_${name.lowercase()}_$chainId")
+    constructor(chainId: ChainId, name: String) : this("s_${name.replace(Regex(":.*"),"").lowercase()}_$chainId")
 
     override fun toString(): String = value
 }
@@ -56,7 +56,7 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
             description: String,
             addToWallets: Boolean = false,
         ) = SymbolEntity.new(SymbolId(chainId, name)) {
-            this.name = name
+            this.name = "$name:$chainId"
             this.chainId = EntityID(chainId, ChainTable)
             this.contractAddress = contractAddress
             this.decimals = decimals
@@ -117,6 +117,8 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
     var createdBy by SymbolTable.createdBy
     var iconUrl by SymbolTable.iconUrl
     var addToWallets by SymbolTable.addToWallets
+
+    fun displayName() = this.name.replace(Regex(":.*"), "")
 
     fun swapOptions(): List<SymbolEntity> =
         MarketEntity.all().mapNotNull {

@@ -40,8 +40,8 @@ class DepositTest {
             wallet.switchChain(config.chains[index].id)
             Faucet.fund(wallet.address, chainId = wallet.currentChainId)
 
-            val btc = config.chains[index].symbols.first { it.name == "BTC".toChainSymbol(index) }
-            val usdc = config.chains[index].symbols.first { it.name == "USDC".toChainSymbol(index) }
+            val btc = config.chains[index].symbols.first { it.name == "BTC".toChainSymbol(config.chains[index].id) }
+            val usdc = config.chains[index].symbols.first { it.name == "USDC".toChainSymbol(config.chains[index].id) }
             val symbolFilterList = listOf(btc.name, usdc.name)
 
             // mint some USDC
@@ -124,7 +124,8 @@ class DepositTest {
         Faucet.fund(wallet1.address, chainId = wallet1.currentChainId)
         Faucet.fund(wallet2.address, chainId = wallet2.currentChainId)
 
-        val btc = apiClient1.getConfiguration().chains[0].symbols.first { it.name == "BTC" }
+        val chain1 = apiClient1.getConfiguration().chains[0]
+        val btc = chain1.symbols.first { it.name == "BTC:${chain1.id}" }
 
         val btcDeposit1Amount = AssetAmount(btc, "0.01")
         val btcDeposit2Amount = AssetAmount(btc, "0.02")

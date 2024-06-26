@@ -108,13 +108,13 @@ export function SwapModal({
                   value={formatUnits(deposit.available, symbol.decimals)}
                 />
               )}{' '}
-              {symbol.name}
+              {symbol.displayName()}
             </span>
           </>
         ) : (
           <>
             <span className="font-[400] text-darkBluishGray2">
-              You have not deposited any {symbol.name}
+              You have not deposited any {symbol.displayName()}
             </span>
           </>
         )
@@ -242,9 +242,13 @@ export function SwapModal({
                 onClick={() => setMarketPriceInverted(!marketPriceInverted)}
               >
                 1{' '}
-                {marketPriceInverted ? sr.topSymbol.name : sr.bottomSymbol.name}{' '}
+                {marketPriceInverted
+                  ? sr.topSymbol.displayName()
+                  : sr.bottomSymbol.displayName()}{' '}
                 ≈ <ExpandableValue value={marketPrice} />{' '}
-                {marketPriceInverted ? sr.bottomSymbol.name : sr.topSymbol.name}
+                {marketPriceInverted
+                  ? sr.bottomSymbol.displayName()
+                  : sr.topSymbol.displayName()}
               </div>
             </div>
             <div className="flex w-full flex-col">

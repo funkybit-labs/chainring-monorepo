@@ -6,6 +6,7 @@ import generic from 'cryptocurrency-icons/svg/color/generic.svg'
 import botanix from 'assets/botanix.svg'
 import bitlayer from 'assets/bitlayer.svg'
 import base from 'assets/base.svg'
+import logo from 'assets/logo.svg'
 import TradingSymbol from 'tradingSymbol'
 
 interface Props {
@@ -14,18 +15,19 @@ interface Props {
 }
 
 export default function SymbolIcon(props: Props) {
-  const symbolName = props.symbol.name
+  const symbolName = props.symbol.displayName()
 
   const icon = (function () {
-    // TODO: CHAIN-345 - improve cross-chain symbology
-    if (symbolName.includes('BTC')) {
+    if (symbolName === 'BTC') {
       return btc
-    } else if (symbolName.includes('ETH')) {
+    } else if (symbolName === 'ETH') {
       return eth
-    } else if (symbolName.includes('USDC')) {
+    } else if (symbolName === 'USDC') {
       return usdc
-    } else if (symbolName.includes('DAI')) {
+    } else if (symbolName === 'DAI') {
       return dai
+    } else if (symbolName === 'RING') {
+      return logo
     }
     return generic
   })()
@@ -38,6 +40,8 @@ export default function SymbolIcon(props: Props) {
         return bitlayer
       case 'Base':
         return base
+      default:
+        return generic
     }
   })()
 

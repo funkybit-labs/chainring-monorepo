@@ -157,7 +157,7 @@ class TestSequencer {
     @MethodSource("percentages")
     fun `Test a market order that executes against multiple orders at multiple levels`(percentage: Int) {
         val sequencer = SequencerClient()
-        val market = sequencer.createMarket(MarketId("BTC2/ETH2"))
+        val market = sequencer.createMarket(MarketId("BTC:1338/ETH:1338"))
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
         val lp1 = generateWalletAddress()
