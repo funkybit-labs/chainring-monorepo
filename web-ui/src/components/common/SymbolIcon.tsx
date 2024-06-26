@@ -17,6 +17,7 @@ export default function SymbolIcon(props: Props) {
   const symbolName = props.symbol.name
 
   const icon = (function () {
+    // TODO: CHAIN-345 - improve cross-chain symbology
     if (symbolName.includes('BTC')) {
       return btc
     } else if (symbolName.includes('ETH')) {

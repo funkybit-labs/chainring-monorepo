@@ -10,6 +10,8 @@ import kotlin.text.StringBuilder
 interface TraceRecorder {
     enum class Op {
         GetConfiguration,
+        GetAccountConfiguration,
+        MarkSymbolAsAdded,
         CreateOrder,
         UpdateOrder,
         CancelOrder,

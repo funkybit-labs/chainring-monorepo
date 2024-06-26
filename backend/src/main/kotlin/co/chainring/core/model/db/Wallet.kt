@@ -8,6 +8,7 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.VarCharColumnType
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.web3j.crypto.Keys
 import java.lang.RuntimeException
@@ -27,6 +28,7 @@ object WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
     val createdBy = varchar("created_by", 10485760)
     val address = varchar("address", 10485760).uniqueIndex()
     val sequencerId = long("sequencer_id").uniqueIndex()
+    val addedSymbols = array<String>("added_symbols", VarCharColumnType(10485760)).default(emptyList())
 }
 
 class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
@@ -75,4 +77,5 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
         toReal = { SequencerWalletId(it) },
         toColumn = { it.value },
     )
+    var addedSymbols by WalletTable.addedSymbols
 }

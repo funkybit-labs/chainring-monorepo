@@ -4,6 +4,7 @@ import arrow.core.Either
 import arrow.core.raise.either
 import arrow.core.raise.ensure
 import co.chainring.apps.api.middleware.SignInMessage
+import co.chainring.apps.api.model.AccountConfigurationApiResponse
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ApiErrors
 import co.chainring.apps.api.model.BalancesApiResponse
@@ -25,6 +26,7 @@ import co.chainring.apps.api.model.OrdersApiResponse
 import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.WithdrawalApiResponse
+import co.chainring.core.blockchain.checksumAddress
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.model.EvmSignature
@@ -48,6 +50,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okhttp3.internal.EMPTY_REQUEST
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
@@ -67,6 +70,7 @@ data class ApiCallFailure(
 
 open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceRecorder: TraceRecorder = TraceRecorder.noOp) {
     val authToken: String = issueAuthToken(ecKeyPair = ecKeyPair)
+    val address = Credentials.create(ecKeyPair).checksumAddress()
 
     companion object {
         private fun listOrdersUrl(statuses: List<OrderStatus>, marketId: MarketId?) = "$apiServerRootUrl/v1/orders".toHttpUrl().newBuilder().apply {
@@ -136,6 +140,26 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .get()
                 .build(),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
+    fun tryGetAccountConfiguration(): Either<ApiCallFailure, AccountConfigurationApiResponse> =
+        executeAndTrace(
+            TraceRecorder.Op.GetAccountConfiguration,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/account-config")
+                .get()
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
+    fun tryMarkSymbolAsAdded(symbolName: String): Either<ApiCallFailure, Unit> =
+        executeAndTrace(
+            TraceRecorder.Op.MarkSymbolAsAdded,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/account-config/$symbolName")
+                .post(EMPTY_REQUEST)
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
     fun tryCreateOrder(apiRequest: CreateOrderApiRequest): Either<ApiCallFailure, CreateOrderApiResponse> =
         executeAndTrace(
@@ -296,6 +320,12 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
 
     open fun getConfiguration(): ConfigurationApiResponse =
         tryGetConfiguration().throwOrReturn()
+
+    open fun getAccountConfiguration(): AccountConfigurationApiResponse =
+        tryGetAccountConfiguration().throwOrReturn()
+
+    open fun markSymbolAsAdded(symbolName: String) =
+        tryMarkSymbolAsAdded(symbolName).throwOrReturn()
 
     open fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
         tryCreateOrder(apiRequest).throwOrReturn()

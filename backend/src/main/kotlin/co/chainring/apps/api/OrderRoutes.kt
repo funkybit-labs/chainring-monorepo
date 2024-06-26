@@ -57,7 +57,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
     private val logger = KotlinLogging.logger {}
 
-    private val orderIdPathParam = Path.map(::OrderId, OrderId::value).of("orderOd", "Order Id")
+    private val orderIdPathParam = Path.map(::OrderId, OrderId::value).of("orderId", "Order Id")
 
     fun createOrder(): ContractRoute {
         val requestBody = Body.auto<CreateOrderApiRequest>().toLens()

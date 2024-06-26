@@ -11,6 +11,7 @@ import { Listbox, Transition } from '@headlessui/react'
 import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import { classNames } from 'utils'
 import { SymbolAndChain } from 'components/common/SymbolAndChain'
+import { addNewSymbolsToWallet } from 'utils/addSymbolsToWallet'
 
 export function FaucetModal({
   walletAddress,
@@ -63,7 +64,7 @@ export function FaucetModal({
       case 'sending':
         break
       case 'sent':
-        close()
+        addNewSymbolsToWallet().finally(() => close())
         break
       case null:
         mutation.mutate()

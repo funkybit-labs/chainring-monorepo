@@ -2,6 +2,7 @@ package co.chainring.integrationtests.utils
 
 import arrow.core.Either
 import co.chainring.apps.api.TestRoutes
+import co.chainring.apps.api.model.AccountConfigurationApiResponse
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.BalancesApiResponse
 import co.chainring.apps.api.model.BatchOrdersApiRequest
@@ -146,6 +147,12 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
 
     override fun getConfiguration(): ConfigurationApiResponse =
         tryGetConfiguration().assertSuccess()
+
+    override fun getAccountConfiguration(): AccountConfigurationApiResponse =
+        tryGetAccountConfiguration().assertSuccess()
+
+    override fun markSymbolAsAdded(symbolName: String) =
+        tryMarkSymbolAsAdded(symbolName).assertSuccess()
 
     override fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
         tryCreateOrder(apiRequest).assertSuccess()

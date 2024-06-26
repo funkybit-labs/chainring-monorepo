@@ -41,7 +41,8 @@ const SymbolSchema = z.object({
   description: z.string(),
   contractAddress: AddressSchema.nullable(),
   decimals: z.number(),
-  faucetSupported: z.boolean()
+  faucetSupported: z.boolean(),
+  iconUrl: z.string().nullable()
 })
 
 export type SymbolType = z.infer<typeof SymbolSchema>
@@ -81,6 +82,13 @@ export const ConfigurationApiResponseSchema = z.object({
 })
 export type ConfigurationApiResponse = z.infer<
   typeof ConfigurationApiResponseSchema
+>
+
+export const AccountConfigurationApiResponseSchema = z.object({
+  newSymbols: z.array(SymbolSchema)
+})
+export type AccountConfigurationApiResponse = z.infer<
+  typeof AccountConfigurationApiResponseSchema
 >
 
 const OrderSideSchema = z.enum(['Buy', 'Sell'])
@@ -354,6 +362,31 @@ export const apiClient = new Zodios(apiBaseUrl, [
     path: '/v1/config',
     alias: 'getConfiguration',
     response: ConfigurationApiResponseSchema
+  },
+  {
+    method: 'get',
+    path: '/v1/account-config',
+    alias: 'getAccountConfiguration',
+    response: AccountConfigurationApiResponseSchema
+  },
+  {
+    method: 'post',
+    path: '/v1/account-config/:symbolName',
+    alias: 'markSymbolAsAdded',
+    parameters: [
+      {
+        name: 'symbolName',
+        type: 'Path',
+        schema: z.string()
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
   },
   {
     method: 'post',
