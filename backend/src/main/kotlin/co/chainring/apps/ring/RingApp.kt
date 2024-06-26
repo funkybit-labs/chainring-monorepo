@@ -9,6 +9,7 @@ import co.chainring.core.blockchain.SettlementCoordinator
 import co.chainring.core.db.DbConfig
 import co.chainring.core.db.migrations
 import co.chainring.core.db.upgrade
+import co.chainring.core.repeater.Repeater
 import co.chainring.core.sequencer.SequencerClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 
@@ -28,6 +29,7 @@ class RingApp(config: RingAppConfig = RingAppConfig()) : BaseApp(config.dbConfig
     )
     private val blockchainTransactionHandlers = ChainManager.getBlockchainClients().map { BlockchainTransactionHandler(it, sequencerClient) }
     private val blockchainDepositHandlers = ChainManager.getBlockchainClients().map { BlockchainDepositHandler(it, sequencerClient) }
+    private val repeaterApp = Repeater(db)
     override fun start() {
         logger.info { "Starting" }
         super.start()
@@ -42,19 +44,21 @@ class RingApp(config: RingAppConfig = RingAppConfig()) : BaseApp(config.dbConfig
             it.start()
         }
         settlementCoordinator.start()
+        repeaterApp.start()
         logger.info { "Started" }
     }
 
     override fun stop() {
         logger.info { "Stopping" }
-        super.stop()
+        repeaterApp.stop()
         settlementCoordinator.stop()
-        blockchainTransactionHandlers.forEach {
-            it.stop()
-        }
         blockchainDepositHandlers.forEach {
             it.stop()
         }
+        blockchainTransactionHandlers.forEach {
+            it.stop()
+        }
+        super.stop()
         logger.info { "Stopped" }
     }
 }
