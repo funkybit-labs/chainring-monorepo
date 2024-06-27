@@ -9,13 +9,15 @@ import co.chainring.core.model.Address
 import co.chainring.core.model.FeeRate
 import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.SymbolEntity
+import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.tasks.fixtures.toChainSymbol
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.extension.ExtendWith
+import java.math.BigDecimal
+import java.math.BigInteger
 import kotlin.test.Test
 
 @ExtendWith(AppUnderTestRunner::class)
@@ -34,12 +36,15 @@ class ConfigRouteTest {
             val exchangeContract = client.loadExchangeContract(chainConfig.contracts[0].address)
             assertEquals(exchangeContract.version.send().toInt(), 1)
 
-            assertNotNull(chainConfig.symbols.firstOrNull { it.name == "ETH".toChainSymbol(chainConfig.id) })
-            assertNotNull(chainConfig.symbols.firstOrNull { it.name == "USDC".toChainSymbol(chainConfig.id) })
+            val ethSymbol = chainConfig.symbols.first { it.name == "ETH".toChainSymbol(chainConfig.id) }
+            assertEquals(BigDecimal("0.0003").toFundamentalUnits(ethSymbol.decimals.toInt()), ethSymbol.withdrawalFee)
+            val usdcSymbol = chainConfig.symbols.first { it.name == "USDC".toChainSymbol(chainConfig.id) }
+            assertEquals(BigDecimal("1").toFundamentalUnits(usdcSymbol.decimals.toInt()), usdcSymbol.withdrawalFee)
 
             val nativeToken = chainConfig.symbols.first { it.contractAddress == null }
             assertEquals("BTC".toChainSymbol(chainConfig.id), nativeToken.name)
             assertEquals(18.toUByte(), nativeToken.decimals)
+            assertEquals(BigDecimal("0.00002").toFundamentalUnits(nativeToken.decimals.toInt()), nativeToken.withdrawalFee)
         }
 
         assertEquals(
@@ -55,7 +60,7 @@ class ConfigRouteTest {
         assertEquals(emptyList<SymbolInfo>(), apiClient.getAccountConfiguration().newSymbols)
         // add a symbol which can be added to a wallet
         val symbol = transaction {
-            SymbolEntity.create("RING", config.chains[0].id, Address.generate(), 18u, "Test ChainRing Token", addToWallets = true)
+            SymbolEntity.create("RING", config.chains[0].id, Address.generate(), 18u, "Test ChainRing Token", addToWallets = true, withdrawalFee = BigInteger.ZERO)
         }
         try {
             assertEquals(
@@ -69,6 +74,7 @@ class ConfigRouteTest {
                             FaucetMode.AllSymbols,
                         ),
                         symbol.iconUrl,
+                        symbol.withdrawalFee,
                     ),
                 ),
                 apiClient.getAccountConfiguration().newSymbols,

@@ -42,7 +42,8 @@ const SymbolSchema = z.object({
   contractAddress: AddressSchema.nullable(),
   decimals: z.number(),
   faucetSupported: z.boolean(),
-  iconUrl: z.string().nullable()
+  iconUrl: z.string().nullable(),
+  withdrawalFee: z.coerce.bigint()
 })
 
 export type SymbolType = z.infer<typeof SymbolSchema>
@@ -328,7 +329,8 @@ const WithdrawalSchema = z.object({
   amount: z.coerce.bigint(),
   status: WithdrawalStatusSchema,
   error: z.string().nullable(),
-  createdAt: z.coerce.date()
+  createdAt: z.coerce.date(),
+  fee: z.coerce.bigint()
 })
 export type Withdrawal = z.infer<typeof WithdrawalSchema>
 

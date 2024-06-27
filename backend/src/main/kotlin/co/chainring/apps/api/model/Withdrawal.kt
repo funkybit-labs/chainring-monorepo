@@ -32,6 +32,7 @@ data class Withdrawal(
     val error: String?,
     val createdAt: Instant,
     val txHash: TxHash?,
+    val fee: BigIntegerJson,
 ) {
     companion object {
         fun fromEntity(entity: WithdrawalEntity): Withdrawal {
@@ -43,6 +44,7 @@ data class Withdrawal(
                 error = entity.error,
                 createdAt = entity.createdAt,
                 txHash = entity.blockchainTransaction?.txHash?.let { TxHash(it.value) },
+                fee = entity.fee,
             )
         }
     }

@@ -50,7 +50,7 @@ export default function SymbolIcon(props: Props) {
       <img src={icon} className={props.className || ''} alt={symbolName} />
       <img
         src={chainIcon}
-        className="absolute -bottom-1 right-1 size-4"
+        className="absolute -bottom-0 right-1 size-1/2"
         alt={props.symbol.chainName}
       />
     </span>

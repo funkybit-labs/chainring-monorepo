@@ -1,5 +1,6 @@
 package co.chainring
 
+import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.FeeRates
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.MarketId
@@ -21,6 +22,8 @@ import co.chainring.testutils.SequencerClient
 import co.chainring.testutils.assertBalanceChanges
 import co.chainring.testutils.assertTrades
 import co.chainring.testutils.fromFundamentalUnits
+import co.chainring.testutils.inSats
+import co.chainring.testutils.inWei
 import co.chainring.testutils.toFundamentalUnits
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -45,6 +48,12 @@ class TestSequencer {
     fun `Test basic order matching`() {
         val sequencer = SequencerClient()
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        val btcWithdrawalFee = BigDecimal("0.0001").inSats()
+        sequencer.setWithdrawalFees(
+            listOf(
+                SequencerClient.WithdrawalFee(Symbol("BTC1"), btcWithdrawalFee),
+            ),
+        )
 
         val market = sequencer.createMarket(MarketId("BTC1/ETH1"))
         val btc1 = market.baseAsset
@@ -147,9 +156,9 @@ class TestSequencer {
         //         ETH1 = 12.376 - 1.0 - 0.01 = 11.366
         //   taker BTC1 = 0.2 - 0.1 = 0.1
         //         ETH1 = 7.552 + 1.0 - 0.02 = 8.532
-        sequencer.withdrawal(maker, btc1, BigDecimal.ZERO, expectedAmount = BigDecimal("9.9"))
+        sequencer.withdrawal(maker, btc1, BigDecimal.ZERO, expectedAmount = BigDecimal("9.9"), expectedWithdrawalFee = btcWithdrawalFee)
         sequencer.withdrawal(maker, eth1, BigDecimal.ZERO, expectedAmount = BigDecimal("11.366"))
-        sequencer.withdrawal(taker, btc1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.1"))
+        sequencer.withdrawal(taker, btc1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.1"), expectedWithdrawalFee = btcWithdrawalFee)
         sequencer.withdrawal(taker, eth1, BigDecimal.ZERO, expectedAmount = BigDecimal("8.532"))
     }
 
@@ -330,6 +339,15 @@ class TestSequencer {
         val sequencer = SequencerClient()
         val walletAddress = generateWalletAddress()
 
+        val ethWithdrawalFee = BigDecimal("0.001").inWei()
+        val pepeWithdrawalFee = BigDecimal("0.002").inWei()
+        sequencer.setWithdrawalFees(
+            listOf(
+                SequencerClient.WithdrawalFee(Symbol("ETH"), ethWithdrawalFee),
+                SequencerClient.WithdrawalFee(Symbol("PEPE"), pepeWithdrawalFee),
+            ),
+        )
+
         val asset1 = SequencerClient.Asset("ETH", decimals = 18)
         val asset2 = SequencerClient.Asset("PEPE", decimals = 18)
         val amount = BigDecimal("0.2")
@@ -338,13 +356,22 @@ class TestSequencer {
         sequencer.deposit(walletAddress, asset1, amount)
 
         // withdraw half
-        sequencer.withdrawal(walletAddress, asset1, BigDecimal("0.1"))
+        sequencer.withdrawal(walletAddress, asset1, BigDecimal("0.1"), expectedWithdrawalFee = ethWithdrawalFee)
 
         // request for more than balance - should fail
         sequencer.withdrawal(walletAddress, asset1, BigDecimal("0.2"), expectedAmount = null)
 
+        // request for less than the fee should fail
+        sequencer.withdrawal(walletAddress, asset1, BigDecimal("0.0001"), expectedAmount = null)
+
+        // request for equal to the fee should fail
+        sequencer.withdrawal(walletAddress, asset1, BigDecimal("0.001"), expectedAmount = null)
+
+        // request for just above the fee should work
+        sequencer.withdrawal(walletAddress, asset1, BigDecimal("0.0011"), expectedWithdrawalFee = ethWithdrawalFee)
+
         // request for the entire balance (set amount to zero) - should withdraw other half
-        sequencer.withdrawal(walletAddress, asset1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.1"))
+        sequencer.withdrawal(walletAddress, asset1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.1") - BigDecimal("0.0011"), expectedWithdrawalFee = ethWithdrawalFee)
 
         // attempt to withdraw more does not return a balance change
         sequencer.withdrawal(walletAddress, asset1, BigDecimal("0.1"), expectedAmount = null)
@@ -354,10 +381,10 @@ class TestSequencer {
         sequencer.withdrawal(walletAddress, asset2, BigDecimal("1"), expectedAmount = null)
 
         // can combine deposits and withdrawals in a batch - amount should be net
-        sequencer.depositsAndWithdrawals(walletAddress, asset1, listOf(BigDecimal("10"), BigDecimal("1").negate()))
+        sequencer.depositsAndWithdrawals(walletAddress, asset1, listOf(BigDecimal("10"), BigDecimal("1").negate()), expectedWithdrawalFees = listOf(ethWithdrawalFee))
 
         // if it nets to 0, no balance change returned
-        sequencer.depositsAndWithdrawals(walletAddress, asset1, listOf(BigDecimal("10").negate(), BigDecimal("10")), expectedAmount = null)
+        sequencer.depositsAndWithdrawals(walletAddress, asset1, listOf(BigDecimal("10").negate(), BigDecimal("10")), expectedAmount = null, expectedWithdrawalFees = listOf(ethWithdrawalFee))
     }
 
     @Test

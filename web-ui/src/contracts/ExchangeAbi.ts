@@ -549,6 +549,12 @@ export default [
                 "type": "uint256",
                 "indexed": false,
                 "internalType": "uint256"
+            },
+            {
+                "name": "fee",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256"
             }
         ],
         "anonymous": false

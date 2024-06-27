@@ -170,6 +170,7 @@ object Examples {
         error = null,
         createdAt = Clock.System.now(),
         txHash = TxHash.emptyHash(),
+        fee = BigInteger("20"),
     )
 
     var deposit = Deposit(

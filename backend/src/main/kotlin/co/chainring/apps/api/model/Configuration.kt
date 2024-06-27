@@ -44,6 +44,7 @@ data class SymbolInfo(
     val decimals: UByte,
     val faucetSupported: Boolean,
     val iconUrl: String?,
+    val withdrawalFee: BigIntegerJson,
 )
 
 @Serializable

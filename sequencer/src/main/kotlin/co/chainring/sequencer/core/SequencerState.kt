@@ -1,5 +1,6 @@
 package co.chainring.sequencer.core
 
+import co.chainring.core.model.Symbol
 import co.chainring.core.utils.humanReadableNanoseconds
 import co.chainring.sequencer.proto.BalancesCheckpoint
 import co.chainring.sequencer.proto.BalancesCheckpointKt.BalanceKt.consumption
@@ -11,6 +12,7 @@ import co.chainring.sequencer.proto.balancesCheckpoint
 import co.chainring.sequencer.proto.feeRates
 import co.chainring.sequencer.proto.metaInfoCheckpoint
 import co.chainring.sequencer.proto.stateDump
+import co.chainring.sequencer.proto.withdrawalFee
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -40,6 +42,7 @@ data class SequencerState(
     val balances: MutableMap<WalletAddress, BalanceByAsset> = mutableMapOf(),
     val consumed: MutableMap<WalletAddress, ConsumedByAsset> = mutableMapOf(),
     var feeRates: FeeRates = FeeRates(maker = FeeRate.zero, taker = FeeRate.zero),
+    var withdrawalFees: MutableMap<Symbol, BigInteger> = mutableMapOf(),
 ) {
     private val logger = KotlinLogging.logger {}
 
@@ -48,6 +51,7 @@ data class SequencerState(
         markets.clear()
         consumed.clear()
         feeRates = FeeRates(maker = FeeRate.zero, taker = FeeRate.zero)
+        withdrawalFees.clear()
     }
 
     fun load(sourceDir: Path) {
@@ -95,6 +99,10 @@ data class SequencerState(
                     logger.debug { "load of marketId market took ${humanReadableNanoseconds(it)}" }
                 }
             }
+
+            withdrawalFees =
+                metaInfoCheckpoint.withdrawalFeesList.associate { Symbol(it.asset) to it.value.toBigInteger() }
+                    .toMutableMap()
         }.let {
             logger.debug { "load all ${markets.size} markets took ${humanReadableNanoseconds(it)}" }
         }
@@ -111,6 +119,14 @@ data class SequencerState(
                 this.markets.addAll(marketIds)
                 this.makerFeeRate = feeRates.maker.value
                 this.takerFeeRate = feeRates.taker.value
+                this.withdrawalFees.addAll(
+                    this@SequencerState.withdrawalFees.map {
+                        withdrawalFee {
+                            this.asset = it.key.value
+                            this.value = it.value.toIntegerValue()
+                        }
+                    },
+                )
             }.writeTo(outputStream)
         }
 
@@ -150,6 +166,14 @@ data class SequencerState(
                 this.maker = this@SequencerState.feeRates.maker.value
                 this.taker = this@SequencerState.feeRates.taker.value
             }
+            this.withdrawalFees.addAll(
+                this@SequencerState.withdrawalFees.map {
+                    withdrawalFee {
+                        this.asset = it.key.value
+                        this.value = it.value.toIntegerValue()
+                    }
+                },
+            )
         }
     }
 

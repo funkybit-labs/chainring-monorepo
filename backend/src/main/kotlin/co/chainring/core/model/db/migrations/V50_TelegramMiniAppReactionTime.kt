@@ -12,36 +12,36 @@ import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.transactions.transaction
 
 @Suppress("ClassName")
-class V49_TelegramMiniAppReactionTime : Migration() {
-    object V49_TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_mini_app_user", ::TelegramMiniAppUserId) {
+class V50_TelegramMiniAppReactionTime : Migration() {
+    object V50_TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_mini_app_user", ::TelegramMiniAppUserId) {
         val gameTickets = long("game_tickets").default(0)
     }
 
-    enum class V49_TelegramMiniAppUserRewardType {
+    enum class V50_TelegramMiniAppUserRewardType {
         GoalAchievement,
         ReactionGame,
         ReferralBonus,
     }
 
-    object V49_TelegramMiniAppUserRewardTable : GUIDTable<TelegramMiniAppUserRewardId>("telegram_mini_app_user_reward", ::TelegramMiniAppUserRewardId) {
+    object V50_TelegramMiniAppUserRewardTable : GUIDTable<TelegramMiniAppUserRewardId>("telegram_mini_app_user_reward", ::TelegramMiniAppUserRewardId) {
         val type = customEnumeration(
             "type",
             "TelegramMiniAppUserRewardType",
-            { value -> V49_TelegramMiniAppUserRewardType.valueOf(value as String) },
+            { value -> V50_TelegramMiniAppUserRewardType.valueOf(value as String) },
             { PGEnum("TelegramMiniAppUserRewardType", it) },
         ).index()
     }
 
-    object V49_TelegramMiniAppGameReactionTimeTable : GUIDTable<TelegramMiniAppGameReactionTimeId>("telegram_mini_app_game_reaction_time", ::TelegramMiniAppGameReactionTimeId) {
+    object V50_TelegramMiniAppGameReactionTimeTable : GUIDTable<TelegramMiniAppGameReactionTimeId>("telegram_mini_app_game_reaction_time", ::TelegramMiniAppGameReactionTimeId) {
         val createdAt = timestamp("created_at")
         val createdBy = varchar("created_by", 10485760)
-        val userGuid = reference("user_guid", V49_TelegramMiniAppUserTable).index()
+        val userGuid = reference("user_guid", V50_TelegramMiniAppUserTable).index()
         val reactionTimeMs = long("reaction_time_ms").index()
     }
     override fun run() {
         transaction {
-            updateEnum<V49_TelegramMiniAppUserRewardType>(listOf(V49_TelegramMiniAppUserRewardTable.type), "TelegramMiniAppUserRewardType")
-            SchemaUtils.createMissingTablesAndColumns(V49_TelegramMiniAppUserTable, V49_TelegramMiniAppGameReactionTimeTable)
+            updateEnum<V50_TelegramMiniAppUserRewardType>(listOf(V50_TelegramMiniAppUserRewardTable.type), "TelegramMiniAppUserRewardType")
+            SchemaUtils.createMissingTablesAndColumns(V50_TelegramMiniAppUserTable, V50_TelegramMiniAppGameReactionTimeTable)
         }
     }
 }

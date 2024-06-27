@@ -15,12 +15,13 @@ sealed class ExchangeTransactions {
         WithdrawAll,
     }
 
-    class Withdraw(sequence: Long, sender: String, token: String, amount: BigInteger, nonce: BigInteger) : StaticStruct(
+    class Withdraw(sequence: Long, sender: String, token: String, amount: BigInteger, nonce: BigInteger, fee: BigInteger) : StaticStruct(
         Uint256(sequence),
         Address(160, sender),
         Address(160, token),
         Uint256(amount),
         Uint64(nonce),
+        Uint256(fee),
     )
 
     class WithdrawWithSignature(tx: Withdraw, signature: ByteArray) : DynamicStruct(

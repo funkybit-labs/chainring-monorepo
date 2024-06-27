@@ -52,7 +52,7 @@ data class MarketParams(
 
 class MockerApp(
     httpPort: Int = System.getenv("HTTP_PORT")?.toIntOrNull() ?: 8000,
-    config: List<String> = System.getenv("MARKETS")?.split(',') ?: listOf("BTC/ETH")
+    config: List<String> = System.getenv("MARKETS")?.split(',') ?: emptyList()
 ) {
     private val logger = KotlinLogging.logger {}
     private val marketsConfig = mutableMapOf<MarketId, MarketParams>()
@@ -60,11 +60,12 @@ class MockerApp(
 
     init {
         config.forEach {
+            val marketIdCleaned = it.replace(Regex("[:/]"), "_")
             marketsConfig[MarketId(it)] = MarketParams(
-                desiredTakersCount = System.getenv("${it}_TAKERS")?.toIntOrNull() ?: 5,
-                priceBaseline = System.getenv("${it}_PRICE_BASELINE")?.toBigDecimalOrNull() ?: BigDecimal("17.5"),
-                initialBaseBalance = System.getenv("${it}_INITIAL_BASE_BALANCE")?.toBigDecimalOrNull() ?: BigDecimal.ONE,
-                makerPrivateKeyHex = System.getenv("${it}_MAKER_PRIVATE_KEY_HEX") ?: ("0x" + Keys.createEcKeyPair().privateKey.toString(16)),
+                desiredTakersCount = System.getenv("${marketIdCleaned}_TAKERS")?.toIntOrNull() ?: 5,
+                priceBaseline = System.getenv("${marketIdCleaned}_PRICE_BASELINE")?.toBigDecimalOrNull() ?: BigDecimal("17.5"),
+                initialBaseBalance = System.getenv("${marketIdCleaned}_INITIAL_BASE_BALANCE")?.toBigDecimalOrNull() ?: BigDecimal.ONE,
+                makerPrivateKeyHex = System.getenv("${marketIdCleaned}_MAKER_PRIVATE_KEY_HEX") ?: ("0x" + Keys.createEcKeyPair().privateKey.toString(16)),
             )
         }
     }

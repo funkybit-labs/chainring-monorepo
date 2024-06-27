@@ -50,10 +50,10 @@ fun main() {
     val takers = mutableListOf<Taker>()
 
     val usdcDai = Market(
-        id = MarketId("USDC/DAI"),
-        baseSymbol = Symbol("USDC"),
+        id = MarketId("USDC:1337/DAI:1337"),
+        baseSymbol = Symbol("USDC:1337"),
         baseDecimals = 6,
-        quoteSymbol = Symbol("DAI"),
+        quoteSymbol = Symbol("DAI:1337"),
         quoteDecimals = 18,
         tickSize = BigDecimal("0.05"),
         lastPrice = BigDecimal("0.995"),

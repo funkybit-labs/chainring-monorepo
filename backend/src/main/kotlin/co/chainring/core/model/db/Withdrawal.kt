@@ -20,6 +20,7 @@ import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
 import org.jetbrains.exposed.sql.transactions.TransactionManager
+import java.math.BigDecimal
 import java.math.BigInteger
 
 @Serializable
@@ -70,6 +71,7 @@ object WithdrawalTable : GUIDTable<WithdrawalId>("withdrawal", ::WithdrawalId) {
     val sequenceId = long("sequence_id").autoIncrement()
     val transactionData = jsonb<EIP712Transaction>("transaction_data", KotlinxSerialization.json).nullable()
     val actualAmount = decimal("actual_amount", 30, 0).nullable()
+    val fee = decimal("fee", 30, 0).default(BigDecimal.ZERO)
 
     init {
         check("tx_when_settling") {
@@ -160,7 +162,13 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
         }
     }
 
-    fun update(status: WithdrawalStatus, error: String?, blockchainTransactionEntity: BlockchainTransactionEntity? = null, actualAmount: BigInteger? = null) {
+    fun update(
+        status: WithdrawalStatus,
+        error: String?,
+        blockchainTransactionEntity: BlockchainTransactionEntity? = null,
+        actualAmount: BigInteger? = null,
+        fee: BigInteger? = null,
+    ) {
         val now = Clock.System.now()
         this.updatedAt = now
         this.status = status
@@ -171,6 +179,9 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
         actualAmount?.let {
             this.actualAmount = it
         }
+        fee?.let {
+            this.fee = it
+        }
     }
 
     fun toEip712Transaction() = EIP712Transaction.WithdrawTx(
@@ -180,6 +191,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
         this.nonce,
         this.amount == BigInteger.ZERO,
         this.signature,
+        this.fee,
     )
 
     var nonce by WithdrawalTable.nonce
@@ -212,5 +224,10 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
     var actualAmount by WithdrawalTable.actualAmount.transform(
         toReal = { it?.toBigInteger() },
         toColumn = { it?.toBigDecimal() },
+    )
+
+    var fee by WithdrawalTable.fee.transform(
+        toReal = { it.toBigInteger() },
+        toColumn = { it.toBigDecimal() },
     )
 }

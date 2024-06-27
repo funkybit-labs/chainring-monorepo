@@ -1,5 +1,6 @@
 package co.chainring.testutils
 
+import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.FeeRates
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.Asset
@@ -36,6 +37,11 @@ class SequencerClient {
     data class Asset(
         val name: String,
         val decimals: Int,
+    )
+
+    data class WithdrawalFee(
+        val asset: Symbol,
+        val fee: BigInteger,
     )
 
     data class Market(
@@ -180,10 +186,29 @@ class SequencerClient {
         assertEquals(feeRates.taker.value, feeRatesSet.taker)
     }
 
+    fun setWithdrawalFees(fees: List<WithdrawalFee>) {
+        val response = sequencer.processRequest(
+            sequencerRequest {
+                this.guid = UUID.randomUUID().toString()
+                this.type = SequencerRequest.Type.SetWithdrawalFees
+                this.withdrawalFees.addAll(
+                    fees.map {
+                        co.chainring.sequencer.proto.withdrawalFee {
+                            this.asset = it.asset.value
+                            this.value = it.fee.toIntegerValue()
+                        }
+                    },
+                )
+            },
+        )
+        val withdrawalFeesSet = response.withdrawalFeesSetList
+        assertEquals(withdrawalFeesSet.size, fees.size)
+    }
+
     private fun List<BigInteger>.sum() = this.reduce { a, b -> a + b }
     private fun List<BigDecimal>.sum() = this.reduce { a, b -> a + b }
 
-    fun depositsAndWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigDecimal>, expectedAmount: BigDecimal? = amounts.sum()): SequencerResponse {
+    fun depositsAndWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigDecimal>, expectedAmount: BigDecimal? = amounts.sum(), expectedWithdrawalFees: List<BigInteger> = listOf()): SequencerResponse {
         val depositsAndWithdrawalsResponse = sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
@@ -224,6 +249,16 @@ class SequencerClient {
                 expectedAmount.setScale(asset.decimals),
                 withdrawal.delta.toBigInteger().fromFundamentalUnits(asset.decimals),
             )
+            assertEquals(
+                expectedWithdrawalFees.size,
+                depositsAndWithdrawalsResponse.withdrawalsCreatedList.size,
+            )
+            assertEquals(
+                expectedWithdrawalFees.toSet(),
+                depositsAndWithdrawalsResponse.withdrawalsCreatedList.map {
+                    it.fee.toBigInteger()
+                }.toSet(),
+            )
         } else {
             assertEquals(0, depositsAndWithdrawalsResponse.balancesChangedCount)
         }
@@ -233,8 +268,8 @@ class SequencerClient {
     fun deposit(walletAddress: WalletAddress, asset: Asset, amount: BigDecimal) =
         depositsAndWithdrawals(walletAddress, asset, listOf(amount))
 
-    fun withdrawal(walletAddress: WalletAddress, asset: Asset, amount: BigDecimal, expectedAmount: BigDecimal? = amount) =
-        depositsAndWithdrawals(walletAddress, asset, listOf(-amount), expectedAmount?.negate())
+    fun withdrawal(walletAddress: WalletAddress, asset: Asset, amount: BigDecimal, expectedAmount: BigDecimal? = amount, expectedWithdrawalFee: BigInteger = BigInteger.ZERO) =
+        depositsAndWithdrawals(walletAddress, asset, listOf(-amount), expectedAmount?.negate(), listOf(expectedWithdrawalFee))
 
     fun failedWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigDecimal>, expectedAmount: BigDecimal? = amounts.sum()): SequencerResponse {
         val failedWithdrawalsResponse = sequencer.processRequest(

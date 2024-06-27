@@ -100,26 +100,30 @@ open class TestWithDb {
         name: String,
         chainId: ChainId,
         decimals: UByte,
+        withdrawalFee: BigInteger = BigInteger.ZERO,
     ): SymbolEntity =
         SymbolEntity.create(
             name,
             chainId,
             contractAddress = null,
             decimals = decimals,
-            "native coin",
+            description = "native coin",
+            withdrawalFee = withdrawalFee,
         )
 
     protected fun createSymbol(
         name: String,
         chainId: ChainId,
         decimals: UByte,
+        withdrawalFee: BigInteger = BigInteger.ZERO,
     ): SymbolEntity =
         SymbolEntity.create(
             name,
             chainId,
             contractAddress = Address.generate(),
             decimals = decimals,
-            "$name coin",
+            description = "$name coin",
+            withdrawalFee = withdrawalFee,
         )
 
     protected fun createMarket(
