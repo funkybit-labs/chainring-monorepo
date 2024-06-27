@@ -69,20 +69,21 @@ open class OrderBaseTest {
         @BeforeAll
         fun loadSymbols() {
             val config = TestApiClient.getConfiguration()
-            usdcDaiMarket = config.markets.first { it.id.value == "USDC:1337/DAI:1337" }
-            btcEthMarket = config.markets.first { it.id.value == "BTC:1337/ETH:1337" }
-            btc2Eth2Market = config.markets.first { it.id.value == "BTC:1338/ETH:1338" }
-            btcUsdcMarket = config.markets.first { it.id.value == "BTC:1337/USDC:1337" }
-            btc2Usdc2Market = config.markets.first { it.id.value == "BTC:1338/USDC:1338" }
-            btcbtc2Market = config.markets.first { it.id.value == "BTC:1337/BTC:1338" }
+            val(chain1, chain2) = config.chains.map { it.id }
+            usdcDaiMarket = config.markets.first { it.id.value == "USDC:$chain1/DAI:$chain1" }
+            btcEthMarket = config.markets.first { it.id.value == "BTC:$chain1/ETH:$chain1" }
+            btc2Eth2Market = config.markets.first { it.id.value == "BTC:$chain2/ETH:$chain2" }
+            btcUsdcMarket = config.markets.first { it.id.value == "BTC:$chain1/USDC:$chain1" }
+            btc2Usdc2Market = config.markets.first { it.id.value == "BTC:$chain2/USDC:$chain2" }
+            btcbtc2Market = config.markets.first { it.id.value == "BTC:$chain1/BTC:$chain2" }
             symbols = config.chains.flatMap { it.symbols }.associateBy { it.name }
-            btc = symbols.getValue("BTC:1337")
-            btc2 = symbols.getValue("BTC:1338")
-            eth = symbols.getValue("ETH:1337")
-            eth2 = symbols.getValue("ETH:1338")
-            usdc = symbols.getValue("USDC:1337")
-            usdc2 = symbols.getValue("USDC:1338")
-            dai = symbols.getValue("DAI:1337")
+            btc = symbols.getValue("BTC:$chain1")
+            btc2 = symbols.getValue("BTC:$chain2")
+            eth = symbols.getValue("ETH:$chain1")
+            eth2 = symbols.getValue("ETH:$chain2")
+            usdc = symbols.getValue("USDC:$chain1")
+            usdc2 = symbols.getValue("USDC:$chain2")
+            dai = symbols.getValue("DAI:$chain1")
             chainIdBySymbol = config.chains.map { chain -> chain.symbols.map { it.name to chain.id } }.flatten().toMap()
         }
 
