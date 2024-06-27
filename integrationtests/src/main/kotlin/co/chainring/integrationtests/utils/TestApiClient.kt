@@ -28,6 +28,7 @@ import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Percentage
+import co.chainring.core.model.WithdrawalFee
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.FeeRates
@@ -118,6 +119,22 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             execute(
                 Request.Builder()
                     .url("$apiServerRootUrl/v1/sequencer-fee-rates")
+                    .put(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
+                    .build(),
+            ).also { httpResponse ->
+                if (httpResponse.code != HttpURLConnection.HTTP_OK) {
+                    throw AbnormalApiResponseException(httpResponse)
+                }
+            }
+        }
+
+        fun setWithdrawalFeesInSequencer(withdrawalFees: List<WithdrawalFee>) =
+            setWithdrawalFeesInSequencer(TestRoutes.Companion.SetWithdrawalFeesInSequencer(withdrawalFees = withdrawalFees))
+
+        fun setWithdrawalFeesInSequencer(apiRequest: TestRoutes.Companion.SetWithdrawalFeesInSequencer) {
+            execute(
+                Request.Builder()
+                    .url("$apiServerRootUrl/v1/sequencer-withdrawal-fees")
                     .put(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                     .build(),
             ).also { httpResponse ->

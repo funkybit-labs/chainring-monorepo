@@ -35,6 +35,7 @@ import org.http4k.lens.Path
 import org.http4k.lens.string
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.math.BigInteger
 
 class ConfigRoutes(private val faucetMode: FaucetMode) {
     private val logger = KotlinLogging.logger {}
@@ -68,6 +69,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                         decimals = 18u,
                                         faucetSupported = false,
                                         iconUrl = "https://icons/eth.svg",
+                                        withdrawalFee = BigInteger.ONE,
                                     ),
                                     SymbolInfo(
                                         name = "USDC",
@@ -76,6 +78,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                         decimals = 18u,
                                         faucetSupported = false,
                                         iconUrl = "https://icons/usdc.svg",
+                                        withdrawalFee = BigInteger.ONE,
                                     ),
                                 ),
                                 jsonRpcUrl = "https://demo-anvil.chainring.co",
@@ -125,6 +128,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                             decimals = it.decimals,
                                             faucetSupported = it.faucetSupported(faucetMode),
                                             iconUrl = it.iconUrl,
+                                            withdrawalFee = it.withdrawalFee,
                                         )
                                     },
                                     jsonRpcUrl = chain.jsonRpcUrl,
@@ -172,6 +176,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                 decimals = 18u,
                                 faucetSupported = true,
                                 iconUrl = "https://icons/ring.svg",
+                                withdrawalFee = BigInteger.ZERO,
                             ),
                         ),
                     ),
@@ -189,6 +194,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                     it.decimals,
                                     it.faucetSupported(faucetMode),
                                     it.iconUrl,
+                                    it.withdrawalFee,
                                 )
                             },
                         ),

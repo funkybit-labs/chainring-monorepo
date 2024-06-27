@@ -10,6 +10,7 @@ import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCEntity
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.SymbolId
+import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.tasks.fixtures.Fixtures
 import java.math.BigInteger
 import kotlin.time.Duration.Companion.hours
@@ -45,7 +46,8 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                         symbol.chainId,
                         contractAddress = contractAddress,
                         decimals = symbol.decimals.toUByte(),
-                        description = symbol.description
+                        description = symbol.description,
+                        withdrawalFee = symbol.withdrawalFee.toFundamentalUnits(symbol.decimals)
                     ).also {
                         it.flush()
                         println("Created symbol ${symbol.name} with guid=${it.guid.value}")
@@ -55,6 +57,7 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                     symbolEntity.also {
                         it.contractAddress = contractAddress
                         it.decimals = symbol.decimals.toUByte()
+                        it.withdrawalFee = symbol.withdrawalFee.toFundamentalUnits(symbol.decimals)
                         it.flush()
                         println("Updated symbol ${it.name} with guid=${it.guid.value}")
                     }

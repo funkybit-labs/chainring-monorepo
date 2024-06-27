@@ -23,6 +23,11 @@ message Withdrawal {
   string externalGuid = 6;
 }
 
+message WithdrawalCreated {
+  string externalGuid = 1;
+  IntegerValue fee = 2;
+}
+
 message FailedWithdrawal {
   string asset = 1;
   uint64 wallet = 2;

@@ -8,6 +8,7 @@ import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
+import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.waitForBalance
 import co.chainring.integrationtests.testutils.waitForFinalizedWithdrawal
@@ -53,6 +54,8 @@ class WithdrawalTest {
 
             val btc = config.chains[index].symbols.first { it.name == "BTC".toChainSymbol(config.chains[index].id) }
             val usdc = config.chains[index].symbols.first { it.name == "USDC".toChainSymbol(config.chains[index].id) }
+            assertEquals(BigDecimal("0.00002").toFundamentalUnits(btc.decimals.toInt()), btc.withdrawalFee)
+            assertEquals(BigDecimal("1").toFundamentalUnits(usdc.decimals.toInt()), usdc.withdrawalFee)
             val symbolFilterList = listOf(btc.name, usdc.name)
 
             // mint some USDC
@@ -95,7 +98,7 @@ class WithdrawalTest {
             )
 
             // deposit some USDC
-            val usdcDepositAmount = AssetAmount(usdc, "15")
+            val usdcDepositAmount = AssetAmount(usdc, "16")
             wallet.deposit(usdcDepositAmount)
             waitForBalance(
                 apiClient,
@@ -140,6 +143,7 @@ class WithdrawalTest {
                 listOf(btcWithdrawal.id),
                 apiClient.listWithdrawals().withdrawals.filter { symbolFilterList.contains(it.symbol.value) }.map { it.id },
             )
+            assertEquals(btc.withdrawalFee, btcWithdrawal.fee)
 
             waitForBalance(
                 apiClient,
@@ -150,7 +154,7 @@ class WithdrawalTest {
                 ),
             )
             assertEquals(
-                walletBtcBalanceBeforeWithdrawals + btcWithdrawalAmount,
+                walletBtcBalanceBeforeWithdrawals + btcWithdrawalAmount - AssetAmount(btc, btcWithdrawal.fee),
                 wallet.getWalletBalance(btc),
             )
 
@@ -183,6 +187,7 @@ class WithdrawalTest {
             val usdcWithdrawal = apiClient.getWithdrawal(pendingUsdcWithdrawal.id).withdrawal
             assertEquals(WithdrawalStatus.Complete, usdcWithdrawal.status)
             assertEquals(listOf(usdcWithdrawal.id, btcWithdrawal.id), apiClient.listWithdrawals().withdrawals.filter { symbolFilterList.contains(it.symbol.value) }.map { it.id })
+            assertEquals(usdc.withdrawalFee, usdcWithdrawal.fee)
 
             waitForBalance(
                 apiClient,
@@ -193,7 +198,7 @@ class WithdrawalTest {
                 ),
             )
             assertEquals(
-                usdcMintAmount - usdcDepositAmount + usdcWithdrawalAmount,
+                usdcMintAmount - usdcDepositAmount + usdcWithdrawalAmount - AssetAmount(usdc, usdcWithdrawal.fee),
                 wallet.getWalletBalance(usdc),
             )
 
@@ -239,6 +244,7 @@ class WithdrawalTest {
             val usdcWithdrawal3 = apiClient.getWithdrawal(pendingUsdcWithdrawal3.id).withdrawal
             assertEquals(WithdrawalStatus.Complete, usdcWithdrawal3.status)
             assertEquals(remainingUsdcBalance.inFundamentalUnits, usdcWithdrawal3.amount)
+            assertEquals(usdc.withdrawalFee, usdcWithdrawal3.fee)
 
             waitForBalance(
                 apiClient,
@@ -247,6 +253,11 @@ class WithdrawalTest {
                     ExpectedBalance(btcDepositAmount * BigDecimal("2") - btcWithdrawalAmount),
                     ExpectedBalance(AssetAmount(usdc, "0")),
                 ),
+            )
+
+            assertEquals(
+                usdcMintAmount - AssetAmount(usdc, usdcWithdrawal.fee) - AssetAmount(usdc, usdcWithdrawal.fee),
+                wallet.getWalletBalance(usdc),
             )
         }
     }
@@ -341,7 +352,7 @@ class WithdrawalTest {
     }
 
     @Test
-    fun `withdraw all remain balance in contract less that amount from sequencer`() {
+    fun `withdraw all balance in contract less that amount from sequencer`() {
         val apiClient = TestApiClient()
         val usdc = apiClient.getConfiguration().chains.flatMap { it.symbols }.first { it.name.startsWith("USDC:") }
 

@@ -62,6 +62,7 @@ message SequencerRequest {
     Reset = 3;
     GetState = 4;
     SetFeeRates = 5;
+    SetWithdrawalFees = 6;
   }
   string guid = 1;
   Type type = 2;
@@ -69,6 +70,7 @@ message SequencerRequest {
   optional OrderBatch orderBatch = 4;
   optional BalanceBatch balanceBatch = 5;
   optional FeeRates feeRates = 6;
+  repeated WithdrawalFee withdrawalFees = 7;
 }
 
 enum SequencerError {
@@ -79,12 +81,14 @@ enum SequencerError {
   ExceedsLimit = 4;
   InvalidFeeRate = 5;
   InvalidPrice = 6;
+  InvalidWithdrawalFee = 7;
 }
 
 message StateDump {
   repeated BalancesCheckpoint.Balance balances = 1;
   repeated MarketCheckpoint markets = 2;
   FeeRates feeRates = 3;
+  repeated WithdrawalFee withdrawalFees = 4;
 }
 
 message SequencerResponse {
@@ -100,6 +104,8 @@ message SequencerResponse {
   optional StateDump stateDump = 10;
   optional FeeRates feeRatesSet = 11;
   optional BidOfferState bidOfferState = 12;
+  repeated WithdrawalCreated withdrawalsCreated = 13;
+  repeated WithdrawalFee withdrawalFeesSet = 14;
 }
 
 message Sequenced {

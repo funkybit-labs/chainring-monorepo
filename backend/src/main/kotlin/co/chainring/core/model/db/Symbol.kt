@@ -14,6 +14,8 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.selectAll
 import org.web3j.crypto.Keys
+import java.math.BigDecimal
+import java.math.BigInteger
 
 @Serializable
 @JvmInline
@@ -33,6 +35,7 @@ object SymbolTable : GUIDTable<SymbolId>("symbol", ::SymbolId) {
     val createdBy = varchar("created_by", 10485760)
     val iconUrl = varchar("icon_url", 10485760).nullable()
     val addToWallets = bool("add_to_wallets").default(false)
+    val withdrawalFee = decimal("withdrawal_fee", 30, 0).default(BigDecimal.ZERO)
 
     init {
         uniqueIndex(
@@ -55,12 +58,14 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
             decimals: UByte,
             description: String,
             addToWallets: Boolean = false,
+            withdrawalFee: BigInteger,
         ) = SymbolEntity.new(SymbolId(chainId, name)) {
             this.name = "$name:$chainId"
             this.chainId = EntityID(chainId, ChainTable)
             this.contractAddress = contractAddress
             this.decimals = decimals
             this.description = description
+            this.withdrawalFee = withdrawalFee
             this.createdAt = Clock.System.now()
             this.createdBy = "system"
             this.addToWallets = addToWallets
@@ -119,6 +124,11 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
     var addToWallets by SymbolTable.addToWallets
 
     fun displayName() = this.name.replace(Regex(":.*"), "")
+
+    var withdrawalFee by SymbolTable.withdrawalFee.transform(
+        toReal = { it.toBigInteger() },
+        toColumn = { it.toBigDecimal() },
+    )
 
     fun swapOptions(): List<SymbolEntity> =
         MarketEntity.all().mapNotNull {

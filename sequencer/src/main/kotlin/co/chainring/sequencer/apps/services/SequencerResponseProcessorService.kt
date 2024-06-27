@@ -52,6 +52,7 @@ import co.chainring.sequencer.proto.newQuantityOrNull
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import java.math.BigDecimal
+import java.math.BigInteger
 import java.math.RoundingMode
 import kotlin.time.Duration.Companion.hours
 
@@ -71,7 +72,12 @@ object SequencerResponseProcessorService {
                         withdrawalEntity.update(WithdrawalStatus.Failed, error(response, "Insufficient Balance"))
                     } else {
                         handleSequencerResponse(request = request, response = response, ordersBeingUpdated = listOf())
-                        withdrawalEntity.update(WithdrawalStatus.Sequenced, null, actualAmount = balanceChange.delta.toBigInteger().negate())
+                        withdrawalEntity.update(
+                            WithdrawalStatus.Sequenced,
+                            null,
+                            actualAmount = balanceChange.delta.toBigInteger().negate(),
+                            fee = response.withdrawalsCreatedList.firstOrNull { it.externalGuid.withdrawalId() == withdrawalEntity.guid.value }?.fee?.toBigInteger() ?: BigInteger.ZERO,
+                        )
                     }
                 }
 
@@ -141,6 +147,14 @@ object SequencerResponseProcessorService {
                             it.minAllowedBidPrice = marketCreated.minAllowedBid.toBigDecimal()
                             it.maxAllowedOfferPrice = marketCreated.maxAllowedOffer.toBigDecimal()
                         }
+                    }
+                }
+            }
+
+            SequencerRequest.Type.SetWithdrawalFees -> {
+                if (response.error == SequencerError.None) {
+                    response.withdrawalFeesSetList.forEach {
+                        SymbolEntity.forName(it.asset).withdrawalFee = it.value.toBigInteger()
                     }
                 }
             }
