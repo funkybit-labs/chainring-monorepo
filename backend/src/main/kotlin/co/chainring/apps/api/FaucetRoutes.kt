@@ -11,6 +11,7 @@ import co.chainring.core.model.Address
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.FaucetDripEntity
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.utils.toFundamentalUnits
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -54,33 +55,66 @@ class FaucetRoutes(private val faucetMode: FaucetMode, blockchainClients: Collec
             )
         } bindContract Method.POST to { request ->
             val payload = requestBody(request)
-            val symbol = transaction { SymbolEntity.forName(payload.symbol) }
-
-            when (val blockchainClient = blockchainClients.firstOrNull { it.chainId == symbol.chainId.value }) {
-                null -> errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.ChainNotSupported, "Chain not supported"))
-                else -> {
-                    val amount = BigDecimal("1")
-
-                    logger.debug { "Sending $amount ${symbol.name} to ${payload.address.value}" }
-
-                    val amountInFundamentalUnits = amount.movePointRight(symbol.decimals.toInt()).toBigInteger()
-                    val txHash = if (symbol.faucetSupported(faucetMode)) {
-                        when (val tokenContractAddress = symbol.contractAddress) {
-                            null -> blockchainClient.asyncDepositNative(payload.address, amountInFundamentalUnits)
-                            else -> blockchainClient.asyncMintERC20(tokenContractAddress, payload.address, amountInFundamentalUnits)
-                        }
-                    } else {
-                        throw RequestProcessingError(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.ProcessingError, "Native faucet is disabled"))
+            val sourceAddress = request.header("X-Forwarded-For") ?: request.source?.address
+            if (sourceAddress == null) {
+                errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.ProcessingError, "Source address not found"))
+            } else {
+                val walletAddress = payload.address
+                val(symbol, eligible) = transaction {
+                    SymbolEntity.forName(payload.symbol).let {
+                        Pair(it, FaucetDripEntity.eligible(it, walletAddress, sourceAddress))
                     }
+                }
 
-                    Response(Status.OK).with(
-                        responseBody of FaucetApiResponse(
-                            chainId = blockchainClient.chainId,
-                            txHash = txHash,
-                            symbol = payload.symbol,
-                            amount = amountInFundamentalUnits,
-                        ),
-                    )
+                if (!eligible) {
+                    errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.ProcessingError, "Faucet may only be used once per day."))
+                } else {
+                    when (val blockchainClient = blockchainClients.firstOrNull { it.chainId == symbol.chainId.value }) {
+                        null -> errorResponse(
+                            Status.UNPROCESSABLE_ENTITY,
+                            ApiError(ReasonCode.ChainNotSupported, "Chain not supported"),
+                        )
+
+                        else -> {
+                            val amount = BigDecimal("1")
+
+                            logger.debug { "Sending $amount ${symbol.name} to ${payload.address.value}" }
+
+                            val amountInFundamentalUnits = amount.movePointRight(symbol.decimals.toInt()).toBigInteger()
+                            val txHash = if (symbol.faucetSupported(faucetMode)) {
+                                when (val tokenContractAddress = symbol.contractAddress) {
+                                    null -> blockchainClient.asyncDepositNative(
+                                        payload.address,
+                                        amountInFundamentalUnits,
+                                    )
+
+                                    else -> blockchainClient.asyncMintERC20(
+                                        tokenContractAddress,
+                                        payload.address,
+                                        amountInFundamentalUnits,
+                                    )
+                                }
+                            } else {
+                                throw RequestProcessingError(
+                                    Status.UNPROCESSABLE_ENTITY,
+                                    ApiError(ReasonCode.ProcessingError, "Native faucet is disabled"),
+                                )
+                            }
+
+                            transaction {
+                                FaucetDripEntity.create(symbol, walletAddress, sourceAddress)
+                            }
+
+                            Response(Status.OK).with(
+                                responseBody of FaucetApiResponse(
+                                    chainId = blockchainClient.chainId,
+                                    txHash = txHash,
+                                    symbol = payload.symbol,
+                                    amount = amountInFundamentalUnits,
+                                ),
+                            )
+                        }
+                    }
                 }
             }
         }
