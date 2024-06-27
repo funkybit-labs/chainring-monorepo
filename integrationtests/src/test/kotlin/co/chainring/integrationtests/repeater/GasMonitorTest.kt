@@ -22,7 +22,7 @@ class GasMonitorTest {
             notifyDbListener("repeater_app_task_ctl", "gas_monitor:10000000000000")
         }
         await().atMost(1, TimeUnit.SECONDS).until {
-            logMessages.isNotEmpty()
+            logMessages.size == 2
         }
         assert(
             logMessages.any {
@@ -53,7 +53,7 @@ class GasMonitorTest {
             notifyDbListener("repeater_app_task_ctl", "gas_monitor:10000000000000")
         }
         await().atMost(1, TimeUnit.SECONDS).until {
-            logMessages.isNotEmpty()
+            logMessages.size == 2
         }
         assert(
             logMessages.any {
