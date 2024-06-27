@@ -283,12 +283,7 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
       {ticks.map((tick, index) => (
         <div
           key={index}
-          className={classNames(
-            'absolute transition-all ease-out duration-[1.5s]',
-            index <= currentTick
-              ? 'transform translate-x-0'
-              : 'transform translate-x-full'
-          )}
+          className="absolute transition-all ease-out duration-[1.5s]"
           style={{
             left: `calc(${
               index <= currentTick ? getTickPosition(tick.timeMs) : 100
