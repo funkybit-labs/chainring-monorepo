@@ -7,8 +7,11 @@ import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ApiErrors
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.errorResponse
+import co.chainring.apps.api.model.processingError
 import co.chainring.apps.api.model.tma.ClaimRewardApiRequest
 import co.chainring.apps.api.model.tma.GetUserApiResponse
+import co.chainring.apps.api.model.tma.ReactionTimeApiRequest
+import co.chainring.apps.api.model.tma.ReactionsTimeApiResponse
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGoal
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
 import org.http4k.contract.ContractRoute
@@ -38,6 +41,7 @@ object TelegramMiniAppRoutes {
                 responseBody to GetUserApiResponse(
                     balance = BigDecimal.ZERO,
                     goals = emptyList(),
+                    gameTickets = 3L,
                 ),
             )
             returning(
@@ -74,6 +78,7 @@ object TelegramMiniAppRoutes {
                 responseBody to GetUserApiResponse(
                     balance = BigDecimal.ZERO,
                     goals = emptyList(),
+                    gameTickets = 3L,
                 ),
             )
         } bindContract Method.POST to { request ->
@@ -107,6 +112,7 @@ object TelegramMiniAppRoutes {
                 responseBody to GetUserApiResponse(
                     balance = BigDecimal.ZERO,
                     goals = emptyList(),
+                    gameTickets = 3L,
                 ),
             )
         } bindContract Method.POST to { request ->
@@ -117,6 +123,54 @@ object TelegramMiniAppRoutes {
                 Response(Status.OK).with(
                     responseBody of GetUserApiResponse.fromEntity(user),
                 )
+            }
+        }
+    }
+
+    val recordReactionTime: ContractRoute = run {
+        val requestBody = Body.auto<ReactionTimeApiRequest>().toLens()
+        val responseBody = Body.auto<ReactionsTimeApiResponse>().toLens()
+
+        "reaction-time" meta {
+            operationId = "record-reaction-time"
+            summary = "Record reaction time"
+            security = telegramMiniAppSecurity
+            tags += listOf(Tag("tma"))
+            receiving(
+                requestBody to ReactionTimeApiRequest(
+                    reactionTimeMs = 250L,
+                ),
+            )
+            returning(
+                Status.OK,
+                responseBody to ReactionsTimeApiResponse(
+                    percentile = BigDecimal.ZERO,
+                    reward = BigDecimal.ZERO,
+                    balance = BigDecimal.ZERO,
+                ),
+            )
+        } bindContract Method.POST to { request ->
+            val apiRequest = requestBody(request)
+            if (apiRequest.reactionTimeMs > 0) {
+                transaction {
+                    val lockedUser = request.telegramMiniAppUser.lockForUpdate()
+
+                    if (lockedUser.gameTickets <= 0) {
+                        return@transaction processingError("No game tickets available")
+                    }
+
+                    val percentile = lockedUser.useGameTicket(apiRequest.reactionTimeMs)
+
+                    Response(Status.OK).with(
+                        responseBody of ReactionsTimeApiResponse(
+                            percentile = percentile.toBigDecimal(),
+                            reward = percentile.toBigDecimal(),
+                            balance = lockedUser.pointsBalance(),
+                        ),
+                    )
+                }
+            } else {
+                errorResponse(Status.BAD_REQUEST, ApiError(ReasonCode.ProcessingError, "reactionTimeMs must be greater than 0"))
             }
         }
     }

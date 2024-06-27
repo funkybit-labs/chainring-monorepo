@@ -8,14 +8,23 @@ export default {
       fontFamily: {
         sans: ['Inter', ...defaultTheme.fontFamily.sans]
       },
+      fontSize: {
+        'xxs': '0.625rem',  // 10px
+        'xxxs': '0.5rem',   // 8px
+      },
       keyframes: {
         swivel: {
           'from': {transform: 'rotateY(0deg)'},
           'to': {transform: 'rotateY(180deg)'}
-        }
+        },
+        gameOrangeBlink: {
+          '0%, 100%': { backgroundColor: 'transparent' },
+          '50%': { backgroundColor: '#FFA337' },
+        },
       },
       animation: {
-        swivel: 'swivel 0.5s linear'
+        swivel: 'swivel 0.5s linear',
+        gameOrangeBlink: 'gameOrangeBlink 1.5s steps(1, end) infinite',
       }
     },
     colors: {
@@ -37,6 +46,13 @@ export default {
       white: "#FFF",
       black: "#111",
       transparent: "transparent",
+
+      // reaction game colors
+      gameOrange: "#FFA337",
+      gameBlue: "#2288E7",
+      gameBlack: "#1E1E1E",
+      gameRed: "#FF7169",
+      gameDisabled: "#646161",
     },
   },
   plugins: [

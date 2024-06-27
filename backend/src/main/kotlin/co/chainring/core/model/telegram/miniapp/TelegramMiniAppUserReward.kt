@@ -9,6 +9,7 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import java.math.BigDecimal
@@ -25,6 +26,7 @@ value class TelegramMiniAppUserRewardId(override val value: String) : EntityId {
 
 enum class TelegramMiniAppUserRewardType {
     GoalAchievement,
+    ReactionGame,
     ReferralBonus,
 }
 
@@ -55,7 +57,7 @@ object TelegramMiniAppUserRewardTable : GUIDTable<TelegramMiniAppUserRewardId>("
 
 class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId>) : GUIDEntity<TelegramMiniAppUserRewardId>(guid) {
     companion object : EntityClass<TelegramMiniAppUserRewardId, TelegramMiniAppUserRewardEntity>(TelegramMiniAppUserRewardTable) {
-        fun create(user: TelegramMiniAppUserEntity, amount: BigDecimal, goalId: TelegramMiniAppGoal.Id) {
+        fun goalAchieved(user: TelegramMiniAppUserEntity, amount: BigDecimal, goalId: TelegramMiniAppGoal.Id) {
             TelegramMiniAppUserRewardTable.insertIgnore {
                 val now = Clock.System.now()
                 it[guid] = EntityID(TelegramMiniAppUserRewardId.generate(), TelegramMiniAppUserRewardTable)
@@ -65,6 +67,19 @@ class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId
                 it[createdBy] = user.guid.value.value
                 it[type] = TelegramMiniAppUserRewardType.GoalAchievement
                 it[TelegramMiniAppUserRewardTable.goalId] = goalId.name
+                it[TelegramMiniAppUserRewardTable.amount] = amount
+            }
+        }
+
+        fun reactionGame(user: TelegramMiniAppUserEntity, amount: BigDecimal) {
+            TelegramMiniAppUserRewardTable.insert {
+                val now = Clock.System.now()
+                it[guid] = EntityID(TelegramMiniAppUserRewardId.generate(), TelegramMiniAppUserRewardTable)
+                it[userGuid] = user.guid
+                it[createdAt] = now
+                it[updatedAt] = now
+                it[createdBy] = user.guid.value.value
+                it[type] = TelegramMiniAppUserRewardType.ReactionGame
                 it[TelegramMiniAppUserRewardTable.amount] = amount
             }
         }

@@ -12,6 +12,7 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.alias
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.sum
 import java.math.BigDecimal
 
@@ -30,6 +31,7 @@ object TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_min
     val createdBy = varchar("created_by", 10485760)
     val updatedAt = timestamp("updated_at").nullable()
     val telegramUserId = long("telegram_user_id").uniqueIndex()
+    val gameTickets = long("game_tickets").default(5)
 }
 
 class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEntity<TelegramMiniAppUserId>(guid) {
@@ -58,6 +60,7 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
         toReal = { TelegramUserId(it) },
         toColumn = { it.value },
     )
+    var gameTickets by TelegramMiniAppUserTable.gameTickets
     val rewards by TelegramMiniAppUserRewardEntity referrersOn TelegramMiniAppUserRewardTable.userGuid
 
     fun pointsBalance(): BigDecimal {
@@ -83,6 +86,25 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
 
     fun grantReward(goalId: TelegramMiniAppGoal.Id) {
         val goal = TelegramMiniAppGoal.allPossible.first { it.id == goalId }
-        TelegramMiniAppUserRewardEntity.create(this, goal.reward, goal.id)
+        TelegramMiniAppUserRewardEntity.goalAchieved(this, goal.reward, goal.id)
+    }
+
+    fun lockForUpdate(): TelegramMiniAppUserEntity {
+        return TelegramMiniAppUserEntity.find { TelegramMiniAppUserTable.telegramUserId eq telegramUserId.value }.forUpdate().single()
+    }
+
+    fun useGameTicket(reactionTimeMs: Long): Int {
+        this.gameTickets -= 1
+        this.updatedAt = Clock.System.now()
+
+        TelegramMiniAppGameReactionTimeEntity.create(this, reactionTimeMs)
+
+        val totalUsers = TelegramMiniAppGameReactionTimeTable.selectAll().count()
+        val fasterUsers = TelegramMiniAppGameReactionTimeEntity.find { TelegramMiniAppGameReactionTimeTable.reactionTimeMs lessEq reactionTimeMs }.count()
+        val percentile = (((totalUsers - fasterUsers).toDouble() / totalUsers) * 100).toInt()
+
+        TelegramMiniAppUserRewardEntity.reactionGame(this, percentile.toBigDecimal())
+
+        return percentile
     }
 }

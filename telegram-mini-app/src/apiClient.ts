@@ -28,7 +28,7 @@ const ApiErrorSchema = z.object({
 })
 export type ApiError = z.infer<typeof ApiErrorSchema>
 
-const ApiErrorsSchema = z.object({
+export const ApiErrorsSchema = z.object({
   errors: z.array(ApiErrorSchema)
 })
 export type ApiErrors = z.infer<typeof ApiErrorsSchema>
@@ -51,12 +51,23 @@ export type UserGoal = z.infer<typeof UserGoalSchema>
 
 const UserSchema = z.object({
   balance: decimal(),
-  goals: z.array(UserGoalSchema)
+  goals: z.array(UserGoalSchema),
+  gameTickets: z.number()
 })
 export type User = z.infer<typeof UserSchema>
 
 const ClaimRewardApiRequest = z.object({
   goalId: GoalIdSchema
+})
+
+const ReactionTimeApiRequest = z.object({
+  reactionTimeMs: z.number()
+})
+
+const ReactionTimeApiResponse = z.object({
+  percentile: decimal(),
+  reward: decimal(),
+  balance: decimal()
 })
 
 export const apiClient = new Zodios(apiBaseUrl, [
@@ -96,6 +107,25 @@ export const apiClient = new Zodios(apiBaseUrl, [
       }
     ],
     response: UserSchema,
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'post',
+    path: '/v1/reaction-time',
+    alias: 'recordReactionTime',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: ReactionTimeApiRequest
+      }
+    ],
+    response: ReactionTimeApiResponse,
     errors: [
       {
         status: 'default',

@@ -42,6 +42,7 @@ import co.chainring.core.model.db.migrations.V45_ChainSettlementBatchIndexes
 import co.chainring.core.model.db.migrations.V46_MarketMinMaxPrice
 import co.chainring.core.model.db.migrations.V47_TelegramMiniAppUser
 import co.chainring.core.model.db.migrations.V48_AddingSymbolsToWallets
+import co.chainring.core.model.db.migrations.V49_TelegramMiniAppReactionTime
 import co.chainring.core.model.db.migrations.V4_AddDecimalsToERC20Token
 import co.chainring.core.model.db.migrations.V5_ChainTable
 import co.chainring.core.model.db.migrations.V6_MarketTable
@@ -98,4 +99,5 @@ val migrations = listOf(
     V46_MarketMinMaxPrice(),
     V47_TelegramMiniAppUser(),
     V48_AddingSymbolsToWallets(),
+    V49_TelegramMiniAppReactionTime(),
 )
