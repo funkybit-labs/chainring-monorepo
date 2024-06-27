@@ -8,7 +8,7 @@ import { Button } from 'components/common/Button'
 import { classNames } from 'utils'
 
 export type ReactionGameResult = {
-  percentile: Decimal
+  percentile: number
   reward: Decimal
 }
 
@@ -85,14 +85,13 @@ export function ReactionGame({
     }
   }
 
-  const percentilesMessage = (percentile: Decimal) => {
-    const p = percentile.toFixed(0)
-    if (percentile.gte(new Decimal(75))) {
-      return `Congratulations! You are faster than ${p}% of ChainRin users!`
-    } else if (percentile.gte(new Decimal(25))) {
-      return `Not bad! You are faster than ${p}% of ChainRing users!`
+  const percentilesMessage = (percentile: number) => {
+    if (percentile >= 75) {
+      return `Congratulations! You are faster than ${percentile}% of ChainRin users!`
+    } else if (percentile >= 25) {
+      return `Not bad! You are faster than ${percentile}% of ChainRing users!`
     } else {
-      return `Keep trying! You are faster than ${p}% of ChainRing users! `
+      return `Keep trying! You are faster than ${percentile}% of ChainRing users! `
     }
   }
 
@@ -260,12 +259,12 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
     if (currentTick < ticks.length) {
       const timer = setTimeout(() => {
         setCurrentTick(currentTick + 1)
-      }, 1500)
+      }, 2000)
       return () => clearTimeout(timer)
     } else {
       const finalTimer = setTimeout(() => {
         setFinished(true)
-      }, 1500)
+      }, 2000)
       return () => clearTimeout(finalTimer)
     }
   }, [currentTick])
@@ -285,7 +284,7 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
         <div
           key={index}
           className={classNames(
-            'absolute transition-all duration-1000',
+            'absolute transition-all ease-out duration-[1.5s]',
             index <= currentTick
               ? 'transform translate-x-0'
               : 'transform translate-x-full'
@@ -322,7 +321,8 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
                   : 'opacity-0'
             )}
             style={{
-              transition: index === currentTick ? 'opacity 0.2s' : 'opacity 1s'
+              transition:
+                index === currentTick ? 'opacity 0.2s' : 'opacity 1.5s'
             }}
           >
             {tick.description}

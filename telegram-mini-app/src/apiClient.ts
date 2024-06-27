@@ -65,7 +65,7 @@ const ReactionTimeApiRequest = z.object({
 })
 
 const ReactionTimeApiResponse = z.object({
-  percentile: decimal(),
+  percentile: z.number(),
   reward: decimal(),
   balance: decimal()
 })
