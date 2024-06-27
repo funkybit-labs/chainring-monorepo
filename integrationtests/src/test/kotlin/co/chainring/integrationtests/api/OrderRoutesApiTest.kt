@@ -1004,7 +1004,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                             amount = AssetAmount(baseSymbol, "0.0001").inFundamentalUnits,
                             marketId = createBatchLimitOrders.createdOrders[0].order.marketId,
                             side = createBatchLimitOrders.createdOrders[0].order.side,
-                            price = BigDecimal("68405.000"),
+                            price = BigDecimal("68525.000"),
                             nonce = generateOrderNonce(),
                             signature = EvmSignature.emptySignature(),
                             verifyingChainId = ChainId.empty,
@@ -1016,7 +1016,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                             amount = AssetAmount(baseSymbol, "0.0002").inFundamentalUnits,
                             marketId = createBatchLimitOrders.createdOrders[1].order.marketId,
                             side = createBatchLimitOrders.createdOrders[2].order.side,
-                            price = BigDecimal("68405.000"),
+                            price = BigDecimal("68525.000"),
                             nonce = generateOrderNonce(),
                             signature = EvmSignature.emptySignature(),
                             verifyingChainId = ChainId.empty,
@@ -1028,7 +1028,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                             amount = AssetAmount(baseSymbol, "0.0002").inFundamentalUnits,
                             marketId = createBatchLimitOrders.createdOrders[1].order.marketId,
                             side = createBatchLimitOrders.createdOrders[2].order.side,
-                            price = BigDecimal("68405.000"),
+                            price = BigDecimal("68525.000"),
                             nonce = generateOrderNonce(),
                             signature = EvmSignature.emptySignature(),
                             verifyingChainId = ChainId.empty,
@@ -1086,16 +1086,16 @@ class OrderRoutesApiTest : OrderBaseTest() {
                         // initial ohlc in the BTC/USDC market
                         // price is a weighted price across all order execution of market order
                         start = OHLCDuration.P5M.durationStart(Clock.System.now()),
-                        open = 68400.8,
-                        high = 68400.8,
-                        low = 68400.8,
-                        close = 68400.8,
+                        open = 68420.8,
+                        high = 68420.8,
+                        low = 68420.8,
+                        close = 68420.8,
                         duration = OHLCDuration.P5M,
                     ),
                     msg.ohlc.last(),
                 )
             }
-            assertLimitsMessageReceived(market, base = BigDecimal("0.0018"), quote = BigDecimal("374.416070"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0.0018"), quote = BigDecimal("374.379350"))
         }
 
         makerWsClient.apply {
@@ -1106,16 +1106,16 @@ class OrderRoutesApiTest : OrderBaseTest() {
                 assertEquals(
                     OHLC(
                         start = OHLCDuration.P5M.durationStart(Clock.System.now()),
-                        open = 68400.8,
-                        high = 68400.8,
-                        low = 68400.8,
-                        close = 68400.8,
+                        open = 68420.8,
+                        high = 68420.8,
+                        low = 68420.8,
+                        close = 68420.8,
                         duration = OHLCDuration.P5M,
                     ),
                     msg.ohlc.last(),
                 )
             }
-            assertLimitsMessageReceived(market, base = BigDecimal("0.1982"), quote = BigDecimal("621.890285"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0.1982"), quote = BigDecimal("621.925925"))
         }
 
         val takerOrders = takerApiClient.listOrders(emptyList(), market.id).orders
