@@ -14,7 +14,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 @Suppress("ClassName")
 class V49_TelegramMiniAppReactionTime : Migration() {
     object V49_TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_mini_app_user", ::TelegramMiniAppUserId) {
-        val gameTickets = long("game_tickets").default(5)
+        val gameTickets = long("game_tickets").default(0)
     }
 
     enum class V49_TelegramMiniAppUserRewardType {

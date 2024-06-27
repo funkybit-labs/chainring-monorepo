@@ -31,7 +31,7 @@ object TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_min
     val createdBy = varchar("created_by", 10485760)
     val updatedAt = timestamp("updated_at").nullable()
     val telegramUserId = long("telegram_user_id").uniqueIndex()
-    val gameTickets = long("game_tickets").default(5)
+    val gameTickets = long("game_tickets").default(0)
 }
 
 class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEntity<TelegramMiniAppUserId>(guid) {

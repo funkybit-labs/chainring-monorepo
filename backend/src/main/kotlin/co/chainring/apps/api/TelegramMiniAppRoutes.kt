@@ -144,7 +144,7 @@ object TelegramMiniAppRoutes {
             returning(
                 Status.OK,
                 responseBody to ReactionsTimeApiResponse(
-                    percentile = BigDecimal.ZERO,
+                    percentile = 0,
                     reward = BigDecimal.ZERO,
                     balance = BigDecimal.ZERO,
                 ),
@@ -163,7 +163,7 @@ object TelegramMiniAppRoutes {
 
                     Response(Status.OK).with(
                         responseBody of ReactionsTimeApiResponse(
-                            percentile = percentile.toBigDecimal(),
+                            percentile = percentile,
                             reward = percentile.toBigDecimal(),
                             balance = lockedUser.pointsBalance(),
                         ),

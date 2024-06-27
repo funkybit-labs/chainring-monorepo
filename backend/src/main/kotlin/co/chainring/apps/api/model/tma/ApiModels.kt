@@ -45,7 +45,7 @@ data class ReactionTimeApiRequest(
 
 @Serializable
 data class ReactionsTimeApiResponse(
-    val percentile: BigDecimalJson,
+    val percentile: Int,
     val reward: BigDecimalJson,
     val balance: BigDecimalJson,
 )
