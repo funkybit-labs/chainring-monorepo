@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
 data class GetUserApiResponse(
     val balance: BigDecimalJson,
     val goals: List<Goal>,
+    val gameTickets: Long,
 ) {
     companion object {
         fun fromEntity(user: TelegramMiniAppUserEntity): GetUserApiResponse =
@@ -20,6 +21,7 @@ data class GetUserApiResponse(
                         Goal(id = it.id, reward = it.reward, achieved = achievedGoals.contains(it.id))
                     }
                 },
+                gameTickets = user.gameTickets,
             )
     }
 
@@ -34,4 +36,16 @@ data class GetUserApiResponse(
 @Serializable
 data class ClaimRewardApiRequest(
     val goalId: TelegramMiniAppGoal.Id,
+)
+
+@Serializable
+data class ReactionTimeApiRequest(
+    val reactionTimeMs: Long,
+)
+
+@Serializable
+data class ReactionsTimeApiResponse(
+    val percentile: Int,
+    val reward: BigDecimalJson,
+    val balance: BigDecimalJson,
 )
