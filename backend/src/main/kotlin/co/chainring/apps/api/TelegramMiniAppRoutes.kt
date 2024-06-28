@@ -14,6 +14,7 @@ import co.chainring.apps.api.model.tma.ReactionTimeApiRequest
 import co.chainring.apps.api.model.tma.ReactionsTimeApiResponse
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGoal
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
+import kotlinx.datetime.Clock
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.Tag
 import org.http4k.contract.meta
@@ -42,6 +43,12 @@ object TelegramMiniAppRoutes {
                     balance = BigDecimal.ZERO,
                     goals = emptyList(),
                     gameTickets = 3L,
+                    checkInStreak = GetUserApiResponse.CheckInStreak(
+                        days = 1,
+                        reward = BigDecimal.ZERO,
+                        gameTickets = 1,
+                        grantedAt = Clock.System.now(),
+                    ),
                 ),
             )
             returning(
@@ -79,6 +86,12 @@ object TelegramMiniAppRoutes {
                     balance = BigDecimal.ZERO,
                     goals = emptyList(),
                     gameTickets = 3L,
+                    checkInStreak = GetUserApiResponse.CheckInStreak(
+                        days = 1,
+                        reward = BigDecimal.ZERO,
+                        gameTickets = 1,
+                        grantedAt = Clock.System.now(),
+                    ),
                 ),
             )
         } bindContract Method.POST to { request ->
@@ -113,6 +126,12 @@ object TelegramMiniAppRoutes {
                     balance = BigDecimal.ZERO,
                     goals = emptyList(),
                     gameTickets = 3L,
+                    checkInStreak = GetUserApiResponse.CheckInStreak(
+                        days = 1,
+                        reward = BigDecimal.ZERO,
+                        gameTickets = 1,
+                        grantedAt = Clock.System.now(),
+                    ),
                 ),
             )
         } bindContract Method.POST to { request ->

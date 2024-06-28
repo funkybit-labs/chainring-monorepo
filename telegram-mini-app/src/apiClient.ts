@@ -49,10 +49,19 @@ const UserGoalSchema = z.object({
 })
 export type UserGoal = z.infer<typeof UserGoalSchema>
 
+const CheckInStreakSchema = z.object({
+  days: z.number(),
+  reward: decimal(),
+  gameTickets: z.number(),
+  grantedAt: z.coerce.date()
+})
+export type CheckInStreak = z.infer<typeof CheckInStreakSchema>
+
 const UserSchema = z.object({
   balance: decimal(),
   goals: z.array(UserGoalSchema),
-  gameTickets: z.number()
+  gameTickets: z.number(),
+  checkInStreak: CheckInStreakSchema
 })
 export type User = z.infer<typeof UserSchema>
 

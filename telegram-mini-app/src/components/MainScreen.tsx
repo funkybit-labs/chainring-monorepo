@@ -23,7 +23,7 @@ export default function MainScreen({ user }: { user: User }) {
             return <FriendsTab />
         }
       })()}
-      <div className="fixed bottom-0 left-0 flex h-12 w-full justify-between bg-darkBluishGray10 px-4 py-3 text-white">
+      <div className="fixed bottom-0 left-0 z-20 flex h-12 w-full justify-between bg-darkBluishGray10 px-4 py-3 text-white">
         <TabButton
           title="Home"
           icon={<HomeSvg />}

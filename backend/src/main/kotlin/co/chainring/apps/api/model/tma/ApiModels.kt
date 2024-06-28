@@ -1,8 +1,10 @@
 package co.chainring.apps.api.model.tma
 
 import co.chainring.apps.api.model.BigDecimalJson
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppCheckInStreak
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGoal
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
+import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -10,10 +12,13 @@ data class GetUserApiResponse(
     val balance: BigDecimalJson,
     val goals: List<Goal>,
     val gameTickets: Long,
+    val checkInStreak: CheckInStreak,
 ) {
     companion object {
-        fun fromEntity(user: TelegramMiniAppUserEntity): GetUserApiResponse =
-            GetUserApiResponse(
+        fun fromEntity(user: TelegramMiniAppUserEntity): GetUserApiResponse {
+            val dailyReward = TelegramMiniAppCheckInStreak.grantDailyReward(user)
+
+            return GetUserApiResponse(
                 balance = user.pointsBalance(),
                 goals = TelegramMiniAppGoal.allPossible.let { allGoals ->
                     val achievedGoals = user.achievedGoals()
@@ -22,7 +27,16 @@ data class GetUserApiResponse(
                     }
                 },
                 gameTickets = user.gameTickets,
+                checkInStreak = dailyReward.let {
+                    CheckInStreak(
+                        days = it.day,
+                        reward = it.cp,
+                        gameTickets = it.gameTickets,
+                        grantedAt = user.lastStreakDayGrantedAt!!,
+                    )
+                },
             )
+        }
     }
 
     @Serializable
@@ -30,6 +44,14 @@ data class GetUserApiResponse(
         val id: TelegramMiniAppGoal.Id,
         val reward: BigDecimalJson,
         val achieved: Boolean,
+    )
+
+    @Serializable
+    data class CheckInStreak(
+        val days: Int,
+        val reward: BigDecimalJson,
+        val gameTickets: Long,
+        val grantedAt: Instant,
     )
 }
 
