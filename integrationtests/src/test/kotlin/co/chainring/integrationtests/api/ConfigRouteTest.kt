@@ -28,7 +28,7 @@ class ConfigRouteTest {
 
         val config = apiClient.getConfiguration()
         assertEquals(config.chains.size, 2)
-        ChainManager.blockchainConfigs.forEachIndexed { index, clientConfig ->
+        ChainManager.blockchainConfigs.forEach { clientConfig ->
             val client = BlockchainClient(clientConfig)
             val chainConfig = config.chains.first { it.id == client.chainId }
             assertEquals(chainConfig.contracts.size, 1)
