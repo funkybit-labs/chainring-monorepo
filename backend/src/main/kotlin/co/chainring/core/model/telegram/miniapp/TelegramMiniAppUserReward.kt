@@ -9,7 +9,6 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import java.math.BigDecimal
@@ -26,6 +25,7 @@ value class TelegramMiniAppUserRewardId(override val value: String) : EntityId {
 
 enum class TelegramMiniAppUserRewardType {
     GoalAchievement,
+    DailyCheckIn,
     ReactionGame,
     ReferralBonus,
 }
@@ -58,6 +58,18 @@ object TelegramMiniAppUserRewardTable : GUIDTable<TelegramMiniAppUserRewardId>("
 class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId>) : GUIDEntity<TelegramMiniAppUserRewardId>(guid) {
     companion object : EntityClass<TelegramMiniAppUserRewardId, TelegramMiniAppUserRewardEntity>(TelegramMiniAppUserRewardTable) {
         fun goalAchieved(user: TelegramMiniAppUserEntity, amount: BigDecimal, goalId: TelegramMiniAppGoal.Id) {
+            create(user, TelegramMiniAppUserRewardType.GoalAchievement, amount, goalId = goalId)
+        }
+
+        fun dailyCheckIn(user: TelegramMiniAppUserEntity, amount: BigDecimal) {
+            create(user, TelegramMiniAppUserRewardType.DailyCheckIn, amount)
+        }
+
+        fun reactionGame(user: TelegramMiniAppUserEntity, amount: BigDecimal) {
+            create(user, TelegramMiniAppUserRewardType.ReactionGame, amount)
+        }
+
+        private fun create(user: TelegramMiniAppUserEntity, type: TelegramMiniAppUserRewardType, amount: BigDecimal, goalId: TelegramMiniAppGoal.Id? = null) {
             TelegramMiniAppUserRewardTable.insertIgnore {
                 val now = Clock.System.now()
                 it[guid] = EntityID(TelegramMiniAppUserRewardId.generate(), TelegramMiniAppUserRewardTable)
@@ -65,21 +77,8 @@ class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId
                 it[createdAt] = now
                 it[updatedAt] = now
                 it[createdBy] = user.guid.value.value
-                it[type] = TelegramMiniAppUserRewardType.GoalAchievement
-                it[TelegramMiniAppUserRewardTable.goalId] = goalId.name
-                it[TelegramMiniAppUserRewardTable.amount] = amount
-            }
-        }
-
-        fun reactionGame(user: TelegramMiniAppUserEntity, amount: BigDecimal) {
-            TelegramMiniAppUserRewardTable.insert {
-                val now = Clock.System.now()
-                it[guid] = EntityID(TelegramMiniAppUserRewardId.generate(), TelegramMiniAppUserRewardTable)
-                it[userGuid] = user.guid
-                it[createdAt] = now
-                it[updatedAt] = now
-                it[createdBy] = user.guid.value.value
-                it[type] = TelegramMiniAppUserRewardType.ReactionGame
+                it[TelegramMiniAppUserRewardTable.type] = type
+                goalId?.let { goal -> it[TelegramMiniAppUserRewardTable.goalId] = goal.name }
                 it[TelegramMiniAppUserRewardTable.amount] = amount
             }
         }

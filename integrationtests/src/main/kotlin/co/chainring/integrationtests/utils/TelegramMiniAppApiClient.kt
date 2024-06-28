@@ -4,6 +4,8 @@ import arrow.core.Either
 import co.chainring.apps.api.middleware.TelegramMiniAppUserData
 import co.chainring.apps.api.model.tma.ClaimRewardApiRequest
 import co.chainring.apps.api.model.tma.GetUserApiResponse
+import co.chainring.apps.api.model.tma.ReactionTimeApiRequest
+import co.chainring.apps.api.model.tma.ReactionsTimeApiResponse
 import co.chainring.core.model.telegram.TelegramUserId
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -36,6 +38,18 @@ class TelegramMiniAppApiClient(val telegramUserId: TelegramUserId) {
             Request.Builder()
                 .url("$apiServerRootUrl/tma/v1/user")
                 .get()
+                .build()
+                .withAuthHeaders(telegramUserId),
+        ).execute().toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
+    fun recordReactionTime(apiRequest: ReactionTimeApiRequest): ReactionsTimeApiResponse =
+        tryRecordReactionTime(apiRequest).assertSuccess()
+
+    fun tryRecordReactionTime(apiRequest: ReactionTimeApiRequest): Either<ApiCallFailure, ReactionsTimeApiResponse> =
+        httpClient.newCall(
+            Request.Builder()
+                .url("$apiServerRootUrl/tma/v1/reaction-time")
+                .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(telegramUserId),
         ).execute().toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
