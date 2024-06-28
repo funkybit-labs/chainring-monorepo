@@ -45,6 +45,7 @@ import co.chainring.core.model.db.migrations.V48_AddingSymbolsToWallets
 import co.chainring.core.model.db.migrations.V49_AddWithdrawalFee
 import co.chainring.core.model.db.migrations.V4_AddDecimalsToERC20Token
 import co.chainring.core.model.db.migrations.V50_TelegramMiniAppReactionTime
+import co.chainring.core.model.db.migrations.V51_FaucetDrip
 import co.chainring.core.model.db.migrations.V51_TelegramMiniAppCheckInStreak
 import co.chainring.core.model.db.migrations.V5_ChainTable
 import co.chainring.core.model.db.migrations.V6_MarketTable
@@ -103,5 +104,6 @@ val migrations = listOf(
     V48_AddingSymbolsToWallets(),
     V49_AddWithdrawalFee(),
     V50_TelegramMiniAppReactionTime(),
+    V51_FaucetDrip(),
     V51_TelegramMiniAppCheckInStreak(),
 )

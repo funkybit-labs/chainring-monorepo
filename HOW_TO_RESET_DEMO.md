@@ -57,6 +57,7 @@ and then truncate db tables using favourite SQL editor. In this way OHLC records
 -- truncate table balance CASCADE;
 -- truncate table wallet CASCADE;
 -- truncate table deployed_smart_contract CASCADE;
+-- truncate table faucet_drip;
 -- delete from key_value_store where key = 'LastProcessedOutputIndex';
 ```
 

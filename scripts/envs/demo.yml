@@ -16,11 +16,16 @@ environment:
     TRADE_SETTLEMENT_BATCH_MAX_WAIT_TIME_MS: "30000"
     WITHDRAWAL_SETTLEMENT_BATCH_MIN_WITHDRAWALS: "5"
     WITHDRAWAL_SETTLEMENT_BATCH_MAX_WAIT_MS: "10000"
+    FAUCET_REFRESH_INTERVAL: PT1M
   sequencer:
     QUEUE_HOME: "/data/queues/demo"
     CHECKPOINTS_ENABLED: "true"
     SANDBOX_MODE: "true"
     STRICT_REPLAY_VALIDATION: "true"
+    JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
+    SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
+  garp:
+    QUEUE_HOME: "/data/queues/demo"
     DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
@@ -111,6 +116,14 @@ services:
     is_essential: "true"
     no_rolling_upgrade: "true"
     environment: sequencer
+    secrets:
+      SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
+  garp:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer
+    count: 1
+    is_essential: "true"
+    no_rolling_upgrade: "true"
+    environment: garp
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-d567d2ec-6ebb-4c6d-b48a-529eb09febfb-KMOVrv
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX

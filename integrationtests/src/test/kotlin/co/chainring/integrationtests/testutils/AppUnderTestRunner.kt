@@ -17,6 +17,7 @@ import co.chainring.core.model.db.BroadcasterJobTable
 import co.chainring.core.model.db.ChainSettlementBatchTable
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.DepositTable
+import co.chainring.core.model.db.FaucetDripTable
 import co.chainring.core.model.db.KeyValueStore
 import co.chainring.core.model.db.OHLCTable
 import co.chainring.core.model.db.OrderExecutionTable
@@ -221,6 +222,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             BalanceTable.deleteAll()
             WalletTable.deleteAll()
             OHLCTable.deleteAll()
+            FaucetDripTable.deleteAll()
         }
     }
 }

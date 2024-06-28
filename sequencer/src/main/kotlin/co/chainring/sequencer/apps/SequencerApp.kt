@@ -657,4 +657,11 @@ class SequencerApp(
         sequencerThread.stop()
         logger.info { "Stopped" }
     }
+
+    fun blockUntilShutdown() {
+        while (!stop) {
+            Thread.sleep(20)
+        }
+        sequencerThread.join()
+    }
 }

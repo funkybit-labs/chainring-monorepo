@@ -84,6 +84,10 @@ module "rds" {
   vpc         = module.vpc.vpc
   aws_region  = var.aws_region
   ci_role_arn = data.terraform_remote_state.shared.outputs.ci_role_arn
+
+  enable_advanced_monitoring          = true
+  enable_performance_insights         = true
+  performance_insights_retention_days = 7
 }
 
 module "web" {
@@ -126,4 +130,6 @@ module "sequencer" {
   subnet_id                               = module.vpc.private_subnet_id_2
   vpc                                     = module.vpc.vpc
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
+  baregate_cpu                            = module.baregate.baregate_cpu
+  baregate_memory                         = module.baregate.baregate_memory * 0.9
 }
