@@ -4,6 +4,8 @@ import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppCheckInStreak
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGoal
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
+import co.chainring.core.utils.truncateTo
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 
@@ -32,7 +34,7 @@ data class GetUserApiResponse(
                         days = it.day,
                         reward = it.cp,
                         gameTickets = it.gameTickets,
-                        grantedAt = user.lastStreakDayGrantedAt!!,
+                        grantedAt = user.lastStreakDayGrantedAt!!.truncateTo(DateTimeUnit.MILLISECOND),
                     )
                 },
             )
