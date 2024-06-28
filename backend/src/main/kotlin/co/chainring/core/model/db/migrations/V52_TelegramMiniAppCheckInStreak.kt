@@ -11,33 +11,33 @@ import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.transactions.transaction
 
 @Suppress("ClassName")
-class V51_TelegramMiniAppCheckInStreak : Migration() {
+class V52_TelegramMiniAppCheckInStreak : Migration() {
 
-    object V51_TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_mini_app_user", ::TelegramMiniAppUserId) {
+    object V52_TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_mini_app_user", ::TelegramMiniAppUserId) {
         val checkInStreakDays = integer("check_in_streak_days").default(0)
         val lastStreakDayGrantedAt = timestamp("last_streak_day_granted_at").nullable()
     }
 
-    enum class V51_TelegramMiniAppUserRewardType {
+    enum class V52_TelegramMiniAppUserRewardType {
         GoalAchievement,
         DailyCheckIn,
         ReactionGame,
         ReferralBonus,
     }
 
-    object V51_TelegramMiniAppUserRewardTable : GUIDTable<TelegramMiniAppUserRewardId>("telegram_mini_app_user_reward", ::TelegramMiniAppUserRewardId) {
+    object V52_TelegramMiniAppUserRewardTable : GUIDTable<TelegramMiniAppUserRewardId>("telegram_mini_app_user_reward", ::TelegramMiniAppUserRewardId) {
         val type = customEnumeration(
             "type",
             "TelegramMiniAppUserRewardType",
-            { value -> V51_TelegramMiniAppUserRewardType.valueOf(value as String) },
+            { value -> V52_TelegramMiniAppUserRewardType.valueOf(value as String) },
             { PGEnum("TelegramMiniAppUserRewardType", it) },
         ).index()
     }
 
     override fun run() {
         transaction {
-            updateEnum<V51_TelegramMiniAppUserRewardType>(listOf(V51_TelegramMiniAppUserRewardTable.type), "TelegramMiniAppUserRewardType")
-            SchemaUtils.createMissingTablesAndColumns(V51_TelegramMiniAppUserTable)
+            updateEnum<V52_TelegramMiniAppUserRewardType>(listOf(V52_TelegramMiniAppUserRewardTable.type), "TelegramMiniAppUserRewardType")
+            SchemaUtils.createMissingTablesAndColumns(V52_TelegramMiniAppUserTable)
         }
     }
 }
