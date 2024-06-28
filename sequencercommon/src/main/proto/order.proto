@@ -24,6 +24,7 @@ message Order {
   string externalGuid = 8;
   uint32 chainId = 9; // the chain id used when creating the signature - does not need to be related to the chain(s) of the market
   optional uint32 percentage = 10;
+  optional IntegerValue maxAvailable = 11;
 }
 
 message CancelOrder {

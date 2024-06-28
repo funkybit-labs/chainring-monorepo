@@ -154,6 +154,7 @@ data class Market(
                                 balanceChanges = balanceChanges,
                                 consumptionChanges = consumptionChanges,
                                 feeRates = feeRates,
+                                null,
                             )
                         }
                     }
@@ -207,7 +208,12 @@ data class Market(
                     else -> {}
                 }
             }
-            orderResult.executions.forEach { execution ->
+            // remainingAvailable is only set for market buy with 100% max and no quote assets reserved for other orders.
+            // On the last trade for this order, any balance changes accumulated on previous trades for the quote asset will
+            // be decremented and the remaining available will be passed in. Any remaining dust after applying
+            // the balances changes from last trade will then be swept into the buyer fee of the last trade.
+            val remainingAvailable = if (order.hasMaxAvailable()) order.maxAvailable.toBigInteger() else null
+            orderResult.executions.forEachIndexed { index, execution ->
                 processExecution(
                     wallet = orderBatch.wallet.toWalletAddress(),
                     takerOrder = order,
@@ -217,6 +223,11 @@ data class Market(
                     balanceChanges = balanceChanges,
                     consumptionChanges = consumptionChanges,
                     feeRates = feeRates,
+                    remainingAvailable = if (remainingAvailable != null && index + 1 == orderResult.executions.size) {
+                        remainingAvailable + (balanceChanges[Pair(orderBatch.wallet.toWalletAddress(), id.quoteAsset())] ?: BigInteger.ZERO)
+                    } else {
+                        null
+                    },
                 )
             }
         }
@@ -274,6 +285,7 @@ data class Market(
         balanceChanges: MutableMap<Pair<WalletAddress, Asset>, BigInteger>,
         consumptionChanges: MutableMap<WalletAddress, Pair<BigInteger, BigInteger>>,
         feeRates: FeeRates,
+        remainingAvailable: BigInteger?,
     ) {
         val notional = notional(execution.amount, execution.price, baseDecimals, quoteDecimals)
 
@@ -282,7 +294,7 @@ data class Market(
 
         val buyOrderGuid: Long
         val buyer: WalletAddress
-        val buyerFee: BigInteger
+        var buyerFee: BigInteger
 
         val sellOrderGuid: Long
         val seller: WalletAddress
@@ -292,6 +304,17 @@ data class Market(
             buyOrderGuid = takerOrder.guid
             buyer = wallet
             buyerFee = notionalFee(notional, feeRates.taker)
+
+            // remainingAvailable should only be non null for Market Buy with max (100%) and no quoteAsset already allocated to other orders in this market
+            if (remainingAvailable != null && takerOrder.type == Order.Type.MarketBuy && takerOrder.hasPercentage() && takerOrder.percentage == 100) {
+                val dust = remainingAvailable - (notional + buyerFee)
+                // if the remaining after we apply this order is below the dust threshold, move the dust to the fee.
+                // otherwise don't apply (this can happen if there was not enough liquidity in this market to fill the market buy)
+                if (dust <= buyerFee) {
+                    logger.debug { "Order ${takerOrder.guid}: Increasing buyer fee by $dust" }
+                    buyerFee += dust
+                }
+            }
 
             sellOrderGuid = execution.counterOrder.guid.value
             seller = execution.counterOrder.wallet
@@ -795,10 +818,11 @@ data class Market(
         return clearingQuantityForMarketSell(baseAssetLimit) * percent.toBigInteger() / Percentage.MAX_VALUE.toBigInteger()
     }
 
-    fun calculateAmountForPercentageBuy(wallet: WalletAddress, walletBalance: BigInteger, percent: Int, takerFeeRate: BigInteger): BigInteger {
-        val quoteAssetLimit = (BigInteger.ZERO.max(walletBalance - quoteAssetsRequired(wallet)) * percent.toBigInteger()) / Percentage.MAX_VALUE.toBigInteger()
+    fun calculateAmountForPercentageBuy(wallet: WalletAddress, walletBalance: BigInteger, percent: Int, takerFeeRate: BigInteger): Pair<BigInteger, BigInteger?> {
+        val quoteAssetsRequired = quoteAssetsRequired(wallet)
+        val quoteAssetLimit = (BigInteger.ZERO.max(walletBalance - quoteAssetsRequired) * percent.toBigInteger()) / Percentage.MAX_VALUE.toBigInteger()
         val quoteAssetLimitAdjustedForFee = (quoteAssetLimit * FeeRate.MAX_VALUE.toBigInteger()) / (FeeRate.MAX_VALUE.toBigInteger() + takerFeeRate)
-        return quantityForMarketBuy(quoteAssetLimitAdjustedForFee)
+        return Pair(quantityForMarketBuy(quoteAssetLimitAdjustedForFee), if (quoteAssetsRequired == BigInteger.ZERO && percent == 100) walletBalance else null)
     }
 
     // returns baseAsset and quoteAsset reserved by order
