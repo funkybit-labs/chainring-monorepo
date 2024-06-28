@@ -234,6 +234,34 @@ resource "aws_ecs_service" "sequencer" {
   desired_count   = 1
 
   network_configuration {
+    security_groups = []
+    subnets         = [var.subnet_id]
+  }
+
+  capacity_provider_strategy {
+    capacity_provider = var.capacity_provider_name
+    base              = 1
+    weight            = 100
+  }
+
+  ordered_placement_strategy {
+    type  = "spread"
+    field = "attribute:ecs.availability-zone"
+  }
+
+  lifecycle {
+    ignore_changes = [task_definition, desired_count]
+  }
+}
+
+
+resource "aws_ecs_service" "garp" {
+  name            = "${var.name_prefix}-garp"
+  cluster         = var.ecs_cluster_name
+  task_definition = aws_ecs_task_definition.gateway_and_response_processor.arn
+  desired_count   = 1
+
+  network_configuration {
     security_groups = [aws_security_group.security_group.id]
     subnets         = [var.subnet_id]
   }

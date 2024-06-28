@@ -84,6 +84,10 @@ module "rds" {
   vpc         = module.vpc.vpc
   aws_region  = var.aws_region
   ci_role_arn = data.terraform_remote_state.shared.outputs.ci_role_arn
+
+  enable_advanced_monitoring          = true
+  enable_performance_insights         = true
+  performance_insights_retention_days = 7
 }
 
 module "web" {
