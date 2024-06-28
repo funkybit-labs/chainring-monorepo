@@ -134,12 +134,14 @@ class TelegramMiniAppApiTest {
     @Test
     fun claimReward() {
         val apiClient = TelegramMiniAppApiClient(TelegramUserId(123L))
-        apiClient.signUp()
+        apiClient.signUp().also {
+            assertEquals("20".crPoints(), it.balance)
+        }
 
         apiClient
             .claimReward(ClaimRewardApiRequest(TelegramMiniAppGoal.Id.GithubSubscription))
             .also {
-                assertEquals("1000".crPoints(), it.balance)
+                assertEquals("1020".crPoints(), it.balance)
                 assertEquals(
                     listOf(
                         GetUserApiResponse.Goal(
@@ -176,7 +178,7 @@ class TelegramMiniAppApiTest {
         apiClient
             .claimReward(ClaimRewardApiRequest(TelegramMiniAppGoal.Id.GithubSubscription))
             .also {
-                assertEquals("1000".crPoints(), it.balance)
+                assertEquals("1020".crPoints(), it.balance)
             }
     }
 

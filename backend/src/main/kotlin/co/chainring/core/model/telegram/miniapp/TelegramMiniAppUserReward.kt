@@ -9,7 +9,7 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import java.math.BigDecimal
 
@@ -58,7 +58,7 @@ object TelegramMiniAppUserRewardTable : GUIDTable<TelegramMiniAppUserRewardId>("
 class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId>) : GUIDEntity<TelegramMiniAppUserRewardId>(guid) {
     companion object : EntityClass<TelegramMiniAppUserRewardId, TelegramMiniAppUserRewardEntity>(TelegramMiniAppUserRewardTable) {
         fun goalAchieved(user: TelegramMiniAppUserEntity, amount: BigDecimal, goalId: TelegramMiniAppGoal.Id) {
-            create(user, TelegramMiniAppUserRewardType.GoalAchievement, amount)
+            create(user, TelegramMiniAppUserRewardType.GoalAchievement, amount, goalId = goalId)
         }
 
         fun dailyCheckIn(user: TelegramMiniAppUserEntity, amount: BigDecimal) {
@@ -69,8 +69,8 @@ class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId
             create(user, TelegramMiniAppUserRewardType.ReactionGame, amount)
         }
 
-        private fun create(user: TelegramMiniAppUserEntity, type: TelegramMiniAppUserRewardType, amount: BigDecimal) {
-            TelegramMiniAppUserRewardTable.insert {
+        private fun create(user: TelegramMiniAppUserEntity, type: TelegramMiniAppUserRewardType, amount: BigDecimal, goalId: TelegramMiniAppGoal.Id? = null) {
+            TelegramMiniAppUserRewardTable.insertIgnore {
                 val now = Clock.System.now()
                 it[guid] = EntityID(TelegramMiniAppUserRewardId.generate(), TelegramMiniAppUserRewardTable)
                 it[userGuid] = user.guid
@@ -78,6 +78,7 @@ class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId
                 it[updatedAt] = now
                 it[createdBy] = user.guid.value.value
                 it[TelegramMiniAppUserRewardTable.type] = type
+                goalId?.let { goal -> it[TelegramMiniAppUserRewardTable.goalId] = goal.name }
                 it[TelegramMiniAppUserRewardTable.amount] = amount
             }
         }

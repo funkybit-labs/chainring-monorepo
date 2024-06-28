@@ -10,6 +10,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.alias
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.selectAll
@@ -81,7 +82,7 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
     fun achievedGoals(): Set<TelegramMiniAppGoal.Id> =
         TelegramMiniAppUserRewardTable
             .select(TelegramMiniAppUserRewardTable.goalId)
-            .where { TelegramMiniAppUserRewardTable.userGuid.eq(guid) }
+            .where { TelegramMiniAppUserRewardTable.userGuid.eq(guid) and TelegramMiniAppUserRewardTable.type.eq(TelegramMiniAppUserRewardType.GoalAchievement) }
             .andWhere { TelegramMiniAppUserRewardTable.goalId.isNotNull() }
             .distinct()
             .mapNotNull {
