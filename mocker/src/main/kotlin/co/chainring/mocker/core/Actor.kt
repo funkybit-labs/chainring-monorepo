@@ -6,6 +6,7 @@ import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
+import co.chainring.core.model.Address
 import co.chainring.integrationtests.utils.ApiClient
 import co.chainring.integrationtests.utils.subscribe
 import co.chainring.integrationtests.utils.unsubscribe
@@ -46,6 +47,7 @@ abstract class Actor(
 
     protected var markets = setOf<Market>()
     private lateinit var chainIdBySymbol: Map<String, ChainId>
+    private val faucetPossible = (System.getenv("FAUCET_POSSIBLE") ?: "0") == "1"
 
     open fun start() {
         logger.info { "$id: starting" }
@@ -53,7 +55,11 @@ abstract class Actor(
         val config = apiClient.getConfiguration()
         chainIdBySymbol = config.chains.map { chain -> chain.symbols.map { it.name to chain.id } }.flatten().toMap()
         markets = config.markets.filter { marketIds.contains(it.id) }.toSet()
-        depositAssets()
+        if (faucetPossible) {
+            depositAssets()
+        } else {
+            depositNoFaucet()
+        }
         connectWebsocket()
 
         onStarted()
@@ -111,7 +117,54 @@ abstract class Actor(
     protected open fun onWebsocketConnected(webSocket: WebSocket) {}
     protected abstract fun handleWebsocketMessage(message: Publishable)
 
-    protected fun depositAssets() {
+    private fun depositNoFaucet() {
+        val config = apiClient.getConfiguration()
+        val gasFeesAmount = BigDecimal("0.1").movePointRight(18).toBigInteger()
+        var deposited = false
+        logger.debug { "$id: going to deposit (no faucet)" }
+        while (!deposited) {
+            try {
+                val initialBalances = apiClient.getBalances().balances
+                synchronized(Actor::class) {
+                    val deposits = config.chains.flatMap { chain ->
+                        wallet.switchChain(chain.id)
+                        chain.symbols.mapNotNull { symbol ->
+                            val balanceToDeposit = wallet.getWalletBalance(symbol)
+                            if (balanceToDeposit.inFundamentalUnits > BigInteger.ZERO) {
+                                val receipt = if (symbol.contractAddress == null) {
+                                    wallet.depositNative(balanceToDeposit.inFundamentalUnits - gasFeesAmount)
+                                } else {
+                                    wallet.depositERC20(symbol.name, balanceToDeposit.inFundamentalUnits)
+                                }
+                                apiClient.createDeposit(
+                                    CreateDepositApiRequest(
+                                        symbol = Symbol(symbol.name),
+                                        amount = balanceToDeposit.inFundamentalUnits,
+                                        txHash = TxHash(receipt.transactionHash)
+                                    )
+                                )
+                            } else null
+                        }
+                    }
+                    val fundedAssets = mutableSetOf<String>()
+                    while (fundedAssets.size < deposits.size) {
+                        Thread.sleep(100)
+                        apiClient.getBalances().balances.forEach { balance ->
+                            if (balance.available > initialBalances.first { it.symbol == balance.symbol }.available) {
+                                fundedAssets.add(balance.symbol.value)
+                            }
+                            balances[balance.symbol.value] = balance.available
+                        }
+                    }
+                }
+                deposited = true
+            } catch (e: Exception) {
+                logger.warn(e) { "$id: retrying deposit because of ${e.message}" }
+            }
+        }
+    }
+
+    private fun depositAssets() {
         // quick fix for org.web3j.protocol.exceptions.JsonRpcError: replacement transaction underpriced
         // looks like same nonce is re-used due to concurrent start of actors which lead to exiting thread
         var deposited = false
