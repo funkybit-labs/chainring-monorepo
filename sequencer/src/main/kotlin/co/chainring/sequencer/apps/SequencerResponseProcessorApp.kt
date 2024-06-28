@@ -85,6 +85,13 @@ class SequencerResponseProcessorApp(
         logger.info { "Stopped" }
     }
 
+    fun blockUntilShutdown() {
+        while (!stop) {
+            Thread.sleep(20)
+        }
+        processorThread.join()
+    }
+
     private fun processResponseWithRetries(requestBytes: ByteArray, response: SequencerResponse, lastReadIndex: Long) {
         val startedAt = Clock.System.now()
         val alertAfterDuration = 1.minutes
