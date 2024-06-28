@@ -50,6 +50,13 @@ run_backend:
 run_sequencer:
 	SANDBOX_MODE=true ./gradlew :sequencer:run
 
+run_only_sequencer:
+	SANDBOX_MODE=true ./gradlew :sequencer:run --args=sequencer
+
+run_not_sequencer:
+	SANDBOX_MODE=true ./gradlew :sequencer:run --args=not-sequencer
+
+
 run_mocker:
 	API_URL=http://localhost:9000 ./gradlew :mocker:run
 

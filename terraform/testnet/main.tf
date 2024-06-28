@@ -126,4 +126,6 @@ module "sequencer" {
   subnet_id                               = module.vpc.private_subnet_id_2
   vpc                                     = module.vpc.vpc
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
+  baregate_cpu                            = module.baregate.baregate_cpu
+  baregate_memory                         = module.baregate.baregate_memory * 0.9
 }

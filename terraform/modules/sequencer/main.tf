@@ -14,9 +14,48 @@ resource "aws_iam_role" "sequencer_exec_role" {
   assume_role_policy = data.aws_iam_policy_document.sequencer_task_doc.json
 }
 
+resource "aws_iam_role" "garp_exec_role" {
+  name_prefix        = "${var.name_prefix}-garp-exec-role"
+  assume_role_policy = data.aws_iam_policy_document.sequencer_task_doc.json
+}
+
 resource "aws_iam_role_policy" "sequencer_execution_role_policy" {
   name   = "${var.name_prefix}-sequencer-task-execution"
   role   = aws_iam_role.sequencer_exec_role.id
+  policy = <<ECS_EXEC_POLICY
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetAuthorizationToken",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "*"
+    },
+   {
+      "Effect": "Allow",
+      "Action": [
+          "secretsmanager:GetSecretValue"
+      ],
+      "Resource": [
+        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:slack-error-reporter-token-*"
+      ]
+    }
+  ]
+}
+ECS_EXEC_POLICY
+}
+
+resource "aws_iam_role_policy" "garp_execution_role_policy" {
+  name   = "${var.name_prefix}-garp-task-execution"
+  role   = aws_iam_role.garp_exec_role.id
   policy = <<ECS_EXEC_POLICY
 {
   "Version": "2012-10-17",
@@ -63,8 +102,8 @@ resource "aws_ecs_task_definition" "sequencer" {
   family                   = "${var.name_prefix}-sequencer"
   network_mode             = "awsvpc"
   requires_compatibilities = ["EC2"]
-  cpu                      = 2048
-  memory                   = 15000
+  cpu                      = floor(var.baregate_cpu / 2)
+  memory                   = floor(var.baregate_memory / 2)
   execution_role_arn       = aws_iam_role.sequencer_exec_role.arn
   task_role_arn            = aws_iam_role.sequencer_task_role.arn
   volume {
@@ -76,7 +115,7 @@ resource "aws_ecs_task_definition" "sequencer" {
       name         = "${var.name_prefix}-sequencer"
       image        = "${local.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/sequencer:latest"
       essential    = true
-      portMappings = local.port_mappings
+      portMappings = []
       cpu          = 0
       volumesFrom  = []
       environment  = []
@@ -90,6 +129,50 @@ resource "aws_ecs_task_definition" "sequencer" {
           "mode" : "non-blocking"
         }
       }
+      command = ["sequencer"]
+      mountPoints = [
+        {
+          sourceVolume  = "queues"
+          containerPath = "/data/queues"
+        }
+      ]
+    },
+  ])
+}
+
+
+resource "aws_ecs_task_definition" "gateway_and_response_processor" {
+  family                   = "${var.name_prefix}-garp"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["EC2"]
+  cpu                      = floor(var.baregate_cpu / 2)
+  memory                   = floor(var.baregate_memory / 2)
+  execution_role_arn       = aws_iam_role.garp_exec_role.arn
+  task_role_arn            = aws_iam_role.sequencer_task_role.arn
+  volume {
+    name      = "queues"
+    host_path = "/data/queues"
+  }
+  container_definitions = jsonencode([
+    {
+      name         = "${var.name_prefix}-garp"
+      image        = "${local.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/sequencer:latest"
+      essential    = true
+      portMappings = local.port_mappings
+      cpu          = 0
+      volumesFrom  = []
+      environment  = []
+      secrets      = []
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group" : aws_cloudwatch_log_group.sequencer.name
+          "awslogs-region" : var.aws_region,
+          "awslogs-stream-prefix" : "${var.name_prefix}-garp",
+          "mode" : "non-blocking"
+        }
+      }
+      command = ["not-sequencer"]
       mountPoints = [
         {
           sourceVolume  = "queues"

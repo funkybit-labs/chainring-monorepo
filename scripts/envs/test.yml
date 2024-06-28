@@ -15,6 +15,9 @@ environment:
     CHECKPOINTS_ENABLED: "false"
     SANDBOX_MODE: "true"
     STRICT_REPLAY_VALIDATION: "true"
+    JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
+  garp:
+    QUEUE_HOME: "/data/queues/test"
     DB_HOST: test-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
   telegrambot:
@@ -75,6 +78,12 @@ services:
     is_essential: "true"
     no_rolling_upgrade: "true"
     environment: sequencer
+  garp:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer
+    count: 1
+    is_essential: "true"
+    no_rolling_upgrade: "true"
+    environment: garp
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
 
