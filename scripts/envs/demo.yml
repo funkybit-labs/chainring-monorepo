@@ -68,6 +68,7 @@ environment:
     BTC/USDC_PRICE_BASELINE: "68390"
     BTC/USDC_INITIAL_BASE_BALANCE: "1"
     BTC/USDC_MAKER_PRIVATE_KEY_HEX: "0x566a0b2ef8642058d96b44cfa8c90b260a56065a60d44bf5d916c125e64d6967"
+    FAUCET_POSSIBLE: "1"
 services:
   api:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
