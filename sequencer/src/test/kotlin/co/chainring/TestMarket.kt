@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TestMarket {
@@ -523,13 +524,18 @@ class TestMarket {
         // this should be filled from first level
         var quoteLimit = BigDecimal("200").toFundamentalUnits(market.quoteDecimals)
         var expectedAmount = BigDecimal("9.803921568627450980").toFundamentalUnits(market.baseDecimals)
-        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 100, feeRate.value.toBigInteger()))
+        val (amount, maxAvailable) = market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 100, feeRate.value.toBigInteger())
+        assertEquals(expectedAmount, amount)
+        assertEquals(quoteLimit, maxAvailable)
         assertTrue(quoteLimit > notionalPlusFee(expectedAmount, BigDecimal("20"), market.baseDecimals, market.quoteDecimals, feeRate))
         // just some tiny dust left.
         assertEquals(BigInteger("8"), quoteLimit - notionalPlusFee(expectedAmount, BigDecimal("20"), market.baseDecimals, market.quoteDecimals, feeRate))
 
         expectedAmount = BigDecimal("4.901960784313725490").toFundamentalUnits(market.baseDecimals)
-        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 50, feeRate.value.toBigInteger()))
+        val (amount2, maxAvailable2) = market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 50, feeRate.value.toBigInteger())
+        assertEquals(expectedAmount, amount2)
+        assertNull(maxAvailable2)
+
         assertTrue(quoteLimit / BigInteger.TWO > notionalPlusFee(expectedAmount, BigDecimal("20"), market.baseDecimals, market.quoteDecimals, feeRate))
         // just some tiny dust left plus the other half.
         assertEquals(BigInteger("4"), quoteLimit / BigInteger.TWO - notionalPlusFee(expectedAmount, BigDecimal("20"), market.baseDecimals, market.quoteDecimals, feeRate))
@@ -537,7 +543,9 @@ class TestMarket {
         // this should require both levels
         quoteLimit = BigDecimal("500").toFundamentalUnits(market.quoteDecimals)
         expectedAmount = BigDecimal("24.295051353874883286").toFundamentalUnits(market.baseDecimals)
-        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 100, feeRate.value.toBigInteger()))
+        val (amount3, maxAvailable3) = market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 100, feeRate.value.toBigInteger())
+        assertEquals(expectedAmount, amount3)
+        assertEquals(quoteLimit, maxAvailable3)
         val expectedNotional = notionalPlusFee(BigDecimal("20").toFundamentalUnits(market.baseDecimals), BigDecimal("20"), market.baseDecimals, market.quoteDecimals, feeRate) +
             notionalPlusFee(BigDecimal("4.295051353874883286").toFundamentalUnits(market.baseDecimals), BigDecimal("21"), market.baseDecimals, market.quoteDecimals, feeRate)
         assertTrue(quoteLimit > expectedNotional)
@@ -575,13 +583,13 @@ class TestMarket {
         // this should be filled from first level
         var quoteLimit = BigDecimal("700000").toFundamentalUnits(market.quoteDecimals)
         var expectedAmount = BigDecimal("9.803921568614285714").toFundamentalUnits(market.baseDecimals)
-        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 100, feeRate.value.toBigInteger()))
+        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 100, feeRate.value.toBigInteger()).first)
         assertTrue(quoteLimit > notionalPlusFee(expectedAmount, BigDecimal("70000"), market.baseDecimals, market.quoteDecimals, feeRate))
         // just some tiny dust left.
         assertEquals(BigInteger("2"), quoteLimit - notionalPlusFee(expectedAmount, BigDecimal("70000"), market.baseDecimals, market.quoteDecimals, feeRate))
 
         expectedAmount = BigDecimal("4.901960784300000000").toFundamentalUnits(market.baseDecimals)
-        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 50, feeRate.value.toBigInteger()))
+        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 50, feeRate.value.toBigInteger()).first)
         assertTrue(quoteLimit / BigInteger.TWO > notionalPlusFee(expectedAmount, BigDecimal("70000"), market.baseDecimals, market.quoteDecimals, feeRate))
         // just some tiny dust left plus the other half.
         assertEquals(BigInteger("1"), quoteLimit / BigInteger.TWO - notionalPlusFee(expectedAmount, BigDecimal("70000"), market.baseDecimals, market.quoteDecimals, feeRate))
@@ -589,7 +597,7 @@ class TestMarket {
         // this should require both levels
         quoteLimit = BigDecimal("2000000").toFundamentalUnits(market.quoteDecimals)
         expectedAmount = BigDecimal("27.898370615845070422").toFundamentalUnits(market.baseDecimals)
-        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 100, feeRate.value.toBigInteger()))
+        assertEquals(expectedAmount, market.calculateAmountForPercentageBuy(WalletAddress(2L), quoteLimit, 100, feeRate.value.toBigInteger()).first)
         val expectedNotional = notionalPlusFee(BigDecimal("20").toFundamentalUnits(market.baseDecimals), BigDecimal("70000"), market.baseDecimals, market.quoteDecimals, feeRate) +
             notionalPlusFee(BigDecimal("7.898370615845070422").toFundamentalUnits(market.baseDecimals), BigDecimal("71000"), market.baseDecimals, market.quoteDecimals, feeRate)
         assertTrue(quoteLimit > expectedNotional)

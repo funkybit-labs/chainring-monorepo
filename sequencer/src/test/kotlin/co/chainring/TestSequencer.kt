@@ -5,6 +5,8 @@ import co.chainring.core.model.db.FeeRates
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.WalletAddress
+import co.chainring.sequencer.core.notional
+import co.chainring.sequencer.core.notionalFee
 import co.chainring.sequencer.core.toBigInteger
 import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toOrderGuid
@@ -297,7 +299,7 @@ class TestSequencer {
                         sellOrderGuid = sell6Order.guid,
                         price = BigDecimal("17.700"),
                         amount = BigDecimal("0.2"),
-                        buyerFee = BigDecimal("0.0708"),
+                        buyerFee = BigDecimal(if (percentage == 100) "0.070851408" else "0.0708"),
                         sellerFee = BigDecimal("0.0354"),
                     ),
                 ),
@@ -1452,6 +1454,187 @@ class TestSequencer {
 
         sequencer.withdrawal(maker, market.quoteAsset, BigDecimal.ZERO, BigDecimal("2.49247855"))
         sequencer.withdrawal(taker, market.baseAsset, BigDecimal.ZERO, BigDecimal("9.56790000"))
+    }
+
+    @Test
+    fun `Test dust gets rolled into last trade fee on market order`() {
+        val sequencer = SequencerClient()
+        val market = sequencer.createMarket(MarketId("BTC21/ETH21"))
+        val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
+        sequencer.setFeeRates(feeRates)
+
+        val lp1 = generateWalletAddress()
+        val lp2 = generateWalletAddress()
+        val tkr = generateWalletAddress()
+
+        sequencer.deposit(lp1, market.baseAsset, BigDecimal("1"))
+        sequencer.deposit(lp2, market.baseAsset, BigDecimal("1"))
+
+        sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.1"), BigDecimal("17.500"), lp1, Order.Type.LimitSell)
+        sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.1"), BigDecimal("18.000"), lp2, Order.Type.LimitSell)
+
+        sequencer.deposit(tkr, market.quoteAsset, BigDecimal("3"))
+
+        sequencer.addOrder(market, BigDecimal.ZERO, null, tkr, Order.Type.MarketBuy, percentage = 100).also { response ->
+            assertEquals(3, response.ordersChangedCount)
+            response.ordersChangedList[0].also {
+                assertEquals(OrderDisposition.Filled, it.disposition)
+                assertEquals(BigDecimal("0.16617647").toFundamentalUnits(market.baseDecimals), it.newQuantity.toBigInteger())
+            }
+            assertEquals(OrderDisposition.Filled, response.ordersChangedList[1].disposition)
+            assertEquals(OrderDisposition.PartiallyFilled, response.ordersChangedList[2].disposition)
+            // make sure entire balance used
+            assertEquals(
+                response.balancesChangedList.first { it.wallet == tkr.value && it.asset == market.quoteAsset.name }.delta.toBigInteger().negate(),
+                BigDecimal("3").toFundamentalUnits(market.quoteAsset.decimals),
+            )
+
+            response.tradesCreatedList[0].also {
+                assertEquals(
+                    it.amount.toBigInteger(),
+                    BigDecimal("0.1").toFundamentalUnits(market.baseDecimals),
+                )
+                assertEquals(
+                    it.buyerFee.toBigInteger(),
+                    notionalFee(
+                        notional(it.amount.toBigInteger(), BigDecimal("17.5"), market.baseDecimals, market.quoteDecimals),
+                        co.chainring.sequencer.core.FeeRate(feeRates.taker.value),
+                    ),
+                )
+            }
+            // verify dust added to last trade fee
+            response.tradesCreatedList[1].also {
+                assertEquals(
+                    it.amount.toBigInteger(),
+                    BigDecimal("0.06617647").toFundamentalUnits(market.baseDecimals),
+                )
+                assertEquals(
+                    it.buyerFee.toBigInteger(),
+                    notionalFee(
+                        notional(it.amount.toBigInteger(), BigDecimal("18.0"), market.baseDecimals, market.quoteDecimals),
+                        co.chainring.sequencer.core.FeeRate(feeRates.taker.value),
+                    ) + BigDecimal("0.000000010800000000").toFundamentalUnits(market.quoteDecimals),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `Test dust not taken if taker has quote assets reserved`() {
+        val sequencer = SequencerClient()
+        val market = sequencer.createMarket(MarketId("BTC22/ETH22"))
+        val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
+        sequencer.setFeeRates(feeRates)
+
+        val lp1 = generateWalletAddress()
+        val lp2 = generateWalletAddress()
+        val tkr = generateWalletAddress()
+
+        sequencer.deposit(lp1, market.baseAsset, BigDecimal("1"))
+        sequencer.deposit(lp2, market.baseAsset, BigDecimal("1"))
+
+        sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.1"), BigDecimal("17.500"), lp1, Order.Type.LimitSell)
+        sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.1"), BigDecimal("18.000"), lp2, Order.Type.LimitSell)
+
+        sequencer.deposit(tkr, market.quoteAsset, BigDecimal("4"))
+
+        sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.1"), BigDecimal("17.400"), tkr, Order.Type.LimitBuy)
+
+        sequencer.addOrder(market, BigDecimal.ZERO, null, tkr, Order.Type.MarketBuy, percentage = 100).also { response ->
+            assertEquals(3, response.ordersChangedCount)
+            response.ordersChangedList[0].also {
+                assertEquals(OrderDisposition.Filled, it.disposition)
+                assertEquals(BigDecimal("0.12492374").toFundamentalUnits(market.baseDecimals), it.newQuantity.toBigInteger())
+            }
+            assertEquals(OrderDisposition.Filled, response.ordersChangedList[1].disposition)
+            assertEquals(OrderDisposition.PartiallyFilled, response.ordersChangedList[2].disposition)
+
+            response.tradesCreatedList[0].also {
+                assertEquals(
+                    it.amount.toBigInteger(),
+                    BigDecimal("0.1").toFundamentalUnits(market.baseDecimals),
+                )
+                assertEquals(
+                    it.buyerFee.toBigInteger(),
+                    notionalFee(
+                        notional(it.amount.toBigInteger(), BigDecimal("17.5"), market.baseDecimals, market.quoteDecimals),
+                        co.chainring.sequencer.core.FeeRate(feeRates.taker.value),
+                    ),
+                )
+            }
+            // no dust added to last trade fee
+            response.tradesCreatedList[1].also {
+                assertEquals(
+                    it.amount.toBigInteger(),
+                    BigDecimal("0.02492374").toFundamentalUnits(market.baseDecimals),
+                )
+                assertEquals(
+                    it.buyerFee.toBigInteger(),
+                    notionalFee(
+                        notional(it.amount.toBigInteger(), BigDecimal("18.0"), market.baseDecimals, market.quoteDecimals),
+                        co.chainring.sequencer.core.FeeRate(feeRates.taker.value),
+                    ),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `Test dust not taken if market is exhausted`() {
+        val sequencer = SequencerClient()
+        val market = sequencer.createMarket(MarketId("BTC23/ETH23"))
+        val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
+        sequencer.setFeeRates(feeRates)
+
+        val lp1 = generateWalletAddress()
+        val lp2 = generateWalletAddress()
+        val tkr = generateWalletAddress()
+
+        sequencer.deposit(lp1, market.baseAsset, BigDecimal("1"))
+        sequencer.deposit(lp2, market.baseAsset, BigDecimal("1"))
+
+        sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.1"), BigDecimal("17.500"), lp1, Order.Type.LimitSell)
+        sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.01"), BigDecimal("18.000"), lp2, Order.Type.LimitSell)
+
+        sequencer.deposit(tkr, market.quoteAsset, BigDecimal("3"))
+
+        sequencer.addOrder(market, BigDecimal.ZERO, null, tkr, Order.Type.MarketBuy, percentage = 100).also { response ->
+            assertEquals(3, response.ordersChangedCount)
+            response.ordersChangedList[0].also {
+                assertEquals(OrderDisposition.Filled, it.disposition)
+                assertEquals(BigDecimal("0.11000000").toFundamentalUnits(market.baseDecimals), it.newQuantity.toBigInteger())
+            }
+            assertEquals(OrderDisposition.Filled, response.ordersChangedList[1].disposition)
+            assertEquals(OrderDisposition.Filled, response.ordersChangedList[2].disposition)
+
+            response.tradesCreatedList[0].also {
+                assertEquals(
+                    it.amount.toBigInteger(),
+                    BigDecimal("0.1").toFundamentalUnits(market.baseDecimals),
+                )
+                assertEquals(
+                    it.buyerFee.toBigInteger(),
+                    notionalFee(
+                        notional(it.amount.toBigInteger(), BigDecimal("17.5"), market.baseDecimals, market.quoteDecimals),
+                        co.chainring.sequencer.core.FeeRate(feeRates.taker.value),
+                    ),
+                )
+            }
+            // no dust added to last trade fee
+            response.tradesCreatedList[1].also {
+                assertEquals(
+                    it.amount.toBigInteger(),
+                    BigDecimal("0.01").toFundamentalUnits(market.baseDecimals),
+                )
+                assertEquals(
+                    it.buyerFee.toBigInteger(),
+                    notionalFee(
+                        notional(it.amount.toBigInteger(), BigDecimal("18.0"), market.baseDecimals, market.quoteDecimals),
+                        co.chainring.sequencer.core.FeeRate(feeRates.taker.value),
+                    ),
+                )
+            }
+        }
     }
 
     private val rnd = Random(0)

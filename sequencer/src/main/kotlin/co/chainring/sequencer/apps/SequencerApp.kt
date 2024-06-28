@@ -360,19 +360,22 @@ class SequencerApp(
                 this.ordersToAdd.addAll(
                     orderBatch.ordersToAddList.map { order ->
                         if (isOrderWithPercentage(order)) {
+                            val walletAddress = orderBatch.wallet.toWalletAddress()
                             order.copy {
                                 this.amount = if (order.type == Order.Type.MarketSell) {
                                     calculateAmountForPercentageSell(
                                         market,
-                                        orderBatch.wallet.toWalletAddress(),
+                                        walletAddress,
                                         order.percentage,
                                     ).toIntegerValue()
                                 } else {
-                                    calculateAmountForPercentageBuy(
+                                    val (amount, maxAvailable) = calculateAmountForPercentageBuy(
                                         market,
-                                        orderBatch.wallet.toWalletAddress(),
+                                        walletAddress,
                                         order.percentage,
-                                    ).toIntegerValue()
+                                    )
+                                    maxAvailable?.let { this.maxAvailable = it.toIntegerValue() }
+                                    amount.toIntegerValue()
                                 }
                             }
                         } else {
@@ -484,7 +487,7 @@ class SequencerApp(
         )
     }
 
-    private fun calculateAmountForPercentageBuy(market: Market, wallet: WalletAddress, percent: Int): BigInteger {
+    private fun calculateAmountForPercentageBuy(market: Market, wallet: WalletAddress, percent: Int): Pair<BigInteger, BigInteger?> {
         return market.calculateAmountForPercentageBuy(
             wallet,
             state.balances[wallet]?.get(market.id.quoteAsset()) ?: BigInteger.ZERO,

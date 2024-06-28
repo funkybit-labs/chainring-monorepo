@@ -92,6 +92,14 @@ open class OrderBaseTest {
             Arguments.of(0),
             Arguments.of(1),
         )
+
+        @JvmStatic
+        fun swapEntries() = listOf(
+            Arguments.of(Triple(btcEthMarket, btc, eth), "3", "3", "17.5", listOf("0.2"), true),
+            Arguments.of(Triple(btcUsdcMarket, btc, usdc), "10000", "10000", "64000.000", listOf("0.05", "0.05", "0.10"), true),
+            Arguments.of(Triple(btcbtc2Market, btc, btc2), "0.12", "0.11", "0.998", listOf("0.2"), true),
+            Arguments.of(Triple(btcbtc2Market, btc, btc2), "0.12", "0.11", "0.998", listOf("0.01"), false),
+        )
     }
 
     fun setupTrader(
