@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { Fragment, useEffect, useRef, useState } from 'react'
 import { ApiErrorsSchema } from 'apiClient'
 import { BrowserView, isBrowser, MobileView } from 'react-device-detect'
 import GameLogoSvg from 'assets/game-logo.svg'
@@ -12,7 +12,7 @@ export type ReactionGameResult = {
   reward: Decimal
 }
 
-type GameState = 'idle' | 'waiting' | 'ready' | 'finished' | 'early'
+type GameState = 'idle' | 'waiting' | 'ready' | 'finished' | 'early' | 'late'
 
 export function ReactionGame({
   tickets,
@@ -31,7 +31,8 @@ export function ReactionGame({
   const [apiError, setApiError] = useState<string>()
 
   const startTimeRef = useRef<number | null>(null)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const readyTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const maxTimeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const circleRef = useRef<HTMLDivElement | null>(null)
 
   const startGame = () => {
@@ -41,28 +42,46 @@ export function ReactionGame({
 
     // random delay between 3s and 5s
     const randomDelay = Math.random() * 3000 + 2000
-    timeoutRef.current = setTimeout(() => {
+    readyTimeoutRef.current = setTimeout(() => {
       if (circleRef.current) {
         circleRef.current.classList.add('bg-gameBlue')
       }
       setGameState('ready')
       startTimeRef.current = Date.now()
+
+      // maximum reaction time is 5 seconds
+      maxTimeTimeoutRef.current = setTimeout(() => {
+        setGameState((prevState) => {
+          if (prevState === 'ready') {
+            setTimeout(() => {
+              startGame()
+            }, 3000)
+
+            return 'late'
+          }
+          return prevState
+        })
+      }, 5000)
     }, randomDelay)
   }
 
-  const handleClick = async () => {
+  const handleTimeMeasure = async () => {
     if (gameState === 'waiting') {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
+      if (readyTimeoutRef.current) {
+        clearTimeout(readyTimeoutRef.current)
       }
       setGameState('early')
       // Wait 2 seconds and restart the game
       setTimeout(() => {
         startGame()
-      }, 2000)
+      }, 1000)
     } else if (gameState === 'ready' && startTimeRef.current) {
+      if (maxTimeTimeoutRef.current) {
+        clearTimeout(maxTimeTimeoutRef.current)
+      }
       const timeElapsed = Date.now() - startTimeRef.current
       setElapsedTime(timeElapsed)
+      console.log("setGameState('finished')")
       setGameState('finished')
 
       onReactionTimeMeasured(timeElapsed)
@@ -96,6 +115,7 @@ export function ReactionGame({
   }
 
   useEffect(() => {
+    console.log('gameState', gameState)
     if (circleRef.current) {
       circleRef.current.classList.remove(
         'animate-gameOrangeBlink',
@@ -113,7 +133,7 @@ export function ReactionGame({
   useEffect(() => {
     const handleSpacebar = (event: KeyboardEvent) => {
       if (event.code === 'Space') {
-        handleClick()
+        handleTimeMeasure()
       }
     }
 
@@ -133,7 +153,8 @@ export function ReactionGame({
       <div className="flex w-full flex-col items-center justify-center text-white">
         {(gameState === 'idle' ||
           gameState === 'waiting' ||
-          gameState === 'early') && (
+          gameState === 'early' ||
+          gameState === 'late') && (
           <div className="absolute left-0 top-4 w-full px-10 text-center text-xl">
             Are you faster than the blink of an eye?
           </div>
@@ -164,7 +185,8 @@ export function ReactionGame({
           <img src={GameLogoSvg} className="size-[213px]" alt="Game" />
           <div
             ref={circleRef}
-            onClick={handleClick}
+            onMouseDown={handleTimeMeasure}
+            onTouchStart={handleTimeMeasure}
             className="absolute inset-0 m-auto flex size-[158px] cursor-pointer items-center justify-center rounded-full"
           >
             {gameState === 'finished' && (
@@ -179,6 +201,9 @@ export function ReactionGame({
             )}
             {gameState === 'early' && (
               <span className="text-xl text-gameRed">Too early!</span>
+            )}
+            {gameState === 'late' && (
+              <span className="text-xl text-gameRed">Try again!</span>
             )}
           </div>
         </div>
@@ -219,7 +244,9 @@ export function ReactionGame({
               )}
             />
           )}
-          {(gameState === 'waiting' || gameState === 'early') && (
+          {(gameState === 'waiting' ||
+            gameState === 'early' ||
+            gameState === 'late') && (
             <div>
               <BrowserView>
                 Press the spacebar when the ring turns{' '}
@@ -237,23 +264,66 @@ export function ReactionGame({
   )
 }
 
-const ticks = [
-  { description: 'A deep breath', label: '2.5s', timeMs: 2500 },
+const regularTicks = [
+  {
+    description: 'A deep breath',
+    label: '2.5s',
+    timeMs: 2500,
+    isYouTick: false
+  },
   {
     description: 'Light from the earth to the moon',
     label: '1.3s',
-    timeMs: 1300
+    timeMs: 1300,
+    isYouTick: false
   },
-  { description: 'Heartbeat', label: '500ms', timeMs: 500 },
-  { description: 'Blink of an eye', label: '150ms', timeMs: 150 },
-  { description: 'Lizard darts its tongue', label: '25ms', timeMs: 25 },
-  { description: 'Light from LA to NYC', label: '10ms', timeMs: 10 },
-  { description: 'ChainRing', label: '1ms', timeMs: 1 }
+  { description: 'Heartbeat', label: '500ms', timeMs: 500, isYouTick: false },
+  {
+    description: 'Blink of an eye',
+    label: '150ms',
+    timeMs: 150,
+    isYouTick: false
+  },
+  {
+    description: 'Lizard darts its tongue',
+    label: '25ms',
+    timeMs: 25,
+    isYouTick: false
+  },
+  {
+    description: 'Light from LA to NYC',
+    label: '10ms',
+    timeMs: 10,
+    isYouTick: false
+  },
+  { description: 'ChainRing', label: '1ms', timeMs: 1, isYouTick: false }
+]
+
+const extraTick = [
+  {
+    description: 'Stop a car from 175km/hr',
+    label: '5',
+    timeMs: 5000,
+    isYouTick: false
+  }
 ]
 
 const Scale = ({ measuredTime }: { measuredTime: number }) => {
   const [currentTick, setCurrentTick] = useState(-1)
-  const [finished, setFinished] = useState(false)
+
+  let ticks = [
+    ...regularTicks,
+    {
+      description: '',
+      label: 'You',
+      timeMs: measuredTime,
+      isYouTick: true
+    }
+  ].sort((a, b) => b.timeMs - a.timeMs)
+
+  if (ticks[0].isYouTick) {
+    ticks = [...extraTick, ...ticks]
+  }
 
   useEffect(() => {
     if (currentTick < ticks.length) {
@@ -261,13 +331,8 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
         setCurrentTick(currentTick + 1)
       }, 2000)
       return () => clearTimeout(timer)
-    } else {
-      const finalTimer = setTimeout(() => {
-        setFinished(true)
-      }, 2000)
-      return () => clearTimeout(finalTimer)
     }
-  }, [currentTick])
+  }, [currentTick, ticks])
 
   const getTickPosition = (timeMs: number) => {
     const minLog = Math.log10(1)
@@ -283,64 +348,72 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
       {ticks.map((tick, index) => (
         <div
           key={index}
-          className="absolute transition-all ease-out duration-[1.5s]"
+          className="absolute transition-all duration-[1.5s] ease-out"
           style={{
             left: `calc(${
               index <= currentTick ? getTickPosition(tick.timeMs) : 100
             }%)`
           }}
         >
-          <div className="relative text-center text-xxxs">
-            <span
-              className={classNames(
-                'absolute top-4 transform -translate-x-1/2 transition-opacity 0.2s',
-                index <= currentTick ? 'opacity-100' : 'opacity-0'
-              )}
-            >
-              {tick.label}
-            </span>
+          {tick.isYouTick && (
             <div
               className={classNames(
-                'absolute top-7 transform -translate-x-1/2 w-[1px] h-1.5 bg-white transition-opacity 0.2s',
+                'absolute text-center transition-opacity 0.2s',
                 index <= currentTick ? 'opacity-100' : 'opacity-0'
               )}
-            ></div>
-          </div>
-          <div
-            className={classNames(
-              'absolute top-0 transform -translate-x-1/2 text-center text-xxxs whitespace-nowrap',
-              index < currentTick
-                ? 'opacity-0'
-                : index === currentTick
-                  ? 'opacity-100'
-                  : 'opacity-0'
-            )}
-            style={{
-              transition:
-                index === currentTick ? 'opacity 0.2s' : 'opacity 1.5s'
-            }}
-          >
-            {tick.description}
-          </div>
+              style={{
+                left: `calc(${getTickPosition(measuredTime)}%)`
+              }}
+            >
+              <div className="absolute left-1/2 top-1 w-2 -translate-x-1/2">
+                <img src={ArrowDownSvg} className="size-[30px]" alt="You" />
+              </div>
+              <span className="absolute top-8 -translate-x-1/2 text-xs text-gameOrange">
+                You
+              </span>
+            </div>
+          )}
+          {!tick.isYouTick && (
+            <Fragment>
+              <div className="relative text-center text-xxxs">
+                <span
+                  className={classNames(
+                    'absolute top-4 transform -translate-x-1/2 transition-opacity 0.2s',
+                    index <= currentTick ? 'opacity-100' : 'opacity-0'
+                  )}
+                >
+                  {tick.label}
+                </span>
+                <div
+                  className={classNames(
+                    'absolute top-7 transform -translate-x-1/2 w-[1px] h-1.5 bg-white transition-opacity 0.2s',
+                    index <= currentTick ? 'opacity-100' : 'opacity-0'
+                  )}
+                ></div>
+              </div>
+              <div
+                className={classNames(
+                  'absolute top-0 transform -translate-x-1/2 text-center text-xxxs whitespace-nowrap',
+                  index < currentTick
+                    ? 'opacity-0'
+                    : index === currentTick
+                      ? 'opacity-100'
+                      : 'opacity-0'
+                )}
+                style={{
+                  transition:
+                    index === currentTick ? 'opacity 0.2s' : 'opacity 1.5s'
+                }}
+              >
+                {tick.description}
+              </div>
+            </Fragment>
+          )}
           {index === 0 && (
             <div className="absolute top-8 h-0.5 w-[2000px] bg-white"></div>
           )}
         </div>
       ))}
-      <div
-        className={classNames(
-          'absolute text-center transition-opacity 0.2s',
-          finished ? 'opacity-100' : 'opacity-0'
-        )}
-        style={{ left: `calc(${getTickPosition(measuredTime)}%)` }}
-      >
-        <div className="absolute left-1/2 top-1 w-2 -translate-x-1/2">
-          <img src={ArrowDownSvg} className="size-[30px]" alt="You" />
-        </div>
-        <span className="absolute top-8 -translate-x-1/2 text-xs text-gameOrange">
-          You
-        </span>
-      </div>
     </div>
   )
 }
