@@ -135,7 +135,7 @@ function HomeScreenContent() {
 
       <div className="mx-4 flex min-h-screen justify-center py-24">
         <div
-          className="my-auto min-w-[400px] laptop:max-w-[1800px]"
+          className="my-auto laptop:max-w-[1800px]"
           ref={homeScreenRef as LegacyRef<HTMLDivElement>}
         >
           {tab === 'Swap' && (
