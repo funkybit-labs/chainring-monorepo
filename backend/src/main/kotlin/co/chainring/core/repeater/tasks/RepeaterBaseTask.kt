@@ -59,4 +59,6 @@ abstract class RepeaterBaseTask(
             timer.scheduleAtFixedRate(this, initialDelay.inWholeMilliseconds, invokePeriod.inWholeMilliseconds, TimeUnit.MILLISECONDS)
         }
     }
+
+    open fun setNextInvocationArgs(args: List<String>) {}
 }
