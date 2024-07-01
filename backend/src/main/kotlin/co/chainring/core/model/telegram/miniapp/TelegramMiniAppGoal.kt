@@ -17,11 +17,11 @@ data class TelegramMiniAppGoal(val id: Id, val reward: BigDecimalJson) {
 
     companion object {
         val allPossible = listOf(
-            TelegramMiniAppGoal(Id.GithubSubscription, reward = "1000".crPoints()),
-            TelegramMiniAppGoal(Id.DiscordSubscription, reward = "1000".crPoints()),
-            TelegramMiniAppGoal(Id.MediumSubscription, reward = "1000".crPoints()),
-            TelegramMiniAppGoal(Id.LinkedinSubscription, reward = "1000".crPoints()),
-            TelegramMiniAppGoal(Id.XSubscription, reward = "1000".crPoints()),
+            TelegramMiniAppGoal(Id.GithubSubscription, reward = "200".crPoints()),
+            TelegramMiniAppGoal(Id.DiscordSubscription, reward = "200".crPoints()),
+            TelegramMiniAppGoal(Id.MediumSubscription, reward = "200".crPoints()),
+            TelegramMiniAppGoal(Id.LinkedinSubscription, reward = "200".crPoints()),
+            TelegramMiniAppGoal(Id.XSubscription, reward = "200".crPoints()),
         )
     }
 }

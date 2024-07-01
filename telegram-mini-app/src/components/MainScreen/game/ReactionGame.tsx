@@ -74,7 +74,7 @@ export function ReactionGame({
         clearTimeout(readyTimeoutRef.current)
       }
       setGameState('early')
-      // Wait 2 seconds and restart the game
+      // Wait 1 second and restart the game
       setTimeout(() => {
         startGame()
       }, 1000)
@@ -273,34 +273,45 @@ const regularTicks = [
     description: 'A deep breath',
     label: '2.5s',
     timeMs: 2500,
-    isYouTick: false
+    isYouTick: false,
+    isChainRingTick: false
   },
   {
     description: 'Light from the earth to the moon',
     label: '1.3s',
     timeMs: 1300,
-    isYouTick: false
+    isYouTick: false,
+    isChainRingTick: false
   },
   { description: 'Heartbeat', label: '500ms', timeMs: 500, isYouTick: false },
   {
     description: 'Blink of an eye',
     label: '150ms',
     timeMs: 150,
-    isYouTick: false
+    isYouTick: false,
+    isChainRingTick: false
   },
   {
     description: 'Lizard darts its tongue',
     label: '25ms',
     timeMs: 25,
-    isYouTick: false
+    isYouTick: false,
+    isChainRingTick: false
   },
   {
     description: 'Light from LA to NYC',
     label: '10ms',
     timeMs: 10,
-    isYouTick: false
+    isYouTick: false,
+    isChainRingTick: false
   },
-  { description: 'ChainRing', label: '1ms', timeMs: 1, isYouTick: false }
+  {
+    description: 'ChainRing',
+    label: '1ms',
+    timeMs: 1,
+    isYouTick: false,
+    isChainRingTick: true
+  }
 ]
 
 const extraTick = [
@@ -308,7 +319,8 @@ const extraTick = [
     description: 'Stop a car from 175km/hr',
     label: '5',
     timeMs: 5000,
-    isYouTick: false
+    isYouTick: false,
+    isChainRingTick: false
   }
 ]
 
@@ -321,7 +333,8 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
       description: '',
       label: 'You',
       timeMs: measuredTime,
-      isYouTick: true
+      isYouTick: true,
+      isChainRingTick: false
     }
   ].sort((a, b) => b.timeMs - a.timeMs)
 
@@ -331,9 +344,12 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
 
   useEffect(() => {
     if (currentTick < ticks.length) {
-      const timer = setTimeout(() => {
-        setCurrentTick(currentTick + 1)
-      }, 2000)
+      const timer = setTimeout(
+        () => {
+          setCurrentTick(currentTick + 1)
+        },
+        currentTick === -1 ? 500 : 1300
+      )
       return () => clearTimeout(timer)
     }
   }, [currentTick, ticks])
@@ -352,7 +368,7 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
       {ticks.map((tick, index) => (
         <div
           key={index}
-          className="absolute transition-all duration-[1.5s] ease-out"
+          className="absolute transition-all duration-[1.2s] ease-out"
           style={{
             left: `calc(${
               index <= currentTick ? getTickPosition(tick.timeMs) : 100
@@ -379,7 +395,7 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
           )}
           {!tick.isYouTick && (
             <Fragment>
-              <div className="relative text-center text-xxxs">
+              <div className="relative text-center text-xxs">
                 <span
                   className={classNames(
                     'absolute top-4 transform -translate-x-1/2 transition-opacity 0.2s',
@@ -397,16 +413,17 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
               </div>
               <div
                 className={classNames(
-                  'absolute top-0 transform -translate-x-1/2 text-center text-xxxs whitespace-nowrap',
-                  index < currentTick
+                  'absolute top-0 transform -translate-x-1/2 text-center text-xxs whitespace-nowrap',
+                  index < currentTick && !tick.isChainRingTick
                     ? 'opacity-0'
-                    : index === currentTick
+                    : index === currentTick ||
+                        (index < currentTick && tick.isChainRingTick)
                       ? 'opacity-100'
                       : 'opacity-0'
                 )}
                 style={{
                   transition:
-                    index === currentTick ? 'opacity 0.2s' : 'opacity 1.5s'
+                    index === currentTick ? 'opacity 0.2s' : 'opacity 1.2s'
                 }}
               >
                 {tick.description}

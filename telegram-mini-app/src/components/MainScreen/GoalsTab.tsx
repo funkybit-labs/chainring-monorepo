@@ -1,5 +1,4 @@
 import { GoalsSvg } from 'components/icons'
-import CRSvg from 'assets/cr.svg'
 import GithubIconSvg from 'assets/github-icon.svg'
 import DiscordIconSvg from 'assets/discord-icon.svg'
 import MediumIconSvg from 'assets/medium-icon.svg'
@@ -17,26 +16,18 @@ import { CRView } from 'components/common/CRView'
 export default function GoalsTab({ user }: { user: User }) {
   return (
     <>
-      <div className="fixed left-0 top-0 flex h-40 w-full flex-col justify-between gap-2 px-4 pb-3 pt-4">
+      <div className="fixed left-0 top-0 flex w-full flex-col justify-between gap-2 px-4 pb-3 pt-4">
         <div className="flex justify-center text-white">
           <GoalsSvg className="size-[60px]" />
         </div>
-        <div className="flex items-center justify-center gap-2">
-          <img src={CRSvg} className="size-[24px]" />
-          <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold text-primary5">3x</span>
-            <span className="text-lg font-bold text-white">Reward</span>
-            <span className="text-darkBluishGray2">01:56:13 time left</span>
-          </div>
-        </div>
-        <div className="flex gap-2">
+        <div className="flex justify-center gap-2">
           <div className="font-bold text-white">
             {user.goals.filter((g) => !g.achieved).length}/{user.goals.length}
           </div>
           <div className="text-darkBluishGray2">Goals available</div>
         </div>
       </div>
-      <div className="h-full pt-40">
+      <div className="h-full pt-32">
         <div className="flex h-full flex-col gap-4 overflow-auto px-4">
           {user.goals.map((goal) => {
             return <GoalRow key={goal.id} goal={goal} />
@@ -91,8 +82,8 @@ function GoalRow({ goal }: { goal: UserGoal }) {
   return (
     <div
       className={classNames(
-        'bg-darkBluishGray9 rounded-lg px-4 py-2 text-white flex justify-between',
-        status == 'achieved' && 'border-2 border-primary5'
+        'bg-darkBluishGray9 rounded-lg px-4 py-2 text-white flex justify-between border-2',
+        status == 'achieved' ? 'border-primary5' : 'border-darkBluishGray9'
       )}
     >
       <div className="flex items-center justify-between gap-4">
