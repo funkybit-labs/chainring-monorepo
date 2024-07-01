@@ -11,7 +11,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 class V55_TelegramMiniAppMilestones : Migration() {
 
     object V55_TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_mini_app_user", ::TelegramMiniAppUserId) {
-        val invites = long("invites").default(0)
+        val invites = long("invites").default(5)
         val lastMilestoneGrantedAt = timestamp("last_milestone_granted_at").nullable()
     }
 

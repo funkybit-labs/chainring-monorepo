@@ -96,7 +96,7 @@ class TelegramMiniAppApiTest {
             assertEquals("20".crPoints(), it.checkInStreak.reward)
             assertEquals(1, it.checkInStreak.gameTickets)
 
-            assertEquals(0, it.invites)
+            assertEquals(5, it.invites)
             assertEquals("980".crPoints(), it.nextMilestoneIn)
             assertNull(it.lastMilestone)
 
@@ -371,7 +371,7 @@ class TelegramMiniAppApiTest {
             assertEquals("20".crPoints(), it.checkInStreak.reward)
             assertEquals(1, it.checkInStreak.gameTickets)
 
-            assertEquals(0, it.invites)
+            assertEquals(5, it.invites)
             assertEquals("980".crPoints(), it.nextMilestoneIn)
             assertNull(it.lastMilestone)
         }
@@ -380,7 +380,7 @@ class TelegramMiniAppApiTest {
             .claimReward(ClaimRewardApiRequest(TelegramMiniAppGoal.Id.GithubSubscription))
             .also {
                 assertEquals("1020".crPoints(), it.balance)
-                assertEquals(3, it.invites)
+                assertEquals(8, it.invites)
 
                 assertEquals("980".crPoints(), it.nextMilestoneIn)
 
@@ -394,7 +394,7 @@ class TelegramMiniAppApiTest {
             .claimReward(ClaimRewardApiRequest(TelegramMiniAppGoal.Id.MediumSubscription))
             .also {
                 assertEquals("2020".crPoints(), it.balance)
-                assertEquals(6, it.invites)
+                assertEquals(11, it.invites)
 
                 assertEquals("6980".crPoints(), it.nextMilestoneIn)
 
@@ -409,7 +409,7 @@ class TelegramMiniAppApiTest {
             .getUser()
             .also {
                 assertEquals("2020".crPoints(), it.balance)
-                assertEquals(6, it.invites)
+                assertEquals(11, it.invites)
 
                 assertEquals("6980".crPoints(), it.nextMilestoneIn)
 
@@ -432,7 +432,7 @@ class TelegramMiniAppApiTest {
             .getUser()
             .also {
                 assertEquals("12120".crPoints(), it.balance)
-                assertEquals(9, it.invites)
+                assertEquals(14, it.invites)
 
                 assertEquals("23880".crPoints(), it.nextMilestoneIn)
 

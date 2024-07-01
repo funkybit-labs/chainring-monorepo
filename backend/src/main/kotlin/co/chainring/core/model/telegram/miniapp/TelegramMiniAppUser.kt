@@ -34,7 +34,7 @@ object TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_min
     val gameTickets = long("game_tickets").default(0)
     val checkInStreakDays = integer("check_in_streak_days").default(0)
     val lastStreakDayGrantedAt = timestamp("last_streak_day_granted_at").nullable()
-    val invites = long("invites").default(0)
+    val invites = long("invites").default(5)
     val lastMilestoneGrantedAt = timestamp("last_milestone_granted_at").nullable()
 }
 

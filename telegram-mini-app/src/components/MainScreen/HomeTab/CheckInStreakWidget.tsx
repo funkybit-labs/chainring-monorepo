@@ -1,5 +1,6 @@
 import React from 'react'
 import { CheckInStreak } from 'apiClient'
+import { CRView } from 'components/common/CRView'
 
 export function CheckInStreakWidget({ streak }: { streak: CheckInStreak }) {
   const daysLabel = streak.days === 1 ? 'day' : 'days'
@@ -11,7 +12,9 @@ export function CheckInStreakWidget({ streak }: { streak: CheckInStreak }) {
         <span className="text-2xl">🔥</span> Check-in streak: {streak.days}{' '}
         {daysLabel}
       </div>
-      <div>+{streak.reward.toFixed(0)} CR</div>
+      <div>
+        +<CRView amount={streak.reward} />
+      </div>
       <div>
         +{streak.gameTickets} {ticketsLabel}
       </div>

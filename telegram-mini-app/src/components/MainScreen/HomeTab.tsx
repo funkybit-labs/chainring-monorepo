@@ -13,6 +13,7 @@ import {
 import { PlayTheGameWidget } from 'components/MainScreen/HomeTab/PlayTheGameWidget'
 import { CheckInStreakWidget } from 'components/MainScreen/HomeTab/CheckInStreakWidget'
 import { MilestoneReachedWidget } from 'components/MainScreen/HomeTab/MilestoneReachedWidget'
+import { CRView } from 'components/common/CRView'
 
 export default function HomeTab({ user }: { user: User }) {
   const queryClient = useQueryClient()
@@ -73,7 +74,7 @@ export default function HomeTab({ user }: { user: User }) {
           </div>
           <div className="mx-auto mt-2 flex w-4/5 items-center justify-center gap-4 rounded-lg bg-darkBluishGray9 px-5 py-4 text-2xl font-bold text-white">
             <img src={CRSvg} className="size-10" alt="CR icon" />
-            {balance.toString()} CR
+            <CRView amount={balance} format={'full'} />
           </div>
           <div className="mx-auto mt-2 flex w-4/5 items-center justify-center gap-4 rounded-lg bg-darkBluishGray9 px-5 py-4 text-2xl font-bold text-white">
             <img src={TicketSvg} className="size-10" alt="Ticket icon" />
@@ -102,7 +103,7 @@ export default function HomeTab({ user }: { user: User }) {
         {user.nextMilestoneIn && (
           <div className="my-2 flex flex-col items-center justify-center">
             <div className="text-center text-white">
-              Next milestone in {user.nextMilestoneIn.toFixed(0)} CR!
+              Next milestone in <CRView amount={user.nextMilestoneIn} />!
             </div>
           </div>
         )}

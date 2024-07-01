@@ -12,6 +12,7 @@ import { apiClient, User, UserGoal, userQueryKey } from 'apiClient'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useWebApp } from '@vkruglikov/react-telegram-web-app'
 import { useState } from 'react'
+import { CRView } from 'components/common/CRView'
 
 export default function GoalsTab({ user }: { user: User }) {
   return (
@@ -99,7 +100,7 @@ function GoalRow({ goal }: { goal: UserGoal }) {
         <div>
           <div className="font-semibold text-white">{description}</div>
           <div className="text-sm text-darkBluishGray1">
-            {goal.reward.toString()} CRs
+            <CRView amount={goal.reward} />s
           </div>
         </div>
       </div>
