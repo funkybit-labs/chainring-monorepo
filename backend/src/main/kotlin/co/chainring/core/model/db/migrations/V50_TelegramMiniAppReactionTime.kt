@@ -18,9 +18,9 @@ class V50_TelegramMiniAppReactionTime : Migration() {
 
     @Serializable
     @JvmInline
-    value class V51_TelegramMiniAppGameReactionTimeId(override val value: String) : EntityId {
+    value class V50_TelegramMiniAppGameReactionTimeId(override val value: String) : EntityId {
         companion object {
-            fun generate(): V51_TelegramMiniAppGameReactionTimeId = V51_TelegramMiniAppGameReactionTimeId(TypeId.generate("tmagrt").toString())
+            fun generate(): V50_TelegramMiniAppGameReactionTimeId = V50_TelegramMiniAppGameReactionTimeId(TypeId.generate("tmagrt").toString())
         }
 
         override fun toString(): String = value
@@ -45,7 +45,7 @@ class V50_TelegramMiniAppReactionTime : Migration() {
         ).index()
     }
 
-    object V50_TelegramMiniAppGameReactionTimeTable : GUIDTable<V51_TelegramMiniAppGameReactionTimeId>("telegram_mini_app_game_reaction_time", ::V51_TelegramMiniAppGameReactionTimeId) {
+    object V50_TelegramMiniAppGameReactionTimeTable : GUIDTable<V50_TelegramMiniAppGameReactionTimeId>("telegram_mini_app_game_reaction_time", ::V50_TelegramMiniAppGameReactionTimeId) {
         val createdAt = timestamp("created_at")
         val createdBy = varchar("created_by", 10485760)
         val userGuid = reference("user_guid", V50_TelegramMiniAppUserTable).index()
