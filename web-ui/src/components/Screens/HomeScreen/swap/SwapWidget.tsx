@@ -189,6 +189,7 @@ export function SwapWidget({
                     )}
                     disabled={sr.mutation.isPending}
                     onClick={() => {
+                      sr.handleMarketOrderFlagChange(true)
                       sr.setPriceFromMarketPrice(
                         incrementDivisor
                           ? BigInt(incrementDivisor as number)
@@ -280,6 +281,7 @@ export function SwapWidget({
                     )}
                     disabled={sr.mutation.isPending}
                     onClick={() => {
+                      sr.handleMarketOrderFlagChange(true)
                       sr.setPriceFromMarketPrice(
                         incrementDivisor
                           ? BigInt(incrementDivisor as number)

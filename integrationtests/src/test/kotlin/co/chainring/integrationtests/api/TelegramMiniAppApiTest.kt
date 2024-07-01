@@ -208,9 +208,9 @@ class TelegramMiniAppApiTest {
         apiClient
             .recordReactionTime(ReactionTimeApiRequest(200))
             .also {
-                assertEquals("53".crPoints(), it.balance)
-                assertEquals(33, it.percentile)
-                assertEquals(0, "33".crPoints().compareTo(it.reward))
+                assertEquals("70".crPoints(), it.balance)
+                assertEquals(50, it.percentile)
+                assertEquals(0, "50".crPoints().compareTo(it.reward))
             }
 
         apiClient
@@ -221,6 +221,26 @@ class TelegramMiniAppApiTest {
                 assertNotNull(error)
                 assertEquals(422, error.httpCode)
                 assertEquals("No game tickets available", error.error?.message)
+            }
+
+        apiClient
+            .tryRecordReactionTime(ReactionTimeApiRequest(0))
+            .also {
+                assertTrue { it.isLeft() }
+                val error = it.leftOrNull()
+                assertNotNull(error)
+                assertEquals(400, error.httpCode)
+                assertEquals("reactionTimeMs must be in range [1, 5000]", error.error?.message)
+            }
+
+        apiClient
+            .tryRecordReactionTime(ReactionTimeApiRequest(5001))
+            .also {
+                assertTrue { it.isLeft() }
+                val error = it.leftOrNull()
+                assertNotNull(error)
+                assertEquals(400, error.httpCode)
+                assertEquals("reactionTimeMs must be in range [1, 5000]", error.error?.message)
             }
     }
 
@@ -411,10 +431,10 @@ class TelegramMiniAppApiTest {
         apiClient
             .getUser()
             .also {
-                assertEquals("11546".crPoints(), it.balance)
+                assertEquals("12120".crPoints(), it.balance)
                 assertEquals(9, it.invites)
 
-                assertEquals("24454".crPoints(), it.nextMilestoneIn)
+                assertEquals("23880".crPoints(), it.nextMilestoneIn)
 
                 val lastMilestone = it.lastMilestone
                 assertNotNull(lastMilestone)
@@ -424,7 +444,7 @@ class TelegramMiniAppApiTest {
 
         // set user balance right before the last milestone (378000) and play game
         updateUser(telegramUserId) { user ->
-            TelegramMiniAppUserRewardEntity.reactionGame(user, BigDecimal("366445"))
+            TelegramMiniAppUserRewardEntity.reactionGame(user, BigDecimal("365870"))
         }
         apiClient.recordReactionTime(ReactionTimeApiRequest(100L))
 

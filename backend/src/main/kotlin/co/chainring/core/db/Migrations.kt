@@ -47,7 +47,9 @@ import co.chainring.core.model.db.migrations.V4_AddDecimalsToERC20Token
 import co.chainring.core.model.db.migrations.V50_TelegramMiniAppReactionTime
 import co.chainring.core.model.db.migrations.V51_FaucetDrip
 import co.chainring.core.model.db.migrations.V52_TelegramMiniAppCheckInStreak
-import co.chainring.core.model.db.migrations.V53_TelegramMiniAppMilestones
+import co.chainring.core.model.db.migrations.V53_AddPendingRollbackStatusToTrade
+import co.chainring.core.model.db.migrations.V54_TelegramMiniAppGameReactionTime
+import co.chainring.core.model.db.migrations.V55_TelegramMiniAppMilestones
 import co.chainring.core.model.db.migrations.V5_ChainTable
 import co.chainring.core.model.db.migrations.V6_MarketTable
 import co.chainring.core.model.db.migrations.V7_OrderTable
@@ -107,5 +109,7 @@ val migrations = listOf(
     V50_TelegramMiniAppReactionTime(),
     V51_FaucetDrip(),
     V52_TelegramMiniAppCheckInStreak(),
-    V53_TelegramMiniAppMilestones(),
+    V53_AddPendingRollbackStatusToTrade(),
+    V54_TelegramMiniAppGameReactionTime(),
+    V55_TelegramMiniAppMilestones(),
 )

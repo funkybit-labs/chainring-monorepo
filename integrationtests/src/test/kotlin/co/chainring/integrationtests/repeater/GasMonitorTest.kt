@@ -47,6 +47,8 @@ class GasMonitorTest {
         transaction {
             notifyDbListener("repeater_app_task_ctl", "gas_monitor")
         }
+        // give a little time for the monitor task to run
+        Thread.sleep(20L)
 
         // then it should warn again
         transaction {

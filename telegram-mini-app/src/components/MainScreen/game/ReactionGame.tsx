@@ -14,6 +14,8 @@ export type ReactionGameResult = {
 
 type GameState = 'idle' | 'waiting' | 'ready' | 'finished' | 'early' | 'late'
 
+const MAX_REACTION_TIME = 5000
+
 export function ReactionGame({
   tickets,
   onReactionTimeMeasured,
@@ -61,7 +63,7 @@ export function ReactionGame({
           }
           return prevState
         })
-      }, 5000)
+      }, MAX_REACTION_TIME)
     }, randomDelay)
   }
 
@@ -79,9 +81,11 @@ export function ReactionGame({
       if (maxTimeTimeoutRef.current) {
         clearTimeout(maxTimeTimeoutRef.current)
       }
-      const timeElapsed = Date.now() - startTimeRef.current
+      const timeElapsed = Math.min(
+        Date.now() - startTimeRef.current,
+        MAX_REACTION_TIME
+      )
       setElapsedTime(timeElapsed)
-      console.log("setGameState('finished')")
       setGameState('finished')
 
       onReactionTimeMeasured(timeElapsed)
@@ -115,7 +119,6 @@ export function ReactionGame({
   }
 
   useEffect(() => {
-    console.log('gameState', gameState)
     if (circleRef.current) {
       circleRef.current.classList.remove(
         'animate-gameOrangeBlink',

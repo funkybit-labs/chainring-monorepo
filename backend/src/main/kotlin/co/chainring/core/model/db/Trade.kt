@@ -27,6 +27,7 @@ value class TradeId(override val value: String) : EntityId {
 enum class SettlementStatus {
     Pending,
     Settling,
+    PendingRollback,
     FailedSettling,
     Completed,
     Failed,
@@ -36,6 +37,8 @@ enum class SettlementStatus {
         return this in listOf(SettlementStatus.Completed, SettlementStatus.Failed)
     }
 }
+
+val pendingTradeStatuses = listOf(SettlementStatus.Pending, SettlementStatus.PendingRollback)
 
 object TradeTable : GUIDTable<TradeId>("trade", ::TradeId) {
     val createdAt = timestamp("created_at")
@@ -60,7 +63,7 @@ object TradeTable : GUIDTable<TradeId>("trade", ::TradeId) {
             customIndexName = "trade_sequence_pending_settlement_status",
             columns = arrayOf(sequenceId, settlementStatus),
             filterCondition = {
-                settlementStatus.eq(SettlementStatus.Pending)
+                settlementStatus.inList(pendingTradeStatuses)
             },
         )
     }
@@ -101,7 +104,7 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
 
         fun findPending(limit: Int = 100): List<TradeEntity> {
             return TradeEntity.find {
-                TradeTable.settlementStatus.eq(SettlementStatus.Pending)
+                TradeTable.settlementStatus.inList(pendingTradeStatuses)
             }.orderBy(TradeTable.sequenceId to SortOrder.ASC).limit(limit).toList()
         }
 
