@@ -765,7 +765,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
             assertPricesMessageReceived(market.id) { msg ->
                 assertEquals(
                     OHLC(
-                        start = OHLCDuration.P5M.durationStart(trade.timestamp),
+                        start = OHLCDuration.P5M.durationStart(trade2.timestamp),
                         open = 17.55,
                         high = 17.55,
                         low = 17.5,
@@ -792,7 +792,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
             assertPricesMessageReceived(market.id) { msg ->
                 assertEquals(
                     OHLC(
-                        start = OHLCDuration.P5M.durationStart(trade.timestamp),
+                        start = OHLCDuration.P5M.durationStart(trade2.timestamp),
                         open = 17.55,
                         high = 17.55,
                         low = 17.5,
