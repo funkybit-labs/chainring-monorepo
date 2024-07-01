@@ -6,11 +6,13 @@ import co.chainring.integrationtests.utils.clearLogMessages
 import co.chainring.integrationtests.utils.logMessages
 import org.awaitility.Awaitility.await
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import java.lang.System.getenv
 import java.util.concurrent.TimeUnit
+import kotlin.math.log
 
 @ExtendWith(AppUnderTestRunner::class)
 class GasMonitorTest {
@@ -41,7 +43,7 @@ class GasMonitorTest {
             notifyDbListener("repeater_app_task_ctl", "gas_monitor:10000000000000")
         }
         Thread.sleep(100L)
-        assert(logMessages.isEmpty())
+        assertEquals(true, logMessages.isEmpty(), "expected no logs but got $logMessages")
 
         // but if the gas recovers
         transaction {
