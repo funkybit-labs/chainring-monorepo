@@ -165,6 +165,18 @@ class SettlementCoordinator(
             return null
         }
 
+        // in order to manually rollback a non netting trade, set its status to 'PendingRollback'
+        // this will revert balance changes from the trade in the sequencer
+        val pendingRollbacks = tradesToPrepare.filter { it.settlementStatus == SettlementStatus.PendingRollback }
+        if (pendingRollbacks.isNotEmpty()) {
+            TradeEntity.markAsFailedSettling(pendingRollbacks.map { it.tradeHash }.toSet(), "Manually Rolled Back")
+            pendingRollbacks.forEach {
+                it.refresh(true)
+                completeSettlement(it)
+            }
+            return null
+        }
+
         val now = Clock.System.now()
         val earliestTradeTimestamp = tradesToPrepare.minBy { it.createdAt }.createdAt
         if (tradesToPrepare.size < batchMinTrades && earliestTradeTimestamp + batchMaxIntervalMs.milliseconds > now) {

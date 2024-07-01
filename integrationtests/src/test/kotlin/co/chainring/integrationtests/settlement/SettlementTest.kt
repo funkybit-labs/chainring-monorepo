@@ -1112,4 +1112,166 @@ class SettlementTest : OrderBaseTest() {
         maker2WsClient.close()
         waitForSettlementBatchToFinish()
     }
+
+    @Test
+    fun `settlement failure - manually rollback trade`() {
+        val market = btcEthMarket
+        val baseSymbol = btc
+        val quoteSymbol = eth
+
+        val (takerApiClient, takerWallet, takerWsClient) = setupTrader(
+            market.id,
+            airdrops = listOf(
+                AssetAmount(baseSymbol, "0.5"),
+                AssetAmount(quoteSymbol, "2"),
+            ),
+            deposits = listOf(
+                AssetAmount(baseSymbol, "0.1"),
+                AssetAmount(quoteSymbol, "2"),
+            ),
+            subscribeToOrderBook = false,
+            subscribeToOrderPrices = false,
+        )
+
+        val (makerApiClient, makerWallet, makerWsClient) = setupTrader(
+            market.id,
+            airdrops = listOf(
+                AssetAmount(baseSymbol, "0.5"),
+                AssetAmount(quoteSymbol, "2"),
+            ),
+            deposits = listOf(
+                AssetAmount(quoteSymbol, "2"),
+            ),
+            subscribeToOrderBook = false,
+            subscribeToOrderPrices = false,
+        )
+
+        val makerStartingBaseBalance = makerWallet.getExchangeBalance(baseSymbol)
+        val makerStartingQuoteBalance = makerWallet.getExchangeBalance(quoteSymbol)
+        val takerStartingBaseBalance = takerWallet.getExchangeBalance(baseSymbol)
+        val takerStartingQuoteBalance = takerWallet.getExchangeBalance(quoteSymbol)
+
+        // place a limit order
+        val limitBuyOrderApiResponse = makerApiClient.createLimitOrder(
+            market,
+            OrderSide.Buy,
+            amount = BigDecimal("0.08"),
+            price = BigDecimal("17.55"),
+            makerWallet,
+        )
+        makerWsClient.apply {
+            assertLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
+            assertLimitsMessageReceived(market, base = BigDecimal("0"), quote = BigDecimal("0.596"))
+        }
+
+        // place a sell order
+        val marketSellOrderApiResponse = takerApiClient.createMarketOrder(
+            market,
+            OrderSide.Sell,
+            BigDecimal("0.08"),
+            takerWallet,
+        )
+        // wait for trade and mark as pending fail.
+        val manuallyRolledBack = waitForPendingTradeAndMarkFailed(marketSellOrderApiResponse.orderId)
+
+        takerWsClient.apply {
+            assertMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
+            assertTradeCreatedMessageReceived(
+                order = marketSellOrderApiResponse,
+                price = BigDecimal("17.55"),
+                amount = AssetAmount(baseSymbol, marketSellOrderApiResponse.order.amount.fixedAmount()),
+                fee = AssetAmount(quoteSymbol, "0.02808"),
+                settlementStatus = SettlementStatus.Pending,
+            )
+            assertOrderUpdatedMessageReceived { msg ->
+                assertEquals(OrderStatus.Filled, msg.order.status)
+                assertEquals(1, msg.order.executions.size)
+                assertAmount(AssetAmount(baseSymbol, "0.08"), msg.order.executions[0].amount)
+                assertAmount(AssetAmount(quoteSymbol, "17.550"), msg.order.executions[0].price)
+                assertEquals(ExecutionRole.Taker, msg.order.executions[0].role)
+            }
+            assertBalancesMessageReceived(
+                listOf(
+                    ExpectedBalance(baseSymbol, total = BigDecimal("0.1"), available = BigDecimal("0.02")),
+                    ExpectedBalance(quoteSymbol, total = BigDecimal("2.0"), available = BigDecimal("3.37592")),
+                ),
+            )
+        }
+
+        makerWsClient.apply {
+            assertTradeCreatedMessageReceived(
+                order = limitBuyOrderApiResponse,
+                price = BigDecimal("17.55"),
+                amount = AssetAmount(baseSymbol, "0.08"),
+                fee = AssetAmount(quoteSymbol, "0.01404"),
+                settlementStatus = SettlementStatus.Pending,
+            )
+            assertOrderUpdatedMessageReceived { msg ->
+                assertEquals(OrderStatus.Filled, msg.order.status)
+                assertEquals(1, msg.order.executions.size)
+                assertAmount(AssetAmount(baseSymbol, "0.08"), msg.order.executions[0].amount)
+                assertAmount(AssetAmount(quoteSymbol, "17.550"), msg.order.executions[0].price)
+                assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
+            }
+            assertBalancesMessageReceived(
+                listOf(
+                    ExpectedBalance(baseSymbol, total = BigDecimal("0"), available = BigDecimal("0.08")),
+                    ExpectedBalance(quoteSymbol, total = BigDecimal("2.0"), available = BigDecimal("0.58196")),
+                ),
+            )
+        }
+
+        val trade = getTradesForOrders(listOf(marketSellOrderApiResponse.orderId)).first()
+
+        takerWsClient.apply {
+            assertLimitsMessageReceived(market.id)
+        }
+        makerWsClient.apply {
+            assertLimitsMessageReceived(market.id)
+        }
+
+        if (manuallyRolledBack) {
+            waitForSettlementToFinish(listOf(trade.id.value), SettlementStatus.Failed)
+
+            takerWsClient.apply {
+                assertMessagesReceived(3) { messages ->
+                    assertContainsTradeUpdatedMessage(messages) { msg ->
+                        assertEquals(marketSellOrderApiResponse.orderId, msg.trade.orderId)
+                        assertEquals(SettlementStatus.Failed, msg.trade.settlementStatus)
+                        assertEquals("Manually Rolled Back", msg.trade.error)
+                    }
+                    assertContainsBalancesMessage(
+                        messages,
+                        listOf(
+                            ExpectedBalance(baseSymbol, total = takerStartingBaseBalance, available = takerStartingBaseBalance),
+                            ExpectedBalance(takerStartingQuoteBalance),
+                        ),
+                    )
+                    assertContainsLimitsMessage(messages, market, base = takerStartingBaseBalance, quote = takerStartingQuoteBalance)
+                }
+            }
+
+            makerWsClient.apply {
+                assertMessagesReceived(3) { messages ->
+                    assertContainsTradeUpdatedMessage(messages) { msg ->
+                        assertEquals(limitBuyOrderApiResponse.orderId, msg.trade.orderId)
+                        assertEquals(SettlementStatus.Failed, msg.trade.settlementStatus)
+                        assertEquals("Manually Rolled Back", msg.trade.error)
+                    }
+                    assertContainsBalancesMessage(
+                        messages,
+                        listOf(
+                            ExpectedBalance(makerStartingBaseBalance),
+                            ExpectedBalance(makerStartingQuoteBalance),
+                        ),
+                    )
+                    assertContainsLimitsMessage(messages, market, base = makerStartingBaseBalance, quote = makerStartingQuoteBalance)
+                }
+            }
+        } else {
+            waitForSettlementToFinish(listOf(trade.id.value), SettlementStatus.Completed)
+        }
+        takerWsClient.close()
+        makerWsClient.close()
+    }
 }
