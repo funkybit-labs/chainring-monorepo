@@ -170,7 +170,7 @@ object TelegramMiniAppRoutes {
             )
         } bindContract Method.POST to { request ->
             val apiRequest = requestBody(request)
-            if (apiRequest.reactionTimeMs > 0) {
+            if (apiRequest.reactionTimeMs in 1..5000) {
                 transaction {
                     val lockedUser = request.telegramMiniAppUser.lockForUpdate()
 
@@ -189,7 +189,7 @@ object TelegramMiniAppRoutes {
                     )
                 }
             } else {
-                errorResponse(Status.BAD_REQUEST, ApiError(ReasonCode.ProcessingError, "reactionTimeMs must be greater than 0"))
+                errorResponse(Status.BAD_REQUEST, ApiError(ReasonCode.ProcessingError, "reactionTimeMs must be in range [1, 5000]"))
             }
         }
     }

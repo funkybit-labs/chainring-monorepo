@@ -201,9 +201,9 @@ class TelegramMiniAppApiTest {
         apiClient
             .recordReactionTime(ReactionTimeApiRequest(200))
             .also {
-                assertEquals("53".crPoints(), it.balance)
-                assertEquals(33, it.percentile)
-                assertEquals(0, "33".crPoints().compareTo(it.reward))
+                assertEquals("70".crPoints(), it.balance)
+                assertEquals(50, it.percentile)
+                assertEquals(0, "50".crPoints().compareTo(it.reward))
             }
 
         apiClient
@@ -214,6 +214,26 @@ class TelegramMiniAppApiTest {
                 assertNotNull(error)
                 assertEquals(422, error.httpCode)
                 assertEquals("No game tickets available", error.error?.message)
+            }
+
+        apiClient
+            .tryRecordReactionTime(ReactionTimeApiRequest(0))
+            .also {
+                assertTrue { it.isLeft() }
+                val error = it.leftOrNull()
+                assertNotNull(error)
+                assertEquals(400, error.httpCode)
+                assertEquals("reactionTimeMs must be in range [1, 5000]", error.error?.message)
+            }
+
+        apiClient
+            .tryRecordReactionTime(ReactionTimeApiRequest(5001))
+            .also {
+                assertTrue { it.isLeft() }
+                val error = it.leftOrNull()
+                assertNotNull(error)
+                assertEquals(400, error.httpCode)
+                assertEquals("reactionTimeMs must be in range [1, 5000]", error.error?.message)
             }
     }
 

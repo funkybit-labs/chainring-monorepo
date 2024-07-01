@@ -13,7 +13,6 @@ import org.jetbrains.exposed.sql.alias
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
-import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.sum
 import java.math.BigDecimal
 
@@ -102,11 +101,7 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
         this.gameTickets -= 1
         this.updatedAt = Clock.System.now()
 
-        TelegramMiniAppGameReactionTimeEntity.create(this, reactionTimeMs)
-
-        val totalReactions = TelegramMiniAppGameReactionTimeTable.selectAll().count()
-        val fasterReactions = TelegramMiniAppGameReactionTimeEntity.find { TelegramMiniAppGameReactionTimeTable.reactionTimeMs lessEq reactionTimeMs }.count()
-        val percentile = (((totalReactions - fasterReactions).toDouble() / totalReactions) * 100).toInt()
+        val percentile = TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(reactionTimeMs)
 
         TelegramMiniAppUserRewardEntity.reactionGame(this, percentile.toBigDecimal())
 

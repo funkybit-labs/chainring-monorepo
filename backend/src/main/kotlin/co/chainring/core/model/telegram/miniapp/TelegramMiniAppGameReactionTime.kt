@@ -1,49 +1,55 @@
 package co.chainring.core.model.telegram.miniapp
 
-import co.chainring.core.model.db.EntityId
-import co.chainring.core.model.db.GUIDEntity
-import co.chainring.core.model.db.GUIDTable
-import de.fxlae.typeid.TypeId
-import kotlinx.datetime.Clock
-import kotlinx.serialization.Serializable
-import org.jetbrains.exposed.dao.EntityClass
-import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
+import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.sql.statements.UpsertStatement
+import org.jetbrains.exposed.sql.sum
+import org.jetbrains.exposed.sql.upsert
+import kotlin.math.round
 
-@Serializable
-@JvmInline
-value class TelegramMiniAppGameReactionTimeId(override val value: String) : EntityId {
-    companion object {
-        fun generate(): TelegramMiniAppGameReactionTimeId = TelegramMiniAppGameReactionTimeId(TypeId.generate("tmagrt").toString())
-    }
+object TelegramMiniAppGameReactionTimeTable : Table("telegram_mini_app_game_reaction_time") {
+    val reactionTimeMs = long("reaction_time_ms")
+    val count = long("count")
 
-    override fun toString(): String = value
+    override val primaryKey = PrimaryKey(reactionTimeMs)
 }
 
-object TelegramMiniAppGameReactionTimeTable : GUIDTable<TelegramMiniAppGameReactionTimeId>("telegram_mini_app_game_reaction_time", ::TelegramMiniAppGameReactionTimeId) {
-    val createdAt = timestamp("created_at")
-    val createdBy = varchar("created_by", 10485760)
-    val userGuid = reference("user_guid", TelegramMiniAppUserTable).index()
-    val reactionTimeMs = long("reaction_time_ms").index()
-}
+object TelegramMiniAppGameReactionTime {
+    private const val STEP_SIZE_MS = 10L
 
-class TelegramMiniAppGameReactionTimeEntity(guid: EntityID<TelegramMiniAppGameReactionTimeId>) : GUIDEntity<TelegramMiniAppGameReactionTimeId>(guid) {
-    companion object : EntityClass<TelegramMiniAppGameReactionTimeId, TelegramMiniAppGameReactionTimeEntity>(TelegramMiniAppGameReactionTimeTable) {
-        fun create(user: TelegramMiniAppUserEntity, reactionTimeMs: Long) {
-            TelegramMiniAppGameReactionTimeTable.insert {
-                val now = Clock.System.now()
-                it[guid] = EntityID(TelegramMiniAppGameReactionTimeId.generate(), TelegramMiniAppGameReactionTimeTable)
-                it[userGuid] = user.guid
-                it[createdAt] = now
-                it[createdBy] = user.guid.value.value
-                it[TelegramMiniAppGameReactionTimeTable.reactionTimeMs] = reactionTimeMs
-            }
+    fun recordAndCalculatePercentile(timeMs: Long): Int {
+        // round timeMs to 10 ms to decrease number of records in the lookup table. 500 is enough to keep good precision.
+        val roundedTimeMs = round(timeMs.toDouble() / STEP_SIZE_MS).toLong() * STEP_SIZE_MS
+
+        // calculate percentile
+        val totalReactions = TelegramMiniAppGameReactionTimeTable.select(
+            TelegramMiniAppGameReactionTimeTable.count.sum(),
+        ).firstOrNull()?.get(TelegramMiniAppGameReactionTimeTable.count.sum()) ?: 0L
+
+        val fasterReactions = TelegramMiniAppGameReactionTimeTable.select(
+            TelegramMiniAppGameReactionTimeTable.count.sum(),
+        ).where {
+            TelegramMiniAppGameReactionTimeTable.reactionTimeMs lessEq roundedTimeMs
+        }.firstOrNull()?.get(TelegramMiniAppGameReactionTimeTable.count.sum()) ?: 0L
+
+        val percentile = when {
+            totalReactions > 0 -> (((totalReactions - fasterReactions).toDouble() / totalReactions) * 100).toInt()
+            // single reaction is user's own, count it as if user was the fastest
+            else -> 100
         }
-    }
 
-    var createdAt by TelegramMiniAppGameReactionTimeTable.createdAt
-    var createdBy by TelegramMiniAppGameReactionTimeTable.createdBy
-    var userGuid by TelegramMiniAppGameReactionTimeTable.userGuid
-    var reactionTimeMs by TelegramMiniAppGameReactionTimeTable.reactionTimeMs
+        // record reaction time
+        TelegramMiniAppGameReactionTimeTable.upsert(
+            keys = arrayOf(TelegramMiniAppGameReactionTimeTable.reactionTimeMs),
+            onUpdate = mutableListOf(
+                TelegramMiniAppGameReactionTimeTable.count to TelegramMiniAppGameReactionTimeTable.count.plus(1L),
+            ),
+            body = fun TelegramMiniAppGameReactionTimeTable.(it: UpsertStatement<Long>) {
+                it[reactionTimeMs] = roundedTimeMs
+                it[count] = 1L
+            },
+        )
+
+        return percentile
+    }
 }
