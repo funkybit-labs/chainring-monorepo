@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import java.lang.System.getenv
 import java.util.concurrent.TimeUnit
-import kotlin.math.log
 
 @ExtendWith(AppUnderTestRunner::class)
 class GasMonitorTest {
