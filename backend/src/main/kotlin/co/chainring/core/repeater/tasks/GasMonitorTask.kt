@@ -8,15 +8,20 @@ import kotlin.time.Duration.Companion.seconds
 
 val warned = mutableSetOf<ChainId>()
 
-class GasMonitorTask(private val minimumGasUnits: BigInteger? = null) : RepeaterBaseTask(
+class GasMonitorTask() : RepeaterBaseTask(
     invokePeriod = 30.seconds,
 ) {
     val logger = KotlinLogging.logger {}
+
+    private var minimumGasUnitsOverride: BigInteger? = null
+    override fun setNextInvocationArgs(args: List<String>) {
+        minimumGasUnitsOverride = args.first().toBigInteger()
+    }
     override fun runWithLock() {
         ChainManager.getBlockchainClients().forEach {
             // set minimum amount to be equivalent to minimum gas units (or 100,000,000 if not specified) at the max
             // priority fee, as this scales well with the actual gas needed
-            val minimumGas = (minimumGasUnits ?: BigInteger.valueOf(100_000_000L)) * it.gasProvider.getMaxPriorityFeePerGas(null)
+            val minimumGas = (minimumGasUnitsOverride ?: BigInteger.valueOf(100_000_000L)) * it.gasProvider.getMaxPriorityFeePerGas(null)
             val availableGas = it.getNativeBalance(it.submitterAddress)
             if (availableGas < minimumGas) {
                 if (!warned.contains(it.chainId)) {
@@ -29,5 +34,6 @@ class GasMonitorTask(private val minimumGasUnits: BigInteger? = null) : Repeater
                 warned.remove(it.chainId)
             }
         }
+        minimumGasUnitsOverride = null
     }
 }
