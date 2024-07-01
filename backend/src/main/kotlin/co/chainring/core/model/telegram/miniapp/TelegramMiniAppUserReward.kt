@@ -70,8 +70,12 @@ class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId
         }
 
         private fun create(user: TelegramMiniAppUserEntity, type: TelegramMiniAppUserRewardType, amount: BigDecimal, goalId: TelegramMiniAppGoal.Id? = null) {
+            val now = Clock.System.now()
+
+            val previousBalance = user.pointsBalance()
+            val newBalance = previousBalance + amount
+
             TelegramMiniAppUserRewardTable.insertIgnore {
-                val now = Clock.System.now()
                 it[guid] = EntityID(TelegramMiniAppUserRewardId.generate(), TelegramMiniAppUserRewardTable)
                 it[userGuid] = user.guid
                 it[createdAt] = now
@@ -80,6 +84,24 @@ class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId
                 it[TelegramMiniAppUserRewardTable.type] = type
                 goalId?.let { goal -> it[TelegramMiniAppUserRewardTable.goalId] = goal.name }
                 it[TelegramMiniAppUserRewardTable.amount] = amount
+            }
+
+            // check if a milestone was reached
+            val previousBalanceNextMilestone = TelegramMiniAppMilestone.nextMilestone(previousBalance)
+            val newBalanceNextMilestone = TelegramMiniAppMilestone.nextMilestone(newBalance)
+            if (previousBalanceNextMilestone != newBalanceNextMilestone) {
+                previousBalanceNextMilestone?.let { reachedMilestone ->
+
+                    if (reachedMilestone.invites == -1L) {
+                        // special case for unlimited invites
+                        user.invites = -1L
+                    } else {
+                        // otherwise sum invites
+                        user.invites += reachedMilestone.invites
+                    }
+
+                    user.lastMilestoneGrantedAt = Clock.System.now()
+                }
             }
         }
     }

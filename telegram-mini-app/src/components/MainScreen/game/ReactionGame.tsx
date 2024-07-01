@@ -6,6 +6,7 @@ import GameLogoSvg from 'assets/game-logo.svg'
 import ArrowDownSvg from 'assets/arrow-down.svg'
 import { Button } from 'components/common/Button'
 import { classNames } from 'utils'
+import { CRView } from 'components/common/CRView'
 
 export type ReactionGameResult = {
   percentile: number
@@ -166,7 +167,7 @@ export function ReactionGame({
           <div className="absolute left-0 top-4 flex w-full flex-col px-10 text-center text-xl">
             <span>{percentilesMessage(gameResult.percentile)}</span>
             <span className="mt-4">
-              +{gameResult.reward.toFixed(0)} CR Points
+              +<CRView amount={gameResult.reward} format={'full'} />
             </span>
           </div>
         )}

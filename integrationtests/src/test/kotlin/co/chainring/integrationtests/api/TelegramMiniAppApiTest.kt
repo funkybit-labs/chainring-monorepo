@@ -10,6 +10,7 @@ import co.chainring.apps.api.model.tma.ReactionTimeApiRequest
 import co.chainring.core.model.telegram.TelegramUserId
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGoal
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserRewardEntity
 import co.chainring.core.utils.crPoints
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.utils.ApiCallFailure
@@ -25,9 +26,11 @@ import org.http4k.format.KotlinxSerialization.json
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.extension.ExtendWith
+import java.math.BigDecimal
 import java.net.HttpURLConnection.HTTP_UNAUTHORIZED
 import kotlin.test.Test
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -92,6 +95,10 @@ class TelegramMiniAppApiTest {
             assertEquals(1, it.checkInStreak.days)
             assertEquals("20".crPoints(), it.checkInStreak.reward)
             assertEquals(1, it.checkInStreak.gameTickets)
+
+            assertEquals(5, it.invites)
+            assertEquals("980".crPoints(), it.nextMilestoneIn)
+            assertNull(it.lastMilestone)
 
             assertEquals(
                 listOf(
@@ -347,6 +354,114 @@ class TelegramMiniAppApiTest {
             assertEquals("20".crPoints(), it.checkInStreak.reward)
             assertEquals(1, it.checkInStreak.gameTickets)
         }
+    }
+
+    @Test
+    fun milestones() {
+        val now = Clock.System.now()
+        val telegramUserId = TelegramUserId(234L)
+        val apiClient = TelegramMiniAppApiClient(telegramUserId)
+
+        apiClient.signUp().also {
+            assertEquals("20".crPoints(), it.balance)
+
+            assertEquals(1, it.gameTickets)
+
+            assertEquals(1, it.checkInStreak.days)
+            assertEquals("20".crPoints(), it.checkInStreak.reward)
+            assertEquals(1, it.checkInStreak.gameTickets)
+
+            assertEquals(5, it.invites)
+            assertEquals("980".crPoints(), it.nextMilestoneIn)
+            assertNull(it.lastMilestone)
+        }
+
+        apiClient
+            .claimReward(ClaimRewardApiRequest(TelegramMiniAppGoal.Id.GithubSubscription))
+            .also {
+                assertEquals("1020".crPoints(), it.balance)
+                assertEquals(8, it.invites)
+
+                assertEquals("980".crPoints(), it.nextMilestoneIn)
+
+                val lastMilestone = it.lastMilestone
+                assertNotNull(lastMilestone)
+                assertEquals(3, lastMilestone.invites)
+                assertTrue { lastMilestone.grantedAt > now }
+            }
+
+        apiClient
+            .claimReward(ClaimRewardApiRequest(TelegramMiniAppGoal.Id.MediumSubscription))
+            .also {
+                assertEquals("2020".crPoints(), it.balance)
+                assertEquals(11, it.invites)
+
+                assertEquals("6980".crPoints(), it.nextMilestoneIn)
+
+                val lastMilestone = it.lastMilestone
+                assertNotNull(lastMilestone)
+                assertEquals(3, lastMilestone.invites)
+                assertTrue { lastMilestone.grantedAt > now }
+            }
+
+        // same reply when resolving user
+        apiClient
+            .getUser()
+            .also {
+                assertEquals("2020".crPoints(), it.balance)
+                assertEquals(11, it.invites)
+
+                assertEquals("6980".crPoints(), it.nextMilestoneIn)
+
+                val lastMilestone = it.lastMilestone
+                assertNotNull(lastMilestone)
+                assertEquals(3, lastMilestone.invites)
+                assertTrue { lastMilestone.grantedAt > now }
+            }
+
+        // grant some games
+        updateUser(telegramUserId) {
+            it.gameTickets = 5000
+        }
+
+        // bump balance by playing game
+        (5000 downTo 4000 step 10).forEach {
+            apiClient.recordReactionTime(ReactionTimeApiRequest(it.toLong()))
+        }
+        apiClient
+            .getUser()
+            .also {
+                assertEquals("12120".crPoints(), it.balance)
+                assertEquals(14, it.invites)
+
+                assertEquals("23880".crPoints(), it.nextMilestoneIn)
+
+                val lastMilestone = it.lastMilestone
+                assertNotNull(lastMilestone)
+                assertEquals(3, lastMilestone.invites)
+                assertTrue { lastMilestone.grantedAt > now }
+            }
+
+        // set user balance right before the last milestone (378000) and play game
+        updateUser(telegramUserId) { user ->
+            TelegramMiniAppUserRewardEntity.reactionGame(user, BigDecimal("365870"))
+        }
+        apiClient.recordReactionTime(ReactionTimeApiRequest(100L))
+
+        apiClient
+            .getUser()
+            .also {
+                assertEquals("378090".crPoints(), it.balance)
+                assertEquals(-1, it.invites)
+
+                // null because the last milestone was reached already
+                assertNull(it.nextMilestoneIn)
+
+                val lastMilestone = it.lastMilestone
+                assertNotNull(lastMilestone)
+                assertEquals(-1, lastMilestone.invites)
+                assertTrue { lastMilestone.grantedAt > now }
+            }
     }
 
     private fun updateUser(telegramUserId: TelegramUserId, fn: (TelegramMiniAppUserEntity) -> Unit) {

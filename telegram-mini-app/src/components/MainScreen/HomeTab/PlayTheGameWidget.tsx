@@ -9,7 +9,7 @@ export function PlayTheGameWidget({
   return (
     <div
       onClick={onEnterGame}
-      className="relative mx-6 mt-6 flex cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-primary4 bg-darkBluishGray8 px-5 py-4 text-center text-xl font-semibold text-primary4"
+      className="relative mx-6 flex cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-primary4 bg-darkBluishGray8 px-5 py-4 text-center text-xl font-semibold text-primary4"
     >
       <img
         src={CRSvg}

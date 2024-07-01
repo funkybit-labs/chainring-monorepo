@@ -57,11 +57,20 @@ const CheckInStreakSchema = z.object({
 })
 export type CheckInStreak = z.infer<typeof CheckInStreakSchema>
 
+const LastMilestoneSchema = z.object({
+  invites: z.number(),
+  grantedAt: z.coerce.date()
+})
+export type LstMilestone = z.infer<typeof LastMilestoneSchema>
+
 const UserSchema = z.object({
   balance: decimal(),
   goals: z.array(UserGoalSchema),
   gameTickets: z.number(),
-  checkInStreak: CheckInStreakSchema
+  checkInStreak: CheckInStreakSchema,
+  invites: z.number(),
+  nextMilestoneIn: decimal().optional(),
+  lastMilestone: LastMilestoneSchema.nullable()
 })
 export type User = z.infer<typeof UserSchema>
 
