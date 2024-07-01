@@ -790,7 +790,7 @@ function Title({
   onSideChanged: (s: OrderSide) => void
 }) {
   return (
-    <div className="flex w-full justify-between text-xl font-semibold">
+    <div className="flex w-full justify-between font-semibold narrow:text-xl">
       <div className="flex items-center gap-1">
         <MarketTitle
           market={market}
@@ -865,7 +865,7 @@ function IntervalsDisplay({
         <button
           key={index}
           className={classNames(
-            'w-11 bg-darkBluishGray8 rounded transition-colors duration-300 ease-in-out',
+            'w-9 narrow:w-11 bg-darkBluishGray8 rounded transition-colors duration-300 ease-in-out',
             intervalValues[index] == selectedInterval
               ? 'border text-primary4'
               : 'text-darkBluishGray3 hover:text-white'
