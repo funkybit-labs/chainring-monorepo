@@ -9,9 +9,10 @@ export function CRView({
 }) {
   const userLocale = navigator.language || 'en-US'
 
-  const formattedValue = new Intl.NumberFormat(userLocale).format(
-    amount.toNumber()
-  )
+  const formattedValue = new Intl.NumberFormat(userLocale, {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0
+  }).format(amount.toNumber())
 
   let suffix = ''
   if (format === 'short') {
