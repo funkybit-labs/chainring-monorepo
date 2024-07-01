@@ -49,6 +49,9 @@ object TelegramMiniAppRoutes {
                         gameTickets = 1,
                         grantedAt = Clock.System.now(),
                     ),
+                    invites = 0L,
+                    nextMilestoneIn = BigDecimal.ZERO,
+                    lastMilestone = null,
                 ),
             )
             returning(
@@ -92,6 +95,9 @@ object TelegramMiniAppRoutes {
                         gameTickets = 1,
                         grantedAt = Clock.System.now(),
                     ),
+                    invites = 0L,
+                    nextMilestoneIn = BigDecimal.ZERO,
+                    lastMilestone = null,
                 ),
             )
         } bindContract Method.POST to { request ->
@@ -132,6 +138,9 @@ object TelegramMiniAppRoutes {
                         gameTickets = 1,
                         grantedAt = Clock.System.now(),
                     ),
+                    invites = 0L,
+                    nextMilestoneIn = BigDecimal.ZERO,
+                    lastMilestone = null,
                 ),
             )
         } bindContract Method.POST to { request ->

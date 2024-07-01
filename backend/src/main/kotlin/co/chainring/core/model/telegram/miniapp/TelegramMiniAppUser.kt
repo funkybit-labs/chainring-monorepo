@@ -35,6 +35,8 @@ object TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_min
     val gameTickets = long("game_tickets").default(0)
     val checkInStreakDays = integer("check_in_streak_days").default(0)
     val lastStreakDayGrantedAt = timestamp("last_streak_day_granted_at").nullable()
+    val invites = long("invites").default(0)
+    val lastMilestoneGrantedAt = timestamp("last_milestone_granted_at").nullable()
 }
 
 class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEntity<TelegramMiniAppUserId>(guid) {
@@ -67,6 +69,8 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
     val rewards by TelegramMiniAppUserRewardEntity referrersOn TelegramMiniAppUserRewardTable.userGuid
     var checkInStreakDays by TelegramMiniAppUserTable.checkInStreakDays
     var lastStreakDayGrantedAt by TelegramMiniAppUserTable.lastStreakDayGrantedAt
+    var invites by TelegramMiniAppUserTable.invites
+    var lastMilestoneGrantedAt by TelegramMiniAppUserTable.lastMilestoneGrantedAt
 
     fun pointsBalance(): BigDecimal {
         val sumColumn = TelegramMiniAppUserRewardTable.amount.sum().alias("amount_sum")

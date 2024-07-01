@@ -6,7 +6,7 @@ export function CheckInStreakWidget({ streak }: { streak: CheckInStreak }) {
   const ticketsLabel = streak.gameTickets === 1 ? 'Game Ticket' : 'Game Tickets'
 
   return (
-    <div className="flex flex-col items-center justify-center px-5 py-4 text-center text-lg font-semibold text-white">
+    <div className="flex flex-col items-center justify-center px-5 text-center text-lg font-semibold text-white">
       <div>
         <span className="text-2xl">🔥</span> Check-in streak: {streak.days}{' '}
         {daysLabel}
