@@ -65,7 +65,7 @@ and then truncate db tables using favourite SQL editor. In this way OHLC records
 Start ring and sequencer
 ```
 python3 ecs-deploy.py start --env demo --services ring
-python3 ecs-deploy.py start --env demo --services sequencer
+python3 ecs-deploy.py start --env demo --services sequencer,garp
 ```
 
 Bind sequencer and database to localhost via `bastion`

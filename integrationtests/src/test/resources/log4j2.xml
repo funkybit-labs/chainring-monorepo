@@ -17,7 +17,7 @@
         <Logger name="co.chainring" level="debug" additivity="false">
             <AppenderRef ref="AsyncAppender"/>
         </Logger>
-        <Logger name="co.chainring" level="error" additivity="false">
+        <Logger name="co.chainring.core.repeater.tasks" level="error" additivity="false">
             <AppenderRef ref="AsyncAppender"/>
             <AppenderRef ref="TestLoggingAppender"/>
         </Logger>

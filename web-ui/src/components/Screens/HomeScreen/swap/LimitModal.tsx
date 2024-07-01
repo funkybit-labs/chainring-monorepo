@@ -21,6 +21,7 @@ import Decimal from 'decimal.js'
 import { ExpandableValue } from 'components/common/ExpandableValue'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
+import Deposit from 'assets/Deposit.svg'
 
 export function LimitModal({
   markets,
@@ -122,7 +123,7 @@ export function LimitModal({
 
       return (
         <>
-          <div className="w-[680px] space-y-4 rounded-[20px] bg-darkBluishGray9 p-8">
+          <div className="max-w-[680px] space-y-4 rounded-[20px] bg-darkBluishGray9 p-8 narrow:w-[680px]">
             <div
               className={classNames(
                 'rounded-[20px] bg-darkBluishGray8 p-4 transition-all',
@@ -143,7 +144,12 @@ export function LimitModal({
                       className="rounded bg-darkBluishGray6 px-2 py-1 text-darkBluishGray2 hover:bg-blue5"
                       onClick={() => openDepositModal(sr.topSymbol)}
                     >
-                      Deposit
+                      <span className="hidden narrow:inline">Deposit</span>
+                      <img
+                        className="hidden max-narrow:inline"
+                        src={Deposit}
+                        alt={'Deposit'}
+                      />
                     </button>
                   )}
                 </div>
@@ -172,6 +178,11 @@ export function LimitModal({
                   onChange={sr.handleTopSymbolChange}
                 />
               </div>
+              {sr.sellAssetsNeeded > 0n && (
+                <div className="text-sm text-brightRed narrow:hidden">
+                  Insufficient Balance
+                </div>
+              )}
               <div className="text-center">
                 <span className="whitespace-nowrap px-4 text-darkBluishGray1">
                   Sell {sr.topSymbol.displayName()} at
@@ -456,7 +467,7 @@ function SellAmountInput({
               '[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
               'text-left !ring-0 !focus:ring-0',
               sellAssetsNeeded > 0n &&
-                '!text-brightRed max-w-44 overflow-auto overflow-ellipsis'
+                '!text-brightRed max-w-20 narrow:max-w-44 overflow-auto overflow-ellipsis'
             )}
             disabled={disabled}
             placeholder="0"
@@ -467,12 +478,19 @@ function SellAmountInput({
         </span>
         {sellAssetsNeeded > 0n && (
           <>
-            <span className="text-sm text-brightRed">Insufficient Balance</span>
+            <span className="hidden text-sm text-brightRed narrow:inline">
+              Insufficient Balance
+            </span>
             <button
               className="ml-2 rounded bg-darkBluishGray6 px-2 py-1 text-sm text-darkBluishGray2 hover:bg-blue5"
               onClick={onDeposit}
             >
-              Deposit
+              <span className="hidden narrow:inline">Deposit</span>
+              <img
+                className="hidden max-narrow:inline"
+                src={Deposit}
+                alt={'Deposit'}
+              />
             </button>
           </>
         )}

@@ -35,6 +35,7 @@ import co.chainring.integrationtests.utils.subscribeToOrderBook
 import co.chainring.integrationtests.utils.subscribeToOrders
 import co.chainring.integrationtests.utils.subscribeToPrices
 import co.chainring.integrationtests.utils.subscribeToTrades
+import org.awaitility.kotlin.await
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.WsClient
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -45,6 +46,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.params.provider.Arguments
 import org.web3j.crypto.Credentials
+import java.time.Duration
 
 open class OrderBaseTest {
 
@@ -208,6 +210,30 @@ open class OrderBaseTest {
         }
 
         waitForSettlementToFinish(tradeIds)
+    }
+
+    fun waitForPendingTradeAndMarkFailed(orderId: OrderId): Boolean {
+        return try {
+            await
+                .pollInSameThread()
+                .pollDelay(Duration.ofMillis(10))
+                .pollInterval(Duration.ofMillis(10))
+                .atMost(Duration.ofMillis(10000L))
+                .until {
+                    val trades = getTradesForOrders(listOf(orderId))
+                    transaction {
+                        if (trades.isNotEmpty() && trades[0].settlementStatus == SettlementStatus.Pending) {
+                            trades[0].settlementStatus = SettlementStatus.PendingRollback
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                }
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 
     fun waitForSettlementToFinish(tradeIds: List<TradeId>, expectedStatus: SettlementStatus = SettlementStatus.Completed) {

@@ -6,9 +6,9 @@ import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.transactions.transaction
 
 @Suppress("ClassName")
-class V53_TelegramMiniAppGameReactionTime : Migration() {
+class V54_TelegramMiniAppGameReactionTime : Migration() {
 
-    object V53_TelegramMiniAppGameReactionTimeTable : Table("telegram_mini_app_game_reaction_time") {
+    object V54_TelegramMiniAppGameReactionTimeTable : Table("telegram_mini_app_game_reaction_time") {
         val reactionTimeMs = long("reaction_time_ms")
         val count = long("count")
 
@@ -18,7 +18,7 @@ class V53_TelegramMiniAppGameReactionTime : Migration() {
     override fun run() {
         transaction {
             exec("DROP TABLE telegram_mini_app_game_reaction_time")
-            SchemaUtils.createMissingTablesAndColumns(V53_TelegramMiniAppGameReactionTimeTable)
+            SchemaUtils.createMissingTablesAndColumns(V54_TelegramMiniAppGameReactionTimeTable)
         }
     }
 }
