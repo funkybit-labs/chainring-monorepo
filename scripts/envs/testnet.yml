@@ -27,6 +27,15 @@ environment:
     QUEUE_HOME: "/data/queues/testnet"
     DB_HOST: testnet-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     SLACK_ERROR_REPORTING_CHANNEL_ID: C0723AASGTH
+  mocker:
+    API_URL: http://testnet-api.chainring.finance:9000
+    EVM_CHAINS: Bitlayer,Base
+    EVM_NETWORK_URL_Bitlayer: https://testnet-rpc.bitlayer.org
+    EVM_NETWORK_URL_Base: https://sepolia.base.org
+    MARKETS: "RING:200810/RING:84532"
+    RING_200810_RING_84532_PRICE_BASELINE: "1.0005"
+    RING_200810_RING_84532_MAKER_PRIVATE_KEY_HEX: "0xde92c413268a6dba35bec3cd76639c7a3568de2ff3ff8c9d0b78efc9aa3e67c5"
+    FAUCET_POSSIBLE: "0"
 services:
   api:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
@@ -64,11 +73,6 @@ services:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-c66acd9d-f00f-43b2-b65d-f260a5b0a8f9-xyU8ZN
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   mocker:
-    API_URL: http://testnet-api.chainring.finance:9000
-    EVM_CHAINS: Bitlayer,Base
-    EVM_NETWORK_URL_Bitlayer: https://testnet-rpc.bitlayer.org
-    EVM_NETWORK_URL_Base: https://sepolia.base.org
-    MARKETS: "RING:200810/RING:84532"
-    RING_200810_RING_84532_PRICE_BASELINE: "1.0005"
-    RING_200810_RING_84532_MAKER_PRIVATE_KEY_HEX: "0xde92c413268a6dba35bec3cd76639c7a3568de2ff3ff8c9d0b78efc9aa3e67c5"
-    FAUCET_POSSIBLE: "0"
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/mocker
+    count: 1
+    environment: mocker
