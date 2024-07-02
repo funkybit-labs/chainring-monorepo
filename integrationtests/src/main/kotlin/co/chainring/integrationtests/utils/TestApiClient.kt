@@ -27,6 +27,7 @@ import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.core.model.EvmSignature
+import co.chainring.core.model.MarketMinFee
 import co.chainring.core.model.Percentage
 import co.chainring.core.model.WithdrawalFee
 import co.chainring.core.model.db.ChainId
@@ -135,6 +136,22 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             execute(
                 Request.Builder()
                     .url("$apiServerRootUrl/v1/sequencer-withdrawal-fees")
+                    .put(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
+                    .build(),
+            ).also { httpResponse ->
+                if (httpResponse.code != HttpURLConnection.HTTP_OK) {
+                    throw AbnormalApiResponseException(httpResponse)
+                }
+            }
+        }
+
+        fun setMarketMinFeesInSequencer(marketMinFees: List<MarketMinFee>) =
+            setMarketMinFeesInSequencer(TestRoutes.Companion.SetMarketMinFeesInSequencer(marketMinFees = marketMinFees))
+
+        fun setMarketMinFeesInSequencer(apiRequest: TestRoutes.Companion.SetMarketMinFeesInSequencer) {
+            execute(
+                Request.Builder()
+                    .url("$apiServerRootUrl/v1/sequencer-market-min-fees")
                     .put(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                     .build(),
             ).also { httpResponse ->

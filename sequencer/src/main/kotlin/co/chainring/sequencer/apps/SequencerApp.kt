@@ -66,7 +66,13 @@ class SequencerApp(
                 val marketId = MarketId(market.marketId)
                 var error: SequencerError? = null
                 if (state.markets.containsKey(marketId)) {
-                    error = SequencerError.MarketExists
+                    val currentMarket = state.markets.getValue(marketId)
+                    if (market.tickSize.toBigDecimal() != currentMarket.tickSize ||
+                        market.baseDecimals != currentMarket.baseDecimals ||
+                        market.quoteDecimals != currentMarket.quoteDecimals
+                    ) {
+                        error = SequencerError.MarketExists
+                    }
                 } else {
                     val tickSize = market.tickSize.toBigDecimal()
                     val halfTick = tickSize.setScale(tickSize.scale() + 1) / BigDecimal.valueOf(2)
@@ -83,6 +89,7 @@ class SequencerApp(
                             maxOrdersPerLevel = market.maxOrdersPerLevel,
                             baseDecimals = market.baseDecimals,
                             quoteDecimals = market.quoteDecimals,
+                            minFee = if (market.hasMinFee()) market.minFee.toBigInteger() else BigInteger.ZERO,
                         )
                     }
                 }
@@ -101,6 +108,7 @@ class SequencerApp(
                                     this.minAllowedBid = levels[0].price.toDecimalValue()
                                     this.maxAllowedOffer = levels[levels.lastIndex - 1].price.toDecimalValue()
                                 }
+                                this.minFee = if (market.hasMinFee()) market.minFee else BigInteger.ZERO.toIntegerValue()
                             },
                         )
                     }
@@ -147,6 +155,28 @@ class SequencerApp(
                     this.processingTime = System.nanoTime() - startTime
                     error?.let { this.error = it } ?: run {
                         this.withdrawalFeesSet.addAll(withdrawalFees)
+                    }
+                }
+            }
+
+            SequencerRequest.Type.SetMarketMinFees -> {
+                var error: SequencerError? = null
+
+                val marketMinFees = request.marketMinFeesList
+                if (marketMinFees.isEmpty()) {
+                    error = SequencerError.InvalidMarketMinFee
+                } else {
+                    marketMinFees.forEach {
+                        state.markets[MarketId(it.marketId)]?.minFee = it.minFee.toBigInteger()
+                    }
+                }
+
+                sequencerResponse {
+                    this.guid = request.guid
+                    this.sequence = sequence
+                    this.processingTime = System.nanoTime() - startTime
+                    error?.let { this.error = it } ?: run {
+                        this.marketMinFeesSet.addAll(marketMinFees)
                     }
                 }
             }

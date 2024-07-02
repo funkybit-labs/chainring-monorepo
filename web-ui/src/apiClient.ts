@@ -66,7 +66,8 @@ const MarketSchema = z.object({
   tickSize: decimal(),
   lastPrice: decimal(),
   minAllowedBidPrice: decimal(),
-  maxAllowedOfferPrice: decimal()
+  maxAllowedOfferPrice: decimal(),
+  minFee: z.coerce.bigint()
 })
 export type Market = z.infer<typeof MarketSchema>
 

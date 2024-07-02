@@ -14,6 +14,7 @@ import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.WithdrawalId
+import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.core.toDecimalValue
@@ -31,6 +32,7 @@ import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderBatch
 import co.chainring.sequencer.proto.resetRequest
 import co.chainring.sequencer.proto.setFeeRatesRequest
+import co.chainring.sequencer.proto.setMarketMinFeesRequest
 import co.chainring.sequencer.proto.setWithdrawalFeesRequest
 import co.chainring.sequencer.proto.withdrawal
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -126,7 +128,7 @@ open class SequencerClient {
         }.sequencerResponse
     }
 
-    suspend fun createMarket(marketId: String, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal, baseDecimals: Int, quoteDecimals: Int): SequencerResponse {
+    suspend fun createMarket(marketId: String, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal, baseDecimals: Int, quoteDecimals: Int, minFee: BigDecimal): SequencerResponse {
         return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
             stub.addMarket(
                 market {
@@ -138,6 +140,7 @@ open class SequencerClient {
                     this.marketPrice = marketPrice.toDecimalValue()
                     this.baseDecimals = baseDecimals
                     this.quoteDecimals = quoteDecimals
+                    this.minFee = minFee.toFundamentalUnits(quoteDecimals).toIntegerValue()
                 },
             )
         }.also {
@@ -173,6 +176,26 @@ open class SequencerClient {
                             co.chainring.sequencer.proto.withdrawalFee {
                                 this.asset = it.asset.value
                                 this.value = it.fee.toIntegerValue()
+                            }
+                        },
+                    )
+                },
+            )
+        }.also {
+            Tracer.newSpan(ServerSpans.gtw, it.processingTime)
+            Tracer.newSpan(ServerSpans.sqr, it.sequencerResponse.processingTime)
+        }.sequencerResponse
+    }
+    suspend fun setMarketMinFees(marketMinFees: Map<MarketId, BigInteger>): SequencerResponse {
+        return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
+            stub.setMarketMinFees(
+                setMarketMinFeesRequest {
+                    this.guid = UUID.randomUUID().toString()
+                    this.marketMinFees.addAll(
+                        marketMinFees.map {
+                            co.chainring.sequencer.proto.marketMinFee {
+                                this.marketId = it.key.value
+                                this.minFee = it.value.toIntegerValue()
                             }
                         },
                     )

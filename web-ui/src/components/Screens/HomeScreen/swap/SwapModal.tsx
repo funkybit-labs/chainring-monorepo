@@ -294,11 +294,13 @@ export function SwapModal({
                         }
                       } else if (sr.mutation.isSuccess) {
                         return '✓ Submitted'
+                      } else if (sr.amountTooLow) {
+                        return 'Amount Too Low'
                       } else {
                         return 'Swap'
                       }
                     }}
-                    status={sr.mutation.status}
+                    status={sr.amountTooLow ? 'error' : sr.mutation.status}
                   />
                 </>
               ) : (

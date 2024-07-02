@@ -160,10 +160,24 @@ class OrderRoutesApiTest : OrderBaseTest() {
         wsClient.assertBalancesMessageReceived()
 
         Faucet.fund(wallet.address)
-        val daiAmountToDeposit = AssetAmount(dai, "20")
+        val daiAmountToDeposit = AssetAmount(dai, "200")
         wallet.mintERC20(daiAmountToDeposit)
         wallet.deposit(daiAmountToDeposit)
         waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(daiAmountToDeposit)))
+
+        // create an order with that does not meet the min fee requirement
+        val createTooSmallOrderResponse = apiClient.createLimitOrder(
+            usdcDaiMarket,
+            OrderSide.Buy,
+            amount = BigDecimal("0.01"),
+            price = BigDecimal("2"),
+            wallet,
+        )
+        wsClient.assertLimitOrderCreatedMessageReceived(createTooSmallOrderResponse)
+        wsClient.assertOrderUpdatedMessageReceived { msg ->
+            assertEquals(createTooSmallOrderResponse.orderId, msg.order.id)
+            assertEquals(OrderStatus.Rejected, msg.order.status)
+        }
 
         // operation on non-existent order
         apiClient.tryGetOrder(OrderId.generate())
@@ -941,10 +955,10 @@ class OrderRoutesApiTest : OrderBaseTest() {
             market.id,
             airdrops = listOf(
                 AssetAmount(baseSymbol, "0.5"),
-                AssetAmount(quoteSymbol, "500"),
+                AssetAmount(quoteSymbol, "5000"),
             ),
             deposits = listOf(
-                AssetAmount(quoteSymbol, "500"),
+                AssetAmount(quoteSymbol, "5000"),
             ),
             subscribeToOrderBook = false,
         )
@@ -959,7 +973,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
         val createBatchLimitOrders = makerApiClient.batchOrders(
             BatchOrdersApiRequest(
                 marketId = market.id,
-                createOrders = listOf("0.00001", "0.00002", "0.0003").map {
+                createOrders = listOf("0.001", "0.002", "0.003").map {
                     makerWallet.signOrder(
                         CreateOrderApiRequest.Limit(
                             nonce = generateOrderNonce(),
@@ -979,12 +993,12 @@ class OrderRoutesApiTest : OrderBaseTest() {
 
         assertEquals(3, createBatchLimitOrders.createdOrders.count())
         repeat(3) { makerWsClient.assertOrderCreatedMessageReceived() }
-        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.19967"), quote = BigDecimal("500"))
+        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.194"), quote = BigDecimal("500"))
 
         val batchOrderResponse = makerApiClient.batchOrders(
             BatchOrdersApiRequest(
                 marketId = market.id,
-                createOrders = listOf("0.0004", "0.0005", "0.0006").map {
+                createOrders = listOf("0.004", "0.005", "0.006").map {
                     makerWallet.signOrder(
                         CreateOrderApiRequest.Limit(
                             nonce = generateOrderNonce(),
@@ -1001,7 +1015,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     makerWallet.signOrder(
                         UpdateOrderApiRequest(
                             orderId = createBatchLimitOrders.createdOrders[0].orderId,
-                            amount = AssetAmount(baseSymbol, "0.0001").inFundamentalUnits,
+                            amount = AssetAmount(baseSymbol, "0.001").inFundamentalUnits,
                             marketId = createBatchLimitOrders.createdOrders[0].order.marketId,
                             side = createBatchLimitOrders.createdOrders[0].order.side,
                             price = BigDecimal("68525.000"),
@@ -1013,7 +1027,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     makerWallet.signOrder(
                         UpdateOrderApiRequest(
                             orderId = createBatchLimitOrders.createdOrders[1].orderId,
-                            amount = AssetAmount(baseSymbol, "0.0002").inFundamentalUnits,
+                            amount = AssetAmount(baseSymbol, "0.002").inFundamentalUnits,
                             marketId = createBatchLimitOrders.createdOrders[1].order.marketId,
                             side = createBatchLimitOrders.createdOrders[2].order.side,
                             price = BigDecimal("68525.000"),
@@ -1025,7 +1039,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     makerWallet.signOrder(
                         UpdateOrderApiRequest(
                             orderId = OrderId.generate(),
-                            amount = AssetAmount(baseSymbol, "0.0002").inFundamentalUnits,
+                            amount = AssetAmount(baseSymbol, "0.002").inFundamentalUnits,
                             marketId = createBatchLimitOrders.createdOrders[1].order.marketId,
                             side = createBatchLimitOrders.createdOrders[2].order.side,
                             price = BigDecimal("68525.000"),
@@ -1059,14 +1073,14 @@ class OrderRoutesApiTest : OrderBaseTest() {
         assertEquals(1, batchOrderResponse.canceledOrders.count { it.requestStatus == RequestStatus.Rejected })
 
         repeat(3) { makerWsClient.assertOrderCreatedMessageReceived() }
-        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.1979"), quote = BigDecimal("500"))
+        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.179"), quote = BigDecimal("500"))
         repeat(3) { makerWsClient.assertOrderUpdatedMessageReceived() }
-        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.1982"), quote = BigDecimal("500"))
+        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.182"), quote = BigDecimal("500"))
 
         assertEquals(5, makerApiClient.listOrders(listOf(OrderStatus.Open), null).orders.size)
 
-        // total BTC available is 0.0001 + 0.0002 + 0.0004 + 0.0005 + 0.0006 = 0.0018
-        val takerOrderAmount = AssetAmount(baseSymbol, "0.0018")
+        // total BTC available is 0.001 + 0.002 + 0.004 + 0.005 + 0.006 = 0.018
+        val takerOrderAmount = AssetAmount(baseSymbol, "0.018")
         // create a market orders that should match against the 5 limit orders
         takerApiClient.createMarketOrder(
             market,
@@ -1095,7 +1109,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     msg.ohlc.last(),
                 )
             }
-            assertLimitsMessageReceived(market, base = BigDecimal("0.0018"), quote = BigDecimal("374.379350"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0.018"), quote = BigDecimal("3743.7935"))
         }
 
         makerWsClient.apply {
@@ -1115,7 +1129,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     msg.ohlc.last(),
                 )
             }
-            assertLimitsMessageReceived(market, base = BigDecimal("0.1982"), quote = BigDecimal("621.925925"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0.182"), quote = BigDecimal("1719.25925"))
         }
 
         val takerOrders = takerApiClient.listOrders(emptyList(), market.id).orders
@@ -1125,7 +1139,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
 
         // now verify the trades
 
-        val expectedAmounts = listOf("0.0001", "0.0002", "0.0004", "0.0005", "0.0006").map { AssetAmount(baseSymbol, it) }.toSet()
+        val expectedAmounts = listOf("0.001", "0.002", "0.004", "0.005", "0.006").map { AssetAmount(baseSymbol, it) }.toSet()
         val trades = getTradesForOrders(takerOrders.map { it.id })
         val prices = trades.map { it.price }.toSet()
 
@@ -1512,7 +1526,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
         val createBatchLimitOrders = makerApiClient.batchOrders(
             BatchOrdersApiRequest(
                 marketId = market.id,
-                createOrders = listOf("0.00001", "0.00002", "0.0003").map {
+                createOrders = listOf("0.001", "0.002", "0.003").map {
                     makerWallet.signOrder(
                         CreateOrderApiRequest.Limit(
                             nonce = generateOrderNonce(),
@@ -1532,12 +1546,12 @@ class OrderRoutesApiTest : OrderBaseTest() {
 
         assertEquals(3, createBatchLimitOrders.createdOrders.count())
         repeat(3) { makerWsClient.assertOrderCreatedMessageReceived() }
-        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.19967"), quote = BigDecimal("1.8"))
+        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.1940"), quote = BigDecimal("1.8"))
 
         val batchOrderResponse = makerApiClient.batchOrders(
             BatchOrdersApiRequest(
                 marketId = market.id,
-                createOrders = listOf("0.0004", "0.0005", "0.0006").map {
+                createOrders = listOf("0.004", "0.005", "0.006").map {
                     makerWallet.signOrder(
                         CreateOrderApiRequest.Limit(
                             nonce = generateOrderNonce(),
@@ -1554,7 +1568,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     makerWallet.signOrder(
                         UpdateOrderApiRequest(
                             orderId = createBatchLimitOrders.createdOrders[0].orderId,
-                            amount = AssetAmount(baseSymbol, "0.0001").inFundamentalUnits,
+                            amount = AssetAmount(baseSymbol, "0.001").inFundamentalUnits,
                             marketId = createBatchLimitOrders.createdOrders[0].order.marketId,
                             side = createBatchLimitOrders.createdOrders[0].order.side,
                             price = BigDecimal("1.002"),
@@ -1566,7 +1580,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     makerWallet.signOrder(
                         UpdateOrderApiRequest(
                             orderId = createBatchLimitOrders.createdOrders[1].orderId,
-                            amount = AssetAmount(baseSymbol, "0.0002").inFundamentalUnits,
+                            amount = AssetAmount(baseSymbol, "0.002").inFundamentalUnits,
                             marketId = createBatchLimitOrders.createdOrders[1].order.marketId,
                             side = createBatchLimitOrders.createdOrders[2].order.side,
                             price = BigDecimal("1.002"),
@@ -1578,7 +1592,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     makerWallet.signOrder(
                         UpdateOrderApiRequest(
                             orderId = OrderId.generate(),
-                            amount = AssetAmount(baseSymbol, "0.0002").inFundamentalUnits,
+                            amount = AssetAmount(baseSymbol, "0.002").inFundamentalUnits,
                             marketId = createBatchLimitOrders.createdOrders[1].order.marketId,
                             side = createBatchLimitOrders.createdOrders[2].order.side,
                             price = BigDecimal("1.002"),
@@ -1612,14 +1626,14 @@ class OrderRoutesApiTest : OrderBaseTest() {
         assertEquals(1, batchOrderResponse.canceledOrders.count { it.requestStatus == RequestStatus.Rejected })
 
         repeat(3) { makerWsClient.assertOrderCreatedMessageReceived() }
-        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.1979"), quote = BigDecimal("1.80"))
+        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.179"), quote = BigDecimal("1.80"))
         repeat(3) { makerWsClient.assertOrderUpdatedMessageReceived() }
-        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.1982"), quote = BigDecimal("1.8"))
+        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.182"), quote = BigDecimal("1.8"))
 
         assertEquals(5, makerApiClient.listOrders().orders.count { it.status == OrderStatus.Open })
 
-        // total BTC available is 0.0001 + 0.0002 + 0.0004 + 0.0005 + 0.0006 = 0.0018
-        val takerOrderAmount = AssetAmount(baseSymbol, "0.0018")
+        // total BTC available is 0.001 + 0.002 + 0.004 + 0.005 + 0.006 = 0.018
+        val takerOrderAmount = AssetAmount(baseSymbol, "0.018")
         // create a market orders that should match against the 5 limit orders
         takerApiClient.createMarketOrder(
             market,
@@ -1633,14 +1647,14 @@ class OrderRoutesApiTest : OrderBaseTest() {
             repeat(5) { assertTradeCreatedMessageReceived() }
             assertOrderUpdatedMessageReceived()
             assertBalancesMessageReceived()
-            assertLimitsMessageReceived(market, base = BigDecimal("0.0018"), quote = BigDecimal("1.798161858"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0.018"), quote = BigDecimal("1.78161858"))
         }
 
         makerWsClient.apply {
             repeat(5) { assertTradeCreatedMessageReceived() }
             repeat(5) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
-            assertLimitsMessageReceived(market, base = BigDecimal("0.1982"), quote = BigDecimal("1.801784079"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0.182"), quote = BigDecimal("1.81784079"))
         }
 
         // should be 8 filled orders
@@ -1650,7 +1664,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
 
         // now verify the trades
 
-        val expectedAmounts = listOf("0.0001", "0.0002", "0.0004", "0.0005", "0.0006").map { AssetAmount(baseSymbol, it) }.toSet()
+        val expectedAmounts = listOf("0.001", "0.002", "0.004", "0.005", "0.006").map { AssetAmount(baseSymbol, it) }.toSet()
         val trades = getTradesForOrders(takerOrders.map { it.id })
         val prices = trades.map { it.price }.toSet()
 

@@ -36,6 +36,7 @@ class TestMarket {
             maxOrdersPerLevel = 100,
             baseDecimals = 18,
             quoteDecimals = 18,
+            minFee = BigInteger.ZERO,
         )
     }
 
@@ -603,6 +604,30 @@ class TestMarket {
         assertTrue(quoteLimit > expectedNotional)
         // just some tiny dust left.
         assertEquals(BigInteger("2"), quoteLimit - expectedNotional)
+    }
+
+    @Test
+    fun `test min fee`() {
+        market = Market(
+            id = MarketId("BTC/USDC"),
+            tickSize = BigDecimal("10"),
+            initialMarketPrice = BigDecimal("69005"),
+            maxLevels = 1000,
+            maxOrdersPerLevel = 100,
+            baseDecimals = 8,
+            quoteDecimals = 6,
+            minFee = BigDecimal("0.02").toFundamentalUnits(6),
+        )
+
+        addOrder(1L, Order.Type.LimitBuy, "50", "69000", expectedDisposition = OrderDisposition.Rejected)
+        addOrder(2L, Order.Type.LimitBuy, BigDecimal("2").toFundamentalUnits(market.baseDecimals).toString(), "69000", expectedDisposition = OrderDisposition.Accepted)
+        addOrder(3L, Order.Type.LimitSell, "50", "70000.000", expectedDisposition = OrderDisposition.Rejected)
+        addOrder(4L, Order.Type.LimitSell, BigDecimal("2").toFundamentalUnits(market.baseDecimals).toString(), "71000.000", expectedDisposition = OrderDisposition.Accepted)
+
+        addOrder(5L, Order.Type.MarketBuy, "50", "0", expectedDisposition = OrderDisposition.Rejected)
+        addOrder(6L, Order.Type.MarketBuy, BigDecimal("1").toFundamentalUnits(market.baseDecimals).toString(), "0", expectedDisposition = OrderDisposition.Filled, counterOrderGuid = 4)
+        addOrder(7L, Order.Type.MarketSell, "50", "0", expectedDisposition = OrderDisposition.Rejected)
+        addOrder(8L, Order.Type.MarketSell, BigDecimal("1").toFundamentalUnits(market.baseDecimals).toString(), "0", expectedDisposition = OrderDisposition.Filled, counterOrderGuid = 2)
     }
 
     private fun updateOrder(guid: Long, orderType: Order.Type, amount: String, price: String, expectedDisposition: OrderDisposition = OrderDisposition.Accepted, counterOrderGuid: Long? = null) {

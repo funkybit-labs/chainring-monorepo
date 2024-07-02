@@ -70,6 +70,7 @@ export type SwapRender = {
   handleMaxBaseAmount: () => void
   handleMaxQuoteAmount: () => void
   topLimit: bigint | undefined
+  amountTooLow: boolean
 }
 
 export function SwapInternals({
@@ -714,6 +715,10 @@ export function SwapInternals({
     }
   })
 
+  const amountTooLow = useMemo(() => {
+    return notional > BigInt(0) && fee < market.minFee
+  }, [notional, fee, market.minFee])
+
   const canSubmit = useMemo(() => {
     if (mutation.isPending) return false
     if (baseAmount <= 0n) return false
@@ -729,7 +734,7 @@ export function SwapInternals({
 
     if (noPriceFound && !isLimitOrder) return false
 
-    return true
+    return !amountTooLow
   }, [
     mutation.isPending,
     side,
@@ -742,7 +747,8 @@ export function SwapInternals({
     noPriceFound,
     fee,
     market.minAllowedBidPrice,
-    market.maxAllowedOfferPrice
+    market.maxAllowedOfferPrice,
+    amountTooLow
   ])
 
   const [buyAmountInputValue, sellAmountInputValue] = useMemo(() => {
@@ -897,6 +903,7 @@ export function SwapInternals({
     percentOffMarket,
     handleMaxBaseAmount,
     handleMaxQuoteAmount,
-    topLimit
+    topLimit,
+    amountTooLow
   })
 }

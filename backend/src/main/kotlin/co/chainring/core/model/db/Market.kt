@@ -1,5 +1,6 @@
 package co.chainring.core.model.db
 
+import co.chainring.core.model.db.WithdrawalEntity.Companion.transform
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
@@ -10,6 +11,7 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import java.math.BigDecimal
+import java.math.BigInteger
 
 @Serializable
 @JvmInline
@@ -31,6 +33,7 @@ object MarketTable : GUIDTable<MarketId>("market", ::MarketId) {
     val lastPrice = decimal("last_price", 30, 18)
     val minAllowedBidPrice = decimal("min_allowed_bid_price", 30, 18)
     val maxAllowedOfferPrice = decimal("max_allowed_offer_price", 30, 18)
+    val minFee = decimal("min_fee", 30, 0).default(BigDecimal.ZERO)
 }
 
 class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
@@ -40,6 +43,7 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
             quoteSymbol: SymbolEntity,
             tickSize: BigDecimal,
             lastPrice: BigDecimal,
+            minFee: BigInteger = BigInteger.ZERO,
         ) = MarketEntity.new(MarketId(baseSymbol, quoteSymbol)) {
             this.baseSymbolGuid = baseSymbol.guid
             this.quoteSymbolGuid = quoteSymbol.guid
@@ -47,6 +51,7 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
             this.lastPrice = lastPrice
             this.minAllowedBidPrice = lastPrice
             this.maxAllowedOfferPrice = lastPrice
+            this.minFee = minFee
         }
 
         override fun all(): SizedIterable<MarketEntity> =
@@ -73,4 +78,9 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
 
     var baseSymbol by SymbolEntity referencedOn MarketTable.baseSymbolGuid
     var quoteSymbol by SymbolEntity referencedOn MarketTable.quoteSymbolGuid
+
+    var minFee by MarketTable.minFee.transform(
+        toReal = { it.toBigInteger() },
+        toColumn = { it.toBigDecimal() },
+    )
 }
