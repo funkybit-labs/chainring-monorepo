@@ -63,7 +63,7 @@ resource "aws_rds_cluster_instance" "db_instance" {
 
 resource "aws_iam_role" "rds_monitoring_role" {
   count = var.enable_advanced_monitoring ? 1 : 0
-  name  = "rds-monitoring-role"
+  name  = "${var.name_prefix}-rds-monitoring-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
