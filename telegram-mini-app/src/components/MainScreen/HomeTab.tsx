@@ -87,26 +87,30 @@ export default function HomeTab({ user }: { user: User }) {
               : `${user.invites} Invite${user.invites === 1 ? '' : 's'} Left`}
           </div>
         </div>
-        {user.checkInStreak.grantedAt.getTime() + fiveMinutesInMs >
-          new Date().getTime() && (
-          <div className="my-2 flex flex-col items-center justify-center">
-            <CheckInStreakWidget streak={user.checkInStreak} />
-          </div>
-        )}
-        {user.lastMilestone &&
-          user.lastMilestone.grantedAt.getTime() + fiveMinutesInMs >
+        <div className="flex flex-row items-center justify-center">
+          {user.checkInStreak.grantedAt.getTime() + fiveMinutesInMs >
             new Date().getTime() && (
             <div className="my-2 flex flex-col items-center justify-center">
-              <MilestoneReachedWidget milestone={user.lastMilestone} />
+              <CheckInStreakWidget streak={user.checkInStreak} />
             </div>
           )}
-        {user.nextMilestoneIn && (
-          <div className="my-2 flex flex-col items-center justify-center">
-            <div className="text-center text-white">
-              Next milestone in <CRView amount={user.nextMilestoneIn} />!
-            </div>
+          <div className="flex size-full flex-col items-center">
+            {user.lastMilestone &&
+              user.lastMilestone.grantedAt.getTime() + fiveMinutesInMs >
+                new Date().getTime() && (
+                <div className="my-2 flex flex-col items-center justify-center">
+                  <MilestoneReachedWidget milestone={user.lastMilestone} />
+                </div>
+              )}
+            {user.nextMilestoneIn && (
+              <div className="my-2 flex flex-col items-center justify-center">
+                <div className="text-center text-white">
+                  Next milestone in <CRView amount={user.nextMilestoneIn} />!
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
         <div className="mb-4 mt-2 flex flex-col items-center justify-center">
           {gameTickets > 0 && <PlayTheGameWidget onEnterGame={enterGame} />}
         </div>

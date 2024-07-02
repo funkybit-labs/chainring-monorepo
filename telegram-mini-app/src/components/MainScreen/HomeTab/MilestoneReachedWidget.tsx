@@ -9,7 +9,7 @@ export function MilestoneReachedWidget({
   return (
     <div className="flex flex-col items-center justify-center px-5 text-center text-lg font-semibold text-white">
       <div>
-        <span className="text-2xl">🎉</span> Milestone reached!
+        <span className="text-2xl">🎉</span> New Milestone!
       </div>
       <div>
         {milestone.invites === -1

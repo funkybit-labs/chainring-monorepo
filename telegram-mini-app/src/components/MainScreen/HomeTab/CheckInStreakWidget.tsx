@@ -8,9 +8,11 @@ export function CheckInStreakWidget({ streak }: { streak: CheckInStreak }) {
 
   return (
     <div className="flex flex-col items-center justify-center px-5 text-center text-lg font-semibold text-white">
+      <div className="whitespace-nowrap">
+        <span className="text-2xl">🔥</span>Check-in streak:
+      </div>
       <div>
-        <span className="text-2xl">🔥</span> Check-in streak: {streak.days}{' '}
-        {daysLabel}
+        {streak.days} {daysLabel}
       </div>
       <div>
         +<CRView amount={streak.reward} />
