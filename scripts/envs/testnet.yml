@@ -28,13 +28,14 @@ environment:
     DB_HOST: testnet-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     SLACK_ERROR_REPORTING_CHANNEL_ID: C0723AASGTH
   mocker:
-    API_URL: http://testnet-api.chainring.finance:9000
+    API_URL: http://testnet-api.chainring.co:9000
     EVM_CHAINS: Bitlayer,Base
     EVM_NETWORK_URL_Bitlayer: https://testnet-rpc.bitlayer.org
     EVM_NETWORK_URL_Base: https://sepolia.base.org
     MARKETS: "RING:200810/RING:84532"
     RING_200810_RING_84532_PRICE_BASELINE: "1.0005"
     RING_200810_RING_84532_MAKER_PRIVATE_KEY_HEX: "0xde92c413268a6dba35bec3cd76639c7a3568de2ff3ff8c9d0b78efc9aa3e67c5"
+    RING_200810_RING_84532_TAKERS: "0"
     FAUCET_POSSIBLE: "0"
 services:
   api:

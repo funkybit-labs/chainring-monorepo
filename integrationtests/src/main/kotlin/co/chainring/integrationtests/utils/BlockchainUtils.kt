@@ -5,6 +5,8 @@ import org.awaitility.kotlin.withAlias
 import org.web3j.protocol.core.RemoteCall
 import java.time.Duration
 
+private val faucetPossible = (System.getenv("FAUCET_POSSIBLE") ?: "0") == "1"
+
 fun <T> RemoteCall<T>.sendAndWaitForConfirmation(): T {
     val async = this.sendAsync()
 
@@ -16,7 +18,7 @@ fun <T> RemoteCall<T>.sendAndWaitForConfirmation(): T {
         .atMost(Duration.ofMillis(10000L))
         .until {
             async.isDone.also { done ->
-                if (!done) Faucet.mine()
+                if (!done && faucetPossible) Faucet.mine()
             }
         }
 
