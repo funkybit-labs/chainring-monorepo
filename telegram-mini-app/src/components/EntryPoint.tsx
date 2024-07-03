@@ -67,7 +67,7 @@ export default function EntryPoint() {
   } else if (userQuery.isSuccess) {
     if (userQuery.data === null) {
       return (
-        <div className="flex h-screen flex-col justify-center gap-12">
+        <div className="flex h-screen flex-col justify-center gap-12 bg-darkBluishGray10">
           {showInviteError && (
             <div className="fixed inset-0 flex flex-col items-center justify-center bg-black/75 p-6">
               <div className="w-full max-w-lg rounded-lg bg-darkBluishGray10 p-6 shadow-lg">
