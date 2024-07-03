@@ -61,7 +61,7 @@ const LastMilestoneSchema = z.object({
   invites: z.number(),
   grantedAt: z.coerce.date()
 })
-export type LstMilestone = z.infer<typeof LastMilestoneSchema>
+export type LastMilestone = z.infer<typeof LastMilestoneSchema>
 
 const UserSchema = z.object({
   balance: decimal(),
