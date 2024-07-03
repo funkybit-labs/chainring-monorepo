@@ -40,6 +40,7 @@ message MarketCreated {
   uint32 quoteDecimals = 4;
   DecimalValue maxAllowedOffer = 5;
   DecimalValue minAllowedBid = 6;
+  optional IntegerValue minFee = 7;
 }
 
 message FeeRates {
@@ -63,6 +64,7 @@ message SequencerRequest {
     GetState = 4;
     SetFeeRates = 5;
     SetWithdrawalFees = 6;
+    SetMarketMinFees = 7;
   }
   string guid = 1;
   Type type = 2;
@@ -71,6 +73,7 @@ message SequencerRequest {
   optional BalanceBatch balanceBatch = 5;
   optional FeeRates feeRates = 6;
   repeated WithdrawalFee withdrawalFees = 7;
+  repeated MarketMinFee marketMinFees = 8;
 }
 
 enum SequencerError {
@@ -82,6 +85,7 @@ enum SequencerError {
   InvalidFeeRate = 5;
   InvalidPrice = 6;
   InvalidWithdrawalFee = 7;
+  InvalidMarketMinFee = 8;
 }
 
 message StateDump {
@@ -106,6 +110,7 @@ message SequencerResponse {
   optional BidOfferState bidOfferState = 12;
   repeated WithdrawalCreated withdrawalsCreated = 13;
   repeated WithdrawalFee withdrawalFeesSet = 14;
+  repeated MarketMinFee marketMinFeesSet = 15;
 }
 
 message Sequenced {

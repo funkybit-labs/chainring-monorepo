@@ -356,6 +356,7 @@ class ExchangeApiService(
                         lastPrice = it.lastPrice,
                         minAllowedBidPrice = it.minAllowedBidPrice,
                         maxAllowedOfferPrice = it.maxAllowedOfferPrice,
+                        minFee = it.minFee,
                     )
                 }
             }

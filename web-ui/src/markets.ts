@@ -12,6 +12,7 @@ export class Market {
   readonly lastPrice: Decimal
   readonly minAllowedBidPrice: Decimal
   readonly maxAllowedOfferPrice: Decimal
+  readonly minFee: bigint
 
   constructor(
     id: string,
@@ -20,7 +21,8 @@ export class Market {
     tickSize: Decimal,
     lastPrice: Decimal,
     minAllowedBidPrice: Decimal,
-    maxAllowedOfferPrice: Decimal
+    maxAllowedOfferPrice: Decimal,
+    minFee: bigint
   ) {
     this.id = id
     this.baseSymbol = baseSymbol
@@ -30,6 +32,7 @@ export class Market {
     this.quoteDecimalPlaces = this.tickSize.decimalPlaces() + 1
     this.minAllowedBidPrice = minAllowedBidPrice
     this.maxAllowedOfferPrice = maxAllowedOfferPrice
+    this.minFee = minFee
   }
 }
 
@@ -46,7 +49,8 @@ export default class Markets {
         m.tickSize,
         m.lastPrice,
         m.minAllowedBidPrice,
-        m.maxAllowedOfferPrice
+        m.maxAllowedOfferPrice,
+        m.minFee
       )
     })
     this.marketById = new Map(this.markets.map((m) => [m.id, m]))

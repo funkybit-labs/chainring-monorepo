@@ -35,6 +35,7 @@ data class Market(
     val quoteDecimals: Int,
     private var maxOfferIx: Int = -1,
     private var minBidIx: Int = -1,
+    var minFee: BigInteger = BigInteger.ZERO,
 ) {
     private val halfTick = tickSize.setScale(tickSize.scale() + 1) / BigDecimal.valueOf(2)
 
@@ -604,7 +605,10 @@ data class Market(
     }
 
     fun addOrder(wallet: Long, order: Order, feeRates: FeeRates): AddOrderResult {
-        return if (order.type == Order.Type.LimitSell) {
+        return if (isBelowMinFee(order, feeRates)) {
+            logger.debug { "Order ${order.guid} rejected since fee below min fee" }
+            AddOrderResult(OrderDisposition.Rejected, noExecutions)
+        } else if (order.type == Order.Type.LimitSell) {
             val levelIx = levelIx(order.price.toBigDecimal())
             if (levelIx > levels.lastIndex || levelIx < 0) {
                 logger.debug { "Order ${order.guid}: LimitSell level (ix $levelIx) overflow/underflow" }
@@ -700,6 +704,15 @@ data class Market(
             logger.error { "Order ${order.guid}: Unknown order type ${order.type} rejected" }
             AddOrderResult(OrderDisposition.Rejected, noExecutions)
         }
+    }
+
+    private fun isBelowMinFee(order: Order, feeRates: FeeRates): Boolean {
+        val (price, feeRate) = when (order.type) {
+            Order.Type.MarketBuy -> Pair(bestOffer, feeRates.taker)
+            Order.Type.MarketSell -> Pair(bestBid, feeRates.taker)
+            else -> Pair(order.price.toBigDecimal(), feeRates.maker)
+        }
+        return notionalFee(notional(order.amount.toBigInteger(), price, baseDecimals, quoteDecimals), feeRate) < minFee
     }
 
     private fun createLimitBuyOrder(levelIx: Int, wallet: Long, order: Order, feeRate: FeeRate): OrderDisposition {
@@ -967,6 +980,7 @@ data class Market(
             this.maxOfferIx = this@Market.maxOfferIx
             this.bestBid = this@Market.bestBid.toDecimalValue()
             this.bestOffer = this@Market.bestOffer.toDecimalValue()
+            this.minFee = this@Market.minFee.toIntegerValue()
             val maxBidIx = levelIx(this@Market.bestBid)
             val minOfferIx = levelIx(this@Market.bestOffer)
             val firstLevelWithData = this.minBidIx.let { if (it == -1) minOfferIx else it }
@@ -990,6 +1004,7 @@ data class Market(
         logger.debug { "maxOfferIx = ${this.maxOfferIx}" }
         logger.debug { "bestBid = ${this.bestBid}" }
         logger.debug { "bestOffer = ${this.bestOffer}" }
+        logger.debug { "minFee = ${this.minFee}" }
         (0 until 1000).forEach { i ->
             if (levels[i].totalQuantity > BigInteger.ZERO) {
                 logger.debug { "   levelIx = ${this.levels[i].levelIx} price = ${this.levels[i].price} side = ${this.levels[i].side}  maxOrderCount = ${this.levels[i].maxOrderCount} totalQuantity = ${this.levels[i].totalQuantity} " }
@@ -1010,6 +1025,7 @@ data class Market(
                 quoteDecimals = checkpoint.quoteDecimals,
                 minBidIx = checkpoint.minBidIx,
                 maxOfferIx = checkpoint.maxOfferIx,
+                minFee = if (checkpoint.hasMinFee()) checkpoint.minFee.toBigInteger() else BigInteger.ZERO,
             ).apply {
                 bestBid = checkpoint.bestBid.toBigDecimal()
 

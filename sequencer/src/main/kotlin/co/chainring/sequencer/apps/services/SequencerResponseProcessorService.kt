@@ -146,6 +146,7 @@ object SequencerResponseProcessorService {
                         MarketEntity[MarketId(marketCreated.marketId)].let {
                             it.minAllowedBidPrice = marketCreated.minAllowedBid.toBigDecimal()
                             it.maxAllowedOfferPrice = marketCreated.maxAllowedOffer.toBigDecimal()
+                            it.minFee = if (marketCreated.hasMinFee()) marketCreated.minFee.toBigInteger() else BigInteger.ZERO
                         }
                     }
                 }
@@ -155,6 +156,14 @@ object SequencerResponseProcessorService {
                 if (response.error == SequencerError.None) {
                     response.withdrawalFeesSetList.forEach {
                         SymbolEntity.forName(it.asset).withdrawalFee = it.value.toBigInteger()
+                    }
+                }
+            }
+
+            SequencerRequest.Type.SetMarketMinFees -> {
+                if (response.error == SequencerError.None) {
+                    response.marketMinFeesSetList.forEach { entry ->
+                        MarketEntity.findById(MarketId(entry.marketId))?.minFee = entry.minFee.toBigInteger()
                     }
                 }
             }

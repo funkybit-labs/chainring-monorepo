@@ -39,7 +39,8 @@ data class Fixtures(
         val baseSymbol: SymbolId,
         val quoteSymbol: SymbolId,
         val tickSize: BigDecimal,
-        val marketPrice: BigDecimal
+        val marketPrice: BigDecimal,
+        val minFee: BigDecimal
     )
 
     data class Wallet(
@@ -72,19 +73,22 @@ fun getFixtures(chainringChainClients: List<BlockchainClient>) = Fixtures(
                 baseSymbol = SymbolId(client.chainId, "BTC"),
                 quoteSymbol = SymbolId(client.chainId, "ETH"),
                 tickSize = "0.05".toBigDecimal(),
-                marketPrice = "17.525".toBigDecimal()
+                marketPrice = "17.525".toBigDecimal(),
+                minFee = BigDecimal("0.00001")
             ),
             Fixtures.Market(
                 baseSymbol = SymbolId(client.chainId, "USDC"),
                 quoteSymbol = SymbolId(client.chainId, "DAI"),
                 tickSize = "0.01".toBigDecimal(),
-                marketPrice = "2.005".toBigDecimal()
+                marketPrice = "2.005".toBigDecimal(),
+                minFee = BigDecimal("0.02")
             ),
             Fixtures.Market(
                 baseSymbol = SymbolId(client.chainId, "BTC"),
                 quoteSymbol = SymbolId(client.chainId, "USDC"),
                 tickSize = "25.00".toBigDecimal(),
-                marketPrice = "60812.500".toBigDecimal()
+                marketPrice = "60812.500".toBigDecimal(),
+                minFee = BigDecimal("0.02")
             ),
         )
     }.flatten() + if (chainringChainClients.size > 1) listOf(
@@ -92,13 +96,15 @@ fun getFixtures(chainringChainClients: List<BlockchainClient>) = Fixtures(
             baseSymbol = SymbolId(chainringChainClients[0].chainId, "BTC"),
             quoteSymbol = SymbolId(chainringChainClients[1].chainId, "BTC"),
             tickSize = "0.001".toBigDecimal(),
-            marketPrice = "1.0005".toBigDecimal()
+            marketPrice = "1.0005".toBigDecimal(),
+            minFee = BigDecimal("0.000005")
         ),
         Fixtures.Market(
             baseSymbol = SymbolId(chainringChainClients[0].chainId, "BTC"),
             quoteSymbol = SymbolId(chainringChainClients[1].chainId, "ETH"),
             tickSize = "0.05".toBigDecimal(),
-            marketPrice = "17.525".toBigDecimal()
+            marketPrice = "17.525".toBigDecimal(),
+            BigDecimal("0.00001")
         ),
     ) else emptyList(),
     wallets = listOf(

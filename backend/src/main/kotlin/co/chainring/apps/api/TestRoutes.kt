@@ -3,12 +3,16 @@ package co.chainring.apps.api
 import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.core.model.FeeRate
+import co.chainring.core.model.MarketMinFee
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.WithdrawalFee
 import co.chainring.core.model.db.FeeRates
+import co.chainring.core.model.db.MarketEntity
+import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.sequencer.SequencerClient
+import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -25,6 +29,7 @@ import org.http4k.core.with
 import org.http4k.format.KotlinxSerialization.auto
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.lang.RuntimeException
+import java.math.BigDecimal
 import java.math.BigInteger
 
 class TestRoutes(
@@ -40,6 +45,7 @@ class TestRoutes(
             val marketPrice: BigDecimalJson,
             val baseDecimals: Int,
             val quoteDecimals: Int,
+            val minFee: BigDecimalJson,
         )
 
         @Serializable
@@ -51,6 +57,11 @@ class TestRoutes(
         @Serializable
         data class SetWithdrawalFeesInSequencer(
             val withdrawalFees: List<WithdrawalFee>,
+        )
+
+        @Serializable
+        data class SetMarketMinFeesInSequencer(
+            val marketMinFees: List<MarketMinFee>,
         )
 
         @Serializable
@@ -86,6 +97,7 @@ class TestRoutes(
                 val maxOfferIx: Int,
                 val minBidIx: Int,
                 val levels: List<OrderBookLevel>,
+                val minFee: BigIntegerJson,
             )
 
             @Serializable
@@ -165,6 +177,7 @@ class TestRoutes(
                             quoteDecimals = 18,
                             maxOfferIx = 123,
                             minBidIx = 123,
+                            minFee = "123".toBigInteger(),
                             levels = listOf(
                                 StateDump.OrderBookLevel(
                                     levelIx = 123,
@@ -234,6 +247,7 @@ class TestRoutes(
                                 quoteDecimals = m.quoteDecimals,
                                 maxOfferIx = m.maxOfferIx,
                                 minBidIx = m.minBidIx,
+                                minFee = m.minFee?.toBigInteger() ?: BigInteger.ZERO,
                                 levels = m.levelsList.map { l ->
                                     StateDump.OrderBookLevel(
                                         levelIx = l.levelIx,
@@ -276,6 +290,7 @@ class TestRoutes(
                     marketPrice = "17.55".toBigDecimal(),
                     baseDecimals = 18,
                     quoteDecimals = 18,
+                    minFee = "0.000005".toBigDecimal(),
                 ),
             )
             returning(
@@ -290,6 +305,7 @@ class TestRoutes(
                     marketPrice = payload.marketPrice,
                     baseDecimals = payload.baseDecimals,
                     quoteDecimals = payload.quoteDecimals,
+                    minFee = payload.minFee,
                 )
                 if (sequencerResponse.hasError()) {
                     throw RuntimeException("Failed to create market in sequencer, error: ${sequencerResponse.error}")
@@ -360,11 +376,47 @@ class TestRoutes(
         }
     }
 
+    private val setMarketMinFeesInSequencer: ContractRoute = run {
+        val requestBody = Body.auto<SetMarketMinFeesInSequencer>().toLens()
+
+        "sequencer-market-min-fees" meta {
+            operationId = "sequencer-market-min-fees"
+            summary = "Set market min fees in Sequencer"
+            tags += listOf(Tag("test"))
+            receiving(
+                requestBody to SetMarketMinFeesInSequencer(
+                    marketMinFees = listOf(
+                        MarketMinFee(MarketId("BTC:1337/ETH:1337"), BigDecimal.ONE),
+                    ),
+                ),
+            )
+            returning(
+                Status.CREATED,
+            )
+        } bindContract Method.PUT to { request ->
+            val payload = requestBody(request)
+            transaction {
+                runBlocking {
+                    val sequencerResponse = sequencerClient.setMarketMinFees(
+                        payload.marketMinFees.associate {
+                            it.marketId to it.minFee.toFundamentalUnits(MarketEntity[it.marketId].quoteSymbol.decimals.toInt())
+                        },
+                    )
+                    if (sequencerResponse.hasError()) {
+                        throw RuntimeException("Failed to set market min fees in sequencer, error: ${sequencerResponse.error}")
+                    }
+                }
+            }
+            Response(Status.OK)
+        }
+    }
+
     val routes = listOf(
         createMarketInSequencer,
         setFeeRatesInSequencer,
         resetSequencer,
         getSequencerState,
         setWithdrawalFeesInSequencer,
+        setMarketMinFeesInSequencer,
     )
 }

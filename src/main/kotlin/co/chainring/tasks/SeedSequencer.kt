@@ -2,6 +2,7 @@ package co.chainring.tasks
 
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.WithdrawalFee
+import co.chainring.core.model.db.MarketId
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.tasks.fixtures.Fixtures
@@ -31,12 +32,21 @@ fun seedSequencer(fixtures: Fixtures) {
                 marketPrice = market.marketPrice,
                 quoteDecimals = quoteSymbol.decimals,
                 baseDecimals = baseSymbol.decimals,
+                minFee = market.minFee
             ).also { response ->
                 if (response.hasError()) {
                     throw RuntimeException("Failed to create market in sequencer: ${response.error}")
                 }
             }
         }
+
+        sequencerClient.setMarketMinFees(
+            fixtures.markets.associate { market ->
+                val baseSymbol = fixtures.symbols.first { it.id == market.baseSymbol }
+                val quoteSymbol = fixtures.symbols.first { it.id == market.quoteSymbol }
+                MarketId("${baseSymbol.name}/${quoteSymbol.name}") to market.minFee.toFundamentalUnits(quoteSymbol.decimals)
+            }
+        )
     }
 }
 

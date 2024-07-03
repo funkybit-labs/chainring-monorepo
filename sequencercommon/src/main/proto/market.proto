@@ -15,4 +15,10 @@ message Market {
   uint32 maxOrdersPerLevel = 6;
   uint32 baseDecimals = 7;
   uint32 quoteDecimals = 8;
+  optional IntegerValue minFee = 9;
+}
+
+message MarketMinFee {
+  string marketId = 1;
+  IntegerValue minFee = 2;
 }

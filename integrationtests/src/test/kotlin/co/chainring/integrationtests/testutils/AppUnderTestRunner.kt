@@ -8,6 +8,7 @@ import co.chainring.apps.ring.RingAppConfig
 import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.db.DbConfig
+import co.chainring.core.model.MarketMinFee
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.WithdrawalFee
 import co.chainring.core.model.db.BalanceLogTable
@@ -19,6 +20,7 @@ import co.chainring.core.model.db.DeployedSmartContractEntity
 import co.chainring.core.model.db.DepositTable
 import co.chainring.core.model.db.FaucetDripTable
 import co.chainring.core.model.db.KeyValueStore
+import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCTable
 import co.chainring.core.model.db.OrderExecutionTable
 import co.chainring.core.model.db.OrderTable
@@ -190,9 +192,21 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                     marketPrice = market.marketPrice,
                     quoteDecimals = quoteSymbol.decimals,
                     baseDecimals = baseSymbol.decimals,
+                    minFee = market.minFee,
                 ),
             )
         }
+
+        TestApiClient.setMarketMinFeesInSequencer(
+            fixtures.markets.map { market ->
+                val baseSymbol = fixtures.symbols.first { it.id == market.baseSymbol }
+                val quoteSymbol = fixtures.symbols.first { it.id == market.quoteSymbol }
+                MarketMinFee(
+                    MarketId("${baseSymbol.name}/${quoteSymbol.name}"),
+                    market.minFee,
+                )
+            },
+        )
 
         try {
             deleteAll()

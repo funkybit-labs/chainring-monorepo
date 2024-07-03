@@ -32,9 +32,11 @@ import co.chainring.sequencer.proto.cancelOrder
 import co.chainring.sequencer.proto.deposit
 import co.chainring.sequencer.proto.feeRates
 import co.chainring.sequencer.proto.market
+import co.chainring.sequencer.proto.marketMinFee
 import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderBatch
 import co.chainring.sequencer.proto.setFeeRatesRequest
+import co.chainring.sequencer.proto.setMarketMinFeesRequest
 import co.chainring.sequencer.proto.setWithdrawalFeesRequest
 import co.chainring.sequencer.proto.withdrawal
 import co.chainring.sequencer.proto.withdrawalFee
@@ -126,11 +128,28 @@ class TestSequencerCheckpoints {
                         this.maxLevels = 1000
                         this.maxOrdersPerLevel = 1000
                         this.marketPrice = "17.525".toBigDecimal().toDecimalValue()
-                        this.baseDecimals = 18
+                        this.baseDecimals = 8
                         this.quoteDecimals = 18
                     },
                 ).success,
             )
+
+            gateway.setMarketMinFees(
+                setMarketMinFeesRequest {
+                    this.guid = UUID.randomUUID().toString()
+                    this.marketMinFees.addAll(
+                        listOf(
+                            marketMinFee {
+                                this.marketId = btcEthMarketId.value
+                                this.minFee = BigDecimal("0.0000003").inWei().toIntegerValue()
+                            },
+                        ),
+                    )
+                },
+            ).also {
+                assertTrue(it.success)
+                assertEquals(it.sequencerResponse.marketMinFeesSetCount, 1)
+            }
 
             assertTrue(
                 gateway.setFeeRates(
@@ -305,6 +324,29 @@ class TestSequencerCheckpoints {
                 }
             }
 
+            // limit sell - too small
+            gateway.applyOrderBatch(
+                orderBatch {
+                    this.guid = UUID.randomUUID().toString()
+                    this.marketId = btcEthMarketId.value
+                    this.wallet = wallet1.value
+                    this.ordersToAdd.add(
+                        order {
+                            this.guid = Random.nextLong()
+                            this.amount = BigDecimal("0.000005").inSats().toIntegerValue()
+                            this.price = BigDecimal("17.570").toDecimalValue()
+                            this.type = Order.Type.LimitSell
+                        },
+                    )
+                },
+            ).also {
+                assertTrue(it.success)
+                assertEquals(1, it.sequencerResponse.ordersChangedCount)
+                it.sequencerResponse.ordersChangedList[0].also { order ->
+                    assertEquals(OrderDisposition.Rejected, order.disposition)
+                }
+            }
+
             // market buy, should be matched
             gateway.applyOrderBatch(
                 orderBatch {
@@ -349,7 +391,7 @@ class TestSequencerCheckpoints {
 
             assertQueueFilesCount(inputQueue, 2)
             assertCheckpointsCount(checkpointsPath, 1)
-            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 9)
+            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 11)
 
             currentTime.addAndGet(60.seconds.inWholeMilliseconds)
 
@@ -399,7 +441,7 @@ class TestSequencerCheckpoints {
             }
 
             assertCheckpointsCount(checkpointsPath, 2)
-            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 11)
+            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 13)
         } finally {
             gatewayApp.stop()
             sequencerApp.stop()

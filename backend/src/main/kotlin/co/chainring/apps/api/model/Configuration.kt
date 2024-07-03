@@ -58,4 +58,5 @@ data class Market(
     val lastPrice: BigDecimalJson,
     val minAllowedBidPrice: BigDecimalJson,
     val maxAllowedOfferPrice: BigDecimalJson,
+    val minFee: BigIntegerJson,
 )

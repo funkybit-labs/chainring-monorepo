@@ -391,12 +391,16 @@ export function LimitModal({
                         return 'Price Too Low'
                       } else if (sr.limitPriceTooHigh) {
                         return 'Price Too High'
+                      } else if (sr.amountTooLow) {
+                        return 'Amount Too Low'
                       } else {
                         return 'Swap'
                       }
                     }}
                     status={
-                      sr.limitPriceTooLow || sr.limitPriceTooHigh
+                      sr.limitPriceTooLow ||
+                      sr.limitPriceTooHigh ||
+                      sr.amountTooLow
                         ? 'error'
                         : sr.mutation.status
                     }

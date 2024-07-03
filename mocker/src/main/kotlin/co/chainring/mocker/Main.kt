@@ -21,6 +21,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
+import java.math.BigInteger
 
 
 val start = Clock.System.now()
@@ -58,7 +59,8 @@ fun main() {
         tickSize = BigDecimal("0.05"),
         lastPrice = BigDecimal("0.995"),
         minAllowedBidPrice = BigDecimal("0.05"),
-        maxAllowedOfferPrice = BigDecimal("2")
+        maxAllowedOfferPrice = BigDecimal("2"),
+        minFee = BigInteger.ZERO
     )
     val priceFunction = DeterministicHarmonicPriceMovement.generateRandom(initialValue = 17.0, maxFluctuation = 1.5)
 

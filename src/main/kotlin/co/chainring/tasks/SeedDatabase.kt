@@ -66,14 +66,14 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
 
         }.associateBy { it.id.value }
 
-        fixtures.markets.forEach { (baseSymbolId, quoteSymbolId, tickSize, marketPrice) ->
+        fixtures.markets.forEach { (baseSymbolId, quoteSymbolId, tickSize, marketPrice, minFee) ->
             val baseSymbol = symbolEntities.getValue(baseSymbolId)
             val quoteSymbol = symbolEntities.getValue(quoteSymbolId)
 
             when (val marketEntity = MarketEntity.findById(MarketId(baseSymbol, quoteSymbol))) {
                 null -> {
                     MarketEntity
-                        .create(baseSymbol, quoteSymbol, tickSize, marketPrice)
+                        .create(baseSymbol, quoteSymbol, tickSize, marketPrice, minFee.toFundamentalUnits(quoteSymbol.decimals))
                         .also {
                             it.flush()
                             println("Created market ${it.guid.value}")
@@ -92,6 +92,7 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                         it.baseSymbol = baseSymbol
                         it.quoteSymbol = quoteSymbol
                         it.tickSize = tickSize
+                        it.minFee = minFee.toFundamentalUnits(quoteSymbol.decimals)
                         it.flush()
                         println("Updated market ${it.guid.value}")
                     }

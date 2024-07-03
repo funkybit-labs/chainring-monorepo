@@ -8,6 +8,7 @@ import co.chainring.core.blockchain.ContractType
 import co.chainring.core.model.Address
 import co.chainring.core.model.FeeRate
 import co.chainring.core.model.db.FeeRates
+import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
@@ -50,6 +51,11 @@ class ConfigRouteTest {
         assertEquals(
             FeeRates(maker = FeeRate.fromPercents(1.0), taker = FeeRate.fromPercents(2.0)),
             config.feeRates,
+        )
+
+        assertEquals(
+            config.markets.associate { it.id to it.minFee },
+            TestApiClient.getSequencerStateDump().markets.associate { MarketId(it.id) to it.minFee },
         )
     }
 
