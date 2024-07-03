@@ -1,6 +1,5 @@
 import { GoalsSvg } from 'components/icons'
 import GithubIconSvg from 'assets/github-icon.svg'
-import DiscordIconSvg from 'assets/discord-icon.svg'
 import MediumIconSvg from 'assets/medium-icon.svg'
 import LinkedInIconSvg from 'assets/linkedin-icon.svg'
 import XIconSvg from 'assets/x-icon.svg'
@@ -64,10 +63,12 @@ function GoalRow({ goal }: { goal: UserGoal }) {
           'Github Subscription',
           'https://github.com/Chainring-Inc'
         ]
-      case 'DiscordSubscription':
-        return [DiscordIconSvg, 'Discord Subscription', 'https://discord.com/']
       case 'MediumSubscription':
-        return [MediumIconSvg, 'Medium Subscription', 'https://medium.com/']
+        return [
+          MediumIconSvg,
+          'Medium Subscription',
+          'https://chainring.medium.com/'
+        ]
       case 'LinkedinSubscription':
         return [
           LinkedInIconSvg,
@@ -75,7 +76,11 @@ function GoalRow({ goal }: { goal: UserGoal }) {
           'https://www.linkedin.com/company/chainring-inc/'
         ]
       case 'XSubscription':
-        return [XIconSvg, 'X (Twitter) Subscription', 'https://x.com']
+        return [
+          XIconSvg,
+          'X (Twitter) Subscription',
+          'https://twitter.com/chainring_fin'
+        ]
     }
   })()
 
