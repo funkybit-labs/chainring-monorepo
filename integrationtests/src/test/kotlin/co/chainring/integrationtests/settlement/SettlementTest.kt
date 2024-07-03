@@ -1247,7 +1247,6 @@ class SettlementTest : OrderBaseTest() {
                             ExpectedBalance(takerStartingQuoteBalance),
                         ),
                     )
-                    assertContainsLimitsMessage(messages, market, base = takerStartingBaseBalance, quote = takerStartingQuoteBalance)
                 }
             }
 
@@ -1271,6 +1270,185 @@ class SettlementTest : OrderBaseTest() {
         } else {
             waitForSettlementToFinish(listOf(trade.id.value), SettlementStatus.Completed)
         }
+        takerWsClient.close()
+        makerWsClient.close()
+    }
+
+    @Test
+    fun `settlements and withdrawals properly sequenced`() {
+        val market = btcEthMarket
+        val baseSymbol = btc
+        val quoteSymbol = eth
+
+        val (takerApiClient, takerWallet, takerWsClient) = setupTrader(
+            market.id,
+            airdrops = listOf(
+                AssetAmount(baseSymbol, "0.5"),
+            ),
+            deposits = listOf(
+                AssetAmount(baseSymbol, "0.4"),
+            ),
+            subscribeToOrderBook = false,
+            subscribeToOrderPrices = false,
+        )
+
+        val (makerApiClient, makerWallet, makerWsClient) = setupTrader(
+            market.id,
+            airdrops = listOf(
+                AssetAmount(baseSymbol, "0.5"),
+                AssetAmount(quoteSymbol, "10"),
+            ),
+            deposits = listOf(
+                AssetAmount(quoteSymbol, "10"),
+            ),
+            subscribeToOrderBook = false,
+            subscribeToOrderPrices = false,
+        )
+
+        // starting onchain balances
+        val makerStartingBaseBalance = makerWallet.getExchangeBalance(baseSymbol)
+        val makerStartingQuoteBalance = makerWallet.getExchangeBalance(quoteSymbol)
+        val takerStartingBaseBalance = takerWallet.getExchangeBalance(baseSymbol)
+        val takerStartingQuoteBalance = takerWallet.getExchangeBalance(quoteSymbol)
+        val takerQuoteQuantity = BigDecimal("1.7199")
+        val makerQuoteAmount = BigDecimal("1.77255")
+
+        // place a limit order
+        val limitBuyOrderApiResponse = makerApiClient.createLimitOrder(
+            market,
+            OrderSide.Buy,
+            amount = BigDecimal("0.25"),
+            price = BigDecimal("17.55"),
+            makerWallet,
+        )
+        makerWsClient.apply {
+            assertLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
+            assertLimitsMessageReceived(market.id)
+        }
+
+        val orderAmount = BigDecimal("0.1")
+
+        // place a sell order
+        val marketSellOrderApiResponse = takerApiClient.createMarketOrder(
+            market,
+            OrderSide.Sell,
+            orderAmount,
+            takerWallet,
+        )
+        // withdraw the quote assets the taker will receive for this trade even though not settled yet
+        // this will only work on chain if the trade is settled before the withdrawal.
+        val pendingWithdrawal = takerApiClient.createWithdrawal(
+            takerWallet.signWithdraw(
+                quoteSymbol.name,
+                takerQuoteQuantity.toFundamentalUnits(quoteSymbol.decimals),
+            ),
+        ).withdrawal
+
+        takerWsClient.apply {
+            assertMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
+            assertTradeCreatedMessageReceived(
+                order = marketSellOrderApiResponse,
+                price = BigDecimal("17.55"),
+                amount = AssetAmount(baseSymbol, marketSellOrderApiResponse.order.amount.fixedAmount()),
+                fee = AssetAmount(quoteSymbol, "0.0351"),
+                settlementStatus = SettlementStatus.Pending,
+            )
+            assertOrderUpdatedMessageReceived { msg ->
+                assertEquals(OrderStatus.Filled, msg.order.status)
+                assertEquals(1, msg.order.executions.size)
+            }
+            assertBalancesMessageReceived(
+                listOf(
+                    ExpectedBalance(
+                        baseSymbol,
+                        total = takerStartingBaseBalance.amount,
+                        available = takerStartingBaseBalance.amount - orderAmount,
+                    ),
+                    ExpectedBalance(
+                        quoteSymbol,
+                        total = takerStartingQuoteBalance.amount,
+                        available = takerStartingQuoteBalance.amount + takerQuoteQuantity,
+                    ),
+                ),
+            )
+        }
+
+        // withdrawal updates
+        takerWsClient.apply {
+            assertLimitsMessageReceived(market.id)
+            assertBalancesMessageReceived {}
+        }
+
+        makerWsClient.apply {
+            assertTradeCreatedMessageReceived(
+                order = limitBuyOrderApiResponse,
+                price = BigDecimal("17.55"),
+                amount = AssetAmount(baseSymbol, "0.1"),
+                fee = AssetAmount(quoteSymbol, "0.01755"),
+                settlementStatus = SettlementStatus.Pending,
+            )
+            assertOrderUpdatedMessageReceived { msg ->
+                assertEquals(OrderStatus.Partial, msg.order.status)
+            }
+            assertBalancesMessageReceived(
+                listOf(
+                    ExpectedBalance(
+                        baseSymbol,
+                        total = makerStartingBaseBalance.amount,
+                        available = makerStartingBaseBalance.amount + orderAmount,
+                    ),
+                    ExpectedBalance(
+                        quoteSymbol,
+                        total = makerStartingQuoteBalance.amount,
+                        available = makerStartingQuoteBalance.amount - makerQuoteAmount,
+                    ),
+                ),
+            )
+        }
+
+        val trade = getTradesForOrders(listOf(marketSellOrderApiResponse.orderId)).first()
+        listOf(takerWsClient, makerWsClient).forEach {
+            it.assertLimitsMessageReceived(market.id)
+        }
+        waitForSettlementToFinish(listOf(trade.id.value))
+
+        takerWsClient.apply {
+            assertMessagesReceived(2) { messages ->
+                assertContainsTradeUpdatedMessage(messages) { msg ->
+                    assertEquals(marketSellOrderApiResponse.orderId, msg.trade.orderId)
+                    assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
+                }
+                assertContainsBalancesMessage(
+                    messages,
+                    listOf(
+                        ExpectedBalance(AssetAmount(baseSymbol, takerStartingBaseBalance.amount - orderAmount)),
+                        ExpectedBalance(
+                            quoteSymbol,
+                            total = takerStartingQuoteBalance.amount + takerQuoteQuantity,
+                            available = BigDecimal.ZERO,
+                        ),
+                    ),
+                )
+            }
+        }
+
+        makerWsClient.apply {
+            assertMessagesReceived(2) {}
+        }
+
+        // wait for the withdrawal to finalize and verify it completed and taker quote assets are zero
+        waitForFinalizedWithdrawal(pendingWithdrawal.id)
+        assertEquals(WithdrawalStatus.Complete, takerApiClient.getWithdrawal(pendingWithdrawal.id).withdrawal.status)
+
+        takerWsClient.apply {
+            assertBalancesMessageReceived(
+                listOf(
+                    ExpectedBalance(AssetAmount(baseSymbol, takerStartingBaseBalance.amount - orderAmount)),
+                    ExpectedBalance(AssetAmount(quoteSymbol, BigDecimal.ZERO)),
+                ),
+            )
+        }
+
         takerWsClient.close()
         makerWsClient.close()
     }

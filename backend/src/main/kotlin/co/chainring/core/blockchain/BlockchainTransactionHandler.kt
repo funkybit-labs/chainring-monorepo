@@ -625,7 +625,7 @@ class BlockchainTransactionHandler(
     }
 
     private fun createNextWithdrawalBatch(): Boolean {
-        val sequencedWithdrawals = WithdrawalEntity.findSequenced(blockchainClient.chainId, 50)
+        val sequencedWithdrawals = WithdrawalEntity.findSequenced(blockchainClient.chainId, 50, TradeEntity.minResponseSequenceForPending())
         if (sequencedWithdrawals.isEmpty()) {
             return false
         }

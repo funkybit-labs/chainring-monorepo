@@ -1103,6 +1103,7 @@ class OrderBookTest : TestWithDb() {
                     amount = trade.amount.toFundamentalUnits(tradeMarket.baseSymbol.decimals),
                     price = trade.price,
                     tradeHash = generateHexString(32),
+                    0L,
                 )
 
                 listOf(trade.buyOrder, trade.sellOrder).forEach { orderId ->

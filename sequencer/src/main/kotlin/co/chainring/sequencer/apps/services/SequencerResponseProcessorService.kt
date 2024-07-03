@@ -76,6 +76,7 @@ object SequencerResponseProcessorService {
                             null,
                             actualAmount = balanceChange.delta.toBigInteger().negate(),
                             fee = response.withdrawalsCreatedList.firstOrNull { it.externalGuid.withdrawalId() == withdrawalEntity.guid.value }?.fee?.toBigInteger() ?: BigInteger.ZERO,
+                            responseSequence = response.sequence,
                         )
                     }
                 }
@@ -239,6 +240,7 @@ object SequencerResponseProcessorService {
                     amount = trade.amount.toBigInteger(),
                     price = trade.price.toBigDecimal(),
                     tradeHash = ECHelper.tradeHash(trade.buyOrderGuid, trade.sellOrderGuid),
+                    responseSequence = response.sequence,
                 )
 
                 // create executions for both

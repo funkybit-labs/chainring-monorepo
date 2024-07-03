@@ -72,6 +72,7 @@ object WithdrawalTable : GUIDTable<WithdrawalId>("withdrawal", ::WithdrawalId) {
     val transactionData = jsonb<EIP712Transaction>("transaction_data", KotlinxSerialization.json).nullable()
     val actualAmount = decimal("actual_amount", 30, 0).nullable()
     val fee = decimal("fee", 30, 0).default(BigDecimal.ZERO)
+    val responseSequence = long("response_sequence").nullable().index()
 
     init {
         check("tx_when_settling") {
@@ -136,11 +137,15 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
             ).toList()
         }
 
-        fun findSequenced(chainId: ChainId, limit: Int): List<WithdrawalEntity> {
+        fun findSequenced(chainId: ChainId, limit: Int, maxResponseSequence: Long?): List<WithdrawalEntity> {
             return WithdrawalTable
                 .join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid)
                 .selectAll()
-                .where { WithdrawalTable.status.eq(WithdrawalStatus.Sequenced).and(SymbolTable.chainId.eq(chainId)) }
+                .where {
+                    WithdrawalTable.status.eq(WithdrawalStatus.Sequenced).and(SymbolTable.chainId.eq(chainId)).let { query ->
+                        maxResponseSequence?.let { query.and(WithdrawalTable.responseSequence.less(it)) } ?: query
+                    }
+                }
                 .orderBy(Pair(WithdrawalTable.sequenceId, SortOrder.ASC))
                 .limit(limit)
                 .map { WithdrawalEntity.wrapRow(it) }
@@ -168,6 +173,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
         blockchainTransactionEntity: BlockchainTransactionEntity? = null,
         actualAmount: BigInteger? = null,
         fee: BigInteger? = null,
+        responseSequence: Long? = null,
     ) {
         val now = Clock.System.now()
         this.updatedAt = now
@@ -181,6 +187,9 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
         }
         fee?.let {
             this.fee = it
+        }
+        responseSequence?.let {
+            this.responseSequence = responseSequence
         }
     }
 
@@ -230,4 +239,6 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
         toReal = { it.toBigInteger() },
         toColumn = { it.toBigDecimal() },
     )
+
+    var responseSequence by WithdrawalTable.responseSequence
 }

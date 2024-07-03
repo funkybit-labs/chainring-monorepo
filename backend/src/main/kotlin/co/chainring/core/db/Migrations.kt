@@ -54,6 +54,7 @@ import co.chainring.core.model.db.migrations.V56_TelegramMiniAppInvites
 import co.chainring.core.model.db.migrations.V57_AddMinFeeToMarket
 import co.chainring.core.model.db.migrations.V58_TelegramMiniAppBotDetection
 import co.chainring.core.model.db.migrations.V59_NullableDepositBlockNumber
+import co.chainring.core.model.db.migrations.V60_AddResponseSequenceToTradeAndWithdrawal
 import co.chainring.core.model.db.migrations.V5_ChainTable
 import co.chainring.core.model.db.migrations.V6_MarketTable
 import co.chainring.core.model.db.migrations.V7_OrderTable
@@ -120,4 +121,5 @@ val migrations = listOf(
     V57_AddMinFeeToMarket(),
     V58_TelegramMiniAppBotDetection(),
     V59_NullableDepositBlockNumber(),
+    V60_AddResponseSequenceToTradeAndWithdrawal(),
 )
