@@ -69,7 +69,7 @@ export default function EntryPoint() {
       return (
         <div className="flex h-screen flex-col justify-center gap-12">
           {showInviteError && (
-            <div className="fixed inset-0 flex flex-col items-center justify-center bg-black p-6 bg-opacity-75">
+            <div className="fixed inset-0 flex flex-col items-center justify-center bg-black/75 p-6">
               <div className="w-full max-w-lg rounded-lg bg-darkBluishGray10 p-6 shadow-lg">
                 <div className="mb-4 flex flex-col text-lg font-semibold text-white">
                   <div className="mb-1">Invalid invite code.</div>
