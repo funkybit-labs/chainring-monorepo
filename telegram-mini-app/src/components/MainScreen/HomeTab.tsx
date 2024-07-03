@@ -72,56 +72,56 @@ export default function HomeTab({ user }: { user: User }) {
           <div className="mt-2 text-center text-sm text-darkBluishGray2">
             Your balance
           </div>
-          <div className="mx-auto mt-2 flex w-4/5 items-center justify-center gap-4 rounded-lg bg-darkBluishGray9 px-5 py-4 text-2xl font-bold text-white">
-            <img src={CRSvg} className="size-10" alt="CR icon" />
-            <CRView amount={balance} format={'full'} />
-          </div>
-          <div className="mx-auto mt-2 flex w-4/5 items-center justify-center gap-4 rounded-lg bg-darkBluishGray9 px-5 py-4 text-2xl font-bold text-white">
-            <img src={TicketSvg} className="size-10" alt="Ticket icon" />
-            {gameTickets} Game Tickets
-          </div>
-          <div className="mx-auto mt-2 flex w-4/5 items-center justify-center gap-4 rounded-lg bg-darkBluishGray9 px-5 py-4 text-2xl font-bold text-white">
-            <img src={InviteSvg} className="size-10" alt="Invites icon" />
-            {user.invites === -1
-              ? 'Unlimited Invites'
-              : `${user.invites} Invite${user.invites === 1 ? '' : 's'} Left`}
-          </div>
-        </div>
-        <div className="flex flex-row items-center justify-center">
-          {user.checkInStreak.grantedAt.getTime() + fiveMinutesInMs >
-            new Date().getTime() && (
-            <div className="my-2 flex flex-col items-center justify-center">
-              <CheckInStreakWidget streak={user.checkInStreak} />
+          <div className="mx-auto mt-2 flex w-4/5 flex-col items-center justify-center rounded-lg bg-darkBluishGray9 px-5 py-4">
+            <div className="flex items-center justify-center gap-4 text-xl font-bold text-white">
+              <img src={CRSvg} className="size-7" alt="CR icon" />
+              <CRView amount={balance} format={'full'} />
             </div>
-          )}
-          <div className="flex size-full flex-col items-center">
-            {user.lastMilestone &&
-              user.lastMilestone.grantedAt.getTime() + fiveMinutesInMs >
-                new Date().getTime() && (
-                <div className="my-2 flex flex-col items-center justify-center">
-                  <MilestoneReachedWidget milestone={user.lastMilestone} />
-                </div>
-              )}
             {user.nextMilestoneIn && (
-              <div className="my-2 flex flex-col items-center justify-center">
-                <div className="text-center text-white">
+              <div className="mt-2 flex w-full flex-col">
+                <div className="text-center text-sm text-white">
                   Next milestone in <CRView amount={user.nextMilestoneIn} />!
                 </div>
               </div>
             )}
           </div>
+          <div className="mx-auto mt-2 flex w-4/5 items-center justify-center gap-4 rounded-lg bg-darkBluishGray9 px-5 py-4 text-xl font-bold text-white">
+            <img src={TicketSvg} className="size-7" alt="Ticket icon" />
+            {gameTickets} Game Tickets
+          </div>
+          <div className="mx-auto mt-2 flex w-4/5 items-center justify-center gap-4 rounded-lg bg-darkBluishGray9 px-5 py-4 text-xl font-bold text-white">
+            <img src={InviteSvg} className="size-7" alt="Invites icon" />
+            {user.invites === -1
+              ? 'Unlimited Invites'
+              : `${user.invites} Invite${user.invites === 1 ? '' : 's'} Left`}
+          </div>
         </div>
-        <div className="mb-4 mt-2 flex flex-col items-center justify-center">
+        <div className="mx-auto my-4 flex flex-col place-content-between">
+          {user.checkInStreak.grantedAt.getTime() + fiveMinutesInMs >
+            new Date().getTime() && (
+            <CheckInStreakWidget streak={user.checkInStreak} />
+          )}
+          <div className="flex w-full flex-col place-content-between">
+            {user.lastMilestone &&
+              user.lastMilestone.grantedAt.getTime() + fiveMinutesInMs >
+                new Date().getTime() && (
+                <div className="flex flex-col ">
+                  <MilestoneReachedWidget milestone={user.lastMilestone} />
+                </div>
+              )}
+          </div>
+        </div>
+        <div className="mb-4 flex flex-col items-center justify-center">
           {gameTickets > 0 && <PlayTheGameWidget onEnterGame={enterGame} />}
         </div>
+        {isGameMode && (
+          <ReactionGame
+            tickets={gameTickets}
+            onReactionTimeMeasured={useGameTicket}
+            onClose={exitGame}
+          />
+        )}
       </div>
-      {isGameMode && (
-        <ReactionGame
-          tickets={gameTickets}
-          onReactionTimeMeasured={useGameTicket}
-          onClose={exitGame}
-        />
-      )}
     </div>
   )
 }
