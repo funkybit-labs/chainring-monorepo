@@ -133,3 +133,32 @@ module "sequencer" {
   baregate_cpu                            = module.baregate.baregate_cpu
   baregate_memory                         = module.baregate.baregate_memory * 0.9
 }
+
+module "mocker" {
+  source            = "../modules/ecs_task"
+  name_prefix       = local.name_prefix
+  task_name         = "mocker"
+  image             = "mocker"
+  ecs_cluster_id    = module.ecs.cluster.id
+  app_ecs_task_role = module.ecs.app_ecs_task_role
+  aws_region        = var.aws_region
+  subnet_id_1       = module.vpc.private_subnet_id_1
+  subnet_id_2       = module.vpc.private_subnet_id_2
+  vpc               = module.vpc.vpc
+  allow_inbound     = true
+  hostnames = [
+    "${local.name_prefix}-mocker.${local.zone_name}"
+  ]
+  lb_https_listener_arn                   = module.alb.https_listener_arn
+  lb_priority                             = 105
+  lb_dns_name                             = module.alb.dns_name
+  zone                                    = local.zone
+  tcp_ports                               = [8000]
+  service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
+}
+
+module "holding_page" {
+  source      = "../modules/holding_page_lambda"
+  name_prefix = local.name_prefix
+  vpc         = module.vpc.vpc
+}
