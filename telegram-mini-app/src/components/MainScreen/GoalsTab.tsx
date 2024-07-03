@@ -16,7 +16,7 @@ import { CRView } from 'components/common/CRView'
 export default function GoalsTab({ user }: { user: User }) {
   return (
     <>
-      <div className="fixed left-0 top-0 flex w-full flex-col justify-between gap-2 px-4 pb-3 pt-4">
+      <div className="fixed left-0 top-0 flex w-full select-none flex-col justify-between gap-2 px-4 pb-3 pt-4">
         <div className="flex justify-center text-white">
           <GoalsSvg className="size-[60px]" />
         </div>
@@ -82,7 +82,7 @@ function GoalRow({ goal }: { goal: UserGoal }) {
   return (
     <div
       className={classNames(
-        'bg-darkBluishGray9 rounded-lg px-4 py-2 text-white flex justify-between border-2',
+        'bg-darkBluishGray9 rounded-lg px-4 py-2 text-white flex justify-between border-2 select-none',
         status == 'achieved' ? 'border-primary5' : 'border-darkBluishGray9'
       )}
     >

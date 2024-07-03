@@ -1,10 +1,10 @@
 import React from 'react'
-import { LstMilestone } from 'apiClient'
+import { LastMilestone } from 'apiClient'
 
 export function MilestoneReachedWidget({
   milestone
 }: {
-  milestone: LstMilestone
+  milestone: LastMilestone
 }) {
   return (
     <div className="flex flex-col items-center justify-center px-5 text-center text-lg font-semibold text-white">

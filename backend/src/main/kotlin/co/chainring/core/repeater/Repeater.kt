@@ -1,6 +1,7 @@
 package co.chainring.core.repeater
 
 import co.chainring.core.repeater.tasks.GasMonitorTask
+import co.chainring.core.repeater.tasks.ReferralPointsTask
 import co.chainring.core.utils.PgListener
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.sql.Database
@@ -12,6 +13,7 @@ class Repeater(db: Database) {
 
     private val tasks = mapOf(
         "gas_monitor" to GasMonitorTask(),
+        "referral_points" to ReferralPointsTask(),
     )
 
     private val timer = ScheduledThreadPoolExecutor(8)

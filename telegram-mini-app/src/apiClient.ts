@@ -61,18 +61,24 @@ const LastMilestoneSchema = z.object({
   invites: z.number(),
   grantedAt: z.coerce.date()
 })
-export type LstMilestone = z.infer<typeof LastMilestoneSchema>
+export type LastMilestone = z.infer<typeof LastMilestoneSchema>
 
 const UserSchema = z.object({
   balance: decimal(),
+  referralBalance: decimal(),
   goals: z.array(UserGoalSchema),
   gameTickets: z.number(),
   checkInStreak: CheckInStreakSchema,
   invites: z.number(),
+  inviteCode: z.string(),
   nextMilestoneIn: decimal().optional(),
   lastMilestone: LastMilestoneSchema.nullable()
 })
 export type User = z.infer<typeof UserSchema>
+
+const SignUpApiRequest = z.object({
+  inviteCode: z.string().nullable()
+})
 
 const ClaimRewardApiRequest = z.object({
   goalId: GoalIdSchema
@@ -105,6 +111,13 @@ export const apiClient = new Zodios(apiBaseUrl, [
     method: 'post',
     path: '/v1/user',
     alias: 'signUp',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: SignUpApiRequest
+      }
+    ],
     response: UserSchema,
     errors: [
       {
