@@ -7,6 +7,7 @@ import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ApiErrors
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.errorResponse
+import co.chainring.apps.api.model.invalidInviteCodeError
 import co.chainring.apps.api.model.processingError
 import co.chainring.apps.api.model.tma.ClaimRewardApiRequest
 import co.chainring.apps.api.model.tma.GetUserApiResponse
@@ -125,7 +126,7 @@ object TelegramMiniAppRoutes {
                             ?.let {
                                 TelegramMiniAppUserEntity.findByInviteCode(apiRequest.inviteCode)
                                     ?.takeIf { it.invites == -1L || it.invites > 0L }
-                                    ?: return@transaction processingError("Invite code is not valid")
+                                    ?: return@transaction invalidInviteCodeError
                             }
 
                         TelegramMiniAppUserEntity.create(request.telegramMiniAppPrincipal.userData.userId, invitedBy = inviter)

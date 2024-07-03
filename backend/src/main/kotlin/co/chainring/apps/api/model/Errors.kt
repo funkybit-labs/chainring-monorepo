@@ -31,6 +31,7 @@ enum class ReasonCode {
     AuthenticationError,
 
     ProcessingError,
+    InvalidInviteCode,
 
     RejectedBySequencer,
 
@@ -57,8 +58,10 @@ fun errorResponse(
 
 fun notFoundError(reason: ReasonCode, message: String): Response = errorResponse(Status.NOT_FOUND, ApiError(reason, message))
 
-fun processingError(message: String): Response = errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.ProcessingError, message))
+fun processingError(message: String): Response = processingError(ReasonCode.ProcessingError, message)
+fun processingError(reason: ReasonCode, message: String): Response = errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(reason, message))
 
 fun unexpectedError(): Response = errorResponse(Status.INTERNAL_SERVER_ERROR, ApiError(ReasonCode.UnexpectedError, "Unexpected Error"))
 
 val orderNotFoundError = notFoundError(ReasonCode.OrderNotFound, "Requested order does not exist")
+val invalidInviteCodeError = processingError(ReasonCode.InvalidInviteCode, "Invite code is not valid")
