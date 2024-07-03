@@ -1,5 +1,6 @@
 package co.chainring.core.model.db
 
+import kotlinx.datetime.Instant
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.deleteWhere
@@ -29,6 +30,14 @@ object KeyValueStore : Table("key_value_store") {
 
     fun setLong(key: String, value: Long) {
         setValue(key, value.toString())
+    }
+
+    fun getInstant(key: String): Instant? {
+        return getValue(key)?.toLong()?.let { Instant.fromEpochMilliseconds(it) }
+    }
+
+    fun setInstant(key: String, value: Instant) {
+        setValue(key, value.toEpochMilliseconds().toString())
     }
 
     fun remove(key: String) {

@@ -6,11 +6,15 @@ import co.chainring.core.model.db.GUIDTable
 import co.chainring.core.model.db.PGEnum
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.JoinType
+import org.jetbrains.exposed.sql.compoundAnd
 import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.sum
 import java.math.BigDecimal
 
 @Serializable
@@ -31,9 +35,8 @@ enum class TelegramMiniAppUserRewardType {
 }
 
 object TelegramMiniAppUserRewardTable : GUIDTable<TelegramMiniAppUserRewardId>("telegram_mini_app_user_reward", ::TelegramMiniAppUserRewardId) {
-    val createdAt = timestamp("created_at")
+    val createdAt = timestamp("created_at").index()
     val createdBy = varchar("created_by", 10485760)
-    val updatedAt = timestamp("updated_at").nullable()
     val userGuid = reference("user_guid", TelegramMiniAppUserTable).index()
     val amount = decimal("amount", 30, 18)
     val type = customEnumeration(
@@ -69,18 +72,21 @@ class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId
             create(user, TelegramMiniAppUserRewardType.ReactionGame, amount)
         }
 
-        private fun create(user: TelegramMiniAppUserEntity, type: TelegramMiniAppUserRewardType, amount: BigDecimal, goalId: TelegramMiniAppGoal.Id? = null) {
+        fun referralBonus(user: TelegramMiniAppUserEntity, amount: BigDecimal) {
+            create(user, TelegramMiniAppUserRewardType.ReferralBonus, amount, by = "system")
+        }
+
+        private fun create(user: TelegramMiniAppUserEntity, type: TelegramMiniAppUserRewardType, amount: BigDecimal, goalId: TelegramMiniAppGoal.Id? = null, by: String = user.guid.value.value) {
             val now = Clock.System.now()
 
-            val previousBalance = user.pointsBalance()
+            val previousBalance = user.pointsBalances().sum()
             val newBalance = previousBalance + amount
 
             TelegramMiniAppUserRewardTable.insertIgnore {
                 it[guid] = EntityID(TelegramMiniAppUserRewardId.generate(), TelegramMiniAppUserRewardTable)
                 it[userGuid] = user.guid
                 it[createdAt] = now
-                it[updatedAt] = now
-                it[createdBy] = user.guid.value.value
+                it[createdBy] = by
                 it[TelegramMiniAppUserRewardTable.type] = type
                 goalId?.let { goal -> it[TelegramMiniAppUserRewardTable.goalId] = goal.name }
                 it[TelegramMiniAppUserRewardTable.amount] = amount
@@ -104,11 +110,30 @@ class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId
                 }
             }
         }
+
+        fun inviteePointsPerInviter(from: Instant, to: Instant): Map<TelegramMiniAppUserId, BigDecimal> {
+            return TelegramMiniAppUserRewardTable
+                .join(TelegramMiniAppUserTable, JoinType.LEFT, TelegramMiniAppUserTable.guid, TelegramMiniAppUserRewardTable.userGuid)
+                .select(TelegramMiniAppUserTable.invitedBy, TelegramMiniAppUserRewardTable.amount.sum())
+                .where {
+                    listOf(
+                        TelegramMiniAppUserTable.invitedBy.isNotNull(),
+                        TelegramMiniAppUserRewardTable.createdAt greater from,
+                        TelegramMiniAppUserRewardTable.createdAt lessEq to,
+                    ).compoundAnd()
+                }
+                .groupBy(TelegramMiniAppUserTable.invitedBy)
+                .associate {
+                    it[TelegramMiniAppUserTable.invitedBy]!!.value to (
+                        it[TelegramMiniAppUserRewardTable.amount.sum()]?.setScale(18)
+                            ?: BigDecimal.ZERO
+                        )
+                }
+        }
     }
 
     var createdAt by TelegramMiniAppUserRewardTable.createdAt
     var createdBy by TelegramMiniAppUserRewardTable.createdBy
-    var updatedAt by TelegramMiniAppUserRewardTable.updatedAt
     var userGuid by TelegramMiniAppUserRewardTable.userGuid
     var user by TelegramMiniAppUserEntity referencedOn TelegramMiniAppUserRewardTable.userGuid
     var amount by TelegramMiniAppUserRewardTable.amount

@@ -160,7 +160,7 @@ data class TelegramMiniAppUserData(
     @SerialName("language_code")
     val languageCode: String,
     @SerialName("allows_write_to_pm")
-    val allowsWriteToPm: Boolean,
+    val allowsWriteToPm: Boolean = false,
 )
 
 data class TelegramMiniAppPrincipal(

@@ -12,8 +12,11 @@ import co.chainring.apps.api.model.tma.ClaimRewardApiRequest
 import co.chainring.apps.api.model.tma.GetUserApiResponse
 import co.chainring.apps.api.model.tma.ReactionTimeApiRequest
 import co.chainring.apps.api.model.tma.ReactionsTimeApiResponse
+import co.chainring.apps.api.model.tma.SingUpApiRequest
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGoal
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppInviteCode
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
+import co.chainring.core.model.telegram.miniapp.sum
 import kotlinx.datetime.Clock
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.Tag
@@ -41,6 +44,7 @@ object TelegramMiniAppRoutes {
                 Status.OK,
                 responseBody to GetUserApiResponse(
                     balance = BigDecimal.ZERO,
+                    referralBalance = BigDecimal.ZERO,
                     goals = emptyList(),
                     gameTickets = 3L,
                     checkInStreak = GetUserApiResponse.CheckInStreak(
@@ -50,6 +54,8 @@ object TelegramMiniAppRoutes {
                         grantedAt = Clock.System.now(),
                     ),
                     invites = 0L,
+                    inviteCode = TelegramMiniAppInviteCode("12345"),
+                    wasInvited = false,
                     nextMilestoneIn = BigDecimal.ZERO,
                     lastMilestone = null,
                 ),
@@ -76,6 +82,7 @@ object TelegramMiniAppRoutes {
     }
 
     val signUp: ContractRoute = run {
+        val requestBody = Body.auto<SingUpApiRequest>().toLens()
         val responseBody = Body.auto<GetUserApiResponse>().toLens()
 
         "user" meta {
@@ -83,10 +90,16 @@ object TelegramMiniAppRoutes {
             summary = "Create user"
             security = telegramMiniAppSecurity
             tags += listOf(Tag("tma"))
+            receiving(
+                requestBody to SingUpApiRequest(
+                    inviteCode = null,
+                ),
+            )
             returning(
                 Status.OK,
                 responseBody to GetUserApiResponse(
                     balance = BigDecimal.ZERO,
+                    referralBalance = BigDecimal.ZERO,
                     goals = emptyList(),
                     gameTickets = 3L,
                     checkInStreak = GetUserApiResponse.CheckInStreak(
@@ -95,15 +108,28 @@ object TelegramMiniAppRoutes {
                         gameTickets = 1,
                         grantedAt = Clock.System.now(),
                     ),
+                    inviteCode = TelegramMiniAppInviteCode("12345"),
                     invites = 0L,
+                    wasInvited = false,
                     nextMilestoneIn = BigDecimal.ZERO,
                     lastMilestone = null,
                 ),
             )
         } bindContract Method.POST to { request ->
+            val apiRequest = requestBody(request)
+
             transaction {
                 val user = request.telegramMiniAppPrincipal.maybeUser
-                    ?: TelegramMiniAppUserEntity.create(request.telegramMiniAppPrincipal.userData.userId)
+                    ?: run {
+                        val inviter = apiRequest.inviteCode
+                            ?.let {
+                                TelegramMiniAppUserEntity.findByInviteCode(apiRequest.inviteCode)
+                                    ?.takeIf { it.invites == -1L || it.invites > 0L }
+                                    ?: return@transaction processingError("Invite code is not valid")
+                            }
+
+                        TelegramMiniAppUserEntity.create(request.telegramMiniAppPrincipal.userData.userId, invitedBy = inviter)
+                    }
 
                 Response(Status.CREATED).with(
                     responseBody of GetUserApiResponse.fromEntity(user),
@@ -130,6 +156,7 @@ object TelegramMiniAppRoutes {
                 Status.OK,
                 responseBody to GetUserApiResponse(
                     balance = BigDecimal.ZERO,
+                    referralBalance = BigDecimal.ZERO,
                     goals = emptyList(),
                     gameTickets = 3L,
                     checkInStreak = GetUserApiResponse.CheckInStreak(
@@ -138,7 +165,9 @@ object TelegramMiniAppRoutes {
                         gameTickets = 1,
                         grantedAt = Clock.System.now(),
                     ),
+                    inviteCode = TelegramMiniAppInviteCode("12345"),
                     invites = 0L,
+                    wasInvited = false,
                     nextMilestoneIn = BigDecimal.ZERO,
                     lastMilestone = null,
                 ),
@@ -193,7 +222,7 @@ object TelegramMiniAppRoutes {
                         responseBody of ReactionsTimeApiResponse(
                             percentile = percentile,
                             reward = percentile.toBigDecimal(),
-                            balance = lockedUser.pointsBalance(),
+                            balance = lockedUser.pointsBalances().sum(),
                         ),
                     )
                 }

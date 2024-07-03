@@ -3,8 +3,12 @@ package co.chainring.apps.api.model.tma
 import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppCheckInStreak
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGoal
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppInviteCode
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppMilestone
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserRewardType
+import co.chainring.core.model.telegram.miniapp.ofType
+import co.chainring.core.model.telegram.miniapp.sum
 import co.chainring.core.utils.truncateTo
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
@@ -13,10 +17,13 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class GetUserApiResponse(
     val balance: BigDecimalJson,
+    val referralBalance: BigDecimalJson,
     val goals: List<Goal>,
     val gameTickets: Long,
     val checkInStreak: CheckInStreak,
     val invites: Long,
+    val inviteCode: TelegramMiniAppInviteCode,
+    val wasInvited: Boolean,
     val nextMilestoneIn: BigDecimalJson?,
     val lastMilestone: Milestone?,
 ) {
@@ -24,12 +31,14 @@ data class GetUserApiResponse(
         fun fromEntity(user: TelegramMiniAppUserEntity): GetUserApiResponse {
             val dailyReward = TelegramMiniAppCheckInStreak.grantDailyReward(user)
 
-            val balance = user.pointsBalance()
-            val previousMilestone = TelegramMiniAppMilestone.previousMilestone(balance)
-            val nextMilestone = TelegramMiniAppMilestone.nextMilestone(balance)
+            val balances = user.pointsBalances()
+            val fullBalance = balances.sum()
+            val previousMilestone = TelegramMiniAppMilestone.previousMilestone(fullBalance)
+            val nextMilestone = TelegramMiniAppMilestone.nextMilestone(fullBalance)
 
             return GetUserApiResponse(
-                balance = balance,
+                balance = fullBalance,
+                referralBalance = balances.ofType(TelegramMiniAppUserRewardType.ReferralBonus),
                 goals = TelegramMiniAppGoal.allPossible.let { allGoals ->
                     val achievedGoals = user.achievedGoals()
                     allGoals.map {
@@ -46,7 +55,9 @@ data class GetUserApiResponse(
                     )
                 },
                 invites = user.invites,
-                nextMilestoneIn = nextMilestone?.let { it.cp - balance },
+                inviteCode = user.inviteCode,
+                wasInvited = user.invitedBy != null,
+                nextMilestoneIn = nextMilestone?.let { it.cp - fullBalance },
                 lastMilestone = user.lastMilestoneGrantedAt?.let { grantedAt ->
                     previousMilestone?.let {
                         Milestone(
@@ -80,6 +91,11 @@ data class GetUserApiResponse(
         val grantedAt: Instant,
     )
 }
+
+@Serializable
+data class SingUpApiRequest(
+    val inviteCode: TelegramMiniAppInviteCode? = null,
+)
 
 @Serializable
 data class ClaimRewardApiRequest(

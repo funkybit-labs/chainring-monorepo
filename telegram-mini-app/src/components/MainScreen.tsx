@@ -20,7 +20,7 @@ export default function MainScreen({ user }: { user: User }) {
           case 'goals':
             return <GoalsTab user={user} />
           case 'friends':
-            return <FriendsTab />
+            return <FriendsTab user={user} />
         }
       })()}
       <div className="fixed bottom-0 left-0 z-20 flex h-12 w-full justify-between bg-darkBluishGray10 px-4 py-3 text-white">

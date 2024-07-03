@@ -4,7 +4,7 @@ import LogoVSvg from 'assets/logo-v.svg'
 import MillisecondsSvg from 'assets/milliseconds.svg'
 import MainScreen from 'components/MainScreen'
 import Spinner from 'components/common/Spinner'
-import { apiClient, userQueryKey } from 'apiClient'
+import { apiClient, ApiErrorsSchema, userQueryKey } from 'apiClient'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isErrorFromAlias } from '@zodios/core'
 import { Button } from 'components/common/Button'
@@ -29,11 +29,26 @@ export default function EntryPoint() {
   })
 
   const signUpMutation = useMutation({
-    mutationFn: async () => apiClient.signUp(undefined),
+    mutationFn: async () => {
+      const query = new URLSearchParams(window.location.search)
+      const inviteCode = query.get('tgWebAppStartParam')
+
+      return apiClient.signUp({ inviteCode: inviteCode }).catch((error) => {
+        let errorMessage = 'An unexpected error occurred'
+        if (
+          error.response &&
+          ApiErrorsSchema.safeParse(error.response.data).success
+        ) {
+          const parsedErrors = ApiErrorsSchema.parse(error.response.data)
+          errorMessage = parsedErrors.errors
+            .map((err) => err.displayMessage)
+            .join(', ')
+        }
+        alert(errorMessage)
+      })
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: userQueryKey }),
-    onError: () => {
-      alert('Something went wrong')
-    }
+    onError: () => queryClient.invalidateQueries({ queryKey: userQueryKey })
   })
 
   if (userQuery.isPending) {

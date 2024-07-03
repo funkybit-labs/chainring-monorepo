@@ -7,6 +7,7 @@ import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.tma.ClaimRewardApiRequest
 import co.chainring.apps.api.model.tma.GetUserApiResponse
 import co.chainring.apps.api.model.tma.ReactionTimeApiRequest
+import co.chainring.core.db.notifyDbListener
 import co.chainring.core.model.telegram.TelegramUserId
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGoal
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
@@ -89,6 +90,7 @@ class TelegramMiniAppApiTest {
 
         val result = apiClient.signUp().also {
             assertEquals("20".crPoints(), it.balance)
+            assertEquals(0, "0".crPoints().compareTo(it.referralBalance))
 
             assertEquals(1, it.gameTickets)
 
@@ -453,6 +455,143 @@ class TelegramMiniAppApiTest {
                 assertEquals(-1, lastMilestone.invites)
                 assertTrue { lastMilestone.grantedAt > now }
             }
+    }
+
+    @Test
+    fun referralPoints() {
+        // setup
+        val lZeroInvitee = TelegramMiniAppApiClient(TelegramUserId(1110L))
+        val lZeroInviteCode = lZeroInvitee.signUp().also {
+            assertEquals("20".crPoints(), it.balance)
+            assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
+        }.inviteCode
+
+        val lOneInvitee = TelegramMiniAppApiClient(TelegramUserId(1111L))
+        val lOneInviteCode = lOneInvitee.signUp(inviteCode = lZeroInviteCode).also {
+            assertEquals("20".crPoints(), it.balance)
+            assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
+        }.inviteCode
+
+        val lTwoInvitee = TelegramMiniAppApiClient(TelegramUserId(1112L))
+        val lTwoInviteCode = lTwoInvitee.signUp(inviteCode = lOneInviteCode).also {
+            assertEquals("20".crPoints(), it.balance)
+            assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
+        }.inviteCode
+
+        val lThreeInvitee = TelegramMiniAppApiClient(TelegramUserId(1113L))
+        lThreeInvitee.signUp(inviteCode = lTwoInviteCode).also {
+            assertEquals("20".crPoints(), it.balance)
+            assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
+        }.inviteCode
+
+        val justUser = TelegramMiniAppApiClient(TelegramUserId(1119L))
+        justUser.signUp(inviteCode = null).also {
+            assertEquals("20".crPoints(), it.balance)
+            assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
+        }
+
+        lThreeInvitee
+            .claimReward(ClaimRewardApiRequest(TelegramMiniAppGoal.Id.GithubSubscription))
+            .also {
+                assertEquals("220".crPoints(), it.balance)
+                assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
+            }
+
+        // distribute referral rewards (3->2)
+        transaction {
+            notifyDbListener("repeater_app_task_ctl", "referral_points")
+        }
+        Thread.sleep(100L)
+
+        lZeroInvitee.getUser().also {
+            assertEquals("22".crPoints(), it.balance)
+            assertEquals("2".crPoints(), it.referralBalance)
+        }
+        lOneInvitee.getUser().also {
+            assertEquals("22".crPoints(), it.balance)
+            assertEquals("2".crPoints(), it.referralBalance)
+        }
+        lTwoInvitee.getUser().also {
+            assertEquals("42".crPoints(), it.balance)
+            assertEquals("22".crPoints(), it.referralBalance)
+        }
+        lThreeInvitee.getUser().also {
+            assertEquals("220".crPoints(), it.balance)
+            assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
+        }
+
+        // distribute referral rewards (2->1)
+        transaction {
+            notifyDbListener("repeater_app_task_ctl", "referral_points")
+        }
+        Thread.sleep(100L)
+
+        lZeroInvitee.getUser().also {
+            assertEquals("22.2".crPoints(), it.balance)
+            assertEquals("2.2".crPoints(), it.referralBalance)
+        }
+        lOneInvitee.getUser().also {
+            assertEquals("24.2".crPoints(), it.balance)
+            assertEquals("4.2".crPoints(), it.referralBalance)
+        }
+        lTwoInvitee.getUser().also {
+            assertEquals("42".crPoints(), it.balance)
+            assertEquals("22".crPoints(), it.referralBalance)
+        }
+        lThreeInvitee.getUser().also {
+            assertEquals("220".crPoints(), it.balance)
+            assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
+        }
+
+        // distribute referral rewards (1->0)
+        transaction {
+            notifyDbListener("repeater_app_task_ctl", "referral_points")
+        }
+        Thread.sleep(100L)
+
+        lZeroInvitee.getUser().also {
+            assertEquals("22.42".crPoints(), it.balance)
+            assertEquals("2.42".crPoints(), it.referralBalance)
+        }
+        lOneInvitee.getUser().also {
+            assertEquals("24.2".crPoints(), it.balance)
+            assertEquals("4.2".crPoints(), it.referralBalance)
+        }
+        lTwoInvitee.getUser().also {
+            assertEquals("42".crPoints(), it.balance)
+            assertEquals("22".crPoints(), it.referralBalance)
+        }
+        lThreeInvitee.getUser().also {
+            assertEquals("220".crPoints(), it.balance)
+            assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
+        }
+
+        // distribute referral rewards (no changes)
+        transaction {
+            notifyDbListener("repeater_app_task_ctl", "referral_points")
+        }
+        Thread.sleep(100L)
+
+        lZeroInvitee.getUser().also {
+            assertEquals("22.42".crPoints(), it.balance)
+            assertEquals("2.42".crPoints(), it.referralBalance)
+        }
+        lOneInvitee.getUser().also {
+            assertEquals("24.2".crPoints(), it.balance)
+            assertEquals("4.2".crPoints(), it.referralBalance)
+        }
+        lTwoInvitee.getUser().also {
+            assertEquals("42".crPoints(), it.balance)
+            assertEquals("22".crPoints(), it.referralBalance)
+        }
+        lThreeInvitee.getUser().also {
+            assertEquals("220".crPoints(), it.balance)
+            assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
+        }
+        justUser.getUser().also {
+            assertEquals("20".crPoints(), it.balance)
+            assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
+        }
     }
 
     private fun updateUser(telegramUserId: TelegramUserId, fn: (TelegramMiniAppUserEntity) -> Unit) {

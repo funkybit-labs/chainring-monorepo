@@ -6,26 +6,27 @@ import co.chainring.apps.api.model.tma.ClaimRewardApiRequest
 import co.chainring.apps.api.model.tma.GetUserApiResponse
 import co.chainring.apps.api.model.tma.ReactionTimeApiRequest
 import co.chainring.apps.api.model.tma.ReactionsTimeApiResponse
+import co.chainring.apps.api.model.tma.SingUpApiRequest
 import co.chainring.core.model.telegram.TelegramUserId
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppInviteCode
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.Headers
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.internal.EMPTY_REQUEST
 import org.http4k.core.toUrlFormEncoded
 import org.http4k.security.HmacSha256.hmacSHA256
 import java.net.HttpURLConnection
 
 class TelegramMiniAppApiClient(val telegramUserId: TelegramUserId) {
-    fun signUp(): GetUserApiResponse =
-        trySignUp().assertSuccess()
+    fun signUp(inviteCode: TelegramMiniAppInviteCode? = null): GetUserApiResponse =
+        trySignUp(inviteCode).assertSuccess()
 
-    fun trySignUp(): Either<ApiCallFailure, GetUserApiResponse> =
+    fun trySignUp(inviteCode: TelegramMiniAppInviteCode? = null): Either<ApiCallFailure, GetUserApiResponse> =
         httpClient.newCall(
             Request.Builder()
                 .url("$apiServerRootUrl/tma/v1/user")
-                .post(EMPTY_REQUEST)
+                .post(Json.encodeToString(SingUpApiRequest(inviteCode)).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(telegramUserId),
         ).execute().toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
