@@ -3,6 +3,7 @@ package co.chainring.core.model.telegram.miniapp
 import co.chainring.core.model.db.EntityId
 import co.chainring.core.model.db.GUIDEntity
 import co.chainring.core.model.db.GUIDTable
+import co.chainring.core.model.db.PGEnum
 import co.chainring.core.model.telegram.TelegramUserId
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
@@ -46,6 +47,12 @@ value class TelegramMiniAppInviteCode(val value: String) {
     override fun toString(): String = value
 }
 
+enum class TelegramMiniAppUserIsBot {
+    No,
+    Maybe,
+    Yes,
+}
+
 object TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_mini_app_user", ::TelegramMiniAppUserId) {
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
@@ -58,10 +65,18 @@ object TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_min
     val invites = long("invites").default(5)
     val inviteCode = varchar("invite_code", 10485760).index()
     val invitedBy = reference("invited_by", TelegramMiniAppUserTable).index().nullable()
+    val isBot = customEnumeration(
+        "is_bot",
+        "TelegramMiniAppUserIsBot",
+        { value -> TelegramMiniAppUserIsBot.valueOf(value as String) },
+        { PGEnum("TelegramMiniAppUserIsBot", it) },
+    ).index().default(TelegramMiniAppUserIsBot.No)
 }
 
 class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEntity<TelegramMiniAppUserId>(guid) {
     companion object : EntityClass<TelegramMiniAppUserId, TelegramMiniAppUserEntity>(TelegramMiniAppUserTable) {
+        private const val HUMAN_REACTION_TIME_THRESHOLD_MS = 25
+
         fun create(telegramUserId: TelegramUserId, invitedBy: TelegramMiniAppUserEntity?): TelegramMiniAppUserEntity {
             invitedBy?.let {
                 it.invites -= 1
@@ -110,6 +125,7 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
         toReal = { TelegramMiniAppInviteCode(it) },
     )
     var invitedBy by TelegramMiniAppUserEntity optionalReferencedOn TelegramMiniAppUserTable.invitedBy
+    var isBot by TelegramMiniAppUserTable.isBot
 
     fun pointsBalances(): Map<TelegramMiniAppUserRewardType, BigDecimal> {
         val sumColumn = TelegramMiniAppUserRewardTable.amount.sum().alias("amount_sum")
@@ -135,7 +151,7 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
 
     fun grantReward(goalId: TelegramMiniAppGoal.Id) {
         val goal = TelegramMiniAppGoal.allPossible.first { it.id == goalId }
-        TelegramMiniAppUserRewardEntity.goalAchieved(this, goal.reward, goal.id)
+        TelegramMiniAppUserRewardEntity.createGoalAchievementReward(this, goal.reward, goal.id)
     }
 
     fun lockForUpdate(): TelegramMiniAppUserEntity {
@@ -146,9 +162,28 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
         this.gameTickets -= 1
         this.updatedAt = Clock.System.now()
 
-        val percentile = TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(reactionTimeMs)
+        if (reactionTimeMs < HUMAN_REACTION_TIME_THRESHOLD_MS) {
+            when (this.isBot) {
+                TelegramMiniAppUserIsBot.No -> {
+                    this.isBot = TelegramMiniAppUserIsBot.Maybe
+                }
+                TelegramMiniAppUserIsBot.Maybe -> {
+                    this.isBot = TelegramMiniAppUserIsBot.Yes
+                }
+                TelegramMiniAppUserIsBot.Yes -> {}
+            }
+        } else if (this.isBot == TelegramMiniAppUserIsBot.Maybe) {
+            this.isBot = TelegramMiniAppUserIsBot.No
+        }
 
-        TelegramMiniAppUserRewardEntity.reactionGame(this, percentile.toBigDecimal())
+        val roundedTime = TelegramMiniAppGameReactionTime.roundTime(reactionTimeMs)
+        val percentile = TelegramMiniAppGameReactionTime.calculatePercentile(roundedTime)
+
+        if (this.isBot != TelegramMiniAppUserIsBot.Yes) {
+            TelegramMiniAppGameReactionTime.record(roundedTime)
+        }
+
+        TelegramMiniAppUserRewardEntity.createReactionGameReward(this, percentile.toBigDecimal())
 
         return percentile
     }

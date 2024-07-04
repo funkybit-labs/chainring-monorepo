@@ -36,7 +36,7 @@ class ReferralPointsTask(val config: DailyPointBonusTaskConfig = DailyPointBonus
                 val referralPoints = inviteePoints.multiply(config.referralBonusRate)
 
                 if (inviteePoints >= config.threshold) {
-                    TelegramMiniAppUserRewardEntity.referralBonus(invitor, referralPoints)
+                    TelegramMiniAppUserRewardEntity.createReferralBonusReward(invitor, referralPoints)
                 }
             }
 

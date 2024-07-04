@@ -11,6 +11,7 @@ import co.chainring.core.db.notifyDbListener
 import co.chainring.core.model.telegram.TelegramUserId
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGoal
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserIsBot
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserRewardEntity
 import co.chainring.core.utils.crPoints
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
@@ -437,7 +438,7 @@ class TelegramMiniAppApiTest {
 
         // set user balance right before the last milestone (378000) and play game
         updateUser(telegramUserId) { user ->
-            TelegramMiniAppUserRewardEntity.reactionGame(user, BigDecimal("365870"))
+            TelegramMiniAppUserRewardEntity.createReactionGameReward(user, BigDecimal("365870"))
         }
         apiClient.recordReactionTime(ReactionTimeApiRequest(100L))
 
@@ -586,6 +587,39 @@ class TelegramMiniAppApiTest {
         }
         lThreeInvitee.getUser().also {
             assertEquals("220".crPoints(), it.balance)
+            assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
+        }
+        justUser.getUser().also {
+            assertEquals("20".crPoints(), it.balance)
+            assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
+        }
+
+        updateUser(lThreeInvitee.telegramUserId) { user ->
+            user.isBot = TelegramMiniAppUserIsBot.Yes
+            TelegramMiniAppUserRewardEntity.createReactionGameReward(user, BigDecimal("280"))
+        }
+        assertEquals("500".crPoints(), lThreeInvitee.getUser().balance)
+
+        // distribute referral rewards (no one should get referral points from lThreeInvitee)
+        transaction {
+            notifyDbListener("repeater_app_task_ctl", "referral_points")
+        }
+        Thread.sleep(100L)
+
+        lZeroInvitee.getUser().also {
+            assertEquals("22.42".crPoints(), it.balance)
+            assertEquals("2.42".crPoints(), it.referralBalance)
+        }
+        lOneInvitee.getUser().also {
+            assertEquals("24.2".crPoints(), it.balance)
+            assertEquals("4.2".crPoints(), it.referralBalance)
+        }
+        lTwoInvitee.getUser().also {
+            assertEquals("42".crPoints(), it.balance)
+            assertEquals("22".crPoints(), it.referralBalance)
+        }
+        lThreeInvitee.getUser().also {
+            assertEquals("500".crPoints(), it.balance)
             assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
         }
         justUser.getUser().also {
