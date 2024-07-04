@@ -96,7 +96,7 @@ class BlockchainDepositHandler(
                         transaction {
                             val deposit = DepositEntity.findByTxHash(txHash)
                             if (deposit == null) {
-                                DepositEntity.upsert(
+                                DepositEntity.createOrUpdate(
                                     wallet = WalletEntity.getOrCreate(Address(Keys.toChecksumAddress(depositEventResponse.from))),
                                     symbol = SymbolEntity.forChainAndContractAddress(
                                         chainId,
@@ -153,14 +153,14 @@ class BlockchainDepositHandler(
                                 BalanceType.Exchange,
                             )
 
-                            pendingDeposit.update(DepositStatus.Confirmed)
+                            pendingDeposit.markAsConfirmed(blockNumber)
                         }
                     }
                     else -> {
                         val error = receipt.revertReason ?: "Unknown Error"
                         logger.error { "Deposit failed with revert reason $error" }
 
-                        pendingDeposit.update(DepositStatus.Failed, error)
+                        pendingDeposit.markAsFailed(error)
                     }
                 }
             }
