@@ -52,7 +52,7 @@ import co.chainring.core.model.db.migrations.V54_TelegramMiniAppGameReactionTime
 import co.chainring.core.model.db.migrations.V55_TelegramMiniAppMilestones
 import co.chainring.core.model.db.migrations.V56_TelegramMiniAppInvites
 import co.chainring.core.model.db.migrations.V57_AddMinFeeToMarket
-import co.chainring.core.model.db.migrations.V58_TelegramMiniAppGameUserReactionTime
+import co.chainring.core.model.db.migrations.V58_TelegramMiniAppBotDetection
 import co.chainring.core.model.db.migrations.V5_ChainTable
 import co.chainring.core.model.db.migrations.V6_MarketTable
 import co.chainring.core.model.db.migrations.V7_OrderTable
@@ -117,5 +117,5 @@ val migrations = listOf(
     V55_TelegramMiniAppMilestones(),
     V56_TelegramMiniAppInvites(),
     V57_AddMinFeeToMarket(),
-    V58_TelegramMiniAppGameUserReactionTime(),
+    V58_TelegramMiniAppBotDetection(),
 )

@@ -118,7 +118,7 @@ class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId
                 .where {
                     listOf(
                         TelegramMiniAppUserTable.invitedBy.isNotNull(),
-                        TelegramMiniAppUserTable.isBot.eq(false),
+                        TelegramMiniAppUserTable.isBot.neq(TelegramMiniAppUserIsBot.Yes),
                         TelegramMiniAppUserRewardTable.createdAt greater from,
                         TelegramMiniAppUserRewardTable.createdAt lessEq to,
                     ).compoundAnd()

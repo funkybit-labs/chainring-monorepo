@@ -3,15 +3,16 @@ package co.chainring.core.model.db
 import co.chainring.core.model.telegram.TelegramUserId
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGameReactionTime
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGameReactionTimeTable
-import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGameUserReactionTimeTable
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserIsBot
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserRewardTable
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserRewardType
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserTable
 import co.chainring.core.model.telegram.miniapp.ofType
 import co.chainring.testutils.TestWithDb
 import org.jetbrains.exposed.sql.deleteAll
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.system.measureTimeMillis
@@ -24,7 +25,8 @@ class ReactionTimeGameTest : TestWithDb() {
     fun setup() {
         transaction {
             TelegramMiniAppGameReactionTimeTable.deleteAll()
-            TelegramMiniAppGameUserReactionTimeTable.deleteAll()
+            TelegramMiniAppUserRewardTable.deleteAll()
+            TelegramMiniAppUserTable.deleteAll()
         }
     }
 
@@ -104,17 +106,23 @@ class ReactionTimeGameTest : TestWithDb() {
             val user = TelegramMiniAppUserEntity.create(TelegramUserId(123), invitedBy = null)
             user.gameTickets = 10
             user.flush()
-            assertFalse(user.isBot)
+            assertEquals(TelegramMiniAppUserIsBot.No, user.isBot)
 
             user.useGameTicket(reactionTimeMs = 100)
             assertEquals(1, getCount(100))
 
-            // this should mark user as bot
             user.useGameTicket(reactionTimeMs = 20)
-            user.useGameTicket(reactionTimeMs = 20)
-            assertEquals(1, getCount(20))
+            assertEquals(TelegramMiniAppUserIsBot.Maybe, user.isBot)
 
-            assertTrue(user.isBot)
+            user.useGameTicket(reactionTimeMs = 30)
+            assertEquals(TelegramMiniAppUserIsBot.No, user.isBot)
+
+            user.useGameTicket(reactionTimeMs = 20)
+            assertEquals(TelegramMiniAppUserIsBot.Maybe, user.isBot)
+
+            user.useGameTicket(reactionTimeMs = 20)
+            assertEquals(TelegramMiniAppUserIsBot.Yes, user.isBot)
+
             user.flush()
 
             val prevReactionGamePoints = user.pointsBalances().ofType(TelegramMiniAppUserRewardType.ReactionGame)

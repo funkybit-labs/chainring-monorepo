@@ -33,7 +33,6 @@ import co.chainring.core.model.db.WithdrawalTable
 import co.chainring.core.model.telegram.bot.TelegramBotUserTable
 import co.chainring.core.model.telegram.bot.TelegramBotUserWalletTable
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGameReactionTimeTable
-import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGameUserReactionTimeTable
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserRewardTable
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserTable
 import co.chainring.core.utils.toFundamentalUnits
@@ -223,7 +222,6 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             TelegramBotUserTable.deleteAll()
             TelegramMiniAppUserRewardTable.deleteAll()
             TelegramMiniAppGameReactionTimeTable.deleteAll()
-            TelegramMiniAppGameUserReactionTimeTable.deleteAll()
             TelegramMiniAppUserTable.deleteAll()
             BroadcasterJobTable.deleteAll()
             OrderExecutionTable.deleteAll()

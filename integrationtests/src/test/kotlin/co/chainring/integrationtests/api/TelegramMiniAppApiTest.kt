@@ -11,6 +11,7 @@ import co.chainring.core.db.notifyDbListener
 import co.chainring.core.model.telegram.TelegramUserId
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGoal
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserIsBot
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserRewardEntity
 import co.chainring.core.utils.crPoints
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
@@ -594,7 +595,7 @@ class TelegramMiniAppApiTest {
         }
 
         updateUser(lThreeInvitee.telegramUserId) { user ->
-            user.isBot = true
+            user.isBot = TelegramMiniAppUserIsBot.Yes
             TelegramMiniAppUserRewardEntity.createReactionGameReward(user, BigDecimal("280"))
         }
         assertEquals("500".crPoints(), lThreeInvitee.getUser().balance)
