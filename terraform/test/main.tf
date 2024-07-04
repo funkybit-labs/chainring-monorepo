@@ -106,6 +106,8 @@ module "anvil" {
   health_check_status                     = "400"
   mount_efs_volume                        = true
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
+  deployment_minimum_healthy_percent      = 0
+  deployment_maximum_percent              = 100
 }
 
 module "otterscan" {
@@ -158,6 +160,8 @@ module "anvil2" {
   health_check_status                     = "400"
   mount_efs_volume                        = true
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
+  deployment_minimum_healthy_percent      = 0
+  deployment_maximum_percent              = 100
 }
 
 module "otterscan2" {
