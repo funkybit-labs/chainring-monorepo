@@ -56,7 +56,7 @@ object DepositTable : GUIDTable<DepositId>("deposit", ::DepositId) {
     ).index()
     val symbolGuid = reference("symbol_guid", SymbolTable).index()
     val amount = decimal("amount", 30, 0)
-    val blockNumber = decimal("block_number", 30, 0).index()
+    val blockNumber = decimal("block_number", 30, 0).nullable().index()
     val transactionHash = varchar("transaction_hash", 10485760).uniqueIndex()
     val updatedAt = timestamp("updated_at").nullable()
     val updatedBy = varchar("updated_by", 10485760).nullable()
@@ -67,24 +67,6 @@ class DepositException(message: String) : Exception(message)
 
 class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
     companion object : EntityClass<DepositId, DepositEntity>(DepositTable) {
-        fun create(
-            wallet: WalletEntity,
-            symbol: SymbolEntity,
-            amount: BigInteger,
-            blockNumber: BigInteger,
-            transactionHash: TxHash,
-        ) = DepositEntity.new(DepositId.generate()) {
-            val now = Clock.System.now()
-            this.createdAt = now
-            this.createdBy = "system"
-            this.wallet = wallet
-            this.symbol = symbol
-            this.status = DepositStatus.Pending
-            this.amount = amount
-            this.blockNumber = blockNumber
-            this.transactionHash = transactionHash
-        }
-
         fun findByTxHash(txHash: TxHash): DepositEntity? {
             return DepositEntity.find {
                 DepositTable.transactionHash.eq(txHash.value)
@@ -126,20 +108,22 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
             ).toList()
         }
 
-        fun upsert(
+        fun createOrUpdate(
             wallet: WalletEntity,
             symbol: SymbolEntity,
             amount: BigIntegerJson,
-            blockNumber: BigInteger,
+            blockNumber: BigInteger?,
             transactionHash: TxHash,
         ): DepositEntity? {
             DepositTable.upsert(
                 DepositTable.transactionHash,
-                onUpdate = listOf(
+                onUpdate = listOfNotNull(
                     DepositTable.walletGuid to stringLiteral(wallet.guid.value.value),
                     DepositTable.symbolGuid to stringLiteral(symbol.guid.value.value),
                     DepositTable.amount to decimalLiteral(amount.toBigDecimal()),
-                    DepositTable.blockNumber to decimalLiteral(blockNumber.toBigDecimal()),
+                    blockNumber?.let {
+                        DepositTable.blockNumber to decimalLiteral(it.toBigDecimal())
+                    },
                     DepositTable.transactionHash to stringLiteral(transactionHash.value),
                 ),
             ) {
@@ -150,7 +134,7 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
                 it[walletGuid] = wallet.guid
                 it[symbolGuid] = symbol.guid
                 it[DepositTable.amount] = amount.toBigDecimal()
-                it[DepositTable.blockNumber] = blockNumber.toBigDecimal()
+                it[DepositTable.blockNumber] = blockNumber?.toBigDecimal()
                 it[DepositTable.transactionHash] = transactionHash.value
             }
 
@@ -158,11 +142,24 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
         }
     }
 
-    fun update(status: DepositStatus, error: String? = null) {
+    fun markAsConfirmed(blockNumber: BigInteger) {
         val now = Clock.System.now()
         this.updatedAt = now
-        this.status = status
+        this.status = DepositStatus.Confirmed
+        this.blockNumber = blockNumber
+    }
+
+    fun markAsFailed(error: String) {
+        val now = Clock.System.now()
+        this.updatedAt = now
+        this.status = DepositStatus.Failed
         this.error = error
+    }
+
+    fun markAsComplete() {
+        val now = Clock.System.now()
+        this.updatedAt = now
+        this.status = DepositStatus.Complete
     }
 
     var walletGuid by DepositTable.walletGuid
@@ -179,8 +176,8 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
     )
 
     var blockNumber by DepositTable.blockNumber.transform(
-        toReal = { it.toBigInteger() },
-        toColumn = { it.toBigDecimal() },
+        toReal = { it?.toBigInteger() },
+        toColumn = { it?.toBigDecimal() },
     )
     var transactionHash by DepositTable.transactionHash.transform(
         toReal = { TxHash(it) },

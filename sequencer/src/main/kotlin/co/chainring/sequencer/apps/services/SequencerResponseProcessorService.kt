@@ -13,7 +13,6 @@ import co.chainring.core.model.db.BalanceType
 import co.chainring.core.model.db.BroadcasterNotification
 import co.chainring.core.model.db.CreateOrderAssignment
 import co.chainring.core.model.db.DepositEntity
-import co.chainring.core.model.db.DepositStatus
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketEntity
@@ -84,10 +83,10 @@ object SequencerResponseProcessorService {
                 request.balanceBatch!!.depositsList.forEach { deposit ->
                     val depositEntity = DepositEntity.findById(deposit.externalGuid.depositId())!!
                     if (response.balancesChangedList.firstOrNull { it.wallet == deposit.wallet } == null) {
-                        depositEntity.update(DepositStatus.Failed, error(response))
+                        depositEntity.markAsFailed(error(response))
                     } else {
                         handleSequencerResponse(request = request, response = response, ordersBeingUpdated = listOf())
-                        depositEntity.update(DepositStatus.Complete, error = null)
+                        depositEntity.markAsComplete()
                     }
                 }
 
