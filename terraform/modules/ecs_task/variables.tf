@@ -50,3 +50,11 @@ variable "mount_efs_volume" {
 }
 variable "service_discovery_private_dns_namespace" {}
 data "aws_caller_identity" "current" {}
+variable "deployment_maximum_percent" {
+  type    = number
+  default = 200
+}
+variable "deployment_minimum_healthy_percent" {
+  type    = number
+  default = 100
+}

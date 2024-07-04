@@ -211,11 +211,13 @@ resource "aws_service_discovery_service" "service_discovery_service" {
 }
 
 resource "aws_ecs_service" "service" {
-  name            = "${var.name_prefix}-${var.task_name}"
-  cluster         = var.ecs_cluster_id
-  task_definition = aws_ecs_task_definition.task.arn
-  desired_count   = 0 # supposed to be updated outside of TF during each deploy
-  launch_type     = "FARGATE"
+  name                               = "${var.name_prefix}-${var.task_name}"
+  cluster                            = var.ecs_cluster_id
+  task_definition                    = aws_ecs_task_definition.task.arn
+  desired_count                      = 0 # supposed to be updated outside of TF during each deploy
+  launch_type                        = "FARGATE"
+  deployment_minimum_healthy_percent = var.deployment_minimum_healthy_percent
+  deployment_maximum_percent         = var.deployment_maximum_percent
 
   network_configuration {
     security_groups = [

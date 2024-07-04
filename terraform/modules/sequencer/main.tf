@@ -228,10 +228,12 @@ resource "aws_service_discovery_service" "sequencer" {
 }
 
 resource "aws_ecs_service" "sequencer" {
-  name            = "${var.name_prefix}-sequencer"
-  cluster         = var.ecs_cluster_name
-  task_definition = aws_ecs_task_definition.sequencer.arn
-  desired_count   = 1
+  name                               = "${var.name_prefix}-sequencer"
+  cluster                            = var.ecs_cluster_name
+  task_definition                    = aws_ecs_task_definition.sequencer.arn
+  desired_count                      = 1
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
 
   network_configuration {
     security_groups = []
@@ -256,10 +258,12 @@ resource "aws_ecs_service" "sequencer" {
 
 
 resource "aws_ecs_service" "garp" {
-  name            = "${var.name_prefix}-garp"
-  cluster         = var.ecs_cluster_name
-  task_definition = aws_ecs_task_definition.gateway_and_response_processor.arn
-  desired_count   = 1
+  name                               = "${var.name_prefix}-garp"
+  cluster                            = var.ecs_cluster_name
+  task_definition                    = aws_ecs_task_definition.gateway_and_response_processor.arn
+  desired_count                      = 1
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
 
   network_configuration {
     security_groups = [aws_security_group.security_group.id]
