@@ -44,13 +44,24 @@ import org.knowm.xchart.XYChartBuilder
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
 
+sealed class LiquidityPlacement {
+    data class Absolute(val amount: BigInteger) : LiquidityPlacement()
+    data class Relative(val fraction: BigDecimal) : LiquidityPlacement()
+
+    companion object {
+        val default = Relative("0.5".toBigDecimal())
+    }
+}
+
 class Maker(
     marketIds: List<MarketId>,
     private val levels: Int,
     private val levelsSpread: Int,
+    private val marketPriceOverride: BigDecimal? = null,
+    private val liquidityPlacement: LiquidityPlacement,
     nativeAssets: Map<String, BigInteger>,
     assets: Map<String, BigInteger>,
-    keyPair: ECKeyPair = Keys.createEcKeyPair()
+    keyPair: ECKeyPair = Keys.createEcKeyPair(),
 ) : Actor(marketIds, nativeAssets, assets, keyPair) {
     override val id: String = "mm_${Address(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
     override val logger: KLogger = KotlinLogging.logger {}
@@ -183,13 +194,21 @@ class Maker(
         }
     }
 
-    private fun offerAndBidAmounts(market: Market, offerPrices: List<BigDecimal>, bidPrices: List<BigDecimal>): Pair<List<BigInteger>, List<BigInteger>> {
+    private fun offerAndBidAmounts(market: Market, offerPrices: List<BigDecimal>, bidPrices: List<BigDecimal>, curPrice: BigDecimal): Pair<List<BigInteger>, List<BigInteger>> {
         val marketId = market.id
 
-        // don't try to use all of the available inventory
-        val useBalanceFraction = 0.5.toBigDecimal()
-        val baseInventory = (balances.getOrDefault(marketId.baseSymbol(), BigInteger.ZERO).toBigDecimal() * useBalanceFraction).toBigInteger()
-        val quoteInventory = (balances.getOrDefault(marketId.quoteSymbol(), BigInteger.ZERO).toBigDecimal() * useBalanceFraction).toBigInteger()
+        val (baseInventory, quoteInventory) = when (liquidityPlacement) {
+            is LiquidityPlacement.Absolute -> {
+                val baseInventory = minOf(balances.getOrDefault(marketId.baseSymbol(), BigInteger.ZERO), liquidityPlacement.amount)
+                val quoteInventory = minOf(balances.getOrDefault(marketId.quoteSymbol(), BigInteger.ZERO), (liquidityPlacement.amount.toBigDecimal() * curPrice).toBigInteger())
+                baseInventory to quoteInventory
+            }
+            is LiquidityPlacement.Relative -> {
+                val baseInventory = (balances.getOrDefault(marketId.baseSymbol(), BigInteger.ZERO).toBigDecimal() * liquidityPlacement.fraction).toBigInteger()
+                val quoteInventory = (balances.getOrDefault(marketId.quoteSymbol(), BigInteger.ZERO).toBigDecimal() * liquidityPlacement.fraction).toBigInteger()
+                baseInventory to quoteInventory
+            }
+        }
 
         val marketToPeakStdDevFactor = 6.0
         val peakToOuterStdDevFactor = 2.0
@@ -214,11 +233,11 @@ class Maker(
     }
 
     private fun adjustQuotes(market: Market, curPrice: BigDecimal) {
-        logger.debug { "$id: adjusting quotes in market ${market.id}, current price: $curPrice" }
+        logger.debug { "$id: adjusting quotes in market ${market.id}, current price: $curPrice, price override: $marketPriceOverride" }
         val marketId = market.id
         val ordersToCancel = currentOrders[marketId] ?: emptyList()
-        val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpread, curPrice)
-        val (offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
+        val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpread, curPrice = marketPriceOverride ?: curPrice)
+        val (offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices, curPrice = marketPriceOverride ?: curPrice)
 
         val createOrders = offerPrices.mapIndexed { ix, price ->
             wallet.signOrder(
@@ -275,13 +294,13 @@ class Maker(
     }
 
     private fun createQuotes(marketId: MarketId, levels: Int, levelsSpread: Int, curPrice: BigDecimal) {
-        logger.debug { "$id: creating quotes in market $marketId, current price: $curPrice" }
+        logger.debug { "$id: creating quotes in market $marketId, current price: $curPrice, price override: $marketPriceOverride" }
         markets.find { it.id == marketId }?.let { market ->
             apiClient.cancelOpenOrders()
             currentOrders[marketId] = mutableSetOf()
 
-            val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpread, curPrice)
-            val (offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices)
+            val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpread, curPrice = marketPriceOverride ?: curPrice)
+            val (offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices, curPrice = marketPriceOverride ?: curPrice)
 
             offerPrices.forEachIndexed { ix, price ->
                 val amount = offerAmounts[ix]
