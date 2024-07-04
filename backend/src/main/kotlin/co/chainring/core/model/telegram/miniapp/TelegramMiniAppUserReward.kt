@@ -60,19 +60,19 @@ object TelegramMiniAppUserRewardTable : GUIDTable<TelegramMiniAppUserRewardId>("
 
 class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId>) : GUIDEntity<TelegramMiniAppUserRewardId>(guid) {
     companion object : EntityClass<TelegramMiniAppUserRewardId, TelegramMiniAppUserRewardEntity>(TelegramMiniAppUserRewardTable) {
-        fun goalAchieved(user: TelegramMiniAppUserEntity, amount: BigDecimal, goalId: TelegramMiniAppGoal.Id) {
+        fun createGoalAchievementReward(user: TelegramMiniAppUserEntity, amount: BigDecimal, goalId: TelegramMiniAppGoal.Id) {
             create(user, TelegramMiniAppUserRewardType.GoalAchievement, amount, goalId = goalId)
         }
 
-        fun dailyCheckIn(user: TelegramMiniAppUserEntity, amount: BigDecimal) {
+        fun createDailyCheckInReward(user: TelegramMiniAppUserEntity, amount: BigDecimal) {
             create(user, TelegramMiniAppUserRewardType.DailyCheckIn, amount)
         }
 
-        fun reactionGame(user: TelegramMiniAppUserEntity, amount: BigDecimal) {
+        fun createReactionGameReward(user: TelegramMiniAppUserEntity, amount: BigDecimal) {
             create(user, TelegramMiniAppUserRewardType.ReactionGame, amount)
         }
 
-        fun referralBonus(user: TelegramMiniAppUserEntity, amount: BigDecimal) {
+        fun createReferralBonusReward(user: TelegramMiniAppUserEntity, amount: BigDecimal) {
             create(user, TelegramMiniAppUserRewardType.ReferralBonus, amount, by = "system")
         }
 
@@ -118,6 +118,7 @@ class TelegramMiniAppUserRewardEntity(guid: EntityID<TelegramMiniAppUserRewardId
                 .where {
                     listOf(
                         TelegramMiniAppUserTable.invitedBy.isNotNull(),
+                        TelegramMiniAppUserTable.isBot.eq(false),
                         TelegramMiniAppUserRewardTable.createdAt greater from,
                         TelegramMiniAppUserRewardTable.createdAt lessEq to,
                     ).compoundAnd()

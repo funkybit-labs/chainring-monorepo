@@ -52,7 +52,7 @@ object TelegramMiniAppCheckInStreak {
             userEntity.checkInStreakDays = streakDay
             userEntity.lastStreakDayGrantedAt = now
             userEntity.gameTickets += config.gameTickets
-            TelegramMiniAppUserRewardEntity.dailyCheckIn(userEntity, config.cp)
+            TelegramMiniAppUserRewardEntity.createDailyCheckInReward(userEntity, config.cp)
         }
 
         return config

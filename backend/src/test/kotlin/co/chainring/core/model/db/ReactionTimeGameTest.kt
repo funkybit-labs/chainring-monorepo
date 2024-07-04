@@ -1,11 +1,17 @@
 package co.chainring.core.model.db
 
+import co.chainring.core.model.telegram.TelegramUserId
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGameReactionTime
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGameReactionTimeTable
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppGameUserReactionTimeTable
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
+import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserRewardType
+import co.chainring.core.model.telegram.miniapp.ofType
 import co.chainring.testutils.TestWithDb
 import org.jetbrains.exposed.sql.deleteAll
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.system.measureTimeMillis
@@ -18,6 +24,7 @@ class ReactionTimeGameTest : TestWithDb() {
     fun setup() {
         transaction {
             TelegramMiniAppGameReactionTimeTable.deleteAll()
+            TelegramMiniAppGameUserReactionTimeTable.deleteAll()
         }
     }
 
@@ -26,11 +33,11 @@ class ReactionTimeGameTest : TestWithDb() {
         transaction {
             assertEquals(0, TelegramMiniAppGameReactionTimeTable.selectAll().count())
 
-            TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(100)
-            TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(100)
-            TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(200)
-            TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(100)
-            TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(100)
+            recordAndCalculatePercentile(100)
+            recordAndCalculatePercentile(100)
+            recordAndCalculatePercentile(200)
+            recordAndCalculatePercentile(100)
+            recordAndCalculatePercentile(100)
 
             assertEquals(2, TelegramMiniAppGameReactionTimeTable.selectAll().count())
 
@@ -43,32 +50,32 @@ class ReactionTimeGameTest : TestWithDb() {
     @Test
     fun `test percentile calculation for first entry`() {
         transaction {
-            assertEquals(100, TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(100))
+            assertEquals(100, recordAndCalculatePercentile(100))
         }
     }
 
     @Test
     fun `test percentile calculation with multiple entries`() {
         transaction {
-            TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(100)
-            TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(200)
-            TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(300)
+            recordAndCalculatePercentile(100)
+            recordAndCalculatePercentile(200)
+            recordAndCalculatePercentile(300)
 
-            assertEquals(66, TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(190))
-            assertEquals(0, TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(500))
-            assertEquals(100, TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(50))
-            assertEquals(33, TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(250))
+            assertEquals(66, recordAndCalculatePercentile(190))
+            assertEquals(0, recordAndCalculatePercentile(500))
+            assertEquals(100, recordAndCalculatePercentile(50))
+            assertEquals(33, recordAndCalculatePercentile(250))
         }
     }
 
     @Test
     fun `test percentile calculation with identical reaction times`() {
         transaction {
-            TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(200)
-            TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(200)
-            TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(200)
+            recordAndCalculatePercentile(200)
+            recordAndCalculatePercentile(200)
+            recordAndCalculatePercentile(200)
 
-            val percentile = TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(200)
+            val percentile = recordAndCalculatePercentile(200)
             // All reactions are the same, so reaction is not faster
             assertEquals(0, percentile)
         }
@@ -78,17 +85,55 @@ class ReactionTimeGameTest : TestWithDb() {
     fun `test calculate reaction take less that 10ms with full lookup table`() {
         transaction {
             (0..5000).forEach {
-                TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(it.toLong())
+                recordAndCalculatePercentile(it.toLong())
             }
         }
 
         measureTimeMillis {
             transaction {
-                TelegramMiniAppGameReactionTime.recordAndCalculatePercentile(2500)
+                recordAndCalculatePercentile(2500)
             }
         }.also { time ->
             assertTrue { time <= 10 }
         }
+    }
+
+    @Test
+    fun `bot detection`() {
+        transaction {
+            val user = TelegramMiniAppUserEntity.create(TelegramUserId(123), invitedBy = null)
+            user.gameTickets = 10
+            user.flush()
+            assertFalse(user.isBot)
+
+            user.useGameTicket(reactionTimeMs = 100)
+            assertEquals(1, getCount(100))
+
+            // this should mark user as bot
+            user.useGameTicket(reactionTimeMs = 20)
+            user.useGameTicket(reactionTimeMs = 20)
+            assertEquals(1, getCount(20))
+
+            assertTrue(user.isBot)
+            user.flush()
+
+            val prevReactionGamePoints = user.pointsBalances().ofType(TelegramMiniAppUserRewardType.ReactionGame)
+
+            // check that bot reaction times do not affect percentiles table
+            // but user still gets rewards
+            user.useGameTicket(reactionTimeMs = 50)
+            user.flush()
+
+            assertEquals(null, getCount(50))
+            assertTrue(user.pointsBalances().ofType(TelegramMiniAppUserRewardType.ReactionGame) > prevReactionGamePoints)
+        }
+    }
+
+    private fun recordAndCalculatePercentile(timeMs: Long): Int {
+        val roundedTime = TelegramMiniAppGameReactionTime.roundTime(timeMs)
+        val percentile = TelegramMiniAppGameReactionTime.calculatePercentile(roundedTime)
+        TelegramMiniAppGameReactionTime.record(roundedTime)
+        return percentile
     }
 
     private fun getCount(timeMs: Long) = TelegramMiniAppGameReactionTimeTable
