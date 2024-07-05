@@ -14,26 +14,23 @@ interface Props {
   className?: string
 }
 
-export default function SymbolIcon(props: Props) {
-  const symbolName = props.symbol.displayName()
+function getSymbolAndChainIcons(symbol: TradingSymbol): {
+  chainIcon: string
+  icon: string
+} {
+  const symbolName = symbol.displayName()
 
-  const icon = (function () {
-    if (symbolName === 'BTC') {
-      return btc
-    } else if (symbolName === 'ETH') {
-      return eth
-    } else if (symbolName === 'USDC') {
-      return usdc
-    } else if (symbolName === 'DAI') {
-      return dai
-    } else if (symbolName === 'RING') {
-      return logo
-    }
+  const icon = (() => {
+    if (symbolName === 'BTC') return btc
+    if (symbolName === 'ETH') return eth
+    if (symbolName === 'USDC') return usdc
+    if (symbolName === 'DAI') return dai
+    if (symbolName === 'RING') return logo
     return generic
   })()
 
-  const chainIcon = (function () {
-    switch (props.symbol.chainName) {
+  const chainIcon = (() => {
+    switch (symbol.chainName) {
       case 'Botanix':
         return botanix
       case 'Bitlayer':
@@ -45,6 +42,13 @@ export default function SymbolIcon(props: Props) {
     }
   })()
 
+  return { icon, chainIcon }
+}
+
+export default function SymbolIcon(props: Props) {
+  const symbolName = props.symbol.displayName()
+  const { icon, chainIcon } = getSymbolAndChainIcons(props.symbol)
+
   return (
     <span className="relative mt-[-1px] min-w-8 p-1">
       <img src={icon} className={props.className || ''} alt={symbolName} />
@@ -54,5 +58,16 @@ export default function SymbolIcon(props: Props) {
         alt={props.symbol.chainName}
       />
     </span>
+  )
+}
+
+export function SymbolIconSVG(props: Props) {
+  const { icon, chainIcon } = getSymbolAndChainIcons(props.symbol)
+
+  return (
+    <g className={props.className}>
+      <image href={icon} width="24" height="24" />
+      <image href={chainIcon} width="12" height="12" x="16" y="12" />
+    </g>
   )
 }

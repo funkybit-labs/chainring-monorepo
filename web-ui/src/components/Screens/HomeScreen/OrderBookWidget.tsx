@@ -16,7 +16,7 @@ import * as d3 from 'd3'
 import Decimal from 'decimal.js'
 import { useGesture } from '@use-gesture/react'
 import TradingSymbol from 'tradingSymbol'
-import SymbolIcon from 'components/common/SymbolIcon'
+import { SymbolIconSVG } from 'components/common/SymbolIcon'
 import usePageVisibility from 'hooks/usePageVisibility'
 
 interface OrderBookChartEntry {
@@ -261,9 +261,10 @@ function OrderBookChart({
     top: 20,
     bottom: 0,
     left: lastPriceLabelWidth + 10,
-    right: 0
+    right: 40 // free space for the symbol icon
   }
   const innerWidth = width - margin.left - margin.right
+  const innerWidthWithMarginRight = width - margin.left
   const innerHeight = height - margin.top - margin.bottom
 
   const yScale = d3.scaleLinear()
@@ -329,21 +330,40 @@ function OrderBookChart({
             yScale(nearestPriceLevel.price.toNumber()) + margin.top
           })`
         )
-      tooltip.select('rect').attr('x', `${innerWidth - labelWidth - 10}`)
+      tooltip
+        .select('rect')
+        .attr('x', `${innerWidthWithMarginRight - labelWidth - 10}`)
       tooltip
         .select('text#line1')
         .text('Price ' + nearestPriceLevel.price.toFixed(tickDecimals))
-        .attr('transform', `translate(${innerWidth - labelWidth - 4},-8)`)
+        .attr(
+          'transform',
+          `translate(${innerWidthWithMarginRight - labelWidth - 4},-8)`
+        )
       tooltip
         .select('text#line2')
         .text('Amount ' + levelAmount.toFixed(tickDecimals + 1))
-        .attr('transform', `translate(${innerWidth - labelWidth - 4},4)`)
+        .attr(
+          'transform',
+          `translate(${innerWidthWithMarginRight - labelWidth - 4},4)`
+        )
       tooltip
         .select('text#line3')
         .text('Total ' + totalAmount.toFixed(tickDecimals + 1))
-        .attr('transform', `translate(${innerWidth - labelWidth - 4},16)`)
+        .attr(
+          'transform',
+          `translate(${innerWidthWithMarginRight - labelWidth - 4},16)`
+        )
     },
-    [innerWidth, lastTrade, margin.top, orderBook, svg, tickDecimals, yScale]
+    [
+      innerWidthWithMarginRight,
+      lastTrade,
+      margin.top,
+      orderBook,
+      svg,
+      tickDecimals,
+      yScale
+    ]
   )
 
   const drawChart = useCallback(() => {
@@ -536,20 +556,31 @@ function OrderBookChart({
             />
             <text transform={`translate(3,${margin.top + 4})`} />
           </g>
+          {quantitySymbol && (
+            <g transform={`translate(${width - 30},${5})`}>
+              <SymbolIconSVG symbol={quantitySymbol} />
+            </g>
+          )}
           <g className="y-axis-mouse-projection hidden text-xs">
-            <line x1={margin.left} x2={innerWidth} y1="0" y2="0" />
-            <rect x={innerWidth - 44} y="-22" width="300" height="44" rx="3" />
+            <line
+              x1={margin.left}
+              x2={innerWidthWithMarginRight}
+              y1="0"
+              y2="0"
+            />
+            <rect
+              x={innerWidthWithMarginRight - 44}
+              y="-22"
+              width="300"
+              height="44"
+              rx="3"
+            />
             <text id="line1" />
             <text id="line2" />
             <text id="line3" />
           </g>
         </g>
       </svg>
-      {quantitySymbol && (
-        <div className="absolute right-0 top-0 flex">
-          <SymbolIcon symbol={quantitySymbol} />
-        </div>
-      )}
     </div>
   )
 }
