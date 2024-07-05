@@ -61,7 +61,7 @@ class BlockchainTransactionHandler(
         workerThread = thread(start = true, name = "batch-transaction-handler-$chainId", isDaemon = true) {
             logger.debug { "Batch Transaction handler thread starting" }
             dbTransaction {
-                BlockchainNonceEntity.clearNonce(blockchainClient.submitterAddress, chainId)
+                BlockchainNonceEntity.clear(blockchainClient.submitterAddress, chainId)
 
                 try {
                     if (tryAcquireAdvisoryLock(chainId.value.toLong())) {
@@ -451,7 +451,7 @@ class BlockchainTransactionHandler(
                     logger.debug { "Tx Not found - currentBlock=$currentBlock lastSeen=$lastSeenBlock maxUnseen=$maxUnseenBlocksForFork" }
                     if (currentBlock > lastSeenBlock + maxUnseenBlocksForFork.toBigInteger()) {
                         logger.debug { "Transaction not found in $maxUnseenBlocksForFork blocks, handling as a fork" }
-                        BlockchainNonceEntity.clearNonce(blockchainClient.submitterAddress, chainId)
+                        BlockchainNonceEntity.clear(blockchainClient.submitterAddress, chainId)
                         onTxNotFound()
                     }
                 }
@@ -497,7 +497,7 @@ class BlockchainTransactionHandler(
 
                 onComplete(receipt, error)
 
-                val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
+                val submitterNonce = BlockchainNonceEntity.getOrCreateForUpdate(blockchainClient.submitterAddress, chainId)
                 submitterNonce.nonce = null
                 tx.markAsFailed(error, gasAccountFee(receipt), receipt.gasUsed)
 
@@ -507,7 +507,7 @@ class BlockchainTransactionHandler(
     }
 
     private fun submitToBlockchain(tx: BlockchainTransactionEntity) {
-        val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
+        val submitterNonce = BlockchainNonceEntity.getOrCreateForUpdate(blockchainClient.submitterAddress, chainId)
         val blockNumber = blockchainClient.getBlockNumber()
         try {
             val nonce = submitterNonce.nonce?.let { it + BigInteger.ONE } ?: getConsistentNonce(submitterNonce.key)
@@ -517,7 +517,7 @@ class BlockchainTransactionHandler(
             tx.markAsSubmitted(txHash, blockNumber)
         } catch (ce: BlockchainClientException) {
             logger.warn(ce) { "Failed with client exception, ${ce.message}" }
-            BlockchainNonceEntity.clearNonce(blockchainClient.submitterAddress, chainId)
+            BlockchainNonceEntity.clear(blockchainClient.submitterAddress, chainId)
         } catch (se: BlockchainServerException) {
             logger.warn(se) { "Failed to send, will retry, ${se.message}" }
         }
@@ -525,7 +525,7 @@ class BlockchainTransactionHandler(
 
     private fun rollbackOnChain() {
         try {
-            val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
+            val submitterNonce = BlockchainNonceEntity.getOrCreateForUpdate(blockchainClient.submitterAddress, chainId)
             val nonce = submitterNonce.nonce?.let { it + BigInteger.ONE } ?: getConsistentNonce(submitterNonce.key)
             sendPendingTransaction(
                 BlockchainTransactionData(
@@ -574,7 +574,7 @@ class BlockchainTransactionHandler(
     }
 
     private fun getTxHash(transactionData: BlockchainTransactionData): TxHash {
-        val submitterNonce = BlockchainNonceEntity.lockForUpdate(blockchainClient.submitterAddress, chainId)
+        val submitterNonce = BlockchainNonceEntity.getOrCreateForUpdate(blockchainClient.submitterAddress, chainId)
         val nonce = getConsistentNonce(submitterNonce.key)
 
         val txManager = blockchainClient.getTxManager(nonce)

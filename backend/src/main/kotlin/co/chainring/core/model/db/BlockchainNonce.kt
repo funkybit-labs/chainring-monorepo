@@ -36,16 +36,24 @@ class BlockchainNonceEntity(id: EntityID<Int>) : IntEntity(id) {
             }
         }
 
-        fun lockForUpdate(address: Address, chainId: ChainId): BlockchainNonceEntity {
-            return BlockchainNonceTable.selectAll().where {
-                BlockchainNonceTable.key eq Keys.toChecksumAddress(address.value) and
-                    BlockchainNonceTable.chainId.eq(chainId)
-            }.forUpdate().map {
-                BlockchainNonceEntity.wrapRow(it)
-            }.single()
+        private fun lockForUpdate(address: Address, chainId: ChainId): BlockchainNonceEntity? {
+            return BlockchainNonceTable.selectAll()
+                .where {
+                    BlockchainNonceTable.key eq Keys.toChecksumAddress(address.value) and BlockchainNonceTable.chainId.eq(chainId)
+                }
+                .forUpdate()
+                .map { BlockchainNonceEntity.wrapRow(it) }
+                .singleOrNull()
         }
 
-        fun clearNonce(address: Address, chainId: ChainId) {
+        fun getOrCreateForUpdate(address: Address, chainId: ChainId): BlockchainNonceEntity {
+            return lockForUpdate(address, chainId) ?: run {
+                create(address, chainId)
+                lockForUpdate(address, chainId)!!
+            }
+        }
+
+        fun clear(address: Address, chainId: ChainId) {
             BlockchainNonceTable.update({
                 BlockchainNonceTable.key eq Keys.toChecksumAddress(address.value) and
                     BlockchainNonceTable.chainId.eq(chainId)
