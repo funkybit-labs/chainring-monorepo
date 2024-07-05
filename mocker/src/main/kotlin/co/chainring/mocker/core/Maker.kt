@@ -39,6 +39,7 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.random.Random
+import kotlinx.datetime.Clock
 import org.knowm.xchart.SwingWrapper
 import org.knowm.xchart.XYChartBuilder
 import org.web3j.crypto.ECKeyPair
@@ -63,6 +64,7 @@ class Maker(
     assets: Map<String, BigInteger>,
     keyPair: ECKeyPair = Keys.createEcKeyPair(),
 ) : Actor(marketIds, nativeAssets, assets, keyPair) {
+    private val marketPriceOverrideFunction: PriceFunction? = marketPriceOverride?.let { PriceFunction.generateDeterministicHarmonicMovement(initialValue = it.toDouble(), maxFluctuation = 0.01) }
     override val id: String = "mm_${Address(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
     override val logger: KLogger = KotlinLogging.logger {}
     private var currentOrders = mutableMapOf<MarketId, MutableSet<Order.Limit>>()
@@ -236,7 +238,7 @@ class Maker(
         logger.debug { "$id: adjusting quotes in market ${market.id}, current price: $curPrice, price override: $marketPriceOverride" }
         val marketId = market.id
         val ordersToCancel = currentOrders[marketId] ?: emptyList()
-        val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpread, curPrice = marketPriceOverride ?: curPrice)
+        val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpread, curPrice = curPrice, marketPriceOverride = marketPriceOverrideFunction)
         val (offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices, curPrice = marketPriceOverride ?: curPrice)
 
         val createOrders = offerPrices.mapIndexed { ix, price ->
@@ -299,7 +301,7 @@ class Maker(
             apiClient.cancelOpenOrders()
             currentOrders[marketId] = mutableSetOf()
 
-            val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpread, curPrice = marketPriceOverride ?: curPrice)
+            val (offerPrices, bidPrices) = offerAndBidPrices(market.tickSize, levels, levelsSpread, curPrice = curPrice, marketPriceOverride = marketPriceOverrideFunction)
             val (offerAmounts, bidAmounts) = offerAndBidAmounts(market, offerPrices, bidPrices, curPrice = marketPriceOverride ?: curPrice)
 
             offerPrices.forEachIndexed { ix, price ->
@@ -343,8 +345,20 @@ class Maker(
     }
 
     companion object {
-        fun offerAndBidPrices(tickSize: BigDecimal, levels: Int, levelsSpread: Int, curPrice: BigDecimal): Pair<List<BigDecimal>, List<BigDecimal>> {
-            val curPriceRounded = curPrice.roundToTickSize(tickSize)
+        fun offerAndBidPrices(tickSize: BigDecimal, levels: Int, levelsSpread: Int, curPrice: BigDecimal, marketPriceOverride: PriceFunction?): Pair<List<BigDecimal>, List<BigDecimal>> {
+
+            val effectivePrice = marketPriceOverride?.let { overrideFunction ->
+                // In market stabilization mode, price is defined by the sum of price function and fraction of market price deviation.
+                // Bigger "market" trades lead to higher movement, but eventually will rollback to price function value.
+
+                val priceOverride = overrideFunction.nextValue(Clock.System.now()).toBigDecimal()
+
+                val priceDifference = curPrice.subtract(priceOverride)
+                val adjustment = priceDifference.multiply("0.25".toBigDecimal())
+                priceOverride.add(adjustment)
+            } ?: curPrice
+
+            val curPriceRounded = effectivePrice.roundToTickSize(tickSize)
             val adjustedLevels = min(levelsSpread / 2, levels)
             val halfLevelsSpread = tickSize.multiply((levelsSpread / 2.0).toBigDecimal())
 
@@ -413,7 +427,7 @@ fun main() {
         val peakToOuterStdDevFactor = 2.0
         val marketToPeakStdDevFactor = 7.0
 
-        val (offerPrices, bidPrices) = Maker.offerAndBidPrices(tickSize = tickSize, levels = 20, levelsSpread = 100, curPrice = initialPrice)
+        val (offerPrices, bidPrices) = Maker.offerAndBidPrices(tickSize = tickSize, levels = 20, levelsSpread = 100, curPrice = initialPrice, marketPriceOverride = null)
         val offerAmounts =
             Maker.generateAsymmetricGaussianAmounts(offerPrices, BigInteger("10000"), marketToPeakStdDevFactor, peakToOuterStdDevFactor)
         val bidAmounts = Maker.generateAsymmetricGaussianAmounts(bidPrices, BigInteger("10000"), peakToOuterStdDevFactor, marketToPeakStdDevFactor)

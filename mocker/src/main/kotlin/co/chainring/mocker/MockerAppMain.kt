@@ -5,7 +5,7 @@ import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
 import co.chainring.integrationtests.utils.ApiClient
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.utils.TraceRecorder
-import co.chainring.mocker.core.DeterministicHarmonicPriceMovement
+import co.chainring.mocker.core.PriceFunction
 import co.chainring.mocker.core.LiquidityPlacement
 import co.chainring.mocker.core.Maker
 import co.chainring.mocker.core.Taker
@@ -59,7 +59,7 @@ class MockerApp(
 ) {
     private val logger = KotlinLogging.logger {}
     private val marketsConfig = mutableMapOf<MarketId, MarketParams>()
-    private val marketsPriceFunctions = mutableMapOf<MarketId, DeterministicHarmonicPriceMovement>()
+    private val marketsPriceFunctions = mutableMapOf<MarketId, PriceFunction>()
 
     init {
         config.forEach {
@@ -130,7 +130,7 @@ class MockerApp(
             }
 
             val priceFunction = marketsPriceFunctions.getOrPut(marketId) {
-                DeterministicHarmonicPriceMovement.generateRandom(
+                PriceFunction.generateDeterministicHarmonicMovement(
                     initialValue = params.priceBaseline.toDouble(),
                     maxFluctuation = market.tickSize.toDouble() * 30
                 )

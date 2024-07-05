@@ -5,7 +5,7 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.utils.TraceRecorder
 import co.chainring.core.utils.humanReadable
-import co.chainring.mocker.core.DeterministicHarmonicPriceMovement
+import co.chainring.mocker.core.PriceFunction
 import co.chainring.mocker.core.LiquidityPlacement
 import co.chainring.mocker.core.Maker
 import co.chainring.mocker.core.Taker
@@ -63,7 +63,7 @@ fun main() {
         maxAllowedOfferPrice = BigDecimal("2"),
         minFee = BigInteger.ZERO
     )
-    val priceFunction = DeterministicHarmonicPriceMovement.generateRandom(initialValue = 17.0, maxFluctuation = 1.5)
+    val priceFunction = PriceFunction.generateDeterministicHarmonicMovement(initialValue = 17.0, maxFluctuation = 1.5)
 
     // schedule metrics
     val statsTask = timerTask {
@@ -154,7 +154,7 @@ fun startMaker(market: Market, marketPriceOverride: BigDecimal?, liquidityPlacem
     return maker
 }
 
-fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, priceFunction: DeterministicHarmonicPriceMovement): Taker {
+fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, priceFunction: PriceFunction): Taker {
     val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
     val quoteAssetBtc = market.quoteSymbol.value.startsWith("BTC")
     val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)
