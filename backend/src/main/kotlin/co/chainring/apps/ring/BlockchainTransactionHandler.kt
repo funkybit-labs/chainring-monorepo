@@ -1,6 +1,10 @@
-package co.chainring.core.blockchain
+package co.chainring.apps.ring
 
 import co.chainring.contracts.generated.Exchange
+import co.chainring.core.blockchain.BlockchainClient
+import co.chainring.core.blockchain.BlockchainClientException
+import co.chainring.core.blockchain.BlockchainServerException
+import co.chainring.core.blockchain.ContractType
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.Address
 import co.chainring.core.model.db.BalanceChange

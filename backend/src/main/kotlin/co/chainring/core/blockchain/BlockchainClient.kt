@@ -14,7 +14,6 @@ import co.chainring.core.model.toEvmSignature
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.toHex
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.reactivex.Flowable
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -34,7 +33,8 @@ import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.DefaultBlockParameterName
 import org.web3j.protocol.core.methods.request.EthFilter
 import org.web3j.protocol.core.methods.request.Transaction
-import org.web3j.protocol.core.methods.response.Log
+import org.web3j.protocol.core.methods.response.EthBlock
+import org.web3j.protocol.core.methods.response.EthLog
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.protocol.http.HttpService
 import org.web3j.tx.RawTransactionManager
@@ -254,9 +254,24 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         return web3j.ethGetTransactionByHash(txHash).send().transaction.getOrNull()
     }
 
+    open fun getBlock(blockNumber: BigInteger, withFullTxObjects: Boolean): EthBlock.Block =
+        web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(blockNumber), withFullTxObjects).send().block
+
     open fun getBlockNumber(): BigInteger {
         return web3j.ethBlockNumber().send().blockNumber
     }
+
+    fun getLogs(blockNumber: BigInteger, address: Address): EthLog =
+        web3j.ethGetLogs(
+            EthFilter(
+                DefaultBlockParameter.valueOf(blockNumber),
+                DefaultBlockParameter.valueOf(blockNumber),
+                address.value,
+            ),
+        ).send()
+
+    fun getExchangeContractLogs(blockNumber: BigInteger): EthLog =
+        getLogs(blockNumber, getContractAddress(ContractType.Exchange))
 
     fun getTxManager(nonceOverride: BigInteger): TransactionManagerWithNonceOverride {
         return TransactionManagerWithNonceOverride(web3j, submitterCredentials, nonceOverride)
@@ -283,9 +298,6 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
             null
         }
     }
-
-    fun ethLogFlowable(filter: EthFilter): Flowable<Log> =
-        web3j.ethLogFlowable(filter)
 
     fun loadERC20(address: Address) = ERC20.load(address.value, web3j, transactionManager, gasProvider)
 
