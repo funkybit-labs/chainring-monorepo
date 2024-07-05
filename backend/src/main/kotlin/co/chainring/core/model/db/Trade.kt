@@ -9,6 +9,7 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.min
 import org.jetbrains.exposed.sql.update
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -57,6 +58,7 @@ object TradeTable : GUIDTable<TradeId>("trade", ::TradeId) {
     val sequenceId = integer("sequence_id").autoIncrement()
     val tradeHash = varchar("trade_hash", 10485760).uniqueIndex()
     val settlementBatchGuid = reference("settlement_batch_guid", SettlementBatchTable).index().nullable()
+    val responseSequence = long("response_sequence").nullable().index()
 
     init {
         index(
@@ -64,6 +66,13 @@ object TradeTable : GUIDTable<TradeId>("trade", ::TradeId) {
             columns = arrayOf(sequenceId, settlementStatus),
             filterCondition = {
                 settlementStatus.inList(pendingTradeStatuses)
+            },
+        )
+        index(
+            customIndexName = "trade_response_sequence_pending_settlement_status",
+            columns = arrayOf(responseSequence, settlementStatus),
+            filterCondition = {
+                settlementStatus.eq(SettlementStatus.Pending)
             },
         )
     }
@@ -77,6 +86,7 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
             amount: BigInteger,
             price: BigDecimal,
             tradeHash: String,
+            responseSequence: Long,
         ) = TradeEntity.new(TradeId.generate()) {
             val now = Clock.System.now()
             this.createdAt = now
@@ -86,6 +96,7 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
             this.price = price
             this.settlementStatus = SettlementStatus.Pending
             this.tradeHash = tradeHash
+            this.responseSequence = responseSequence
         }
 
         fun markAsFailedSettling(tradeHashes: Set<String>, error: String) {
@@ -100,6 +111,14 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
                 it[this.settlementStatus] = SettlementStatus.Settling
                 it[this.settlementBatchGuid] = settlementBatch.guid
             }
+        }
+
+        fun minResponseSequenceForPending(): Long? {
+            return TradeTable
+                .select(TradeTable.responseSequence.min())
+                .where { TradeTable.settlementStatus.eq(SettlementStatus.Pending) }
+                .minByOrNull { TradeTable.responseSequence }
+                ?.let { it[TradeTable.responseSequence.min()]?.toLong() }
         }
 
         fun findPending(limit: Int = 100): List<TradeEntity> {
@@ -151,4 +170,6 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
 
     val settlementBatchGuid by TradeTable.settlementBatchGuid
     var settlementBatch by SettlementBatchEntity optionalReferencedOn TradeTable.settlementBatchGuid
+
+    var responseSequence by TradeTable.responseSequence
 }
