@@ -28,6 +28,7 @@ resource "aws_iam_role_policy" "auth" {
                 "iam:PassRole",
                 "ecs:UpdateService",
                 "elasticloadbalancing:DescribeLoadBalancers",
+                "elasticloadbalancing:DescribeTargetGroups",
                 "elasticloadbalancing:DescribeListeners",
                 "elasticloadbalancing:DescribeRules",
                 "elasticloadbalancing:DescribeTags",
