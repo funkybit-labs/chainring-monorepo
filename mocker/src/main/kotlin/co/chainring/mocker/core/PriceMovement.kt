@@ -11,7 +11,7 @@ import kotlinx.datetime.toJavaInstant
 import org.knowm.xchart.SwingWrapper
 import org.knowm.xchart.XYChartBuilder
 
-class DeterministicHarmonicPriceMovement(
+class PriceFunction(
     private val initialValue: Double,
     private val maxFluctuation: Double,
 ) {
@@ -50,8 +50,8 @@ class DeterministicHarmonicPriceMovement(
     )
 
     companion object {
-        fun generateRandom(initialValue: Double, maxFluctuation: Double): DeterministicHarmonicPriceMovement {
-            return DeterministicHarmonicPriceMovement(initialValue = initialValue, maxFluctuation = maxFluctuation)
+        fun generateDeterministicHarmonicMovement(initialValue: Double, maxFluctuation: Double): PriceFunction {
+            return PriceFunction(initialValue = initialValue, maxFluctuation = maxFluctuation)
         }
     }
 }
@@ -60,7 +60,7 @@ class DeterministicHarmonicPriceMovement(
 fun main() {
     val initialPrice = 17.0
     val maxDeviation = initialPrice * 0.01
-    val priceFunction = DeterministicHarmonicPriceMovement(initialPrice, maxDeviation)
+    val priceFunction = PriceFunction(initialPrice, maxDeviation)
 
     val now = Clock.System.now()
     val timestamps = (1..20 * 60).map { (now + it.seconds * 30) }

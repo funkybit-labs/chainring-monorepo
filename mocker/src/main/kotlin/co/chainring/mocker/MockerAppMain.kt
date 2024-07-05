@@ -5,7 +5,8 @@ import co.chainring.apps.api.middleware.RequestProcessingExceptionHandler
 import co.chainring.integrationtests.utils.ApiClient
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.utils.TraceRecorder
-import co.chainring.mocker.core.DeterministicHarmonicPriceMovement
+import co.chainring.mocker.core.PriceFunction
+import co.chainring.mocker.core.LiquidityPlacement
 import co.chainring.mocker.core.Maker
 import co.chainring.mocker.core.Taker
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -46,6 +47,8 @@ data class MarketParams(
     var priceBaseline: BigDecimal,
     var initialBaseBalance: BigDecimal,
     var makerPrivateKeyHex: String,
+    var priceStabilization: Boolean,
+    var liquidityPlacement: LiquidityPlacement,
     val makers: MutableList<Maker> = mutableListOf(),
     val takers: MutableList<Taker> = mutableListOf()
 )
@@ -56,7 +59,7 @@ class MockerApp(
 ) {
     private val logger = KotlinLogging.logger {}
     private val marketsConfig = mutableMapOf<MarketId, MarketParams>()
-    private val marketsPriceFunctions = mutableMapOf<MarketId, DeterministicHarmonicPriceMovement>()
+    private val marketsPriceFunctions = mutableMapOf<MarketId, PriceFunction>()
 
     init {
         config.forEach {
@@ -66,6 +69,16 @@ class MockerApp(
                 priceBaseline = System.getenv("${marketIdCleaned}_PRICE_BASELINE")?.toBigDecimalOrNull() ?: BigDecimal("17.5"),
                 initialBaseBalance = System.getenv("${marketIdCleaned}_INITIAL_BASE_BALANCE")?.toBigDecimalOrNull() ?: BigDecimal.ONE,
                 makerPrivateKeyHex = System.getenv("${marketIdCleaned}_MAKER_PRIVATE_KEY_HEX") ?: ("0x" + Keys.createEcKeyPair().privateKey.toString(16)),
+                priceStabilization = System.getenv("${marketIdCleaned}_MAKER_PRICE_STABILIZATION")?.toBoolean() ?: false,
+                liquidityPlacement = System.getenv("${marketIdCleaned}_MAKER_LIQUIDITY_PLACEMENT")
+                    ?.let { value ->
+                        if (value.endsWith("%")) {
+                            LiquidityPlacement.Relative(fraction = (value.removeSuffix("%").toDouble() / 100).toBigDecimal())
+                        } else {
+                            LiquidityPlacement.Absolute(value.toBigInteger())
+                        }
+                    }
+                    ?: LiquidityPlacement.default
             )
         }
     }
@@ -117,7 +130,7 @@ class MockerApp(
             }
 
             val priceFunction = marketsPriceFunctions.getOrPut(marketId) {
-                DeterministicHarmonicPriceMovement.generateRandom(
+                PriceFunction.generateDeterministicHarmonicMovement(
                     initialValue = params.priceBaseline.toDouble(),
                     maxFluctuation = market.tickSize.toDouble() * 30
                 )
@@ -127,9 +140,11 @@ class MockerApp(
             if (params.makers.size == 0) {
                 params.makers.add(
                     startMaker(
-                        market,
-                        params.initialBaseBalance * BigDecimal(100),
-                        params.initialBaseBalance * params.priceBaseline * BigDecimal(100),
+                        market = market,
+                        marketPriceOverride = if (params.priceStabilization) params.priceBaseline else null,
+                        liquidityPlacement = params.liquidityPlacement,
+                        baseAssetAmount = params.initialBaseBalance * BigDecimal(100),
+                        quoteAssetAmount = params.initialBaseBalance * params.priceBaseline * BigDecimal(100),
                         keyPair = ECKeyPair.create(Numeric.toBigInt(params.makerPrivateKeyHex))
                     )
                 )

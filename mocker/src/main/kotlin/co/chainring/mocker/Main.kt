@@ -5,7 +5,8 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.utils.TraceRecorder
 import co.chainring.core.utils.humanReadable
-import co.chainring.mocker.core.DeterministicHarmonicPriceMovement
+import co.chainring.mocker.core.PriceFunction
+import co.chainring.mocker.core.LiquidityPlacement
 import co.chainring.mocker.core.Maker
 import co.chainring.mocker.core.Taker
 import co.chainring.mocker.core.toFundamentalUnits
@@ -62,7 +63,7 @@ fun main() {
         maxAllowedOfferPrice = BigDecimal("2"),
         minFee = BigInteger.ZERO
     )
-    val priceFunction = DeterministicHarmonicPriceMovement.generateRandom(initialValue = 17.0, maxFluctuation = 1.5)
+    val priceFunction = PriceFunction.generateDeterministicHarmonicMovement(initialValue = 17.0, maxFluctuation = 1.5)
 
     // schedule metrics
     val statsTask = timerTask {
@@ -81,7 +82,7 @@ fun main() {
 
     // initial load
     (1..initialMakers).map {
-        makers.add(startMaker(usdcDai, 10000.0.toBigDecimal(), 5000.0.toBigDecimal()))
+        makers.add(startMaker(usdcDai, marketPriceOverride = null, liquidityPlacement = LiquidityPlacement.default, baseAssetAmount = 10000.0.toBigDecimal(), quoteAssetAmount = 5000.0.toBigDecimal()))
     }
     (1..initialTakers).map {
         takers.add(startTaker(usdcDai, 100.0.toBigDecimal(), 50.0.toBigDecimal(), priceFunction))
@@ -97,7 +98,7 @@ fun main() {
             this.cancel()
         } else {
             logger.debug { "Starting maker #${makers.size + 1}" }
-            makers.add(startMaker(usdcDai, 10000.0.toBigDecimal(), 5000.0.toBigDecimal()))
+            makers.add(startMaker(usdcDai, marketPriceOverride = null, liquidityPlacement = LiquidityPlacement.default, baseAssetAmount = 10000.0.toBigDecimal(), quoteAssetAmount = 5000.0.toBigDecimal()))
         }
     }, 0, newMakerInterval.inWholeMilliseconds)
     timer.scheduleAtFixedRate(timerTask {
@@ -124,7 +125,7 @@ fun main() {
     timer.cancel()
 }
 
-fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, keyPair: ECKeyPair = Keys.createEcKeyPair()): Maker {
+fun startMaker(market: Market, marketPriceOverride: BigDecimal?, liquidityPlacement: LiquidityPlacement, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, keyPair: ECKeyPair = Keys.createEcKeyPair()): Maker {
     val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
     val quoteAssetBtc = market.quoteSymbol.value.startsWith("BTC")
     val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)
@@ -132,6 +133,8 @@ fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: Bi
 
     val maker = Maker(
         marketIds = listOf(market.id),
+        marketPriceOverride = marketPriceOverride,
+        liquidityPlacement = liquidityPlacement,
         levels = 20, levelsSpread = 100,
         nativeAssets = when {
             baseAssetBtc && quoteAssetBtc -> listOf(baseAsset, quoteAsset).toMap()
@@ -145,13 +148,13 @@ fun startMaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: Bi
             quoteAssetBtc -> mapOf(baseAsset)
             else -> mapOf(baseAsset, quoteAsset)
         },
-        keyPair = keyPair
+        keyPair = keyPair,
     )
     maker.start()
     return maker
 }
 
-fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, priceFunction: DeterministicHarmonicPriceMovement): Taker {
+fun startTaker(market: Market, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, priceFunction: PriceFunction): Taker {
     val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
     val quoteAssetBtc = market.quoteSymbol.value.startsWith("BTC")
     val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)

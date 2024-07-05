@@ -41,7 +41,7 @@ class Taker(
     private val rate: Long,
     nativeAssets: Map<String, BigInteger>,
     assets: Map<String, BigInteger>,
-    private val priceCorrectionFunction: DeterministicHarmonicPriceMovement,
+    private val priceCorrectionFunction: PriceFunction,
     keyPair: ECKeyPair = Keys.createEcKeyPair()
 ) : Actor(marketIds, nativeAssets, assets, keyPair) {
     override val id: String = "tkr_${Address(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
