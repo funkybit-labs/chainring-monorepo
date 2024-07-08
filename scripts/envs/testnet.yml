@@ -46,6 +46,7 @@ services:
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-c66acd9d-f00f-43b2-b65d-f260a5b0a8f9-xyU8ZN
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
+      EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/api/EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY-7XFaCF
   ring:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
     count: 1
