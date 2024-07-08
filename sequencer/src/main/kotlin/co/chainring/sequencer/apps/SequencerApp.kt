@@ -527,7 +527,7 @@ class SequencerApp(
     }
 
     private fun calculateLimitBuyOrderNotionalPlusFee(order: Order, market: Market): BigInteger {
-        return if (order.price.toBigDecimal() >= market.bestOffer) {
+        return if (market.levelIx(order.price.toBigDecimal()) >= market.bestOfferIx) {
             // limit order crosses the market
             val orderPrice = order.price.toBigDecimal()
             val levelIx = market.levelIx(orderPrice)

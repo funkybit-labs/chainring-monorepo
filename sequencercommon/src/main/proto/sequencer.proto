@@ -53,6 +53,8 @@ message BidOfferState {
   int32 minBidIx = 2;
   DecimalValue bestBid = 3;
   DecimalValue bestOffer = 4;
+  int32 bestBidIx = 5;
+  int32 bestOfferIx = 6;
 }
 
 message SequencerRequest {
