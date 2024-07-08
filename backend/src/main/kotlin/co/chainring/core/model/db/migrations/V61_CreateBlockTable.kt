@@ -4,6 +4,7 @@ import co.chainring.core.db.Migration
 import co.chainring.core.model.db.BlockHash
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.ChainIdColumnType
+import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.GUIDTable
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.dao.id.IdTable
@@ -28,9 +29,13 @@ class V61_CreateBlockTable : Migration() {
         }
     }
 
+    object V61_DepositTable : GUIDTable<DepositId>("deposit", ::DepositId) {
+        val canBeResubmitted = bool("can_be_resubmitted").default(false)
+    }
+
     override fun run() {
         transaction {
-            SchemaUtils.createMissingTablesAndColumns(V61_BlockTable)
+            SchemaUtils.createMissingTablesAndColumns(V61_BlockTable, V61_DepositTable)
         }
     }
 }

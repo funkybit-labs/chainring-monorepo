@@ -82,7 +82,7 @@ class BlockchainDepositHandler(
         val receipt = blockchainClient.getTransactionReceipt(pendingDeposit.transactionHash.value)
         if (receipt == null) {
             if (Clock.System.now() - pendingDeposit.createdAt > receiptMaxWaitTime) {
-                pendingDeposit.markAsFailed("Transaction receipt not found")
+                pendingDeposit.markAsFailed("Transaction receipt not found", canBeResubmitted = true)
             }
         } else {
             receipt.blockNumber?.let { blockNumber ->

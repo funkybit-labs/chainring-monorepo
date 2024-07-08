@@ -262,5 +262,12 @@ class DepositTest {
                     it.txHash == depositTxHash && it.status == Deposit.Status.Failed
                 } != null
             }
+
+        assertEquals(depositTxHash, wallet.asyncDepositNative(amount.inFundamentalUnits))
+
+        // verify that same deposit tx can be submitted again
+        apiClient.createDeposit(CreateDepositApiRequest(Symbol(btc.name), amount.inFundamentalUnits, depositTxHash)).deposit.also {
+            assertEquals(Deposit.Status.Pending, it.status)
+        }
     }
 }

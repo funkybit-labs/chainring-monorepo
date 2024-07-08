@@ -63,6 +63,7 @@ object DepositTable : GUIDTable<DepositId>("deposit", ::DepositId) {
     val updatedAt = timestamp("updated_at").nullable()
     val updatedBy = varchar("updated_by", 10485760).nullable()
     val error = varchar("error", 10485760).nullable()
+    val canBeResubmitted = bool("can_be_resubmitted").default(false)
 }
 
 class DepositException(message: String) : Exception(message)
@@ -142,7 +143,13 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
                 it[DepositTable.transactionHash] = transactionHash.value
             }
 
-            return findByTxHash(transactionHash)
+            return findByTxHash(transactionHash)?.also {
+                if (it.status == DepositStatus.Failed && it.canBeResubmitted) {
+                    it.status = DepositStatus.Pending
+                    it.createdAt = Clock.System.now()
+                    it.updatedAt = it.createdAt
+                }
+            }
         }
 
         fun countConfirmedOrCompleted(blockNumbers: List<BigInteger>, chainId: ChainId): Long =
@@ -179,11 +186,12 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
         this.status = DepositStatus.Confirmed
     }
 
-    fun markAsFailed(error: String) {
+    fun markAsFailed(error: String, canBeResubmitted: Boolean = false) {
         val now = Clock.System.now()
         this.updatedAt = now
         this.status = DepositStatus.Failed
         this.error = error
+        this.canBeResubmitted = canBeResubmitted
     }
 
     fun markAsComplete() {
@@ -220,4 +228,5 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
     var updatedBy by DepositTable.updatedBy
 
     var error by DepositTable.error
+    var canBeResubmitted by DepositTable.canBeResubmitted
 }

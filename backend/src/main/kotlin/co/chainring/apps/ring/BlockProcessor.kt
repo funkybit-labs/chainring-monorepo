@@ -69,6 +69,9 @@ class BlockProcessor(
         }
     }
 
+    private val blocksNumberToCheckOnForkDetected =
+        BigInteger.valueOf((System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toLongOrNull() ?: 1) + 1)
+
     private fun processBlock(blockNumber: BigInteger) {
         val blockFromRpcNode = blockchainClient.getBlock(blockNumber, withFullTxObjects = false)
         val blockHash = BlockHash(blockFromRpcNode.hash)
@@ -92,7 +95,10 @@ class BlockProcessor(
             logger.error { "It looks like we forked, looking for split point starting at $blockNumber, chainId=$chainId" }
 
             val blocksToRollback = BlockEntity
-                .getRecentBlocksUpToNumber(blockNumber - BigInteger.valueOf(5), chainId)
+                .getRecentBlocksUpToNumber(
+                    blockNumber - blocksNumberToCheckOnForkDetected,
+                    chainId,
+                )
                 .filter { processedBlock ->
                     val blockHashFromRpcNode = BlockHash(blockchainClient.getBlock(blockFromRpcNode.number, withFullTxObjects = false).hash)
                     processedBlock.id.value != blockHashFromRpcNode
@@ -149,19 +155,4 @@ class BlockProcessor(
             .limit(1)
             .map { BlockEntity.wrapRow(it) }
             .firstOrNull()
-
-//        KeyValueStore.getBigInt(lastBlockNumberKey)
-//            ?: blockchainClient.getBlockNumber()
-//
-//    private fun setLastProcessedBlockNumber(blockNumber: BigInteger) =
-//        KeyValueStore.setBigInt(lastBlockNumberKey, blockNumber)
-//
-//    private fun getLastProcessedBlockHash(): BlockHash? =
-//        KeyValueStore.getValue(lastBlockHashKey)?.let { BlockHash(it) }
-//
-//    private fun setLastProcessedBlockHash(hash: BlockHash) =
-//        KeyValueStore.setValue(lastBlockHashKey, hash.value)
-//
-//    private val lastBlockNumberKey = "BlockProcessor:LastProcessedBlockNumber:$chainId"
-//    private val lastBlockHashKey = "BlockProcessor:LastProcessedBlockHash:$chainId"
 }
