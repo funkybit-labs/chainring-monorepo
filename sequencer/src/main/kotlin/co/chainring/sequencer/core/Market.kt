@@ -65,9 +65,9 @@ data class Market(
 
     var maxOfferIx: Int = -1
         private set
-    var bestOfferIx: Int = levels.last().levelIx
+    var bestOfferIx: Int = -1
         private set
-    var bestBidIx: Int = levels.first().levelIx
+    var bestBidIx: Int = -1
         private set
     var minBidIx: Int = -1
         private set
@@ -565,7 +565,7 @@ data class Market(
             index += 1
         }
         maxOfferIx = -1
-        return levels.last().levelIx
+        return -1
     }
 
     private fun findNextBestBidIx(lastExecutionLevel: OrderBookLevel): Int {
@@ -577,7 +577,7 @@ data class Market(
             index -= 1
         }
         minBidIx = -1
-        return levels.first().levelIx
+        return -1
     }
 
     private fun findMinBidIx(): Int {
@@ -589,7 +589,7 @@ data class Market(
             }
             index += 1
         }
-        bestBidIx = levels.first().levelIx
+        bestBidIx = -1
         return -1
     }
 
@@ -602,12 +602,13 @@ data class Market(
             }
             index -= 1
         }
-        bestOfferIx = levels.last().levelIx
+        bestOfferIx = -1
         return -1
     }
 
     fun addOrder(wallet: Long, order: Order, feeRates: FeeRates): AddOrderResult {
         return if (isBelowMinFee(order, feeRates)) {
+            // TODO market orders should be rejected earlier in case of empty side
             logger.debug { "Order ${order.guid} rejected since fee below min fee" }
             AddOrderResult(OrderDisposition.Rejected, noExecutions)
         } else if (order.type == Order.Type.LimitSell) {
@@ -616,7 +617,7 @@ data class Market(
                 logger.debug { "Order ${order.guid}: LimitSell level (ix $levelIx) overflow/underflow" }
                 AddOrderResult(OrderDisposition.Rejected, noExecutions)
             } else {
-                if (levelIx <= bestBidIx) {
+                if (bestBidIx != -1 && levelIx <= bestBidIx) {
                     // in case when crossing market execute as market sell order until `levelIx`
                     val crossingOrderResult = handleCrossingOrder(order, stopAtLevelIx = levelIx)
                     val filledAmount = crossingOrderResult.executions.sumOf { it.amount }
@@ -659,7 +660,7 @@ data class Market(
                 logger.debug { "Order ${order.guid}: LimitBuy level (ix $levelIx) overflow/underflow" }
                 AddOrderResult(OrderDisposition.Rejected, noExecutions)
             } else {
-                if (levelIx >= bestOfferIx) {
+                if (bestOfferIx != -1 && levelIx >= bestOfferIx) {
                     // in case when crossing market execute as market buy order until `levelIx`
                     val crossingOrderResult = handleCrossingOrder(order, stopAtLevelIx = levelIx)
                     val filledAmount = crossingOrderResult.executions.sumOf { it.amount }
@@ -710,8 +711,14 @@ data class Market(
 
     private fun isBelowMinFee(order: Order, feeRates: FeeRates): Boolean {
         val (price, feeRate) = when (order.type) {
-            Order.Type.MarketBuy -> Pair(levels[bestOfferIx].price, feeRates.taker)
-            Order.Type.MarketSell -> Pair(levels[bestBidIx].price, feeRates.taker)
+            Order.Type.MarketBuy -> {
+                val marketOfferIx = if (bestOfferIx == -1) levels.last().levelIx else bestOfferIx
+                Pair(levels[marketOfferIx].price, feeRates.taker)
+            }
+            Order.Type.MarketSell -> {
+                val marketBidIx = if (bestBidIx == -1) levels.first().levelIx else bestBidIx
+                Pair(levels[marketBidIx].price, feeRates.taker)
+            }
             else -> Pair(order.price.toBigDecimal(), feeRates.maker)
         }
         return notionalFee(notional(order.amount.toBigInteger(), price, baseDecimals, quoteDecimals), feeRate) < minFee
@@ -723,7 +730,7 @@ data class Market(
             buyOrdersByWallet.getOrPut(levelOrder!!.wallet) { CopyOnWriteArrayList() }.add(levelOrder)
             ordersByGuid[levelOrder.guid] = levelOrder
             levels[levelIx].side = BookSide.Buy
-            if (levelIx > bestBidIx) {
+            if (bestBidIx == -1 || levelIx > bestBidIx) {
                 bestBidIx = levelIx
             }
         } else {
@@ -738,7 +745,7 @@ data class Market(
             sellOrdersByWallet.getOrPut(levelOrder!!.wallet) { CopyOnWriteArrayList() }.add(levelOrder)
             ordersByGuid[levelOrder.guid] = levelOrder
             levels[levelIx].side = BookSide.Sell
-            if (levelIx < bestOfferIx) {
+            if (bestOfferIx == -1 || levelIx < bestOfferIx) {
                 bestOfferIx = levelIx
             }
         } else {
@@ -754,7 +761,7 @@ data class Market(
         var remainingAmount = amount
         var totalPriceUnits = BigDecimal.ZERO
 
-        while (index <= levels.size) {
+        while (index > 0 && index <= levels.size) {
             if (stopAtLevelIx != null && index > stopAtLevelIx) {
                 // stopAtLevelIx is provided to handle crossing-market execution of limit orders
                 break
@@ -887,7 +894,7 @@ data class Market(
                     }
 
                     // update bestBid only when order stays on the book
-                    if (newLevelIx > bestBidIx && (previousNotionalAndFee + notionalDelta) > BigInteger.ZERO) bestBidIx = newLevelIx
+                    if ((bestBidIx == -1 || newLevelIx > bestBidIx) && (previousNotionalAndFee + notionalDelta) > BigInteger.ZERO) bestBidIx = newLevelIx
 
                     Pair(BigInteger.ZERO, notionalDelta)
                 } else {
@@ -895,7 +902,7 @@ data class Market(
                     val limitChunkQuantity = order.quantity - marketChunkQuantity
 
                     // update bestOffer only when order stays on the book
-                    if (newLevelIx < bestOfferIx && limitChunkQuantity > BigInteger.ZERO) bestOfferIx = newLevelIx
+                    if ((bestOfferIx == -1 || newLevelIx < bestOfferIx) && limitChunkQuantity > BigInteger.ZERO) bestOfferIx = newLevelIx
 
                     Pair(limitChunkQuantity - order.quantity, BigInteger.ZERO)
                 }
@@ -983,14 +990,14 @@ data class Market(
             this.bestOfferIx = this@Market.bestOfferIx
             this.maxOfferIx = this@Market.maxOfferIx
             this.minFee = this@Market.minFee.toIntegerValue()
-            val maxBidIx = this@Market.bestBidIx
-            val minOfferIx = this@Market.bestOfferIx
-            val firstLevelWithData = this.minBidIx.let { if (it == -1) minOfferIx else it }
-            val lastLevelWithData = this.maxOfferIx.let { if (it == -1) maxBidIx else it }
-            (firstLevelWithData..lastLevelWithData).forEach { i ->
-                val level = this@Market.levels[i]
-                if (level.totalQuantity > BigInteger.ZERO) {
-                    this.levels.add(level.toCheckpoint())
+            val firstLevelWithData = this@Market.minBidIx.let { if (it == -1) this@Market.bestOfferIx else it }
+            val lastLevelWithData = this@Market.maxOfferIx.let { if (it == -1) this@Market.bestBidIx else it }
+            if (firstLevelWithData != -1 && lastLevelWithData != -1) {
+                (firstLevelWithData..lastLevelWithData).forEach { i ->
+                    val level = this@Market.levels[i]
+                    if (level.totalQuantity > BigInteger.ZERO) {
+                        this.levels.add(level.toCheckpoint())
+                    }
                 }
             }
         }

@@ -44,7 +44,7 @@ class TestMarket {
 
     @Test
     fun testBidValues() {
-        validateBidAndOffer("0.050".levelIx(market), -1, "50.000".levelIx(market), -1)
+        validateBidAndOffer(-1, -1, -1, -1)
 
         addOrder(1L, Order.Type.LimitBuy, "1", "17.500")
         addOrder(2L, Order.Type.LimitBuy, "1", "17.500")
@@ -90,12 +90,12 @@ class TestMarket {
 
         // cancel order 4, minBidIx and bestBid should be back at initial values
         cancelOrders(listOf(4L))
-        validateBidAndOffer("0.050".levelIx(market), -1, "50.000".levelIx(market), -1)
+        validateBidAndOffer(-1, -1, -1, -1)
     }
 
     @Test
     fun testOfferValues() {
-        validateBidAndOffer("0.050".levelIx(market), -1, "50.000".levelIx(market), -1)
+        validateBidAndOffer(-1, -1, -1, -1)
 
         addOrder(1L, Order.Type.LimitSell, "1", "17.550")
         addOrder(2L, Order.Type.LimitSell, "1", "17.550")
@@ -141,12 +141,12 @@ class TestMarket {
 
         // cancel order 4, should be back at initial values
         cancelOrders(listOf(4L))
-        validateBidAndOffer("0.050".levelIx(market), -1, "50.000".levelIx(market), -1)
+        validateBidAndOffer(-1, -1, -1, -1)
     }
 
     @Test
     fun testOrderMatching() {
-        validateBidAndOffer("0.050".levelIx(market), -1, "50.000".levelIx(market), -1)
+        validateBidAndOffer(-1, -1, -1, -1)
 
         addOrder(1L, Order.Type.LimitBuy, "5", "17.300")
         addOrder(2L, Order.Type.LimitBuy, "5", "17.500")
@@ -199,12 +199,12 @@ class TestMarket {
         addOrder(9L, Order.Type.MarketSell, "5", "0", OrderDisposition.Filled, counterOrderGuid = 1L)
         addOrder(10L, Order.Type.MarketBuy, "5", "0", OrderDisposition.Filled, counterOrderGuid = 4L)
 
-        validateBidAndOffer("0.050".levelIx(market), -1, "50.000".levelIx(market), -1)
+        validateBidAndOffer(-1, -1, -1, -1)
     }
 
     @Test
     fun testCrossingLimitSellOrders() {
-        validateBidAndOffer("0.050".levelIx(market), -1, "50.000".levelIx(market), -1)
+        validateBidAndOffer(-1, -1, -1, -1)
 
         addOrder(1L, Order.Type.LimitBuy, "5", "17.300")
         addOrder(2L, Order.Type.LimitBuy, "5", "17.500")
@@ -247,7 +247,7 @@ class TestMarket {
         // submit limit sell that crosses and exhausts all the buys, bidIx and bestBid should go back to initial values
         addOrder(8L, Order.Type.LimitSell, "6", "17.250", OrderDisposition.PartiallyFilled, counterOrderGuid = 1L)
         validateBidAndOffer(
-            bestBidIx = "0.050".levelIx(market),
+            bestBidIx = -1,
             minBidIx = -1,
             bestOfferIx = "17.250".levelIx(market),
             maxOfferIx = "17.700".levelIx(market),
@@ -259,7 +259,7 @@ class TestMarket {
 
     @Test
     fun testCrossingEdgeCases() {
-        validateBidAndOffer("0.050".levelIx(market), -1, "50.000".levelIx(market), -1)
+        validateBidAndOffer(-1, -1, -1, -1)
 
         addOrder(1L, Order.Type.LimitSell, "5", "50.000")
         addOrder(2L, Order.Type.LimitBuy, "5", "0.050")
@@ -275,8 +275,8 @@ class TestMarket {
         addOrder(3L, Order.Type.LimitBuy, "5", "50.000", OrderDisposition.Filled, counterOrderGuid = 1L)
         validateBidAndOffer(
             bestBidIx = "0.050".levelIx(market),
-            minBidIx = 0,
-            bestOfferIx = "50.000".levelIx(market),
+            minBidIx = "0.050".levelIx(market),
+            bestOfferIx = -1,
             maxOfferIx = -1,
         )
 
@@ -284,34 +284,34 @@ class TestMarket {
         addOrder(4L, Order.Type.LimitSell, "5", "50.000")
         validateBidAndOffer(
             bestBidIx = "0.050".levelIx(market),
-            minBidIx = 0,
+            minBidIx = "0.050".levelIx(market),
             bestOfferIx = "50.000".levelIx(market),
-            maxOfferIx = 999,
+            maxOfferIx = "50.000".levelIx(market),
         )
 
         // LimitBuy that consumes all of resting sell and stays on the book
         addOrder(5L, Order.Type.LimitBuy, "6", "50.000", OrderDisposition.PartiallyFilled, counterOrderGuid = 4L)
         validateBidAndOffer(
             bestBidIx = "50.000".levelIx(market),
-            minBidIx = 0,
-            bestOfferIx = "50.000".levelIx(market),
+            minBidIx = "0.050".levelIx(market),
+            bestOfferIx = -1,
             maxOfferIx = -1,
         )
         // cancel that Limit Buy
         cancelOrders(listOf(5L))
         validateBidAndOffer(
             bestBidIx = "0.050".levelIx(market),
-            minBidIx = 0,
-            bestOfferIx = "50.000".levelIx(market),
+            minBidIx = "0.050".levelIx(market),
+            bestOfferIx = -1,
             maxOfferIx = -1,
         )
 
         // add a LimitSell that exactly consumes resting buy
         addOrder(6L, Order.Type.LimitSell, "5", "0.050", OrderDisposition.Filled, counterOrderGuid = 2L)
         validateBidAndOffer(
-            bestBidIx = "0.050".levelIx(market),
+            bestBidIx = -1,
             minBidIx = -1,
-            bestOfferIx = "50.000".levelIx(market),
+            bestOfferIx = -1,
             maxOfferIx = -1,
         )
 
@@ -319,24 +319,24 @@ class TestMarket {
         addOrder(7L, Order.Type.LimitBuy, "5", "0.050")
         validateBidAndOffer(
             bestBidIx = "0.050".levelIx(market),
-            minBidIx = 0,
-            bestOfferIx = "50.000".levelIx(market),
+            minBidIx = "0.050".levelIx(market),
+            bestOfferIx = -1,
             maxOfferIx = -1,
         )
 
         // LimitSell that consumes all of resting buy and stays on the book
         addOrder(8L, Order.Type.LimitSell, "6", "0.050", OrderDisposition.PartiallyFilled, counterOrderGuid = 7L)
         validateBidAndOffer(
-            bestBidIx = "0.050".levelIx(market),
+            bestBidIx = -1,
             minBidIx = -1,
             bestOfferIx = "0.050".levelIx(market),
-            maxOfferIx = 0,
+            maxOfferIx = "0.050".levelIx(market),
         )
     }
 
     @Test
     fun testCrossingLimitBuyOrders() {
-        validateBidAndOffer("0.050".levelIx(market), -1, "50.000".levelIx(market), -1)
+        validateBidAndOffer(-1, -1, -1, -1)
 
         addOrder(1L, Order.Type.LimitBuy, "5", "17.300")
         addOrder(2L, Order.Type.LimitBuy, "5", "17.500")
@@ -381,7 +381,7 @@ class TestMarket {
         validateBidAndOffer(
             bestBidIx = "17.700".levelIx(market),
             minBidIx = "17.300".levelIx(market),
-            bestOfferIx = "50.000".levelIx(market),
+            bestOfferIx = -1,
             maxOfferIx = -1,
         )
 
@@ -391,7 +391,7 @@ class TestMarket {
 
     @Test
     fun testUpdateOrderCrossingLimitSellOrders() {
-        validateBidAndOffer("0.050".levelIx(market), -1, "50.000".levelIx(market), -1)
+        validateBidAndOffer(-1, -1, -1, -1)
 
         addOrder(1L, Order.Type.LimitBuy, "5", "17.300")
         addOrder(2L, Order.Type.LimitBuy, "5", "17.500")
@@ -434,7 +434,7 @@ class TestMarket {
 
     @Test
     fun testUpdateOrderCrossingLimitBuyOrders() {
-        validateBidAndOffer("0.050".levelIx(market), -1, "50.000".levelIx(market), -1)
+        validateBidAndOffer(-1, -1, -1, -1)
 
         addOrder(1L, Order.Type.LimitBuy, "5", "17.300")
         addOrder(2L, Order.Type.LimitBuy, "5", "17.500")
@@ -689,12 +689,12 @@ class TestMarket {
     }
 
     private fun validateBid(bestBidIx: Int, minBidIx: Int) {
-        assertEquals(market.bestBidIx, bestBidIx)
-        assertEquals(market.minBidIx, minBidIx)
+        assertEquals(bestBidIx, market.bestBidIx)
+        assertEquals(minBidIx, market.minBidIx)
     }
 
     private fun validateOffer(bestOfferIx: Int, maxOfferIx: Int) {
-        assertEquals(market.bestOfferIx, bestOfferIx)
-        assertEquals(market.maxOfferIx, maxOfferIx)
+        assertEquals(bestOfferIx, market.bestOfferIx)
+        assertEquals(maxOfferIx, market.maxOfferIx)
     }
 }
