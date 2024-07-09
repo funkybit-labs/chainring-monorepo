@@ -100,10 +100,8 @@ object SequencerResponseProcessorService {
 
             SequencerRequest.Type.ApplyOrderBatch -> {
                 response.bidOfferState?.let {
-                    val bestBid = it.bestBid.toBigDecimal()
-                    val bestOffer = it.bestOffer.toBigDecimal()
-                    logger.debug { "bestBid = $bestBid, bestOffer = $bestOffer, minBidIx=${it.minBidIx.toBigInteger()}, maxOfferIx=${it.maxOfferIx.toBigInteger()}}" }
-                    if (bestBid >= bestOffer) {
+                    logger.debug { "minBidIx=${it.minBidIx}, bestBidIx = ${it.bestBidIx}, bestOfferIx = ${it.bestOfferIx}, maxOfferIx=${it.maxOfferIx}" }
+                    if (it.bestBidIx >= it.bestOfferIx) {
                         request.orderBatch.ordersToAddList.forEach {
                             logger.debug { "add - ${it.guid} ${it.externalGuid} ${it.type} ${it.amount.toBigInteger()} ${it.price.toBigDecimal()}" }
                         }

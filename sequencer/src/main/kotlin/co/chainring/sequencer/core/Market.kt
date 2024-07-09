@@ -23,7 +23,6 @@ import java.math.BigDecimal
 import java.math.BigInteger
 import java.util.concurrent.CopyOnWriteArrayList
 
-// market price must be exactly halfway between two ticks
 data class Market(
     val id: MarketId,
     val tickSize: BigDecimal,
@@ -46,47 +45,18 @@ data class Market(
         OrderBookLevel(
             levelIx = levelIx,
             side = side,
-            // the initial market price is between ticks, which introduces an additional '0' in the end
-            // price = price(levelIx).setScale(initialMarketPrice.scale()),
             price = price(levelIx),
             maxOrderCount = maxOrdersPerLevel,
         )
 
-//    private val halfTick = tickSize.setScale(tickSize.scale() + 1) / BigDecimal.valueOf(2)
-//    private fun marketIx(): Int = min(maxLevels / 2, (initialMarketPrice - halfTick).divideToIntegralValue(tickSize).toInt())
-//    fun levelIx(price: BigDecimal): Int = (price - levels[0].price).divideToIntegralValue(tickSize).toInt()
-//    val levels: Array<OrderBookLevel> = marketIx().let { marketIx ->
-//        Array(maxLevels) { n ->
-//            if (n < marketIx) {
-//                OrderBookLevel(
-//                    n,
-//                    BookSide.Buy,
-//                    initialMarketPrice.minus(tickSize.multiply((marketIx - n - 0.5).toBigDecimal())),
-//                    maxOrdersPerLevel,
-//                )
-//            } else {
-//                OrderBookLevel(
-//                    n,
-//                    BookSide.Sell,
-//                    initialMarketPrice.plus(tickSize.multiply((n - marketIx + 0.5).toBigDecimal())),
-//                    maxOrdersPerLevel,
-//                )
-//            }
-//        }
-//    }
-
-    // sell boundary
     var maxOfferIx: Int = -1
         private set
     var bestOfferIx: Int = -1
         private set
-
-    // spread
     var bestBidIx: Int = -1
         private set
     var minBidIx: Int = -1
         private set
-    // buy boundary
 
     // TODO - change these mutable maps to a HashMap that pre-allocates
     val buyOrdersByWallet = mutableMapOf<WalletAddress, CopyOnWriteArrayList<LevelOrder>>()
@@ -1012,8 +982,8 @@ data class Market(
                 minFee = if (checkpoint.hasMinFee()) checkpoint.minFee.toBigInteger() else BigInteger.ZERO,
             ).apply {
                 maxOfferIx = checkpoint.maxOfferIx
-                bestOfferIx = checkpoint.bestOfferIx // TODO make backward compatible
-                bestBidIx = checkpoint.bestBidIx // TODO make backward compatible
+                bestOfferIx = checkpoint.bestOfferIx
+                bestBidIx = checkpoint.bestBidIx
                 minBidIx = checkpoint.minBidIx
 
                 checkpoint.levelsList
