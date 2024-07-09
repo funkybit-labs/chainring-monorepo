@@ -105,8 +105,13 @@ class SequencerApp(
                                 this.baseDecimals = market.baseDecimals
                                 this.quoteDecimals = market.quoteDecimals
                                 state.markets[marketId]?.levels?.let { levels ->
-                                    this.minAllowedBid = levels[0].price.toDecimalValue()
-                                    this.maxAllowedOffer = levels[levels.lastIndex - 1].price.toDecimalValue()
+                                    // TODO drop min/max values
+                                    this.minAllowedBid = market.tickSize
+                                    val marketIx = market.marketPrice.toBigDecimal().divideToIntegralValue(tickSize.toBigDecimal()).toInt()
+                                    this.maxAllowedOffer = market.tickSize.toBigDecimal().multiply((marketIx * 2).toBigDecimal()).toDecimalValue()
+                                    // market.marketPrice.toBigDecimal().multiply(BigDecimal("2")).divideToIntegralValue(tickSize).toInt()
+//                                    this.minAllowedBid = levels[0].price.toDecimalValue()
+//                                    this.maxAllowedOffer = levels[levels.lastIndex - 1].price.toDecimalValue()
                                 }
                                 this.minFee = if (market.hasMinFee()) market.minFee else BigInteger.ZERO.toIntegerValue()
                             },
@@ -470,7 +475,7 @@ class SequencerApp(
                     )
                 }
                 if (oldQuoteAssets > BigInteger.ZERO) { // LimitBuy
-                    val previousNotionalAndFee = notionalPlusFee(order.quantity, market.levels[order.levelIx].price, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
+                    val previousNotionalAndFee = notionalPlusFee(order.quantity, market.price(order.levelIx), market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
                     val notionalAndFee = calculateLimitBuyOrderNotionalPlusFee(orderChange, market)
                     quoteAssetsRequired.merge(order.wallet, notionalAndFee - previousNotionalAndFee, ::sumBigIntegers)
                 }

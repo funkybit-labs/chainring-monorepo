@@ -39,7 +39,7 @@ class TestMarket {
     }
 
     private fun String.levelIx(market: Market): Int {
-        return (BigDecimal(this) - market.levels[0].price).divideToIntegralValue(market.tickSize).toInt()
+        return BigDecimal(this).divideToIntegralValue(market.tickSize).toInt()
     }
 
     @Test
@@ -153,19 +153,19 @@ class TestMarket {
         addOrder(3L, Order.Type.LimitSell, "5", "17.550")
         addOrder(4L, Order.Type.LimitSell, "5", "17.700")
         validateBidAndOffer(
+            maxOfferIx = "17.700".levelIx(market),
+            bestOfferIx = "17.550".levelIx(market),
             bestBidIx = "17.500".levelIx(market),
             minBidIx = "17.300".levelIx(market),
-            bestOfferIx = "17.550".levelIx(market),
-            maxOfferIx = "17.700".levelIx(market),
         )
 
         // market sell - no levels exhausted
         addOrder(5L, Order.Type.MarketSell, "3", "0", OrderDisposition.Filled, counterOrderGuid = 2L)
         validateBidAndOffer(
+            maxOfferIx = "17.700".levelIx(market),
+            bestOfferIx = "17.550".levelIx(market),
             bestBidIx = "17.500".levelIx(market),
             minBidIx = "17.300".levelIx(market),
-            bestOfferIx = "17.550".levelIx(market),
-            maxOfferIx = "17.700".levelIx(market),
         )
 
         // market sell - level with best bid exhausted - should go to the next level with orders
@@ -266,9 +266,9 @@ class TestMarket {
 
         validateBidAndOffer(
             bestBidIx = "0.050".levelIx(market),
-            minBidIx = 0,
+            minBidIx = "0.050".levelIx(market),
             bestOfferIx = "50.000".levelIx(market),
-            maxOfferIx = 999,
+            maxOfferIx = "50.000".levelIx(market),
         )
 
         // limit buy that exactly consumes all of resting sell

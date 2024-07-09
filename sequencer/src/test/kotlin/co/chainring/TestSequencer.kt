@@ -91,7 +91,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder.guid,
-                        price = BigDecimal("12.000"),
+                        price = BigDecimal("12.00"),
                         amount = BigDecimal("0.2"),
                         buyerFee = BigDecimal("0.048"),
                         sellerFee = BigDecimal("0.024"),
@@ -131,7 +131,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = makerOrder.guid,
                         sellOrderGuid = takerOrder.guid,
-                        price = BigDecimal("10.000"),
+                        price = BigDecimal("10.00"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.01"),
                         sellerFee = BigDecimal("0.02"),
@@ -226,7 +226,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder1.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.00351"),
                         sellerFee = BigDecimal("0.001755"),
@@ -234,7 +234,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder2.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.00351"),
                         sellerFee = BigDecimal("0.001755"),
@@ -242,7 +242,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder3.guid,
-                        price = BigDecimal("17.600"),
+                        price = BigDecimal("17.60"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.0352"),
                         sellerFee = BigDecimal("0.0176"),
@@ -250,7 +250,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder4.guid,
-                        price = BigDecimal("17.600"),
+                        price = BigDecimal("17.60"),
                         amount = BigDecimal("0.05"),
                         buyerFee = BigDecimal("0.0176"),
                         sellerFee = BigDecimal("0.0088"),
@@ -281,7 +281,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = sell4Order.guid,
-                        price = BigDecimal("17.600"),
+                        price = BigDecimal("17.60"),
                         amount = BigDecimal("0.05"),
                         buyerFee = BigDecimal("0.0176"),
                         sellerFee = BigDecimal("0.0088"),
@@ -289,7 +289,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = sell5Order.guid,
-                        price = BigDecimal("17.700"),
+                        price = BigDecimal("17.70"),
                         amount = BigDecimal("0.2"),
                         buyerFee = BigDecimal("0.0708"),
                         sellerFee = BigDecimal("0.0354"),
@@ -297,7 +297,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = sell6Order.guid,
-                        price = BigDecimal("17.700"),
+                        price = BigDecimal("17.70"),
                         amount = BigDecimal("0.2"),
                         buyerFee = BigDecimal(if (percentage == 100) "0.070851408" else "0.0708"),
                         sellerFee = BigDecimal("0.0354"),
@@ -468,7 +468,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.0351"),
                         sellerFee = BigDecimal("0.01755"),
@@ -501,7 +501,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.0351"),
                         sellerFee = BigDecimal("0.01755"),
@@ -567,7 +567,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = sellOrder1.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.003510"),
                         sellerFee = BigDecimal("0.001755"),
@@ -575,7 +575,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = sellOrder2.guid,
-                        price = BigDecimal("18.000"),
+                        price = BigDecimal("18.00"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.0036"),
                         sellerFee = BigDecimal("0.0018"),
@@ -583,7 +583,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = sellOrder3.guid,
-                        price = BigDecimal("18.500"),
+                        price = BigDecimal("18.50"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.00370"),
                         sellerFee = BigDecimal("0.00185"),
@@ -632,7 +632,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = makerOrder.guid,
                         sellOrderGuid = takerOrder.guid,
-                        price = BigDecimal("17.500"),
+                        price = BigDecimal("17.50"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.01750"),
                         sellerFee = BigDecimal("0.03500"),
@@ -669,7 +669,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = makerOrder.guid,
                         sellOrderGuid = takerOrder.guid,
-                        price = BigDecimal("17.500"),
+                        price = BigDecimal("17.50"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.01750"),
                         sellerFee = BigDecimal("0.03500"),
@@ -724,7 +724,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = buyOrder1.guid,
                         sellOrderGuid = takerOrder.guid,
-                        price = BigDecimal("17.500"),
+                        price = BigDecimal("17.50"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.001750"),
                         sellerFee = BigDecimal("0.003500"),
@@ -732,7 +732,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = buyOrder2.guid,
                         sellOrderGuid = takerOrder.guid,
-                        price = BigDecimal("17.000"),
+                        price = BigDecimal("17.00"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.001700"),
                         sellerFee = BigDecimal("0.003400"),
@@ -740,7 +740,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = buyOrder3.guid,
                         sellOrderGuid = takerOrder.guid,
-                        price = BigDecimal("16.500"),
+                        price = BigDecimal("16.50"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.001650"),
                         sellerFee = BigDecimal("0.003300"),
@@ -933,7 +933,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = m1buy1.guid,
                         sellOrderGuid = response.ordersChangedList[0].guid,
-                        price = BigDecimal("17.500"),
+                        price = BigDecimal("17.50"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.01750"),
                         sellerFee = BigDecimal("0.03500"),
@@ -967,7 +967,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = response.ordersChangedList[0].guid,
                         sellOrderGuid = m1sell1.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.03510"),
                         sellerFee = BigDecimal("0.01755"),
@@ -1085,7 +1085,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = response.ordersChangedList[0].guid,
                         sellOrderGuid = sellOrder1.guid,
-                        price = BigDecimal("10.000"),
+                        price = BigDecimal("10.00"),
                         amount = BigDecimal("5.0"),
                         // taker's fee is 4%
                         buyerFee = BigDecimal("2.0"),
@@ -1095,7 +1095,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = response.ordersChangedList[0].guid,
                         sellOrderGuid = sellOrder2.guid,
-                        price = BigDecimal("10.000"),
+                        price = BigDecimal("10.00"),
                         amount = BigDecimal("5.0"),
                         // taker's fee is 4%
                         buyerFee = BigDecimal("2.0"),
@@ -1222,7 +1222,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.43210"),
                         buyerFee = BigDecimal("0.1516671000000000"),
                         sellerFee = BigDecimal("0.075833550000000"),
@@ -1304,7 +1304,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("1"),
                         buyerFee = BigDecimal("0.3510"),
                         sellerFee = BigDecimal("0.1755"),
@@ -1397,7 +1397,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.43210"),
                         buyerFee = BigDecimal("0.1516671"),
                         sellerFee = BigDecimal("0.07583355"),

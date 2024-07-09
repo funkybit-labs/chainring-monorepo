@@ -63,7 +63,6 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.io.path.createDirectories
 import kotlin.io.path.name
 import kotlin.random.Random
-import kotlin.test.assertContentEquals
 import kotlin.time.Duration.Companion.seconds
 
 class TestSequencerCheckpoints {
@@ -886,7 +885,8 @@ class TestSequencerCheckpoints {
                                     marketId = btcEthMarketId.value
                                     wallet = wallet1.value
                                     ordersToCancel.addAll(
-                                        orders.map {
+                                        // remove all except 1 to keep level on the book
+                                        orders.take(orders.size - 1).map {
                                             cancelOrder {
                                                 this.guid = it.guid
                                             }
@@ -910,14 +910,16 @@ class TestSequencerCheckpoints {
                         }
 
                         // verify setup
-                        val targetLevel = market.levels[market.levelIx(price.toBigDecimal())]
+                        val targetLevel = market.levels.get(market.levelIx(price.toBigDecimal()))!!
                         assertEquals(990, targetLevel.orderHead)
-                        assertEquals(10, targetLevel.orderTail)
+                        assertEquals(11, targetLevel.orderTail)
                     },
                 ),
             ),
         )
     }
+
+    // TODO add test to prove that level is deleted from the book once empty
 
     private fun verifySerialization(initialState: SequencerState) {
         checkpointsPath.toFile().deleteRecursively()
@@ -933,21 +935,38 @@ class TestSequencerCheckpoints {
         initialState.markets.values.forEach { initialStateMarket ->
             val restoredStateMarket = restoredState.markets.getValue(initialStateMarket.id)
 
-            initialStateMarket.levels.forEach { initialStateLevel ->
+            var initialNode = initialStateMarket.levels.first()
+            var restoredNode = restoredStateMarket.levels.first()
+
+            while (initialNode != null && restoredNode != null) {
+                val initialStateLevel = initialNode.value
+                val restoredStateLevel = restoredNode.value
+
+                // Compare the level indices
+                assertEquals(
+                    initialStateLevel.levelIx,
+                    restoredStateLevel.levelIx,
+                    "Level index mismatch at initial levelIx=${initialStateLevel.levelIx} vs restored levelIx=${restoredStateLevel.levelIx}",
+                )
+
+                // Compare the orders in each level
                 initialStateLevel.orders.forEachIndexed { i, initialStateOrder ->
                     assertEquals(
                         initialStateOrder,
-                        restoredStateMarket.levels[initialStateLevel.levelIx].orders[i],
+                        restoredStateLevel.orders[i],
                         "Order mismatch at levelIx=${initialStateLevel.levelIx}, orderIx=$i",
                     )
                 }
+
+                // Move to the next node
+                initialNode = initialNode.next()
+                restoredNode = restoredNode.next()
             }
 
-            assertContentEquals(
-                initialStateMarket.levels,
-                restoredStateMarket.levels,
-                "Levels in market ${initialStateMarket.id} don't match",
-            )
+            // Ensure both iterators are fully consumed, indicating both structures are of the same size
+            assert(initialNode == null && restoredNode == null) {
+                "Levels in market ${initialStateMarket.id} don't match"
+            }
         }
 
         assertEquals(initialState, restoredState)
