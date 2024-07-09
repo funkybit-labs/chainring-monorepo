@@ -12,6 +12,7 @@ object Faucet {
     private val blockchainClients = ChainManager.blockchainConfigs.map {
         TestBlockchainClient(it)
     }
+
     private val blockchainClientsByChainId = blockchainClients.associateBy { it.chainId }
 
     fun fund(address: Address, amount: BigInteger? = null, chainId: ChainId? = null): TransactionReceipt {
@@ -26,6 +27,6 @@ object Faucet {
         }
     }
 
-    private fun blockchainClient(chainId: ChainId?) =
+    fun blockchainClient(chainId: ChainId?) =
         chainId?.let { blockchainClientsByChainId.getValue(chainId) } ?: blockchainClients.first()
 }

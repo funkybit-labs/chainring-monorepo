@@ -1,5 +1,7 @@
-package co.chainring.core.blockchain
+package co.chainring.apps.ring
 
+import co.chainring.core.blockchain.BlockchainClient
+import co.chainring.core.blockchain.ContractType
 import co.chainring.core.model.Address
 import co.chainring.core.model.db.DeployedSmartContractEntity
 import io.github.oshai.kotlinlogging.KotlinLogging

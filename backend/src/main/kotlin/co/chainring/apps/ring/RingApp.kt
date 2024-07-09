@@ -1,11 +1,7 @@
 package co.chainring.apps.ring
 
 import co.chainring.apps.BaseApp
-import co.chainring.core.blockchain.BlockchainDepositHandler
-import co.chainring.core.blockchain.BlockchainTransactionHandler
 import co.chainring.core.blockchain.ChainManager
-import co.chainring.core.blockchain.ContractsPublisher
-import co.chainring.core.blockchain.SettlementCoordinator
 import co.chainring.core.db.DbConfig
 import co.chainring.core.db.migrations
 import co.chainring.core.db.upgrade
@@ -19,45 +15,34 @@ data class RingAppConfig(
 
 class RingApp(config: RingAppConfig = RingAppConfig()) : BaseApp(config.dbConfig) {
     override val logger = KotlinLogging.logger {}
-
-    private val contractsPublishers = ChainManager.getBlockchainClients().map { ContractsPublisher(it) }
-
+    private val blockchainClients = ChainManager.getBlockchainClients()
     private val sequencerClient = SequencerClient()
-    private val settlementCoordinator = SettlementCoordinator(
-        ChainManager.getBlockchainClients(),
-        sequencerClient,
-    )
-    private val blockchainTransactionHandlers = ChainManager.getBlockchainClients().map { BlockchainTransactionHandler(it, sequencerClient) }
-    private val blockchainDepositHandlers = ChainManager.getBlockchainClients().map { BlockchainDepositHandler(it, sequencerClient) }
-    private val repeaterApp = Repeater(db)
+
+    private val chainWorkers = blockchainClients.map { ChainWorker(it, sequencerClient) }
+    private val settlementCoordinator = SettlementCoordinator(blockchainClients, sequencerClient)
+
+    private val repeater = Repeater(db)
+
     override fun start() {
         logger.info { "Starting" }
         super.start()
+
         db.upgrade(migrations, logger)
-        contractsPublishers.forEach {
-            it.updateContracts()
-        }
-        blockchainTransactionHandlers.forEach {
-            it.start()
-        }
-        blockchainDepositHandlers.forEach {
-            it.start()
-        }
+
+        chainWorkers.forEach(ChainWorker::start)
         settlementCoordinator.start()
-        repeaterApp.start()
+        repeater.start()
+
         logger.info { "Started" }
     }
 
     override fun stop() {
         logger.info { "Stopping" }
-        repeaterApp.stop()
+
+        repeater.stop()
         settlementCoordinator.stop()
-        blockchainDepositHandlers.forEach {
-            it.stop()
-        }
-        blockchainTransactionHandlers.forEach {
-            it.stop()
-        }
+        chainWorkers.forEach(ChainWorker::stop)
+
         super.stop()
         logger.info { "Stopped" }
     }

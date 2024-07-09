@@ -1,6 +1,8 @@
-package co.chainring.core.blockchain
+package co.chainring.apps.ring
 
 import co.chainring.apps.api.model.websocket.TradeUpdated
+import co.chainring.core.blockchain.BlockchainClient
+import co.chainring.core.blockchain.ContractType
 import co.chainring.core.evm.Adjustment
 import co.chainring.core.evm.BatchSettlement
 import co.chainring.core.evm.ECHelper.sha3
