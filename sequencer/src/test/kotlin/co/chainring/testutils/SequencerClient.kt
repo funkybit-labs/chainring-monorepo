@@ -4,6 +4,7 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.FeeRates
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.Asset
+import co.chainring.sequencer.core.Clock
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.OrderGuid
 import co.chainring.sequencer.core.WalletAddress
@@ -31,8 +32,8 @@ import java.util.UUID
 import kotlin.random.Random
 import kotlin.test.assertNotNull
 
-class SequencerClient {
-    private val sequencer = SequencerApp(checkpointsPath = null)
+class SequencerClient(clock: Clock) {
+    private val sequencer = SequencerApp(clock, checkpointsPath = null)
 
     data class Asset(
         val name: String,

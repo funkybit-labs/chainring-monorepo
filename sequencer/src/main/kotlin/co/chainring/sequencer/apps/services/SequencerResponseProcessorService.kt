@@ -50,6 +50,7 @@ import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.newQuantityOrNull
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.RoundingMode
@@ -220,7 +221,7 @@ object SequencerResponseProcessorService {
     }
 
     private fun handleSequencerResponse(request: SequencerRequest, response: SequencerResponse, ordersBeingUpdated: List<Long> = listOf()) {
-        val timestamp = Clock.System.now()
+        val timestamp = Instant.fromEpochMilliseconds(response.createdAt)
 
         val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
         val limitsChanged = mutableSetOf<Pair<WalletEntity, MarketEntity>>()

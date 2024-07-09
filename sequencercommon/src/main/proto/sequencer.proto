@@ -111,6 +111,7 @@ message SequencerResponse {
   repeated WithdrawalCreated withdrawalsCreated = 13;
   repeated WithdrawalFee withdrawalFeesSet = 14;
   repeated MarketMinFee marketMinFeesSet = 15;
+  uint64 createdAt = 16;
 }
 
 message Sequenced {

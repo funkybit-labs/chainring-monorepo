@@ -2,6 +2,7 @@ package co.chainring.sequencer.apps
 
 import co.chainring.core.model.Symbol
 import co.chainring.sequencer.core.Asset
+import co.chainring.sequencer.core.Clock
 import co.chainring.sequencer.core.FeeRate
 import co.chainring.sequencer.core.FeeRates
 import co.chainring.sequencer.core.LevelOrder
@@ -48,6 +49,7 @@ import co.chainring.sequencer.core.inputQueue as defaultInputQueue
 import co.chainring.sequencer.core.outputQueue as defaultOutputQueue
 
 class SequencerApp(
+    val clock: Clock = Clock(),
     val inputQueue: RollingChronicleQueue = defaultInputQueue,
     val outputQueue: RollingChronicleQueue = defaultOutputQueue,
     val checkpointsPath: Path?,
@@ -96,7 +98,6 @@ class SequencerApp(
                 sequencerResponse {
                     this.guid = market.guid
                     this.sequence = sequence
-                    this.processingTime = System.nanoTime() - startTime
                     error?.let { this.error = it } ?: run {
                         this.marketsCreated.add(
                             marketCreated {
@@ -112,6 +113,8 @@ class SequencerApp(
                             },
                         )
                     }
+                    this.createdAt = clock.currentTimeMillis()
+                    this.processingTime = clock.nanoTime() - startTime
                 }
             }
             SequencerRequest.Type.SetFeeRates -> {
@@ -130,10 +133,11 @@ class SequencerApp(
                 sequencerResponse {
                     this.guid = request.guid
                     this.sequence = sequence
-                    this.processingTime = System.nanoTime() - startTime
                     error?.let { this.error = it } ?: run {
                         this.feeRatesSet = feeRates
                     }
+                    this.createdAt = clock.currentTimeMillis()
+                    this.processingTime = clock.nanoTime() - startTime
                 }
             }
 
@@ -152,10 +156,11 @@ class SequencerApp(
                 sequencerResponse {
                     this.guid = request.guid
                     this.sequence = sequence
-                    this.processingTime = System.nanoTime() - startTime
                     error?.let { this.error = it } ?: run {
                         this.withdrawalFeesSet.addAll(withdrawalFees)
                     }
+                    this.createdAt = clock.currentTimeMillis()
+                    this.processingTime = clock.nanoTime() - startTime
                 }
             }
 
@@ -174,10 +179,11 @@ class SequencerApp(
                 sequencerResponse {
                     this.guid = request.guid
                     this.sequence = sequence
-                    this.processingTime = System.nanoTime() - startTime
                     error?.let { this.error = it } ?: run {
                         this.marketMinFeesSet.addAll(marketMinFees)
                     }
+                    this.createdAt = clock.currentTimeMillis()
+                    this.processingTime = clock.nanoTime() - startTime
                 }
             }
 
@@ -226,7 +232,6 @@ class SequencerApp(
                 }
                 sequencerResponse {
                     this.sequence = sequence
-                    this.processingTime = System.nanoTime() - startTime
                     this.guid = orderBatch.guid
                     this.ordersChanged.addAll(ordersChanged)
                     this.ordersChanged.addAll(autoReduce(walletsAndAssetsWithBalanceChanges))
@@ -239,6 +244,8 @@ class SequencerApp(
                     market?.let {
                         this.bidOfferState = market.getBidOfferState()
                     }
+                    this.createdAt = clock.currentTimeMillis()
+                    this.processingTime = clock.nanoTime() - startTime
                 }
             }
 
@@ -312,7 +319,6 @@ class SequencerApp(
                 sequencerResponse {
                     this.guid = balanceBatch.guid
                     this.sequence = sequence
-                    this.processingTime = System.nanoTime() - startTime
                     this.balancesChanged.addAll(
                         balancesChanged.mapNotNull { (k, delta) ->
                             val (wallet, asset) = k
@@ -336,6 +342,8 @@ class SequencerApp(
                             }
                         },
                     )
+                    this.createdAt = clock.currentTimeMillis()
+                    this.processingTime = clock.nanoTime() - startTime
                 }
             }
             SequencerRequest.Type.Reset -> {
@@ -343,15 +351,17 @@ class SequencerApp(
                     state.clear()
                     sequencerResponse {
                         this.sequence = sequence
-                        this.processingTime = System.nanoTime() - startTime
                         this.guid = request.guid
+                        this.createdAt = clock.currentTimeMillis()
+                        this.processingTime = clock.nanoTime() - startTime
                     }
                 } else {
                     sequencerResponse {
                         this.sequence = sequence
-                        this.processingTime = System.nanoTime() - startTime
                         this.guid = request.guid
                         this.error = SequencerError.UnknownRequest
+                        this.createdAt = clock.currentTimeMillis()
+                        this.processingTime = clock.nanoTime() - startTime
                     }
                 }
             }
@@ -359,25 +369,28 @@ class SequencerApp(
                 if (inSandboxMode) {
                     sequencerResponse {
                         this.sequence = sequence
-                        this.processingTime = System.nanoTime() - startTime
                         this.guid = request.guid
                         this.stateDump = state.getDump()
+                        this.createdAt = clock.currentTimeMillis()
+                        this.processingTime = clock.nanoTime() - startTime
                     }
                 } else {
                     sequencerResponse {
                         this.sequence = sequence
-                        this.processingTime = System.nanoTime() - startTime
                         this.guid = request.guid
                         this.error = SequencerError.UnknownRequest
+                        this.createdAt = clock.currentTimeMillis()
+                        this.processingTime = clock.nanoTime() - startTime
                     }
                 }
             }
             null, SequencerRequest.Type.UNRECOGNIZED -> {
                 sequencerResponse {
                     this.sequence = sequence
-                    this.processingTime = System.nanoTime() - startTime
                     this.guid = request.guid
                     this.error = SequencerError.UnknownRequest
+                    this.createdAt = clock.currentTimeMillis()
+                    this.processingTime = clock.nanoTime() - startTime
                 }
             }
         }
@@ -570,7 +583,7 @@ class SequencerApp(
 
                 inputTailer.readingDocument().use { dc ->
                     if (dc.isPresent) {
-                        val startTime = System.nanoTime()
+                        val startTime = clock.nanoTime()
                         dc.wire()?.read()?.bytes { bytes ->
                             val request = SequencerRequest.parseFrom(bytes.toByteArray())
                             val response = processRequest(request, dc.index(), startTime)
@@ -578,7 +591,11 @@ class SequencerApp(
                             if (strictReplayValidation && response.sequence <= lastSequenceNumberProcessedBeforeRestart) {
                                 // validate actual response matches expected while replaying requests
                                 loadResponseFromOutputQueue(response.sequence)?.let {
-                                    val expectedResponse = it.toBuilder().setProcessingTime(response.processingTime).build()
+                                    val expectedResponse = it.toBuilder()
+                                        .setProcessingTime(response.processingTime)
+                                        .setCreatedAt(response.createdAt)
+                                        .build()
+
                                     if (request.type != SequencerRequest.Type.GetState && response != expectedResponse) {
                                         logger.error { "Actual response did not match expected, exiting. Sequence: ${dc.index()}, requests processed since start: $requestsProcessedSinceStarted, request: $request, expected response: $expectedResponse, actual response: $response" }
                                         exitProcess(1)
