@@ -22,8 +22,10 @@ import org.http4k.client.WebsocketClient
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.extension.ExtendWith
 import org.web3j.utils.Numeric
+import java.lang.System.getenv
 import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -175,6 +177,9 @@ class DepositTest {
 
     @Test
     fun `test on chain deposit detection - forks are handled`() {
+        // test is skipped in the test env
+        Assumptions.assumeTrue((getenv("INTEGRATION_RUN") ?: "0") != "1")
+
         val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
 
