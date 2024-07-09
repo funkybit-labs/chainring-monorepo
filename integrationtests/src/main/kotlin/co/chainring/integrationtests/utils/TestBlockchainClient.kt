@@ -4,11 +4,14 @@ import co.chainring.contracts.generated.MockERC20
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
 import co.chainring.core.model.Address
+import co.chainring.core.model.TxHash
 import org.web3j.protocol.core.Request
+import org.web3j.protocol.core.Response
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.protocol.core.methods.response.VoidResponse
 import org.web3j.tx.Transfer
 import org.web3j.utils.Convert
+import org.web3j.utils.Numeric
 import java.math.BigInteger
 
 class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : BlockchainClient(blockchainConfig) {
@@ -32,6 +35,36 @@ class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : Blockchai
             VoidResponse::class.java,
         ).send()
     }
+
+    class SnapshotResponse : Response<String>() {
+        val id: BigInteger
+            get() = Numeric.decodeQuantity(result)
+    }
+
+    fun snapshot(): SnapshotResponse =
+        Request(
+            "evm_snapshot",
+            emptyList<String>(),
+            web3jService,
+            SnapshotResponse::class.java,
+        ).send()
+
+    fun revert(snapshotId: BigInteger) {
+        Request(
+            "evm_revert",
+            listOf(snapshotId),
+            web3jService,
+            VoidResponse::class.java,
+        ).send()
+    }
+
+    fun dropTransaction(txHash: TxHash) =
+        Request(
+            "anvil_dropTransaction",
+            listOf(txHash.value),
+            web3jService,
+            VoidResponse::class.java,
+        ).send()
 
     fun setIntervalMining(interval: Int = 1): VoidResponse = Request(
         "evm_setIntervalMining",

@@ -11,11 +11,13 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.decimalLiteral
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.max
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.stringLiteral
+import org.jetbrains.exposed.sql.update
 import org.jetbrains.exposed.sql.upsert
 import org.jetbrains.exposed.sql.vendors.ForUpdateOption
 import java.math.BigInteger
@@ -61,6 +63,7 @@ object DepositTable : GUIDTable<DepositId>("deposit", ::DepositId) {
     val updatedAt = timestamp("updated_at").nullable()
     val updatedBy = varchar("updated_by", 10485760).nullable()
     val error = varchar("error", 10485760).nullable()
+    val canBeResubmitted = bool("can_be_resubmitted").default(false)
 }
 
 class DepositException(message: String) : Exception(message)
@@ -73,9 +76,11 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
             }.firstOrNull()
         }
 
-        fun maxBlockNumber(): BigInteger? {
+        fun maxBlockNumber(chainId: ChainId): BigInteger? {
             return DepositTable
+                .leftJoin(SymbolTable)
                 .select(DepositTable.blockNumber.max())
+                .where { SymbolTable.chainId.eq(chainId) }
                 .maxByOrNull { DepositTable.blockNumber }
                 ?.let { it[DepositTable.blockNumber.max()]?.toBigInteger() }
         }
@@ -138,22 +143,55 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
                 it[DepositTable.transactionHash] = transactionHash.value
             }
 
-            return findByTxHash(transactionHash)
+            return findByTxHash(transactionHash)?.also {
+                if (it.status == DepositStatus.Failed && it.canBeResubmitted) {
+                    it.status = DepositStatus.Pending
+                    it.createdAt = Clock.System.now()
+                    it.updatedAt = it.createdAt
+                }
+            }
+        }
+
+        fun countConfirmedOrCompleted(blockNumbers: List<BigInteger>, chainId: ChainId): Long =
+            DepositTable
+                .leftJoin(SymbolTable)
+                .selectAll()
+                .where { DepositTable.blockNumber.inList(blockNumbers.map { it.toBigDecimal() }) }
+                .andWhere { SymbolTable.chainId.eq(chainId) }
+                .andWhere { DepositTable.status.inList(listOf(DepositStatus.Confirmed, DepositStatus.Complete)) }
+                .count()
+
+        fun markAsFailedByBlockNumbers(blockNumbers: List<BigInteger>, chainId: ChainId, error: String) {
+            DepositTable
+                .leftJoin(SymbolTable)
+                .update({
+                    DepositTable.blockNumber.inList(blockNumbers.map { it.toBigDecimal() })
+                        .and(SymbolTable.chainId.eq(chainId))
+                }) {
+                    it[DepositTable.status] = DepositStatus.Failed
+                    it[DepositTable.error] = error
+                }
         }
     }
 
-    fun markAsConfirmed(blockNumber: BigInteger) {
+    fun updateBlockNumber(blockNumber: BigInteger) {
         val now = Clock.System.now()
         this.updatedAt = now
-        this.status = DepositStatus.Confirmed
         this.blockNumber = blockNumber
     }
 
-    fun markAsFailed(error: String) {
+    fun markAsConfirmed() {
+        val now = Clock.System.now()
+        this.updatedAt = now
+        this.status = DepositStatus.Confirmed
+    }
+
+    fun markAsFailed(error: String, canBeResubmitted: Boolean = false) {
         val now = Clock.System.now()
         this.updatedAt = now
         this.status = DepositStatus.Failed
         this.error = error
+        this.canBeResubmitted = canBeResubmitted
     }
 
     fun markAsComplete() {
@@ -190,4 +228,5 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
     var updatedBy by DepositTable.updatedBy
 
     var error by DepositTable.error
+    var canBeResubmitted by DepositTable.canBeResubmitted
 }

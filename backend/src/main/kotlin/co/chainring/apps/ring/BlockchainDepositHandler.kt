@@ -1,39 +1,32 @@
-package co.chainring.core.blockchain
+package co.chainring.apps.ring
 
-import co.chainring.contracts.generated.Exchange
-import co.chainring.core.model.Address
-import co.chainring.core.model.TxHash
+import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.model.db.BalanceChange
 import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BalanceType
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.DepositStatus
 import co.chainring.core.model.db.DepositTable
-import co.chainring.core.model.db.SymbolEntity
-import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.sequencer.core.Asset
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.reactivex.Flowable
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
-import org.web3j.crypto.Keys
-import org.web3j.protocol.core.DefaultBlockParameter
-import org.web3j.protocol.core.DefaultBlockParameterName
-import org.web3j.protocol.core.methods.request.EthFilter
-import org.web3j.tx.Contract
 import java.math.BigInteger
-import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 
 class BlockchainDepositHandler(
     private val blockchainClient: BlockchainClient,
     private val sequencerClient: SequencerClient,
     private val numConfirmations: Int = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toIntOrNull() ?: 1,
     private val pollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
+    private val receiptMaxWaitTime: Duration = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_RECEIPT_MAX_WAIT_TIME_MS")?.toLongOrNull()?.milliseconds ?: 10.minutes,
 ) {
     private val chainId = blockchainClient.chainId
     private var workerThread: Thread? = null
@@ -48,8 +41,6 @@ class BlockchainDepositHandler(
 
     fun start() {
         logger.debug { "Starting deposit confirmation handler" }
-
-        registerDepositEventsConsumer()
 
         workerThread = thread(start = true, name = "deposit-confirmation-handler-$chainId", isDaemon = true) {
             logger.debug { "Deposit confirmation handler thread starting for $chainId" }
@@ -67,60 +58,6 @@ class BlockchainDepositHandler(
                 }
             }
         }
-    }
-
-    private fun registerDepositEventsConsumer() {
-        val exchangeContractAddress = blockchainClient.getContractAddress(ContractType.Exchange).value
-
-        val startFromBlock = maxSeenBlockNumber()
-            ?: System.getenv("EVM_NETWORK_EARLIEST_BLOCK")?.let { DefaultBlockParameter.valueOf(it.toBigInteger()) }
-            ?: DefaultBlockParameterName.LATEST
-
-        logger.debug { "registerDepositEventsConsumer starting from block ${startFromBlock.value}" }
-
-        val filter = EthFilter(startFromBlock, DefaultBlockParameterName.LATEST, exchangeContractAddress)
-
-        blockchainClient.ethLogFlowable(filter)
-            .retryWhen { f: Flowable<Throwable> -> f.take(5).delay(300, TimeUnit.MILLISECONDS) }
-            .subscribe(
-                { eventLog ->
-                    // listen to all events of the exchange contract and manually check for DEPOSIT_EVENT
-                    // exchangeContract.depositEventFlowable(filter) fails with null pointer on any other event form the contract
-                    if (Contract.staticExtractEventParameters(Exchange.DEPOSIT_EVENT, eventLog) != null) {
-                        val depositEventResponse = Exchange.getDepositEventFromLog(eventLog)
-                        logger.debug { "Received deposit event (from: ${depositEventResponse.from}, amount: ${depositEventResponse.amount}, token: ${depositEventResponse.token}, txHash: ${depositEventResponse.log.transactionHash})" }
-
-                        val blockNumber = depositEventResponse.log.blockNumber
-                        val txHash = TxHash(depositEventResponse.log.transactionHash)
-
-                        transaction {
-                            val deposit = DepositEntity.findByTxHash(txHash)
-                            if (deposit == null) {
-                                DepositEntity.createOrUpdate(
-                                    wallet = WalletEntity.getOrCreate(Address(Keys.toChecksumAddress(depositEventResponse.from))),
-                                    symbol = SymbolEntity.forChainAndContractAddress(
-                                        chainId,
-                                        Address(Keys.toChecksumAddress(depositEventResponse.token)).takeIf { it != Address.zero },
-                                    ),
-                                    amount = depositEventResponse.amount,
-                                    blockNumber = blockNumber,
-                                    transactionHash = txHash,
-                                )
-                            } else {
-                                if (deposit.blockNumber != blockNumber) {
-                                    deposit.blockNumber = blockNumber
-                                    deposit.updatedAt = Clock.System.now()
-                                }
-                                logger.debug { "Skipping already recorded deposit (tx hash: $txHash)" }
-                            }
-                        }
-                    }
-                },
-                { throwable: Throwable ->
-                    logger.error(throwable) { "Unexpected error occurred while processing deposit events" }
-                    registerDepositEventsConsumer()
-                },
-            )
     }
 
     private fun refreshPendingDeposits() {
@@ -142,7 +79,12 @@ class BlockchainDepositHandler(
     }
 
     private fun refreshPendingDeposit(pendingDeposit: DepositEntity, currentBlock: BigInteger) {
-        blockchainClient.getTransactionReceipt(pendingDeposit.transactionHash.value)?.let { receipt ->
+        val receipt = blockchainClient.getTransactionReceipt(pendingDeposit.transactionHash.value)
+        if (receipt == null) {
+            if (Clock.System.now() - pendingDeposit.createdAt > receiptMaxWaitTime) {
+                pendingDeposit.markAsFailed("Transaction receipt not found", canBeResubmitted = true)
+            }
+        } else {
             receipt.blockNumber?.let { blockNumber ->
                 when (receipt.status) {
                     "0x1" -> {
@@ -153,7 +95,11 @@ class BlockchainDepositHandler(
                                 BalanceType.Exchange,
                             )
 
-                            pendingDeposit.markAsConfirmed(blockNumber)
+                            pendingDeposit.markAsConfirmed()
+                        }
+
+                        if (pendingDeposit.blockNumber == null) {
+                            pendingDeposit.updateBlockNumber(blockNumber)
                         }
                     }
                     else -> {
@@ -184,10 +130,6 @@ class BlockchainDepositHandler(
         } catch (e: Exception) {
             logger.error(e) { "Failed to notify Sequencer about deposit ${deposit.guid}" }
         }
-    }
-
-    private fun maxSeenBlockNumber() = transaction {
-        DepositEntity.maxBlockNumber()?.let { DefaultBlockParameter.valueOf(it) }
     }
 
     private fun confirmations(currentBlock: BigInteger, startingBlock: BigInteger): Int {

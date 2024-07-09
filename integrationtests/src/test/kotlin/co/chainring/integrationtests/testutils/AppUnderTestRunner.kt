@@ -13,6 +13,7 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.WithdrawalFee
 import co.chainring.core.model.db.BalanceLogTable
 import co.chainring.core.model.db.BalanceTable
+import co.chainring.core.model.db.BlockTable
 import co.chainring.core.model.db.BlockchainTransactionTable
 import co.chainring.core.model.db.BroadcasterJobTable
 import co.chainring.core.model.db.ChainSettlementBatchTable
@@ -114,6 +115,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                                     )?.deprecated = true
                                 }
                                 WithdrawalEntity.findPending().forEach { it.update(WithdrawalStatus.Failed, "restarting test") }
+                                BlockTable.deleteAll()
                             }
                             ringApp.start()
                             apiApp.start()
@@ -218,6 +220,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
 
     private fun deleteAll() {
         transaction {
+            BlockTable.deleteAll()
             TelegramBotUserWalletTable.deleteAll()
             TelegramBotUserTable.deleteAll()
             TelegramMiniAppUserRewardTable.deleteAll()

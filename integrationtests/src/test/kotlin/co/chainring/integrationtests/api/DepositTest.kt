@@ -3,6 +3,7 @@ package co.chainring.integrationtests.api
 import co.chainring.apps.api.model.CreateDepositApiRequest
 import co.chainring.apps.api.model.Deposit
 import co.chainring.core.model.Symbol
+import co.chainring.core.model.db.DepositEntity
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.waitForBalance
 import co.chainring.integrationtests.utils.AssetAmount
@@ -14,13 +15,19 @@ import co.chainring.integrationtests.utils.assertBalancesMessageReceived
 import co.chainring.integrationtests.utils.blocking
 import co.chainring.integrationtests.utils.subscribeToBalances
 import co.chainring.tasks.fixtures.toChainSymbol
+import kotlinx.datetime.Clock
+import org.awaitility.kotlin.await
+import org.awaitility.kotlin.withAlias
 import org.http4k.client.WebsocketClient
+import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.extension.ExtendWith
 import org.web3j.utils.Numeric
+import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertNotNull
+import kotlin.time.Duration.Companion.minutes
 
 @ExtendWith(AppUnderTestRunner::class)
 class DepositTest {
@@ -136,5 +143,131 @@ class DepositTest {
         val pendingBtcDeposit2 = apiClient2.createDeposit(CreateDepositApiRequest(Symbol(btc.name), btcDeposit1Amount.inFundamentalUnits, btcDeposit2TxHash)).deposit
         assertEquals(listOf(pendingBtcDeposit1), apiClient1.listDeposits().deposits.filter { it.symbol.value == btc.name })
         assertEquals(listOf(pendingBtcDeposit2), apiClient2.listDeposits().deposits.filter { it.symbol.value == btc.name })
+    }
+
+    @Test
+    fun `test on chain deposit detection`() {
+        val apiClient = TestApiClient()
+        val wallet = Wallet(apiClient)
+
+        Faucet.fund(wallet.address, chainId = wallet.currentChainId)
+
+        val chain = apiClient.getConfiguration().chains[0]
+        val btc = chain.symbols.first { it.name == "BTC:${chain.id}" }
+        val depositAmount = AssetAmount(btc, "0.01")
+
+        val depositTxHash = wallet.asyncDepositNative(depositAmount.inFundamentalUnits)
+
+        Faucet.mine()
+
+        await
+            .withAlias("Waiting for deposit to be detected")
+            .pollInSameThread()
+            .pollDelay(Duration.ofMillis(100))
+            .pollInterval(Duration.ofMillis(100))
+            .atMost(Duration.ofMillis(10000L))
+            .until {
+                apiClient.listDeposits().deposits.firstOrNull {
+                    it.txHash == depositTxHash && it.amount == depositAmount.inFundamentalUnits
+                } != null
+            }
+    }
+
+    @Test
+    fun `test on chain deposit detection - forks are handled`() {
+        val apiClient = TestApiClient()
+        val wallet = Wallet(apiClient)
+
+        Faucet.fund(wallet.address, chainId = wallet.currentChainId)
+
+        val chain = apiClient.getConfiguration().chains[0]
+        val btc = chain.symbols.first { it.name == "BTC:${chain.id}" }
+
+        val chainClient = Faucet.blockchainClient(chain.id)
+        val snapshotId = chainClient.snapshot().id
+
+        val deposit1TxHash = wallet.asyncDepositNative(AssetAmount(btc, "0.01").inFundamentalUnits)
+        chainClient.mine()
+
+        await
+            .withAlias("Waiting for deposit 1 to be detected")
+            .pollInSameThread()
+            .pollDelay(Duration.ofMillis(100))
+            .pollInterval(Duration.ofMillis(100))
+            .atMost(Duration.ofMillis(10000L))
+            .until {
+                apiClient.listDeposits().deposits.firstOrNull {
+                    it.txHash == deposit1TxHash
+                } != null
+            }
+
+        chainClient.revert(snapshotId)
+        chainClient.mine()
+
+        val deposit2TxHash = wallet.asyncDepositNative(AssetAmount(btc, "0.02").inFundamentalUnits)
+        chainClient.mine()
+
+        await
+            .withAlias("Waiting for deposit 2 to be completed")
+            .pollInSameThread()
+            .pollDelay(Duration.ofMillis(100))
+            .pollInterval(Duration.ofMillis(100))
+            .atMost(Duration.ofMillis(10000L))
+            .until {
+                apiClient.listDeposits().deposits.firstOrNull {
+                    it.txHash == deposit2TxHash && it.status == Deposit.Status.Complete
+                } != null
+            }
+
+        // check that deposit 1 was marked as failed
+        apiClient.listDeposits().deposits.first { it.txHash == deposit1TxHash }.also {
+            assertEquals(Deposit.Status.Failed, it.status)
+            assertEquals("Fork rollback", it.error)
+        }
+    }
+
+    @Test
+    fun `test deposit fails after timeout if no tx receipt found`() {
+        val apiClient = TestApiClient()
+        val wallet = Wallet(apiClient)
+
+        Faucet.fund(wallet.address, chainId = wallet.currentChainId)
+
+        val chain = apiClient.getConfiguration().chains[0]
+        val btc = chain.symbols.first { it.name == "BTC:${chain.id}" }
+        val amount = AssetAmount(btc, "0.01")
+
+        val chainClient = Faucet.blockchainClient(chain.id)
+
+        val depositTxHash = wallet.asyncDepositNative(amount.inFundamentalUnits)
+        apiClient.createDeposit(CreateDepositApiRequest(Symbol(btc.name), amount.inFundamentalUnits, depositTxHash)).deposit.also {
+            assertEquals(Deposit.Status.Pending, it.status)
+        }
+        chainClient.dropTransaction(depositTxHash)
+
+        transaction {
+            DepositEntity.findByTxHash(depositTxHash)!!.also {
+                it.createdAt = Clock.System.now() - 11.minutes
+            }
+        }
+
+        await
+            .withAlias("Waiting for deposit to be marked as failed")
+            .pollInSameThread()
+            .pollDelay(Duration.ofMillis(100))
+            .pollInterval(Duration.ofMillis(100))
+            .atMost(Duration.ofMillis(10000L))
+            .until {
+                apiClient.listDeposits().deposits.firstOrNull {
+                    it.txHash == depositTxHash && it.status == Deposit.Status.Failed
+                } != null
+            }
+
+        assertEquals(depositTxHash, wallet.asyncDepositNative(amount.inFundamentalUnits))
+
+        // verify that same deposit tx can be submitted again
+        apiClient.createDeposit(CreateDepositApiRequest(Symbol(btc.name), amount.inFundamentalUnits, depositTxHash)).deposit.also {
+            assertEquals(Deposit.Status.Pending, it.status)
+        }
     }
 }

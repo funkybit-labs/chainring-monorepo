@@ -5,6 +5,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.upsert
+import java.math.BigInteger
 
 object KeyValueStore : Table("key_value_store") {
 
@@ -38,6 +39,14 @@ object KeyValueStore : Table("key_value_store") {
 
     fun setInstant(key: String, value: Instant) {
         setValue(key, value.toEpochMilliseconds().toString())
+    }
+
+    fun getBigInt(key: String): BigInteger? {
+        return getValue(key)?.toBigInteger()
+    }
+
+    fun setBigInt(key: String, value: BigInteger) {
+        setValue(key, value.toString())
     }
 
     fun remove(key: String) {
