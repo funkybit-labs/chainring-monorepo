@@ -3,11 +3,11 @@ package co.chainring.integrationtests.utils
 import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
+import co.chainring.core.blockchain.DefaultBlockParam
 import co.chainring.core.model.Address
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.utils.fromFundamentalUnits
 import kotlinx.coroutines.runBlocking
-import org.web3j.crypto.Keys
 import java.math.BigInteger
 
 class ExchangeContractManager {
@@ -44,13 +44,11 @@ class ExchangeContractManager {
 
     fun getFeeBalance(symbol: String): BigInteger {
         val blockchainClient = blockchainClients.getValue(symbolByChainId.getValue(symbol))
-        val feeAccountAddress = blockchainClient.exchangeContract.feeAccount().send().let {
-            Address(Keys.toChecksumAddress(it))
-        }
+        val feeAccountAddress = blockchainClient.getFeeAccountAddress(DefaultBlockParam.Latest)
         val tokenAddress = symbols.getValue(symbol).contractAddress ?: Address.zero
 
         return runBlocking {
-            blockchainClient.getExchangeBalance(feeAccountAddress, tokenAddress)
+            blockchainClient.getExchangeBalance(feeAccountAddress, tokenAddress, DefaultBlockParam.Latest)
         }
     }
 }

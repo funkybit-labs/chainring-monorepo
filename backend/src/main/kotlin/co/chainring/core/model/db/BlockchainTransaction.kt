@@ -83,22 +83,22 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
         }
     }
 
-    fun updateBlockProcessed(blockNumber: BigInteger) {
+    fun updateBlockNumber(blockNumber: BigInteger) {
         this.blockNumber = blockNumber
         this.updatedAt = Clock.System.now()
         this.updatedBy = "system"
     }
 
-    fun markAsSeen(blockNumber: BigInteger) {
+    fun updateLastSeenBlock(blockNumber: BigInteger) {
         this.lastSeenBlock = blockNumber
         this.updatedAt = Clock.System.now()
         this.updatedBy = "system"
     }
 
-    fun markAsSubmitted(txHash: TxHash, blockNumber: BigInteger) {
+    fun markAsSubmitted(txHash: TxHash, blockNumber: BigInteger?, lastSeenBlock: BigInteger?) {
         this.txHash = txHash
         this.blockNumber = blockNumber
-        this.lastSeenBlock = blockNumber
+        this.lastSeenBlock = lastSeenBlock
         this.status = BlockchainTransactionStatus.Submitted
         this.updatedAt = Clock.System.now()
         this.updatedBy = "system"
