@@ -804,7 +804,6 @@ data class Market(
     // if the price change would cross the market order will be filled (partially)
     private fun changeOrder(orderChange: Order, feeRates: FeeRates): ChangeOrderResult? {
         return ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
-            val wallet = order.wallet
             val level = levels.get(order.levelIx)!!
             val newLevelIx = levelIx(orderChange.price.toBigDecimal())
             val newLevelPrice = price(newLevelIx)
@@ -849,18 +848,23 @@ data class Market(
 
                     Pair(limitChunkQuantity - order.quantity, BigInteger.ZERO)
                 }
+
+                // note: Order is reset during removal, should not be used after reset
+                // note: Level might be reset in case when the last order was removed
+                val wallet = order.wallet
+                val side = level.side
                 removeOrder(order.guid, feeRates)
+
                 val addOrderResult = addOrder(
                     wallet.value,
                     order {
                         this.guid = orderChange.guid
-                        this.type = if (level.side == BookSide.Buy) Order.Type.LimitBuy else Order.Type.LimitSell
+                        this.type = if (side == BookSide.Buy) Order.Type.LimitBuy else Order.Type.LimitSell
                         this.amount = orderChange.amount
                         this.price = orderChange.price
                     },
                     feeRates,
                 )
-                // note: 'order' object is reset during removal, 'order.wallet' returns 0
                 ChangeOrderResult(wallet, addOrderResult.disposition, addOrderResult.executions, baseAssetDelta, quoteAssetDelta)
             }
         }

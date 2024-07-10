@@ -9,6 +9,7 @@ class AVLTree<T : AVLTree.Node<T>> {
         var right: T? = null,
         var parent: T? = null,
     ) {
+        @Suppress("UNCHECKED_CAST")
         fun next(): T? {
             var current: T? = this as T
             if (current?.right != null) {
@@ -27,6 +28,7 @@ class AVLTree<T : AVLTree.Node<T>> {
             }
         }
 
+        @Suppress("UNCHECKED_CAST")
         fun previous(): T? {
             var current: T? = this as T
             if (current?.left != null) {
