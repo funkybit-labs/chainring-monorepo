@@ -81,6 +81,7 @@ tasks.test {
         "--add-opens=java.base/java.io=ALL-UNNAMED",
         "--add-opens=java.base/java.util=ALL-UNNAMED"
     )
+    environment("FAUCET_POSSIBLE", "1")
 }
 
 tasks.withType<KotlinCompile> {
