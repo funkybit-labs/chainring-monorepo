@@ -73,6 +73,8 @@ class BlockProcessor(
         BigInteger.valueOf((System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toLongOrNull() ?: 1) + 1)
 
     private fun processBlock(blockNumber: BigInteger) {
+        logger.info { "Processing block $blockNumber, chainId=$chainId" }
+
         val blockFromRpcNode = blockchainClient.getBlock(blockNumber, withFullTxObjects = false)
         val blockHash = BlockHash(blockFromRpcNode.hash)
         val blockParentHash = BlockHash(blockFromRpcNode.parentHash)
@@ -106,7 +108,7 @@ class BlockProcessor(
 
             val blockNumbersToRollback = blocksToRollback.map { it.number }
 
-            logger.debug { "Rolling back blocks ${blockNumbersToRollback.joinToString(", ")}, chainId=$chainId" }
+            logger.info { "Rolling back blocks ${blockNumbersToRollback.joinToString(", ")}, chainId=$chainId" }
 
             if (DepositEntity.countConfirmedOrCompleted(blockNumbersToRollback, chainId) > 0) {
                 logger.error { "Failed to rollback due to finalized deposits in blocks to rollback, chainId=$chainId" }
