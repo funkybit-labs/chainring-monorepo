@@ -5,6 +5,7 @@ import co.chainring.contracts.generated.ERC20
 import co.chainring.contracts.generated.Exchange
 import co.chainring.contracts.generated.MockERC20
 import co.chainring.contracts.generated.UUPSUpgradeable
+import co.chainring.core.evm.BatchSettlement
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.TxHash
@@ -13,9 +14,11 @@ import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.toEvmSignature
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.toHex
+import co.chainring.core.utils.toHexBytes
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
@@ -25,12 +28,14 @@ import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
+import org.web3j.abi.DefaultFunctionEncoder
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.Keys
 import org.web3j.crypto.Sign
 import org.web3j.protocol.Web3j
 import org.web3j.protocol.core.DefaultBlockParameter
 import org.web3j.protocol.core.DefaultBlockParameterName
+import org.web3j.protocol.core.RemoteFunctionCall
 import org.web3j.protocol.core.methods.request.EthFilter
 import org.web3j.protocol.core.methods.request.Transaction
 import org.web3j.protocol.core.methods.response.EthBlock
@@ -38,6 +43,7 @@ import org.web3j.protocol.core.methods.response.EthLog
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.protocol.http.HttpService
 import org.web3j.tx.RawTransactionManager
+import org.web3j.tx.exceptions.ContractCallException
 import org.web3j.tx.response.PollingTransactionReceiptProcessor
 import org.web3j.utils.Async
 import java.math.BigDecimal
@@ -62,6 +68,36 @@ open class TransactionManagerWithNonceOverride(
 
 fun Credentials.checksumAddress(): Address {
     return Address(Keys.toChecksumAddress(this.address))
+}
+
+sealed class DefaultBlockParam {
+    data object Earliest : DefaultBlockParam()
+    data object Latest : DefaultBlockParam()
+    data object Safe : DefaultBlockParam()
+    data object Finalized : DefaultBlockParam()
+    data object Pending : DefaultBlockParam()
+    data class BlockNumber(val value: BigInteger) : DefaultBlockParam()
+
+    fun toWeb3j(): DefaultBlockParameter =
+        when (this) {
+            is Earliest -> DefaultBlockParameter.valueOf("earliest")
+            is Latest -> DefaultBlockParameter.valueOf("latest")
+            is Safe -> DefaultBlockParameter.valueOf("safe")
+            is Finalized -> DefaultBlockParameter.valueOf("finalized")
+            is Pending -> DefaultBlockParameter.valueOf("pending")
+            is BlockNumber -> DefaultBlockParameter.valueOf(this.value)
+        }
+
+    override fun toString(): String {
+        return when (this) {
+            is Earliest -> "earliest"
+            is Latest -> "latest"
+            is Safe -> "safe"
+            is Finalized -> "finalized"
+            is Pending -> "pending"
+            is BlockNumber -> this.value.toString()
+        }
+    }
 }
 
 open class BlockchainClient(val config: BlockchainClientConfig) {
@@ -96,8 +132,6 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         web3j = web3j,
     )
     private val contractMap = mutableMapOf<ContractType, Address>()
-
-    lateinit var exchangeContract: Exchange
 
     companion object {
         val logger = KotlinLogging.logger {}
@@ -210,18 +244,45 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         )
     }
 
-    suspend fun getExchangeBalance(address: Address, tokenAddress: Address): BigInteger {
-        return exchangeContract.balances(address.value, tokenAddress.value).sendAsync().await()
+    private fun <A> exchangeContractCall(block: DefaultBlockParam, f: Exchange.() -> RemoteFunctionCall<A>): RemoteFunctionCall<A> {
+        val contract = loadExchangeContract(exchangeContractAddress)
+        contract.setDefaultBlockParameter(block.toWeb3j())
+        val startTime = Clock.System.now()
+        while (true) {
+            try {
+                return f(contract)
+            } catch (e: ContractCallException) {
+                val errorMessage = e.message ?: ""
+                val badBlockNumberErrors = setOf(
+                    // returned by Anvil
+                    "BlockOutOfRangeError",
+                    // returned by Bitlayer and Sepolia
+                    "header not found",
+                )
+                if (
+                    badBlockNumberErrors.none { errorMessage.contains(it) } ||
+                    Clock.System.now() - startTime >= config.maxRpcNodeEventualConsistencyTolerance
+                ) {
+                    throw e
+                }
+            }
+        }
     }
 
-    suspend fun getExchangeBalances(walletAddress: Address, tokenAddresses: List<Address>): Map<Address, BigInteger> =
+    suspend fun getExchangeBalance(address: Address, tokenAddress: Address, block: DefaultBlockParam): BigInteger {
+        return exchangeContractCall(block) {
+            balances(address.value, tokenAddress.value)
+        }.sendAsync().await()
+    }
+
+    private suspend fun getExchangeBalances(walletAddress: Address, tokenAddresses: List<Address>, block: DefaultBlockParam): Map<Address, BigInteger> =
         tokenAddresses.associateWith { tokenAddress ->
-            getExchangeBalance(walletAddress, tokenAddress)
+            getExchangeBalance(walletAddress, tokenAddress, block)
         }
 
-    suspend fun getExchangeBalances(walletAddresses: List<Address>, tokenAddresses: List<Address>): Map<Address, Map<Address, BigInteger>> =
+    suspend fun getExchangeBalances(walletAddresses: List<Address>, tokenAddresses: List<Address>, block: DefaultBlockParam): Map<Address, Map<Address, BigInteger>> =
         walletAddresses.associateWith { walletAddress ->
-            getExchangeBalances(walletAddress, tokenAddresses)
+            getExchangeBalances(walletAddress, tokenAddresses, block)
         }
 
     fun loadExchangeContract(address: Address): Exchange {
@@ -230,9 +291,6 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
 
     fun setContractAddress(contractType: ContractType, address: Address) {
         contractMap[contractType] = address
-        if (contractType == ContractType.Exchange) {
-            exchangeContract = loadExchangeContract(address)
-        }
     }
 
     fun getContractAddress(contractType: ContractType): Address =
@@ -261,17 +319,16 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         return web3j.ethBlockNumber().send().blockNumber
     }
 
-    fun getLogs(blockNumber: BigInteger, address: Address): EthLog =
-        web3j.ethGetLogs(
-            EthFilter(
-                DefaultBlockParameter.valueOf(blockNumber),
-                DefaultBlockParameter.valueOf(blockNumber),
-                address.value,
-            ),
-        ).send()
+    fun getLogs(block: DefaultBlockParam, address: Address): EthLog =
+        web3j
+            .ethGetLogs(EthFilter(block.toWeb3j(), block.toWeb3j(), address.value))
+            .send()
 
-    fun getExchangeContractLogs(blockNumber: BigInteger): EthLog =
-        getLogs(blockNumber, getContractAddress(ContractType.Exchange))
+    fun getExchangeContractLogs(block: BigInteger): EthLog =
+        getLogs(DefaultBlockParam.BlockNumber(block), getContractAddress(ContractType.Exchange))
+
+    fun getExchangeContractLogs(block: DefaultBlockParam): EthLog =
+        getLogs(block, getContractAddress(ContractType.Exchange))
 
     fun getTxManager(nonceOverride: BigInteger): TransactionManagerWithNonceOverride {
         return TransactionManagerWithNonceOverride(web3j, submitterCredentials, nonceOverride)
@@ -340,10 +397,17 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
     fun asyncDepositNative(address: Address, amount: BigInteger): TxHash =
         sendTransaction(address, "", amount)
 
-    fun batchHash(): String = exchangeContract.batchHash().send().toHex(false)
-    fun lastSettlementBatchHash(): String = exchangeContract.lastSettlementBatchHash().send().toHex(false)
+    fun batchHash(block: BigInteger): String =
+        exchangeContractCall(DefaultBlockParam.BlockNumber(block), Exchange::batchHash).send().toHex(false)
 
-    fun lastWithdrawalBatchHash(): String = exchangeContract.lastWithdrawalBatchHash().send().toHex(false)
+    fun batchHash(block: DefaultBlockParam): String =
+        exchangeContractCall(block, Exchange::batchHash).send().toHex(false)
+
+    fun lastSettlementBatchHash(block: DefaultBlockParam): String =
+        exchangeContractCall(block, Exchange::lastSettlementBatchHash).send().toHex(false)
+
+    fun lastWithdrawalBatchHash(block: DefaultBlockParam): String =
+        exchangeContractCall(block, Exchange::lastWithdrawalBatchHash).send().toHex(false)
 
     fun asyncMintERC20(
         tokenContractAddress: Address,
@@ -358,4 +422,30 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
                 .encodeFunctionCall(),
             BigInteger.ZERO,
         )
+
+    fun getFeeAccountAddress(block: DefaultBlockParam): Address =
+        Address(Keys.toChecksumAddress(exchangeContractCall(block, Exchange::feeAccount).send()))
+
+    val exchangeContractAddress: Address
+        get() = contractMap.getValue(ContractType.Exchange)
+
+    fun encodeSubmitWithdrawalsFunctionCall(withdrawals: List<ByteArray>): String =
+        loadExchangeContract(exchangeContractAddress)
+            .submitWithdrawals(withdrawals)
+            .encodeFunctionCall()
+
+    fun encodeRollbackBatchFunctionCall(): String =
+        loadExchangeContract(exchangeContractAddress)
+            .rollbackBatch()
+            .encodeFunctionCall()
+
+    fun encodePrepareSettlementBatchFunctionCall(batchSettlement: BatchSettlement): String =
+        loadExchangeContract(exchangeContractAddress)
+            .prepareSettlementBatch(DefaultFunctionEncoder().encodeParameters(listOf(batchSettlement)).toHexBytes())
+            .encodeFunctionCall()
+
+    fun encodeSubmitSettlementBatchFunctionCall(batchSettlement: BatchSettlement): String =
+        loadExchangeContract(exchangeContractAddress)
+            .submitSettlementBatch(DefaultFunctionEncoder().encodeParameters(listOf(batchSettlement)).toHexBytes())
+            .encodeFunctionCall()
 }
