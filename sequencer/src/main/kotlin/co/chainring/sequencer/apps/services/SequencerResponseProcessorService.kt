@@ -47,6 +47,7 @@ import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.SequencerError
 import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerResponse
+import co.chainring.sequencer.proto.bidOfferStateOrNull
 import co.chainring.sequencer.proto.newQuantityOrNull
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
@@ -99,7 +100,7 @@ object SequencerResponseProcessorService {
             }
 
             SequencerRequest.Type.ApplyOrderBatch -> {
-                response.bidOfferState?.let {
+                response.bidOfferStateOrNull?.let {
                     val bestBid = it.bestBid.toBigDecimal()
                     val bestOffer = it.bestOffer.toBigDecimal()
                     logger.debug { "bestBid = $bestBid, bestOffer = $bestOffer, minBidIx=${it.minBidIx.toBigInteger()}, maxOfferIx=${it.maxOfferIx.toBigInteger()}}" }
