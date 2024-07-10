@@ -29,7 +29,7 @@ class AVLTree<T : AVLTree.Node<T>> {
         }
 
         @Suppress("UNCHECKED_CAST")
-        fun previous(): T? {
+        fun prev(): T? {
             var current: T? = this as T
             if (current?.left != null) {
                 current = current.left
