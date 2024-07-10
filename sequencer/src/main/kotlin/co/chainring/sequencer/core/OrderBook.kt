@@ -95,11 +95,6 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
         side = BookSide.Sell
         price = BigDecimal.ZERO
         totalQuantity = BigInteger.ZERO
-
-        // level orders are provided back in Executions, reset causes effects
-        /*orderHead = 0
-        orderTail = 0
-        orders.forEach { it.reset() }*/
         super.reset()
     }
 

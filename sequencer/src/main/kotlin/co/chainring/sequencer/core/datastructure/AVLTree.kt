@@ -137,11 +137,11 @@ class AVLTree<T : AVLTree.Node<T>> {
                     successor.right?.parent = successor
                 }
 
-                // Connect the left child of the treeNode to the successor
+                // connect the left child of the treeNode to the successor
                 successor.left = parent.left
                 successor.left?.parent = successor
 
-                // Update the parent of the treeNode to point to the successor
+                // update the parent of the treeNode to point to the successor
                 successor.parent = parent.parent
                 if (parent.parent == null) {
                     root = successor
@@ -251,20 +251,14 @@ class AVLTree<T : AVLTree.Node<T>> {
     }
 
     fun traverse(action: (T) -> Unit) {
-        inorderTraversal(root, action)
+        traverse(root, action)
     }
 
-    fun toList(): List<T> {
-        val result = mutableListOf<T>()
-        traverse { result.add(it) }
-        return result
-    }
-
-    private fun inorderTraversal(parent: T?, action: (T) -> Unit) {
+    private fun traverse(parent: T?, action: (T) -> Unit) {
         if (parent != null) {
-            inorderTraversal(parent.left, action)
+            traverse(parent.left, action)
             action(parent)
-            inorderTraversal(parent.right, action)
+            traverse(parent.right, action)
         }
     }
 

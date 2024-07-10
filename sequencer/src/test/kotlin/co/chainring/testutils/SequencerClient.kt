@@ -142,7 +142,7 @@ class SequencerClient {
             },
         )
 
-    fun createMarket(marketId: MarketId, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal = "17.525".toBigDecimal(), baseDecimals: Int = 8, quoteDecimals: Int = 18): Market {
+    fun createMarket(marketId: MarketId, tickSize: BigDecimal = "0.05".toBigDecimal(), baseDecimals: Int = 8, quoteDecimals: Int = 18): Market {
         val createMarketResponse = sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
@@ -151,9 +151,7 @@ class SequencerClient {
                     this.guid = UUID.randomUUID().toString()
                     this.marketId = marketId.value
                     this.tickSize = tickSize.toDecimalValue()
-                    this.maxLevels = 1000
                     this.maxOrdersPerLevel = 1000
-                    this.marketPrice = marketPrice.toDecimalValue()
                     this.baseDecimals = baseDecimals
                     this.quoteDecimals = quoteDecimals
                 }

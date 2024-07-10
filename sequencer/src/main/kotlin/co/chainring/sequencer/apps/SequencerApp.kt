@@ -15,7 +15,6 @@ import co.chainring.sequencer.core.sumBigIntegers
 import co.chainring.sequencer.core.toAsset
 import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
-import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.core.toOrderGuid
 import co.chainring.sequencer.core.toWalletAddress
@@ -39,7 +38,6 @@ import net.openhft.chronicle.queue.TailerDirection
 import net.openhft.chronicle.queue.TailerState
 import net.openhft.chronicle.queue.impl.RollingChronicleQueue
 import java.lang.Thread.UncaughtExceptionHandler
-import java.math.BigDecimal
 import java.math.BigInteger
 import java.nio.file.Path
 import kotlin.concurrent.thread
@@ -74,24 +72,14 @@ class SequencerApp(
                         error = SequencerError.MarketExists
                     }
                 } else {
-                    val tickSize = market.tickSize.toBigDecimal()
-                    val halfTick = tickSize.setScale(tickSize.scale() + 1) / BigDecimal.valueOf(2)
-                    val marketPrice = market.marketPrice.toBigDecimal()
-                    if (BigDecimal.ZERO.compareTo((marketPrice + halfTick).remainder(tickSize)) != 0) {
-                        // initial market price is not exactly between ticks
-                        error = SequencerError.InvalidPrice
-                    } else {
-                        state.markets[marketId] = Market(
-                            id = marketId,
-                            tickSize = tickSize,
-                            initialMarketPrice = marketPrice,
-                            maxLevels = market.maxLevels,
-                            maxOrdersPerLevel = market.maxOrdersPerLevel,
-                            baseDecimals = market.baseDecimals,
-                            quoteDecimals = market.quoteDecimals,
-                            minFee = if (market.hasMinFee()) market.minFee.toBigInteger() else BigInteger.ZERO,
-                        )
-                    }
+                    state.markets[marketId] = Market(
+                        id = marketId,
+                        tickSize = market.tickSize.toBigDecimal(),
+                        maxOrdersPerLevel = market.maxOrdersPerLevel,
+                        baseDecimals = market.baseDecimals,
+                        quoteDecimals = market.quoteDecimals,
+                        minFee = if (market.hasMinFee()) market.minFee.toBigInteger() else BigInteger.ZERO,
+                    )
                 }
                 sequencerResponse {
                     this.guid = market.guid
@@ -104,15 +92,6 @@ class SequencerApp(
                                 this.tickSize = market.tickSize
                                 this.baseDecimals = market.baseDecimals
                                 this.quoteDecimals = market.quoteDecimals
-                                state.markets[marketId]?.levels?.let { levels ->
-                                    // TODO drop min/max values
-                                    this.minAllowedBid = market.tickSize
-                                    val marketIx = market.marketPrice.toBigDecimal().divideToIntegralValue(tickSize.toBigDecimal()).toInt()
-                                    this.maxAllowedOffer = market.tickSize.toBigDecimal().multiply((marketIx * 2).toBigDecimal()).toDecimalValue()
-                                    // market.marketPrice.toBigDecimal().multiply(BigDecimal("2")).divideToIntegralValue(tickSize).toInt()
-//                                    this.minAllowedBid = levels[0].price.toDecimalValue()
-//                                    this.maxAllowedOffer = levels[levels.lastIndex - 1].price.toDecimalValue()
-                                }
                                 this.minFee = if (market.hasMinFee()) market.minFee else BigInteger.ZERO.toIntegerValue()
                             },
                         )

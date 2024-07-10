@@ -124,9 +124,7 @@ class TestSequencerCheckpoints {
                         this.guid = UUID.randomUUID().toString()
                         this.marketId = btcEthMarketId.value
                         this.tickSize = "0.05".toBigDecimal().toDecimalValue()
-                        this.maxLevels = 1000
                         this.maxOrdersPerLevel = 1000
-                        this.marketPrice = "17.525".toBigDecimal().toDecimalValue()
                         this.baseDecimals = 8
                         this.quoteDecimals = 18
                     },
@@ -564,9 +562,7 @@ class TestSequencerCheckpoints {
                     btcEthMarketId to Market(
                         id = btcEthMarketId,
                         tickSize = BigDecimal("0.05"),
-                        maxLevels = 1000,
                         maxOrdersPerLevel = 1000,
-                        initialMarketPrice = BigDecimal("17.525"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
                     ),
@@ -593,9 +589,7 @@ class TestSequencerCheckpoints {
                     btcEthMarketId to Market(
                         id = btcEthMarketId,
                         tickSize = BigDecimal("0.05"),
-                        maxLevels = 1000,
                         maxOrdersPerLevel = 1000,
-                        initialMarketPrice = BigDecimal("17.525"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
                     ).also { market ->
@@ -649,9 +643,7 @@ class TestSequencerCheckpoints {
                     btcEthMarketId to Market(
                         id = btcEthMarketId,
                         tickSize = BigDecimal("0.05"),
-                        maxLevels = 1000,
                         maxOrdersPerLevel = 1000,
-                        initialMarketPrice = BigDecimal("17.525"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
                     ).also { market ->
@@ -707,9 +699,7 @@ class TestSequencerCheckpoints {
                     btcEthMarketId to Market(
                         id = btcEthMarketId,
                         tickSize = BigDecimal("0.05"),
-                        maxLevels = 1000,
                         maxOrdersPerLevel = 1000,
-                        initialMarketPrice = BigDecimal("17.525"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
                     ).also { market ->
@@ -761,9 +751,7 @@ class TestSequencerCheckpoints {
                     btcUsdcMarketId to Market(
                         id = btcUsdcMarketId,
                         tickSize = BigDecimal("1.00"),
-                        maxLevels = 1000,
                         maxOrdersPerLevel = 1000,
-                        initialMarketPrice = BigDecimal("70000"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
                     ).also { market ->
@@ -854,9 +842,7 @@ class TestSequencerCheckpoints {
                     btcEthMarketId to Market(
                         id = btcEthMarketId,
                         tickSize = BigDecimal("0.05"),
-                        maxLevels = 1000,
                         maxOrdersPerLevel = 1000,
-                        initialMarketPrice = BigDecimal("17.525"),
                         baseDecimals = 18,
                         quoteDecimals = 18,
                     ).also { market ->
@@ -986,8 +972,6 @@ class TestSequencerCheckpoints {
                 initialState.markets[marketId]!!.let { initialMarket ->
                     assertEquals(initialMarket.id, marketCheckpoint.id.toMarketId())
                     assertEquals(initialMarket.tickSize, marketCheckpoint.tickSize.toBigDecimal())
-                    assertEquals(initialMarket.initialMarketPrice, marketCheckpoint.marketPrice.toBigDecimal())
-                    assertEquals(initialMarket.maxLevels, marketCheckpoint.maxLevels)
                     assertEquals(initialMarket.maxOrdersPerLevel, marketCheckpoint.maxOrdersPerLevel)
                     assertEquals(initialMarket.baseDecimals, marketCheckpoint.baseDecimals)
                     assertEquals(initialMarket.quoteDecimals, marketCheckpoint.quoteDecimals)

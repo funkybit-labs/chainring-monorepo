@@ -42,7 +42,6 @@ class TestRoutes(
         data class CreateMarketInSequencer(
             val id: String,
             val tickSize: BigDecimalJson,
-            val marketPrice: BigDecimalJson,
             val baseDecimals: Int,
             val quoteDecimals: Int,
             val minFee: BigDecimalJson,
@@ -89,8 +88,6 @@ class TestRoutes(
             data class Market(
                 val id: String,
                 val tickSize: BigDecimalJson,
-                val marketPrice: BigDecimalJson,
-                val maxLevels: Int,
                 val maxOrdersPerLevel: Int,
                 val baseDecimals: Int,
                 val quoteDecimals: Int,
@@ -170,8 +167,6 @@ class TestRoutes(
                         StateDump.Market(
                             id = "marketId",
                             tickSize = "123".toBigDecimal(),
-                            marketPrice = "123".toBigDecimal(),
-                            maxLevels = 123,
                             maxOrdersPerLevel = 123,
                             baseDecimals = 18,
                             quoteDecimals = 18,
@@ -240,8 +235,6 @@ class TestRoutes(
                             StateDump.Market(
                                 id = m.id,
                                 tickSize = m.tickSize.toBigDecimal(),
-                                marketPrice = m.marketPrice.toBigDecimal(),
-                                maxLevels = m.maxLevels,
                                 maxOrdersPerLevel = m.maxOrdersPerLevel,
                                 baseDecimals = m.baseDecimals,
                                 quoteDecimals = m.quoteDecimals,
@@ -287,7 +280,6 @@ class TestRoutes(
                 requestBody to CreateMarketInSequencer(
                     id = "BTC/ETH",
                     tickSize = "0.05".toBigDecimal(),
-                    marketPrice = "17.55".toBigDecimal(),
                     baseDecimals = 18,
                     quoteDecimals = 18,
                     minFee = "0.000005".toBigDecimal(),
@@ -302,7 +294,6 @@ class TestRoutes(
                 val sequencerResponse = sequencerClient.createMarket(
                     marketId = payload.id,
                     tickSize = payload.tickSize,
-                    marketPrice = payload.marketPrice,
                     baseDecimals = payload.baseDecimals,
                     quoteDecimals = payload.quoteDecimals,
                     minFee = payload.minFee,

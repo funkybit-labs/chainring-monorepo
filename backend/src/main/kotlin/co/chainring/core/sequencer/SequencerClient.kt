@@ -128,16 +128,14 @@ open class SequencerClient {
         }.sequencerResponse
     }
 
-    suspend fun createMarket(marketId: String, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal, baseDecimals: Int, quoteDecimals: Int, minFee: BigDecimal): SequencerResponse {
+    suspend fun createMarket(marketId: String, tickSize: BigDecimal = "0.05".toBigDecimal(), baseDecimals: Int, quoteDecimals: Int, minFee: BigDecimal): SequencerResponse {
         return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
             stub.addMarket(
                 market {
                     this.guid = UUID.randomUUID().toString()
                     this.marketId = marketId
                     this.tickSize = tickSize.toDecimalValue()
-                    this.maxLevels = 1000
                     this.maxOrdersPerLevel = 1000
-                    this.marketPrice = marketPrice.toDecimalValue()
                     this.baseDecimals = baseDecimals
                     this.quoteDecimals = quoteDecimals
                     this.minFee = minFee.toFundamentalUnits(quoteDecimals).toIntegerValue()

@@ -28,8 +28,6 @@ import java.util.concurrent.CopyOnWriteArrayList
 data class Market(
     val id: MarketId,
     val tickSize: BigDecimal,
-    val initialMarketPrice: BigDecimal,
-    val maxLevels: Int,
     val maxOrdersPerLevel: Int,
     val baseDecimals: Int,
     val quoteDecimals: Int,
@@ -887,10 +885,8 @@ data class Market(
 
         other as Market
 
-        if (maxLevels != other.maxLevels) return false
         if (maxOrdersPerLevel != other.maxOrdersPerLevel) return false
         if (tickSize != other.tickSize) return false
-        if (initialMarketPrice != other.initialMarketPrice) return false
         if (baseDecimals != other.baseDecimals) return false
         if (quoteDecimals != other.quoteDecimals) return false
         if (levels != other.levels) return false
@@ -904,19 +900,17 @@ data class Market(
     }
 
     override fun hashCode(): Int {
-        var result = maxLevels
-        result = 31 * result + maxOrdersPerLevel
+        var result = maxOrdersPerLevel
         result = 31 * result + tickSize.hashCode()
-        result = 31 * result + initialMarketPrice.hashCode()
         result = 31 * result + baseDecimals
         result = 31 * result + quoteDecimals
         result = 31 * result + maxOfferIx
+        result = 31 * result + bestOfferIx.hashCode()
+        result = 31 * result + bestBidIx.hashCode()
         result = 31 * result + minBidIx
         result = 31 * result + levels.hashCode()
         result = 31 * result + buyOrdersByWallet.hashCode()
         result = 31 * result + sellOrdersByWallet.hashCode()
-        result = 31 * result + bestBidIx.hashCode()
-        result = 31 * result + bestOfferIx.hashCode()
         result = 31 * result + ordersByGuid.hashCode()
         return result
     }
@@ -925,8 +919,6 @@ data class Market(
         return marketCheckpoint {
             this.id = this@Market.id.value
             this.tickSize = this@Market.tickSize.toDecimalValue()
-            this.marketPrice = this@Market.initialMarketPrice.toDecimalValue()
-            this.maxLevels = this@Market.maxLevels
             this.maxOrdersPerLevel = this@Market.maxOrdersPerLevel
             this.baseDecimals = this@Market.baseDecimals
             this.quoteDecimals = this@Market.quoteDecimals
@@ -938,22 +930,10 @@ data class Market(
             this@Market.levels.traverse { level ->
                 this.levels.add(level.toCheckpoint())
             }
-//
-//            val firstLevelWithData = this@Market.minBidIx.let { if (it == -1) this@Market.bestOfferIx else it }
-//            val lastLevelWithData = this@Market.maxOfferIx.let { if (it == -1) this@Market.bestBidIx else it }
-//            if (firstLevelWithData != -1 && lastLevelWithData != -1) {
-//                (firstLevelWithData..lastLevelWithData).forEach { i ->
-//                    val level = this@Market.levels[i]
-//                    if (level.totalQuantity > BigInteger.ZERO) {
-//                        this.levels.add(level.toCheckpoint())
-//                    }
-//                }
-//            }
         }
     }
 
     private fun logState() {
-        logger.debug { "maxLevels = ${this.maxLevels}" }
         logger.debug { "maxOrdersPerLevel = ${this.maxOrdersPerLevel}" }
         logger.debug { "baseDecimals = ${this.baseDecimals}" }
         logger.debug { "minBidIx = ${this.minBidIx}" }
@@ -979,8 +959,6 @@ data class Market(
             return Market(
                 id = checkpoint.id.toMarketId(),
                 tickSize = tickSize,
-                initialMarketPrice = checkpoint.marketPrice.toBigDecimal(),
-                maxLevels = checkpoint.maxLevels,
                 maxOrdersPerLevel = checkpoint.maxOrdersPerLevel,
                 baseDecimals = checkpoint.baseDecimals,
                 quoteDecimals = checkpoint.quoteDecimals,

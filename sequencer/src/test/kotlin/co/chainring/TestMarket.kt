@@ -29,8 +29,6 @@ class TestMarket {
         market = Market(
             id = MarketId("BTC/ETH"),
             tickSize = BigDecimal("0.05"),
-            initialMarketPrice = BigDecimal("17.525"),
-            maxLevels = 1000,
             maxOrdersPerLevel = 100,
             baseDecimals = 18,
             quoteDecimals = 18,
@@ -561,8 +559,6 @@ class TestMarket {
         market = Market(
             id = MarketId("BTC/USDC"),
             tickSize = BigDecimal("10"),
-            initialMarketPrice = BigDecimal("69005"),
-            maxLevels = 1000,
             maxOrdersPerLevel = 100,
             baseDecimals = 18,
             quoteDecimals = 6,
@@ -613,8 +609,6 @@ class TestMarket {
         market = Market(
             id = MarketId("BTC/USDC"),
             tickSize = BigDecimal("10"),
-            initialMarketPrice = BigDecimal("69005"),
-            maxLevels = 1000,
             maxOrdersPerLevel = 100,
             baseDecimals = 8,
             quoteDecimals = 6,
