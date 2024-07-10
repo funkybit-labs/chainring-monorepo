@@ -48,14 +48,6 @@ data class Market(
     )
     val levels = AVLTree<OrderBookLevel>()
 
-    private fun initLevel(levelIx: Int, side: BookSide): OrderBookLevel =
-        OrderBookLevel(
-            ix = levelIx,
-            side = side,
-            price = price(levelIx),
-            maxOrderCount = maxOrdersPerLevel,
-        )
-
     var maxOfferIx: Int = -1
         private set
     var bestOfferIx: Int = -1
