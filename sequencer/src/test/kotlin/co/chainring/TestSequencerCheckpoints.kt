@@ -944,9 +944,9 @@ class TestSequencerCheckpoints {
 
                 // Compare the level indices
                 assertEquals(
-                    initialStateLevel.levelIx,
-                    restoredStateLevel.levelIx,
-                    "Level index mismatch at initial levelIx=${initialStateLevel.levelIx} vs restored levelIx=${restoredStateLevel.levelIx}",
+                    initialStateLevel.ix,
+                    restoredStateLevel.ix,
+                    "Level index mismatch at initial levelIx=${initialStateLevel.ix} vs restored levelIx=${restoredStateLevel.ix}",
                 )
 
                 // Compare the orders in each level
@@ -954,7 +954,7 @@ class TestSequencerCheckpoints {
                     assertEquals(
                         initialStateOrder,
                         restoredStateLevel.orders[i],
-                        "Order mismatch at levelIx=${initialStateLevel.levelIx}, orderIx=$i",
+                        "Order mismatch at levelIx=${initialStateLevel.ix}, orderIx=$i",
                     )
                 }
 

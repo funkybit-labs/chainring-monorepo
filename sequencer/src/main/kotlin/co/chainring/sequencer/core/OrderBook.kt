@@ -66,19 +66,46 @@ data class LevelOrder(
     }
 }
 
-class OrderBookLevel(var levelIx: Int, var side: BookSide, val price: BigDecimal, val maxOrderCount: Int) :
-    AVLTree.Node<OrderBookLevel>(id = levelIx) {
+class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val maxOrderCount: Int) : AVLTree.Node<OrderBookLevel>(ix) {
 
     val orders = Array(maxOrderCount) { _ ->
-        LevelOrder(guid = 0L.toOrderGuid(), wallet = 0L.toWalletAddress(), quantity = BigInteger.ZERO, feeRate = FeeRate.zero, levelIx = levelIx)
+        LevelOrder(guid = 0L.toOrderGuid(), wallet = 0L.toWalletAddress(), quantity = BigInteger.ZERO, feeRate = FeeRate.zero, levelIx = ix)
     }
     var totalQuantity = BigInteger.ZERO
     var orderHead = 0
     var orderTail = 0
 
+    companion object {
+        fun empty(maxOrderCount: Int): OrderBookLevel {
+            return OrderBookLevel(0, BookSide.Sell, BigDecimal.ZERO, maxOrderCount)
+        }
+    }
+
+    fun init(levelIx: Int, buy: BookSide, price: BigDecimal): OrderBookLevel {
+        this.ix = levelIx
+        this.side = buy
+        this.price = price
+        // level orders keep reference to levelIx, not to the level object, hence need to be touched
+        orders.forEach { it.levelIx = levelIx }
+        return this
+    }
+
+    override fun reset() {
+        ix = 0
+        side = BookSide.Sell
+        price = BigDecimal.ZERO
+        totalQuantity = BigInteger.ZERO
+
+        // level orders are provided back in Executions, reset causes effects
+        /*orderHead = 0
+        orderTail = 0
+        orders.forEach { it.reset() }*/
+        super.reset()
+    }
+
     fun toCheckpoint(): MarketCheckpoint.OrderBookLevel {
         return orderBookLevel {
-            this.levelIx = this@OrderBookLevel.levelIx
+            this.levelIx = this@OrderBookLevel.ix
             this.side = when (this@OrderBookLevel.side) {
                 BookSide.Buy -> MarketCheckpoint.BookSide.Buy
                 BookSide.Sell -> MarketCheckpoint.BookSide.Sell
@@ -204,7 +231,7 @@ class OrderBookLevel(var levelIx: Int, var side: BookSide, val price: BigDecimal
 
         other as OrderBookLevel
 
-        if (levelIx != other.levelIx) return false
+        if (ix != other.ix) return false
         if (side != other.side) return false
         if (price != other.price) return false
         if (maxOrderCount != other.maxOrderCount) return false
@@ -227,7 +254,7 @@ class OrderBookLevel(var levelIx: Int, var side: BookSide, val price: BigDecimal
     }
 
     override fun hashCode(): Int {
-        var result = levelIx
+        var result = ix
         result = 31 * result + side.hashCode()
         result = 31 * result + price.hashCode()
         result = 31 * result + maxOrderCount

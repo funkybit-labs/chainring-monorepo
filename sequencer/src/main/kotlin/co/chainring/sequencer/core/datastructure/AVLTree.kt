@@ -3,7 +3,7 @@ package co.chainring.sequencer.core.datastructure
 class AVLTree<T : AVLTree.Node<T>> {
 
     abstract class Node<T : Node<T>>(
-        val id: Int,
+        var ix: Int,
         var height: Int = 1,
         var left: T? = null,
         var right: T? = null,
@@ -44,6 +44,14 @@ class AVLTree<T : AVLTree.Node<T>> {
                 return parent
             }
         }
+
+        open fun reset() {
+            ix = 0
+            height = 1
+            left = null
+            right = null
+            parent = null
+        }
     }
 
     private var root: T? = null
@@ -53,111 +61,107 @@ class AVLTree<T : AVLTree.Node<T>> {
         return value
     }
 
-    private fun add(treeNode: T?, value: T): T {
-        if (treeNode == null) return value
+    private fun add(parent: T?, value: T): T {
+        if (parent == null) return value
 
-        if (value.id < treeNode.id) {
-            treeNode.left = add(treeNode.left, value)
-            treeNode.left?.parent = treeNode
-        } else if (value.id > treeNode.id) {
-            treeNode.right = add(treeNode.right, value)
-            treeNode.right?.parent = treeNode
+        if (value.ix < parent.ix) {
+            parent.left = add(parent.left, value)
+            parent.left?.parent = parent
+        } else if (value.ix > parent.ix) {
+            parent.right = add(parent.right, value)
+            parent.right?.parent = parent
         } else {
-            return treeNode
+            return parent
         }
 
-        treeNode.height = 1 + maxOf(height(treeNode.left), height(treeNode.right))
+        parent.height = 1 + maxOf(height(parent.left), height(parent.right))
 
-        return balance(treeNode)
+        return balance(parent)
     }
 
-    fun get(levelIx: Int): T? {
-        return getTreeNode(root, levelIx)
+    fun get(ix: Int): T? {
+        return get(root, ix)
     }
 
-    fun getTreeNode(levelIx: Int): T? {
-        return getTreeNode(root, levelIx)
-    }
+    private fun get(parent: T?, ix: Int): T? {
+        if (parent == null || parent.ix == ix) return parent
 
-    private fun getTreeNode(treeNode: T?, levelIx: Int): T? {
-        if (treeNode == null || treeNode.id == levelIx) return treeNode
-
-        return if (levelIx < treeNode.id) {
-            getTreeNode(treeNode.left, levelIx)
+        return if (ix < parent.ix) {
+            get(parent.left, ix)
         } else {
-            getTreeNode(treeNode.right, levelIx)
+            get(parent.right, ix)
         }
     }
 
-    fun remove(levelIx: Int) {
-        root = remove(root, levelIx)
+    fun remove(ix: Int) {
+        root = remove(root, ix)
     }
 
-    private fun remove(treeNode: T?, levelIx: Int): T? {
-        if (treeNode == null) return null
+    private fun remove(parent: T?, ix: Int): T? {
+        if (parent == null) return null
 
         when {
-            levelIx < treeNode.id -> {
-                treeNode.left = remove(treeNode.left, levelIx)
+            ix < parent.ix -> {
+                parent.left = remove(parent.left, ix)
             }
-            levelIx > treeNode.id -> {
-                treeNode.right = remove(treeNode.right, levelIx)
+            ix > parent.ix -> {
+                parent.right = remove(parent.right, ix)
             }
             else -> {
                 // node with only one child or no child
-                if (treeNode.left == null || treeNode.right == null) {
-                    val temp = treeNode.left ?: treeNode.right
+                if (parent.left == null || parent.right == null) {
+                    val temp = parent.left ?: parent.right
                     if (temp == null) {
                         // no child case
                         return null
                     } else {
                         // one child case
-                        temp.parent = treeNode.parent
+                        temp.parent = parent.parent
                         return temp
                     }
                 }
 
                 // node with two children
-                val successor = minValueNode(treeNode.right!!)
+                val successor = minValueNode(parent.right!!)
 
                 // connect the right child of the successor to its parent
-                if (successor.parent != treeNode) {
+                if (successor.parent != parent) {
                     successor.parent?.left = successor.right
                     if (successor.right != null) {
                         successor.right?.parent = successor.parent
                     }
 
-                    successor.right = treeNode.right
+                    successor.right = parent.right
                     successor.right?.parent = successor
                 }
 
                 // Connect the left child of the treeNode to the successor
-                successor.left = treeNode.left
+                successor.left = parent.left
                 successor.left?.parent = successor
 
                 // Update the parent of the treeNode to point to the successor
-                successor.parent = treeNode.parent
-                if (treeNode.parent == null) {
+                successor.parent = parent.parent
+                if (parent.parent == null) {
                     root = successor
-                } else if (treeNode == treeNode.parent?.left) {
-                    treeNode.parent?.left = successor
+                } else if (parent == parent.parent?.left) {
+                    parent.parent?.left = successor
                 } else {
-                    treeNode.parent?.right = successor
+                    parent.parent?.right = successor
                 }
 
-                treeNode.left = null
-                treeNode.right = null
-                treeNode.parent = null
+                parent.left = null
+                parent.right = null
+                parent.parent = null
 
-                treeNode.height = 1 + maxOf(height(treeNode.left), height(treeNode.right))
+                parent.height = 1 + maxOf(height(parent.left), height(parent.right))
 
                 return balance(successor)
             }
         }
 
-        treeNode.height = 1 + maxOf(height(treeNode.left), height(treeNode.right))
+        parent.height = 1 + maxOf(height(parent.left), height(parent.right))
 
-        return balance(treeNode)
+        return balance(parent)
     }
 
     fun first(): T? {
@@ -204,40 +208,40 @@ class AVLTree<T : AVLTree.Node<T>> {
 
     private fun rightRotate(y: T): T {
         val x = y.left!!
-        val T2 = x.right
+        val t2 = x.right
 
         x.right = y
-        y.left = T2
+        y.left = t2
 
         y.height = maxOf(height(y.left), height(y.right)) + 1
         x.height = maxOf(height(x.left), height(x.right)) + 1
 
         x.parent = y.parent
         y.parent = x
-        if (T2 != null) T2.parent = y
+        if (t2 != null) t2.parent = y
 
         return x
     }
 
     private fun leftRotate(x: T): T {
         val y = x.right!!
-        val T2 = y.left
+        val t2 = y.left
 
         y.left = x
-        x.right = T2
+        x.right = t2
 
         x.height = maxOf(height(x.left), height(x.right)) + 1
         y.height = maxOf(height(y.left), height(y.right)) + 1
 
         y.parent = x.parent
         x.parent = y
-        if (T2 != null) T2.parent = x
+        if (t2 != null) t2.parent = x
 
         return y
     }
 
-    private fun minValueNode(treeNode: T): T {
-        var current = treeNode
+    private fun minValueNode(parent: T): T {
+        var current = parent
         while (current.left != null) {
             current = current.left!!
         }
@@ -248,11 +252,17 @@ class AVLTree<T : AVLTree.Node<T>> {
         inorderTraversal(root, action)
     }
 
-    private fun inorderTraversal(treeNode: T?, action: (T) -> Unit) {
-        if (treeNode != null) {
-            inorderTraversal(treeNode.left, action)
-            action(treeNode)
-            inorderTraversal(treeNode.right, action)
+    fun toList(): List<T> {
+        val result = mutableListOf<T>()
+        traverse { result.add(it) }
+        return result
+    }
+
+    private fun inorderTraversal(parent: T?, action: (T) -> Unit) {
+        if (parent != null) {
+            inorderTraversal(parent.left, action)
+            action(parent)
+            inorderTraversal(parent.right, action)
         }
     }
 

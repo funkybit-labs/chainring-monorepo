@@ -493,11 +493,11 @@ class TestMarket {
         )
         if (response.createdTrades.isNotEmpty()) {
             if (orderType == Order.Type.MarketSell || orderType == Order.Type.LimitSell) {
-                assertEquals(response.createdTrades.first().sellOrderGuid, guid)
-                assertEquals(response.createdTrades.first().buyOrderGuid, counterOrderGuid)
+                assertEquals(guid, response.createdTrades.first().sellOrderGuid)
+                assertEquals(counterOrderGuid, response.createdTrades.first().buyOrderGuid)
             } else {
-                assertEquals(response.createdTrades.first().buyOrderGuid, guid)
-                assertEquals(response.createdTrades.first().sellOrderGuid, counterOrderGuid)
+                assertEquals(guid, response.createdTrades.first().buyOrderGuid)
+                assertEquals(counterOrderGuid, response.createdTrades.first().sellOrderGuid)
             }
         }
         assertEquals(
