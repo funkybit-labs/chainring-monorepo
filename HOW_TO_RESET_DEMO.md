@@ -21,7 +21,7 @@ IdentityFile ~/.ssh/baregate_id_rsa
 
 ## Stop services
 ```
-python3 ecs-deploy.py stop --env demo --services mocker,api,telegrambot,ring,sequencer
+python3 ecs-deploy.py stop --env demo --services mocker,api,telegrambot,ring,sequencer,garp
 ```
 
 ## Truncate data
@@ -96,8 +96,7 @@ make db_seed
 
 Start api, telegrambot, mocker
 ```
-python3 ecs-deploy.py start --env demo --services api
-python3 ecs-deploy.py start --env demo --services telegrambot
+python3 ecs-deploy.py start --env demo --services api,telegrambot
 python3 ecs-deploy.py start --env demo --services mocker
 ```
 
