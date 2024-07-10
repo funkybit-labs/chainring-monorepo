@@ -1,6 +1,7 @@
 package co.chainring.sequencer.core
 
 import co.chainring.core.model.Percentage
+import co.chainring.sequencer.core.datastructure.AVLTree
 import co.chainring.sequencer.proto.BalanceChange
 import co.chainring.sequencer.proto.BidOfferState
 import co.chainring.sequencer.proto.MarketCheckpoint
@@ -39,7 +40,7 @@ data class Market(
     fun levelIx(price: BigDecimal): Int = price.divideToIntegralValue(tickSize).toInt()
     fun price(levelIx: Int): BigDecimal = tickSize.multiply(levelIx.toBigDecimal())
 
-    var levels = MarketLevels()
+    var levels = AVLTree<OrderBookLevel>()
 
     private fun initLevel(levelIx: Int, side: BookSide): OrderBookLevel =
         OrderBookLevel(
@@ -415,13 +416,13 @@ data class Market(
             var currentLevel = if (isBuyOrder) levels.getTreeNode(bestOfferIx) else levels.getTreeNode(bestBidIx)
 
             while (currentLevel != null) {
-                val levelIx = currentLevel.value.levelIx
+                val levelIx = currentLevel.levelIx
 
                 if (stopAtLevelIx != null) {
                     // stopAtLevelIx is provided to handle crossing-market execution of limit orders
                     if (
-                        isBuyOrder && currentLevel.value.levelIx > stopAtLevelIx ||
-                        isSellOrder && currentLevel.value.levelIx < stopAtLevelIx
+                        isBuyOrder && currentLevel.levelIx > stopAtLevelIx ||
+                        isSellOrder && currentLevel.levelIx < stopAtLevelIx
                     ) {
                         break
                     }
@@ -429,12 +430,12 @@ data class Market(
 
                 logger.debug { "handle crossing order $levelIx ${price(levelIx)}" }
 
-                val orderBookLevelFill = currentLevel.value.fillOrder(remainingAmount)
+                val orderBookLevelFill = currentLevel.fillOrder(remainingAmount)
                 remainingAmount = orderBookLevelFill.remainingAmount
                 executions.addAll(orderBookLevelFill.executions)
 
                 // schedule deletion if level was exhausted
-                currentLevel.value.takeIf { it.totalQuantity == BigInteger.ZERO }?.let { exhaustedLevelIxs.add(it.levelIx) }
+                currentLevel.takeIf { it.totalQuantity == BigInteger.ZERO }?.let { exhaustedLevelIxs.add(it.levelIx) }
 
                 if (remainingAmount == BigInteger.ZERO) break
 
@@ -443,13 +444,13 @@ data class Market(
 
             if (isBuyOrder) {
                 bestOfferIx = currentLevel?.let {
-                    if (it.value.totalQuantity > BigInteger.ZERO) it.value.levelIx else it.next()?.value?.levelIx
+                    if (it.totalQuantity > BigInteger.ZERO) it.levelIx else it.next()?.levelIx
                 } ?: -1
                 // also reset maxOfferIx in case when sell side is exhausted
                 if (bestOfferIx == -1) maxOfferIx = -1
             } else {
                 bestBidIx = currentLevel?.let {
-                    if (it.value.totalQuantity > BigInteger.ZERO) it.value.levelIx else it.previous()?.value?.levelIx
+                    if (it.totalQuantity > BigInteger.ZERO) it.levelIx else it.previous()?.levelIx
                 } ?: -1
                 // also reset minBidIx in case when buy side is exhausted
                 if (bestBidIx == -1) minBidIx = -1
@@ -497,8 +498,7 @@ data class Market(
     private fun removeOrder(guid: OrderGuid, feeRates: FeeRates): RemoveOrderResult? {
         var ret: RemoveOrderResult? = null
         ordersByGuid[guid]?.let { levelOrder ->
-            val levelNode = levels.getTreeNode(levelOrder.levelIx)!!
-            val level = levelNode.value
+            val level = levels.getTreeNode(levelOrder.levelIx)!!
             ret = if (level.side == BookSide.Buy) {
                 buyOrdersByWallet[levelOrder.wallet]?.let {
                     it.remove(levelOrder)
@@ -522,38 +522,38 @@ data class Market(
             if (level.totalQuantity == BigInteger.ZERO) {
                 if (level.side == BookSide.Buy) {
                     if (level.levelIx == minBidIx) {
-                        val nextLevel = levelNode.next()
-                        if (nextLevel == null || nextLevel.value.levelIx > bestBidIx) {
+                        val nextLevel = level.next()
+                        if (nextLevel == null || nextLevel.levelIx > bestBidIx) {
                             minBidIx = -1
                             bestBidIx = -1
                         } else {
-                            minBidIx = nextLevel.value.levelIx
+                            minBidIx = nextLevel.levelIx
                         }
                     } else if (level.levelIx == bestBidIx) {
-                        val prevLevel = levelNode.previous()
+                        val prevLevel = level.previous()
                         if (prevLevel == null) {
                             minBidIx = -1
                             bestBidIx = -1
                         } else {
-                            bestBidIx = prevLevel.value.levelIx
+                            bestBidIx = prevLevel.levelIx
                         }
                     }
                 } else {
                     if (level.levelIx == bestOfferIx) {
-                        val nextLevel = levelNode.next()
+                        val nextLevel = level.next()
                         if (nextLevel == null) {
                             bestOfferIx = -1
                             maxOfferIx = -1
                         } else {
-                            bestOfferIx = nextLevel.value.levelIx
+                            bestOfferIx = nextLevel.levelIx
                         }
                     } else if (level.levelIx == maxOfferIx) {
-                        val prevLevel = levelNode.previous()
-                        if (prevLevel == null || prevLevel.value.levelIx < bestOfferIx) {
+                        val prevLevel = level.previous()
+                        if (prevLevel == null || prevLevel.levelIx < bestOfferIx) {
                             bestOfferIx = -1
                             maxOfferIx = -1
                         } else {
-                            maxOfferIx = prevLevel.value.levelIx
+                            maxOfferIx = prevLevel.levelIx
                         }
                     }
                 }
@@ -711,10 +711,9 @@ data class Market(
         var totalPriceUnits = BigDecimal.ZERO
 
         var currentLevel = if (bestOfferIx != -1) levels.getTreeNode(bestOfferIx) else null
-        while (currentLevel != null && (stopAtLevelIx == null || currentLevel.value.levelIx <= stopAtLevelIx)) {
-            val level = currentLevel.value
-            val quantityAtLevel = level.totalQuantity.min(remainingAmount)
-            totalPriceUnits += quantityAtLevel.toBigDecimal().setScale(18) * level.price
+        while (currentLevel != null && (stopAtLevelIx == null || currentLevel.levelIx <= stopAtLevelIx)) {
+            val quantityAtLevel = currentLevel.totalQuantity.min(remainingAmount)
+            totalPriceUnits += quantityAtLevel.toBigDecimal().setScale(18) * currentLevel.price
             remainingAmount -= quantityAtLevel
 
             if (remainingAmount == BigInteger.ZERO) break
@@ -734,16 +733,15 @@ data class Market(
 
         var currentLevel = if (bestOfferIx != -1) levels.getTreeNode(bestOfferIx) else null
         while (currentLevel != null) {
-            val level = currentLevel.value
-            val quantityAtLevel = level.totalQuantity
+            val quantityAtLevel = currentLevel.totalQuantity
 
             if (quantityAtLevel > BigInteger.ZERO) {
-                val notionalAtLevel = remainingNotional.min(notional(quantityAtLevel, level.price, baseDecimals, quoteDecimals))
+                val notionalAtLevel = remainingNotional.min(notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals))
 
                 if (notionalAtLevel == remainingNotional) {
                     return baseAmount + quantityFromNotionalAndPrice(
                         remainingNotional,
-                        level.price,
+                        currentLevel.price,
                         baseDecimals,
                         quoteDecimals,
                     )
@@ -764,9 +762,8 @@ data class Market(
         var remainingAmount = amount
 
         var currentLevel = if (bestBidIx != -1) levels.getTreeNode(bestBidIx) else null
-        while (currentLevel != null && (stopAtLevelIx == null || currentLevel.value.levelIx >= stopAtLevelIx)) {
-            val level = currentLevel.value
-            val quantityAtLevel = level.totalQuantity.min(remainingAmount)
+        while (currentLevel != null && (stopAtLevelIx == null || currentLevel.levelIx >= stopAtLevelIx)) {
+            val quantityAtLevel = currentLevel.totalQuantity.min(remainingAmount)
             remainingAmount -= quantityAtLevel
 
             if (remainingAmount == BigInteger.ZERO) break

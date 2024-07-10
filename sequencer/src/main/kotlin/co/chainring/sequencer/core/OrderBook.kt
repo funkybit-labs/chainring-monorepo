@@ -1,5 +1,6 @@
 package co.chainring.sequencer.core
 
+import co.chainring.sequencer.core.datastructure.AVLTree
 import co.chainring.sequencer.proto.MarketCheckpoint
 import co.chainring.sequencer.proto.MarketCheckpointKt.levelOrder
 import co.chainring.sequencer.proto.MarketCheckpointKt.orderBookLevel
@@ -65,7 +66,9 @@ data class LevelOrder(
     }
 }
 
-class OrderBookLevel(val levelIx: Int, var side: BookSide, val price: BigDecimal, val maxOrderCount: Int) {
+class OrderBookLevel(var levelIx: Int, var side: BookSide, val price: BigDecimal, val maxOrderCount: Int) :
+    AVLTree.Node<OrderBookLevel>(id = levelIx) {
+
     val orders = Array(maxOrderCount) { _ ->
         LevelOrder(guid = 0L.toOrderGuid(), wallet = 0L.toWalletAddress(), quantity = BigInteger.ZERO, feeRate = FeeRate.zero, levelIx = levelIx)
     }

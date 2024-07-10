@@ -1,19 +1,16 @@
-package co.chainring.sequencer.core
+package co.chainring.sequencer.core.datastructure
 
-import kotlin.random.Random
-import kotlin.system.measureNanoTime
+class AVLTree<T : AVLTree.Node<T>> {
 
-class MarketLevels {
-
-    data class TreeNode(
-        var value: OrderBookLevel,
+    abstract class Node<T : Node<T>>(
+        val id: Int,
         var height: Int = 1,
-        var left: TreeNode? = null,
-        var right: TreeNode? = null,
-        var parent: TreeNode? = null,
+        var left: T? = null,
+        var right: T? = null,
+        var parent: T? = null,
     ) {
-        fun next(): TreeNode? {
-            var current: TreeNode? = this
+        fun next(): T? {
+            var current: T? = this as T
             if (current?.right != null) {
                 current = current.right
                 while (current?.left != null) {
@@ -30,8 +27,8 @@ class MarketLevels {
             }
         }
 
-        fun previous(): TreeNode? {
-            var current: TreeNode? = this
+        fun previous(): T? {
+            var current: T? = this as T
             if (current?.left != null) {
                 current = current.left
                 while (current?.right != null) {
@@ -47,36 +44,22 @@ class MarketLevels {
                 return parent
             }
         }
-
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (other !is TreeNode) return false
-            return value == other.value
-        }
-
-        override fun hashCode(): Int {
-            return value.hashCode()
-        }
-
-        override fun toString(): String {
-            return "Node(levelIx=${value.levelIx}, levelIx=${value.price}, quantity=${value.totalQuantity}, height=$height)"
-        }
     }
 
-    private var root: TreeNode? = null
+    private var root: T? = null
 
-    fun add(value: OrderBookLevel): OrderBookLevel {
+    fun add(value: T): T {
         root = add(root, value)
         return value
     }
 
-    private fun add(treeNode: TreeNode?, value: OrderBookLevel): TreeNode {
-        if (treeNode == null) return TreeNode(value)
+    private fun add(treeNode: T?, value: T): T {
+        if (treeNode == null) return value
 
-        if (value.levelIx < treeNode.value.levelIx) {
+        if (value.id < treeNode.id) {
             treeNode.left = add(treeNode.left, value)
             treeNode.left?.parent = treeNode
-        } else if (value.levelIx > treeNode.value.levelIx) {
+        } else if (value.id > treeNode.id) {
             treeNode.right = add(treeNode.right, value)
             treeNode.right?.parent = treeNode
         } else {
@@ -88,19 +71,18 @@ class MarketLevels {
         return balance(treeNode)
     }
 
-    fun get(levelIx: Int): OrderBookLevel? {
-        val node = getTreeNode(root, levelIx)
-        return node?.value
-    }
-
-    fun getTreeNode(levelIx: Int): TreeNode? {
+    fun get(levelIx: Int): T? {
         return getTreeNode(root, levelIx)
     }
 
-    private fun getTreeNode(treeNode: TreeNode?, levelIx: Int): TreeNode? {
-        if (treeNode == null || treeNode.value.levelIx == levelIx) return treeNode
+    fun getTreeNode(levelIx: Int): T? {
+        return getTreeNode(root, levelIx)
+    }
 
-        return if (levelIx < treeNode.value.levelIx) {
+    private fun getTreeNode(treeNode: T?, levelIx: Int): T? {
+        if (treeNode == null || treeNode.id == levelIx) return treeNode
+
+        return if (levelIx < treeNode.id) {
             getTreeNode(treeNode.left, levelIx)
         } else {
             getTreeNode(treeNode.right, levelIx)
@@ -111,31 +93,65 @@ class MarketLevels {
         root = remove(root, levelIx)
     }
 
-    private fun remove(treeNode: TreeNode?, levelIx: Int): TreeNode? {
-        if (treeNode == null) return treeNode
+    private fun remove(treeNode: T?, levelIx: Int): T? {
+        if (treeNode == null) return null
 
         when {
-            levelIx < treeNode.value.levelIx -> {
+            levelIx < treeNode.id -> {
                 treeNode.left = remove(treeNode.left, levelIx)
             }
-            levelIx > treeNode.value.levelIx -> {
+            levelIx > treeNode.id -> {
                 treeNode.right = remove(treeNode.right, levelIx)
             }
             else -> {
+                // node with only one child or no child
                 if (treeNode.left == null || treeNode.right == null) {
                     val temp = treeNode.left ?: treeNode.right
-
                     if (temp == null) {
+                        // no child case
                         return null
                     } else {
+                        // one child case
                         temp.parent = treeNode.parent
                         return temp
                     }
                 }
 
-                val temp = minValueNode(treeNode.right!!)
-                treeNode.value = temp.value
-                treeNode.right = remove(treeNode.right, temp.value.levelIx)
+                // node with two children
+                val successor = minValueNode(treeNode.right!!)
+
+                // connect the right child of the successor to its parent
+                if (successor.parent != treeNode) {
+                    successor.parent?.left = successor.right
+                    if (successor.right != null) {
+                        successor.right?.parent = successor.parent
+                    }
+
+                    successor.right = treeNode.right
+                    successor.right?.parent = successor
+                }
+
+                // Connect the left child of the treeNode to the successor
+                successor.left = treeNode.left
+                successor.left?.parent = successor
+
+                // Update the parent of the treeNode to point to the successor
+                successor.parent = treeNode.parent
+                if (treeNode.parent == null) {
+                    root = successor
+                } else if (treeNode == treeNode.parent?.left) {
+                    treeNode.parent?.left = successor
+                } else {
+                    treeNode.parent?.right = successor
+                }
+
+                treeNode.left = null
+                treeNode.right = null
+                treeNode.parent = null
+
+                treeNode.height = 1 + maxOf(height(treeNode.left), height(treeNode.right))
+
+                return balance(successor)
             }
         }
 
@@ -144,7 +160,7 @@ class MarketLevels {
         return balance(treeNode)
     }
 
-    fun first(): TreeNode? {
+    fun first(): T? {
         var current = root ?: return null
         while (current.left != null) {
             current = current.left!!
@@ -152,7 +168,7 @@ class MarketLevels {
         return current
     }
 
-    fun last(): TreeNode? {
+    fun last(): T? {
         var current = root ?: return null
         while (current.right != null) {
             current = current.right!!
@@ -160,11 +176,11 @@ class MarketLevels {
         return current
     }
 
-    private fun height(treeNode: TreeNode?): Int {
+    private fun height(treeNode: T?): Int {
         return treeNode?.height ?: 0
     }
 
-    private fun balance(treeNode: TreeNode): TreeNode {
+    private fun balance(treeNode: T): T {
         val balance = getBalance(treeNode)
 
         return when {
@@ -182,11 +198,11 @@ class MarketLevels {
         }
     }
 
-    private fun getBalance(treeNode: TreeNode?): Int {
+    private fun getBalance(treeNode: T?): Int {
         return if (treeNode == null) 0 else height(treeNode.left) - height(treeNode.right)
     }
 
-    private fun rightRotate(y: TreeNode): TreeNode {
+    private fun rightRotate(y: T): T {
         val x = y.left!!
         val T2 = x.right
 
@@ -203,7 +219,7 @@ class MarketLevels {
         return x
     }
 
-    private fun leftRotate(x: TreeNode): TreeNode {
+    private fun leftRotate(x: T): T {
         val y = x.right!!
         val T2 = y.left
 
@@ -220,7 +236,7 @@ class MarketLevels {
         return y
     }
 
-    private fun minValueNode(treeNode: TreeNode): TreeNode {
+    private fun minValueNode(treeNode: T): T {
         var current = treeNode
         while (current.left != null) {
             current = current.left!!
@@ -228,27 +244,27 @@ class MarketLevels {
         return current
     }
 
-    fun traverse(action: (OrderBookLevel) -> Unit) {
+    fun traverse(action: (T) -> Unit) {
         inorderTraversal(root, action)
     }
 
-    private fun inorderTraversal(treeNode: TreeNode?, action: (OrderBookLevel) -> Unit) {
+    private fun inorderTraversal(treeNode: T?, action: (T) -> Unit) {
         if (treeNode != null) {
             inorderTraversal(treeNode.left, action)
-            action(treeNode.value)
+            action(treeNode)
             inorderTraversal(treeNode.right, action)
         }
     }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (other !is MarketLevels) return false
+        if (other !is AVLTree<*>) return false
 
         var thisNode = this.first()
         var otherNode = other.first()
 
         while (thisNode != null && otherNode != null) {
-            if (thisNode.value != otherNode.value) return false
+            if (thisNode != otherNode) return false
             thisNode = thisNode.next()
             otherNode = otherNode.next()
         }
@@ -261,46 +277,10 @@ class MarketLevels {
         var node = first()
 
         while (node != null) {
-            result = 31 * result + node.value.hashCode()
+            result = 31 * result + node.hashCode()
             node = node.next()
         }
 
         return result
     }
-}
-
-fun main() {
-    val tree = MarketLevels()
-
-    repeat(50) { i ->
-        measureNanoTime {
-            repeat(1000) { j ->
-                tree.add(OrderBookLevel(i * 1000 + j, side = BookSide.Sell, (i * 1000 + j).toBigDecimal(), 0))
-            }
-        }.also {
-            println("Adding 1000 entries took $it nanos")
-        }
-    }
-
-    repeat(50) { i ->
-        measureNanoTime {
-            repeat(1000) { j ->
-                tree.get(Random.nextInt())
-            }
-        }.also {
-            println("Getting 1000 entries took $it nanos")
-        }
-    }
-
-    /*repeat(100) { i ->
-        measureNanoTime {
-            (0 until 1000).forEach { j ->
-                tree.delete(i * j)
-            }
-        }.also {
-            println("Removing 1000 entries took $it nanos")
-        }
-    }*/
-
-    // skipList.dumpListState()
 }

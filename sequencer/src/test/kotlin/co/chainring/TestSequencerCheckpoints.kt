@@ -939,8 +939,8 @@ class TestSequencerCheckpoints {
             var restoredNode = restoredStateMarket.levels.first()
 
             while (initialNode != null && restoredNode != null) {
-                val initialStateLevel = initialNode.value
-                val restoredStateLevel = restoredNode.value
+                val initialStateLevel = initialNode
+                val restoredStateLevel = restoredNode
 
                 // Compare the level indices
                 assertEquals(
