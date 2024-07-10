@@ -221,7 +221,11 @@ object SequencerResponseProcessorService {
     }
 
     private fun handleSequencerResponse(request: SequencerRequest, response: SequencerResponse, ordersBeingUpdated: List<Long> = listOf()) {
-        val timestamp = Instant.fromEpochMilliseconds(response.createdAt)
+        val timestamp = if (response.createdAt > 0) {
+            Instant.fromEpochMilliseconds(response.createdAt)
+        } else {
+            Clock.System.now()
+        }
 
         val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
         val limitsChanged = mutableSetOf<Pair<WalletEntity, MarketEntity>>()
