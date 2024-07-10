@@ -77,6 +77,18 @@ sealed class CreateOrderApiRequest {
     ) : CreateOrderApiRequest()
 
     @Serializable
+    @SerialName("backToBackMarket")
+    data class BackToBackMarket(
+        override val nonce: String,
+        override val marketId: MarketId,
+        val secondMarketId: MarketId,
+        override val side: OrderSide,
+        override val amount: OrderAmount,
+        override val signature: EvmSignature,
+        override val verifyingChainId: ChainId,
+    ) : CreateOrderApiRequest()
+
+    @Serializable
     @SerialName("limit")
     data class Limit(
         override val nonce: String,
@@ -167,6 +179,20 @@ sealed class Order {
     ) : Order()
 
     @Serializable
+    @SerialName("backToBackMarket")
+    data class BackToBackMarket(
+        override val id: OrderId,
+        override val status: OrderStatus,
+        override val marketId: MarketId,
+        val secondMarketId: MarketId,
+        override val side: OrderSide,
+        override val amount: BigIntegerJson,
+        override val originalAmount: BigIntegerJson,
+        override val executions: List<Execution>,
+        override val timing: Timing,
+    ) : Order()
+
+    @Serializable
     @SerialName("limit")
     data class Limit(
         override val id: OrderId,
@@ -188,6 +214,7 @@ sealed class Order {
         val role: ExecutionRole,
         val feeAmount: BigIntegerJson,
         val feeSymbol: Symbol,
+        val marketId: MarketId,
     )
 
     @Serializable

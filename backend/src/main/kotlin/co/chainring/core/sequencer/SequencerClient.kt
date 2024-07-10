@@ -21,6 +21,8 @@ import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.proto.GatewayGrpcKt
 import co.chainring.sequencer.proto.SequencerResponse
+import co.chainring.sequencer.proto.backToBackOrder
+import co.chainring.sequencer.proto.backToBackOrderRequest
 import co.chainring.sequencer.proto.balanceBatch
 import co.chainring.sequencer.proto.cancelOrder
 import co.chainring.sequencer.proto.deposit
@@ -80,7 +82,6 @@ open class SequencerClient {
         val sequencerOrderId: Long,
         val amount: BigInteger,
         val levelIx: Int?,
-        val wallet: Long,
         val orderType: co.chainring.sequencer.proto.Order.Type,
         val nonce: BigInteger?,
         val signature: EvmSignature?,
@@ -120,6 +121,28 @@ open class SequencerClient {
                         ordersToCancel.map { toCancelOrderDSL(it) },
                     )
                     this.cancelAll = cancelAll
+                },
+            )
+        }.also {
+            Tracer.newSpan(ServerSpans.gtw, it.processingTime)
+            Tracer.newSpan(ServerSpans.sqr, it.sequencerResponse.processingTime)
+        }.sequencerResponse
+    }
+
+    suspend fun backToBackOrder(
+        marketIds: List<MarketId>,
+        wallet: Long,
+        order: Order,
+    ): SequencerResponse {
+        return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
+            stub.applyBackToBackOrder(
+                backToBackOrderRequest {
+                    this.guid = UUID.randomUUID().toString()
+                    this.order = backToBackOrder {
+                        this.wallet = wallet
+                        this.marketIds.addAll(marketIds.map { it.value })
+                        this.order = toOrderDSL(order)
+                    }
                 },
             )
         }.also {

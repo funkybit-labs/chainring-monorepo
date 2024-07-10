@@ -105,7 +105,7 @@ class Wallet(
 
     fun getExchangeERC20Balance(symbol: String): BigInteger {
         val chainId = chains.first { c -> c.symbols.any { it.name == symbol } }.id
-        return exchangeContractByChainId.getValue(chainId).balances(address.value, erc20TokenAddress(symbol)).sendAndWaitForConfirmation()
+        return exchangeContractByChainId.getValue(chainId).balances(address.value, erc20TokenAddress(symbol, chainId)).sendAndWaitForConfirmation()
     }
 
     fun getExchangeNativeBalance(): BigInteger {
@@ -197,6 +197,27 @@ class Wallet(
         it.symbols.contains(symbol)
     }.id
 
+    fun signOrder(request: CreateOrderApiRequest.BackToBackMarket): CreateOrderApiRequest.BackToBackMarket {
+        val (baseSymbol, _) = marketSymbols(request.marketId)
+        val (_, quoteSymbol) = marketSymbols(request.secondMarketId)
+
+        val tx = EIP712Transaction.Order(
+            address,
+            baseChainId = chainId(baseSymbol),
+            baseToken = baseSymbol.contractAddress ?: Address.zero,
+            quoteChainId = chainId(quoteSymbol),
+            quoteToken = quoteSymbol.contractAddress ?: Address.zero,
+            amount = if (request.side == OrderSide.Buy) request.amount else request.amount.negate(),
+            price = BigInteger.ZERO,
+            nonce = BigInteger(1, request.nonce.toHexBytes()),
+            signature = EvmSignature.emptySignature(),
+        )
+        return request.copy(
+            signature = blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId))),
+            verifyingChainId = this.currentChainId,
+        )
+    }
+
     fun signOrder(request: CreateOrderApiRequest.Market): CreateOrderApiRequest.Market {
         val (baseSymbol, quoteSymbol) = marketSymbols(request.marketId)
 
@@ -265,6 +286,9 @@ class Wallet(
 
     private fun erc20TokenAddress(symbol: String) =
         chains.first { it.id == currentChainId }.symbols.firstOrNull { (it.name == symbol || it.name == "$symbol:$currentChainId") && it.contractAddress != null }?.contractAddress?.value
+
+    private fun erc20TokenAddress(symbol: String, chainId: ChainId) =
+        chains.first { it.id == chainId }.symbols.firstOrNull { (it.name == symbol || it.name == "$symbol:$currentChainId") && it.contractAddress != null }?.contractAddress?.value
 
     private fun marketSymbols(marketId: MarketId): Pair<SymbolInfo, SymbolInfo> =
         marketId

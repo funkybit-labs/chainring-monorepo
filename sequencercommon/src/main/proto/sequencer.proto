@@ -63,6 +63,7 @@ message SequencerRequest {
     SetFeeRates = 5;
     SetWithdrawalFees = 6;
     SetMarketMinFees = 7;
+    ApplyBackToBackOrder = 8;
   }
   string guid = 1;
   Type type = 2;
@@ -72,6 +73,7 @@ message SequencerRequest {
   optional FeeRates feeRates = 6;
   repeated WithdrawalFee withdrawalFees = 7;
   repeated MarketMinFee marketMinFees = 8;
+  optional BackToBackOrder backToBackOrder = 9;
 }
 
 enum SequencerError {
@@ -83,6 +85,7 @@ enum SequencerError {
   InvalidFeeRate = 5;
   InvalidWithdrawalFee = 6;
   InvalidMarketMinFee = 7;
+  InvalidBackToBackOrder = 8;
 }
 
 message StateDump {

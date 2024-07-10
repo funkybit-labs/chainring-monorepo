@@ -39,6 +39,11 @@ message SetMarketMinFeesRequest {
   repeated MarketMinFee marketMinFees = 2;
 }
 
+message BackToBackOrderRequest {
+  string guid = 1;
+  BackToBackOrder order = 2;
+}
+
 service Gateway {
   rpc AddMarket (Market) returns (GatewayResponse);
   rpc SetFeeRates (SetFeeRatesRequest) returns (GatewayResponse);
@@ -48,4 +53,5 @@ service Gateway {
   rpc GetState (GetStateRequest) returns (GatewayResponse);
   rpc SetWithdrawalFees (SetWithdrawalFeesRequest) returns (GatewayResponse);
   rpc SetMarketMinFees (SetMarketMinFeesRequest) returns (GatewayResponse);
+  rpc ApplyBackToBackOrder (BackToBackOrderRequest) returns (GatewayResponse);
 }
