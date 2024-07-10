@@ -229,23 +229,18 @@ export function SwapInternals({
         limitsTopic(market.id)
       ]
     }, [market.id]),
-    handler: useCallback(
-      (message: Publishable) => {
-        if (message.type === 'OrderBook') {
-          setOrderBook(message)
-        } else if (message.type === 'Limits') {
-          setBaseLimit(message.base)
-          setQuoteLimit(message.quote)
-        } else if (message.type === 'Balances') {
-          setBalances(message.balances)
-        } else if (message.type === 'OrderUpdated') {
-          if (message.order.id === lastOrderId) {
-            setLastOrder(message.order)
-          }
-        }
-      },
-      [lastOrderId]
-    ),
+    handler: useCallback((message: Publishable) => {
+      if (message.type === 'OrderBook') {
+        setOrderBook(message)
+      } else if (message.type === 'Limits') {
+        setBaseLimit(message.base)
+        setQuoteLimit(message.quote)
+      } else if (message.type === 'Balances') {
+        setBalances(message.balances)
+      } else if (message.type === 'OrderUpdated') {
+        setLastOrder(message.order)
+      }
+    }, []),
     onUnsubscribe: useCallback(() => {
       setBalances([])
       setBaseLimit(undefined)
@@ -899,7 +894,7 @@ export function SwapInternals({
     canSubmit,
     getMarketPrice: getSimulatedPrice,
     quoteDecimals: market.quoteDecimalPlaces,
-    lastOrder,
+    lastOrder: lastOrderId === lastOrder?.id ? lastOrder : undefined,
     percentOffMarket,
     handleMaxBaseAmount,
     handleMaxQuoteAmount,
