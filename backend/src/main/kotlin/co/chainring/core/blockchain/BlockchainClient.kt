@@ -252,7 +252,17 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
             try {
                 return f(contract)
             } catch (e: ContractCallException) {
-                if (e.message?.contains("BlockOutOfRangeError") != true || Clock.System.now() - startTime >= config.maxRpcNodeEventualConsistencyTolerance) {
+                val errorMessage = e.message ?: ""
+                val badBlockNumberErrors = setOf(
+                    // returned by Anvil
+                    "BlockOutOfRangeError",
+                    // returned by Bitlayer and Sepolia
+                    "header not found",
+                )
+                if (
+                    badBlockNumberErrors.none { errorMessage.contains(it) } ||
+                    Clock.System.now() - startTime >= config.maxRpcNodeEventualConsistencyTolerance
+                ) {
                     throw e
                 }
             }
