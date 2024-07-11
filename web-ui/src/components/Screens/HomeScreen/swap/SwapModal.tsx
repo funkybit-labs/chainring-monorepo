@@ -22,6 +22,7 @@ import { ExpandableValue } from 'components/common/ExpandableValue'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import Deposit from 'assets/Deposit.svg'
+import MarketPrice from 'components/Screens/HomeScreen/swap/MarketPrice'
 
 export function SwapModal({
   markets,
@@ -249,19 +250,13 @@ export function SwapModal({
                   />
                 </div>
               </div>
-              <div
-                className="mt-1 cursor-pointer pl-4 text-darkBluishGray1 hover:text-statusOrange"
+              <MarketPrice
+                bottomSymbol={sr.bottomSymbol}
+                topSymbol={sr.topSymbol}
+                isInverted={marketPriceInverted}
+                price={marketPrice}
                 onClick={() => setMarketPriceInverted(!marketPriceInverted)}
-              >
-                1{' '}
-                {marketPriceInverted
-                  ? sr.topSymbol.displayName()
-                  : sr.bottomSymbol.displayName()}{' '}
-                ≈ <ExpandableValue value={marketPrice} />{' '}
-                {marketPriceInverted
-                  ? sr.bottomSymbol.displayName()
-                  : sr.topSymbol.displayName()}
-              </div>
+              />
             </div>
             <div className="flex w-full flex-col">
               {walletAddress && exchangeContractAddress ? (
