@@ -5,7 +5,6 @@ import { useMemo, useState } from 'react'
 import {
   call,
   getBalance,
-  getTransactionCount,
   readContract,
   sendTransaction,
   waitForTransactionReceipt
@@ -65,7 +64,6 @@ export default function DepositModal({
   })
 
   const [submitPhase, setSubmitPhase] = useState<
-    | 'waitingForTxCount'
     | 'checkingAllowanceAmount'
     | 'waitingForAllowanceApproval'
     | 'waitingForAllowanceReceipt'
@@ -82,11 +80,6 @@ export default function DepositModal({
         let depositHash: string
 
         if (symbol.contractAddress) {
-          setSubmitPhase('waitingForTxCount')
-          const transactionCount = await getTransactionCount(config, {
-            address: walletAddress
-          })
-
           setSubmitPhase('checkingAllowanceAmount')
           const allowance = await call(config, {
             to: symbol.contractAddress,
@@ -100,7 +93,6 @@ export default function DepositModal({
 
           const allowanceAmount = allowance.data ? BigInt(allowance.data) : 0n
 
-          let nextNonce = transactionCount
           if (allowanceAmount < amount) {
             setSubmitPhase('waitingForAllowanceApproval')
             const hash = await sendTransaction(config, {
@@ -110,12 +102,10 @@ export default function DepositModal({
                 abi: ERC20Abi,
                 args: [exchangeContractAddress, amount],
                 functionName: 'approve'
-              } as EncodeFunctionDataParameters),
-              nonce: nextNonce
+              } as EncodeFunctionDataParameters)
             })
             setSubmitPhase('waitingForAllowanceReceipt')
             await waitForTransactionReceipt(config, { hash })
-            nextNonce += 1
           }
 
           setSubmitPhase('waitingForDepositApproval')
@@ -126,8 +116,7 @@ export default function DepositModal({
               abi: ExchangeAbi,
               functionName: 'deposit',
               args: [symbol.contractAddress!, amount]
-            }),
-            nonce: nextNonce
+            })
           })
         } else {
           setSubmitPhase('waitingForDepositApproval')
@@ -207,7 +196,6 @@ export default function DepositModal({
                   error={mutation.error?.message}
                   caption={() => {
                     switch (submitPhase) {
-                      case 'waitingForTxCount':
                       case 'checkingAllowanceAmount':
                         return 'Preparing deposit'
                       case 'waitingForAllowanceApproval':
