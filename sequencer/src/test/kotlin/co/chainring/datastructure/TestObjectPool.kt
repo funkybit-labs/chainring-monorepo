@@ -1,4 +1,4 @@
-package co.chainring
+package co.chainring.datastructure
 
 import co.chainring.sequencer.core.datastructure.ObjectPool
 import org.junit.jupiter.api.Test
