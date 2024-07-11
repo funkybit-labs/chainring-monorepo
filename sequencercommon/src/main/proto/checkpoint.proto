@@ -38,17 +38,15 @@ message BalancesCheckpoint {
 message MarketCheckpoint {
   string id = 1;
   DecimalValue tickSize = 2;
-  DecimalValue marketPrice = 3;
-  uint32 maxLevels = 4;
-  uint32 maxOrdersPerLevel = 5;
-  uint32 baseDecimals = 6;
-  uint32 quoteDecimals = 7;
-  int32 maxOfferIx = 8;
+  uint32 maxOrdersPerLevel = 3;
+  uint32 baseDecimals = 4;
+  uint32 quoteDecimals = 5;
+  int32 maxOfferIx = 6;
+  int32 bestOfferIx = 7;
+  int32 bestBidIx = 8;
   int32 minBidIx = 9;
   repeated OrderBookLevel levels = 10;
-  DecimalValue bestBid = 11;
-  DecimalValue bestOffer = 12;
-  IntegerValue minFee = 13;
+  IntegerValue minFee = 11;
 
   message OrderBookLevel {
     int32 levelIx = 1;
@@ -70,7 +68,6 @@ message MarketCheckpoint {
     uint64 guid = 1;
     uint64 wallet = 2;
     IntegerValue quantity = 3;
-    uint32 levelIx = 4;
     IntegerValue originalQuantity = 5;
     uint64 feeRate = 6;
   }

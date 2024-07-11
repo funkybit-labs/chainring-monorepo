@@ -191,7 +191,6 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                 TestRoutes.Companion.CreateMarketInSequencer(
                     id = "${baseSymbol.name}/${quoteSymbol.name}",
                     tickSize = market.tickSize,
-                    marketPrice = market.marketPrice,
                     quoteDecimals = quoteSymbol.decimals,
                     baseDecimals = baseSymbol.decimals,
                     minFee = market.minFee,

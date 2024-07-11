@@ -10,7 +10,7 @@ message TradeCreated {
   uint64 buyOrderGuid = 1;
   uint64 sellOrderGuid = 2;
   IntegerValue amount = 3;
-  DecimalValue price = 4;
+  int32 levelIx = 4;
   IntegerValue buyerFee = 5;
   IntegerValue sellerFee = 6;
 }

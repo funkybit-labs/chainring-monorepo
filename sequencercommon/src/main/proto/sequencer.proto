@@ -38,9 +38,7 @@ message MarketCreated {
   DecimalValue tickSize = 2;
   uint32 baseDecimals = 3;
   uint32 quoteDecimals = 4;
-  DecimalValue maxAllowedOffer = 5;
-  DecimalValue minAllowedBid = 6;
-  optional IntegerValue minFee = 7;
+  optional IntegerValue minFee = 6;
 }
 
 message FeeRates {
@@ -51,8 +49,8 @@ message FeeRates {
 message BidOfferState {
   int32 maxOfferIx = 1;
   int32 minBidIx = 2;
-  DecimalValue bestBid = 3;
-  DecimalValue bestOffer = 4;
+  int32 bestBidIx = 3;
+  int32 bestOfferIx = 4;
 }
 
 message SequencerRequest {
@@ -83,9 +81,8 @@ enum SequencerError {
   UnknownMarket = 3;
   ExceedsLimit = 4;
   InvalidFeeRate = 5;
-  InvalidPrice = 6;
-  InvalidWithdrawalFee = 7;
-  InvalidMarketMinFee = 8;
+  InvalidWithdrawalFee = 6;
+  InvalidMarketMinFee = 7;
 }
 
 message StateDump {

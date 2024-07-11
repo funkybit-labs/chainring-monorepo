@@ -47,6 +47,7 @@ class SequencerClient(clock: Clock) {
 
     data class Market(
         val id: MarketId,
+        val tickSize: BigDecimal,
         val baseDecimals: Int,
         val quoteDecimals: Int,
     ) {
@@ -80,7 +81,7 @@ class SequencerClient(clock: Clock) {
                         order {
                             this.guid = Random.nextLong()
                             this.amount = amount.toFundamentalUnits(market.baseDecimals).toIntegerValue()
-                            this.price = price?.toDecimalValue() ?: BigDecimal.ZERO.toDecimalValue()
+                            this.levelIx = price?.divideToIntegralValue(market.tickSize)?.toInt() ?: 0
                             this.type = orderType
                             this.percentage = percentage
                         },
@@ -118,7 +119,7 @@ class SequencerClient(clock: Clock) {
                     order {
                         this.guid = guid.value
                         this.amount = amount.toFundamentalUnits(market.baseDecimals).toIntegerValue()
-                        this.price = price.toDecimalValue()
+                        this.levelIx = price.divideToIntegralValue(market.tickSize).toInt()
                     },
                 )
             }
@@ -143,7 +144,7 @@ class SequencerClient(clock: Clock) {
             },
         )
 
-    fun createMarket(marketId: MarketId, tickSize: BigDecimal = "0.05".toBigDecimal(), marketPrice: BigDecimal = "17.525".toBigDecimal(), baseDecimals: Int = 8, quoteDecimals: Int = 18): Market {
+    fun createMarket(marketId: MarketId, tickSize: BigDecimal = "0.05".toBigDecimal(), baseDecimals: Int = 8, quoteDecimals: Int = 18): Market {
         val createMarketResponse = sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
@@ -152,9 +153,7 @@ class SequencerClient(clock: Clock) {
                     this.guid = UUID.randomUUID().toString()
                     this.marketId = marketId.value
                     this.tickSize = tickSize.toDecimalValue()
-                    this.maxLevels = 1000
                     this.maxOrdersPerLevel = 1000
-                    this.marketPrice = marketPrice.toDecimalValue()
                     this.baseDecimals = baseDecimals
                     this.quoteDecimals = quoteDecimals
                 }
@@ -167,7 +166,12 @@ class SequencerClient(clock: Clock) {
         assertEquals(baseDecimals, createdMarket.baseDecimals)
         assertEquals(quoteDecimals, createdMarket.quoteDecimals)
 
-        return Market(marketId, baseDecimals = createdMarket.baseDecimals, quoteDecimals = createdMarket.quoteDecimals)
+        return Market(
+            marketId,
+            tickSize = createdMarket.tickSize.toBigDecimal(),
+            baseDecimals = createdMarket.baseDecimals,
+            quoteDecimals = createdMarket.quoteDecimals,
+        )
     }
 
     fun setFeeRates(feeRates: FeeRates) {

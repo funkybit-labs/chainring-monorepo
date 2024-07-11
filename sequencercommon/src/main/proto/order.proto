@@ -18,9 +18,9 @@ message Order {
 
   Type type = 3;
   IntegerValue amount = 4;
-  optional DecimalValue price = 5; // required for limit orders
+  optional int32 levelIx = 5; // required for limit orders
   optional IntegerValue nonce = 6; // required for add order
-  optional string signature = 7; // required for add order (created CHAIN-123 as order updates should require a new signature)
+  optional string signature = 7; // required for add order
   string externalGuid = 8;
   uint32 chainId = 9; // the chain id used when creating the signature - does not need to be related to the chain(s) of the market
   optional uint32 percentage = 10;

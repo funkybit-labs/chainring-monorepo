@@ -29,7 +29,6 @@ fun seedSequencer(fixtures: Fixtures) {
             sequencerClient.createMarket(
                 marketId = "${baseSymbol.name}/${quoteSymbol.name}",
                 tickSize = market.tickSize,
-                marketPrice = market.marketPrice,
                 quoteDecimals = quoteSymbol.decimals,
                 baseDecimals = baseSymbol.decimals,
                 minFee = market.minFee

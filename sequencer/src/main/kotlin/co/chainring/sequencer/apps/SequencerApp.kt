@@ -40,7 +40,6 @@ import net.openhft.chronicle.queue.TailerDirection
 import net.openhft.chronicle.queue.TailerState
 import net.openhft.chronicle.queue.impl.RollingChronicleQueue
 import java.lang.Thread.UncaughtExceptionHandler
-import java.math.BigDecimal
 import java.math.BigInteger
 import java.nio.file.Path
 import kotlin.concurrent.thread
@@ -76,24 +75,14 @@ class SequencerApp(
                         error = SequencerError.MarketExists
                     }
                 } else {
-                    val tickSize = market.tickSize.toBigDecimal()
-                    val halfTick = tickSize.setScale(tickSize.scale() + 1) / BigDecimal.valueOf(2)
-                    val marketPrice = market.marketPrice.toBigDecimal()
-                    if (BigDecimal.ZERO.compareTo((marketPrice + halfTick).remainder(tickSize)) != 0) {
-                        // initial market price is not exactly between ticks
-                        error = SequencerError.InvalidPrice
-                    } else {
-                        state.markets[marketId] = Market(
-                            id = marketId,
-                            tickSize = tickSize,
-                            initialMarketPrice = marketPrice,
-                            maxLevels = market.maxLevels,
-                            maxOrdersPerLevel = market.maxOrdersPerLevel,
-                            baseDecimals = market.baseDecimals,
-                            quoteDecimals = market.quoteDecimals,
-                            minFee = if (market.hasMinFee()) market.minFee.toBigInteger() else BigInteger.ZERO,
-                        )
-                    }
+                    state.markets[marketId] = Market(
+                        id = marketId,
+                        tickSize = market.tickSize.toBigDecimal(),
+                        maxOrdersPerLevel = market.maxOrdersPerLevel,
+                        baseDecimals = market.baseDecimals,
+                        quoteDecimals = market.quoteDecimals,
+                        minFee = if (market.hasMinFee()) market.minFee.toBigInteger() else BigInteger.ZERO,
+                    )
                 }
                 sequencerResponse {
                     this.guid = market.guid
@@ -105,10 +94,6 @@ class SequencerApp(
                                 this.tickSize = market.tickSize
                                 this.baseDecimals = market.baseDecimals
                                 this.quoteDecimals = market.quoteDecimals
-                                state.markets[marketId]?.levels?.let { levels ->
-                                    this.minAllowedBid = levels[0].price.toDecimalValue()
-                                    this.maxAllowedOffer = levels[levels.lastIndex - 1].price.toDecimalValue()
-                                }
                                 this.minFee = if (market.hasMinFee()) market.minFee else BigInteger.ZERO.toIntegerValue()
                             },
                         )
@@ -291,7 +276,7 @@ class SequencerApp(
                         val baseAsset = market.id.baseAsset()
                         val quoteAsset = market.id.quoteAsset()
                         val baseAmount = failedSettlement.trade.amount.toBigInteger()
-                        val price = failedSettlement.trade.price.toBigDecimal()
+                        val price = market.price(failedSettlement.trade.levelIx)
                         val notional = notional(baseAmount, price, market.baseDecimals, market.quoteDecimals)
 
                         val sellWallet = failedSettlement.sellWallet.toWalletAddress()
@@ -483,7 +468,7 @@ class SequencerApp(
                     )
                 }
                 if (oldQuoteAssets > BigInteger.ZERO) { // LimitBuy
-                    val previousNotionalAndFee = notionalPlusFee(order.quantity, market.levels[order.levelIx].price, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
+                    val previousNotionalAndFee = notionalPlusFee(order.quantity, order.level.price, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
                     val notionalAndFee = calculateLimitBuyOrderNotionalPlusFee(orderChange, market)
                     quoteAssetsRequired.merge(order.wallet, notionalAndFee - previousNotionalAndFee, ::sumBigIntegers)
                 }
@@ -540,12 +525,10 @@ class SequencerApp(
     }
 
     private fun calculateLimitBuyOrderNotionalPlusFee(order: Order, market: Market): BigInteger {
-        return if (order.price.toBigDecimal() >= market.bestOffer) {
+        val orderPrice = market.price(order.levelIx)
+        return if (order.levelIx >= market.bestOfferIx) {
             // limit order crosses the market
-            val orderPrice = order.price.toBigDecimal()
-            val levelIx = market.levelIx(orderPrice)
-
-            val (clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger(), stopAtLevelIx = levelIx)
+            val (clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger(), stopAtLevelIx = order.levelIx)
             val remainingQuantity = order.amount.toBigInteger() - availableQuantity
 
             val marketChunkNotional = notionalPlusFee(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals, state.feeRates.taker)
@@ -553,7 +536,7 @@ class SequencerApp(
 
             marketChunkNotional + limitChunkNotional
         } else {
-            notionalPlusFee(order.amount, order.price, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
+            notionalPlusFee(order.amount, orderPrice.toDecimalValue(), market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
         }
     }
 

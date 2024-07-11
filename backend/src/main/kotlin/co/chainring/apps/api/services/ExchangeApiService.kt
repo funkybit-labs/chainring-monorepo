@@ -137,7 +137,7 @@ class ExchangeApiService(
             SequencerClient.Order(
                 sequencerOrderId = orderId.toSequencerId().value,
                 amount = orderRequest.amount.fixedAmount(),
-                price = price?.toString(),
+                levelIx = price?.divideToIntegralValue(market.tickSize)?.toInt(),
                 wallet = walletAddress.toSequencerId().value,
                 orderType = toSequencerOrderType(orderRequest is CreateOrderApiRequest.Market, orderRequest.side),
                 nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
@@ -171,7 +171,7 @@ class ExchangeApiService(
             SequencerClient.Order(
                 sequencerOrderId = orderRequest.orderId.toSequencerId().value,
                 amount = orderRequest.amount,
-                price = orderRequest.price.toString(),
+                levelIx = orderRequest.price.divideToIntegralValue(market.tickSize).toInt(),
                 wallet = walletAddress.toSequencerId().value,
                 orderType = toSequencerOrderType(false, orderRequest.side),
                 nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),

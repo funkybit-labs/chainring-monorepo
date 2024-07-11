@@ -5,7 +5,6 @@ import co.chainring.sequencer.core.FeeRate
 import co.chainring.sequencer.core.LevelOrder
 import co.chainring.sequencer.core.OrderBookLevel
 import co.chainring.sequencer.core.toBigInteger
-import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderDisposition
@@ -272,7 +271,7 @@ class TestOrderBookLevel {
         return order {
             this.guid = nextOrderId++
             this.amount = amount.toIntegerValue()
-            this.price = BigDecimal.ONE.toDecimalValue()
+            this.levelIx = 1
             this.type = Order.Type.LimitBuy
         }.also {
             if (addToSet) {

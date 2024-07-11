@@ -2,23 +2,19 @@ package co.chainring
 
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.FeeRates
-import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.WalletAddress
 import co.chainring.sequencer.core.notional
 import co.chainring.sequencer.core.notionalFee
 import co.chainring.sequencer.core.toBigInteger
-import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toOrderGuid
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderChangeRejected
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.SequencerError
-import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.newQuantityOrNull
-import co.chainring.sequencer.proto.sequencerRequest
 import co.chainring.testutils.ExpectedTrade
 import co.chainring.testutils.MockClock
 import co.chainring.testutils.SequencerClient
@@ -34,7 +30,6 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import java.math.BigDecimal
-import java.util.UUID
 import kotlin.random.Random
 
 class TestSequencer {
@@ -94,7 +89,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder.guid,
-                        price = BigDecimal("12.000"),
+                        price = BigDecimal("12.00"),
                         amount = BigDecimal("0.2"),
                         buyerFee = BigDecimal("0.048"),
                         sellerFee = BigDecimal("0.024"),
@@ -135,7 +130,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = makerOrder.guid,
                         sellOrderGuid = takerOrder.guid,
-                        price = BigDecimal("10.000"),
+                        price = BigDecimal("10.00"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.01"),
                         sellerFee = BigDecimal("0.02"),
@@ -231,7 +226,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder1.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.00351"),
                         sellerFee = BigDecimal("0.001755"),
@@ -239,7 +234,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder2.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.00351"),
                         sellerFee = BigDecimal("0.001755"),
@@ -247,7 +242,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder3.guid,
-                        price = BigDecimal("17.600"),
+                        price = BigDecimal("17.60"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.0352"),
                         sellerFee = BigDecimal("0.0176"),
@@ -255,7 +250,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder4.guid,
-                        price = BigDecimal("17.600"),
+                        price = BigDecimal("17.60"),
                         amount = BigDecimal("0.05"),
                         buyerFee = BigDecimal("0.0176"),
                         sellerFee = BigDecimal("0.0088"),
@@ -287,7 +282,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = sell4Order.guid,
-                        price = BigDecimal("17.600"),
+                        price = BigDecimal("17.60"),
                         amount = BigDecimal("0.05"),
                         buyerFee = BigDecimal("0.0176"),
                         sellerFee = BigDecimal("0.0088"),
@@ -295,7 +290,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = sell5Order.guid,
-                        price = BigDecimal("17.700"),
+                        price = BigDecimal("17.70"),
                         amount = BigDecimal("0.2"),
                         buyerFee = BigDecimal("0.0708"),
                         sellerFee = BigDecimal("0.0354"),
@@ -303,7 +298,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = sell6Order.guid,
-                        price = BigDecimal("17.700"),
+                        price = BigDecimal("17.70"),
                         amount = BigDecimal("0.2"),
                         buyerFee = BigDecimal(if (percentage == 100) "0.070851408" else "0.0708"),
                         sellerFee = BigDecimal("0.0354"),
@@ -400,7 +395,7 @@ class TestSequencer {
     fun `test limit checking on orders`() {
         val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
-        val market1 = sequencer.createMarket(MarketId("BTC3/ETH3"), marketPrice = BigDecimal("11.025"))
+        val market1 = sequencer.createMarket(MarketId("BTC3/ETH3"))
 
         val maker = generateWalletAddress()
         // cannot place a buy or sell limit order without any deposits
@@ -424,7 +419,7 @@ class TestSequencer {
         assertEquals(SequencerError.ExceedsLimit, sequencer.addOrder(market1, BigDecimal("0.001"), BigDecimal("11.00"), maker, Order.Type.LimitBuy).error)
 
         // but we can reuse the same liquidity in another market
-        val market2 = sequencer.createMarket(MarketId("ETH3/USDC3"), baseDecimals = 18, quoteDecimals = 6, tickSize = BigDecimal("1"), marketPrice = BigDecimal("100.5"))
+        val market2 = sequencer.createMarket(MarketId("ETH3/USDC3"), baseDecimals = 18, quoteDecimals = 6, tickSize = BigDecimal("1"))
         sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1.111"), BigDecimal("100.00"), maker, Order.Type.LimitSell)
 
         // if we deposit some more we can add another order
@@ -477,7 +472,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.0351"),
                         sellerFee = BigDecimal("0.01755"),
@@ -511,7 +506,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.0351"),
                         sellerFee = BigDecimal("0.01755"),
@@ -578,7 +573,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = sellOrder1.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.003510"),
                         sellerFee = BigDecimal("0.001755"),
@@ -586,7 +581,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = sellOrder2.guid,
-                        price = BigDecimal("18.000"),
+                        price = BigDecimal("18.00"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.0036"),
                         sellerFee = BigDecimal("0.0018"),
@@ -594,7 +589,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = sellOrder3.guid,
-                        price = BigDecimal("18.500"),
+                        price = BigDecimal("18.50"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.00370"),
                         sellerFee = BigDecimal("0.00185"),
@@ -644,7 +639,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = makerOrder.guid,
                         sellOrderGuid = takerOrder.guid,
-                        price = BigDecimal("17.500"),
+                        price = BigDecimal("17.50"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.01750"),
                         sellerFee = BigDecimal("0.03500"),
@@ -682,7 +677,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = makerOrder.guid,
                         sellOrderGuid = takerOrder.guid,
-                        price = BigDecimal("17.500"),
+                        price = BigDecimal("17.50"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.01750"),
                         sellerFee = BigDecimal("0.03500"),
@@ -738,7 +733,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = buyOrder1.guid,
                         sellOrderGuid = takerOrder.guid,
-                        price = BigDecimal("17.500"),
+                        price = BigDecimal("17.50"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.001750"),
                         sellerFee = BigDecimal("0.003500"),
@@ -746,7 +741,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = buyOrder2.guid,
                         sellOrderGuid = takerOrder.guid,
-                        price = BigDecimal("17.000"),
+                        price = BigDecimal("17.00"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.001700"),
                         sellerFee = BigDecimal("0.003400"),
@@ -754,7 +749,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = buyOrder3.guid,
                         sellOrderGuid = takerOrder.guid,
-                        price = BigDecimal("16.500"),
+                        price = BigDecimal("16.50"),
                         amount = BigDecimal("0.01"),
                         buyerFee = BigDecimal("0.001650"),
                         sellerFee = BigDecimal("0.003300"),
@@ -959,7 +954,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = m1buy1.guid,
                         sellOrderGuid = response.ordersChangedList[0].guid,
-                        price = BigDecimal("17.500"),
+                        price = BigDecimal("17.50"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.01750"),
                         sellerFee = BigDecimal("0.03500"),
@@ -994,7 +989,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = response.ordersChangedList[0].guid,
                         sellOrderGuid = m1sell1.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.1"),
                         buyerFee = BigDecimal("0.03510"),
                         sellerFee = BigDecimal("0.01755"),
@@ -1019,9 +1014,9 @@ class TestSequencer {
         val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
-        val market1 = sequencer.createMarket(MarketId("BTC6/ETH6"), tickSize = BigDecimal(1), marketPrice = BigDecimal(10.5), baseDecimals = 8, quoteDecimals = 18)
-        val market2 = sequencer.createMarket(MarketId("ETH6/USDC6"), tickSize = BigDecimal(1), marketPrice = BigDecimal(9.5), baseDecimals = 18, quoteDecimals = 6)
-        val market3 = sequencer.createMarket(MarketId("XXX6/ETH6"), tickSize = BigDecimal(1), marketPrice = BigDecimal(20.5), baseDecimals = 1, quoteDecimals = 18)
+        val market1 = sequencer.createMarket(MarketId("BTC6/ETH6"), tickSize = BigDecimal(1), baseDecimals = 8, quoteDecimals = 18)
+        val market2 = sequencer.createMarket(MarketId("ETH6/USDC6"), tickSize = BigDecimal(1), baseDecimals = 18, quoteDecimals = 6)
+        val market3 = sequencer.createMarket(MarketId("XXX6/ETH6"), tickSize = BigDecimal(1), baseDecimals = 1, quoteDecimals = 18)
 
         val maker = generateWalletAddress()
 
@@ -1115,7 +1110,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = response.ordersChangedList[0].guid,
                         sellOrderGuid = sellOrder1.guid,
-                        price = BigDecimal("10.000"),
+                        price = BigDecimal("10.00"),
                         amount = BigDecimal("5.0"),
                         // taker's fee is 4%
                         buyerFee = BigDecimal("2.0"),
@@ -1125,7 +1120,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = response.ordersChangedList[0].guid,
                         sellOrderGuid = sellOrder2.guid,
-                        price = BigDecimal("10.000"),
+                        price = BigDecimal("10.00"),
                         amount = BigDecimal("5.0"),
                         // taker's fee is 4%
                         buyerFee = BigDecimal("2.0"),
@@ -1135,52 +1130,6 @@ class TestSequencer {
                 ),
             )
         }
-    }
-
-    @Test
-    fun `initial market price should exactly between ticks`() {
-        fun expectMarketCreationFail(sequencerApp: SequencerApp, marketId: MarketId, tickSize: BigDecimal, marketPrice: BigDecimal, baseDecimals: Int = 8, quoteDecimals: Int = 18) {
-            val createMarketResponse = sequencerApp.processRequest(
-                sequencerRequest {
-                    this.guid = UUID.randomUUID().toString()
-                    this.type = SequencerRequest.Type.AddMarket
-                    this.addMarket = market {
-                        this.guid = UUID.randomUUID().toString()
-                        this.marketId = marketId.value
-                        this.tickSize = tickSize.toDecimalValue()
-                        this.maxLevels = 1000
-                        this.maxOrdersPerLevel = 1000
-                        this.marketPrice = marketPrice.toDecimalValue()
-                        this.baseDecimals = baseDecimals
-                        this.quoteDecimals = quoteDecimals
-                    }
-                },
-            )
-            assertEquals(0, createMarketResponse.marketsCreatedCount)
-            assertEquals(0, createMarketResponse.marketsCreatedList.size)
-            assertEquals(SequencerError.InvalidPrice, createMarketResponse.error)
-        }
-
-        val sequencerApp = SequencerApp(checkpointsPath = null)
-        val sequencerClient = SequencerClient(mockClock)
-
-        // fail
-        expectMarketCreationFail(sequencerApp, MarketId("BTC98/ETH98"), tickSize = BigDecimal("1"), marketPrice = BigDecimal("1"))
-        expectMarketCreationFail(sequencerApp, MarketId("BTC98/ETH98"), tickSize = BigDecimal("1"), marketPrice = BigDecimal("100"))
-        expectMarketCreationFail(sequencerApp, MarketId("BTC98/ETH98"), tickSize = BigDecimal("1"), marketPrice = BigDecimal("100.001"))
-        expectMarketCreationFail(sequencerApp, MarketId("BTC98/ETH98"), tickSize = BigDecimal("1"), marketPrice = BigDecimal("100.501"))
-        // succeed
-        sequencerClient.createMarket(MarketId("BTC98/ETH98"), tickSize = BigDecimal("1"), marketPrice = BigDecimal("100.50"))
-
-        // fail
-        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("17"))
-        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("17.05"))
-        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.024"))
-        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.026"))
-        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.0251"))
-        expectMarketCreationFail(sequencerApp, MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.005"), marketPrice = BigDecimal("60.02500001"))
-        // succeed
-        sequencerClient.createMarket(MarketId("BTC99/ETH99"), tickSize = BigDecimal("0.05"), marketPrice = BigDecimal("60.025"))
     }
 
     @Test
@@ -1253,7 +1202,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.43210"),
                         buyerFee = BigDecimal("0.1516671000000000"),
                         sellerFee = BigDecimal("0.075833550000000"),
@@ -1336,7 +1285,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("1"),
                         buyerFee = BigDecimal("0.3510"),
                         sellerFee = BigDecimal("0.1755"),
@@ -1431,7 +1380,7 @@ class TestSequencer {
                     ExpectedTrade(
                         buyOrderGuid = takerOrder.guid,
                         sellOrderGuid = makerOrder.guid,
-                        price = BigDecimal("17.550"),
+                        price = BigDecimal("17.55"),
                         amount = BigDecimal("0.43210"),
                         buyerFee = BigDecimal("0.1516671"),
                         sellerFee = BigDecimal("0.07583355"),

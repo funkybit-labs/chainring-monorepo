@@ -65,7 +65,7 @@ class MockerApp(
         config.forEach {
             val marketIdCleaned = it.replace(Regex("[:/]"), "_")
             marketsConfig[MarketId(it)] = MarketParams(
-                desiredTakersCount = System.getenv("${marketIdCleaned}_TAKERS")?.toIntOrNull() ?: 5,
+                desiredTakersCount = System.getenv("${marketIdCleaned}_TAKERS")?.toIntOrNull() ?: 20,
                 priceBaseline = System.getenv("${marketIdCleaned}_PRICE_BASELINE")?.toBigDecimalOrNull() ?: BigDecimal("17.5"),
                 initialBaseBalance = System.getenv("${marketIdCleaned}_INITIAL_BASE_BALANCE")?.toBigDecimalOrNull() ?: BigDecimal.ONE,
                 makerPrivateKeyHex = System.getenv("${marketIdCleaned}_MAKER_PRIVATE_KEY_HEX") ?: ("0x" + Keys.createEcKeyPair().privateKey.toString(16)),
@@ -182,8 +182,8 @@ class MockerApp(
             }
             it.scheduleAtFixedRate(
                 metricsTask,
-                5.minutes.inWholeMilliseconds,
-                5.minutes.inWholeMilliseconds,
+                1.minutes.inWholeMilliseconds,
+                1.minutes.inWholeMilliseconds,
             )
         }
 

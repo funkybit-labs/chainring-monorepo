@@ -105,7 +105,7 @@ data class CreateOrderAssignment(
     val type: OrderType,
     val side: OrderSide,
     val amount: BigInteger,
-    val price: BigDecimal?,
+    val levelIx: Int?,
     val signature: EvmSignature,
     val sequencerOrderId: SequencerOrderId,
     val sequencerTimeNs: BigInteger,
@@ -114,7 +114,7 @@ data class CreateOrderAssignment(
 data class UpdateOrderAssignment(
     val orderId: OrderId,
     val amount: BigInteger,
-    val price: BigDecimal?,
+    val levelIx: Int?,
     val nonce: BigInteger,
     val signature: EvmSignature,
 )
@@ -236,7 +236,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 this[OrderTable.type] = assignment.type
                 this[OrderTable.amount] = assignment.amount.toBigDecimal()
                 this[OrderTable.originalAmount] = assignment.amount.toBigDecimal()
-                this[OrderTable.price] = assignment.price
+                this[OrderTable.price] = assignment.levelIx?.let { market.tickSize.multiply(it.toBigDecimal()) }
                 this[OrderTable.nonce] = assignment.nonce.toByteArrayNoSign().toHex(false)
                 this[OrderTable.signature] = assignment.signature.value
                 this[OrderTable.sequencerOrderId] = assignment.sequencerOrderId.value
@@ -247,7 +247,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                     updateAssignments.forEach { assignment ->
                         addBatch(EntityID(assignment.orderId, OrderTable))
                         this[OrderTable.amount] = assignment.amount.toBigDecimal()
-                        this[OrderTable.price] = assignment.price
+                        this[OrderTable.price] = assignment.levelIx?.let { market.tickSize.multiply(it.toBigDecimal()) }
                         this[OrderTable.nonce] = assignment.nonce.toByteArrayNoSign().toHex(false)
                         this[OrderTable.signature] = assignment.signature.value
                         this[BalanceTable.updatedAt] = now
