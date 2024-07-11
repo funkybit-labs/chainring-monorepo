@@ -168,7 +168,6 @@ class AVLTree<T : AVLTree.Node<T>> {
 
     fun first(): T? = root?.let { minValueNode(it) }
 
-
     fun last(): T? {
         var current = root ?: return null
         while (current.right != null) {

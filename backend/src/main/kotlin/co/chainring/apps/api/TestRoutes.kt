@@ -101,7 +101,6 @@ class TestRoutes(
             data class OrderBookLevel(
                 val levelIx: Int,
                 val side: String,
-                val price: BigDecimalJson,
                 val maxOrderCount: Int,
                 val totalQuantity: BigIntegerJson,
                 val orderHead: Int,
@@ -114,7 +113,6 @@ class TestRoutes(
                 val guid: Long,
                 val wallet: String,
                 val quantity: BigIntegerJson,
-                val levelIx: Int,
                 val originalQuantity: BigIntegerJson,
             )
         }
@@ -177,7 +175,6 @@ class TestRoutes(
                                 StateDump.OrderBookLevel(
                                     levelIx = 123,
                                     side = "Buy",
-                                    price = "123".toBigDecimal(),
                                     maxOrderCount = 123,
                                     totalQuantity = "123".toBigInteger(),
                                     orderHead = 123,
@@ -187,7 +184,6 @@ class TestRoutes(
                                             guid = 123L,
                                             wallet = "Wallet",
                                             quantity = "123".toBigInteger(),
-                                            levelIx = 123,
                                             originalQuantity = "123".toBigInteger(),
                                         ),
                                     ),
@@ -245,7 +241,6 @@ class TestRoutes(
                                     StateDump.OrderBookLevel(
                                         levelIx = l.levelIx,
                                         side = l.side.name,
-                                        price = l.price.toBigDecimal(),
                                         maxOrderCount = l.maxOrderCount,
                                         totalQuantity = l.totalQuantity.toBigInteger(),
                                         orderHead = l.orderHead,
@@ -255,7 +250,6 @@ class TestRoutes(
                                                 guid = lo.guid,
                                                 wallet = walletAddresses[lo.wallet] ?: lo.wallet.toString(),
                                                 quantity = lo.quantity.toBigInteger(),
-                                                levelIx = lo.levelIx,
                                                 originalQuantity = lo.originalQuantity.toBigInteger(),
                                             )
                                         },

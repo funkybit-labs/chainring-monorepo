@@ -15,6 +15,7 @@ import co.chainring.sequencer.core.sumBigIntegers
 import co.chainring.sequencer.core.toAsset
 import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
+import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.core.toOrderGuid
 import co.chainring.sequencer.core.toWalletAddress
@@ -268,7 +269,7 @@ class SequencerApp(
                         val baseAsset = market.id.baseAsset()
                         val quoteAsset = market.id.quoteAsset()
                         val baseAmount = failedSettlement.trade.amount.toBigInteger()
-                        val price = failedSettlement.trade.price.toBigDecimal()
+                        val price = market.price(failedSettlement.trade.levelIx)
                         val notional = notional(baseAmount, price, market.baseDecimals, market.quoteDecimals)
 
                         val sellWallet = failedSettlement.sellWallet.toWalletAddress()
@@ -454,7 +455,7 @@ class SequencerApp(
                     )
                 }
                 if (oldQuoteAssets > BigInteger.ZERO) { // LimitBuy
-                    val previousNotionalAndFee = notionalPlusFee(order.quantity, market.price(order.levelIx), market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
+                    val previousNotionalAndFee = notionalPlusFee(order.quantity, order.level.price, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
                     val notionalAndFee = calculateLimitBuyOrderNotionalPlusFee(orderChange, market)
                     quoteAssetsRequired.merge(order.wallet, notionalAndFee - previousNotionalAndFee, ::sumBigIntegers)
                 }
@@ -511,12 +512,10 @@ class SequencerApp(
     }
 
     private fun calculateLimitBuyOrderNotionalPlusFee(order: Order, market: Market): BigInteger {
-        return if (market.levelIx(order.price.toBigDecimal()) >= market.bestOfferIx) {
+        val orderPrice = market.price(order.levelIx)
+        return if (order.levelIx >= market.bestOfferIx) {
             // limit order crosses the market
-            val orderPrice = order.price.toBigDecimal()
-            val levelIx = market.levelIx(orderPrice)
-
-            val (clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger(), stopAtLevelIx = levelIx)
+            val (clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger(), stopAtLevelIx = order.levelIx)
             val remainingQuantity = order.amount.toBigInteger() - availableQuantity
 
             val marketChunkNotional = notionalPlusFee(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals, state.feeRates.taker)
@@ -524,7 +523,7 @@ class SequencerApp(
 
             marketChunkNotional + limitChunkNotional
         } else {
-            notionalPlusFee(order.amount, order.price, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
+            notionalPlusFee(order.amount, orderPrice.toDecimalValue(), market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
         }
     }
 

@@ -6,7 +6,6 @@ import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.WalletAddress
 import co.chainring.sequencer.core.notionalPlusFee
-import co.chainring.sequencer.core.toDecimalValue
 import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderDisposition
@@ -46,42 +45,54 @@ class TestMarket {
 
         addOrder(1L, Order.Type.LimitBuy, "1", "17.500")
         addOrder(2L, Order.Type.LimitBuy, "1", "17.500")
-        validateBid(
+        validateBidAndOffer(
+            maxOfferIx = -1,
+            bestOfferIx = -1,
             bestBidIx = "17.500".levelIx(market),
             minBidIx = "17.500".levelIx(market),
         )
 
         addOrder(3L, Order.Type.LimitBuy, "1", "17.450")
         addOrder(4L, Order.Type.LimitBuy, "1", "17.450")
-        validateBid(
+        validateBidAndOffer(
+            maxOfferIx = -1,
+            bestOfferIx = -1,
             bestBidIx = "17.500".levelIx(market),
             minBidIx = "17.450".levelIx(market),
         )
 
         addOrder(5L, Order.Type.LimitBuy, "1", "17.400")
         addOrder(6L, Order.Type.LimitBuy, "1", "17.400")
-        validateBid(
+        validateBidAndOffer(
+            maxOfferIx = -1,
+            bestOfferIx = -1,
             bestBidIx = "17.500".levelIx(market),
             minBidIx = "17.400".levelIx(market),
         )
 
         // cancel order 1, 3 and 5 - nothing should change
         cancelOrders(listOf(1L, 3L, 5L))
-        validateBid(
+        validateBidAndOffer(
+            maxOfferIx = -1,
+            bestOfferIx = -1,
             bestBidIx = "17.500".levelIx(market),
             minBidIx = "17.400".levelIx(market),
         )
 
         // cancel order 2, bestBid should change
         cancelOrders(listOf(2L))
-        validateBid(
+        validateBidAndOffer(
+            maxOfferIx = -1,
+            bestOfferIx = -1,
             bestBidIx = "17.450".levelIx(market),
             minBidIx = "17.400".levelIx(market),
         )
 
         // cancel order 6, minBidIx should change
         cancelOrders(listOf(6L))
-        validateBid(
+        validateBidAndOffer(
+            maxOfferIx = -1,
+            bestOfferIx = -1,
             bestBidIx = "17.450".levelIx(market),
             minBidIx = "17.450".levelIx(market),
         )
@@ -97,44 +108,56 @@ class TestMarket {
 
         addOrder(1L, Order.Type.LimitSell, "1", "17.550")
         addOrder(2L, Order.Type.LimitSell, "1", "17.550")
-        validateOffer(
-            bestOfferIx = "17.550".levelIx(market),
+        validateBidAndOffer(
             maxOfferIx = "17.550".levelIx(market),
+            bestOfferIx = "17.550".levelIx(market),
+            bestBidIx = -1,
+            minBidIx = -1,
         )
 
         addOrder(3L, Order.Type.LimitSell, "1", "17.600")
         addOrder(4L, Order.Type.LimitSell, "1", "17.600")
-        validateOffer(
+        validateBidAndOffer(
             bestOfferIx = "17.550".levelIx(market),
             maxOfferIx = "17.600".levelIx(market),
+            bestBidIx = -1,
+            minBidIx = -1,
         )
 
         addOrder(5L, Order.Type.LimitSell, "1", "17.700")
         addOrder(6L, Order.Type.LimitSell, "1", "17.700")
-        validateOffer(
+        validateBidAndOffer(
             bestOfferIx = "17.550".levelIx(market),
             maxOfferIx = "17.700".levelIx(market),
+            bestBidIx = -1,
+            minBidIx = -1,
         )
 
         // cancel order 1, 3 and 5 - nothing should change
         cancelOrders(listOf(1L, 3L, 5L))
-        validateOffer(
+        validateBidAndOffer(
             bestOfferIx = "17.550".levelIx(market),
             maxOfferIx = "17.700".levelIx(market),
+            bestBidIx = -1,
+            minBidIx = -1,
         )
 
         // cancel order 2, bestOffer should change
         cancelOrders(listOf(2L))
-        validateOffer(
+        validateBidAndOffer(
             bestOfferIx = "17.600".levelIx(market),
             maxOfferIx = "17.700".levelIx(market),
+            bestBidIx = -1,
+            minBidIx = -1,
         )
 
         // cancel order 6, maxOfferIx should change
         cancelOrders(listOf(6L))
-        validateOffer(
+        validateBidAndOffer(
             bestOfferIx = "17.600".levelIx(market),
             maxOfferIx = "17.600".levelIx(market),
+            bestBidIx = -1,
+            minBidIx = -1,
         )
 
         // cancel order 4, should be back at initial values
@@ -483,7 +506,7 @@ class TestMarket {
                         this.guid = guid
                         this.type = orderType
                         this.amount = BigInteger(amount).toIntegerValue()
-                        this.price = BigDecimal(price).toDecimalValue()
+                        this.levelIx = price.levelIx(market)
                     },
                 )
             },
@@ -636,7 +659,7 @@ class TestMarket {
                         this.guid = guid
                         this.type = orderType
                         this.amount = BigInteger(amount).toIntegerValue()
-                        this.price = BigDecimal(price).toDecimalValue()
+                        this.levelIx = price.levelIx(market)
                     },
                 )
             },

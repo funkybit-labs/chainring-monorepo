@@ -1,7 +1,6 @@
 package co.chainring.testutils
 
 import co.chainring.sequencer.core.WalletAddress
-import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.SequencerResponse
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -32,7 +31,7 @@ fun SequencerResponse.assertTrades(
             ExpectedTrade(
                 buyOrderGuid = it.buyOrderGuid,
                 sellOrderGuid = it.sellOrderGuid,
-                price = it.price.toBigDecimal(),
+                price = market.tickSize.multiply(it.levelIx.toBigDecimal()),
                 amount = it.amount.fromFundamentalUnits(market.baseDecimals),
                 buyerFee = it.buyerFee.fromFundamentalUnits(market.quoteDecimals),
                 sellerFee = it.sellerFee.fromFundamentalUnits(market.quoteDecimals),

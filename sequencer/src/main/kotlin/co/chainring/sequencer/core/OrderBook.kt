@@ -26,7 +26,7 @@ data class LevelOrder(
     var wallet: WalletAddress,
     var quantity: BigInteger,
     var feeRate: FeeRate,
-    var levelIx: Int,
+    var level: OrderBookLevel,
     var originalQuantity: BigInteger = quantity,
 ) {
     fun update(wallet: Long, order: Order, feeRate: FeeRate) {
@@ -50,26 +50,52 @@ data class LevelOrder(
             this.guid = this@LevelOrder.guid.value
             this.wallet = this@LevelOrder.wallet.value
             this.quantity = this@LevelOrder.quantity.toIntegerValue()
-            this.levelIx = this@LevelOrder.levelIx
             this.originalQuantity = this@LevelOrder.originalQuantity.toIntegerValue()
             this.feeRate = this@LevelOrder.feeRate.value
         }
     }
 
-    fun fromCheckpoint(checkpoint: MarketCheckpoint.LevelOrder) {
+    fun fromCheckpoint(checkpoint: MarketCheckpoint.LevelOrder, level: OrderBookLevel) {
         this.guid = OrderGuid(checkpoint.guid)
         this.wallet = WalletAddress(checkpoint.wallet)
         this.quantity = checkpoint.quantity.toBigInteger()
-        this.levelIx = checkpoint.levelIx
+        this.level = level
         this.originalQuantity = checkpoint.originalQuantity.toBigInteger()
         this.feeRate = FeeRate(checkpoint.feeRate)
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as LevelOrder
+
+        if (guid != other.guid) return false
+        if (wallet != other.wallet) return false
+        if (quantity != other.quantity) return false
+        if (feeRate != other.feeRate) return false
+        if (level.ix != other.level.ix) return false
+        if (originalQuantity != other.originalQuantity) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = guid.hashCode()
+        result = 31 * result + wallet.hashCode()
+        result = 31 * result + quantity.hashCode()
+        result = 31 * result + feeRate.hashCode()
+        result = 31 * result + level.ix.hashCode()
+        result = 31 * result + originalQuantity.hashCode()
+        return result
+    }
 }
 
+// price is used for notional calculation
 class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val maxOrderCount: Int) : AVLTree.Node<OrderBookLevel>(ix) {
 
     val orders = Array(maxOrderCount) { _ ->
-        LevelOrder(guid = 0L.toOrderGuid(), wallet = 0L.toWalletAddress(), quantity = BigInteger.ZERO, feeRate = FeeRate.zero, levelIx = ix)
+        LevelOrder(guid = 0L.toOrderGuid(), wallet = 0L.toWalletAddress(), quantity = BigInteger.ZERO, feeRate = FeeRate.zero, level = this)
     }
     var totalQuantity = BigInteger.ZERO
     var orderHead = 0
@@ -85,8 +111,6 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
         this.ix = levelIx
         this.side = buy
         this.price = price
-        // level orders keep reference to levelIx, not to the level object, hence need to be touched
-        orders.forEach { it.levelIx = levelIx }
         return this
     }
 
@@ -135,7 +159,7 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
         for (i in 0 until checkpointOrdersCount) {
             val orderCheckpoint = checkpoint.ordersList[i]
             val index = (orderHead + i) % maxOrderCount
-            orders[index].fromCheckpoint(orderCheckpoint)
+            orders[index].fromCheckpoint(orderCheckpoint, level = this)
         }
         totalQuantity = checkpoint.totalQuantity.toBigInteger()
     }
@@ -154,28 +178,30 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
     }
 
     fun fillOrder(requestedAmount: BigInteger): OrderBookLevelFill {
-        var ix = orderHead
+        var orderIx = orderHead
         val executions = mutableListOf<Execution>()
         var remainingAmount = requestedAmount
-        while (ix != orderTail && remainingAmount > BigInteger.ZERO) {
-            val curOrder = orders[ix]
+        while (orderIx != orderTail && remainingAmount > BigInteger.ZERO) {
+            val curOrder = orders[orderIx]
             if (remainingAmount >= curOrder.quantity) {
                 executions.add(
                     Execution(
                         counterOrder = curOrder,
                         amount = curOrder.quantity,
+                        levelIx = this.ix,
                         price = this.price,
                         counterOrderExhausted = true,
                     ),
                 )
                 totalQuantity -= curOrder.quantity
                 remainingAmount -= curOrder.quantity
-                ix = (ix + 1) % maxOrderCount
+                orderIx = (orderIx + 1) % maxOrderCount
             } else {
                 executions.add(
                     Execution(
                         counterOrder = curOrder,
                         amount = remainingAmount,
+                        levelIx = this.ix,
                         price = this.price,
                         counterOrderExhausted = false,
                     ),
@@ -186,7 +212,7 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
             }
         }
         // remove consumed orders
-        orderHead = ix // TODO: CHAIN-274 Also reset consumed orders
+        orderHead = orderIx // TODO: CHAIN-274 Also reset consumed orders
 
         return OrderBookLevelFill(
             remainingAmount,
@@ -228,7 +254,6 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
 
         if (ix != other.ix) return false
         if (side != other.side) return false
-        if (price != other.price) return false
         if (maxOrderCount != other.maxOrderCount) return false
         if (totalQuantity != other.totalQuantity) return false
 
@@ -251,7 +276,6 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
     override fun hashCode(): Int {
         var result = ix
         result = 31 * result + side.hashCode()
-        result = 31 * result + price.hashCode()
         result = 31 * result + maxOrderCount
         result = 31 * result + totalQuantity.hashCode()
         result = 31 * result + orderHead
@@ -271,6 +295,7 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
 data class Execution(
     val counterOrder: LevelOrder,
     val amount: BigInteger,
+    val levelIx: Int,
     val price: BigDecimal,
     val counterOrderExhausted: Boolean,
 )

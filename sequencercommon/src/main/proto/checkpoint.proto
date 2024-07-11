@@ -68,7 +68,6 @@ message MarketCheckpoint {
     uint64 guid = 1;
     uint64 wallet = 2;
     IntegerValue quantity = 3;
-    uint32 levelIx = 4;
     IntegerValue originalQuantity = 5;
     uint64 feeRate = 6;
   }

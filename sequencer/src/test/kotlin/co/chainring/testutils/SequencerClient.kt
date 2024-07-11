@@ -46,6 +46,7 @@ class SequencerClient {
 
     data class Market(
         val id: MarketId,
+        val tickSize: BigDecimal,
         val baseDecimals: Int,
         val quoteDecimals: Int,
     ) {
@@ -79,7 +80,7 @@ class SequencerClient {
                         order {
                             this.guid = Random.nextLong()
                             this.amount = amount.toFundamentalUnits(market.baseDecimals).toIntegerValue()
-                            this.price = price?.toDecimalValue() ?: BigDecimal.ZERO.toDecimalValue()
+                            this.levelIx = price?.divideToIntegralValue(market.tickSize)?.toInt() ?: 0
                             this.type = orderType
                             this.percentage = percentage
                         },
@@ -117,7 +118,7 @@ class SequencerClient {
                     order {
                         this.guid = guid.value
                         this.amount = amount.toFundamentalUnits(market.baseDecimals).toIntegerValue()
-                        this.price = price.toDecimalValue()
+                        this.levelIx = price.divideToIntegralValue(market.tickSize).toInt()
                     },
                 )
             }
@@ -164,7 +165,12 @@ class SequencerClient {
         assertEquals(baseDecimals, createdMarket.baseDecimals)
         assertEquals(quoteDecimals, createdMarket.quoteDecimals)
 
-        return Market(marketId, baseDecimals = createdMarket.baseDecimals, quoteDecimals = createdMarket.quoteDecimals)
+        return Market(
+            marketId,
+            tickSize = createdMarket.tickSize.toBigDecimal(),
+            baseDecimals = createdMarket.baseDecimals,
+            quoteDecimals = createdMarket.quoteDecimals,
+        )
     }
 
     fun setFeeRates(feeRates: FeeRates) {

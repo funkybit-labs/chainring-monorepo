@@ -79,7 +79,7 @@ open class SequencerClient {
     data class Order(
         val sequencerOrderId: Long,
         val amount: BigInteger,
-        val price: String?,
+        val levelIx: Int?,
         val wallet: Long,
         val orderType: co.chainring.sequencer.proto.Order.Type,
         val nonce: BigInteger?,
@@ -292,7 +292,7 @@ open class SequencerClient {
         buyOrderId: OrderId,
         sellOrderId: OrderId,
         amount: BigInteger,
-        price: BigDecimal,
+        levelIx: Int,
         buyerFee: BigInteger,
         sellerFee: BigInteger,
     ): SequencerResponse {
@@ -309,7 +309,7 @@ open class SequencerClient {
                                 this.buyOrderGuid = buyOrderId.toSequencerId().value
                                 this.sellOrderGuid = sellOrderId.toSequencerId().value
                                 this.amount = amount.toIntegerValue()
-                                this.price = price.toDecimalValue()
+                                this.levelIx = levelIx
                                 this.buyerFee = buyerFee.toIntegerValue()
                                 this.sellerFee = sellerFee.toIntegerValue()
                             }
@@ -359,7 +359,7 @@ open class SequencerClient {
     private fun toOrderDSL(order: Order) = order {
         this.guid = order.sequencerOrderId
         this.amount = order.amount.toIntegerValue()
-        this.price = order.price?.toBigDecimal()?.toDecimalValue() ?: BigDecimal.ZERO.toDecimalValue()
+        this.levelIx = order.levelIx ?: 0
         this.type = order.orderType
         this.nonce = order.nonce?.toIntegerValue() ?: BigInteger.ZERO.toIntegerValue()
         this.signature = order.signature?.value ?: EvmSignature.emptySignature().value

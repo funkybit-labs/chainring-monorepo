@@ -5,14 +5,11 @@ import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.Asset
-import co.chainring.sequencer.core.FeeRate
 import co.chainring.sequencer.core.FeeRates
-import co.chainring.sequencer.core.LevelOrder
 import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.OrderGuid
 import co.chainring.sequencer.core.SequencerState
-import co.chainring.sequencer.core.WalletAddress
 import co.chainring.sequencer.core.queueHome
 import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
@@ -76,8 +73,12 @@ class TestSequencerCheckpoints {
     private val btc = Asset("BTC")
     private val eth = Asset("ETH")
     private val usdc = Asset("USDC")
+
     private val btcEthMarketId = MarketId("BTC/ETH")
+    private val btcEthMarketTickSize = "0.05".toBigDecimal()
+
     private val btcUsdcMarketId = MarketId("BTC/USDC")
+    private val btcUsdcMarketTickSize = "1".toBigDecimal()
 
     @BeforeEach
     fun beforeEach() {
@@ -123,7 +124,7 @@ class TestSequencerCheckpoints {
                     market {
                         this.guid = UUID.randomUUID().toString()
                         this.marketId = btcEthMarketId.value
-                        this.tickSize = "0.05".toBigDecimal().toDecimalValue()
+                        this.tickSize = btcEthMarketTickSize.toDecimalValue()
                         this.maxOrdersPerLevel = 1000
                         this.baseDecimals = 8
                         this.quoteDecimals = 18
@@ -224,7 +225,7 @@ class TestSequencerCheckpoints {
                             order {
                                 this.guid = Random.nextLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.550").toDecimalValue()
+                                this.levelIx = "17.550".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitSell
                             },
                         )
@@ -246,7 +247,7 @@ class TestSequencerCheckpoints {
                             order {
                                 this.guid = Random.nextLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.560").toDecimalValue()
+                                this.levelIx = "17.560".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitSell
                             },
                         )
@@ -265,7 +266,7 @@ class TestSequencerCheckpoints {
                             order {
                                 this.guid = Random.nextLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.570").toDecimalValue()
+                                this.levelIx = "17.570".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitSell
                             },
                         )
@@ -331,7 +332,7 @@ class TestSequencerCheckpoints {
                         order {
                             this.guid = Random.nextLong()
                             this.amount = BigDecimal("0.000005").inSats().toIntegerValue()
-                            this.price = BigDecimal("17.570").toDecimalValue()
+                            this.levelIx = "17.570".levelIx(btcEthMarketTickSize)
                             this.type = Order.Type.LimitSell
                         },
                     )
@@ -354,7 +355,7 @@ class TestSequencerCheckpoints {
                         order {
                             this.guid = Random.nextLong()
                             this.amount = BigDecimal("0.0011").inSats().toIntegerValue()
-                            this.price = BigDecimal.ZERO.toDecimalValue()
+                            this.levelIx = 0
                             this.type = Order.Type.MarketBuy
                         },
                     )
@@ -402,7 +403,7 @@ class TestSequencerCheckpoints {
                             order {
                                 this.guid = Random.nextLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.550").toDecimalValue()
+                                this.levelIx = "17.550".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitSell
                             },
                         )
@@ -427,7 +428,7 @@ class TestSequencerCheckpoints {
                         order {
                             this.guid = Random.nextLong()
                             this.amount = BigDecimal("0.0011").inSats().toIntegerValue()
-                            this.price = BigDecimal.ZERO.toDecimalValue()
+                            this.levelIx = 0
                             this.type = Order.Type.MarketBuy
                         },
                     )
@@ -597,19 +598,19 @@ class TestSequencerCheckpoints {
                             order {
                                 this.guid = 1
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.550").toDecimalValue()
+                                this.levelIx = "17.550".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitSell
                             },
                             order {
                                 this.guid = 2
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.560").toDecimalValue()
+                                this.levelIx = "17.560".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitSell
                             },
                             order {
                                 this.guid = 3
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.600").toDecimalValue()
+                                this.levelIx = "17.600".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitSell
                             },
                         ).forEach { order ->
@@ -651,19 +652,19 @@ class TestSequencerCheckpoints {
                             order {
                                 this.guid = 1
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.3").toDecimalValue()
+                                this.levelIx = "17.3".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 2
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.4").toDecimalValue()
+                                this.levelIx = "17.4".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 3
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.5").toDecimalValue()
+                                this.levelIx = "17.5".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitBuy
                             },
                         ).forEach { order ->
@@ -707,37 +708,37 @@ class TestSequencerCheckpoints {
                             order {
                                 this.guid = 1
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.3").toDecimalValue()
+                                this.levelIx = "17.3".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 2
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.4").toDecimalValue()
+                                this.levelIx = "17.4".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 3
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.5").toDecimalValue()
+                                this.levelIx = "17.5".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 4
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.550").toDecimalValue()
+                                this.levelIx = "17.550".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitSell
                             },
                             order {
                                 this.guid = 5
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.560").toDecimalValue()
+                                this.levelIx = "17.560".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitSell
                             },
                             order {
                                 this.guid = 6
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("17.600").toDecimalValue()
+                                this.levelIx = "17.600".levelIx(btcEthMarketTickSize)
                                 this.type = Order.Type.LimitSell
                             },
                         ).forEach { order ->
@@ -759,37 +760,37 @@ class TestSequencerCheckpoints {
                             order {
                                 this.guid = 1
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("69997").toDecimalValue()
+                                this.levelIx = "69997".levelIx(btcUsdcMarketTickSize)
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 2
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("69998").toDecimalValue()
+                                this.levelIx = "69998".levelIx(btcUsdcMarketTickSize)
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 3
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("69999").toDecimalValue()
+                                this.levelIx = "69999".levelIx(btcUsdcMarketTickSize)
                                 this.type = Order.Type.LimitBuy
                             },
                             order {
                                 this.guid = 4
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("70001").toDecimalValue()
+                                this.levelIx = "70001".levelIx(btcUsdcMarketTickSize)
                                 this.type = Order.Type.LimitSell
                             },
                             order {
                                 this.guid = 5
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("70002").toDecimalValue()
+                                this.levelIx = "70002".levelIx(btcUsdcMarketTickSize)
                                 this.type = Order.Type.LimitSell
                             },
                             order {
                                 this.guid = 6
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = BigDecimal("70003").toDecimalValue()
+                                this.levelIx = "70003".levelIx(btcUsdcMarketTickSize)
                                 this.type = Order.Type.LimitSell
                             },
                         ).forEach { order ->
@@ -817,9 +818,9 @@ class TestSequencerCheckpoints {
 
     private fun `test state storing and loading - order level circular buffer`(orderType: Type) {
         val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
-        val price = when (orderType) {
-            Type.LimitBuy -> BigDecimal("17.500").toDecimalValue()
-            Type.LimitSell -> BigDecimal("17.550").toDecimalValue()
+        val levelIx = when (orderType) {
+            Type.LimitBuy -> "17.500".levelIx(btcEthMarketTickSize)
+            Type.LimitSell -> "17.550".levelIx(btcEthMarketTickSize)
             else -> throw IllegalArgumentException("$orderType not supported")
         }
 
@@ -851,7 +852,7 @@ class TestSequencerCheckpoints {
                             order {
                                 this.guid = it.toLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = price
+                                this.levelIx = levelIx
                                 this.type = orderType
                             }
                         }.also { orders ->
@@ -888,7 +889,7 @@ class TestSequencerCheckpoints {
                             order {
                                 this.guid = it.toLong()
                                 this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
-                                this.price = price
+                                this.levelIx = levelIx
                                 this.type = orderType
                             }
                         }.forEach { order ->
@@ -896,7 +897,7 @@ class TestSequencerCheckpoints {
                         }
 
                         // verify setup
-                        val targetLevel = market.levels.get(market.levelIx(price.toBigDecimal()))!!
+                        val targetLevel = market.levels.get(levelIx)!!
                         assertEquals(990, targetLevel.orderHead)
                         assertEquals(11, targetLevel.orderTail)
                     },
@@ -978,20 +979,19 @@ class TestSequencerCheckpoints {
 
                     // verify checkpoint contains exact number of orders
                     assertEquals(
-                        initialMarket.ordersByGuid.map { (_, v) -> v }.toSet(),
-                        marketCheckpoint.levelsList.flatMap { it.ordersList }.map {
-                            LevelOrder(
-                                OrderGuid(it.guid),
-                                WalletAddress(it.wallet),
-                                it.quantity.toBigInteger(),
-                                FeeRate(it.feeRate),
-                                it.levelIx,
-                                it.originalQuantity.toBigInteger(),
-                            )
-                        }.toSet(),
+                        initialMarket.ordersByGuid.map { (_, v) -> v.guid }.toSet(),
+                        marketCheckpoint.levelsList.map { level ->
+                            level.ordersList.map {
+                                OrderGuid(it.guid)
+                            }
+                        }.flatten().toSet(),
                     )
                 }
             }
         }
+    }
+
+    private fun String.levelIx(tickSize: BigDecimal): Int {
+        return BigDecimal(this).divideToIntegralValue(tickSize).toInt()
     }
 }

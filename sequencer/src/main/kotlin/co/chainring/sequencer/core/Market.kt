@@ -36,7 +36,6 @@ data class Market(
 
     private val logger = KotlinLogging.logger { }
 
-    fun levelIx(price: BigDecimal): Int = price.divideToIntegralValue(tickSize).toInt()
     fun price(levelIx: Int): BigDecimal = tickSize.multiply(levelIx.toBigDecimal())
 
     val levels = AVLTree<OrderBookLevel>()
@@ -112,7 +111,7 @@ data class Market(
             val validationResult = validateOrderForWallet(orderBatch.wallet, orderChange.guid)
             if (validationResult == OrderChangeRejected.Reason.None) {
                 ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
-                    val side = levels.get(order.levelIx)!!.side
+                    val side = order.level.side
                     changeOrder(orderChange, feeRates)?.let { changeOrderResult: ChangeOrderResult ->
                         ordersChanged.add(
                             orderChanged {
@@ -133,7 +132,7 @@ data class Market(
                                     // type is not available on orderChange, therefore resolving from the level
                                     this.type = if (side == BookSide.Buy) Order.Type.LimitBuy else Order.Type.LimitSell
                                     this.amount = orderChange.amount
-                                    this.price = orderChange.price
+                                    this.levelIx = orderChange.levelIx
                                 },
                                 execution = execution,
                                 createdTrades = createdTrades,
@@ -181,7 +180,7 @@ data class Market(
                         orderBatch.wallet.toWalletAddress(),
                         Pair(
                             BigInteger.ZERO,
-                            notionalPlusFee(order.amount.toBigInteger() - filledAmount, order.price.toBigDecimal(), baseDecimals, quoteDecimals, feeRateInBps),
+                            notionalPlusFee(order.amount.toBigInteger() - filledAmount, price(order.levelIx), baseDecimals, quoteDecimals, feeRateInBps),
                         ),
                         ::sumBigIntegerPair,
                     )
@@ -327,7 +326,7 @@ data class Market(
                 this.sellOrderGuid = sellOrderGuid
                 this.sellerFee = sellerFee.toIntegerValue()
                 amount = execution.amount.toIntegerValue()
-                price = execution.price.toDecimalValue()
+                levelIx = execution.levelIx
             },
         )
 
@@ -353,7 +352,7 @@ data class Market(
         var total = BigInteger.ZERO
         return if (asset == id.baseAsset()) {
             sellOrdersByWallet[walletAddress]?.let { sellOrders ->
-                sellOrders.sortedBy { it.levelIx }.mapNotNull { levelOrder ->
+                sellOrders.sortedBy { it.level.ix }.mapNotNull { levelOrder ->
                     if (levelOrder.quantity <= limit - total) {
                         total += levelOrder.quantity
                         null
@@ -370,8 +369,8 @@ data class Market(
             } ?: emptyList()
         } else {
             buyOrdersByWallet[walletAddress]?.let { buyOrders ->
-                buyOrders.sortedByDescending { it.levelIx }.mapNotNull { levelOrder ->
-                    val price = price(levelOrder.levelIx)
+                buyOrders.sortedByDescending { it.level.ix }.mapNotNull { levelOrder ->
+                    val price = levelOrder.level.price
                     val notionalAmount = notionalPlusFee(levelOrder.quantity, price, baseDecimals, quoteDecimals, levelOrder.feeRate)
                     if (notionalAmount + total <= limit) {
                         total += notionalAmount
@@ -397,7 +396,7 @@ data class Market(
 
     fun quoteAssetsRequired(wallet: WalletAddress): BigInteger =
         buyOrdersByWallet[wallet]?.map { order ->
-            notionalPlusFee(order.quantity, price(order.levelIx), baseDecimals, quoteDecimals, order.feeRate)
+            notionalPlusFee(order.quantity, order.level.price, baseDecimals, quoteDecimals, order.feeRate)
         }?.reduceOrNull(::sumBigIntegers) ?: BigInteger.ZERO
 
     private fun handleCrossingOrder(order: Order, stopAtLevelIx: Int? = null): AddOrderResult {
@@ -425,7 +424,7 @@ data class Market(
                     }
                 }
 
-                logger.debug { "handle crossing order $levelIx ${price(levelIx)}" }
+                logger.debug { "handle crossing order $levelIx" }
 
                 val orderBookLevelFill = currentLevel.fillOrder(remainingAmount)
                 remainingAmount = orderBookLevelFill.remainingAmount
@@ -496,7 +495,7 @@ data class Market(
     private fun removeOrder(guid: OrderGuid, feeRates: FeeRates): RemoveOrderResult? {
         var ret: RemoveOrderResult? = null
         ordersByGuid[guid]?.let { levelOrder ->
-            val level = levels.get(levelOrder.levelIx)!!
+            val level = levelOrder.level
             ret = if (level.side == BookSide.Buy) {
                 buyOrdersByWallet[levelOrder.wallet]?.let {
                     it.remove(levelOrder)
@@ -568,7 +567,7 @@ data class Market(
             logger.debug { "Order ${order.guid} rejected since fee below min fee" }
             AddOrderResult(OrderDisposition.Rejected, noExecutions)
         } else if (order.type == Order.Type.LimitSell) {
-            val levelIx = levelIx(order.price.toBigDecimal())
+            val levelIx = order.levelIx
             if (bestBidIx != -1 && levelIx <= bestBidIx) {
                 // in case when crossing market execute as market sell order until `levelIx`
                 val crossingOrderResult = handleCrossingOrder(order, stopAtLevelIx = levelIx)
@@ -606,7 +605,7 @@ data class Market(
                 AddOrderResult(disposition, noExecutions)
             }
         } else if (order.type == Order.Type.LimitBuy) {
-            val levelIx = levelIx(order.price.toBigDecimal())
+            val levelIx = order.levelIx
             if (bestOfferIx != -1 && levelIx >= bestOfferIx) {
                 // in case when crossing market execute as market buy order until `levelIx`
                 val crossingOrderResult = handleCrossingOrder(order, stopAtLevelIx = levelIx)
@@ -656,20 +655,20 @@ data class Market(
     }
 
     private fun isBelowMinFee(order: Order, feeRates: FeeRates): Boolean {
-        val (price, feeRate) = when (order.type) {
+        val (levelIx, feeRate) = when (order.type) {
             Order.Type.MarketBuy -> {
-                Pair(levels.get(bestOfferIx)?.price, feeRates.taker)
+                Pair(bestOfferIx, feeRates.taker)
             }
             Order.Type.MarketSell -> {
-                Pair(levels.get(bestBidIx)?.price, feeRates.taker)
+                Pair(bestBidIx, feeRates.taker)
             }
-            else -> Pair(order.price.toBigDecimal(), feeRates.maker)
+            else -> Pair(order.levelIx, feeRates.maker)
         }
 
         // in case of empty book let it proceed, order will be rejected anyway
-        if (price == null) return false
+        if (levelIx == -1) return false
 
-        return notionalFee(notional(order.amount.toBigInteger(), price, baseDecimals, quoteDecimals), feeRate) < minFee
+        return notionalFee(notional(order.amount.toBigInteger(), price(levelIx), baseDecimals, quoteDecimals), feeRate) < minFee
     }
 
     private fun createLimitBuyOrder(levelIx: Int, wallet: Long, order: Order, feeRate: FeeRate): OrderDisposition {
@@ -743,7 +742,7 @@ data class Market(
                 if (notionalAtLevel == remainingNotional) {
                     return baseAmount + quantityFromNotionalAndPrice(
                         remainingNotional,
-                        currentLevel.price,
+                        price(currentLevel.ix),
                         baseDecimals,
                         quoteDecimals,
                     )
@@ -790,7 +789,7 @@ data class Market(
 
     // returns baseAsset and quoteAsset reserved by order
     fun assetsReservedForOrder(levelOrder: LevelOrder): Pair<BigInteger, BigInteger> {
-        val level = levels.get(levelOrder.levelIx)!!
+        val level = levelOrder.level
         return if (level.side == BookSide.Buy) {
             BigInteger.ZERO to notionalPlusFee(levelOrder.quantity, level.price, baseDecimals, quoteDecimals, levelOrder.feeRate)
         } else {
@@ -802,12 +801,11 @@ data class Market(
     // if the price change would cross the market order will be filled (partially)
     private fun changeOrder(orderChange: Order, feeRates: FeeRates): ChangeOrderResult? {
         return ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
-            val level = levels.get(order.levelIx)!!
-            val newLevelIx = levelIx(orderChange.price.toBigDecimal())
-            val newLevelPrice = price(newLevelIx)
+            val level = order.level
+            val newLevelIx = orderChange.levelIx
             val newQuantity = orderChange.amount.toBigInteger()
             val quantityDelta = newQuantity - order.quantity
-            if (newLevelPrice.compareTo(level.price) == 0) {
+            if (newLevelIx == level.ix) {
                 // price stays same, quantity changes
                 val baseAssetDelta = if (level.side == BookSide.Buy) BigInteger.ZERO else quantityDelta
                 val quoteAssetDelta = if (level.side == BookSide.Buy) notionalPlusFee(quantityDelta, level.price, baseDecimals, quoteDecimals, feeRates.maker) else BigInteger.ZERO
@@ -817,7 +815,8 @@ data class Market(
             } else {
                 // price change results into deleting existing and re-adding new order
                 val (baseAssetDelta, quoteAssetDelta) = if (level.side == BookSide.Buy) {
-                    val previousNotionalAndFee = notionalPlusFee(order.quantity, price(order.levelIx), baseDecimals, quoteDecimals, order.feeRate)
+                    val previousNotionalAndFee = notionalPlusFee(order.quantity, level.price, baseDecimals, quoteDecimals, order.feeRate)
+                    val newLevelPrice = price(newLevelIx)
 
                     val notionalDelta = if (newLevelIx >= bestOfferIx) {
                         // with the updated price limit order crosses the market
@@ -859,7 +858,7 @@ data class Market(
                         this.guid = orderChange.guid
                         this.type = if (side == BookSide.Buy) Order.Type.LimitBuy else Order.Type.LimitSell
                         this.amount = orderChange.amount
-                        this.price = orderChange.price
+                        this.levelIx = orderChange.levelIx
                     },
                     feeRates,
                 )
@@ -944,7 +943,7 @@ data class Market(
         logger.debug { "bestOfferIx = ${this.bestOfferIx}" }
         logger.debug { "minFee = ${this.minFee}" }
         levels.traverse { level ->
-            logger.debug { "   levelIx = ${level.ix} price = ${level.price} side = ${level.side}  maxOrderCount = ${level.maxOrderCount} totalQuantity = ${level.totalQuantity} " }
+            logger.debug { "   levelIx = ${level.ix} side = ${level.side}  maxOrderCount = ${level.maxOrderCount} totalQuantity = ${level.totalQuantity} " }
         }
     }
 
@@ -968,7 +967,7 @@ data class Market(
                     val level = OrderBookLevel(
                         ix = levelCheckpoint.levelIx,
                         side = BookSide.Buy,
-                        price = price(levelCheckpoint.levelIx),
+                        price = levelCheckpoint.price.toBigDecimal(),
                         maxOrderCount = checkpoint.maxOrdersPerLevel,
                     )
                     level.fromCheckpoint(levelCheckpoint)

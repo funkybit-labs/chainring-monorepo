@@ -103,10 +103,10 @@ object SequencerResponseProcessorService {
                     logger.debug { "minBidIx=${it.minBidIx}, bestBidIx = ${it.bestBidIx}, bestOfferIx = ${it.bestOfferIx}, maxOfferIx=${it.maxOfferIx}" }
                     if (it.bestBidIx >= it.bestOfferIx) {
                         request.orderBatch.ordersToAddList.forEach {
-                            logger.debug { "add - ${it.guid} ${it.externalGuid} ${it.type} ${it.amount.toBigInteger()} ${it.price.toBigDecimal()}" }
+                            logger.debug { "add - ${it.guid} ${it.externalGuid} ${it.type} ${it.amount.toBigInteger()} ${it.levelIx}" }
                         }
                         request.orderBatch.ordersToChangeList.forEach {
-                            logger.debug { "change - ${it.guid} ${it.externalGuid} ${it.type} ${it.amount.toBigInteger()} ${it.price.toBigDecimal()}" }
+                            logger.debug { "change - ${it.guid} ${it.externalGuid} ${it.type} ${it.amount.toBigInteger()} ${it.levelIx}" }
                         }
                         request.orderBatch.ordersToCancelList.forEach {
                             logger.debug { "cancel - ${it.guid} ${it.externalGuid}" }
@@ -183,7 +183,7 @@ object SequencerResponseProcessorService {
                     toOrderType(it.type),
                     toOrderSide(it.type),
                     it.amount.toBigInteger(),
-                    it.price.toBigDecimal(),
+                    it.levelIx,
                     it.signature.toEvmSignature(),
                     it.guid.sequencerOrderId(),
                     response.processingTime.toBigInteger(),
@@ -196,7 +196,7 @@ object SequencerResponseProcessorService {
                     UpdateOrderAssignment(
                         it.externalGuid.orderId(),
                         it.amount.toBigInteger(),
-                        it.price.toBigDecimal(),
+                        it.levelIx,
                         it.nonce.toBigInteger(),
                         it.signature.toEvmSignature(),
                     )
@@ -228,7 +228,7 @@ object SequencerResponseProcessorService {
 
         // handle trades
         val tradesWithTakerOrder: List<Pair<TradeEntity, OrderEntity>> = response.tradesCreatedList.mapNotNull { trade ->
-            logger.debug { "Trade Created: buyOrderGuid=${trade.buyOrderGuid}, sellOrderGuid=${trade.sellOrderGuid}, amount=${trade.amount.toBigInteger()} price=${trade.price.toBigDecimal()}, buyerFee=${trade.buyerFee.toBigInteger()}, sellerFee=${trade.sellerFee.toBigInteger()}" }
+            logger.debug { "Trade Created: buyOrderGuid=${trade.buyOrderGuid}, sellOrderGuid=${trade.sellOrderGuid}, amount=${trade.amount.toBigInteger()} levelIx=${trade.levelIx}, buyerFee=${trade.buyerFee.toBigInteger()}, sellerFee=${trade.sellerFee.toBigInteger()}" }
             val buyOrder = OrderEntity.findBySequencerOrderId(trade.buyOrderGuid)
             val sellOrder = OrderEntity.findBySequencerOrderId(trade.sellOrderGuid)
 
@@ -237,7 +237,7 @@ object SequencerResponseProcessorService {
                     timestamp = timestamp,
                     market = buyOrder.market,
                     amount = trade.amount.toBigInteger(),
-                    price = trade.price.toBigDecimal(),
+                    price = buyOrder.market.tickSize.multiply(trade.levelIx.toBigDecimal()),
                     tradeHash = ECHelper.tradeHash(trade.buyOrderGuid, trade.sellOrderGuid),
                     responseSequence = response.sequence,
                 )

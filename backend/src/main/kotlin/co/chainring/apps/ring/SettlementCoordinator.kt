@@ -425,6 +425,8 @@ class SettlementCoordinator(
             val sellExecution = executions.first { it.order.side == OrderSide.Sell }
             val sellOrder = sellExecution.order
 
+            val market = tradeEntity.market
+
             val sequencerResponse = runBlocking {
                 sequencerClient.failSettlement(
                     buyWallet = buyOrder.wallet.address.toSequencerId().value,
@@ -433,7 +435,7 @@ class SettlementCoordinator(
                     buyOrderId = buyOrder.guid.value,
                     sellOrderId = sellOrder.guid.value,
                     amount = tradeEntity.amount,
-                    price = tradeEntity.price,
+                    levelIx = tradeEntity.price.divideToIntegralValue(market.tickSize).toInt(),
                     buyerFee = buyExecution.feeAmount,
                     sellerFee = sellExecution.feeAmount,
                 )
