@@ -16,6 +16,7 @@ import co.chainring.sequencer.proto.SequencerError
 import co.chainring.sequencer.proto.market
 import co.chainring.sequencer.proto.newQuantityOrNull
 import co.chainring.testutils.ExpectedTrade
+import co.chainring.testutils.MockClock
 import co.chainring.testutils.SequencerClient
 import co.chainring.testutils.assertBalanceChanges
 import co.chainring.testutils.assertTrades
@@ -32,6 +33,7 @@ import java.math.BigDecimal
 import kotlin.random.Random
 
 class TestSequencer {
+    private val mockClock = MockClock()
 
     companion object {
         @JvmStatic
@@ -43,7 +45,7 @@ class TestSequencer {
 
     @Test
     fun `Test basic order matching`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val btcWithdrawalFee = BigDecimal("0.0001").inSats()
         sequencer.setWithdrawalFees(
@@ -71,6 +73,7 @@ class TestSequencer {
 
         // place a market buy and see that it gets executed
         sequencer.addOrder(market, BigDecimal("0.2"), null, taker, Order.Type.MarketBuy).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(2, response.ordersChangedCount)
 
             val takerOrder = response.ordersChangedList[0]
@@ -112,6 +115,7 @@ class TestSequencer {
 
         // now try a market sell which can only be partially filled and see that it gets executed
         sequencer.addOrder(market, BigDecimal("0.2"), null, taker, Order.Type.MarketSell).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(2, response.ordersChangedCount)
 
             val takerOrder = response.ordersChangedList[0]
@@ -162,7 +166,7 @@ class TestSequencer {
     @ParameterizedTest
     @MethodSource("percentages")
     fun `Test a market order that executes against multiple orders at multiple levels`(percentage: Int) {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         val market = sequencer.createMarket(MarketId("BTC:1338/ETH:1338"))
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
@@ -185,6 +189,7 @@ class TestSequencer {
         sequencer.deposit(tkr, market.quoteAsset, BigDecimal("2.9910004") + BigDecimal("0.059820008"))
 
         sequencer.addOrder(market, BigDecimal("0.17"), null, tkr, Order.Type.MarketBuy).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(5, response.ordersChangedCount)
 
             val takerOrder = response.ordersChangedList[0].also {
@@ -259,6 +264,7 @@ class TestSequencer {
         // notional is 0.45 * 17.689 = 7.96005, fee would be notional * 0,02 = 0.159201
         sequencer.deposit(tkr, market.quoteAsset, BigDecimal("7.96005") + BigDecimal("0.159201"))
         sequencer.addOrder(market, if (percentage == 0) BigDecimal("0.45") else BigDecimal.ZERO, null, tkr, Order.Type.MarketBuy, percentage = percentage).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(4, response.ordersChangedCount)
             val takerOrder = response.ordersChangedList[0].also {
                 assertEquals(OrderDisposition.Filled, it.disposition)
@@ -304,7 +310,7 @@ class TestSequencer {
 
     @Test
     fun `Test market order that executes against multiple orders at multiple levels`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         val market = sequencer.createMarket(MarketId("BTC20/ETH20"))
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
@@ -321,6 +327,7 @@ class TestSequencer {
         sequencer.deposit(tkr, market.quoteAsset, BigDecimal("10"))
 
         sequencer.addOrder(market, BigDecimal.ZERO, null, tkr, Order.Type.MarketBuy, percentage = 100).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(3, response.ordersChangedCount)
             response.ordersChangedList[0].also {
                 assertEquals(OrderDisposition.Filled, it.disposition)
@@ -333,7 +340,7 @@ class TestSequencer {
 
     @Test
     fun `test balances`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         val walletAddress = generateWalletAddress()
 
         val ethWithdrawalFee = BigDecimal("0.001").inWei()
@@ -386,7 +393,7 @@ class TestSequencer {
 
     @Test
     fun `test limit checking on orders`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market1 = sequencer.createMarket(MarketId("BTC3/ETH3"))
 
@@ -426,6 +433,7 @@ class TestSequencer {
         val taker = generateWalletAddress()
         sequencer.deposit(taker, market1.baseAsset, BigDecimal("0.1"))
         sequencer.addOrder(market1, BigDecimal("0.1"), null, taker, Order.Type.MarketSell).also {
+            assertEquals(mockClock.currentTimeMillis(), it.createdAt)
             assertEquals(OrderDisposition.Filled, it.ordersChangedList.first().disposition)
         }
 
@@ -434,7 +442,7 @@ class TestSequencer {
 
     @Test
     fun `test LimitBuy order can cross the market`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC8/ETH8"))
 
@@ -451,6 +459,7 @@ class TestSequencer {
 
         // limit order can cross the market and be filled immediately
         sequencer.addOrder(market, BigDecimal("0.1"), BigDecimal("18.00"), crossingTheMarketMaker, Order.Type.LimitBuy).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             val takerOrder = response.ordersChangedList.first()
             assertEquals(OrderDisposition.Filled, takerOrder.disposition)
 
@@ -484,6 +493,7 @@ class TestSequencer {
 
         // or filled partially with remaining limit amount stays on the book
         sequencer.addOrder(market, BigDecimal("0.2"), BigDecimal("18.00"), crossingTheMarketMaker, Order.Type.LimitBuy).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             val takerOrder = response.ordersChangedList.first()
             assertEquals(OrderDisposition.PartiallyFilled, takerOrder.disposition)
 
@@ -518,7 +528,7 @@ class TestSequencer {
 
     @Test
     fun `test LimitBuy order can cross the market filling LimitSell orders at multiple levels until limit price`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC9/ETH9"))
 
@@ -548,6 +558,7 @@ class TestSequencer {
 
         // limit order is partially filled until limit price is reached
         sequencer.addOrder(market, BigDecimal("0.05"), BigDecimal("18.50"), crossingTheMarketMaker, Order.Type.LimitBuy).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(4, response.ordersChangedCount)
             val takerOrder = response.ordersChangedList[0].also {
                 assertEquals(OrderDisposition.PartiallyFilled, it.disposition)
@@ -600,7 +611,7 @@ class TestSequencer {
 
     @Test
     fun `test LimitSell order can cross the market`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC10/ETH10"))
 
@@ -617,6 +628,7 @@ class TestSequencer {
 
         // limit order can cross the market and be filled immediately
         sequencer.addOrder(market, BigDecimal("0.1"), BigDecimal("17.00"), crossingTheMarketMaker, Order.Type.LimitSell).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(2, response.ordersChangedList.size)
             val takerOrder = response.ordersChangedList.first()
             val makerOrder = response.ordersChangedList.last()
@@ -648,6 +660,7 @@ class TestSequencer {
 
         // or filled partially with remaining limit amount stays on the book
         sequencer.addOrder(market, BigDecimal("0.2"), BigDecimal("17.00"), crossingTheMarketMaker, Order.Type.LimitSell).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(2, response.ordersChangedList.size)
 
             val takerOrder = response.ordersChangedList.first().also {
@@ -686,7 +699,7 @@ class TestSequencer {
 
     @Test
     fun `test LimitSell order can cross the market filling LimitBuy orders at multiple levels until limit price`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC11/ETH11"))
 
@@ -705,6 +718,7 @@ class TestSequencer {
 
         // limit order is partially filled until price is reached
         sequencer.addOrder(market, BigDecimal("0.05"), BigDecimal("16.50"), crossingTheMarketMaker, Order.Type.LimitSell).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(4, response.ordersChangedCount)
             val takerOrder = response.ordersChangedList.first().also {
                 assertEquals(OrderDisposition.PartiallyFilled, it.disposition)
@@ -757,7 +771,7 @@ class TestSequencer {
 
     @Test
     fun `test order cancel`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC4/ETH4"))
 
@@ -767,6 +781,7 @@ class TestSequencer {
         val order = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.1"), BigDecimal("17.55"), maker, Order.Type.LimitSell)
 
         sequencer.cancelOrder(market, order.guid, maker).also {
+            assertEquals(mockClock.currentTimeMillis(), it.createdAt)
             assertEquals(OrderDisposition.Canceled, it.ordersChangedList.first().disposition)
         }
 
@@ -777,6 +792,7 @@ class TestSequencer {
 
         // have taker try to cancel maker order
         sequencer.cancelOrder(market, order2.guid, taker).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(0, response.ordersChangedList.size)
             assertEquals(1, response.ordersChangeRejectedList.size)
             assertEquals(OrderChangeRejected.Reason.NotForWallet, response.ordersChangeRejectedList.first().reason)
@@ -784,6 +800,7 @@ class TestSequencer {
 
         // try canceling an order which has been partially filled
         sequencer.addOrder(market, BigDecimal("0.05"), null, taker, Order.Type.MarketBuy).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             val partiallyFilledOrder = response.ordersChangedList[1]
             assertEquals(OrderDisposition.PartiallyFilled, partiallyFilledOrder.disposition)
             assertEquals(order2.guid, partiallyFilledOrder.guid)
@@ -795,6 +812,7 @@ class TestSequencer {
 
         // cancel an invalid order
         sequencer.cancelOrder(market, order2.guid, maker).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(0, response.ordersChangedList.size)
             assertEquals(1, response.ordersChangeRejectedList.size)
             assertEquals(OrderChangeRejected.Reason.DoesNotExist, response.ordersChangeRejectedList.first().reason)
@@ -803,7 +821,7 @@ class TestSequencer {
 
     @Test
     fun `test order change`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC5/ETH5"))
 
@@ -813,6 +831,7 @@ class TestSequencer {
 
         // reduce amount
         sequencer.changeOrder(market, sellOrder1.guid.toOrderGuid(), BigDecimal("0.0999"), BigDecimal("17.55"), maker).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
         }
 
@@ -821,6 +840,7 @@ class TestSequencer {
 
         // but can change price
         sequencer.changeOrder(market, sellOrder1.guid.toOrderGuid(), BigDecimal("0.0999"), BigDecimal("17.60"), maker).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
         }
 
@@ -829,6 +849,7 @@ class TestSequencer {
 
         // can change the price to cross the market, disposition is 'Accepted' since there is no liquidity yet available in the market
         sequencer.changeOrder(market, sellOrder1.guid.toOrderGuid(), BigDecimal("0.0999"), BigDecimal("15.50"), maker).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
         }
 
@@ -862,16 +883,19 @@ class TestSequencer {
 
         // but can decrease amount or decrease price
         sequencer.changeOrder(market, buyOrder1.guid.toOrderGuid(), BigDecimal("0.99"), BigDecimal("10.00"), maker).also {
+            assertEquals(mockClock.currentTimeMillis(), it.createdAt)
             assertEquals(OrderDisposition.Accepted, it.ordersChangedList.first().disposition)
         }
 
         sequencer.changeOrder(market, buyOrder1.guid.toOrderGuid(), BigDecimal("1"), BigDecimal("9.95"), maker).also {
+            assertEquals(mockClock.currentTimeMillis(), it.createdAt)
             assertEquals(OrderDisposition.Accepted, it.ordersChangedList.first().disposition)
         }
 
         // different wallet try to update an order
         val taker = generateWalletAddress()
         sequencer.changeOrder(market, buyOrder1.guid.toOrderGuid(), BigDecimal("0.99"), BigDecimal("9.95"), taker).also {
+            assertEquals(mockClock.currentTimeMillis(), it.createdAt)
             assertEquals(0, it.ordersChangedList.size)
             assertEquals(1, it.ordersChangeRejectedList.size)
             assertEquals(OrderChangeRejected.Reason.NotForWallet, it.ordersChangeRejectedList.first().reason)
@@ -879,6 +903,7 @@ class TestSequencer {
 
         // update an invalid order.
         sequencer.changeOrder(market, (buyOrder1.guid + 1).toOrderGuid(), BigDecimal("0.99"), BigDecimal("9.95"), maker).also {
+            assertEquals(mockClock.currentTimeMillis(), it.createdAt)
             assertEquals(0, it.ordersChangedList.size)
             assertEquals(1, it.ordersChangeRejectedList.size)
             assertEquals(OrderChangeRejected.Reason.DoesNotExist, it.ordersChangeRejectedList.first().reason)
@@ -887,7 +912,7 @@ class TestSequencer {
 
     @Test
     fun `test order change when new price crosses the market`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC12/ETH12"))
 
@@ -918,6 +943,7 @@ class TestSequencer {
 
         // update limit sell order to cross the market. Results in immediate partial execution.
         sequencer.changeOrder(market, m2sell1.guid.toOrderGuid(), BigDecimal("0.2"), BigDecimal("17.30"), anotherMaker).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(2, response.ordersChangedCount)
             assertEquals(OrderDisposition.PartiallyFilled, response.ordersChangedList[0].disposition)
             assertEquals(OrderDisposition.Filled, response.ordersChangedList[1].disposition)
@@ -952,6 +978,7 @@ class TestSequencer {
 
         // update limit buy order to cross the market (immediate partial execution)
         sequencer.changeOrder(market, m2buy1.guid.toOrderGuid(), BigDecimal("0.2"), BigDecimal("17.75"), anotherMaker).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(2, response.ordersChangedCount)
             assertEquals(OrderDisposition.PartiallyFilled, response.ordersChangedList[0].disposition)
             assertEquals(OrderDisposition.Filled, response.ordersChangedList[1].disposition)
@@ -984,7 +1011,7 @@ class TestSequencer {
 
     @Test
     fun `test auto-reduce from trades`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
         val market1 = sequencer.createMarket(MarketId("BTC6/ETH6"), tickSize = BigDecimal(1), baseDecimals = 8, quoteDecimals = 18)
@@ -1009,6 +1036,7 @@ class TestSequencer {
         val taker = generateWalletAddress()
         sequencer.deposit(taker, market1.baseAsset, BigDecimal("0.6"))
         sequencer.addOrder(market1, BigDecimal("0.6"), null, taker, Order.Type.MarketSell).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(OrderDisposition.Filled, response.ordersChangedList.first().disposition)
 
             // the maker's offer in market2 should be auto-reduced
@@ -1025,7 +1053,7 @@ class TestSequencer {
 
     @Test
     fun `test auto-reduce from withdrawals`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC7/ETH7"))
 
@@ -1038,6 +1066,7 @@ class TestSequencer {
 
         // now maker withdraws 7 BTC
         sequencer.withdrawal(maker, market.baseAsset, BigDecimal("7")).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             val reducedOffer1 = response.ordersChangedList.first { it.guid == order1.guid }
             assertEquals(OrderDisposition.AutoReduced, reducedOffer1.disposition)
             assertEquals(BigDecimal("3").setScale(market.baseDecimals), reducedOffer1.newQuantity.fromFundamentalUnits(market.baseDecimals))
@@ -1050,7 +1079,7 @@ class TestSequencer {
 
     @Test
     fun `fee rate change does not affect existing orders in the book`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         // set maker fee rate to 1% and taker fee rate to 2%
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC8/ETH8"))
@@ -1069,6 +1098,7 @@ class TestSequencer {
         val sellOrder2 = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("5"), BigDecimal("10.00"), maker, Order.Type.LimitSell)
 
         sequencer.addOrder(market, BigDecimal("10"), null, taker, Order.Type.MarketBuy).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(3, response.ordersChangedList.size)
             assertEquals(OrderDisposition.Filled, response.ordersChangedList[0].disposition)
             assertEquals(OrderDisposition.Filled, response.ordersChangedList[1].disposition)
@@ -1104,7 +1134,7 @@ class TestSequencer {
 
     @Test
     fun `test failed withdrawals`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
         val walletAddress = generateWalletAddress()
@@ -1129,7 +1159,7 @@ class TestSequencer {
 
     @Test
     fun `Test failed settlements`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
         val market = sequencer.createMarket(MarketId("BTC8/ETH8"))
@@ -1154,6 +1184,7 @@ class TestSequencer {
         sequencer.deposit(taker, market.baseAsset, BigDecimal("10"))
 
         val trade = sequencer.addOrder(market, BigDecimal("0.43210"), null, taker, Order.Type.MarketBuy).let { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(2, response.ordersChangedCount)
 
             val takerOrder = response.ordersChangedList[0].also {
@@ -1214,7 +1245,7 @@ class TestSequencer {
 
     @Test
     fun `Test autoreduce on failed settlements`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
         val market = sequencer.createMarket(MarketId("BTC9/ETH9"))
@@ -1236,6 +1267,7 @@ class TestSequencer {
         sequencer.deposit(taker, market.baseAsset, BigDecimal("1"))
 
         val trade = sequencer.addOrder(market, BigDecimal("1"), null, taker, Order.Type.MarketBuy).let { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(2, response.ordersChangedCount)
 
             val takerOrder = response.ordersChangedList[0].also {
@@ -1279,6 +1311,7 @@ class TestSequencer {
 
         // now rollback the settlement - all the balances should be back to their original values
         sequencer.failedSettlement(taker, maker, market, trade).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             response.assertBalanceChanges(
                 market,
                 listOf(
@@ -1304,7 +1337,7 @@ class TestSequencer {
 
     @Test
     fun `Test failed settlements - balances can go negative`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
         val market = sequencer.createMarket(MarketId("BTC10/ETH10"))
@@ -1329,6 +1362,7 @@ class TestSequencer {
         sequencer.deposit(taker, market.baseAsset, BigDecimal("10"))
 
         val trade = sequencer.addOrder(market, BigDecimal("0.43210"), null, taker, Order.Type.MarketBuy).let { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(2, response.ordersChangedCount)
 
             val takerOrder = response.ordersChangedList[0].also {
@@ -1380,6 +1414,7 @@ class TestSequencer {
 
         // now rollback the settlement - some balances go negative (takers base balance, and makers quote balance
         sequencer.failedSettlement(taker, maker, market, trade).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             response.assertBalanceChanges(
                 market,
                 listOf(
@@ -1407,7 +1442,7 @@ class TestSequencer {
 
     @Test
     fun `Test dust gets rolled into last trade fee on market order`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         val market = sequencer.createMarket(MarketId("BTC21/ETH21"))
         val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
         sequencer.setFeeRates(feeRates)
@@ -1425,6 +1460,7 @@ class TestSequencer {
         sequencer.deposit(tkr, market.quoteAsset, BigDecimal("3"))
 
         sequencer.addOrder(market, BigDecimal.ZERO, null, tkr, Order.Type.MarketBuy, percentage = 100).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(3, response.ordersChangedCount)
             response.ordersChangedList[0].also {
                 assertEquals(OrderDisposition.Filled, it.disposition)
@@ -1470,7 +1506,7 @@ class TestSequencer {
 
     @Test
     fun `Test dust not taken if taker has quote assets reserved`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         val market = sequencer.createMarket(MarketId("BTC22/ETH22"))
         val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
         sequencer.setFeeRates(feeRates)
@@ -1490,6 +1526,7 @@ class TestSequencer {
         sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.1"), BigDecimal("17.400"), tkr, Order.Type.LimitBuy)
 
         sequencer.addOrder(market, BigDecimal.ZERO, null, tkr, Order.Type.MarketBuy, percentage = 100).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(3, response.ordersChangedCount)
             response.ordersChangedList[0].also {
                 assertEquals(OrderDisposition.Filled, it.disposition)
@@ -1530,7 +1567,7 @@ class TestSequencer {
 
     @Test
     fun `Test dust not taken if market is exhausted`() {
-        val sequencer = SequencerClient()
+        val sequencer = SequencerClient(mockClock)
         val market = sequencer.createMarket(MarketId("BTC23/ETH23"))
         val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
         sequencer.setFeeRates(feeRates)
@@ -1548,6 +1585,7 @@ class TestSequencer {
         sequencer.deposit(tkr, market.quoteAsset, BigDecimal("3"))
 
         sequencer.addOrder(market, BigDecimal.ZERO, null, tkr, Order.Type.MarketBuy, percentage = 100).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(3, response.ordersChangedCount)
             response.ordersChangedList[0].also {
                 assertEquals(OrderDisposition.Filled, it.disposition)

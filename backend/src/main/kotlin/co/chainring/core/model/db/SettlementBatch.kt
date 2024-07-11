@@ -6,6 +6,7 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import java.math.BigInteger
 
 @JvmInline
 value class SettlementBatchId(override val value: String) : EntityId {
@@ -102,6 +103,12 @@ class SettlementBatchEntity(guid: EntityID<SettlementBatchId>) : GUIDEntity<Sett
         this.updatedAt = Clock.System.now()
         this.updatedBy = "system"
     }
+
+    fun preparationTxBlockNumbers(): Map<ChainId, BigInteger?> =
+        chainBatches.associate { it.chainId.value to it.preparationTx.blockNumber }
+
+    fun submissionTxBlockNumbers(): Map<ChainId, BigInteger?> =
+        chainBatches.associate { it.chainId.value to it.submissionTx?.blockNumber }
 
     var createdAt by SettlementBatchTable.createdAt
     var createdBy by SettlementBatchTable.createdBy

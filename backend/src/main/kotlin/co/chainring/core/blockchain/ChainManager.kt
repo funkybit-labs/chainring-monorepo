@@ -3,6 +3,9 @@ package co.chainring.core.blockchain
 import co.chainring.core.model.Address
 import co.chainring.core.model.db.ChainId
 import java.math.BigInteger
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 
 data class BlockchainClientConfig(
     val name: String,
@@ -18,6 +21,7 @@ data class BlockchainClientConfig(
     val contractInvocationLimit: BigInteger,
     val defaultMaxPriorityFeePerGasInWei: BigInteger,
     val enableWeb3jLogging: Boolean,
+    val maxRpcNodeEventualConsistencyTolerance: Duration,
 )
 
 object ChainManager {
@@ -70,6 +74,7 @@ object ChainManager {
                 "5000000000",
             ),
             enableWeb3jLogging = (System.getenv("ENABLE_WEB3J_LOGGING") ?: "true") == "true",
+            maxRpcNodeEventualConsistencyTolerance = System.getenv("MAX_RPC_NODE_EVENTUAL_CONSISTENCE_TOLERANCE_MS")?.toLongOrNull()?.milliseconds ?: 1.minutes,
         )
     }
 

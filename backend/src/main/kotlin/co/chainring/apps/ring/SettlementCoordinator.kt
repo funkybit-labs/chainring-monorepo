@@ -2,7 +2,7 @@ package co.chainring.apps.ring
 
 import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.core.blockchain.BlockchainClient
-import co.chainring.core.blockchain.ContractType
+import co.chainring.core.blockchain.DefaultBlockParam
 import co.chainring.core.evm.Adjustment
 import co.chainring.core.evm.BatchSettlement
 import co.chainring.core.evm.ECHelper.sha3
@@ -112,7 +112,7 @@ class SettlementCoordinator(
                         // if any trades failed settling, complete them
                         // they will be marked as failed and sequencer will be called to revert the settlements
                         failedTrades.forEach {
-                            completeSettlement(it)
+                            completeSettlement(it, batch.preparationTxBlockNumbers())
                         }
 
                         // rollback the batches
@@ -157,7 +157,7 @@ class SettlementCoordinator(
 
         batch.markAsCompleted()
         tradesSettling.forEach {
-            completeSettlement(it)
+            completeSettlement(it, batch.submissionTxBlockNumbers())
         }
     }
 
@@ -174,7 +174,7 @@ class SettlementCoordinator(
             TradeEntity.markAsFailedSettling(pendingRollbacks.map { it.tradeHash }.toSet(), "Manually Rolled Back")
             pendingRollbacks.forEach {
                 it.refresh(true)
-                completeSettlement(it)
+                completeSettlement(it, chainBlockNumbers = emptyMap())
             }
             return null
         }
@@ -232,8 +232,8 @@ class SettlementCoordinator(
                 BlockchainTransactionEntity.create(
                     chainId = chainId,
                     transactionData = BlockchainTransactionData(
-                        blockchainClient.exchangeContract.rollbackBatch().encodeFunctionCall(),
-                        blockchainClient.getContractAddress(ContractType.Exchange),
+                        blockchainClient.encodeRollbackBatchFunctionCall(),
+                        blockchainClient.exchangeContractAddress,
                         BigInteger.ZERO,
                     ),
                     null,
@@ -258,7 +258,7 @@ class SettlementCoordinator(
             val batchSettlement = batchSettlementsByChainId[chainId]
             if (batchSettlement != null) {
                 chainSettlementBatch.markAsSubmitting(
-                    createBlockchainTransactionRecord(chainId, batchSettlement, chainSettlementBatch.prepararationTx.batchHash, isSubmit = true),
+                    createBlockchainTransactionRecord(chainId, batchSettlement, chainSettlementBatch.preparationTx.batchHash, isSubmit = true),
                 )
             } else {
                 // no remaining for this chain - mark as complete
@@ -372,14 +372,13 @@ class SettlementCoordinator(
     }
     private fun createBlockchainTransactionRecord(chainId: ChainId, batchSettlement: BatchSettlement, batchHash: String?, isSubmit: Boolean = false): BlockchainTransactionEntity {
         val blockchainClient = blockchainClientsByChainId.getValue(chainId)
-        val paramData = DefaultFunctionEncoder().encodeParameters(listOf(batchSettlement)).toHexBytes()
         val transactionData = BlockchainTransactionData(
             data = if (isSubmit) {
-                blockchainClient.exchangeContract.submitSettlementBatch(paramData).encodeFunctionCall()
+                blockchainClient.encodeSubmitSettlementBatchFunctionCall(batchSettlement)
             } else {
-                blockchainClient.exchangeContract.prepareSettlementBatch(paramData).encodeFunctionCall()
+                blockchainClient.encodePrepareSettlementBatchFunctionCall(batchSettlement)
             },
-            to = Address(blockchainClient.exchangeContract.contractAddress),
+            to = blockchainClient.exchangeContractAddress,
             value = BigInteger.ZERO,
         )
         return BlockchainTransactionEntity.create(
@@ -410,7 +409,7 @@ class SettlementCoordinator(
             symbolMap.getValue(it.quoteSymbolGuid.value).chainId.value == chainId
     }
 
-    private fun completeSettlement(tradeEntity: TradeEntity) {
+    private fun completeSettlement(tradeEntity: TradeEntity, chainBlockNumbers: Map<ChainId, BigInteger?>) {
         val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
         val executions = tradeEntity.executions
 
@@ -456,10 +455,10 @@ class SettlementCoordinator(
             val baseSymbolChainId = symbolMap.getValue(market.baseSymbolGuid.value).chainId.value
             val quoteSymbolChainId = symbolMap.getValue(market.quoteSymbolGuid.value).chainId.value
             if (baseSymbolChainId == quoteSymbolChainId) {
-                updateBalances(wallets, symbols, baseSymbolChainId)
+                updateBalances(wallets, symbols, baseSymbolChainId, chainBlockNumbers[baseSymbolChainId])
             } else {
-                updateBalances(wallets, listOf(market.baseSymbolGuid.value), baseSymbolChainId)
-                updateBalances(wallets, listOf(market.quoteSymbolGuid.value), quoteSymbolChainId)
+                updateBalances(wallets, listOf(market.baseSymbolGuid.value), baseSymbolChainId, chainBlockNumbers[baseSymbolChainId])
+                updateBalances(wallets, listOf(market.quoteSymbolGuid.value), quoteSymbolChainId, chainBlockNumbers[quoteSymbolChainId])
             }
 
             wallets.forEach { wallet ->
@@ -479,11 +478,12 @@ class SettlementCoordinator(
         publishBroadcasterNotifications(broadcasterNotifications)
     }
 
-    private fun updateBalances(wallets: List<WalletEntity>, symbolIds: List<SymbolId>, chainId: ChainId) {
+    private fun updateBalances(wallets: List<WalletEntity>, symbolIds: List<SymbolId>, chainId: ChainId, blockNumber: BigInteger?) {
         val finalExchangeBalances = runBlocking {
             blockchainClientsByChainId.getValue(chainId).getExchangeBalances(
                 wallets.map { it.address },
                 symbolIds.map { symbolMap.getValue(it).contractAddress ?: Address.zero },
+                blockNumber?.let { DefaultBlockParam.BlockNumber(it) } ?: DefaultBlockParam.Latest,
             )
         }
         logger.debug { "finalExchangeBalances = $finalExchangeBalances" }

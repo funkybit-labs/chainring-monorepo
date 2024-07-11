@@ -12,6 +12,7 @@ environment:
     SEQUENCER_HOST_NAME: testnet-sequencer.chainring.co
     SEQUENCER_PORT: "5337"
     EVM_FEE_ACCOUNT_ADDRESS: "0x5E027795ec717ae1cAfa705F93720C02aB429b95"
+    JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
     DEFAULT_MAX_PRIORITY_FEE_PER_GAS_WEI_Bitlayer: "100000000"
     DEFAULT_MAX_PRIORITY_FEE_PER_GAS_WEI_Base: "100000"
     SLACK_ERROR_REPORTING_CHANNEL_ID: C0723AASGTH
@@ -23,10 +24,12 @@ environment:
     QUEUE_HOME: "/data/queues/testnet"
     CHECKPOINTS_ENABLED: "true"
     SLACK_ERROR_REPORTING_CHANNEL_ID: C0723AASGTH
+    JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
   garp:
     QUEUE_HOME: "/data/queues/testnet"
     DB_HOST: testnet-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     SLACK_ERROR_REPORTING_CHANNEL_ID: C0723AASGTH
+    JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
   mocker:
     API_URL: http://testnet-api.chainring.co:9000
     EVM_CHAINS: Bitlayer,Base

@@ -177,7 +177,7 @@ open class OrderBaseTest {
         // wait for the prepareTx to be submitted
         waitFor {
             transaction {
-                ChainSettlementBatchEntity[chainBatchGuid].prepararationTx.status == BlockchainTransactionStatus.Submitted
+                ChainSettlementBatchEntity[chainBatchGuid].preparationTx.status == BlockchainTransactionStatus.Submitted
             }
         }
 
@@ -192,7 +192,7 @@ open class OrderBaseTest {
 
         // now change the hash in DB - this will cause it to think the tx does not exist
         transaction {
-            ChainSettlementBatchEntity[chainBatchGuid].prepararationTx.txHash = TxHash("0x6d37aaf942f1679e7c34d241859017d5caf42f57f7c1b4f1f0c149c2649bb822")
+            ChainSettlementBatchEntity[chainBatchGuid].preparationTx.txHash = TxHash("0x6d37aaf942f1679e7c34d241859017d5caf42f57f7c1b4f1f0c149c2649bb822")
         }
 
         waitFor {

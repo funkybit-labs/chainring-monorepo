@@ -17,6 +17,7 @@ import { bigintToScaledDecimal, scaledDecimalToBigint } from 'utils/pricesUtils'
 import Decimal from 'decimal.js'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
+import MarketPrice from 'components/Screens/HomeScreen/swap/MarketPrice'
 
 export function SwapWidget({
   markets,
@@ -295,19 +296,13 @@ export function SwapWidget({
                 ))}
               </div>
             </div>
-            <div
-              className="mt-1 cursor-pointer pl-4 text-darkBluishGray1 hover:text-statusOrange"
+            <MarketPrice
+              bottomSymbol={sr.bottomSymbol}
+              topSymbol={sr.topSymbol}
+              isInverted={marketPriceInverted}
+              price={marketPrice}
               onClick={() => setMarketPriceInverted(!marketPriceInverted)}
-            >
-              1{' '}
-              {marketPriceInverted
-                ? sr.topSymbol.displayName()
-                : sr.bottomSymbol.displayName()}{' '}
-              ≈ <ExpandableValue value={marketPrice} />{' '}
-              {marketPriceInverted
-                ? sr.bottomSymbol.displayName()
-                : sr.topSymbol.displayName()}
-            </div>
+            />
             <div className="flex w-full flex-col">
               {walletAddress && exchangeContractAddress ? (
                 <>

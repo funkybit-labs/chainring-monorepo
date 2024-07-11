@@ -4,6 +4,7 @@ import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
+import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.ReasonCode
@@ -17,12 +18,16 @@ import co.chainring.apps.api.model.websocket.OrderBookEntry
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.ExecutionRole
+import co.chainring.core.model.db.MarketEntity
+import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.SettlementStatus
+import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.utils.generateOrderNonce
+import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.OrderBaseTest
 import co.chainring.integrationtests.testutils.waitForBalance
@@ -61,6 +66,7 @@ import co.chainring.integrationtests.utils.sum
 import co.chainring.integrationtests.utils.toCancelOrderRequest
 import kotlinx.datetime.Clock
 import org.http4k.client.WebsocketClient
+import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.extension.ExtendWith
@@ -325,6 +331,49 @@ class OrderRoutesApiTest : OrderBaseTest() {
         ).assertError(
             ApiError(ReasonCode.RejectedBySequencer, "Order does not exist or is already finalized"),
         )
+
+        // try an order for an unknown market - first if market isn't even in DB, we just get a 500 from API
+        val badMarketId = MarketId("${dai.name}/${usdc.name}")
+        apiClient.tryCreateOrder(
+            wallet.signOrder(
+                CreateOrderApiRequest.Market(
+                    nonce = generateOrderNonce(),
+                    marketId = badMarketId,
+                    side = OrderSide.Buy,
+                    amount = OrderAmount.Fixed(BigDecimal("1").inFundamentalUnits(usdc)),
+                    signature = EvmSignature.emptySignature(),
+                    verifyingChainId = ChainId.empty,
+                ),
+            ),
+        ).assertError(
+            ApiError(ReasonCode.UnexpectedError, "An unexpected error has occurred. Please, contact support if this issue persists."),
+        )
+
+        // create market in DB, still isn't known to sequencer, so we should get an UnknownMarket error
+        val badMarket = transaction {
+            MarketEntity
+                .create(SymbolEntity.forName(dai.name), SymbolEntity.forName(usdc.name), "0.01".toBigDecimal(), "2.005".toBigDecimal(), BigDecimal("0.02").toFundamentalUnits(18))
+        }
+        try {
+            apiClient.tryCreateOrder(
+                wallet.signOrder(
+                    CreateOrderApiRequest.Market(
+                        nonce = generateOrderNonce(),
+                        marketId = badMarketId,
+                        side = OrderSide.Buy,
+                        amount = OrderAmount.Fixed(BigDecimal("1").inFundamentalUnits(usdc)),
+                        signature = EvmSignature.emptySignature(),
+                        verifyingChainId = ChainId.empty,
+                    ),
+                ),
+            ).assertError(
+                ApiError(ReasonCode.ProcessingError, "Unable to process request - UnknownMarket"),
+            )
+        } finally {
+            transaction {
+                badMarket.delete()
+            }
+        }
     }
 
     @Test

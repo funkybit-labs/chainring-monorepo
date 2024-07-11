@@ -3,10 +3,11 @@ import { BaseError as WagmiError, useConfig } from 'wagmi'
 import { ERC20Abi, ExchangeAbi } from 'contracts'
 import { useMemo, useState } from 'react'
 import {
+  call,
   getBalance,
-  getTransactionCount,
   readContract,
-  sendTransaction
+  sendTransaction,
+  waitForTransactionReceipt
 } from 'wagmi/actions'
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
@@ -63,8 +64,9 @@ export default function DepositModal({
   })
 
   const [submitPhase, setSubmitPhase] = useState<
-    | 'waitingForTxCount'
+    | 'checkingAllowanceAmount'
     | 'waitingForAllowanceApproval'
+    | 'waitingForAllowanceReceipt'
     | 'waitingForDepositApproval'
     | 'submittingDeposit'
     | null
@@ -78,31 +80,43 @@ export default function DepositModal({
         let depositHash: string
 
         if (symbol.contractAddress) {
-          setSubmitPhase('waitingForTxCount')
-          const transactionCount = await getTransactionCount(config, {
-            address: walletAddress
-          })
-
-          setSubmitPhase('waitingForAllowanceApproval')
-          await sendTransaction(config, {
+          setSubmitPhase('checkingAllowanceAmount')
+          const allowance = await call(config, {
             to: symbol.contractAddress,
+            chainId: symbol.chainId,
             data: encodeFunctionData({
               abi: ERC20Abi,
-              args: [exchangeContractAddress, amount],
-              functionName: 'approve'
-            } as EncodeFunctionDataParameters),
-            nonce: transactionCount
+              args: [walletAddress, exchangeContractAddress],
+              functionName: 'allowance'
+            })
           })
+
+          const allowanceAmount = allowance.data ? BigInt(allowance.data) : 0n
+
+          if (allowanceAmount < amount) {
+            setSubmitPhase('waitingForAllowanceApproval')
+            const hash = await sendTransaction(config, {
+              to: symbol.contractAddress,
+              chainId: symbol.chainId,
+              data: encodeFunctionData({
+                abi: ERC20Abi,
+                args: [exchangeContractAddress, amount],
+                functionName: 'approve'
+              } as EncodeFunctionDataParameters)
+            })
+            setSubmitPhase('waitingForAllowanceReceipt')
+            await waitForTransactionReceipt(config, { hash })
+          }
 
           setSubmitPhase('waitingForDepositApproval')
           depositHash = await sendTransaction(config, {
             to: exchangeContractAddress,
+            chainId: symbol.chainId,
             data: encodeFunctionData({
               abi: ExchangeAbi,
               functionName: 'deposit',
-              args: [symbol.contractAddress, amount]
-            }),
-            nonce: transactionCount + 1
+              args: [symbol.contractAddress!, amount]
+            })
           })
         } else {
           setSubmitPhase('waitingForDepositApproval')
@@ -182,9 +196,12 @@ export default function DepositModal({
                   error={mutation.error?.message}
                   caption={() => {
                     switch (submitPhase) {
-                      case 'waitingForTxCount':
+                      case 'checkingAllowanceAmount':
+                        return 'Preparing deposit'
                       case 'waitingForAllowanceApproval':
                         return 'Waiting for allowance approval'
+                      case 'waitingForAllowanceReceipt':
+                        return 'Waiting for allowance transaction '
                       case 'waitingForDepositApproval':
                         return 'Waiting for deposit approval'
                       case 'submittingDeposit':

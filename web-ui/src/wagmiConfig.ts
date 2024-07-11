@@ -32,7 +32,7 @@ export const initializeWagmiConfig = async () => {
       nativeCurrency: {
         decimals: nativeSymbol.decimals,
         name: nativeSymbol.description,
-        symbol: nativeSymbol.name
+        symbol: nativeSymbol.name.replace(new RegExp(':.*', ''), '')
       },
       rpcUrls: {
         default: { http: [chain.jsonRpcUrl] }

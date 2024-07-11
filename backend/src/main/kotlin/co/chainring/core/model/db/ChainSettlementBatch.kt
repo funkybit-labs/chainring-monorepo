@@ -157,7 +157,7 @@ class ChainSettlementBatchEntity(guid: EntityID<ChainSettlementBatchId>) : GUIDE
     var settlementBatch by SettlementBatchEntity referencedOn ChainSettlementBatchTable.settlementBatchGuid
 
     var preparationTxGuid by ChainSettlementBatchTable.preparationTxGuid
-    var prepararationTx by BlockchainTransactionEntity referencedOn ChainSettlementBatchTable.preparationTxGuid
+    var preparationTx by BlockchainTransactionEntity referencedOn ChainSettlementBatchTable.preparationTxGuid
 
     var submissionTxGuid by ChainSettlementBatchTable.submissionTxGuid
     var submissionTx by BlockchainTransactionEntity optionalReferencedOn ChainSettlementBatchTable.submissionTxGuid
