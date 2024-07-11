@@ -61,6 +61,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.io.path.createDirectories
 import kotlin.io.path.name
 import kotlin.random.Random
+import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.seconds
 
 class TestSequencerCheckpoints {
@@ -907,7 +908,66 @@ class TestSequencerCheckpoints {
         )
     }
 
-    // TODO add test to prove that level is deleted from the book once empty
+    @Test
+    fun `test state storing and loading - empty levels are excluded from the snapshot`() {
+        val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
+        verifySerialization(
+            SequencerState(
+                feeRates = feeRates,
+                withdrawalFees = mutableMapOf(
+                    Symbol("BTC") to BigInteger.TEN,
+                ),
+                markets = mutableMapOf(
+                    btcEthMarketId to Market(
+                        id = btcEthMarketId,
+                        tickSize = BigDecimal("0.05"),
+                        maxOrdersPerLevel = 1000,
+                        baseDecimals = 18,
+                        quoteDecimals = 18,
+                    ).also { market ->
+                        // fill and remove data to set level's head and tail to the position 990
+                        (1..1000).map {
+                            order {
+                                this.guid = it.toLong()
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.levelIx = it
+                                this.type = if (Random.nextBoolean()) Type.LimitBuy else Type.LimitSell
+                            }
+                        }.also { orders ->
+                            market.applyOrderBatch(
+                                orderBatch {
+                                    guid = UUID.randomUUID().toString()
+                                    marketId = btcEthMarketId.value
+                                    wallet = wallet1.value
+                                    ordersToAdd.addAll(orders)
+                                },
+                                feeRates,
+                            )
+
+                            market.applyOrderBatch(
+                                orderBatch {
+                                    guid = UUID.randomUUID().toString()
+                                    marketId = btcEthMarketId.value
+                                    wallet = wallet1.value
+                                    ordersToCancel.addAll(
+                                        orders.map {
+                                            cancelOrder {
+                                                this.guid = it.guid
+                                            }
+                                        },
+                                    )
+                                },
+                                feeRates,
+                            )
+                        }
+
+                        // no levels should be in the market
+                        assertNull(market.levels.first())
+                    },
+                ),
+            ),
+        )
+    }
 
     private fun verifySerialization(initialState: SequencerState) {
         checkpointsPath.toFile().deleteRecursively()

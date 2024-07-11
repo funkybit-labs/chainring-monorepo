@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -647,6 +648,52 @@ class TestMarket {
         addOrder(6L, Order.Type.MarketBuy, BigDecimal("1").toFundamentalUnits(market.baseDecimals).toString(), "0", expectedDisposition = OrderDisposition.Filled, counterOrderGuid = 4)
         addOrder(7L, Order.Type.MarketSell, "50", "0", expectedDisposition = OrderDisposition.Rejected)
         addOrder(8L, Order.Type.MarketSell, BigDecimal("1").toFundamentalUnits(market.baseDecimals).toString(), "0", expectedDisposition = OrderDisposition.Filled, counterOrderGuid = 2)
+    }
+
+    @Test
+    fun `empty levels are removed from the market`() {
+        market = Market(
+            id = MarketId("BTC/ETH"),
+            tickSize = BigDecimal("0.05"),
+            maxOrdersPerLevel = 100,
+            baseDecimals = 18,
+            quoteDecimals = 18,
+            minFee = BigInteger.ZERO,
+        )
+        val amount = BigDecimal("50").toFundamentalUnits(market.baseDecimals).toString()
+
+        // when the last order on the level is canceled
+        assertNull(market.levels.get("17".levelIx(market)))
+        addOrder(1L, Order.Type.LimitBuy, amount, "17", expectedDisposition = OrderDisposition.Accepted)
+        addOrder(2L, Order.Type.LimitBuy, amount, "17", expectedDisposition = OrderDisposition.Accepted)
+        addOrder(3L, Order.Type.LimitBuy, amount, "17", expectedDisposition = OrderDisposition.Accepted)
+        assertNotNull(market.levels.get("17".levelIx(market)))
+        cancelOrders(listOf(1L))
+        assertNotNull(market.levels.get("17".levelIx(market)))
+        cancelOrders(listOf(2L))
+        assertNotNull(market.levels.get("17".levelIx(market)))
+        cancelOrders(listOf(3L))
+        assertNull(market.levels.get("17".levelIx(market)))
+
+        // or filled
+        assertNull(market.levels.get("25".levelIx(market)))
+        addOrder(4L, Order.Type.LimitBuy, amount, "25", expectedDisposition = OrderDisposition.Accepted)
+        addOrder(5L, Order.Type.LimitBuy, amount, "25", expectedDisposition = OrderDisposition.Accepted)
+        assertNotNull(market.levels.get("25".levelIx(market)))
+        addOrder(6L, Order.Type.MarketSell, amount, "0", expectedDisposition = OrderDisposition.Filled, counterOrderGuid = 4L)
+        assertNotNull(market.levels.get("25".levelIx(market)))
+        addOrder(7L, Order.Type.MarketSell, amount, "0", expectedDisposition = OrderDisposition.Filled, counterOrderGuid = 5L)
+        assertNull(market.levels.get("25".levelIx(market)))
+
+        // or moved to another level
+        assertNull(market.levels.get("35".levelIx(market)))
+        assertNull(market.levels.get("36".levelIx(market)))
+        addOrder(8L, Order.Type.LimitBuy, amount, "35", expectedDisposition = OrderDisposition.Accepted)
+        assertNotNull(market.levels.get("35".levelIx(market)))
+        assertNull(market.levels.get("36".levelIx(market)))
+        updateOrder(8L, Order.Type.LimitBuy, amount, "36", expectedDisposition = OrderDisposition.Accepted)
+        assertNull(market.levels.get("35".levelIx(market)))
+        assertNotNull(market.levels.get("36".levelIx(market)))
     }
 
     private fun updateOrder(guid: Long, orderType: Order.Type, amount: String, price: String, expectedDisposition: OrderDisposition = OrderDisposition.Accepted, counterOrderGuid: Long? = null) {
