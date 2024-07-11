@@ -14,11 +14,7 @@ class ObjectPool<T>(
 
     fun borrow(init: ((T) -> T)? = null): T {
         borrowedCount++
-        val obj = if (pool.isNotEmpty()) {
-            pool.removeAt(pool.size - 1)
-        } else {
-            create()
-        }
+        val obj = pool.removeLastOrNull() ?: create()
         return init?.invoke(obj) ?: obj
     }
 

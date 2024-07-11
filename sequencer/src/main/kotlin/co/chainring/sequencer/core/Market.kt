@@ -40,7 +40,7 @@ data class Market(
 
     val levels = AVLTree<OrderBookLevel>()
 
-    private val pool = ObjectPool(
+    private val levelPool = ObjectPool(
         create = { OrderBookLevel.empty(maxOrdersPerLevel) },
         reset = { it.reset() },
         initialSize = 1000,
@@ -454,7 +454,7 @@ data class Market(
 
             exhaustedLevels.forEach {
                 levels.remove(it.ix)
-                pool.release(it)
+                levelPool.release(it)
             }
         }
 
@@ -555,7 +555,7 @@ data class Market(
                     }
                 }
                 levels.remove(level.ix)
-                pool.release(level)
+                levelPool.release(level)
             }
             ordersByGuid.remove(guid)
         }
@@ -701,7 +701,7 @@ data class Market(
 
     private fun getOrCreateLevel(levelIx: Int, side: BookSide): OrderBookLevel {
         return levels.get(levelIx)
-            ?: pool
+            ?: levelPool
                 .borrow { level -> level.init(levelIx, side, price(levelIx)) }
                 .let { levels.add(it) }
     }
