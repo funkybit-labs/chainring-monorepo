@@ -1,9 +1,9 @@
 package co.chainring
 
 import co.chainring.sequencer.core.datastructure.ObjectPool
+import org.junit.jupiter.api.Test
 import kotlin.random.Random
 import kotlin.test.assertEquals
-import org.junit.jupiter.api.Test
 
 class TestObjectPool {
 
@@ -14,7 +14,7 @@ class TestObjectPool {
         val pool = ObjectPool(
             create = { TestObject(Int.MIN_VALUE) },
             reset = { it.value = Int.MIN_VALUE },
-            initialSize = 100
+            initialSize = 100,
         )
         assertEquals(100, pool.getPoolSize())
         assertEquals(0, pool.getBorrowedCount())
@@ -45,21 +45,21 @@ class TestObjectPool {
         val pool = ObjectPool(
             create = { TestObject(Int.MIN_VALUE) },
             reset = { it.value = Int.MIN_VALUE },
-            initialSize = 100
+            initialSize = 100,
         )
 
         val allObjectsAttempt1 = (1 until 100).map { pool.borrow(init = { it.also { it.value = 1 } }) }
-        allObjectsAttempt1.forEach { assertEquals(1, it.value)}
+        allObjectsAttempt1.forEach { assertEquals(1, it.value) }
         allObjectsAttempt1.forEach { pool.release(it) }
-        allObjectsAttempt1.forEach { assertEquals(Int.MIN_VALUE, it.value)}
+        allObjectsAttempt1.forEach { assertEquals(Int.MIN_VALUE, it.value) }
 
         val allObjectsAttempt2 = (1 until 100).map { pool.borrow(init = { it.also { it.value = 2 } }) }
-        allObjectsAttempt2.forEach { assertEquals(2, it.value)}
+        allObjectsAttempt2.forEach { assertEquals(2, it.value) }
         allObjectsAttempt2.forEach { pool.release(it) }
-        allObjectsAttempt2.forEach { assertEquals(Int.MIN_VALUE, it.value)}
+        allObjectsAttempt2.forEach { assertEquals(Int.MIN_VALUE, it.value) }
 
         val allObjectsAttempt3 = (1 until 100).map { pool.borrow(init = { it.also { it.value = 3 } }) }
-        allObjectsAttempt3.forEach { assertEquals(3, it.value)}
+        allObjectsAttempt3.forEach { assertEquals(3, it.value) }
     }
 
     @Test
@@ -67,11 +67,11 @@ class TestObjectPool {
         val pool = ObjectPool(
             create = { TestObject(Int.MIN_VALUE) },
             reset = { it.value = Int.MIN_VALUE },
-            initialSize = 100
+            initialSize = 100,
         )
 
         val allExisting = (0 until 100).map { pool.borrow(init = { it.also { it.value = 1 } }) }
-        allExisting.forEach { assertEquals(1, it.value)}
+        allExisting.forEach { assertEquals(1, it.value) }
         assertEquals(0, pool.getPoolSize())
         assertEquals(100, pool.getBorrowedCount())
 
@@ -98,7 +98,7 @@ class TestObjectPool {
         val pool = ObjectPool(
             create = { TestObject(Int.MIN_VALUE) },
             reset = { it.value = Int.MIN_VALUE },
-            initialSize = 100
+            initialSize = 100,
         )
 
         val obj1 = pool.borrow()
@@ -113,7 +113,7 @@ class TestObjectPool {
         val pool = ObjectPool(
             create = { TestObject(Int.MIN_VALUE) },
             reset = { it.value = Int.MIN_VALUE },
-            initialSize = 100
+            initialSize = 100,
         )
 
         val obj = pool.borrow { it.also { it.value = 10 } }
@@ -122,5 +122,4 @@ class TestObjectPool {
         pool.release(obj)
         assertEquals(Int.MIN_VALUE, obj.value)
     }
-
 }
