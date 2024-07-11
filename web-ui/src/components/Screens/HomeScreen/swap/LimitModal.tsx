@@ -190,11 +190,7 @@ export function LimitModal({
                 </span>
                 <span className="relative">
                   <input
-                    value={
-                      sr.sellLimitPriceInputValue
-                        ? sr.sellLimitPrice.toString()
-                        : ''
-                    }
+                    value={sr.sellLimitPriceInputValue}
                     disabled={sr.mutation.isPending}
                     onChange={(e) => {
                       if (e.target.value) setMarketPriceInverted(true)
@@ -294,11 +290,7 @@ export function LimitModal({
                   </span>
                   <span className="relative">
                     <input
-                      value={
-                        sr.buyLimitPriceInputValue
-                          ? sr.buyLimitPrice.toString()
-                          : ''
-                      }
+                      value={sr.buyLimitPriceInputValue}
                       disabled={sr.mutation.isPending}
                       onChange={(e) => {
                         if (e.target.value) setMarketPriceInverted(false)

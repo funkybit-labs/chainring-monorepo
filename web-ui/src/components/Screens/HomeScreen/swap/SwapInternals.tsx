@@ -149,9 +149,12 @@ export function SwapInternals({
     if (side === 'Sell') {
       return inputValueToDecimal(buyLimitPriceInputValue).toSignificantDigits(6)
     } else {
-      return inputValueToDecimal(buyLimitPriceInputValue)
-        .divToInt(market.tickSize)
-        .mul(market.tickSize)
+      return Decimal.max(
+        market.tickSize,
+        inputValueToDecimal(buyLimitPriceInputValue)
+          .divToInt(market.tickSize)
+          .mul(market.tickSize)
+      )
     }
   }, [buyLimitPriceInputValue, market.tickSize, side])
 
@@ -161,9 +164,12 @@ export function SwapInternals({
         6
       )
     } else {
-      return inputValueToDecimal(sellLimitPriceInputValue)
-        .divToInt(market.tickSize)
-        .mul(market.tickSize)
+      return Decimal.max(
+        market.tickSize,
+        inputValueToDecimal(sellLimitPriceInputValue)
+          .divToInt(market.tickSize)
+          .mul(market.tickSize)
+      )
     }
   }, [sellLimitPriceInputValue, side, market.tickSize])
 
@@ -438,7 +444,7 @@ export function SwapInternals({
           setBuyLimitPriceInputValue('')
         } else {
           setBuyLimitPriceInputValue(
-            new Decimal(1).div(sellLimitPrice).toString()
+            new Decimal(1).div(sellLimitPrice).toSignificantDigits(6).toString()
           )
         }
       } else {
@@ -460,7 +466,7 @@ export function SwapInternals({
           setSellLimitPriceInputValue('')
         } else {
           setSellLimitPriceInputValue(
-            new Decimal(1).div(buyLimitPrice).toString()
+            new Decimal(1).div(buyLimitPrice).toSignificantDigits(6).toString()
           )
         }
       } else {
