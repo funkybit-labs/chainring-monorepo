@@ -166,18 +166,21 @@ class AVLTree<T : AVLTree.Node<T>> {
         return balance(parent)
     }
 
-    fun first(): T? {
-        var current = root ?: return null
-        while (current.left != null) {
-            current = current.left!!
-        }
-        return current
-    }
+    fun first(): T? = root?.let { minValueNode(it) }
+
 
     fun last(): T? {
         var current = root ?: return null
         while (current.right != null) {
             current = current.right!!
+        }
+        return current
+    }
+
+    private fun minValueNode(parent: T): T {
+        var current = parent
+        while (current.left != null) {
+            current = current.left!!
         }
         return current
     }
@@ -242,14 +245,6 @@ class AVLTree<T : AVLTree.Node<T>> {
         return y
     }
 
-    private fun minValueNode(parent: T): T {
-        var current = parent
-        while (current.left != null) {
-            current = current.left!!
-        }
-        return current
-    }
-
     fun traverse(action: (T) -> Unit) {
         traverse(root, action)
     }
@@ -280,13 +275,7 @@ class AVLTree<T : AVLTree.Node<T>> {
 
     override fun hashCode(): Int {
         var result = 1
-        var node = first()
-
-        while (node != null) {
-            result = 31 * result + node.hashCode()
-            node = node.next()
-        }
-
+        traverse { result = 31 * result + it.hashCode() }
         return result
     }
 }
