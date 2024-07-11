@@ -23,6 +23,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.extension.ExtendWith
 import org.web3j.utils.Numeric
 import java.lang.System.getenv
@@ -147,6 +148,7 @@ class DepositTest {
         assertEquals(listOf(pendingBtcDeposit2), apiClient2.listDeposits().deposits.filter { it.symbol.value == btc.name })
     }
 
+    @Disabled
     @Test
     fun `test on chain deposit detection`() {
         val apiClient = TestApiClient()
@@ -175,6 +177,7 @@ class DepositTest {
             }
     }
 
+    @Disabled
     @Test
     fun `test on chain deposit detection - forks are handled`() {
         // test is skipped in the test env

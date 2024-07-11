@@ -81,6 +81,7 @@ class BlockProcessor(
         val lastProcessedBlock = getLastProcessedBlock()
 
         if (lastProcessedBlock == null || blockParentHash == lastProcessedBlock.guid.value) {
+            logger.info { "Storing block [number=$blockNumber,hash=$blockHash,parentHash=$blockParentHash], chainId=$chainId" }
             BlockEntity.create(blockHash, blockNumber, blockParentHash, chainId)
 
             val getLogsResult = blockchainClient.getExchangeContractLogs(blockNumber)
@@ -94,7 +95,7 @@ class BlockProcessor(
                 processLog(logResult.get())
             }
         } else {
-            logger.error { "It looks like we forked, looking for split point starting at $blockNumber, chainId=$chainId" }
+            logger.error { "It looks like we forked: for block [height=$blockNumber,hash=$blockHash,parentHash=$blockParentHash] latest block found in db is [height=${lastProcessedBlock.number},hash=${lastProcessedBlock.guid.value},parentHash=${lastProcessedBlock.parentGuid.value}]. Looking for split point starting at $blockNumber, chainId=$chainId" }
 
             val blocksToRollback = BlockEntity
                 .getRecentBlocksUpToNumber(
