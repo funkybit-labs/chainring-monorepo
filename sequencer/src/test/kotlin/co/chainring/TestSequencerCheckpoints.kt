@@ -5,6 +5,7 @@ import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.GatewayConfig
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.Asset
+import co.chainring.sequencer.core.Clock
 import co.chainring.sequencer.core.FeeRate
 import co.chainring.sequencer.core.FeeRates
 import co.chainring.sequencer.core.LevelOrder
@@ -109,7 +110,7 @@ class TestSequencerCheckpoints {
         assertCheckpointsCount(checkpointsPath, 0)
 
         val gatewayApp = GatewayApp(GatewayConfig(port = 5339), inputQueue, outputQueue, sequencedQueue)
-        val sequencerApp = SequencerApp(inputQueue, outputQueue, checkpointsPath)
+        val sequencerApp = SequencerApp(Clock(), inputQueue, outputQueue, checkpointsPath)
 
         try {
             sequencerApp.start()
