@@ -6,7 +6,6 @@ import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
-import co.chainring.core.model.Address
 import co.chainring.integrationtests.utils.ApiClient
 import co.chainring.integrationtests.utils.subscribe
 import co.chainring.integrationtests.utils.unsubscribe
@@ -16,6 +15,7 @@ import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketId
 import co.chainring.integrationtests.utils.Faucet
 import co.chainring.core.utils.TraceRecorder
+import co.chainring.integrationtests.utils.AssetAmount
 import co.chainring.integrationtests.utils.Wallet
 import java.math.BigInteger
 import org.web3j.crypto.ECKeyPair
@@ -131,11 +131,7 @@ abstract class Actor(
                         chain.symbols.mapNotNull { symbol ->
                             val balanceToDeposit = wallet.getWalletBalance(symbol)
                             if (balanceToDeposit.inFundamentalUnits > BigInteger.ZERO) {
-                                val receipt = if (symbol.contractAddress == null) {
-                                    wallet.depositNative(balanceToDeposit.inFundamentalUnits - gasFeesAmount)
-                                } else {
-                                    wallet.depositERC20(symbol.name, balanceToDeposit.inFundamentalUnits)
-                                }
+                                val receipt = wallet.depositAndWaitForTxReceipt(balanceToDeposit)
                                 apiClient.createDeposit(
                                     CreateDepositApiRequest(
                                         symbol = Symbol(symbol.name),
@@ -182,22 +178,20 @@ abstract class Actor(
                         when (val nativeAmount = nativeAmountByChainId[chainId]) {
                             null -> {
                                 // put some balance enough to pay gas, but do not deposit
-                                Faucet.fund(wallet.address, gasFeesAmount, chainId)
+                                Faucet.fundAndWaitForTxReceipt(wallet.address, gasFeesAmount, chainId)
                             }
                             else -> {
-                                Faucet.fund(wallet.address, nativeAmount + gasFeesAmount, chainId)
+                                Faucet.fundAndWaitForTxReceipt(wallet.address, nativeAmount + gasFeesAmount, chainId)
 
                                 val nativeSymbol = config.chains.first { it.id == chainId }.symbols.first { it.contractAddress == null }
-                                val availableAmount =
-                                    initialBalances.find { it.symbol.value == nativeSymbol.name }?.available
-                                        ?: BigInteger.ZERO
+                                val availableAmount = initialBalances.find { it.symbol.value == nativeSymbol.name }?.available ?: BigInteger.ZERO
                                 val deltaAmount = nativeAmount - availableAmount
 
                                 if (deltaAmount > BigInteger.ZERO) {
                                     logger.debug { "Funding ${wallet.address} with ${deltaAmount * BigInteger.TWO} on chain $chainId" }
                                     wallet.switchChain(chainId)
                                     logger.debug { "Native deposit $deltaAmount to ${wallet.address} on chain $chainId" }
-                                    val receipt = wallet.depositNative(deltaAmount)
+                                    val receipt = wallet.depositAndWaitForTxReceipt(AssetAmount(nativeSymbol, deltaAmount))
                                     apiClient.createDeposit(CreateDepositApiRequest(
                                         symbol = Symbol(nativeSymbol.name),
                                         amount = deltaAmount,
@@ -211,14 +205,15 @@ abstract class Actor(
                     }
                     assets.forEach { (symbol, desiredAmount) ->
                         val chainId = chainIdBySymbol.getValue(symbol)
+                        val symbolInfo = config.chains.first { it.id == chainId }.symbols.first { it.name == symbol }
                         val availableAmount = initialBalances.find { it.symbol.value == symbol }?.available ?: BigInteger.ZERO
                         val deltaAmount = desiredAmount - availableAmount
 
                         if (deltaAmount > BigInteger.ZERO) {
                             wallet.switchChain(chainId)
-                            wallet.mintERC20(symbol, deltaAmount)
+                            wallet.mintERC20AndWaitForReceipt(symbol, deltaAmount)
                             logger.debug { "$symbol deposit $deltaAmount to ${wallet.address} on chain $chainId" }
-                            val receipt = wallet.depositERC20(symbol, deltaAmount)
+                            val receipt = wallet.depositAndWaitForTxReceipt(AssetAmount(symbolInfo, deltaAmount))
                             apiClient.createDeposit(CreateDepositApiRequest(
                                 symbol = Symbol(symbol),
                                 amount = deltaAmount,

@@ -394,7 +394,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
             amount,
         ).transactionHash.let { TxHash(it) }
 
-    fun asyncDepositNative(address: Address, amount: BigInteger): TxHash =
+    fun sendNativeDepositTx(address: Address, amount: BigInteger): TxHash =
         sendTransaction(address, "", amount)
 
     fun batchHash(block: BigInteger): String =
@@ -409,7 +409,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
     fun lastWithdrawalBatchHash(block: DefaultBlockParam): String =
         exchangeContractCall(block, Exchange::lastWithdrawalBatchHash).send().toHex(false)
 
-    fun asyncMintERC20(
+    fun sendMintERC20Tx(
         tokenContractAddress: Address,
         receiver: Address,
         amount: BigInteger,

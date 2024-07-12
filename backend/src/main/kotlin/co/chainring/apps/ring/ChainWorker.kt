@@ -9,7 +9,7 @@ class ChainWorker(
 ) {
     private val contractsPublisher = ContractsPublisher(blockchainClient)
 
-//    private val blockProcessor = BlockProcessor(blockchainClient)
+    private val blockProcessor = BlockProcessor(blockchainClient)
     private val blockchainTransactionHandler =
         BlockchainTransactionHandler(blockchainClient, sequencerClient)
     private val blockchainDepositHandler =
@@ -17,7 +17,7 @@ class ChainWorker(
 
     fun start() {
         contractsPublisher.updateContracts()
-//        blockProcessor.start()
+        blockProcessor.start()
         blockchainTransactionHandler.start()
         blockchainDepositHandler.start()
     }
@@ -25,6 +25,6 @@ class ChainWorker(
     fun stop() {
         blockchainDepositHandler.stop()
         blockchainTransactionHandler.stop()
-//        blockProcessor.stop()
+        blockProcessor.stop()
     }
 }

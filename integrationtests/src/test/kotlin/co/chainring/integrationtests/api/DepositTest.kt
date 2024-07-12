@@ -3,6 +3,7 @@ package co.chainring.integrationtests.api
 import co.chainring.apps.api.model.CreateDepositApiRequest
 import co.chainring.apps.api.model.Deposit
 import co.chainring.core.model.Symbol
+import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.testutils.waitForBalance
@@ -23,7 +24,6 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.extension.ExtendWith
 import org.web3j.utils.Numeric
 import java.lang.System.getenv
@@ -48,7 +48,7 @@ class DepositTest {
         (0 until config.chains.size).forEach { index ->
 
             wallet.switchChain(config.chains[index].id)
-            Faucet.fund(wallet.address, chainId = wallet.currentChainId)
+            Faucet.fundAndMine(wallet.address, chainId = wallet.currentChainId)
 
             val btc = config.chains[index].symbols.first { it.name == "BTC".toChainSymbol(config.chains[index].id) }
             val usdc = config.chains[index].symbols.first { it.name == "USDC".toChainSymbol(config.chains[index].id) }
@@ -56,7 +56,7 @@ class DepositTest {
 
             // mint some USDC
             val usdcMintAmount = AssetAmount(usdc, "20")
-            wallet.mintERC20(usdcMintAmount)
+            wallet.mintERC20AndMine(usdcMintAmount)
 
             assertEquals(wallet.getWalletBalance(usdc), usdcMintAmount)
 
@@ -65,7 +65,7 @@ class DepositTest {
             val btcDepositAmount = AssetAmount(btc, "0.001")
             val usdcDepositAmount = AssetAmount(usdc, "15")
 
-            val btcDepositTxHash = wallet.asyncDeposit(btcDepositAmount)
+            val btcDepositTxHash = wallet.sendDepositTx(btcDepositAmount)
             assertTrue(apiClient.listDeposits().deposits.none { it.symbol.value == btc.name })
             val pendingBtcDeposit = apiClient.createDeposit(CreateDepositApiRequest(Symbol(btc.name), btcDepositAmount.inFundamentalUnits, btcDepositTxHash)).deposit
             assertEquals(Deposit.Status.Pending, pendingBtcDeposit.status)
@@ -95,7 +95,7 @@ class DepositTest {
             assertEquals(wallet.getWalletBalance(btc), walletStartingBtcBalance - btcDepositAmount - depositGasCost)
 
             // deposit some USDC
-            val usdcDepositTxHash = wallet.asyncDeposit(usdcDepositAmount)
+            val usdcDepositTxHash = wallet.sendDepositTx(usdcDepositAmount)
 
             assertTrue(apiClient.listDeposits().deposits.none { it.symbol.value == usdc.name })
             val pendingUsdcDeposit = apiClient.createDeposit(CreateDepositApiRequest(Symbol(usdc.name), usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
@@ -131,8 +131,8 @@ class DepositTest {
         val apiClient2 = TestApiClient()
         val wallet2 = Wallet(apiClient2)
 
-        Faucet.fund(wallet1.address, chainId = wallet1.currentChainId)
-        Faucet.fund(wallet2.address, chainId = wallet2.currentChainId)
+        Faucet.fundAndMine(wallet1.address, chainId = wallet1.currentChainId)
+        Faucet.fundAndMine(wallet2.address, chainId = wallet2.currentChainId)
 
         val chain1 = apiClient1.getConfiguration().chains[0]
         val btc = chain1.symbols.first { it.name == "BTC:${chain1.id}" }
@@ -140,29 +140,26 @@ class DepositTest {
         val btcDeposit1Amount = AssetAmount(btc, "0.01")
         val btcDeposit2Amount = AssetAmount(btc, "0.02")
 
-        val btcDeposit1TxHash = wallet1.asyncDepositNative(btcDeposit1Amount.inFundamentalUnits)
+        val btcDeposit1TxHash = wallet1.sendNativeDepositTx(btcDeposit1Amount.inFundamentalUnits)
         val pendingBtcDeposit1 = apiClient1.createDeposit(CreateDepositApiRequest(Symbol(btc.name), btcDeposit1Amount.inFundamentalUnits, btcDeposit1TxHash)).deposit
-        val btcDeposit2TxHash = wallet2.asyncDepositNative(btcDeposit2Amount.inFundamentalUnits)
+        val btcDeposit2TxHash = wallet2.sendNativeDepositTx(btcDeposit2Amount.inFundamentalUnits)
         val pendingBtcDeposit2 = apiClient2.createDeposit(CreateDepositApiRequest(Symbol(btc.name), btcDeposit1Amount.inFundamentalUnits, btcDeposit2TxHash)).deposit
         assertEquals(listOf(pendingBtcDeposit1), apiClient1.listDeposits().deposits.filter { it.symbol.value == btc.name })
         assertEquals(listOf(pendingBtcDeposit2), apiClient2.listDeposits().deposits.filter { it.symbol.value == btc.name })
     }
 
-    @Disabled
     @Test
     fun `test on chain deposit detection`() {
         val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
 
-        Faucet.fund(wallet.address, chainId = wallet.currentChainId)
+        Faucet.fundAndMine(wallet.address, chainId = wallet.currentChainId)
 
         val chain = apiClient.getConfiguration().chains[0]
         val btc = chain.symbols.first { it.name == "BTC:${chain.id}" }
         val depositAmount = AssetAmount(btc, "0.01")
 
-        val depositTxHash = wallet.asyncDepositNative(depositAmount.inFundamentalUnits)
-
-        Faucet.mine()
+        val depositTxHash = TxHash(wallet.depositAndMine(depositAmount).transactionHash)
 
         await
             .withAlias("Waiting for deposit to be detected")
@@ -177,7 +174,6 @@ class DepositTest {
             }
     }
 
-    @Disabled
     @Test
     fun `test on chain deposit detection - forks are handled`() {
         // test is skipped in the test env
@@ -186,7 +182,7 @@ class DepositTest {
         val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
 
-        Faucet.fund(wallet.address, chainId = wallet.currentChainId)
+        Faucet.fundAndMine(wallet.address, chainId = wallet.currentChainId)
 
         val chain = apiClient.getConfiguration().chains[0]
         val btc = chain.symbols.first { it.name == "BTC:${chain.id}" }
@@ -194,7 +190,7 @@ class DepositTest {
         val chainClient = Faucet.blockchainClient(chain.id)
         val snapshotId = chainClient.snapshot().id
 
-        val deposit1TxHash = wallet.asyncDepositNative(AssetAmount(btc, "0.01").inFundamentalUnits)
+        val deposit1TxHash = wallet.sendNativeDepositTx(AssetAmount(btc, "0.01").inFundamentalUnits)
         chainClient.mine()
 
         await
@@ -212,7 +208,7 @@ class DepositTest {
         chainClient.revert(snapshotId)
         chainClient.mine()
 
-        val deposit2TxHash = wallet.asyncDepositNative(AssetAmount(btc, "0.02").inFundamentalUnits)
+        val deposit2TxHash = wallet.sendNativeDepositTx(AssetAmount(btc, "0.02").inFundamentalUnits)
         chainClient.mine()
 
         await
@@ -239,7 +235,7 @@ class DepositTest {
         val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
 
-        Faucet.fund(wallet.address, chainId = wallet.currentChainId)
+        Faucet.fundAndMine(wallet.address, chainId = wallet.currentChainId)
 
         val chain = apiClient.getConfiguration().chains[0]
         val btc = chain.symbols.first { it.name == "BTC:${chain.id}" }
@@ -247,7 +243,7 @@ class DepositTest {
 
         val chainClient = Faucet.blockchainClient(chain.id)
 
-        val depositTxHash = wallet.asyncDepositNative(amount.inFundamentalUnits)
+        val depositTxHash = wallet.sendNativeDepositTx(amount.inFundamentalUnits)
         apiClient.createDeposit(CreateDepositApiRequest(Symbol(btc.name), amount.inFundamentalUnits, depositTxHash)).deposit.also {
             assertEquals(Deposit.Status.Pending, it.status)
         }
@@ -271,7 +267,7 @@ class DepositTest {
                 } != null
             }
 
-        assertEquals(depositTxHash, wallet.asyncDepositNative(amount.inFundamentalUnits))
+        assertEquals(depositTxHash, wallet.sendNativeDepositTx(amount.inFundamentalUnits))
 
         // verify that same deposit tx can be submitted again
         apiClient.createDeposit(CreateDepositApiRequest(Symbol(btc.name), amount.inFundamentalUnits, depositTxHash)).deposit.also {

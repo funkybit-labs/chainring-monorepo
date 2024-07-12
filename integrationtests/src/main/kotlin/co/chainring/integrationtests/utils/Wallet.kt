@@ -63,6 +63,9 @@ class Wallet(
         return blockchainClientsByChainId.getValue(currentChainId)
     }
 
+    fun waitForTransactionReceipt(txHash: TxHash): TransactionReceipt =
+        currentBlockchainClient().waitForTransactionReceipt(txHash)
+
     fun getWalletERC20Balance(symbol: Symbol): BigInteger {
         return loadErc20Contract(symbol.value).balanceOf(address.value).send()
     }
@@ -71,13 +74,25 @@ class Wallet(
         return loadErc20Contract(symbol).balanceOf(address.value).send()
     }
 
-    fun mintERC20(symbol: String, amount: BigInteger) {
-        loadErc20Contract(symbol).mint(address.value, amount).sendAndWaitForConfirmation()
+    fun mintERC20AndMine(symbol: String, amount: BigInteger): TransactionReceipt {
+        val txHash = sendMintERC20Tx(symbol, amount)
+        val blockchainClient = blockchainClientsByChainId.getValue(currentChainId)
+        blockchainClient.mine()
+        return blockchainClient.getTransactionReceipt(txHash)!!
     }
 
-    fun mintERC20(assetAmount: AssetAmount) {
-        mintERC20(assetAmount.symbol.name, assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
-    }
+    fun mintERC20AndWaitForReceipt(symbol: String, amount: BigInteger): TransactionReceipt =
+        waitForTransactionReceipt(sendMintERC20Tx(symbol, amount))
+
+    fun sendMintERC20Tx(symbol: String, amount: BigInteger): TxHash =
+        currentBlockchainClient().sendMintERC20Tx(
+            Address(loadErc20Contract(symbol).contractAddress),
+            address,
+            amount,
+        )
+
+    fun mintERC20AndMine(assetAmount: AssetAmount): TransactionReceipt =
+        mintERC20AndMine(assetAmount.symbol.name, assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
 
     fun getWalletNativeBalance(): BigInteger {
         return blockchainClientsByChainId.getValue(currentChainId).getNativeBalance(address)
@@ -105,42 +120,47 @@ class Wallet(
 
     fun getExchangeERC20Balance(symbol: String): BigInteger {
         val chainId = chains.first { c -> c.symbols.any { it.name == symbol } }.id
-        return exchangeContractByChainId.getValue(chainId).balances(address.value, erc20TokenAddress(symbol, chainId)).sendAndWaitForConfirmation()
+        return exchangeContractByChainId.getValue(chainId).balances(address.value, erc20TokenAddress(symbol, chainId)).send()
     }
 
     fun getExchangeNativeBalance(): BigInteger {
-        return exchangeContractByChainId.getValue(currentChainId).balances(address.value, Address.zero.value).sendAndWaitForConfirmation()
+        return exchangeContractByChainId.getValue(currentChainId).balances(address.value, Address.zero.value).send()
     }
 
     private fun getExchangeNativeBalance(symbol: String): BigInteger {
         val chainId = chains.first { c -> c.symbols.any { it.name == symbol } }.id
-        return exchangeContractByChainId.getValue(chainId).balances(address.value, Address.zero.value).sendAndWaitForConfirmation()
+        return exchangeContractByChainId.getValue(chainId).balances(address.value, Address.zero.value).send()
     }
 
-    fun deposit(assetAmount: AssetAmount): TransactionReceipt {
+    fun depositAndMine(assetAmount: AssetAmount): TransactionReceipt {
+        val txHash = sendDepositTx(assetAmount)
+        apiClient.createDeposit(
+            CreateDepositApiRequest(
+                symbol = Symbol(assetAmount.symbol.name),
+                amount = assetAmount.inFundamentalUnits,
+                txHash = txHash,
+            ),
+        )
+        val blockchainClient = blockchainClientsByChainId.getValue(currentChainId)
+        blockchainClient.mine()
+        return blockchainClient.getTransactionReceipt(txHash)!!
+    }
+
+    fun depositAndWaitForTxReceipt(assetAmount: AssetAmount): TransactionReceipt =
+        waitForTransactionReceipt(sendDepositTx(assetAmount))
+
+    fun sendDepositTx(assetAmount: AssetAmount): TxHash {
         return if (assetAmount.symbol.contractAddress == null) {
-            depositNative(assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
+            sendNativeDepositTx(assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
         } else {
-            depositERC20(assetAmount.symbol.name, assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
-        }.also {
-            apiClient.createDeposit(
-                CreateDepositApiRequest(
-                    symbol = Symbol(assetAmount.symbol.name),
-                    amount = assetAmount.inFundamentalUnits,
-                    txHash = TxHash(it.transactionHash),
-                ),
-            )
+            sendERC20DepositTx(assetAmount.symbol.name, assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
         }
     }
 
-    fun asyncDepositNative(amount: BigInteger): TxHash =
-        blockchainClientsByChainId.getValue(currentChainId).asyncDepositNative(exchangeContractAddressByChainId.getValue(currentChainId), amount)
+    fun sendNativeDepositTx(amount: BigInteger): TxHash =
+        blockchainClientsByChainId.getValue(currentChainId).sendNativeDepositTx(exchangeContractAddressByChainId.getValue(currentChainId), amount)
 
-    fun depositNative(amount: BigInteger): TransactionReceipt {
-        return blockchainClientsByChainId.getValue(currentChainId).depositNative(exchangeContractAddressByChainId.getValue(currentChainId), amount)
-    }
-
-    fun asyncDepositERC20(symbol: String, amount: BigInteger): TxHash {
+    fun sendERC20DepositTx(symbol: String, amount: BigInteger): TxHash {
         val erc20Contract = loadErc20Contract(symbol)
 
         blockchainClientsByChainId.getValue(currentChainId).sendTransaction(
@@ -154,19 +174,6 @@ class Wallet(
             exchangeContractByChainId.getValue(currentChainId).deposit(erc20TokenAddress(symbol), amount).encodeFunctionCall(),
             BigInteger.ZERO,
         )
-    }
-
-    fun asyncDeposit(assetAmount: AssetAmount): TxHash {
-        return if (assetAmount.symbol.contractAddress == null) {
-            asyncDepositNative(assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
-        } else {
-            asyncDepositERC20(assetAmount.symbol.name, assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
-        }
-    }
-
-    fun depositERC20(symbol: String, amount: BigInteger): TransactionReceipt {
-        loadErc20Contract(symbol).approve(exchangeContractAddressByChainId.getValue(currentChainId).value, amount).sendAndWaitForConfirmation()
-        return exchangeContractByChainId.getValue(currentChainId).deposit(erc20TokenAddress(symbol), amount).sendAndWaitForConfirmation()
     }
 
     fun signWithdraw(symbol: String, amount: BigInteger, nonceOverride: Long? = null): CreateWithdrawalApiRequest {
