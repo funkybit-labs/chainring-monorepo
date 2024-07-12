@@ -68,6 +68,8 @@ export function SwapModal({
     onMarketChange,
     onSideChange: onChangedSide,
     isLimitOrder: false,
+    marketSessionStorageKey: 'sm_market',
+    sideSessionStorageKey: 'sm_side',
     Renderer: function (sr: SwapRender) {
       const sellAmountInputRef = useRef<HTMLInputElement>(null)
       const config = useConfig()
