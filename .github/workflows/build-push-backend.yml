@@ -19,12 +19,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Setup JDK
         uses: ./.github/actions/setup-java-17
-      - name: Build with Gradle Wrapper
-        run: ./gradlew build -x test
+      - name: Setup AWS
+        uses: ./.github/actions/setup-aws
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
       - name: Start Anvil and Postgres containers
         run: |
-          make anvil_image
-          make otterscan_image
           make start_ci_containers
       - name: Check with Gradle Wrapper
         run: ./gradlew check
@@ -35,18 +35,18 @@ jobs:
         uses: dorny/test-reporter@v1.8.0
         if: success() || failure()
         with:
-            name: Unit/Integration Tests
-            path: '**/build/test-results/test/TEST-*.xml'
-            reporter: java-junit
-            fail-on-empty: 'false'
+          name: Unit/Integration Tests
+          path: '**/build/test-results/test/TEST-*.xml'
+          reporter: java-junit
+          fail-on-empty: 'false'
       - name: Store Reports
         if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
-         name: integration-reports
-         path: |
-           **/build/reports/
-           **/build/test-results/
+          name: integration-reports
+          path: |
+            **/build/reports/
+            **/build/test-results/
 
   publish_to_ecr:
     if: ${{ github.event_name == 'push' }}

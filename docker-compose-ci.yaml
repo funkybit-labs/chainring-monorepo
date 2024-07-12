@@ -1,6 +1,6 @@
 services:
   anvil:
-    image: anvil # custom image (./anvil/Dockerfile)
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil:latest
     container_name: anvil
     restart: always
     environment:
@@ -10,7 +10,7 @@ services:
     volumes:
       - anvil-data:/root/.foundry
   anvil-2:
-    image: anvil # custom image (./anvil/Dockerfile)
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil:latest
     container_name: anvil2
     restart: always
     environment:
