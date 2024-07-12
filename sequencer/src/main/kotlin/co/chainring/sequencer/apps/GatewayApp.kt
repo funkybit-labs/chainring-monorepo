@@ -1,5 +1,6 @@
 package co.chainring.sequencer.apps
 
+import co.chainring.sequencer.proto.BackToBackOrderRequest
 import co.chainring.sequencer.proto.BalanceBatch
 import co.chainring.sequencer.proto.GatewayGrpcKt
 import co.chainring.sequencer.proto.GatewayResponse
@@ -188,6 +189,14 @@ class GatewayApp(
                 this.guid = request.guid
                 this.type = SequencerRequest.Type.SetMarketMinFees
                 this.marketMinFees.addAll(request.marketMinFeesList)
+            }
+        }
+
+        override suspend fun applyBackToBackOrder(request: BackToBackOrderRequest): GatewayResponse {
+            return toSequencer {
+                this.guid = request.guid
+                this.type = SequencerRequest.Type.ApplyBackToBackOrder
+                this.backToBackOrder = request.order
             }
         }
     }

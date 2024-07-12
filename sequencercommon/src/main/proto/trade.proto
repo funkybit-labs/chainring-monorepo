@@ -13,4 +13,5 @@ message TradeCreated {
   int32 levelIx = 4;
   IntegerValue buyerFee = 5;
   IntegerValue sellerFee = 6;
+  string marketId = 7;
 }

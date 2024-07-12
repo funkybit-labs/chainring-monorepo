@@ -41,6 +41,7 @@ import co.chainring.core.sequencer.sequencerWalletId
 import co.chainring.core.sequencer.withdrawalId
 import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
+import co.chainring.sequencer.proto.BackToBackOrder
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderBatch
 import co.chainring.sequencer.proto.OrderDisposition
@@ -126,6 +127,20 @@ object SequencerResponseProcessorService {
                             request = request,
                             response = response,
                             ordersBeingUpdated = request.orderBatch.ordersToChangeList.map { it.guid },
+                            orderIdsInRequest = (request.orderBatch.ordersToAddList + request.orderBatch.ordersToChangeList).map { it.guid },
+                        )
+                    }
+                }
+            }
+
+            SequencerRequest.Type.ApplyBackToBackOrder -> {
+                if (response.error == SequencerError.None) {
+                    WalletEntity.getBySequencerId(request.backToBackOrder.wallet.sequencerWalletId())?.let { wallet ->
+                        handleBackToBackMarketOrder(request.backToBackOrder, wallet, response)
+                        handleSequencerResponse(
+                            request = request,
+                            response = response,
+                            orderIdsInRequest = listOf(request.backToBackOrder.order.guid),
                         )
                     }
                 }
@@ -220,7 +235,33 @@ object SequencerResponseProcessorService {
         }
     }
 
-    private fun handleSequencerResponse(request: SequencerRequest, response: SequencerResponse, ordersBeingUpdated: List<Long> = listOf()) {
+    private fun handleBackToBackMarketOrder(backToBackOrder: BackToBackOrder, wallet: WalletEntity, response: SequencerResponse) {
+        val createAssignment =
+            CreateOrderAssignment(
+                backToBackOrder.order.externalGuid.orderId(),
+                backToBackOrder.order.nonce.toBigInteger(),
+                OrderType.BackToBackMarket,
+                toOrderSide(backToBackOrder.order.type),
+                backToBackOrder.order.amount.toBigInteger(),
+                backToBackOrder.order.levelIx,
+                backToBackOrder.order.signature.toEvmSignature(),
+                backToBackOrder.order.guid.sequencerOrderId(),
+                response.processingTime.toBigInteger(),
+            )
+
+        val market = getMarket(MarketId(backToBackOrder.marketIdsList[0]))
+        val backToBackMarket = getMarket(MarketId(backToBackOrder.marketIdsList[1]))
+
+        OrderEntity.batchUpdate(market, wallet, listOf(createAssignment), listOf(), backToBackMarket = backToBackMarket)
+
+        val createdOrder = OrderEntity.listOrdersWithExecutions(listOf(createAssignment.orderId)).map { it.toOrderResponse() }.first()
+
+        publishBroadcasterNotifications(
+            listOf(BroadcasterNotification(OrderCreated(createdOrder), wallet.address)),
+        )
+    }
+
+    private fun handleSequencerResponse(request: SequencerRequest, response: SequencerResponse, ordersBeingUpdated: List<Long> = listOf(), orderIdsInRequest: List<Long> = listOf()) {
         val timestamp = if (response.createdAt > 0) {
             Instant.fromEpochMilliseconds(response.createdAt)
         } else {
@@ -230,20 +271,20 @@ object SequencerResponseProcessorService {
         val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
         val limitsChanged = mutableSetOf<Pair<WalletEntity, MarketEntity>>()
 
-        val orderIdsInRequest: List<Long> = (request.orderBatch.ordersToAddList + request.orderBatch.ordersToChangeList).map { it.guid }
-
         // handle trades
         val tradesWithTakerOrder: List<Pair<TradeEntity, OrderEntity>> = response.tradesCreatedList.mapNotNull { trade ->
             logger.debug { "Trade Created: buyOrderGuid=${trade.buyOrderGuid}, sellOrderGuid=${trade.sellOrderGuid}, amount=${trade.amount.toBigInteger()} levelIx=${trade.levelIx}, buyerFee=${trade.buyerFee.toBigInteger()}, sellerFee=${trade.sellerFee.toBigInteger()}" }
             val buyOrder = OrderEntity.findBySequencerOrderId(trade.buyOrderGuid)
             val sellOrder = OrderEntity.findBySequencerOrderId(trade.sellOrderGuid)
 
+            val tradeMarket = getMarket(MarketId(trade.marketId))
+
             if (buyOrder != null && sellOrder != null) {
                 val tradeEntity = TradeEntity.create(
                     timestamp = timestamp,
-                    market = buyOrder.market,
+                    market = tradeMarket,
                     amount = trade.amount.toBigInteger(),
-                    price = buyOrder.market.tickSize.multiply(trade.levelIx.toBigDecimal()),
+                    price = tradeMarket.tickSize.multiply(trade.levelIx.toBigDecimal()),
                     tradeHash = ECHelper.tradeHash(trade.buyOrderGuid, trade.sellOrderGuid),
                     responseSequence = response.sequence,
                 )
@@ -264,7 +305,8 @@ object SequencerResponseProcessorService {
                         } else {
                             trade.sellerFee.toBigInteger()
                         },
-                        feeSymbol = Symbol(order.market.quoteSymbol.name),
+                        feeSymbol = Symbol(tradeMarket.quoteSymbol.name),
+                        marketEntity = tradeMarket,
                     )
 
                     execution.refresh(flush = true)

@@ -57,6 +57,7 @@ import co.chainring.core.model.db.migrations.V59_NullableDepositBlockNumber
 import co.chainring.core.model.db.migrations.V5_ChainTable
 import co.chainring.core.model.db.migrations.V60_AddResponseSequenceToTradeAndWithdrawal
 import co.chainring.core.model.db.migrations.V61_CreateBlockTable
+import co.chainring.core.model.db.migrations.V62_BackToBackOrders
 import co.chainring.core.model.db.migrations.V6_MarketTable
 import co.chainring.core.model.db.migrations.V7_OrderTable
 import co.chainring.core.model.db.migrations.V8_ExecutionsAndTrades
@@ -124,4 +125,5 @@ val migrations = listOf(
     V59_NullableDepositBlockNumber(),
     V60_AddResponseSequenceToTradeAndWithdrawal(),
     V61_CreateBlockTable(),
+    V62_BackToBackOrders(),
 )

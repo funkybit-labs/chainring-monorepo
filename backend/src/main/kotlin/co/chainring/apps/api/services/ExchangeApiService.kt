@@ -62,15 +62,76 @@ class ExchangeApiService(
         walletAddress: Address,
         apiRequest: CreateOrderApiRequest,
     ): CreateOrderApiResponse {
-        return orderBatch(
+        return when (apiRequest) {
+            is CreateOrderApiRequest.BackToBackMarket -> addBackToBackMarketOrder(
+                walletAddress,
+                apiRequest,
+            )
+
+            else -> orderBatch(
+                walletAddress,
+                BatchOrdersApiRequest(
+                    marketId = apiRequest.marketId,
+                    createOrders = listOf(apiRequest),
+                    updateOrders = emptyList(),
+                    cancelOrders = emptyList(),
+                ),
+            ).createdOrders.first()
+        }
+    }
+
+    private fun addBackToBackMarketOrder(
+        walletAddress: Address,
+        orderRequest: CreateOrderApiRequest.BackToBackMarket,
+    ): CreateOrderApiResponse {
+        val orderId = OrderId.generate()
+
+        val market1 = getMarket(orderRequest.marketId)
+        val baseSymbol = getSymbolEntity(market1.baseSymbol)
+        val market2 = getMarket(orderRequest.secondMarketId)
+        val quoteSymbol = getSymbolEntity(market2.quoteSymbol)
+
+        verifyEIP712Signature(
             walletAddress,
-            BatchOrdersApiRequest(
-                marketId = apiRequest.marketId,
-                createOrders = listOf(apiRequest),
-                updateOrders = emptyList(),
-                cancelOrders = emptyList(),
+            EIP712Transaction.Order(
+                walletAddress,
+                baseChainId = baseSymbol.chainId.value,
+                baseToken = baseSymbol.contractAddress ?: Address.zero,
+                quoteChainId = quoteSymbol.chainId.value,
+                quoteToken = quoteSymbol.contractAddress ?: Address.zero,
+                amount = if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
+                price = BigInteger.ZERO,
+                nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
+                signature = orderRequest.signature,
             ),
-        ).createdOrders.first()
+            verifyingChainId = orderRequest.verifyingChainId,
+        )
+
+        val response = runBlocking {
+            sequencerClient.backToBackOrder(
+                listOf(market1.id, market2.id),
+                walletAddress.toSequencerId().value,
+                SequencerClient.Order(
+                    sequencerOrderId = orderId.toSequencerId().value,
+                    amount = orderRequest.amount.fixedAmount(),
+                    levelIx = null,
+                    orderType = toSequencerOrderType(true, orderRequest.side),
+                    nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
+                    signature = orderRequest.signature,
+                    orderId = orderId,
+                    chainId = orderRequest.verifyingChainId,
+                    percentage = orderRequest.amount.percentage(),
+                ),
+            )
+        }
+
+        when (response.error) {
+            SequencerError.None -> {}
+            SequencerError.ExceedsLimit -> throw RequestProcessingError("Order exceeds limit")
+            else -> throw RequestProcessingError("Unable to process request - ${response.error}")
+        }
+
+        return CreateOrderApiResponse(orderId, RequestStatus.Accepted, null, orderRequest)
     }
 
     fun updateOrder(
@@ -138,7 +199,6 @@ class ExchangeApiService(
                 sequencerOrderId = orderId.toSequencerId().value,
                 amount = orderRequest.amount.fixedAmount(),
                 levelIx = price?.divideToIntegralValue(market.tickSize)?.toInt(),
-                wallet = walletAddress.toSequencerId().value,
                 orderType = toSequencerOrderType(orderRequest is CreateOrderApiRequest.Market, orderRequest.side),
                 nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
                 signature = orderRequest.signature,
@@ -172,7 +232,6 @@ class ExchangeApiService(
                 sequencerOrderId = orderRequest.orderId.toSequencerId().value,
                 amount = orderRequest.amount,
                 levelIx = orderRequest.price.divideToIntegralValue(market.tickSize).toInt(),
-                wallet = walletAddress.toSequencerId().value,
                 orderType = toSequencerOrderType(false, orderRequest.side),
                 nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
                 signature = orderRequest.signature,

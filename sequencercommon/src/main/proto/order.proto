@@ -51,3 +51,10 @@ enum OrderDisposition {
   Canceled = 5;
   AutoReduced = 6;
 }
+
+message BackToBackOrder {
+  string guid = 1;
+  uint64 wallet = 2;
+  repeated string marketIds = 3;
+  Order order = 4;
+}

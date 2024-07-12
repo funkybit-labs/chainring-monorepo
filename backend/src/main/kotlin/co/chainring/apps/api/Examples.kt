@@ -112,6 +112,7 @@ object Examples {
                 role = ExecutionRole.Maker,
                 feeAmount = BigInteger("0"),
                 feeSymbol = Symbol("ETH"),
+                marketId = MarketId("BTC/ETH"),
             ),
         ),
         timing = Order.Timing(
@@ -138,6 +139,7 @@ object Examples {
                 role = ExecutionRole.Maker,
                 feeAmount = BigInteger("0"),
                 feeSymbol = Symbol("ETH"),
+                marketId = MarketId("BTC/ETH"),
             ),
         ),
         timing = Order.Timing(

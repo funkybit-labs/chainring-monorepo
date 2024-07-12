@@ -13,6 +13,7 @@ data class ExpectedTrade(
     val amount: BigDecimal,
     val buyerFee: BigDecimal,
     val sellerFee: BigDecimal,
+    val marketId: String? = null,
 )
 
 fun SequencerResponse.assertTrades(
@@ -25,6 +26,7 @@ fun SequencerResponse.assertTrades(
                 amount = it.amount.setScale(market.baseDecimals),
                 buyerFee = it.buyerFee.setScale(market.quoteDecimals),
                 sellerFee = it.sellerFee.setScale(market.quoteDecimals),
+                marketId = market.id.value,
             )
         },
         tradesCreatedList.map {
@@ -35,8 +37,33 @@ fun SequencerResponse.assertTrades(
                 amount = it.amount.fromFundamentalUnits(market.baseDecimals),
                 buyerFee = it.buyerFee.fromFundamentalUnits(market.quoteDecimals),
                 sellerFee = it.sellerFee.fromFundamentalUnits(market.quoteDecimals),
+                marketId = it.marketId,
             )
         },
+    )
+}
+
+fun SequencerResponse.assertTrade(
+    market: SequencerClient.Market,
+    expectedTrade: ExpectedTrade,
+    index: Int,
+) {
+    assertEquals(
+        expectedTrade.copy(
+            amount = expectedTrade.amount.setScale(market.baseDecimals),
+            buyerFee = expectedTrade.buyerFee.setScale(market.quoteDecimals),
+            sellerFee = expectedTrade.sellerFee.setScale(market.quoteDecimals),
+            marketId = market.id.value,
+        ),
+        ExpectedTrade(
+            buyOrderGuid = tradesCreatedList[index].buyOrderGuid,
+            sellOrderGuid = tradesCreatedList[index].sellOrderGuid,
+            price = market.tickSize.multiply(tradesCreatedList[index].levelIx.toBigDecimal()),
+            amount = tradesCreatedList[index].amount.fromFundamentalUnits(market.baseDecimals),
+            buyerFee = tradesCreatedList[index].buyerFee.fromFundamentalUnits(market.quoteDecimals),
+            sellerFee = tradesCreatedList[index].sellerFee.fromFundamentalUnits(market.quoteDecimals),
+            marketId = tradesCreatedList[index].marketId,
+        ),
     )
 }
 

@@ -327,6 +327,7 @@ data class Market(
                 this.sellerFee = sellerFee.toIntegerValue()
                 amount = execution.amount.toIntegerValue()
                 levelIx = execution.levelIx
+                this.marketId = id.value
             },
         )
 
@@ -654,15 +655,26 @@ data class Market(
         }
     }
 
-    private fun isBelowMinFee(order: Order, feeRates: FeeRates): Boolean {
+    fun isBelowMinFee(order: Order, feeRates: FeeRates): Boolean {
         val (levelIx, feeRate) = when (order.type) {
             Order.Type.MarketBuy -> {
+                if (feeRates.taker.value == 0L) {
+                    return false
+                }
                 Pair(bestOfferIx, feeRates.taker)
             }
             Order.Type.MarketSell -> {
+                if (feeRates.taker.value == 0L) {
+                    return false
+                }
                 Pair(bestBidIx, feeRates.taker)
             }
-            else -> Pair(order.levelIx, feeRates.maker)
+            else -> {
+                if (feeRates.maker.value == 0L) {
+                    return false
+                }
+                Pair(order.levelIx, feeRates.maker)
+            }
         }
 
         // in case of empty book let it proceed, order will be rejected anyway
@@ -728,7 +740,23 @@ data class Market(
         return Pair(clearingPrice, availableQuantity)
     }
 
-    private fun quantityForMarketBuy(notional: BigInteger): BigInteger {
+    fun quantityAndNotionalForMarketBuy(amount: BigInteger): Pair<BigInteger, BigInteger> {
+        var remainingAmount = amount
+        var notional = BigInteger.ZERO
+
+        var currentLevel = if (bestOfferIx != -1) levels.get(bestOfferIx) else null
+        while (currentLevel != null) {
+            val quantityAtLevel = currentLevel.totalQuantity.min(remainingAmount)
+            notional += notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals)
+            remainingAmount -= quantityAtLevel
+            if (remainingAmount == BigInteger.ZERO) break
+
+            currentLevel = currentLevel.next()
+        }
+        return Pair(amount - remainingAmount, notional)
+    }
+
+    fun quantityForMarketBuy(notional: BigInteger): BigInteger {
         var remainingNotional = notional
         var baseAmount = BigInteger.ZERO
 
@@ -773,6 +801,48 @@ data class Market(
         }
 
         return amount - remainingAmount
+    }
+
+    fun quantityAndNotionalForMarketSell(amount: BigInteger): Pair<BigInteger, BigInteger> {
+        var remainingAmount = amount
+        var notionalReceived = BigInteger.ZERO
+        var currentLevel = if (bestBidIx != -1) levels.get(bestBidIx) else null
+        while (currentLevel != null) {
+            val quantityAtLevel = currentLevel.totalQuantity.min(remainingAmount)
+            notionalReceived += notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals)
+            remainingAmount -= quantityAtLevel
+            if (remainingAmount == BigInteger.ZERO) {
+                break
+            }
+            currentLevel = currentLevel.prev()
+        }
+        return Pair(amount - remainingAmount, notionalReceived)
+    }
+
+    fun quantityForMarketSell(notional: BigInteger): BigInteger {
+        var remainingNotional = notional
+        var baseAmount = BigInteger.ZERO
+
+        var currentLevel = if (bestBidIx != -1) levels.get(bestBidIx) else null
+        while (currentLevel != null) {
+            val quantityAtLevel = currentLevel.totalQuantity
+            if (quantityAtLevel > BigInteger.ZERO) {
+                val notionalAtLevel =
+                    remainingNotional.min(notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals))
+                if (notionalAtLevel == remainingNotional) {
+                    return baseAmount + quantityFromNotionalAndPrice(
+                        remainingNotional,
+                        currentLevel.price,
+                        baseDecimals,
+                        quoteDecimals,
+                    )
+                }
+                baseAmount += quantityAtLevel
+                remainingNotional -= notionalAtLevel
+            }
+            currentLevel = currentLevel.prev()
+        }
+        return baseAmount
     }
 
     fun calculateAmountForPercentageSell(wallet: WalletAddress, walletBalance: BigInteger, percent: Int): BigInteger {

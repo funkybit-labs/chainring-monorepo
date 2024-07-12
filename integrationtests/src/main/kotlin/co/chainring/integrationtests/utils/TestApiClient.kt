@@ -228,6 +228,25 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
         return response
     }
 
+    fun createBackToBackMarketOrder(markets: List<Market>, side: OrderSide, amount: BigDecimal?, wallet: Wallet, percentage: Percentage? = null): CreateOrderApiResponse {
+        val request = CreateOrderApiRequest.BackToBackMarket(
+            nonce = generateOrderNonce(),
+            marketId = markets[0].id,
+            secondMarketId = markets[1].id,
+            side = side,
+            amount = amount?.let { OrderAmount.Fixed(it.toFundamentalUnits(markets[0].baseDecimals)) } ?: OrderAmount.Percent(percentage!!),
+            signature = EvmSignature.emptySignature(),
+            verifyingChainId = ChainId.empty,
+        ).let { wallet.signOrder(it) }
+
+        val response = createOrder(request)
+
+        assertIs<CreateOrderApiRequest.BackToBackMarket>(response.order)
+        assertEquals(request, response.order)
+
+        return response
+    }
+
     override fun batchOrders(apiRequest: BatchOrdersApiRequest): BatchOrdersApiResponse =
         tryBatchOrders(apiRequest).assertSuccess()
 

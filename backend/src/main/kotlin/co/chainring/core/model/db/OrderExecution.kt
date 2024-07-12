@@ -43,6 +43,7 @@ object OrderExecutionTable : GUIDTable<ExecutionId>("order_execution", ::Executi
     ).index()
     val feeAmount = decimal("fee_amount", 30, 0)
     val feeSymbol = varchar("fee_symbol", 10485760)
+    val marketGuid = reference("market_guid", MarketTable).nullable()
 }
 
 class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId>(guid) {
@@ -50,7 +51,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
         return Trade(
             id = this.trade.guid.value,
             orderId = this.orderGuid.value,
-            marketId = this.order.marketGuid.value,
+            marketId = this.marketGuid?.value ?: this.order.marketGuid.value,
             timestamp = this.timestamp,
             side = this.order.side,
             amount = this.trade.amount,
@@ -70,6 +71,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             role: ExecutionRole,
             feeAmount: BigInteger,
             feeSymbol: Symbol,
+            marketEntity: MarketEntity? = null,
         ) = OrderExecutionEntity.new(ExecutionId.generate()) {
             val now = Clock.System.now()
             this.createdAt = now
@@ -79,6 +81,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             this.role = role
             this.feeAmount = feeAmount
             this.feeSymbol = feeSymbol
+            this.marketGuid = marketEntity?.guid
         }
 
         fun findForOrder(orderEntity: OrderEntity): List<OrderExecutionEntity> {
@@ -130,4 +133,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
         toReal = { Symbol(it) },
         toColumn = { it.value },
     )
+
+    var marketGuid by OrderExecutionTable.marketGuid
+    var market by MarketEntity optionalReferencedOn OrderExecutionTable.marketGuid
 }

@@ -2,6 +2,7 @@ package co.chainring.testutils
 
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.FeeRates
+import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.core.Clock
@@ -19,6 +20,7 @@ import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.TradeCreated
+import co.chainring.sequencer.proto.backToBackOrder
 import co.chainring.sequencer.proto.balanceBatch
 import co.chainring.sequencer.proto.feeRates
 import co.chainring.sequencer.proto.market
@@ -90,6 +92,32 @@ class SequencerClient(clock: Clock) {
             },
         )
 
+    fun addBackToBackOrder(
+        orderGuid: Long,
+        firstMarket: Market,
+        secondMarket: Market,
+        amount: BigDecimal,
+        wallet: WalletAddress,
+        orderType: Order.Type,
+        percentage: Int? = null,
+    ) =
+        sequencer.processRequest(
+            sequencerRequest {
+                this.guid = UUID.randomUUID().toString()
+                this.type = SequencerRequest.Type.ApplyBackToBackOrder
+                this.backToBackOrder = backToBackOrder {
+                    this.marketIds.addAll(listOf(firstMarket.id.value, secondMarket.id.value))
+                    this.wallet = wallet.value
+                    this.order = order {
+                        this.guid = orderGuid
+                        this.amount = amount.toFundamentalUnits(firstMarket.baseDecimals).toIntegerValue()
+                        this.type = orderType
+                        percentage?.let { this.percentage = percentage }
+                    }
+                }
+            },
+        )
+
     fun addOrderAndVerifyAccepted(
         market: Market,
         amount: BigDecimal,
@@ -144,7 +172,7 @@ class SequencerClient(clock: Clock) {
             },
         )
 
-    fun createMarket(marketId: MarketId, tickSize: BigDecimal = "0.05".toBigDecimal(), baseDecimals: Int = 8, quoteDecimals: Int = 18): Market {
+    fun createMarket(marketId: MarketId, tickSize: BigDecimal = "0.05".toBigDecimal(), baseDecimals: Int = 8, quoteDecimals: Int = 18, minFee: BigDecimal? = null): Market {
         val createMarketResponse = sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
@@ -156,6 +184,7 @@ class SequencerClient(clock: Clock) {
                     this.maxOrdersPerLevel = 1000
                     this.baseDecimals = baseDecimals
                     this.quoteDecimals = quoteDecimals
+                    minFee?.let { this.minFee = minFee.toFundamentalUnits(quoteDecimals).toIntegerValue() }
                 }
             },
         )

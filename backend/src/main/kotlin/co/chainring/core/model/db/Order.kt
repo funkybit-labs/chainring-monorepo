@@ -55,6 +55,7 @@ value class OrderId(override val value: String) : EntityId {
 enum class OrderType {
     Market,
     Limit,
+    BackToBackMarket,
 }
 
 @Serializable
@@ -154,6 +155,7 @@ object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
     val signature = varchar("signature", 10485760)
     val sequencerOrderId = long("sequencer_order_id").uniqueIndex().nullable()
     val sequencerTimeNs = decimal("sequencer_time_ns", 30, 0)
+    val secondMarketGuid = reference("second_market_guid", MarketTable).nullable()
 
     init {
         OrderTable.index(
@@ -181,6 +183,34 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                         role = execution.role,
                         feeAmount = execution.feeAmount,
                         feeSymbol = execution.feeSymbol,
+                        marketId = execution.market?.guid?.value ?: this.marketGuid.value,
+                    )
+                },
+                timing = Order.Timing(
+                    createdAt = this.createdAt,
+                    updatedAt = this.updatedAt,
+                    closedAt = this.closedAt,
+                    sequencerTimeNs = this.sequencerTimeNs,
+                ),
+            )
+
+            OrderType.BackToBackMarket -> Order.BackToBackMarket(
+                id = this.id.value,
+                status = this.status,
+                marketId = this.marketGuid.value,
+                secondMarketId = this.secondMarketGuid!!.value,
+                side = this.side,
+                amount = this.amount,
+                originalAmount = this.originalAmount,
+                executions = executions.map { execution ->
+                    Order.Execution(
+                        timestamp = execution.timestamp,
+                        amount = execution.trade.amount,
+                        price = execution.trade.price,
+                        role = execution.role,
+                        feeAmount = execution.feeAmount,
+                        feeSymbol = execution.feeSymbol,
+                        marketId = execution.market?.guid?.value ?: this.marketGuid.value,
                     )
                 },
                 timing = Order.Timing(
@@ -207,6 +237,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                         role = execution.role,
                         feeAmount = execution.feeAmount,
                         feeSymbol = execution.feeSymbol,
+                        marketId = this.marketGuid.value,
                     )
                 },
                 timing = Order.Timing(
@@ -220,7 +251,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
     }
 
     companion object : EntityClass<OrderId, OrderEntity>(OrderTable) {
-        fun batchUpdate(market: MarketEntity, wallet: WalletEntity, createAssignments: List<CreateOrderAssignment>, updateAssignments: List<UpdateOrderAssignment>) {
+        fun batchUpdate(market: MarketEntity, wallet: WalletEntity, createAssignments: List<CreateOrderAssignment>, updateAssignments: List<UpdateOrderAssignment>, backToBackMarket: MarketEntity? = null) {
             if (createAssignments.isEmpty() && updateAssignments.isEmpty()) {
                 return
             }
@@ -241,6 +272,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 this[OrderTable.signature] = assignment.signature.value
                 this[OrderTable.sequencerOrderId] = assignment.sequencerOrderId.value
                 this[OrderTable.sequencerTimeNs] = assignment.sequencerTimeNs.toBigDecimal()
+                this[OrderTable.secondMarketGuid] = backToBackMarket?.guid
             }
             if (updateAssignments.isNotEmpty()) {
                 BatchUpdateStatement(OrderTable).apply {
@@ -524,6 +556,9 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         toReal = { it.toBigInteger() },
         toColumn = { it.toBigDecimal() },
     )
+
+    var secondMarketGuid by OrderTable.secondMarketGuid
+    var secondMarket by MarketEntity optionalReferencedOn OrderTable.secondMarketGuid
 }
 
 fun Pair<OrderEntity, List<OrderExecutionEntity>>.toOrderResponse() = this.first.toOrderResponse(this.second)
