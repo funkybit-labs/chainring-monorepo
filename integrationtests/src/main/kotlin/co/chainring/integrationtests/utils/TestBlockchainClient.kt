@@ -19,16 +19,6 @@ import kotlin.time.toJavaDuration
 class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : BlockchainClient(blockchainConfig) {
     fun loadERC20Mock(address: String) = MockERC20.load(address, web3j, transactionManager, gasProvider)
 
-//    fun depositNative(address: Address, amount: BigInteger): TransactionReceipt {
-//        return Transfer(web3j, transactionManager).sendFunds(
-//            address.value,
-//            Convert.toWei(amount.toString(10), Convert.Unit.WEI),
-//            Convert.Unit.WEI,
-//            web3j.ethGasPrice().send().gasPrice,
-//            gasProvider.gasLimit,
-//        ).send()
-//    }
-
     fun waitForTransactionReceipt(txHash: TxHash): TransactionReceipt {
         var receipt: TransactionReceipt? = null
 
