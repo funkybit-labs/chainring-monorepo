@@ -448,8 +448,12 @@ function OrderBookChart({
       .tickSizeOuter(0)
       .tickSizeInner(0)
       .tickPadding(10)
-      .ticks(7)
-      .tickFormat((d: d3.NumberValue) => d.valueOf().toFixed(tickDecimals))
+    if (inverted) {
+      yAxis.tickValues(evenlyPlacedReciprocalTicks(yScale, 6))
+    } else {
+      yAxis.ticks(7)
+    }
+    yAxis.tickFormat((d: d3.NumberValue) => d.valueOf().toFixed(tickDecimals))
 
     // @ts-expect-error @definitelytyped/no-unnecessary-generics
     svg.select('.x-axis').call(xAxis)
@@ -477,6 +481,20 @@ function OrderBookChart({
         .select('text')
         .text(lastTrade.price)
         .attr('fill', lastPriceStyle.textColor)
+    }
+
+    function evenlyPlacedReciprocalTicks(
+      yScale: d3.ScaleLinear<number, number> | d3.ScalePower<number, number>,
+      numTicks: number
+    ): number[] {
+      const [rangeStart, rangeEnd] = yScale.range().sort((a, b) => a - b)
+      const tickRange = rangeEnd - rangeStart
+      const tickInterval = (tickRange * 0.8) / (numTicks - 1)
+      const startPoint = rangeStart + tickRange * 0.1
+
+      return Array.from({ length: numTicks }, (_, i) =>
+        yScale.invert(startPoint + i * tickInterval)
+      )
     }
 
     // draw levels
@@ -534,6 +552,7 @@ function OrderBookChart({
   }, [
     innerHeight,
     innerWidth,
+    inverted,
     lastTrade,
     orderBook,
     svg,
