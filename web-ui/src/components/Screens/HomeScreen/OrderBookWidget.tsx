@@ -26,6 +26,8 @@ interface OrderBookChartEntry {
   sellSize: Decimal
 }
 
+const CLAMP_MAX_TICKS = 250
+
 export function OrderBookWidget({
   market,
   side,
@@ -44,11 +46,38 @@ export function OrderBookWidget({
 
   useWebsocketSubscription({
     topics: useMemo(() => [orderBookTopic(market.id)], [market.id]),
-    handler: useCallback((message: Publishable) => {
-      if (message.type === 'OrderBook') {
-        setRawOrderBook(message)
-      }
-    }, [])
+    handler: useCallback(
+      (message: Publishable) => {
+        if (message.type === 'OrderBook') {
+          const maxBuy =
+            message.buy.length > 0
+              ? message.buy
+                  .map((d) => parseFloat(d.price))
+                  .reduce((max, price) => (max > price ? max : price))
+              : 0
+          const minBuy = maxBuy - market.tickSize.toNumber() * CLAMP_MAX_TICKS
+
+          const minSell =
+            message.sell.length > 0
+              ? message.sell
+                  .map((d) => parseFloat(d.price))
+                  .reduce((min, price) => (min < price ? min : price))
+              : 0
+          const maxSell = minSell + market.tickSize.toNumber() * CLAMP_MAX_TICKS
+
+          // clamp to CLAMP_TICKS on each side
+          const clamped = {
+            type: message.type,
+            buy: message.buy.filter((d) => parseFloat(d.price) >= minBuy),
+            sell: message.sell.filter((d) => parseFloat(d.price) <= maxSell),
+            last: message.last
+          }
+
+          setRawOrderBook(clamped)
+        }
+      },
+      [market.tickSize]
+    )
   })
 
   // change of market causes re-calculation of the inflated OrderBook before new OrderBook state is loaded.
@@ -83,22 +112,32 @@ export function OrderBookWidget({
 
     if (rawOrderBook) {
       // find out min and max price
-      let minBuyPrice = rawOrderBook.buy.reduce(
-        (min, d) => Decimal.min(min, new Decimal(d.price)),
-        new Decimal(rawOrderBook.last.price)
-      )
-      let maxSellPrice = rawOrderBook.sell.reduce(
-        (max, d) => Decimal.max(max, new Decimal(d.price)),
-        new Decimal(rawOrderBook.last.price)
-      )
+      const allPrices = rawOrderBook.buy
+        .map((d) => new Decimal(d.price))
+        .concat(rawOrderBook.sell.map((d) => new Decimal(d.price)))
+      let minPrice, maxPrice
+      if (allPrices.length > 0) {
+        minPrice = allPrices.reduce((min, price) =>
+          min.lessThan(price) ? min : price
+        )
+        maxPrice = allPrices.reduce((max, price) =>
+          max.greaterThan(price) ? max : price
+        )
+      } else {
+        // default values when there are no prices
+        minPrice = new Decimal(0)
+        maxPrice = new Decimal(0)
+      }
 
       // add 2 ticks on both sides as buffer area
-      minBuyPrice = minBuyPrice.minus(tickSize.mul(new Decimal(2)))
-      maxSellPrice = maxSellPrice.plus(tickSize.mul(new Decimal(2)))
+      minPrice = minPrice.greaterThan(new Decimal(0))
+        ? minPrice.minus(tickSize.mul(new Decimal(2)))
+        : minPrice
+      maxPrice = maxPrice.plus(tickSize.mul(new Decimal(2)))
 
-      let price = minBuyPrice
+      let price = minPrice
       const allPriceLevels: Decimal[] = []
-      while (price.lessThanOrEqualTo(maxSellPrice)) {
+      while (price.lessThanOrEqualTo(maxPrice)) {
         allPriceLevels.push(price)
         price = price.plus(tickSize)
       }
@@ -143,7 +182,7 @@ export function OrderBookWidget({
     function invertLast(last: LastTrade): LastTrade {
       const lastPrice = parseFloat(last.price)
       return {
-        price: (1.0 / lastPrice).toFixed(
+        price: (lastPrice === 0 ? 0 : 1.0 / lastPrice).toFixed(
           (tickSize.decimalPlaces() === 0 ? 5 : tickSize.decimalPlaces()) +
             lastPrice.toFixed(0).length +
             1
@@ -199,6 +238,7 @@ export function OrderBookWidget({
                 side === 'Sell' ? market.quoteSymbol : market.baseSymbol
               }
               orderBook={orderBookChartEntries}
+              inverted={side === 'Sell'}
               lastTrade={orderBookLastTrade}
               width={Math.max(width - 32, 100)}
               height={Math.max(height - 32, 400)}
@@ -226,6 +266,7 @@ function directionStyle(direction: Direction) {
 
 function OrderBookChart({
   orderBook,
+  inverted,
   lastTrade,
   tickDecimals,
   quantitySymbol,
@@ -234,6 +275,7 @@ function OrderBookChart({
   renderAnimation
 }: {
   orderBook: OrderBookChartEntry[]
+  inverted: boolean
   lastTrade: LastTrade
   tickDecimals: number
   quantitySymbol: TradingSymbol | undefined
@@ -267,7 +309,7 @@ function OrderBookChart({
   const innerWidthWithMarginRight = width - margin.left
   const innerHeight = height - margin.top - margin.bottom
 
-  const yScale = d3.scaleLinear()
+  const yScale = inverted ? d3.scalePow().exponent(-1) : d3.scaleLinear()
 
   const lastMousePointerLocation = useRef({ mouseX: 0, mouseY: 0 })
   const updateMouseProjections = useCallback(
@@ -297,17 +339,13 @@ function OrderBookChart({
         nearestPriceLevel.buySize
       )
 
-      let totalAmount = new Decimal(0)
-      if (nearestPriceLevel.price.gt(new Decimal(lastTrade.price))) {
-        totalAmount = orderBook
-          .filter((d) => d.price.lte(nearestPriceLevel.price))
-          .reduce((acc, d) => acc.plus(d.sellSize), new Decimal(0))
-      }
-      if (nearestPriceLevel.price.lt(new Decimal(lastTrade.price))) {
-        totalAmount = orderBook
-          .filter((d) => d.price.gte(nearestPriceLevel.price))
-          .reduce((acc, d) => acc.plus(d.buySize), new Decimal(0))
-      }
+      const totalSell = orderBook
+        .filter((d) => d.price.lte(nearestPriceLevel.price))
+        .reduce((acc, d) => acc.plus(d.sellSize), new Decimal(0))
+      const totalBuy = orderBook
+        .filter((d) => d.price.gte(nearestPriceLevel.price))
+        .reduce((acc, d) => acc.plus(d.buySize), new Decimal(0))
+      const totalAmount = totalSell.gt(new Decimal(0)) ? totalSell : totalBuy
 
       const svgMouseProjection = svg.select('.y-axis-mouse-projection')
       const formattedLevelAmount = levelAmount.toFixed(tickDecimals + 1)
@@ -330,34 +368,52 @@ function OrderBookChart({
             yScale(nearestPriceLevel.price.toNumber()) + margin.top
           })`
         )
+
+      // make tooltip are always be visible on the screen
+      const yAdjustToScreen =
+        mouseY > innerHeight + margin.top - 22 // lower boundary
+          ? innerHeight + margin.top - mouseY - 22
+          : mouseY < margin.top + 10 // upped boundary
+            ? margin.top + 10 - mouseY
+            : 0
       tooltip
         .select('rect')
         .attr('x', `${innerWidthWithMarginRight - labelWidth - 10}`)
+        .attr('y', yAdjustToScreen - 22)
       tooltip
         .select('text#line1')
         .text('Price ' + nearestPriceLevel.price.toFixed(tickDecimals))
         .attr(
           'transform',
-          `translate(${innerWidthWithMarginRight - labelWidth - 4},-8)`
+          `translate(
+          ${innerWidthWithMarginRight - labelWidth - 4},
+          ${-8 + yAdjustToScreen}
+          )`
         )
       tooltip
         .select('text#line2')
         .text('Amount ' + levelAmount.toFixed(tickDecimals + 1))
         .attr(
           'transform',
-          `translate(${innerWidthWithMarginRight - labelWidth - 4},4)`
+          `translate(
+          ${innerWidthWithMarginRight - labelWidth - 4},
+          ${4 + yAdjustToScreen}
+          )`
         )
       tooltip
         .select('text#line3')
         .text('Total ' + totalAmount.toFixed(tickDecimals + 1))
         .attr(
           'transform',
-          `translate(${innerWidthWithMarginRight - labelWidth - 4},16)`
+          `translate(
+          ${innerWidthWithMarginRight - labelWidth - 4},
+          ${16 + yAdjustToScreen}
+          )`
         )
     },
     [
       innerWidthWithMarginRight,
-      lastTrade,
+      innerHeight,
       margin.top,
       orderBook,
       svg,
@@ -401,32 +457,35 @@ function OrderBookChart({
     svg.select('.y-axis').call(yAxis)
 
     // update last price tracker
-    const lastPriceStyle = directionStyle(lastTrade.direction)
+    const parsedLastPrice = parseFloat(lastTrade.price)
     let lastPriceGroup = svg
       .select('.y-axis-order-book-last-price')
-      .classed('hidden', !lastTrade.price)
-    if (renderAnimation) {
-      // @ts-expect-error Selection and Transition interfaces are compatible, casting only because of generic BaseType
-      lastPriceGroup = lastPriceGroup
-        .transition()
-        .duration(50) as typeof lastPriceGroup
+      .classed('hidden', parsedLastPrice === 0)
+    if (parsedLastPrice !== 0) {
+      if (renderAnimation) {
+        // @ts-expect-error Selection and Transition interfaces are compatible, casting only because of generic BaseType
+        lastPriceGroup = lastPriceGroup
+          .transition()
+          .duration(50) as typeof lastPriceGroup
+      }
+      lastPriceGroup.attr(
+        'transform',
+        `translate(0,${yScale(parsedLastPrice)})`
+      )
+      const lastPriceStyle = directionStyle(lastTrade.direction)
+      lastPriceGroup
+        .select('text')
+        .text(lastTrade.price)
+        .attr('fill', lastPriceStyle.textColor)
     }
-    lastPriceGroup.attr(
-      'transform',
-      `translate(0,${yScale(parseFloat(lastTrade.price))})`
-    )
-    lastPriceGroup
-      .select('text')
-      .text(lastTrade.price)
-      .attr('fill', lastPriceStyle.textColor)
 
     // draw levels
     function barHeight(
-      from: number,
-      to: number,
-      scale: d3.ScaleLinear<number, number>
+      price: number,
+      tickSize: number,
+      scale: d3.ScaleLinear<number, number> | d3.ScalePower<number, number>
     ): number {
-      return Math.abs(scale(from) - scale(to))
+      return Math.abs(scale(price) - scale(price + tickSize))
     }
 
     const bars = svg
@@ -451,11 +510,10 @@ function OrderBookChart({
         'y',
         (d) =>
           yScale(d.price.toNumber()) -
-          barHeight(d.tickSize.toNumber(), d.tickSize.toNumber() * 2, yScale) /
-            2
+          barHeight(d.price.toNumber(), d.tickSize.toNumber(), yScale) / 2
       )
       .attr('height', (d) =>
-        barHeight(d.tickSize.toNumber(), d.tickSize.toNumber() * 2, yScale)
+        barHeight(d.price.toNumber(), d.tickSize.toNumber(), yScale)
       )
       .attr('width', (d) => {
         const result = xScale(Decimal.max(d.buySize, d.sellSize).toNumber())
