@@ -68,6 +68,8 @@ export function LimitModal({
     onMarketChange,
     onSideChange: onChangedSide,
     isLimitOrder: true,
+    marketSessionStorageKey: 'lm_market',
+    sideSessionStorageKey: 'lm_side',
     Renderer: function (sr: SwapRender) {
       const sellAmountInputRef = useRef<HTMLInputElement>(null)
       const config = useConfig()

@@ -81,6 +81,8 @@ export function SwapInternals({
   onMarketChange,
   onSideChange,
   isLimitOrder: initialIsLimitOrder,
+  marketSessionStorageKey,
+  sideSessionStorageKey,
   Renderer
 }: {
   markets: Markets
@@ -90,6 +92,8 @@ export function SwapInternals({
   onMarketChange: (m: Market) => void
   onSideChange: (s: OrderSide) => void
   isLimitOrder: boolean
+  marketSessionStorageKey: string
+  sideSessionStorageKey: string
   Renderer: (r: SwapRender) => JSX.Element
 }) {
   const [market, setMarket] = useState<Market>(markets.first()!)
@@ -106,8 +110,10 @@ export function SwapInternals({
   const [percentage, setPercentage] = useState<number | null>(null)
 
   useEffect(() => {
-    const selectedMarket = window.sessionStorage.getItem('market')
-    const selectedSide = window.sessionStorage.getItem('side')
+    const selectedMarket = window.sessionStorage.getItem(
+      marketSessionStorageKey
+    )
+    const selectedSide = window.sessionStorage.getItem(sideSessionStorageKey)
     if (selectedMarket && selectedSide) {
       const market = markets.findById(selectedMarket)
       if (market) {
@@ -123,7 +129,7 @@ export function SwapInternals({
         }
       }
     }
-  }, [markets])
+  }, [markets, marketSessionStorageKey, sideSessionStorageKey])
 
   const [topBalance, bottomBalance] = useMemo(() => {
     const topBalance = balances.find(
@@ -218,6 +224,9 @@ export function SwapInternals({
   }, [sellLimitPrice, side, market])
 
   const [orderBook, setOrderBook] = useState<OrderBook | undefined>(undefined)
+  const [secondMarketOrderBook, setSecondMarketOrderBook] = useState<
+    OrderBook | undefined
+  >(undefined)
 
   const [baseLimit, setBaseLimit] = useState<bigint | undefined>(undefined)
   const [quoteLimit, setQuoteLimit] = useState<bigint | undefined>(undefined)
@@ -228,36 +237,76 @@ export function SwapInternals({
 
   useWebsocketSubscription({
     topics: useMemo(() => {
-      return [
-        balancesTopic,
-        ordersTopic,
-        orderBookTopic(market.id),
-        limitsTopic(market.id)
-      ]
-    }, [market.id]),
-    handler: useCallback((message: Publishable) => {
-      if (message.type === 'OrderBook') {
-        setOrderBook(message)
-      } else if (message.type === 'Limits') {
-        setBaseLimit(message.base)
-        setQuoteLimit(message.quote)
-      } else if (message.type === 'Balances') {
-        setBalances(message.balances)
-      } else if (message.type === 'OrderUpdated') {
-        setLastOrder(message.order)
+      if (market.isBackToBack()) {
+        return [
+          balancesTopic,
+          ordersTopic,
+          orderBookTopic(market.marketIds[0]),
+          orderBookTopic(market.marketIds[1]),
+          limitsTopic(market.marketIds[0]),
+          limitsTopic(market.marketIds[1])
+        ]
+      } else {
+        return [
+          balancesTopic,
+          ordersTopic,
+          orderBookTopic(market.id),
+          limitsTopic(market.id)
+        ]
       }
-    }, []),
+    }, [market]),
+    handler: useCallback(
+      (message: Publishable) => {
+        if (message.type === 'OrderBook') {
+          if (market.isBackToBack()) {
+            message.marketId == market.marketIds[0]
+              ? setOrderBook(message)
+              : setSecondMarketOrderBook(message)
+          } else {
+            setOrderBook(message)
+          }
+        } else if (message.type === 'Limits') {
+          if (market.isBackToBack()) {
+            message.marketId == market.marketIds[0]
+              ? setBaseLimit(message.base)
+              : setQuoteLimit(message.quote)
+          } else {
+            setBaseLimit(message.base)
+            setQuoteLimit(message.quote)
+          }
+        } else if (message.type === 'Balances') {
+          setBalances(message.balances)
+        } else if (message.type === 'OrderUpdated') {
+          setLastOrder(message.order)
+        }
+      },
+      [market]
+    ),
     onUnsubscribe: useCallback(() => {
       setBalances([])
       setBaseLimit(undefined)
       setQuoteLimit(undefined)
+      setSecondMarketOrderBook(undefined)
+      setOrderBook(undefined)
     }, [])
   })
 
   const marketPrice = useMemo(() => {
-    if (orderBook === undefined) return 0n
-    return getMarketPrice(side, baseAmount, market, orderBook)
-  }, [side, baseAmount, orderBook, market])
+    if (
+      orderBook === undefined ||
+      (market.isBackToBack() && secondMarketOrderBook === undefined)
+    ) {
+      return 0n
+    }
+    return getMarketPrice(
+      side,
+      baseAmount,
+      market,
+      orderBook,
+      markets,
+      secondMarketOrderBook
+    )
+  }, [side, baseAmount, orderBook, secondMarketOrderBook, market, markets])
 
   const limitPriceAsBigInt = useMemo(() => {
     return BigInt(
@@ -332,11 +381,21 @@ export function SwapInternals({
 
   useEffect(() => {
     if (baseAmountManuallyChanged) {
-      if (orderBook !== undefined) {
+      if (
+        orderBook !== undefined &&
+        (!market.isBackToBack() || secondMarketOrderBook !== undefined)
+      ) {
         const indicativePrice =
           isLimitOrder && !limitPrice.isZero()
             ? limitPriceAsBigInt
-            : getMarketPrice(side, baseAmount, market, orderBook)
+            : getMarketPrice(
+                side,
+                baseAmount,
+                market,
+                orderBook,
+                markets,
+                secondMarketOrderBook
+              )
         if (indicativePrice === 0n) {
           setNoPriceFound(true)
         } else {
@@ -353,7 +412,9 @@ export function SwapInternals({
     baseAmountManuallyChanged,
     setQuoteAmountInputValue,
     orderBook,
+    secondMarketOrderBook,
     market,
+    markets,
     baseSymbol,
     quoteSymbol,
     side,
@@ -367,21 +428,40 @@ export function SwapInternals({
     side: OrderSide,
     market: Market,
     orderBook: OrderBook,
+    markets: Markets,
+    secondMarketOrderBook: OrderBook | undefined,
     baseDecimals: number
   ): bigint {
     let price = 0n
-    let nextPrice = getMarketPrice(side, 1n, market, orderBook)
+    let nextPrice = getMarketPrice(
+      side,
+      1n,
+      market,
+      orderBook,
+      markets,
+      secondMarketOrderBook
+    )
     while (price !== nextPrice) {
       price = nextPrice
       const amount = (quoteAmount * BigInt(Math.pow(10, baseDecimals))) / price
-      nextPrice = getMarketPrice(side, amount, market, orderBook)
+      nextPrice = getMarketPrice(
+        side,
+        amount,
+        market,
+        orderBook,
+        markets,
+        secondMarketOrderBook
+      )
     }
     return price
   }
 
   useEffect(() => {
     if (quoteAmountManuallyChanged) {
-      if (orderBook !== undefined) {
+      if (
+        orderBook !== undefined &&
+        (!market.isBackToBack() || secondMarketOrderBook !== undefined)
+      ) {
         const indicativePrice =
           isLimitOrder && !limitPrice.isZero()
             ? limitPriceAsBigInt
@@ -390,6 +470,8 @@ export function SwapInternals({
                 side,
                 market,
                 orderBook,
+                markets,
+                secondMarketOrderBook,
                 baseSymbol.decimals
               )
         if (indicativePrice === 0n) {
@@ -408,7 +490,9 @@ export function SwapInternals({
     quoteAmountManuallyChanged,
     setBaseAmountInputValue,
     orderBook,
+    secondMarketOrderBook,
     market,
+    markets,
     baseSymbol,
     side,
     isLimitOrder,
@@ -503,8 +587,8 @@ export function SwapInternals({
   function saveMarketAndSide(market: Market, side: OrderSide) {
     setSide(side)
     setMarket(market)
-    window.sessionStorage.setItem('market', market.id)
-    window.sessionStorage.setItem('side', side)
+    window.sessionStorage.setItem(marketSessionStorageKey, market.id)
+    window.sessionStorage.setItem(sideSessionStorageKey, side)
     onMarketChange(market)
     onSideChange(side)
   }
@@ -677,6 +761,25 @@ export function SwapInternals({
             signature: signature,
             verifyingChainId: config.state.chainId
           })
+        } else if (market.isBackToBack()) {
+          response = await apiClient.createOrder({
+            nonce: nonce,
+            marketId: market.marketIds[0],
+            secondMarketId: market.marketIds[1],
+            type: 'backToBackMarket',
+            side: side,
+            amount: percentage
+              ? {
+                  type: 'percent',
+                  value: percentage
+                }
+              : {
+                  type: 'fixed',
+                  value: baseAmount
+                },
+            signature: signature,
+            verifyingChainId: config.state.chainId
+          })
         } else {
           response = await apiClient.createOrder({
             nonce: nonce,
@@ -809,8 +912,15 @@ export function SwapInternals({
     side: OrderSide,
     amount: bigint
   ): bigint | undefined {
-    if (orderBook) {
-      const marketPrice = getMarketPrice(side, amount, market, orderBook)
+    if (orderBook && (!market.isBackToBack() || secondMarketOrderBook)) {
+      const marketPrice = getMarketPrice(
+        side,
+        amount,
+        market,
+        orderBook,
+        markets,
+        secondMarketOrderBook
+      )
       if (side === 'Sell' && marketPrice !== 0n) {
         return scaledDecimalToBigint(
           new Decimal(1).div(
@@ -828,7 +938,14 @@ export function SwapInternals({
     if (orderBook) {
       const mktPrice = new Decimal(
         formatUnits(
-          getMarketPrice(side, baseAmount, market, orderBook),
+          getMarketPrice(
+            side,
+            baseAmount,
+            market,
+            orderBook,
+            markets,
+            secondMarketOrderBook
+          ),
           quoteSymbol.decimals
         )
       )
@@ -848,7 +965,16 @@ export function SwapInternals({
       }
     }
     return
-  }, [orderBook, side, baseAmount, market, buyLimitPrice, quoteSymbol])
+  }, [
+    orderBook,
+    side,
+    baseAmount,
+    market,
+    markets,
+    buyLimitPrice,
+    quoteSymbol,
+    secondMarketOrderBook
+  ])
 
   const [limitPriceTooLow, limitPriceTooHigh] = useMemo(() => {
     const limitPriceTooLow =
