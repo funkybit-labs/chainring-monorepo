@@ -73,7 +73,7 @@ object SequencerResponseProcessorService {
                     if (balanceChange == null) {
                         withdrawalEntity.update(WithdrawalStatus.Failed, error(response, "Insufficient Balance"))
                     } else {
-                        handleSequencerResponse(request = request, response = response, ordersBeingUpdated = listOf())
+                        handleSequencerResponse(response, ordersBeingUpdated = listOf())
                         withdrawalEntity.update(
                             WithdrawalStatus.Sequenced,
                             null,
@@ -89,7 +89,7 @@ object SequencerResponseProcessorService {
                     if (response.balancesChangedList.firstOrNull { it.wallet == deposit.wallet } == null) {
                         depositEntity.markAsFailed(error(response))
                     } else {
-                        handleSequencerResponse(request = request, response = response, ordersBeingUpdated = listOf())
+                        handleSequencerResponse(response, ordersBeingUpdated = listOf())
                         depositEntity.markAsComplete()
                     }
                 }
@@ -97,7 +97,7 @@ object SequencerResponseProcessorService {
                 if (request.balanceBatch.failedWithdrawalsList.isNotEmpty() ||
                     request.balanceBatch.failedSettlementsList.isNotEmpty()
                 ) {
-                    handleSequencerResponse(request = request, response = response, ordersBeingUpdated = listOf())
+                    handleSequencerResponse(response, ordersBeingUpdated = listOf())
                 }
             }
 
@@ -124,8 +124,7 @@ object SequencerResponseProcessorService {
                     WalletEntity.getBySequencerId(request.orderBatch.wallet.sequencerWalletId())?.let { wallet ->
                         handleOrderBatchUpdates(request.orderBatch, wallet, response)
                         handleSequencerResponse(
-                            request = request,
-                            response = response,
+                            response,
                             ordersBeingUpdated = request.orderBatch.ordersToChangeList.map { it.guid },
                             orderIdsInRequest = (request.orderBatch.ordersToAddList + request.orderBatch.ordersToChangeList).map { it.guid },
                         )
@@ -138,8 +137,7 @@ object SequencerResponseProcessorService {
                     WalletEntity.getBySequencerId(request.backToBackOrder.wallet.sequencerWalletId())?.let { wallet ->
                         handleBackToBackMarketOrder(request.backToBackOrder, wallet, response)
                         handleSequencerResponse(
-                            request = request,
-                            response = response,
+                            response,
                             orderIdsInRequest = listOf(request.backToBackOrder.order.guid),
                         )
                     }
@@ -261,7 +259,7 @@ object SequencerResponseProcessorService {
         )
     }
 
-    private fun handleSequencerResponse(request: SequencerRequest, response: SequencerResponse, ordersBeingUpdated: List<Long> = listOf(), orderIdsInRequest: List<Long> = listOf()) {
+    private fun handleSequencerResponse(response: SequencerResponse, ordersBeingUpdated: List<Long> = listOf(), orderIdsInRequest: List<Long> = listOf()) {
         val timestamp = if (response.createdAt > 0) {
             Instant.fromEpochMilliseconds(response.createdAt)
         } else {

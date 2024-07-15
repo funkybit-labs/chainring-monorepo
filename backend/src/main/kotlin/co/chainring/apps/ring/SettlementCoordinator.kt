@@ -162,7 +162,7 @@ class SettlementCoordinator(
     }
 
     private fun createNextBatch(): SettlementBatchEntity? {
-        val tradesToPrepare = TradeEntity.findPending()
+        val tradesToPrepare = TradeEntity.findPendingForNewSettlementBatch()
         if (tradesToPrepare.isEmpty()) {
             return null
         }
