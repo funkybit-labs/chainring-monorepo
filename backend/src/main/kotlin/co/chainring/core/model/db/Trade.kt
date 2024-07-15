@@ -8,7 +8,6 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.min
 import org.jetbrains.exposed.sql.update
@@ -124,42 +123,22 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
         }
 
         fun findPendingForNewSettlementBatch(limit: Int = 100): List<TradeEntity> {
-            val pendingTradesCountByRespSeq = TradeTable
-                .select(TradeTable.responseSequence, TradeTable.guid.count())
-                .where { TradeTable.settlementStatus.inList(pendingTradeStatuses) }
-                .groupBy(TradeTable.responseSequence)
-                .orderBy(TradeTable.responseSequence, SortOrder.ASC)
-                .limit(limit)
-                .map { it[TradeTable.responseSequence]!! to it[TradeTable.guid.count()] }
-
-            if (pendingTradesCountByRespSeq.isEmpty()) {
-                return emptyList()
-            }
-
-            val responseSequencesToInclude = mutableListOf<Long>()
-            var tradesCountAcc = 0L
-            for ((respSeq, tradesCount) in pendingTradesCountByRespSeq) {
-                tradesCountAcc += tradesCount
-                if (tradesCountAcc > limit) {
-                    break
-                } else {
-                    responseSequencesToInclude.add(respSeq)
-                }
-            }
-
-            if (responseSequencesToInclude.isEmpty()) {
-                if (tradesCountAcc > limit) {
-                    val (firstRespSeq, firstRespSeqTradesCount) = pendingTradesCountByRespSeq.first()
-                    throw RuntimeException("Failed to form trades batch of size <= $limit: response sequence $firstRespSeq contains $firstRespSeqTradesCount trades")
-                } else {
-                    return emptyList()
-                }
-            }
-
-            return TradeEntity.find {
+            val trades = TradeEntity.find {
                 TradeTable.settlementStatus.inList(pendingTradeStatuses)
-                    .and(TradeTable.responseSequence.inList(responseSequencesToInclude))
             }.orderBy(TradeTable.sequenceId to SortOrder.ASC).limit(limit).toList()
+
+            return if (trades.size == limit) {
+                val lastTrade = trades.last()
+                // load the remaining trades from the same Sequencer response
+                // to make sure they all settle in one batch
+                trades + TradeEntity.find {
+                    TradeTable.settlementStatus.inList(pendingTradeStatuses)
+                        .and(TradeTable.responseSequence.eq(lastTrade.responseSequence))
+                        .and(TradeTable.sequenceId.greater(lastTrade.sequenceId))
+                }.orderBy(TradeTable.sequenceId to SortOrder.ASC).toList()
+            } else {
+                trades
+            }
         }
 
         fun findSettling(): List<TradeEntity> {

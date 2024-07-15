@@ -7,7 +7,6 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import java.math.BigDecimal
 import java.math.BigInteger
 
@@ -64,13 +63,19 @@ class TradeEntityTest : TestWithDb() {
         )
 
         assertEquals(
-            listOf("trade_3", "trade_4", "trade_5"),
+            listOf("trade_3", "trade_4", "trade_5", "trade_6", "trade_7"),
             getPendingTradeGuidsForNewSettlementBatch(limit = 4),
         )
 
-        assertThrows<RuntimeException>("Failed to form trades batch of size <= 2: response sequence 10 contains 3 trades") {
-            getPendingTradeGuidsForNewSettlementBatch(limit = 2)
-        }
+        assertEquals(
+            listOf("trade_3", "trade_4", "trade_5"),
+            getPendingTradeGuidsForNewSettlementBatch(limit = 2),
+        )
+
+        assertEquals(
+            listOf("trade_3", "trade_4", "trade_5", "trade_6", "trade_7", "trade_8"),
+            getPendingTradeGuidsForNewSettlementBatch(limit = 10),
+        )
     }
 
     data class Trade(
