@@ -4,7 +4,6 @@ import co.chainring.apps.api.model.FaucetApiRequest
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.TxHash
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
-import co.chainring.integrationtests.utils.Faucet
 import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.Wallet
 import org.awaitility.kotlin.await
@@ -46,7 +45,7 @@ class FaucetTest {
                 .pollInterval(Duration.ofMillis(100))
                 .atMost(Duration.ofMillis(10000L))
                 .untilAsserted {
-                    Faucet.mine(chainId = chain.id)
+                    wallet.currentBlockchainClient().mine()
                     val nativeBalanceAfter = wallet.getWalletNativeBalance()
                     assertEquals(BigInteger("1000000000000000000"), nativeBalanceAfter - nativeBalanceBefore)
                 }
@@ -81,7 +80,7 @@ class FaucetTest {
                 .pollInterval(Duration.ofMillis(100))
                 .atMost(Duration.ofMillis(10000L))
                 .untilAsserted {
-                    Faucet.mine(chainId = chain.id)
+                    wallet.currentBlockchainClient().mine()
                     val balanceAfter = wallet.getWalletERC20Balance(erc20Symbol)
                     assertEquals(BigInteger("1000000000000000000"), balanceAfter - balanceBefore)
                 }

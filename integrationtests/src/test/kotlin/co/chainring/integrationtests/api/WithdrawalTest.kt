@@ -1,11 +1,9 @@
 package co.chainring.integrationtests.api
 
 import co.chainring.apps.api.model.ApiError
-import co.chainring.apps.api.model.CreateDepositApiRequest
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.core.evm.EIP712Transaction
-import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.utils.toFundamentalUnits
@@ -50,7 +48,7 @@ class WithdrawalTest {
         (0 until config.chains.size).forEach { index ->
 
             wallet.switchChain(config.chains[index].id)
-            Faucet.fund(wallet.address, chainId = wallet.currentChainId)
+            Faucet.fundAndMine(wallet.address, chainId = wallet.currentChainId)
 
             val btc = config.chains[index].symbols.first { it.name == "BTC".toChainSymbol(config.chains[index].id) }
             val usdc = config.chains[index].symbols.first { it.name == "USDC".toChainSymbol(config.chains[index].id) }
@@ -60,7 +58,7 @@ class WithdrawalTest {
 
             // mint some USDC
             val usdcMintAmount = AssetAmount(usdc, "20")
-            wallet.mintERC20(usdcMintAmount)
+            wallet.mintERC20AndMine(usdcMintAmount)
 
             assertEquals(wallet.getWalletBalance(usdc), usdcMintAmount)
 
@@ -68,7 +66,7 @@ class WithdrawalTest {
 
             // deposit some BTC
             val btcDepositAmount = AssetAmount(btc, "0.001")
-            val depositTxReceipt = wallet.deposit(btcDepositAmount)
+            val depositTxReceipt = wallet.depositAndMine(btcDepositAmount)
             waitForBalance(
                 apiClient,
                 wsClient,
@@ -81,7 +79,7 @@ class WithdrawalTest {
             assertEquals(walletStartingBtcBalance - btcDepositAmount - depositGasCost, wallet.getWalletBalance(btc))
 
             // deposit more BTC
-            val depositTxReceipt2 = wallet.deposit(btcDepositAmount)
+            val depositTxReceipt2 = wallet.depositAndMine(btcDepositAmount)
             waitForBalance(
                 apiClient,
                 wsClient,
@@ -99,7 +97,7 @@ class WithdrawalTest {
 
             // deposit some USDC
             val usdcDepositAmount = AssetAmount(usdc, "16")
-            wallet.deposit(usdcDepositAmount)
+            wallet.depositAndMine(usdcDepositAmount)
             waitForBalance(
                 apiClient,
                 wsClient,
@@ -272,12 +270,12 @@ class WithdrawalTest {
         wsClient.assertBalancesMessageReceived()
 
         val wallet = Wallet(apiClient)
-        Faucet.fund(wallet.address)
+        Faucet.fundAndMine(wallet.address)
 
         val amount = AssetAmount(usdc, "1000")
-        wallet.mintERC20(amount * BigDecimal("2"))
+        wallet.mintERC20AndMine(amount * BigDecimal("2"))
 
-        wallet.deposit(amount)
+        wallet.depositAndMine(amount)
         waitForBalance(
             apiClient,
             wsClient,
@@ -304,12 +302,12 @@ class WithdrawalTest {
         wsClient.assertBalancesMessageReceived()
 
         val wallet = Wallet(apiClient)
-        Faucet.fund(wallet.address)
+        Faucet.fundAndMine(wallet.address)
 
         val initialDepositAmount = AssetAmount(usdc, "1001")
-        wallet.mintERC20(initialDepositAmount * BigDecimal("2"))
+        wallet.mintERC20AndMine(initialDepositAmount * BigDecimal("2"))
 
-        wallet.deposit(initialDepositAmount)
+        wallet.depositAndMine(initialDepositAmount)
         // available/total should match
         waitForBalance(
             apiClient,
@@ -331,8 +329,7 @@ class WithdrawalTest {
         )
         // submit a deposit
         val newDepositAmount = AssetAmount(usdc, "100")
-        val txHash = wallet.asyncDepositERC20(newDepositAmount.symbol.name, newDepositAmount.inFundamentalUnits)
-        apiClient.createDeposit(CreateDepositApiRequest(Symbol(usdc.name), newDepositAmount.inFundamentalUnits, txHash))
+        wallet.depositAndMine(newDepositAmount)
 
         waitForFinalizedWithdrawal(pendingUsdcWithdrawal.id)
         val usdcWithdrawal = apiClient.getWithdrawal(pendingUsdcWithdrawal.id).withdrawal
@@ -361,12 +358,12 @@ class WithdrawalTest {
         wsClient.assertBalancesMessageReceived()
 
         val wallet = Wallet(apiClient)
-        Faucet.fund(wallet.address)
+        Faucet.fundAndMine(wallet.address)
 
         val initialDepositAmount = AssetAmount(usdc, "1000")
-        wallet.mintERC20(initialDepositAmount * BigDecimal("2"))
+        wallet.mintERC20AndMine(initialDepositAmount * BigDecimal("2"))
 
-        wallet.deposit(initialDepositAmount)
+        wallet.depositAndMine(initialDepositAmount)
         // available/total should match
         waitForBalance(
             apiClient,
@@ -475,15 +472,15 @@ class WithdrawalTest {
         wsClient2.subscribeToBalances()
         wsClient2.assertBalancesMessageReceived()
 
-        Faucet.fund(wallet1.address, chainId = wallet1.currentChainId)
-        Faucet.fund(wallet2.address, chainId = wallet2.currentChainId)
+        Faucet.fundAndMine(wallet1.address, chainId = wallet1.currentChainId)
+        Faucet.fundAndMine(wallet2.address, chainId = wallet2.currentChainId)
         val btc = apiClient1.getConfiguration().chains.flatMap { it.symbols }.first { it.name.startsWith("BTC:") }
 
         val btcDeposit1Amount = AssetAmount(btc, "0.01")
         val btcDeposit2Amount = AssetAmount(btc, "0.02")
 
-        wallet1.deposit(btcDeposit1Amount)
-        wallet2.deposit(btcDeposit2Amount)
+        wallet1.depositAndMine(btcDeposit1Amount)
+        wallet2.depositAndMine(btcDeposit2Amount)
 
         waitForBalance(
             apiClient1,
@@ -520,11 +517,11 @@ class WithdrawalTest {
         wsClient.assertBalancesMessageReceived()
 
         val wallet = Wallet(apiClient)
-        Faucet.fund(wallet.address)
+        Faucet.fundAndMine(wallet.address)
 
         // deposit some BTC
         val btcDepositAmount = AssetAmount(btc, "0.002")
-        wallet.deposit(btcDepositAmount)
+        wallet.depositAndMine(btcDepositAmount)
         waitForBalance(
             apiClient,
             wsClient,

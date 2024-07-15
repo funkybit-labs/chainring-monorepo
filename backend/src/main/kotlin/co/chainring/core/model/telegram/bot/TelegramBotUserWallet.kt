@@ -146,7 +146,7 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
                 }
             }
         } else {
-            blockchainClient.asyncDepositNative(exchangeContractAddress, bigIntAmount)
+            blockchainClient.sendNativeDepositTx(exchangeContractAddress, bigIntAmount)
         }
     }
 

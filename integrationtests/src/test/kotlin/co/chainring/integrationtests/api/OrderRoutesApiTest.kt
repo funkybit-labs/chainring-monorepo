@@ -4,7 +4,6 @@ import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
-import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.ReasonCode
@@ -95,11 +94,11 @@ class OrderRoutesApiTest : OrderBaseTest() {
         wsClient.subscribeToLimits(usdcDaiMarket.id)
         wsClient.assertLimitsMessageReceived(usdcDaiMarket.id)
 
-        Faucet.fund(wallet.address)
+        Faucet.fundAndMine(wallet.address)
 
         val daiAmountToDeposit = AssetAmount(dai, "14")
-        wallet.mintERC20(daiAmountToDeposit)
-        wallet.deposit(daiAmountToDeposit)
+        wallet.mintERC20AndMine(daiAmountToDeposit)
+        wallet.depositAndMine(daiAmountToDeposit)
         waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(daiAmountToDeposit)))
 
         wsClient.assertLimitsMessageReceived(usdcDaiMarket, base = AssetAmount(usdc, "0"), quote = daiAmountToDeposit)
@@ -165,10 +164,10 @@ class OrderRoutesApiTest : OrderBaseTest() {
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()
 
-        Faucet.fund(wallet.address)
+        Faucet.fundAndMine(wallet.address)
         val daiAmountToDeposit = AssetAmount(dai, "200")
-        wallet.mintERC20(daiAmountToDeposit)
-        wallet.deposit(daiAmountToDeposit)
+        wallet.mintERC20AndMine(daiAmountToDeposit)
+        wallet.depositAndMine(daiAmountToDeposit)
         waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(daiAmountToDeposit)))
 
         // create an order with that does not meet the min fee requirement
@@ -391,10 +390,10 @@ class OrderRoutesApiTest : OrderBaseTest() {
         wsClient.subscribeToLimits(usdcDaiMarket.id)
         wsClient.assertLimitsMessageReceived(usdcDaiMarket.id)
 
-        Faucet.fund(wallet.address)
+        Faucet.fundAndMine(wallet.address)
         val daiAmountToDeposit = AssetAmount(dai, "30")
-        wallet.mintERC20(daiAmountToDeposit)
-        wallet.deposit(daiAmountToDeposit)
+        wallet.mintERC20AndMine(daiAmountToDeposit)
+        wallet.depositAndMine(daiAmountToDeposit)
         waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(daiAmountToDeposit)))
         wsClient.assertLimitsMessageReceived(usdcDaiMarket.id)
 

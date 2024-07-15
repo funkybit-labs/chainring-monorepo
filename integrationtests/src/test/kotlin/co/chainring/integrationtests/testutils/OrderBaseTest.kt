@@ -144,9 +144,9 @@ open class OrderBaseTest {
                 wallet.switchChain(chainId)
             }
             if (it.symbol.contractAddress == null) {
-                Faucet.fund(wallet.address, it.inFundamentalUnits, chainId)
+                Faucet.fundAndMine(wallet.address, it.inFundamentalUnits, chainId)
             } else {
-                wallet.mintERC20(it)
+                wallet.mintERC20AndMine(it)
             }
         }
 
@@ -155,7 +155,7 @@ open class OrderBaseTest {
             if (chainId != wallet.currentChainId) {
                 wallet.switchChain(chainId)
             }
-            wallet.deposit(it)
+            wallet.depositAndMine(it)
             wsClient.assertBalancesMessageReceived()
             wsClient.assertLimitsMessageReceived(marketId)
         }
