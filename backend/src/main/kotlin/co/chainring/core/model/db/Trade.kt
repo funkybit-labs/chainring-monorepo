@@ -151,7 +151,7 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
             return TradeEntity.find {
                 TradeTable.settlementBatchGuid.eq(settlementBatch.guid) and
                     TradeTable.settlementStatus.eq(SettlementStatus.FailedSettling)
-            }.orderBy(TradeTable.sequenceId to SortOrder.ASC).toList()
+            }.orderBy(TradeTable.sequenceId to SortOrder.DESC).toList()
         }
     }
 

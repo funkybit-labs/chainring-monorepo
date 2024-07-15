@@ -87,7 +87,7 @@ class BalanceEntity(guid: EntityID<BalanceId>) : GUIDEntity<BalanceId>(guid) {
                         balanceId = startingBalanceEntity?.guid?.value ?: BalanceId.generate(),
                         balanceBefore = startingBalance,
                         balanceAfter = when (change) {
-                            is BalanceChange.Delta -> BigInteger.ZERO.max((startingBalance ?: BigInteger.ZERO) + change.amount)
+                            is BalanceChange.Delta -> (startingBalance ?: BigInteger.ZERO) + change.amount
                             is BalanceChange.Replace -> change.amount
                         },
                         balanceType,

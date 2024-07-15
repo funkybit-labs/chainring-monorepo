@@ -22,6 +22,7 @@ import co.chainring.integrationtests.utils.assertOrderCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertOrderUpdatedMessageReceived
 import co.chainring.integrationtests.utils.assertTradeCreatedMessageReceived
 import co.chainring.integrationtests.utils.ofAsset
+import co.chainring.sequencer.core.notional
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.extension.ExtendWith
 import java.math.BigDecimal
@@ -215,6 +216,189 @@ class BackToBackOrderTest : OrderBaseTest() {
     }
 
     @Test
+    fun `back to back - market sell - swap btc for usdc2 - partial fill`() {
+        val (market, baseSymbol, bridgeSymbol) = Triple(btcbtc2Market, btc, btc2)
+        val (secondMarket, _, quoteSymbol) = Triple(btc2Usdc2Market, btc2, usdc2)
+
+        val (makerApiClient, makerWallet, makerWsClient) = setupTrader(
+            secondMarket.id,
+            airdrops = listOf(
+                AssetAmount(bridgeSymbol, "5.0"),
+                AssetAmount(quoteSymbol, "400000"),
+            ),
+            deposits = listOf(
+                AssetAmount(bridgeSymbol, "4.9"),
+                AssetAmount(quoteSymbol, "400000"),
+            ),
+            subscribeToOrderBook = false,
+            subscribeToOrderPrices = false,
+        )
+
+        val (takerApiClient, takerWallet, takerWsClient) = setupTrader(
+            market.id,
+            airdrops = listOf(
+                AssetAmount(baseSymbol, "5"),
+            ),
+            deposits = listOf(
+                AssetAmount(baseSymbol, "4.9"),
+            ),
+            subscribeToOrderBook = false,
+            subscribeToOrderPrices = false,
+        )
+
+        // starting onchain balances
+        val makerStartingBaseBalance = makerWallet.getExchangeBalance(baseSymbol)
+        val makerStartingBridgeBalance = makerWallet.getExchangeBalance(bridgeSymbol)
+        val makerStartingQuoteBalance = makerWallet.getExchangeBalance(quoteSymbol)
+        val takerStartingBaseBalance = takerWallet.getExchangeBalance(baseSymbol)
+        val takerStartingQuoteBalance = takerWallet.getExchangeBalance(quoteSymbol)
+
+        val limitBuyOrder1 = makerApiClient.batchOrders(
+            BatchOrdersApiRequest(
+                marketId = market.id,
+                createOrders = listOf(
+                    makerWallet.signOrder(
+                        CreateOrderApiRequest.Limit(
+                            nonce = generateOrderNonce(),
+                            marketId = market.id,
+                            side = OrderSide.Buy,
+                            amount = OrderAmount.Fixed(AssetAmount(baseSymbol, BigDecimal("3.9")).inFundamentalUnits),
+                            price = BigDecimal("1.01"),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    ),
+                ),
+                updateOrders = listOf(),
+                cancelOrders = listOf(),
+            ),
+        )
+        val limitBuyOrder2 = makerApiClient.batchOrders(
+            BatchOrdersApiRequest(
+                marketId = secondMarket.id,
+                createOrders = listOf(
+                    makerWallet.signOrder(
+                        CreateOrderApiRequest.Limit(
+                            nonce = generateOrderNonce(),
+                            marketId = secondMarket.id,
+                            side = OrderSide.Buy,
+                            amount = OrderAmount.Fixed(AssetAmount(bridgeSymbol, BigDecimal("3")).inFundamentalUnits),
+                            price = BigDecimal("66000.000"),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    ),
+                ),
+                updateOrders = listOf(),
+                cancelOrders = listOf(),
+            ),
+        )
+
+        assertEquals(1, limitBuyOrder1.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
+        assertEquals(1, limitBuyOrder2.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
+
+        repeat(2) { makerWsClient.assertOrderCreatedMessageReceived() }
+        makerWsClient.assertLimitsMessageReceived(secondMarket.id)
+
+        assertEquals(2, makerApiClient.listOrders(listOf(OrderStatus.Open), null).orders.size)
+
+        takerApiClient.createBackToBackMarketOrder(
+            listOf(market, secondMarket),
+            OrderSide.Sell,
+            amount = null,
+            takerWallet,
+            percentage = Percentage(100),
+        )
+
+        takerWsClient.apply {
+            assertOrderCreatedMessageReceived()
+            assertTradeCreatedMessageReceived {
+                assertEquals(btcbtc2Market.id, it.trade.marketId)
+                assertEquals(OrderSide.Sell, it.trade.side)
+                // assertEquals(takerStartingBaseBalance.inFundamentalUnits, it.trade.amount)
+                assertEquals(BigDecimal("1.01").setScale(18), it.trade.price)
+                assertEquals(BigInteger.ZERO, it.trade.feeAmount)
+                assertEquals(btc2.name, it.trade.feeSymbol.value)
+            }
+            assertTradeCreatedMessageReceived {
+                assertEquals(btc2Usdc2Market.id, it.trade.marketId)
+                assertEquals(OrderSide.Sell, it.trade.side)
+                assertEquals(BigDecimal("2.999999999999999999").toFundamentalUnits(btc2.decimals), it.trade.amount)
+                assertEquals(BigDecimal("66000.00").setScale(18), it.trade.price)
+                assertEquals(BigDecimal("3959.999999").toFundamentalUnits(usdc2.decimals), it.trade.feeAmount)
+                assertEquals(usdc2.name, it.trade.feeSymbol.value)
+            }
+            assertOrderUpdatedMessageReceived {
+                assertEquals(BigDecimal("3.9").toFundamentalUnits(market.baseDecimals), it.order.amount)
+                assertEquals(it.order.status, OrderStatus.Partial)
+            }
+            assertBalancesMessageReceived(
+                listOf(
+                    ExpectedBalance(baseSymbol, total = BigDecimal("4.9"), available = BigDecimal("1.929702970297029703")),
+                    ExpectedBalance(quoteSymbol, total = BigDecimal("0"), available = BigDecimal("194040")),
+                ),
+            )
+            assertLimitsMessageReceived(market.id)
+        }
+
+        makerWsClient.apply {
+            repeat(2) { assertTradeCreatedMessageReceived() }
+            repeat(2) { assertOrderUpdatedMessageReceived() }
+            assertBalancesMessageReceived()
+            assertLimitsMessageReceived(secondMarket.id)
+        }
+
+        val takerOrders = takerApiClient.listOrders(emptyList(), market.id).orders
+        assertEquals(1, takerOrders.count { it.status == OrderStatus.Partial })
+
+        assertEquals(2, makerApiClient.listOrders(listOf(OrderStatus.Filled, OrderStatus.Partial)).orders.size)
+
+        // now verify the trades
+        val trades = getTradesForOrders(takerOrders.map { it.id })
+        assertEquals(2, trades.size)
+
+        waitForSettlementToFinish(trades.map { it.id.value })
+
+        val trade1 = trades.first { it.marketGuid.value == market.id }
+        val trade2 = trades.first { it.marketGuid.value == secondMarket.id }
+
+        assertEquals(trade1.amount, BigDecimal("2.970297029702970297").toFundamentalUnits(btc.decimals))
+        assertEquals(trade1.price, BigDecimal("1.01").setScale(18))
+
+        assertEquals(trade2.amount, BigDecimal("2.999999999999999999").toFundamentalUnits(btc2.decimals))
+        assertEquals(trade2.price, BigDecimal("66000.00").setScale(18))
+
+        val notionalTrade1 = trade1.price.ofAsset(bridgeSymbol) * AssetAmount(baseSymbol, trade1.amount).amount
+        val notionalTrade2 = trade2.price.ofAsset(quoteSymbol) * AssetAmount(bridgeSymbol, trade2.amount).amount
+
+        val makerFeeTrade1 = notionalTrade1 * BigDecimal("0.01")
+        val makerFeeTrade2 = notionalTrade2 * BigDecimal("0.01").setScale(18)
+        val takerFee = notionalTrade2 * BigDecimal("0.02")
+
+        assertBalances(
+            listOf(
+                ExpectedBalance(makerStartingBaseBalance + AssetAmount(btc, BigDecimal("2.970297029702970297"))),
+                ExpectedBalance(makerStartingBridgeBalance - makerFeeTrade1),
+                ExpectedBalance(makerStartingQuoteBalance - notionalTrade2 - makerFeeTrade2),
+            ),
+            makerApiClient.getBalances().balances,
+        )
+        assertBalances(
+            listOf(
+                ExpectedBalance(takerStartingBaseBalance - AssetAmount(btc, trade1.amount)),
+                ExpectedBalance(takerStartingQuoteBalance + notionalTrade2 - takerFee),
+            ),
+            takerApiClient.getBalances().balances,
+        )
+
+        takerApiClient.cancelOpenOrders()
+        makerApiClient.cancelOpenOrders()
+
+        makerWsClient.close()
+        takerWsClient.close()
+    }
+
+    @Test
     fun `back to back - market buy - swap eth2 for btc`() {
         val (market, baseSymbol, bridgeSymbol) = Triple(btcbtc2Market, btc, btc2)
         val (secondMarket, _, quoteSymbol) = Triple(btc2Eth2Market, btc2, eth2)
@@ -368,6 +552,195 @@ class BackToBackOrderTest : OrderBaseTest() {
         val trade2 = trades.first { it.marketGuid.value == market.id }
 
         assertEquals(trade1.amount, bridgeOrderAmount.inFundamentalUnits)
+        assertEquals(trade1.price, quotePrice.setScale(18))
+
+        assertEquals(trade2.amount, baseOrderAmount.inFundamentalUnits)
+        assertEquals(trade2.price, bridgePrice.setScale(18))
+
+        val notionalTrade1 = trade1.price.ofAsset(quoteSymbol) * AssetAmount(bridgeSymbol, trade1.amount).amount
+        val notionalTrade2 = trade2.price.ofAsset(bridgeSymbol) * AssetAmount(baseSymbol, trade2.amount).amount
+
+        val makerFeeTrade1 = notionalTrade1 * BigDecimal("0.01")
+        val makerFeeTrade2 = notionalTrade2 * BigDecimal("0.01")
+        val takerFee = notionalTrade1 * BigDecimal("0.02")
+
+        assertBalances(
+            listOf(
+                ExpectedBalance(makerStartingBaseBalance - baseOrderAmount),
+                ExpectedBalance(makerStartingBridgeBalance - makerFeeTrade2),
+                ExpectedBalance(makerStartingQuoteBalance + notionalTrade1 - makerFeeTrade1),
+            ),
+            makerApiClient.getBalances().balances,
+        )
+        assertBalances(
+            listOf(
+                ExpectedBalance(takerStartingBaseBalance + baseOrderAmount),
+                ExpectedBalance(takerStartingQuoteBalance - notionalTrade1 - takerFee),
+            ),
+            takerApiClient.getBalances().balances,
+        )
+
+        takerApiClient.cancelOpenOrders()
+        makerApiClient.cancelOpenOrders()
+
+        makerWsClient.close()
+        takerWsClient.close()
+    }
+
+    @Test
+    fun `back to back - market buy - swap eth2 for btc - partial fill`() {
+        val (market, baseSymbol, bridgeSymbol) = Triple(btcbtc2Market, btc, btc2)
+        val (secondMarket, _, quoteSymbol) = Triple(btc2Eth2Market, btc2, eth2)
+
+        val (makerApiClient, makerWallet, makerWsClient) = setupTrader(
+            market.id,
+            airdrops = listOf(
+                AssetAmount(bridgeSymbol, "1.3"),
+                AssetAmount(baseSymbol, "1.2"),
+            ),
+            deposits = listOf(
+                AssetAmount(bridgeSymbol, "1.2"),
+                AssetAmount(baseSymbol, "1.1"),
+            ),
+            subscribeToOrderBook = false,
+            subscribeToOrderPrices = false,
+        )
+
+        val (takerApiClient, takerWallet, takerWsClient) = setupTrader(
+            secondMarket.id,
+            airdrops = listOf(
+                AssetAmount(bridgeSymbol, "0.1"),
+                AssetAmount(quoteSymbol, "30"),
+            ),
+            deposits = listOf(
+                AssetAmount(quoteSymbol, "30"),
+            ),
+            subscribeToOrderBook = false,
+            subscribeToOrderPrices = false,
+        )
+
+        // starting onchain balances
+        val makerStartingBaseBalance = makerWallet.getExchangeBalance(baseSymbol)
+        val makerStartingBridgeBalance = makerWallet.getExchangeBalance(bridgeSymbol)
+        val makerStartingQuoteBalance = makerWallet.getExchangeBalance(quoteSymbol)
+        val takerStartingBaseBalance = takerWallet.getExchangeBalance(baseSymbol)
+        val takerStartingQuoteBalance = takerWallet.getExchangeBalance(quoteSymbol)
+
+        val bridgePrice = BigDecimal("1.01")
+        val quotePrice = BigDecimal("17.55")
+        val baseOrderAmount = AssetAmount(btc, "0.812345678901234567")
+        val firstOrderAmount = notional(baseOrderAmount.inFundamentalUnits, bridgePrice, btc.decimals.toInt(), btc2.decimals.toInt())
+        val bridgeOrderAmount = AssetAmount(btc2, "1.123456789012345678")
+
+        val limitSellOrder1 = makerApiClient.batchOrders(
+            BatchOrdersApiRequest(
+                marketId = market.id,
+                createOrders = listOf(
+                    makerWallet.signOrder(
+                        CreateOrderApiRequest.Limit(
+                            nonce = generateOrderNonce(),
+                            marketId = market.id,
+                            side = OrderSide.Sell,
+                            amount = OrderAmount.Fixed(baseOrderAmount.inFundamentalUnits),
+                            price = bridgePrice,
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    ),
+                ),
+                updateOrders = listOf(),
+                cancelOrders = listOf(),
+            ),
+        )
+        val limitSellOrder2 = makerApiClient.batchOrders(
+            BatchOrdersApiRequest(
+                marketId = secondMarket.id,
+                createOrders = listOf(
+                    makerWallet.signOrder(
+                        CreateOrderApiRequest.Limit(
+                            nonce = generateOrderNonce(),
+                            marketId = secondMarket.id,
+                            side = OrderSide.Sell,
+                            amount = OrderAmount.Fixed(bridgeOrderAmount.inFundamentalUnits),
+                            price = quotePrice,
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    ),
+                ),
+                updateOrders = listOf(),
+                cancelOrders = listOf(),
+            ),
+        )
+
+        assertEquals(1, limitSellOrder1.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
+        assertEquals(1, limitSellOrder2.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
+
+        makerWsClient.assertOrderCreatedMessageReceived()
+        makerWsClient.assertLimitsMessageReceived(market.id)
+        makerWsClient.assertOrderCreatedMessageReceived()
+
+        assertEquals(2, makerApiClient.listOrders(listOf(OrderStatus.Open), null).orders.size)
+
+        takerApiClient.createBackToBackMarketOrder(
+            listOf(market, secondMarket),
+            OrderSide.Buy,
+            amount = BigDecimal("1.4"),
+            takerWallet,
+        )
+
+        takerWsClient.apply {
+            assertOrderCreatedMessageReceived()
+            assertTradeCreatedMessageReceived {
+                assertEquals(btc2Eth2Market.id, it.trade.marketId)
+                assertEquals(OrderSide.Buy, it.trade.side)
+                assertEquals(AssetAmount(btc2, firstOrderAmount).inFundamentalUnits, it.trade.amount)
+                assertEquals(quotePrice.setScale(18), it.trade.price)
+                assertEquals(BigDecimal("0.287984666627276666").toFundamentalUnits(quoteSymbol.decimals), it.trade.feeAmount)
+                assertEquals(eth2.name, it.trade.feeSymbol.value)
+            }
+            assertTradeCreatedMessageReceived {
+                assertEquals(btcbtc2Market.id, it.trade.marketId)
+                assertEquals(OrderSide.Buy, it.trade.side)
+                assertEquals(baseOrderAmount.inFundamentalUnits, it.trade.amount)
+                assertEquals(bridgePrice.setScale(18), it.trade.price)
+                assertEquals(BigInteger.ZERO, it.trade.feeAmount)
+                assertEquals(btc2.name, it.trade.feeSymbol.value)
+            }
+            assertOrderUpdatedMessageReceived {
+                assertEquals(it.order.status, OrderStatus.Partial)
+            }
+            assertBalancesMessageReceived(
+                listOf(
+                    ExpectedBalance(baseSymbol, total = BigDecimal("0"), available = baseOrderAmount.amount),
+                    ExpectedBalance(quoteSymbol, total = BigDecimal("30"), available = BigDecimal("15.312782002008890029")),
+                ),
+            )
+            assertLimitsMessageReceived(secondMarket.id)
+        }
+
+        makerWsClient.apply {
+            repeat(2) { assertTradeCreatedMessageReceived() }
+            repeat(2) { assertOrderUpdatedMessageReceived() }
+            assertBalancesMessageReceived()
+            assertLimitsMessageReceived(market.id)
+        }
+
+        val takerOrders = takerApiClient.listOrders(emptyList(), market.id).orders
+        assertEquals(1, takerOrders.count { it.status == OrderStatus.Partial })
+
+        assertEquals(2, makerApiClient.listOrders(listOf(OrderStatus.Filled, OrderStatus.Partial)).orders.size)
+
+        // now verify the trades
+        val trades = getTradesForOrders(takerOrders.map { it.id })
+        assertEquals(2, trades.size)
+
+        waitForSettlementToFinish(trades.map { it.id.value })
+
+        val trade1 = trades.first { it.marketGuid.value == secondMarket.id }
+        val trade2 = trades.first { it.marketGuid.value == market.id }
+
+        assertEquals(trade1.amount, firstOrderAmount)
         assertEquals(trade1.price, quotePrice.setScale(18))
 
         assertEquals(trade2.amount, baseOrderAmount.inFundamentalUnits)
