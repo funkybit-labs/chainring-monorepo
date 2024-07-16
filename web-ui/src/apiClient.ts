@@ -42,7 +42,7 @@ const SymbolSchema = z.object({
   contractAddress: AddressSchema.nullable(),
   decimals: z.number(),
   faucetSupported: z.boolean(),
-  iconUrl: z.string().nullable(),
+  iconUrl: z.string(),
   withdrawalFee: z.coerce.bigint()
 })
 

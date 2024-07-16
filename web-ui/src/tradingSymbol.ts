@@ -9,6 +9,7 @@ export default class TradingSymbol {
   chainId: number
   faucetSupported: boolean
   withdrawalFee: bigint
+  iconUrl: string
 
   constructor(
     name: string,
@@ -18,7 +19,8 @@ export default class TradingSymbol {
     decimals: number,
     chainId: number,
     faucetSupported: boolean,
-    withdrawalFee: bigint
+    withdrawalFee: bigint,
+    iconUrl: string
   ) {
     this.name = name
     this.chainName = chainName
@@ -28,6 +30,7 @@ export default class TradingSymbol {
     this.chainId = chainId
     this.faucetSupported = faucetSupported
     this.withdrawalFee = withdrawalFee
+    this.iconUrl = iconUrl
   }
 
   displayName = () => {
