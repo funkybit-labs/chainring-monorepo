@@ -3,6 +3,7 @@ package co.chainring.integrationtests.utils
 import arrow.core.Either
 import arrow.core.raise.either
 import arrow.core.raise.ensure
+import co.chainring.apps.api.AdminRoutes
 import co.chainring.apps.api.middleware.SignInMessage
 import co.chainring.apps.api.model.AccountConfigurationApiResponse
 import co.chainring.apps.api.model.ApiError
@@ -304,13 +305,73 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
 
     fun tryFaucet(apiRequest: FaucetApiRequest): Either<ApiCallFailure, FaucetApiResponse> =
         executeAndTrace(
-            TraceRecorder.Op.GetBalances,
+            TraceRecorder.Op.FaucetDrip,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/faucet")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
+    fun tryCreateSymbol(adminRequest: AdminRoutes.Companion.AdminSymbol): Either<ApiCallFailure, Unit> =
+        executeAndTrace(
+            TraceRecorder.Op.CreateSymbol,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/admin/symbol")
+                .post(Json.encodeToString(adminRequest).toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
+
+    fun tryListSymbols(): Either<ApiCallFailure, List<AdminRoutes.Companion.AdminSymbol>> =
+        executeAndTrace(
+            TraceRecorder.Op.ListSymbols,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/admin/symbol")
+                .get()
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
+    fun tryPatchSymbol(adminRequest: AdminRoutes.Companion.AdminSymbol): Either<ApiCallFailure, Unit> =
+        executeAndTrace(
+            TraceRecorder.Op.PatchSymbol,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/admin/symbol/${adminRequest.name}")
+                .patch(Json.encodeToString(adminRequest).toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
+    fun tryCreateMarket(adminRequest: AdminRoutes.Companion.AdminMarket): Either<ApiCallFailure, Unit> =
+        executeAndTrace(
+            TraceRecorder.Op.CreateMarket,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/admin/market")
+                .post(Json.encodeToString(adminRequest).toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
+
+    fun tryListMarkets(): Either<ApiCallFailure, List<AdminRoutes.Companion.AdminMarket>> =
+        executeAndTrace(
+            TraceRecorder.Op.ListMarkets,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/admin/market")
+                .get()
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
+    fun tryPatchMarket(adminRequest: AdminRoutes.Companion.AdminMarket): Either<ApiCallFailure, Unit> =
+        executeAndTrace(
+            TraceRecorder.Op.PatchMarket,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/admin/market/${adminRequest.id}")
+                .patch(Json.encodeToString(adminRequest).toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     private fun executeAndTrace(op: TraceRecorder.Op, request: Request): Response {
         return traceRecorder.record(op) {
@@ -372,6 +433,24 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
 
     open fun faucet(apiRequest: FaucetApiRequest) =
         tryFaucet(apiRequest).throwOrReturn()
+
+    open fun createSymbol(adminRequest: AdminRoutes.Companion.AdminSymbol) =
+        tryCreateSymbol(adminRequest).throwOrReturn()
+
+    open fun listSymbols() =
+        tryListSymbols().throwOrReturn()
+
+    open fun patchSymbol(adminRequest: AdminRoutes.Companion.AdminSymbol) =
+        tryPatchSymbol(adminRequest).throwOrReturn()
+
+    open fun createMarket(adminRequest: AdminRoutes.Companion.AdminMarket) =
+        tryCreateMarket(adminRequest).throwOrReturn()
+
+    open fun listMarkets() =
+        tryListMarkets().throwOrReturn()
+
+    open fun patchMarket(adminRequest: AdminRoutes.Companion.AdminMarket) =
+        tryPatchMarket(adminRequest).throwOrReturn()
 }
 
 fun <T> Either<ApiCallFailure, T>.throwOrReturn(): T {

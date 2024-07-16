@@ -79,11 +79,6 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
                 .orderBy(Pair(SymbolTable.name, SortOrder.ASC))
                 .toList()
 
-        fun forChainAndName(chainId: ChainId, name: String): SymbolEntity =
-            SymbolEntity
-                .find { SymbolTable.chainId.eq(chainId) and SymbolTable.name.eq(name) }
-                .single()
-
         fun forName(name: String): SymbolEntity =
             SymbolEntity
                 .find { SymbolTable.name.eq(name) }

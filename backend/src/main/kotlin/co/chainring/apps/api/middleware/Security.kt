@@ -12,6 +12,7 @@ import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.model.Address
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.telegram.TelegramUserId
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
 import co.chainring.core.model.toChecksumAddress
@@ -68,6 +69,18 @@ val signedTokenSecurity = object : Security {
         }
 
         return validateAuthToken(authHeader.removePrefix(AUTHORIZATION_SCHEME_PREFIX))
+    }
+}
+
+val adminSecurity = object : Security {
+    override val filter = Filter { next -> wrapWithAdminCheck(next) }
+
+    private fun wrapWithAdminCheck(httpHandler: HttpHandler): HttpHandler = { request ->
+        if (transaction { WalletEntity.findByAddress(request.principal.toChecksumAddress())?.isAdmin } == true) {
+            httpHandler(request)
+        } else {
+            unauthorizedResponse("Access denied")
+        }
     }
 }
 
