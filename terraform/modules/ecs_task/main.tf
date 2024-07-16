@@ -27,50 +27,59 @@ EOF
 }
 
 resource "aws_iam_role_policy" "ecs_execution_role_policy" {
-  name   = "${var.name_prefix}-${var.task_name}-task-execution"
-  role   = aws_iam_role.ecs_task_execution_role.id
-  policy = <<ECS_EXEC_POLICY
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "ecr:GetAuthorizationToken",
-        "ecr:BatchCheckLayerAvailability",
-        "ecr:GetDownloadUrlForLayer",
-        "ecr:BatchGetImage",
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
+  name = "${var.name_prefix}-${var.task_name}-task-execution"
+  role = aws_iam_role.ecs_task_execution_role.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = flatten([[
+      {
+        Effect = "Allow",
+        Action = [
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        Resource = "*"
+      },
+      {
+        Effect = "Allow",
+        Action = [
           "secretsmanager:GetSecretValue"
-      ],
-      "Resource": [
-        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:${var.name_prefix}/${var.task_name}/*",
-        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:slack-error-reporter-token-*"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
+        ],
+        Resource = [
+          "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:${var.name_prefix}/${var.task_name}/*",
+          "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:slack-error-reporter-token-*"
+        ]
+      },
+      {
+        Effect = "Allow",
+        Action = [
           "secretsmanager:GetSecretValue"
-      ],
-      "Resource": [
-        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*"
-      ],
-      "Condition": {
-        "StringEquals": {"aws:ResourceTag/Name": "${var.name_prefix}-db-cluster"}
+        ],
+        Resource = [
+          "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*"
+        ],
+        Condition = {
+          "StringEquals" : { "aws:ResourceTag/Name" : "${var.name_prefix}-db-cluster" }
+        }
       }
-    }
-  ]
-}
-ECS_EXEC_POLICY
+      ], (var.icons_bucket_arn == "" ? [] : [
+        {
+          Action = [
+            "s3:GetObject",
+            "s3:PutObject",
+            "s3:PutObjectAcl"
+          ],
+          Effect   = "Allow",
+          Resource = var.icons_bucket_arn
+        }
+      ]
+    )])
+  })
 }
 
 resource "aws_security_group" "security_group" {

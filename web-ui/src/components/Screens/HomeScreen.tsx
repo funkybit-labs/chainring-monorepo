@@ -69,7 +69,8 @@ function HomeScreenContent() {
                     symbol.decimals,
                     chain.id,
                     symbol.faucetSupported,
-                    symbol.withdrawalFee
+                    symbol.withdrawalFee,
+                    symbol.iconUrl
                   )
               )
             )
