@@ -10,7 +10,7 @@ class V63_SymbolIconUrls : Migration() {
         transaction {
             exec(
                 """
-                UPDATE symbol SET icon_url = '/src/assets/' || LOWER(SPLIT_PART(name, ':', 1)) ||'.svg'
+                UPDATE symbol SET icon_url = 'https://chainring-web-icons.s3.us-east-2.amazonaws.com/symbols/' || LOWER(SPLIT_PART(name, ':', 1)) || '.svg'
                 """.trimIndent(),
             )
             exec(
