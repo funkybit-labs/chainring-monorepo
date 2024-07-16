@@ -502,10 +502,11 @@ class SequencerApp(
         if (quantity == BigInteger.ZERO || bridgeAssetAvailable == BigInteger.ZERO) {
             return SequencerError.InvalidBackToBackOrder
         }
-        val quantityForFirstOrder = if (bridgeAssetReceived != bridgeAssetAvailable) {
-            firstMarket.quantityForMarketSell(bridgeAssetAvailable)
+        val (quantityForFirstOrder, quantityForSecondOrder) = if (bridgeAssetReceived != bridgeAssetAvailable) {
+            val newQuantity = firstMarket.quantityForMarketSell(bridgeAssetAvailable)
+            firstMarket.quantityAndNotionalForMarketSell(newQuantity)
         } else {
-            quantity
+            Pair(quantity, bridgeAssetReceived)
         }
 
         val firstOrderBatch = orderBatch {
@@ -532,7 +533,7 @@ class SequencerApp(
         val secondOrder = order {
             this.guid = order.guid
             this.type = order.type
-            this.amount = bridgeAssetAvailable.toIntegerValue()
+            this.amount = quantityForSecondOrder.toIntegerValue()
         }
         if (secondMarket.isBelowMinFee(secondOrder, state.feeRates)) {
             ordersChanged.add(
