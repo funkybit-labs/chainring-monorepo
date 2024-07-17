@@ -136,24 +136,4 @@ class SovereignWithdrawalTest {
             waitForBalance(apiClient, wsClient, listOf())
         }
     }
-
-    @Test
-    fun testSovereignWithdrawalNonSequenced() {
-        // complete non-requested
-
-        // request duplicate
-        // request parallel
-
-        // premature complete
-    }
-
-    @Test
-    fun testSovereignWithdrawalErrorCases() {
-        // complete non-requested
-
-        // request duplicate
-        // request parallel
-
-        // premature complete
-    }
 }
