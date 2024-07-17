@@ -4,7 +4,6 @@ import co.chainring.core.db.DbConfig
 import co.chainring.core.db.connect
 import co.chainring.core.model.db.BlockchainNonceEntity
 import co.chainring.core.model.db.ChainEntity
-import co.chainring.core.model.db.KeyValueStore
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCEntity
@@ -73,7 +72,14 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
             when (val marketEntity = MarketEntity.findById(MarketId(baseSymbol, quoteSymbol))) {
                 null -> {
                     MarketEntity
-                        .create(baseSymbol, quoteSymbol, tickSize, lastPrice, minFee.toFundamentalUnits(quoteSymbol.decimals))
+                        .create(
+                            baseSymbol,
+                            quoteSymbol,
+                            tickSize,
+                            lastPrice,
+                            "seed",
+                            minFee.toFundamentalUnits(quoteSymbol.decimals)
+                        )
                         .also {
                             it.flush()
                             println("Created market ${it.guid.value}")

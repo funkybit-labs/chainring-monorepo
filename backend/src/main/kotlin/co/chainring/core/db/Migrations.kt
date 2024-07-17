@@ -59,6 +59,7 @@ import co.chainring.core.model.db.migrations.V60_AddResponseSequenceToTradeAndWi
 import co.chainring.core.model.db.migrations.V61_CreateBlockTable
 import co.chainring.core.model.db.migrations.V62_BackToBackOrders
 import co.chainring.core.model.db.migrations.V63_SymbolIconUrls
+import co.chainring.core.model.db.migrations.V64_AddIsAdminToWallet
 import co.chainring.core.model.db.migrations.V6_MarketTable
 import co.chainring.core.model.db.migrations.V7_OrderTable
 import co.chainring.core.model.db.migrations.V8_ExecutionsAndTrades
@@ -128,4 +129,5 @@ val migrations = listOf(
     V61_CreateBlockTable(),
     V62_BackToBackOrders(),
     V63_SymbolIconUrls(),
+    V64_AddIsAdminToWallet(),
 )

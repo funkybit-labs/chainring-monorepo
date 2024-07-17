@@ -351,7 +351,14 @@ class OrderRoutesApiTest : OrderBaseTest() {
         // create market in DB, still isn't known to sequencer, so we should get an UnknownMarket error
         val badMarket = transaction {
             MarketEntity
-                .create(SymbolEntity.forName(dai.name), SymbolEntity.forName(usdc.name), "0.01".toBigDecimal(), "2.005".toBigDecimal(), BigDecimal("0.02").toFundamentalUnits(18))
+                .create(
+                    SymbolEntity.forName(dai.name),
+                    SymbolEntity.forName(usdc.name),
+                    "0.01".toBigDecimal(),
+                    "2.005".toBigDecimal(),
+                    "test",
+                    BigDecimal("0.02").toFundamentalUnits(18),
+                )
         }
         try {
             apiClient.tryCreateOrder(

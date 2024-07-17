@@ -29,6 +29,7 @@ object WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
     val address = varchar("address", 10485760).uniqueIndex()
     val sequencerId = long("sequencer_id").uniqueIndex()
     val addedSymbols = array<String>("added_symbols", VarCharColumnType(10485760)).default(emptyList())
+    val isAdmin = bool("is_admin").default(false)
 }
 
 class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
@@ -78,4 +79,5 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
         toColumn = { it.value },
     )
     var addedSymbols by WalletTable.addedSymbols
+    var isAdmin by WalletTable.isAdmin
 }

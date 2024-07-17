@@ -43,7 +43,7 @@ data class SymbolInfo(
     val contractAddress: Address?,
     val decimals: UByte,
     val faucetSupported: Boolean,
-    val iconUrl: String?,
+    val iconUrl: String,
     val withdrawalFee: BigIntegerJson,
 )
 
