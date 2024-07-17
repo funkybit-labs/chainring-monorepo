@@ -70,6 +70,7 @@ export function OrderBookWidget({
 
           // clamp to CLAMP_TICKS on each side
           const clamped = {
+            marketId: message.marketId,
             type: message.type,
             buy: message.buy.filter((d) => parseFloat(d.price) >= minBuy),
             sell: message.sell.filter((d) => parseFloat(d.price) <= maxSell),
