@@ -1,6 +1,6 @@
 package co.chainring.core.model.db
 
-import co.chainring.core.model.db.WithdrawalEntity.Companion.transform
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
@@ -8,6 +8,7 @@ import org.jetbrains.exposed.dao.with
 import org.jetbrains.exposed.sql.SizedIterable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import java.math.BigDecimal
@@ -27,6 +28,10 @@ value class MarketId(override val value: String) : EntityId {
 }
 
 object MarketTable : GUIDTable<MarketId>("market", ::MarketId) {
+    val createdAt = timestamp("created_at")
+    val createdBy = varchar("created_by", 10485760)
+    val updatedAt = timestamp("updated_at").nullable()
+    val updatedBy = varchar("updated_by", 10485760).nullable()
     val baseSymbolGuid = reference("base_symbol_guid", SymbolTable)
     val quoteSymbolGuid = reference("quote_symbol_guid", SymbolTable)
     val tickSize = decimal("tick_size", 30, 18)
@@ -43,8 +48,11 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
             quoteSymbol: SymbolEntity,
             tickSize: BigDecimal,
             lastPrice: BigDecimal,
+            createdBy: String,
             minFee: BigInteger = BigInteger.ZERO,
         ) = MarketEntity.new(MarketId(baseSymbol, quoteSymbol)) {
+            this.createdAt = Clock.System.now()
+            this.createdBy = createdBy
             this.baseSymbolGuid = baseSymbol.guid
             this.quoteSymbolGuid = quoteSymbol.guid
             this.tickSize = tickSize
@@ -69,6 +77,10 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
             }.singleOrNull()
     }
 
+    var createdAt by MarketTable.createdAt
+    var createdBy by MarketTable.createdBy
+    var updatedAt by MarketTable.updatedAt
+    var updatedBy by MarketTable.updatedBy
     var baseSymbolGuid by MarketTable.baseSymbolGuid
     var quoteSymbolGuid by MarketTable.quoteSymbolGuid
     var tickSize by MarketTable.tickSize

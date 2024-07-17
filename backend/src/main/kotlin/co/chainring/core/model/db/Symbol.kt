@@ -33,6 +33,8 @@ object SymbolTable : GUIDTable<SymbolId>("symbol", ::SymbolId) {
     val description = varchar("description", 10485760)
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
+    val updatedAt = timestamp("updated_at").nullable()
+    val updatedBy = varchar("updated_by", 10485760).nullable()
     val iconUrl = varchar("icon_url", 10485760)
     val addToWallets = bool("add_to_wallets").default(false)
     val withdrawalFee = decimal("withdrawal_fee", 30, 0).default(BigDecimal.ZERO)
@@ -117,6 +119,8 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
     var description by SymbolTable.description
     var createdAt by SymbolTable.createdAt
     var createdBy by SymbolTable.createdBy
+    var updatedAt by SymbolTable.updatedAt
+    var updatedBy by SymbolTable.updatedBy
     var iconUrl by SymbolTable.iconUrl
     var addToWallets by SymbolTable.addToWallets
 
