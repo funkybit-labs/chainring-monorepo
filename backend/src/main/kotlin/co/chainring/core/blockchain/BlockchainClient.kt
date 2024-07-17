@@ -109,7 +109,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
     )
     protected val credentials = Credentials.create(config.privateKeyHex)
     val chainId = ChainId(web3j.ethChainId().send().chainId)
-    private val receiptProcessor = PollingTransactionReceiptProcessor(
+    protected val receiptProcessor = PollingTransactionReceiptProcessor(
         web3j,
         config.pollingIntervalInMs,
         config.maxPollingAttempts.toInt(),
@@ -228,6 +228,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
                     ).initialize(
                         submitterCredentials.address,
                         config.feeAccountAddress,
+                        config.sovereignWithdrawalDelay
                     ).send()
                 }
             }
@@ -305,6 +306,12 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
             return receipt.get()
         } else {
             null
+        }
+    }
+
+    fun gasUsed(txHash: TxHash): BigInteger? {
+        return getTransactionReceipt(txHash.value)?.let {
+            it.gasUsed * BigInteger(it.effectiveGasPrice.substring(2), 16)
         }
     }
 

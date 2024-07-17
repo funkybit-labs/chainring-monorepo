@@ -651,7 +651,7 @@ class BlockchainTransactionHandler(
                 }
                 ).getTxData(withdrawal.sequenceId)
         }
-        val batchHash = sha3(withdrawals.map { sha3(it) }.reduce { a, b -> a + b }).toHex(false)
+        val batchHash = sha3(withdrawals.map { sha3(it) }.reduce { a, b -> a + b }).toHex(add0x = false)
         logger.debug { "calculated withdrawal hash = $batchHash" }
         val transactionData = BlockchainTransactionData(
             data = blockchainClient.encodeSubmitWithdrawalsFunctionCall(withdrawals),

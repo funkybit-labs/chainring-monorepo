@@ -29,6 +29,7 @@ import org.web3j.crypto.Keys
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import java.math.BigDecimal
 import java.math.BigInteger
+import org.web3j.crypto.Credentials
 
 class Wallet(
     val walletKeypair: ECKeyPair,
@@ -44,6 +45,13 @@ class Wallet(
     }
     private val blockchainClients = ChainManager.blockchainConfigs.map {
         TestBlockchainClient(ChainManager.getBlockchainClient(it, walletKeypair.privateKey.toByteArray().toHex()).config)
+            .also { blockchainClient ->
+                val chain = chains.first { it.id == blockchainClient.chainId }
+                blockchainClient.setContractAddress(
+                    ContractType.Exchange,
+                    chain.contracts.first { it.name == "Exchange" }.address,
+                )
+            }
     }
 
     private val blockchainClientsByChainId = blockchainClients.associateBy { it.chainId }
@@ -171,7 +179,7 @@ class Wallet(
 
         return blockchainClientsByChainId.getValue(currentChainId).sendTransaction(
             Address(exchangeContractByChainId.getValue(currentChainId).contractAddress),
-            exchangeContractByChainId.getValue(currentChainId).deposit(erc20TokenAddress(symbol), amount).encodeFunctionCall(),
+            exchangeContractByChainId.getValue(currentChainId).deposit(erc20TokenAddress(symbol)?.value, amount).encodeFunctionCall(),
             BigInteger.ZERO,
         )
     }
@@ -180,7 +188,7 @@ class Wallet(
         val nonce = nonceOverride ?: getWithdrawalNonce()
         val tx = EIP712Transaction.WithdrawTx(
             address,
-            TokenAddressAndChain(erc20TokenAddress(symbol)?.let { Address(it) } ?: Address.zero, this.currentChainId),
+            TokenAddressAndChain(erc20TokenAddress(symbol) ?: Address.zero, this.currentChainId),
             amount,
             nonce,
             amount == BigInteger.ZERO,
@@ -289,12 +297,12 @@ class Wallet(
         return System.currentTimeMillis()
     }
 
-    private fun loadErc20Contract(symbol: String) = blockchainClientsByChainId.getValue(currentChainId).loadERC20Mock(erc20TokenAddress(symbol)!!)
+    private fun loadErc20Contract(symbol: String) = blockchainClientsByChainId.getValue(currentChainId).loadERC20Mock(erc20TokenAddress(symbol)!!.value)
 
-    private fun erc20TokenAddress(symbol: String) =
-        chains.first { it.id == currentChainId }.symbols.firstOrNull { (it.name == symbol || it.name == "$symbol:$currentChainId") && it.contractAddress != null }?.contractAddress?.value
+    private fun erc20TokenAddress(symbol: String): Address? =
+        chains.first { it.id == currentChainId }.symbols.firstOrNull { (it.name == symbol || it.name == "$symbol:$currentChainId") && it.contractAddress != null }?.contractAddress
 
-    private fun erc20TokenAddress(symbol: String, chainId: ChainId) =
+    private fun erc20TokenAddress(symbol: String, chainId: ChainId): String? =
         chains.first { it.id == chainId }.symbols.firstOrNull { (it.name == symbol || it.name == "$symbol:$currentChainId") && it.contractAddress != null }?.contractAddress?.value
 
     private fun marketSymbols(marketId: MarketId): Pair<SymbolInfo, SymbolInfo> =
@@ -306,4 +314,16 @@ class Wallet(
                     chains.map { it.symbols.filter { s -> s.name == quote } }.flatten().first(),
                 )
             }
+
+    fun requestSovereignWithdrawalAndMine(symbol: String, amount: BigInteger): TxHash {
+        val blockchainClient = blockchainClientsByChainId.getValue(currentChainId)
+
+        return blockchainClient
+            .initiateSovereignWithdrawal(
+                senderCredentials = Credentials.create(walletKeypair),
+                tokenContractAddress = erc20TokenAddress(symbol) ?: Address.zero,
+                amount = amount
+            )
+            .also { blockchainClient.mine() }
+    }
 }

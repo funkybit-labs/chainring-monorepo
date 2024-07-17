@@ -30,7 +30,7 @@ data class SymbolContractAddress(
 )
 
 val blockchainClients = ChainManager.blockchainConfigs.map {
-    FixturesBlockchainClient(it.copy(enableWeb3jLogging = false))
+    FixturesBlockchainClient(it.copy(enableWeb3jLogging = false, sovereignWithdrawalDelay = 1.toBigInteger()))
 }
 val blockchainClientsByChainId = blockchainClients.associateBy { it.chainId }
 
