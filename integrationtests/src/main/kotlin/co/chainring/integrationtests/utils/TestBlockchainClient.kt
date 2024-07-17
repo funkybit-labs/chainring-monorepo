@@ -9,17 +9,17 @@ import co.chainring.core.model.Address
 import co.chainring.core.model.TxHash
 import org.awaitility.kotlin.await
 import org.awaitility.kotlin.withAlias
+import org.web3j.crypto.Credentials
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.protocol.core.methods.response.VoidResponse
+import org.web3j.tx.RawTransactionManager
 import org.web3j.utils.Numeric
 import java.math.BigInteger
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
-import org.web3j.crypto.Credentials
-import org.web3j.tx.RawTransactionManager
 
 class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : BlockchainClient(blockchainConfig) {
     fun loadERC20Mock(address: String) = MockERC20.load(address, web3j, transactionManager, gasProvider)

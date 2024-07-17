@@ -24,12 +24,12 @@ import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHex
 import co.chainring.core.utils.toHexBytes
+import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import java.math.BigDecimal
 import java.math.BigInteger
-import org.web3j.crypto.Credentials
 
 class Wallet(
     val walletKeypair: ECKeyPair,
@@ -322,7 +322,7 @@ class Wallet(
             .initiateSovereignWithdrawal(
                 senderCredentials = Credentials.create(walletKeypair),
                 tokenContractAddress = erc20TokenAddress(symbol) ?: Address.zero,
-                amount = amount
+                amount = amount,
             )
             .also { blockchainClient.mine() }
     }

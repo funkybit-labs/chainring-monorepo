@@ -1,7 +1,6 @@
 package co.chainring.apps.ring
 
 import co.chainring.apps.api.model.Withdrawal
-import co.chainring.apps.api.services.ExchangeApiService
 import co.chainring.contracts.generated.Exchange
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.model.Address
@@ -19,6 +18,7 @@ import co.chainring.core.sequencer.toSequencerId
 import co.chainring.core.utils.rangeTo
 import co.chainring.sequencer.core.Asset
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.selectAll
@@ -29,7 +29,6 @@ import org.web3j.protocol.core.methods.response.Log
 import org.web3j.tx.Contract
 import java.math.BigInteger
 import kotlin.concurrent.thread
-import kotlinx.coroutines.runBlocking
 
 class BlockProcessor(
     private val blockchainClient: BlockchainClient,

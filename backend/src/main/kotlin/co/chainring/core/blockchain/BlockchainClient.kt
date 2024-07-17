@@ -228,7 +228,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
                     ).initialize(
                         submitterCredentials.address,
                         config.feeAccountAddress,
-                        config.sovereignWithdrawalDelay
+                        config.sovereignWithdrawalDelay,
                     ).send()
                 }
             }

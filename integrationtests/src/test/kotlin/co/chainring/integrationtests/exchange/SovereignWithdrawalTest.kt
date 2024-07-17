@@ -13,15 +13,15 @@ import co.chainring.integrationtests.utils.blocking
 import co.chainring.integrationtests.utils.subscribeToBalances
 import co.chainring.tasks.blockchainClient
 import co.chainring.tasks.fixtures.toChainSymbol
-import java.math.BigDecimal
-import java.time.Duration
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import org.awaitility.kotlin.await
 import org.http4k.client.WebsocketClient
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.extension.ExtendWith
 import org.web3j.utils.Numeric
+import java.math.BigDecimal
+import java.time.Duration
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 @ExtendWith(AppUnderTestRunner::class)
 class SovereignWithdrawalTest {
@@ -82,7 +82,6 @@ class SovereignWithdrawalTest {
             )
             Assertions.assertEquals(usdcMintAmount - usdcDepositAmount, wallet.getWalletBalance(usdc))
 
-
             // BTC sovereign withdrawal
             val walletBtcBalanceBeforeWithdrawal = wallet.getWalletBalance(btc).amount.toFundamentalUnits(btc.decimals)
             val btcWithdrawalAmount = BigDecimal("0.1")
@@ -105,7 +104,7 @@ class SovereignWithdrawalTest {
                     // calculate also gas since gas is paid in native symbol
                     assertEquals(
                         expected = walletBtcBalanceBeforeWithdrawal + withdrawalAmount - withdrawalFee - btcWithdrawalGasCost,
-                        actual = walletBalanceAfterWithdrawal
+                        actual = walletBalanceAfterWithdrawal,
                     )
                 }
             waitForBalance(apiClient, wsClient, listOf())
@@ -130,7 +129,7 @@ class SovereignWithdrawalTest {
 
                     assertEquals(
                         expected = walletUsdcBalanceBeforeWithdrawal + withdrawalAmount - withdrawalFee,
-                        actual = walletBalanceAfterWithdrawal
+                        actual = walletBalanceAfterWithdrawal,
                     )
                 }
             waitForBalance(apiClient, wsClient, listOf())
