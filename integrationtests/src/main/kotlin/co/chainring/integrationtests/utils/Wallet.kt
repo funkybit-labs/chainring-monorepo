@@ -318,12 +318,10 @@ class Wallet(
     fun requestSovereignWithdrawalAndMine(symbol: String, amount: BigInteger): TxHash {
         val blockchainClient = blockchainClientsByChainId.getValue(currentChainId)
 
-        return blockchainClient
-            .initiateSovereignWithdrawal(
-                senderCredentials = Credentials.create(walletKeypair),
-                tokenContractAddress = erc20TokenAddress(symbol) ?: Address.zero,
-                amount = amount,
-            )
-            .also { blockchainClient.mine() }
+        return blockchainClient.sovereignWithdrawal(
+            senderCredentials = Credentials.create(walletKeypair),
+            tokenContractAddress = erc20TokenAddress(symbol) ?: Address.zero,
+            amount = amount,
+        ).also { blockchainClient.mine() }
     }
 }

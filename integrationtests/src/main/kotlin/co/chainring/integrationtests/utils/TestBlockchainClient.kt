@@ -95,7 +95,7 @@ class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : Blockchai
         VoidResponse::class.java,
     ).send()
 
-    fun initiateSovereignWithdrawal(senderCredentials: Credentials, tokenContractAddress: Address, amount: BigInteger): TxHash {
+    fun sovereignWithdrawal(senderCredentials: Credentials, tokenContractAddress: Address, amount: BigInteger): TxHash {
         val exchangeContractAddress = getContractAddress(ContractType.Exchange).value
         val txManager = RawTransactionManager(
             web3j,
@@ -105,7 +105,7 @@ class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : Blockchai
         )
 
         val sovereignWithdrawalFunction = loadExchange(exchangeContractAddress)
-            .initiateSovereignWithdrawal(tokenContractAddress.value, amount)
+            .sovereignWithdrawal(tokenContractAddress.value, amount)
             .encodeFunctionCall()
 
         return txManager.sendTransaction(
