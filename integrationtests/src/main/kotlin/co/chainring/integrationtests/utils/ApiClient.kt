@@ -30,9 +30,11 @@ import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.core.blockchain.checksumAddress
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.evm.EIP712Helper
+import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.DepositId
+import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderStatus
@@ -373,6 +375,46 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
+    fun tryListAdmins(): Either<ApiCallFailure, List<Address>> =
+        executeAndTrace(
+            TraceRecorder.Op.ListAdmins,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/admin/admin")
+                .get()
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
+    fun tryAddAdmin(address: Address): Either<ApiCallFailure, Unit> =
+        executeAndTrace(
+            TraceRecorder.Op.AddAdmin,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/admin/admin/${address.value}")
+                .put("".toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
+
+    fun tryRemoveAdmin(address: Address): Either<ApiCallFailure, Unit> =
+        executeAndTrace(
+            TraceRecorder.Op.RemoveAdmin,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/admin/admin/${address.value}")
+                .delete()
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
+
+    fun trySetFeeRates(feeRates: FeeRates): Either<ApiCallFailure, Unit> =
+        executeAndTrace(
+            TraceRecorder.Op.SetFeeRates,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/admin/fee-rates")
+                .post(Json.encodeToString(feeRates).toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
+
     private fun executeAndTrace(op: TraceRecorder.Op, request: Request): Response {
         return traceRecorder.record(op) {
             httpClient.newCall(request).execute()
@@ -451,6 +493,14 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
 
     open fun patchMarket(adminRequest: AdminRoutes.Companion.AdminMarket) =
         tryPatchMarket(adminRequest).throwOrReturn()
+
+    open fun listAdmins() = tryListAdmins().throwOrReturn()
+
+    open fun addAdmin(address: Address) = tryAddAdmin(address).throwOrReturn()
+
+    open fun removeAdmin(address: Address) = tryRemoveAdmin(address).throwOrReturn()
+
+    open fun setFeeRates(feeRates: FeeRates) = trySetFeeRates(feeRates).throwOrReturn()
 }
 
 fun <T> Either<ApiCallFailure, T>.throwOrReturn(): T {

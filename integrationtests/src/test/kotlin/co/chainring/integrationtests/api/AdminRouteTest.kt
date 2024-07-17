@@ -4,7 +4,10 @@ import co.chainring.apps.api.AdminRoutes
 import co.chainring.apps.api.FaucetMode
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.ReasonCode
+import co.chainring.apps.api.model.Role
 import co.chainring.core.model.Address
+import co.chainring.core.model.FeeRate
+import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.SymbolEntity
@@ -21,6 +24,39 @@ import kotlin.test.Test
 
 @ExtendWith(AppUnderTestRunner::class)
 class AdminRouteTest {
+    @Test
+    fun `test admin management`() {
+        val apiClient = TestApiClient()
+
+        apiClient.tryListAdmins().assertError(ApiError(ReasonCode.AuthenticationError, "Access denied"))
+        assertEquals(Role.User, apiClient.getAccountConfiguration().role)
+        transaction {
+            WalletEntity.getOrCreate(apiClient.address).isAdmin = true
+        }
+        assertEquals(listOf(apiClient.address), apiClient.listAdmins())
+        assertEquals(Role.Admin, apiClient.getAccountConfiguration().role)
+
+        val apiClient2 = TestApiClient()
+        apiClient.addAdmin(apiClient2.address)
+        apiClient2.removeAdmin(apiClient.address)
+        apiClient.tryListAdmins().assertError(ApiError(ReasonCode.AuthenticationError, "Access denied"))
+        assertEquals(Role.User, apiClient.getAccountConfiguration().role)
+    }
+
+    @Test
+    fun `test set fee rates`() {
+        val apiClient = TestApiClient()
+
+        val feeRates = apiClient.getConfiguration().feeRates
+        transaction {
+            WalletEntity.getOrCreate(apiClient.address).isAdmin = true
+        }
+
+        val newFeeRates = FeeRates(FeeRate(feeRates.maker.value + 1L), FeeRate(feeRates.taker.value + 2L))
+        apiClient.setFeeRates(newFeeRates)
+        assertEquals(newFeeRates, apiClient.getConfiguration().feeRates)
+    }
+
     @Test
     fun `test symbol management`() {
         val apiClient = TestApiClient()

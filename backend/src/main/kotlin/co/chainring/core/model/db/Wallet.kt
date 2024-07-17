@@ -66,6 +66,14 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
                 WalletTable.sequencerId.eq(sequencerId.value)
             }.firstOrNull()
         }
+
+        fun getAdminAddresses(): List<Address> {
+            return WalletTable.select(listOf(WalletTable.address)).where {
+                WalletTable.isAdmin.eq(true)
+            }.map {
+                Address(it[WalletTable.address])
+            }
+        }
     }
 
     var createdAt by WalletTable.createdAt
