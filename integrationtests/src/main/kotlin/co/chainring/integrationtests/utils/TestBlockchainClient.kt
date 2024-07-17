@@ -99,7 +99,8 @@ class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : Blockchai
         val exchangeContractAddress = getContractAddress(ContractType.Exchange).value
         val txManager = RawTransactionManager(
             web3j,
-            senderCredentials, // custom sender credentials
+            // custom sender credentials
+            senderCredentials,
             chainId.value.toLong(),
             receiptProcessor,
         )
