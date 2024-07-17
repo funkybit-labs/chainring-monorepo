@@ -55,7 +55,10 @@ export function OrderBookWidget({
                   .map((d) => parseFloat(d.price))
                   .reduce((max, price) => (max > price ? max : price))
               : 0
-          const minBuy = maxBuy - market.tickSize.toNumber() * CLAMP_MAX_TICKS
+          const minBuy = Math.max(
+            maxBuy - market.tickSize.toNumber() * CLAMP_MAX_TICKS,
+            market.tickSize.toNumber()
+          )
 
           const minSell =
             message.sell.length > 0
@@ -360,21 +363,18 @@ function OrderBookChart({
       const labelWidth = (measuredText.node()?.getBBox().width ?? 0) * 0.95 // take 95% of calculated width
       measuredText.remove()
 
+      const nearestPriceY =
+        yScale(nearestPriceLevel.price.toNumber()) + margin.top
       const tooltip = svgMouseProjection
         .classed('hidden', mouseY < margin.top)
-        .attr(
-          'transform',
-          `translate(0,${
-            yScale(nearestPriceLevel.price.toNumber()) + margin.top
-          })`
-        )
+        .attr('transform', `translate(0,${nearestPriceY})`)
 
       // make tooltip are always be visible on the screen
       const yAdjustToScreen =
-        mouseY > innerHeight + margin.top - 22 // lower boundary
-          ? innerHeight + margin.top - mouseY - 22
-          : mouseY < margin.top + 10 // upped boundary
-            ? margin.top + 10 - mouseY
+        nearestPriceY > innerHeight + margin.top - 22 // lower boundary
+          ? innerHeight + margin.top - nearestPriceY - 22
+          : nearestPriceY < margin.top + 10 // upped boundary
+            ? margin.top + 10 - nearestPriceY
             : 0
       tooltip
         .select('rect')
