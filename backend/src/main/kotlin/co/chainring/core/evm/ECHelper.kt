@@ -28,12 +28,13 @@ object ECHelper {
         return (signature.r + signature.s + signature.v).toHex().toEvmSignature()
     }
 
-    fun isValidSignature(messageHash: ByteArray, signature: EvmSignature, signerAddress: Address): Boolean {
+    fun isValidSignature(messageHash: ByteArray, signature: EvmSignature, signerAddress: Address, linkedSignerAddress: Address? = null): Boolean {
         val (r, s, v) = decodeSignature(signature)
         val ecdsaSig = ECDSASignature(r, s).toCanonicalised()
 
         val recoveredAddress = Keys.toChecksumAddress(Keys.getAddress(Sign.recoverFromSignature(v.toInt() - 27, ecdsaSig, messageHash)))
-        return recoveredAddress == Keys.toChecksumAddress(signerAddress.value)
+        return recoveredAddress == Keys.toChecksumAddress(signerAddress.value) ||
+            (linkedSignerAddress != null && recoveredAddress == Keys.toChecksumAddress(linkedSignerAddress.value))
     }
 
     private fun decodeSignature(signature: EvmSignature): Triple<BigInteger, BigInteger, BigInteger> {

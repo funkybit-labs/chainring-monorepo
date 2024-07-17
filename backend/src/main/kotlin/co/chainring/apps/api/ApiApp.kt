@@ -8,6 +8,7 @@ import co.chainring.apps.api.services.ExchangeApiService
 import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.db.DbConfig
 import co.chainring.core.sequencer.SequencerClient
+import co.chainring.core.services.LinkedSignerService
 import co.chainring.core.websocket.Broadcaster
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.contract
@@ -162,6 +163,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     override fun start() {
         logger.info { "Starting" }
         super.start()
+        LinkedSignerService.start(db)
         server.start()
         broadcaster.start()
         logger.info { "Started" }
@@ -172,6 +174,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
         super.stop()
         broadcaster.stop()
         server.stop()
+        LinkedSignerService.stop()
         logger.info { "Stopped" }
     }
 }

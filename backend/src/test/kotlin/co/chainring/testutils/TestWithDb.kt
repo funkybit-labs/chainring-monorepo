@@ -32,6 +32,7 @@ import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.SymbolTable
 import co.chainring.core.model.db.TradeTable
 import co.chainring.core.model.db.WalletEntity
+import co.chainring.core.model.db.WalletLinkedSignerTable
 import co.chainring.core.model.db.WalletTable
 import co.chainring.core.model.db.WithdrawalTable
 import co.chainring.core.utils.toFundamentalUnits
@@ -77,6 +78,7 @@ open class TestWithDb {
             BalanceTable.deleteAll()
             DepositTable.deleteAll()
             WithdrawalTable.deleteAll()
+            WalletLinkedSignerTable.deleteAll()
             WalletTable.deleteAll()
             BlockchainTransactionTable.deleteAll()
             BlockchainNonceTable.deleteAll()

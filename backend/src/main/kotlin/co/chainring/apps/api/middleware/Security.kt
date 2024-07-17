@@ -17,6 +17,7 @@ import co.chainring.core.model.telegram.TelegramUserId
 import co.chainring.core.model.telegram.miniapp.TelegramMiniAppUserEntity
 import co.chainring.core.model.toChecksumAddress
 import co.chainring.core.model.toEvmSignature
+import co.chainring.core.services.LinkedSignerService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -122,10 +123,12 @@ private fun endOfValidityInterval(signInMessage: SignInMessage): Instant =
 
 private fun validateSignature(signInMessage: SignInMessage, signature: String): Boolean {
     return runCatching {
+        val walletAddress = Address(Keys.toChecksumAddress(signInMessage.address))
         ECHelper.isValidSignature(
             messageHash = EIP712Helper.computeHash(signInMessage),
             signature = signature.toEvmSignature(),
-            signerAddress = Address(Keys.toChecksumAddress(signInMessage.address)),
+            signerAddress = walletAddress,
+            linkedSignerAddress = LinkedSignerService.getLinkedSigner(walletAddress, signInMessage.chainId),
         )
     }.getOrElse { false }
 }

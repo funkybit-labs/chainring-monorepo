@@ -224,6 +224,50 @@ export default [
     },
     {
         "type": "function",
+        "name": "linkSigner",
+        "inputs": [
+            {
+                "name": "_linkedSigner",
+                "type": "address",
+                "internalType": "address"
+            },
+            {
+                "name": "_digest",
+                "type": "bytes32",
+                "internalType": "bytes32"
+            },
+            {
+                "name": "_signature",
+                "type": "bytes",
+                "internalType": "bytes"
+            }
+        ],
+        "outputs": [
+            
+        ],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "linkedSigners",
+        "inputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
         "name": "owner",
         "inputs": [
             
@@ -266,6 +310,17 @@ export default [
             }
         ],
         "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "removeLinkedSigner",
+        "inputs": [
+            
+        ],
+        "outputs": [
+            
+        ],
+        "stateMutability": "nonpayable"
     },
     {
         "type": "function",
@@ -520,6 +575,44 @@ export default [
                 "type": "uint64",
                 "indexed": false,
                 "internalType": "uint64"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "LinkSignerFailed",
+        "inputs": [
+            {
+                "name": "sender",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address"
+            },
+            {
+                "name": "linkedSigner",
+                "type": "address",
+                "indexed": false,
+                "internalType": "address"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "LinkedSigner",
+        "inputs": [
+            {
+                "name": "sender",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address"
+            },
+            {
+                "name": "linkedSigner",
+                "type": "address",
+                "indexed": false,
+                "internalType": "address"
             }
         ],
         "anonymous": false
