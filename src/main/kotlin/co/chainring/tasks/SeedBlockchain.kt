@@ -75,7 +75,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
                 if (currentBalance < balance) {
                     Pair(
                         symbol.chainId,
-                        blockchainClient.asyncMintERC20(
+                        blockchainClient.sendMintERC20Tx(
                             symbolContractAddress,
                             wallet.address,
                             balance - currentBalance

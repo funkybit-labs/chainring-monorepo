@@ -50,6 +50,8 @@ export function SwapWidget({
     onMarketChange,
     onSideChange: onChangedSide,
     isLimitOrder: false,
+    marketSessionStorageKey: 'market',
+    sideSessionStorageKey: 'side',
     Renderer: function (sr: SwapRender) {
       const [marketPriceInverted, setMarketPriceInverted] = useState(false)
 

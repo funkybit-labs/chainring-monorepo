@@ -58,3 +58,6 @@ variable "deployment_minimum_healthy_percent" {
   type    = number
   default = 100
 }
+variable "icons_bucket_arn" {
+  default = ""
+}

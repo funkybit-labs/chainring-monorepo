@@ -1,12 +1,7 @@
-import btc from 'assets/btc.svg'
-import eth from 'assets/eth.svg'
-import usdc from 'assets/usdc.svg'
-import dai from 'assets/dai.svg'
 import generic from 'cryptocurrency-icons/svg/color/generic.svg'
 import botanix from 'assets/botanix.svg'
 import bitlayer from 'assets/bitlayer.svg'
 import base from 'assets/base.svg'
-import logo from 'assets/logo.svg'
 import TradingSymbol from 'tradingSymbol'
 
 interface Props {
@@ -18,17 +13,6 @@ function getSymbolAndChainIcons(symbol: TradingSymbol): {
   chainIcon: string
   icon: string
 } {
-  const symbolName = symbol.displayName()
-
-  const icon = (() => {
-    if (symbolName === 'BTC') return btc
-    if (symbolName === 'ETH') return eth
-    if (symbolName === 'USDC') return usdc
-    if (symbolName === 'DAI') return dai
-    if (symbolName === 'RING') return logo
-    return generic
-  })()
-
   const chainIcon = (() => {
     switch (symbol.chainName) {
       case 'Botanix':
@@ -42,7 +26,7 @@ function getSymbolAndChainIcons(symbol: TradingSymbol): {
     }
   })()
 
-  return { icon, chainIcon }
+  return { icon: symbol.iconUrl, chainIcon }
 }
 
 export default function SymbolIcon(props: Props) {

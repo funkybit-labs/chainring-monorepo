@@ -38,53 +38,64 @@ function HomeScreenContent() {
     (window.sessionStorage.getItem('tab') as Tab | null) ?? 'Swap'
   )
 
-  const { exchangeContract, chains, markets, symbols, feeRates } =
-    useMemo(() => {
-      const config = configQuery.data
-      const chainConfig = config?.chains.find(
-        (chain) => chain.id === (wallet.chainId || config.chains[0]?.id)
-      )
+  const {
+    exchangeContract,
+    chains,
+    markets,
+    symbols,
+    feeRates,
+    marketsWithBackToBack
+  } = useMemo(() => {
+    const config = configQuery.data
+    const chainConfig = config?.chains.find(
+      (chain) => chain.id === (wallet.chainId || config.chains[0]?.id)
+    )
 
-      const exchangeContract = chainConfig?.contracts?.find(
-        (c) => c.name == 'Exchange'
-      )
+    const exchangeContract = chainConfig?.contracts?.find(
+      (c) => c.name == 'Exchange'
+    )
 
-      const symbols = config
-        ? new TradingSymbols(
-            config?.chains
-              .map((chain) =>
-                chain.symbols.map(
-                  (symbol) =>
-                    new TradingSymbol(
-                      symbol.name,
-                      chain.name,
-                      symbol.description,
-                      symbol.contractAddress,
-                      symbol.decimals,
-                      chain.id,
-                      symbol.faucetSupported,
-                      symbol.withdrawalFee
-                    )
-                )
+    const symbols = config
+      ? new TradingSymbols(
+          config?.chains
+            .map((chain) =>
+              chain.symbols.map(
+                (symbol) =>
+                  new TradingSymbol(
+                    symbol.name,
+                    chain.name,
+                    symbol.description,
+                    symbol.contractAddress,
+                    symbol.decimals,
+                    chain.id,
+                    symbol.faucetSupported,
+                    symbol.withdrawalFee,
+                    symbol.iconUrl
+                  )
               )
-              .reduce((accumulator, value) => accumulator.concat(value), [])
-          )
-        : null
-      const markets =
-        config && symbols ? new Markets(config.markets, symbols) : null
+            )
+            .reduce((accumulator, value) => accumulator.concat(value), [])
+        )
+      : null
+    const markets =
+      config && symbols ? new Markets(config.markets, symbols, false) : null
 
-      const feeRates = config && config.feeRates
+    const marketsWithBackToBack =
+      config && symbols ? new Markets(config.markets, symbols, true) : null
 
-      const chains: Chain[] = config?.chains ?? []
+    const feeRates = config && config.feeRates
 
-      return {
-        exchangeContract,
-        chains,
-        markets,
-        symbols,
-        feeRates
-      }
-    }, [configQuery.data, wallet.chainId])
+    const chains: Chain[] = config?.chains ?? []
+
+    return {
+      exchangeContract,
+      chains,
+      markets,
+      symbols,
+      feeRates,
+      marketsWithBackToBack
+    }
+  }, [configQuery.data, wallet.chainId])
 
   useEffect(() => {
     if (markets !== null && selectedMarket == null) {
@@ -129,7 +140,7 @@ function HomeScreenContent() {
     window.sessionStorage.setItem('tab', tab)
   }
 
-  return markets && feeRates && selectedMarket ? (
+  return markets && marketsWithBackToBack && feeRates && selectedMarket ? (
     <div className="min-h-screen bg-darkBluishGray10">
       <Header initialTab={tab} markets={markets} onTabChange={saveTab} />
 
@@ -140,7 +151,7 @@ function HomeScreenContent() {
         >
           {tab === 'Swap' && (
             <SwapModal
-              markets={markets}
+              markets={marketsWithBackToBack}
               walletAddress={wallet.address}
               exchangeContractAddress={exchangeContract?.address}
               feeRates={feeRates}

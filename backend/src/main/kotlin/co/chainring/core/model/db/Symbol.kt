@@ -33,7 +33,7 @@ object SymbolTable : GUIDTable<SymbolId>("symbol", ::SymbolId) {
     val description = varchar("description", 10485760)
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
-    val iconUrl = varchar("icon_url", 10485760).nullable()
+    val iconUrl = varchar("icon_url", 10485760)
     val addToWallets = bool("add_to_wallets").default(false)
     val withdrawalFee = decimal("withdrawal_fee", 30, 0).default(BigDecimal.ZERO)
 
@@ -59,6 +59,7 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
             description: String,
             addToWallets: Boolean = false,
             withdrawalFee: BigInteger,
+            iconUrl: String = "#",
         ) = SymbolEntity.new(SymbolId(chainId, name)) {
             this.name = "$name:$chainId"
             this.chainId = EntityID(chainId, ChainTable)
@@ -69,6 +70,7 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
             this.createdAt = Clock.System.now()
             this.createdBy = "system"
             this.addToWallets = addToWallets
+            this.iconUrl = iconUrl
         }
 
         fun forChain(chainId: ChainId): List<SymbolEntity> =

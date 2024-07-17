@@ -1,8 +1,9 @@
 import { OHLC, OHLCDuration, OrderBook } from 'websocketMessages'
 import { OrderSide } from 'apiClient'
 import { parseUnits } from 'viem'
-import { Market } from 'markets'
+import Markets, { Market } from 'markets'
 import Decimal from 'decimal.js'
+import { calculateNotional } from 'utils/index'
 
 export const ohlcDurationsMs: Record<OHLCDuration, number> = {
   ['P1M']: 60 * 1000,
@@ -57,6 +58,55 @@ function fillGaps(draft: OHLC[], untilTime: number, ohlcDuration: number) {
 }
 
 export function getMarketPrice(
+  side: OrderSide,
+  amount: bigint,
+  market: Market,
+  orderBook: OrderBook,
+  markets: Markets,
+  secondMarketOrderBook: OrderBook | undefined
+): bigint {
+  if (market.isBackToBack()) {
+    if (secondMarketOrderBook === undefined) {
+      return 0n
+    }
+
+    const firstMarket = markets.getById(market.marketIds[0])
+    const secondMarket = markets.getById(market.marketIds[1])
+    const firstOrderPrice = calculateMarketPrice(
+      side,
+      amount,
+      markets.getById(market.marketIds[0]),
+      orderBook
+    )
+    const firstOrderNotional = calculateNotional(
+      firstOrderPrice,
+      amount,
+      market.baseSymbol
+    )
+    const secondOrderPrice = calculateMarketPrice(
+      side,
+      firstOrderNotional,
+      secondMarket,
+      secondMarketOrderBook
+    )
+    return scaledDecimalToBigint(
+      bigintToScaledDecimal(
+        firstOrderPrice,
+        firstMarket.quoteSymbol.decimals
+      ).mul(
+        bigintToScaledDecimal(
+          secondOrderPrice,
+          secondMarket.quoteSymbol.decimals
+        )
+      ),
+      secondMarket.quoteSymbol.decimals
+    )
+  } else {
+    return calculateMarketPrice(side, amount, market, orderBook)
+  }
+}
+
+function calculateMarketPrice(
   side: OrderSide,
   amount: bigint,
   market: Market,

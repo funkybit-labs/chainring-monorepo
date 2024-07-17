@@ -83,12 +83,12 @@ class FaucetRoutes(private val faucetMode: FaucetMode, blockchainClients: Collec
                             val amountInFundamentalUnits = amount.movePointRight(symbol.decimals.toInt()).toBigInteger()
                             val txHash = if (symbol.faucetSupported(faucetMode)) {
                                 when (val tokenContractAddress = symbol.contractAddress) {
-                                    null -> blockchainClient.asyncDepositNative(
+                                    null -> blockchainClient.sendNativeDepositTx(
                                         payload.address,
                                         amountInFundamentalUnits,
                                     )
 
-                                    else -> blockchainClient.asyncMintERC20(
+                                    else -> blockchainClient.sendMintERC20Tx(
                                         tokenContractAddress,
                                         payload.address,
                                         amountInFundamentalUnits,

@@ -32,7 +32,7 @@ data class AssetAmount(
     }
 
     operator fun times(other: BigDecimal): AssetAmount {
-        return AssetAmount(symbol, (amount * other).setScale(symbol.decimals.toInt(), RoundingMode.HALF_DOWN))
+        return AssetAmount(symbol, (amount * other).setScale(symbol.decimals.toInt(), RoundingMode.FLOOR))
     }
 }
 

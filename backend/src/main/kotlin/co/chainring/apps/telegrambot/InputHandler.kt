@@ -93,7 +93,7 @@ class InputHandler(
 
                         val txHash = ChainManager
                             .getBlockchainClient(symbol.chainId.value)
-                            .asyncDepositNative(currentWallet.address, amount.toFundamentalUnits(symbol.decimals))
+                            .sendNativeDepositTx(currentWallet.address, amount.toFundamentalUnits(symbol.decimals))
 
                         send(OutputMessage.airdropRequested(user, symbol, amount))
                         user.updateSessionState(SessionState.AirdropPending(symbol, amount, txHash))

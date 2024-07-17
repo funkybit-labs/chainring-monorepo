@@ -15,8 +15,19 @@ object Faucet {
 
     private val blockchainClientsByChainId = blockchainClients.associateBy { it.chainId }
 
-    fun fund(address: Address, amount: BigInteger? = null, chainId: ChainId? = null): TransactionReceipt {
-        return blockchainClient(chainId).depositNative(address, amount ?: BigDecimal("0.05").toFundamentalUnits(18))
+    fun fundAndMine(address: Address, amount: BigInteger? = null, chainId: ChainId? = null): TransactionReceipt {
+        return blockchainClient(chainId).let { client ->
+            val txHash = client.sendNativeDepositTx(address, amount ?: BigDecimal("0.05").toFundamentalUnits(18))
+            client.mine()
+            client.getTransactionReceipt(txHash)!!
+        }
+    }
+
+    fun fundAndWaitForTxReceipt(address: Address, amount: BigInteger? = null, chainId: ChainId? = null): TransactionReceipt {
+        return blockchainClient(chainId).let { client ->
+            val txHash = client.sendNativeDepositTx(address, amount ?: BigDecimal("0.05").toFundamentalUnits(18))
+            client.waitForTransactionReceipt(txHash)
+        }
     }
 
     fun mine(numberOfBlocks: Int = 1, chainId: ChainId? = null) {

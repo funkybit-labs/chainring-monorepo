@@ -87,7 +87,8 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
             price: BigDecimal,
             tradeHash: String,
             responseSequence: Long,
-        ) = TradeEntity.new(TradeId.generate()) {
+            id: TradeId = TradeId.generate(),
+        ) = TradeEntity.new(id) {
             val now = Clock.System.now()
             this.createdAt = now
             this.timestamp = timestamp
@@ -121,10 +122,23 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
                 ?.let { it[TradeTable.responseSequence.min()]?.toLong() }
         }
 
-        fun findPending(limit: Int = 100): List<TradeEntity> {
-            return TradeEntity.find {
+        fun findPendingForNewSettlementBatch(limit: Int = 100): List<TradeEntity> {
+            val trades = TradeEntity.find {
                 TradeTable.settlementStatus.inList(pendingTradeStatuses)
             }.orderBy(TradeTable.sequenceId to SortOrder.ASC).limit(limit).toList()
+
+            return if (trades.size == limit) {
+                val lastTrade = trades.last()
+                // load the remaining trades from the same Sequencer response
+                // to make sure they all settle in one batch
+                trades + TradeEntity.find {
+                    TradeTable.settlementStatus.inList(pendingTradeStatuses)
+                        .and(TradeTable.responseSequence.eq(lastTrade.responseSequence))
+                        .and(TradeTable.sequenceId.greater(lastTrade.sequenceId))
+                }.orderBy(TradeTable.sequenceId to SortOrder.ASC).toList()
+            } else {
+                trades
+            }
         }
 
         fun findSettling(): List<TradeEntity> {
@@ -137,7 +151,7 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
             return TradeEntity.find {
                 TradeTable.settlementBatchGuid.eq(settlementBatch.guid) and
                     TradeTable.settlementStatus.eq(SettlementStatus.FailedSettling)
-            }.orderBy(TradeTable.sequenceId to SortOrder.ASC).toList()
+            }.orderBy(TradeTable.sequenceId to SortOrder.DESC).toList()
         }
     }
 

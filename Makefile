@@ -58,7 +58,7 @@ run_not_sequencer:
 
 
 run_mocker:
-	API_URL=http://localhost:9000 ./gradlew :mocker:run
+	FAUCET_POSSIBLE=1 MARKETS=BTC:1337/ETH:1337 BTC_1337_ETH_1337_PRICE_BASELINE=17.5 BTC_1337_ETH_1337_INITIAL_BASE_BALANCE=1 API_URL=http://localhost:9000 ./gradlew :mocker:run
 
 run_telegrambot:
 	API_URL=http://localhost:9000 ./gradlew :telegrambot:run

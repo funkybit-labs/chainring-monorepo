@@ -42,7 +42,7 @@ const SymbolSchema = z.object({
   contractAddress: AddressSchema.nullable(),
   decimals: z.number(),
   faucetSupported: z.boolean(),
-  iconUrl: z.string().nullable(),
+  iconUrl: z.string(),
   withdrawalFee: z.coerce.bigint()
 })
 
@@ -122,6 +122,20 @@ const CreateMarketOrderSchema = z.object({
 })
 export type CreateMarketOrder = z.infer<typeof CreateMarketOrderSchema>
 
+const CreateBackToBackMarketOrderSchema = z.object({
+  nonce: z.string(),
+  type: z.literal('backToBackMarket'),
+  marketId: z.string(),
+  secondMarketId: z.string(),
+  side: OrderSideSchema,
+  amount: OrderAmountSchema,
+  signature: z.string(),
+  verifyingChainId: z.number()
+})
+export type CreateBackToBackMarketOrder = z.infer<
+  typeof CreateBackToBackMarketOrderSchema
+>
+
 const CreateLimitOrderSchema = z.object({
   nonce: z.string(),
   type: z.literal('limit'),
@@ -136,7 +150,8 @@ export type CreateLimitOrder = z.infer<typeof CreateLimitOrderSchema>
 
 const CreateOrderRequestSchema = z.discriminatedUnion('type', [
   CreateMarketOrderSchema,
-  CreateLimitOrderSchema
+  CreateLimitOrderSchema,
+  CreateBackToBackMarketOrderSchema
 ])
 export type CreateOrderRequest = z.infer<typeof CreateOrderRequestSchema>
 
@@ -183,7 +198,8 @@ const OrderExecutionSchema = z.object({
   price: decimal(),
   role: ExecutionRoleSchema,
   feeAmount: z.coerce.bigint(),
-  feeSymbol: z.string()
+  feeSymbol: z.string(),
+  marketId: z.string()
 })
 export type OrderExecution = z.infer<typeof OrderExecutionSchema>
 
@@ -233,8 +249,26 @@ const LimitOrderSchema = z.object({
 })
 export type LimitOrder = z.infer<typeof LimitOrderSchema>
 
+const BackToBackMarketOrderSchema = z.object({
+  id: z.string(),
+  type: z.literal('backToBackMarket'),
+  status: OrderStatusSchema,
+  marketId: z.string(),
+  secondMarketId: z.string(),
+  side: OrderSideSchema,
+  amount: z.coerce.bigint(),
+  originalAmount: z.coerce.bigint(),
+  executions: z.array(OrderExecutionSchema),
+  timing: OrderTimingSchema
+})
+export type BackToBackMarketOrder = z.infer<typeof BackToBackMarketOrderSchema>
+
 export const OrderSchema = z
-  .discriminatedUnion('type', [MarketOrderSchema, LimitOrderSchema])
+  .discriminatedUnion('type', [
+    MarketOrderSchema,
+    LimitOrderSchema,
+    BackToBackMarketOrderSchema
+  ])
   .transform((data) => {
     return {
       ...data,

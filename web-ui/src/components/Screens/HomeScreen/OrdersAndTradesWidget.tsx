@@ -109,6 +109,10 @@ export default function OrdersAndTradesWidget({
             <tbody>
               {orders.map((order) => {
                 const market = markets.getById(order.marketId)
+                const secondMarket =
+                  order.type === 'backToBackMarket'
+                    ? markets.getById(order.secondMarketId)
+                    : null
 
                 return (
                   <tr
@@ -129,7 +133,7 @@ export default function OrdersAndTradesWidget({
                       <SymbolAndChain
                         symbol={
                           order.side === 'Buy'
-                            ? market.quoteSymbol
+                            ? secondMarket?.quoteSymbol ?? market.quoteSymbol
                             : market.baseSymbol
                         }
                       />
@@ -139,7 +143,7 @@ export default function OrdersAndTradesWidget({
                         symbol={
                           order.side === 'Buy'
                             ? market.baseSymbol
-                            : market.quoteSymbol
+                            : secondMarket?.quoteSymbol ?? market.quoteSymbol
                         }
                       />
                     </td>

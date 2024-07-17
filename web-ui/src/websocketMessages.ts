@@ -49,6 +49,7 @@ const LastTradeSchema = z.object({
 export type LastTrade = z.infer<typeof LastTradeSchema>
 
 export const OrderBookSchema = z.object({
+  marketId: z.string(),
   type: z.literal('OrderBook'),
   buy: z.array(OrderBookEntrySchema),
   sell: z.array(OrderBookEntrySchema),

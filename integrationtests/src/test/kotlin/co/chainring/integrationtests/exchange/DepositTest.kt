@@ -28,13 +28,13 @@ class DepositTest {
         // mint some USDC
         val startingUsdcWalletBalance = wallet.getWalletERC20Balance(usdc)
         val mintAmount = BigDecimal("20").toFundamentalUnits(symbolInfo.decimals.toInt())
-        wallet.mintERC20(usdc, mintAmount)
+        wallet.mintERC20AndMine(usdc, mintAmount)
         assertEquals(wallet.getWalletERC20Balance(usdc), startingUsdcWalletBalance + mintAmount)
 
         val startingUsdcExchangeBalance = wallet.getExchangeERC20Balance(usdc)
         val depositAmount = BigDecimal("15").toFundamentalUnits(symbolInfo.decimals.toInt())
 
-        wallet.deposit(AssetAmount(symbolInfo, depositAmount))
+        wallet.depositAndMine(AssetAmount(symbolInfo, depositAmount))
         assertEquals(wallet.getExchangeERC20Balance(usdc), startingUsdcExchangeBalance + depositAmount)
         assertEquals(wallet.getWalletERC20Balance(usdc), startingUsdcWalletBalance + mintAmount - depositAmount)
     }
@@ -49,7 +49,7 @@ class DepositTest {
         val startingExchangeBalance = wallet.getExchangeNativeBalance()
         val depositAmount = BigDecimal("2").toFundamentalUnits(symbolInfo.decimals.toInt())
 
-        val depositTxReceipt = wallet.deposit(AssetAmount(symbolInfo, depositAmount))
+        val depositTxReceipt = wallet.depositAndMine(AssetAmount(symbolInfo, depositAmount))
         val depositGasCost = depositTxReceipt.gasUsed * Numeric.decodeQuantity(depositTxReceipt.effectiveGasPrice)
         assertEquals(wallet.getExchangeNativeBalance(), startingExchangeBalance + depositAmount)
         assertEquals(wallet.getWalletNativeBalance(), startingWalletBalance - depositAmount - depositGasCost)
