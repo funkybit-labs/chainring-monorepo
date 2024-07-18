@@ -1133,6 +1133,50 @@ class TestSequencer {
     }
 
     @Test
+    fun `fee rate increase - consumption released correctly`() {
+        val sequencer = SequencerClient(mockClock)
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 0.0, taker = 0.0))
+        val market = sequencer.createMarket(MarketId("BTC200/ETH200"))
+
+        val maker = generateWalletAddress()
+        sequencer.deposit(maker, market.quoteAsset, BigDecimal("50"))
+
+        // maker adds orders that use all the quote (plus fee)
+        val order1 = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("1"), BigDecimal("10.00"), maker, Order.Type.LimitBuy)
+        val order2 = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("1"), BigDecimal("10.00"), maker, Order.Type.LimitBuy)
+        val order3 = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("1"), BigDecimal("10.00"), maker, Order.Type.LimitBuy)
+        val order4 = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("1"), BigDecimal("10.00"), maker, Order.Type.LimitBuy)
+        val order5 = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("1"), BigDecimal("10.00"), maker, Order.Type.LimitBuy)
+
+        // check all the quote has been used
+        assertEquals(
+            SequencerError.ExceedsLimit,
+            sequencer.addOrder(
+                market,
+                BigDecimal("0.001"),
+                BigDecimal("10.00"),
+                maker,
+                Order.Type.LimitBuy,
+            ).error,
+        )
+
+        // decrease fee rate to zero
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = 100.0, taker = 100.0))
+
+        // quote consumption should be released using the original order's fee rate releasing 10 (10 order + 0 fee)
+        sequencer.cancelOrder(market, order1.guid, maker)
+
+        // now withdraw
+        sequencer.withdrawal(maker, market.quoteAsset, BigDecimal("11")).also { response ->
+            assertEquals(mockClock.currentTimeMillis(), response.createdAt)
+
+            // since only consumption '10' order was released, withdrawal of 11 should lead to auto-reduce
+            assertEquals(1, response.ordersChangedList.size)
+            assertEquals(OrderDisposition.AutoReduced, response.ordersChangedList.first().disposition)
+        }
+    }
+
+    @Test
     fun `test failed withdrawals`() {
         val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))

@@ -85,7 +85,7 @@ data class Market(
         orderBatch.ordersToCancelList.forEach { cancelOrder ->
             val validationResult = validateOrderForWallet(orderBatch.wallet, cancelOrder.guid)
             if (validationResult == OrderChangeRejected.Reason.None) {
-                removeOrder(cancelOrder.guid.toOrderGuid(), feeRates)?.let { result ->
+                removeOrder(cancelOrder.guid.toOrderGuid())?.let { result ->
                     ordersChanged.add(
                         orderChanged {
                             this.guid = cancelOrder.guid
@@ -493,7 +493,7 @@ data class Market(
     }
 
     // if the order is found, returns wallet and how much of the base asset and quote asset it was consuming; null otherwise
-    private fun removeOrder(guid: OrderGuid, feeRates: FeeRates): RemoveOrderResult? {
+    private fun removeOrder(guid: OrderGuid): RemoveOrderResult? {
         var ret: RemoveOrderResult? = null
         ordersByGuid[guid]?.let { levelOrder ->
             val level = levelOrder.level
@@ -504,7 +504,7 @@ data class Market(
                         buyOrdersByWallet.remove(levelOrder.wallet)
                     }
                 }
-                RemoveOrderResult(levelOrder.wallet, BigInteger.ZERO, notionalPlusFee(levelOrder.quantity, level.price, baseDecimals, quoteDecimals, feeRates.maker))
+                RemoveOrderResult(levelOrder.wallet, BigInteger.ZERO, notionalPlusFee(levelOrder.quantity, level.price, baseDecimals, quoteDecimals, levelOrder.feeRate))
             } else {
                 sellOrdersByWallet[levelOrder.wallet]?.let {
                     it.remove(levelOrder)
@@ -878,7 +878,7 @@ data class Market(
             if (newLevelIx == level.ix) {
                 // price stays same, quantity changes
                 val baseAssetDelta = if (level.side == BookSide.Buy) BigInteger.ZERO else quantityDelta
-                val quoteAssetDelta = if (level.side == BookSide.Buy) notionalPlusFee(quantityDelta, level.price, baseDecimals, quoteDecimals, feeRates.maker) else BigInteger.ZERO
+                val quoteAssetDelta = if (level.side == BookSide.Buy) notionalPlusFee(quantityDelta, level.price, baseDecimals, quoteDecimals, order.feeRate) else BigInteger.ZERO
                 level.totalQuantity += quantityDelta
                 order.quantity = newQuantity
                 ChangeOrderResult(order.wallet, OrderDisposition.Accepted, noExecutions, baseAssetDelta, quoteAssetDelta)
@@ -920,7 +920,7 @@ data class Market(
                 // note: Level might be reset in case when the last order was removed
                 val wallet = order.wallet
                 val side = level.side
-                removeOrder(order.guid, feeRates)
+                removeOrder(order.guid)
 
                 val addOrderResult = addOrder(
                     wallet.value,
