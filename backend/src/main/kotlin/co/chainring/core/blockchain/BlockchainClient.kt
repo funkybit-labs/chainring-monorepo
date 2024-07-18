@@ -238,14 +238,14 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         logger.debug { "Deployment complete for $contractType" }
         setContractAddress(contractType, proxyAddress)
 
-        /*val contractSovereignWithdrawalDelay = getSovereignWithdrawalDelay(DefaultBlockParam.Latest)
+        val contractSovereignWithdrawalDelay = getSovereignWithdrawalDelay(DefaultBlockParam.Latest)
         if (contractSovereignWithdrawalDelay != config.sovereignWithdrawalDelaySeconds) {
             logger.debug { "Updating sovereign withdrawal delay value from $contractSovereignWithdrawalDelay to ${config.sovereignWithdrawalDelaySeconds}" }
 
             exchangeContractCall(DefaultBlockParam.Latest) {
                 setSovereignWithdrawalDelay(config.sovereignWithdrawalDelaySeconds)
             }.send()
-        }*/
+        }
 
         return DeployedContract(
             proxyAddress = proxyAddress,
