@@ -184,7 +184,33 @@ class Wallet(
         )
     }
 
-    fun signWithdraw(symbol: String, amount: BigInteger, nonceOverride: Long? = null): CreateWithdrawalApiRequest {
+    fun setLinkedSigner(linkedSigner: String, digest: ByteArray, signature: EvmSignature): TransactionReceipt {
+        val blockchainClient = blockchainClientsByChainId.getValue(currentChainId)
+        val txHash = blockchainClient.sendTransaction(
+            Address(exchangeContractByChainId.getValue(currentChainId).contractAddress),
+            exchangeContractByChainId.getValue(currentChainId).linkSigner(linkedSigner, digest, signature.toByteArray()).encodeFunctionCall(),
+            BigInteger.ZERO,
+        )
+        blockchainClient.mine()
+        return blockchainClient.getTransactionReceipt(txHash)!!
+    }
+
+    fun removeLinkedSigner(): TransactionReceipt {
+        val blockchainClient = blockchainClientsByChainId.getValue(currentChainId)
+        val txHash = blockchainClient.sendTransaction(
+            Address(exchangeContractByChainId.getValue(currentChainId).contractAddress),
+            exchangeContractByChainId.getValue(currentChainId).removeLinkedSigner().encodeFunctionCall(),
+            BigInteger.ZERO,
+        )
+        blockchainClient.mine()
+        return blockchainClient.getTransactionReceipt(txHash)!!
+    }
+
+    fun getLinkedSigner(chainId: ChainId): Address {
+        return Address(Keys.toChecksumAddress(exchangeContractByChainId.getValue(chainId).linkedSigners(address.value).send()))
+    }
+
+    fun signWithdraw(symbol: String, amount: BigInteger, nonceOverride: Long? = null, linkedSignerEcKeyPair: ECKeyPair? = null): CreateWithdrawalApiRequest {
         val nonce = nonceOverride ?: getWithdrawalNonce()
         val tx = EIP712Transaction.WithdrawTx(
             address,
@@ -198,13 +224,13 @@ class Wallet(
             Symbol(symbol),
             amount,
             nonce,
-            blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId))),
+            blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId)), linkedSignerEcKeyPair),
         )
     }
 
-    fun signOrder(request: CreateOrderApiRequest.Limit): CreateOrderApiRequest.Limit =
+    fun signOrder(request: CreateOrderApiRequest.Limit, linkedSignerEcKeyPair: ECKeyPair? = null): CreateOrderApiRequest.Limit =
         request.copy(
-            signature = limitOrderEip712TxSignature(request.marketId, request.amount, request.price, request.side, request.nonce),
+            signature = limitOrderEip712TxSignature(request.marketId, request.amount, request.price, request.side, request.nonce, linkedSignerEcKeyPair),
             verifyingChainId = this.currentChainId,
         )
 
@@ -277,7 +303,7 @@ class Wallet(
         exchangeContractByChainId.getValue(currentChainId).rollbackBatch().sendAsync()
     }
 
-    private fun limitOrderEip712TxSignature(marketId: MarketId, amount: OrderAmount, price: BigDecimal, side: OrderSide, nonce: String): EvmSignature {
+    private fun limitOrderEip712TxSignature(marketId: MarketId, amount: OrderAmount, price: BigDecimal, side: OrderSide, nonce: String, linkedSignerEcKeyPair: ECKeyPair? = null): EvmSignature {
         val (baseSymbol, quoteSymbol) = marketSymbols(marketId)
         val tx = EIP712Transaction.Order(
             address,
@@ -290,7 +316,7 @@ class Wallet(
             nonce = BigInteger(1, nonce.toHexBytes()),
             signature = EvmSignature.emptySignature(),
         )
-        return blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId)))
+        return blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId)), linkedSignerEcKeyPair)
     }
 
     private fun getWithdrawalNonce(): Long {

@@ -73,6 +73,8 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
     val authToken: String = issueAuthToken(ecKeyPair = ecKeyPair)
     val address = Credentials.create(ecKeyPair).checksumAddress()
 
+    var linkedSignerEcKeyPair: ECKeyPair? = null
+
     companion object {
         private fun listOrdersUrl(statuses: List<OrderStatus>, marketId: MarketId?) = "$apiServerRootUrl/v1/orders".toHttpUrl().newBuilder().apply {
             addQueryParameter("statuses", statuses.joinToString(","))
@@ -91,8 +93,8 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                     },
             ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
-        internal fun authHeaders(ecKeyPair: ECKeyPair): Headers {
-            val didToken = issueAuthToken(ecKeyPair)
+        internal fun authHeaders(ecKeyPair: ECKeyPair, linkedSignerEcKeyPair: ECKeyPair?): Headers {
+            val didToken = issueAuthToken(ecKeyPair, linkedSignerEcKeyPair = linkedSignerEcKeyPair)
 
             return Headers.Builder()
                 .add(
@@ -106,6 +108,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
             address: String = "0x${Keys.getAddress(ecKeyPair)}",
             chainId: ChainId = ChainId(1337U),
             timestamp: Instant = Clock.System.now(),
+            linkedSignerEcKeyPair: ECKeyPair? = null,
         ): String {
             val message = SignInMessage(
                 message = "[ChainRing Labs] Please sign this message to verify your ownership of this wallet address. This action will not cost any gas fees.",
@@ -115,7 +118,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
             )
 
             val body: String = Json.encodeToString(message)
-            val signature: EvmSignature = ECHelper.signData(Credentials.create(ecKeyPair), EIP712Helper.computeHash(message))
+            val signature: EvmSignature = ECHelper.signData(Credentials.create(linkedSignerEcKeyPair ?: ecKeyPair), EIP712Helper.computeHash(message))
 
             return "${Base64.getUrlEncoder().encodeToString(body.toByteArray())}.${signature.value}"
         }
@@ -270,7 +273,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/withdrawals")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(ecKeyPair, linkedSignerEcKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryGetWithdrawal(id: WithdrawalId): Either<ApiCallFailure, WithdrawalApiResponse> =
@@ -280,7 +283,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/withdrawals/$id")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(ecKeyPair, linkedSignerEcKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryListWithdrawals(): Either<ApiCallFailure, ListWithdrawalsApiResponse> =
@@ -290,7 +293,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/withdrawals")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(ecKeyPair, linkedSignerEcKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryGetBalances(): Either<ApiCallFailure, BalancesApiResponse> =
@@ -464,11 +467,11 @@ val json = Json {
     this.ignoreUnknownKeys = true
 }
 
-fun Request.withAuthHeaders(ecKeyPair: ECKeyPair?): Request =
+fun Request.withAuthHeaders(ecKeyPair: ECKeyPair?, linkedSignerEcKeyPair: ECKeyPair? = null): Request =
     if (ecKeyPair == null) {
         this
     } else {
-        addHeaders(ApiClient.authHeaders(ecKeyPair))
+        addHeaders(ApiClient.authHeaders(ecKeyPair, linkedSignerEcKeyPair))
     }
 
 inline fun <reified T> Response.toErrorOrPayload(expectedStatusCode: Int): Either<ApiCallFailure, T> {

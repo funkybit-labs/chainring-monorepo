@@ -27,6 +27,7 @@ import co.chainring.core.model.db.OrderExecutionTable
 import co.chainring.core.model.db.OrderTable
 import co.chainring.core.model.db.SettlementBatchTable
 import co.chainring.core.model.db.TradeTable
+import co.chainring.core.model.db.WalletLinkedSignerTable
 import co.chainring.core.model.db.WalletTable
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
@@ -236,6 +237,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             BlockchainTransactionTable.deleteAll()
             BalanceLogTable.deleteAll()
             BalanceTable.deleteAll()
+            WalletLinkedSignerTable.deleteAll()
             WalletTable.deleteAll()
             OHLCTable.deleteAll()
             FaucetDripTable.deleteAll()

@@ -15,6 +15,7 @@ import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.sequencer.toSequencerId
+import co.chainring.core.services.LinkedSignerService
 import co.chainring.core.utils.rangeTo
 import co.chainring.sequencer.core.Asset
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -192,6 +193,15 @@ class BlockProcessor(
                     withdrawal.id,
                 )
             }
+        }
+
+        if (Contract.staticExtractEventParameters(Exchange.LINKEDSIGNER_EVENT, log) != null) {
+            val linkedSignerEventResponse = Exchange.getLinkedSignerEventFromLog(log)
+            logger.debug { "Received linked signer (wallet: ${linkedSignerEventResponse.sender}, signer: ${linkedSignerEventResponse.linkedSigner}, txHash: ${linkedSignerEventResponse.log.transactionHash}), chainId: $chainId" }
+
+            val linkedSignerAddress = Address(Keys.toChecksumAddress(linkedSignerEventResponse.linkedSigner))
+            val walletAddress = Address(Keys.toChecksumAddress(linkedSignerEventResponse.sender))
+            LinkedSignerService.createOrUpdateWalletLinkedSigner(walletAddress, chainId, linkedSignerAddress)
         }
     }
 

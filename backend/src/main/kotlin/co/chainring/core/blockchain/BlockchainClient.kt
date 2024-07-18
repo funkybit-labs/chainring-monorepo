@@ -30,6 +30,7 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
 import org.web3j.abi.DefaultFunctionEncoder
 import org.web3j.crypto.Credentials
+import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
 import org.web3j.crypto.Sign
 import org.web3j.protocol.Web3j
@@ -343,9 +344,6 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
     fun getExchangeContractLogs(block: BigInteger): EthLog =
         getLogs(DefaultBlockParam.BlockNumber(block), getContractAddress(ContractType.Exchange))
 
-    fun getExchangeContractLogs(block: DefaultBlockParam): EthLog =
-        getLogs(block, getContractAddress(ContractType.Exchange))
-
     fun getTxManager(nonceOverride: BigInteger): TransactionManagerWithNonceOverride {
         return TransactionManagerWithNonceOverride(web3j, submitterCredentials, nonceOverride)
     }
@@ -374,8 +372,8 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
 
     fun loadERC20(address: Address) = ERC20.load(address.value, web3j, transactionManager, gasProvider)
 
-    fun signData(hash: ByteArray): EvmSignature {
-        val signature = Sign.signMessage(hash, credentials.ecKeyPair, false)
+    fun signData(hash: ByteArray, linkedSignerEcKeyPair: ECKeyPair? = null): EvmSignature {
+        val signature = Sign.signMessage(hash, linkedSignerEcKeyPair ?: credentials.ecKeyPair, false)
         return (signature.r + signature.s + signature.v).toHex().toEvmSignature()
     }
 

@@ -191,7 +191,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
     override fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
         tryCreateOrder(apiRequest).assertSuccess()
 
-    fun createLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: Wallet): CreateOrderApiResponse {
+    fun createLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: Wallet, linkedSignerEcKeyPair: ECKeyPair? = null): CreateOrderApiResponse {
         val request = CreateOrderApiRequest.Limit(
             nonce = generateOrderNonce(),
             marketId = market.id,
@@ -200,7 +200,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             price = price,
             signature = EvmSignature.emptySignature(),
             verifyingChainId = ChainId.empty,
-        ).let { wallet.signOrder(it) }
+        ).let { wallet.signOrder(it, linkedSignerEcKeyPair = linkedSignerEcKeyPair) }
 
         val response = createOrder(request)
 
@@ -208,6 +208,20 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
         assertEquals(request, response.order)
 
         return response
+    }
+
+    fun tryCreateLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: Wallet, linkedSignerEcKeyPair: ECKeyPair? = null): Either<ApiCallFailure, CreateOrderApiResponse> {
+        val request = CreateOrderApiRequest.Limit(
+            nonce = generateOrderNonce(),
+            marketId = market.id,
+            side = side,
+            amount = OrderAmount.Fixed(amount.toFundamentalUnits(market.baseDecimals)),
+            price = price,
+            signature = EvmSignature.emptySignature(),
+            verifyingChainId = ChainId.empty,
+        ).let { wallet.signOrder(it, linkedSignerEcKeyPair = linkedSignerEcKeyPair) }
+
+        return tryCreateOrder(request)
     }
 
     fun createMarketOrder(market: Market, side: OrderSide, amount: BigDecimal?, wallet: Wallet, percentage: Percentage? = null): CreateOrderApiResponse {

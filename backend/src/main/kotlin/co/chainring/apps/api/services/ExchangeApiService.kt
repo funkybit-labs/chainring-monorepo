@@ -40,6 +40,7 @@ import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.sequencer.toSequencerId
+import co.chainring.core.services.LinkedSignerService
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import co.chainring.sequencer.core.Asset
@@ -463,6 +464,7 @@ class ExchangeApiService(
                 EIP712Helper.computeHash(tx, verifyingChainId, verifyingContract),
                 tx.signature,
                 walletAddress,
+                LinkedSignerService.getLinkedSigner(walletAddress, verifyingChainId),
             )
         }.onFailure {
             logger.warn(it) { "Exception verifying EIP712 signature" }
