@@ -197,10 +197,9 @@ class Broadcaster(val db: Database) {
                         SubscriptionTopic.Trades,
                         Trades(
                             OrderExecutionEntity
-                                .listForWallet(
+                                .listLatestForWallet(
                                     WalletEntity.getOrCreate(client.principal),
-                                    beforeTimestamp = Clock.System.now(),
-                                    limit = 100,
+                                    maxSequencerResponses = 100,
                                 ).map(OrderExecutionEntity::toTradeResponse),
                         ),
                     ),

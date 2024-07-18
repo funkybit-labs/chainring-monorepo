@@ -107,6 +107,33 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             }.toList()
         }
 
+        fun listLatestForWallet(wallet: WalletEntity, maxSequencerResponses: Int): List<OrderExecutionEntity> {
+            val sequencerResponseNumbers = TradeTable
+                .join(OrderExecutionTable, JoinType.INNER, TradeTable.guid, OrderExecutionTable.tradeGuid)
+                .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
+                .select(TradeTable.responseSequence)
+                .withDistinct(true)
+                .where {
+                    OrderTable.walletGuid.eq(wallet.guid)
+                }
+                .orderBy(TradeTable.responseSequence, SortOrder.DESC)
+                .limit(maxSequencerResponses)
+                .mapNotNull { it[TradeTable.responseSequence] }
+
+            return OrderExecutionTable
+                .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
+                .join(TradeTable, JoinType.INNER, TradeTable.guid, OrderExecutionTable.tradeGuid)
+                .select(OrderExecutionTable.columns)
+                .where {
+                    OrderTable.walletGuid.eq(wallet.guid)
+                        .and(TradeTable.responseSequence.inList(sequencerResponseNumbers))
+                }
+                .orderBy(Pair(TradeTable.responseSequence, SortOrder.DESC), Pair(TradeTable.sequenceId, SortOrder.ASC))
+                .map {
+                    OrderExecutionEntity.wrapRow(it)
+                }.toList()
+        }
+
         fun listForWallet(wallet: WalletEntity, beforeTimestamp: Instant, limit: Int): List<OrderExecutionEntity> {
             return OrderExecutionTable
                 .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
@@ -115,7 +142,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
                 .where {
                     OrderTable.walletGuid.eq(wallet.guid) and OrderExecutionTable.timestamp.less(beforeTimestamp)
                 }
-                .orderBy(Pair(TradeTable.responseSequence, SortOrder.DESC), Pair(TradeTable.sequenceId, SortOrder.ASC))
+                .orderBy(Pair(OrderExecutionTable.timestamp, SortOrder.DESC))
                 .limit(limit)
                 .map {
                     OrderExecutionEntity.wrapRow(it)
