@@ -228,7 +228,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
                     ).initialize(
                         submitterCredentials.address,
                         config.feeAccountAddress,
-                        config.sovereignWithdrawalDelay,
+                        config.sovereignWithdrawalDelaySeconds,
                     ).send()
                 }
             }
@@ -237,6 +237,15 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
 
         logger.debug { "Deployment complete for $contractType" }
         setContractAddress(contractType, proxyAddress)
+
+        /*val contractSovereignWithdrawalDelay = getSovereignWithdrawalDelay(DefaultBlockParam.Latest)
+        if (contractSovereignWithdrawalDelay != config.sovereignWithdrawalDelaySeconds) {
+            logger.debug { "Updating sovereign withdrawal delay value from $contractSovereignWithdrawalDelay to ${config.sovereignWithdrawalDelaySeconds}" }
+
+            exchangeContractCall(DefaultBlockParam.Latest) {
+                setSovereignWithdrawalDelay(config.sovereignWithdrawalDelaySeconds)
+            }.send()
+        }*/
 
         return DeployedContract(
             proxyAddress = proxyAddress,
@@ -404,9 +413,6 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
     fun sendNativeDepositTx(address: Address, amount: BigInteger): TxHash =
         sendTransaction(address, "", amount)
 
-    fun batchHash(block: BigInteger): String =
-        exchangeContractCall(DefaultBlockParam.BlockNumber(block), Exchange::batchHash).send().toHex(false)
-
     fun batchHash(block: DefaultBlockParam): String =
         exchangeContractCall(block, Exchange::batchHash).send().toHex(false)
 
@@ -432,6 +438,9 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
 
     fun getFeeAccountAddress(block: DefaultBlockParam): Address =
         Address(Keys.toChecksumAddress(exchangeContractCall(block, Exchange::feeAccount).send()))
+
+    fun getSovereignWithdrawalDelay(block: DefaultBlockParam): BigInteger =
+        exchangeContractCall(block, Exchange::sovereignWithdrawalDelay).send()
 
     val exchangeContractAddress: Address
         get() = contractMap.getValue(ContractType.Exchange)

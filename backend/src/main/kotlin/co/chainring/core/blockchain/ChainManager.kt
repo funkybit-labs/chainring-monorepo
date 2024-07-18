@@ -22,7 +22,7 @@ data class BlockchainClientConfig(
     val defaultMaxPriorityFeePerGasInWei: BigInteger,
     val enableWeb3jLogging: Boolean,
     val maxRpcNodeEventualConsistencyTolerance: Duration,
-    val sovereignWithdrawalDelay: BigInteger,
+    val sovereignWithdrawalDelaySeconds: BigInteger,
 )
 
 object ChainManager {
@@ -76,7 +76,7 @@ object ChainManager {
             ),
             enableWeb3jLogging = (System.getenv("ENABLE_WEB3J_LOGGING") ?: "true") == "true",
             maxRpcNodeEventualConsistencyTolerance = System.getenv("MAX_RPC_NODE_EVENTUAL_CONSISTENCE_TOLERANCE_MS")?.toLongOrNull()?.milliseconds ?: 1.minutes,
-            sovereignWithdrawalDelay = bigIntegerValue(chainName, "SOVEREIGN_WITHDRAWAL_DELAY_S", "604800"),
+            sovereignWithdrawalDelaySeconds = bigIntegerValue(chainName, "SOVEREIGN_WITHDRAWAL_DELAY_SECONDS", "604800"),
         )
     }
 
