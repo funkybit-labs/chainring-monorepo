@@ -1,8 +1,10 @@
 package co.chainring.apps.ring
 
+import co.chainring.apps.api.model.Withdrawal
 import co.chainring.contracts.generated.Exchange
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.model.Address
+import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.TxHash
 import co.chainring.core.model.db.BlockEntity
 import co.chainring.core.model.db.BlockHash
@@ -10,8 +12,13 @@ import co.chainring.core.model.db.BlockTable
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.WalletEntity
+import co.chainring.core.model.db.WithdrawalEntity
+import co.chainring.core.sequencer.SequencerClient
+import co.chainring.core.sequencer.toSequencerId
 import co.chainring.core.utils.rangeTo
+import co.chainring.sequencer.core.Asset
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.selectAll
@@ -25,6 +32,7 @@ import kotlin.concurrent.thread
 
 class BlockProcessor(
     private val blockchainClient: BlockchainClient,
+    private val sequencerClient: SequencerClient,
     private val pollingIntervalInMs: Long =
         System.getenv("BLOCKCHAIN_BLOCK_PROCESSOR_POLLING_INTERVAL_MS")?.toLongOrNull()
             ?: 1000L,
@@ -146,6 +154,43 @@ class BlockProcessor(
                     deposit.updatedAt = Clock.System.now()
                 }
                 logger.debug { "Skipping already recorded deposit (tx hash: $txHash)" }
+            }
+        }
+
+        if (Contract.staticExtractEventParameters(Exchange.WITHDRAWALREQUESTED_EVENT, log) != null) {
+            val withdrawalEventResponse = Exchange.getWithdrawalRequestedEventFromLog(log)
+            logger.debug { "Received sovereign withdrawal request event (from: ${withdrawalEventResponse.from}, amount: ${withdrawalEventResponse.amount}, token: ${withdrawalEventResponse.token}, txHash: ${withdrawalEventResponse.log.transactionHash}), chainId: $chainId" }
+
+            val fromAddress = Address(Keys.toChecksumAddress(withdrawalEventResponse.from))
+            val symbol = SymbolEntity.forChainAndContractAddress(
+                chainId,
+                Address(Keys.toChecksumAddress(withdrawalEventResponse.token)).takeIf { it != Address.zero },
+            )
+            val nonce = 0L
+            val evmSignature = EvmSignature.emptySignature()
+
+            val withdrawal = transaction {
+                WithdrawalEntity.createPending(
+                    WalletEntity.getByAddress(fromAddress),
+                    symbol = symbol,
+                    amount = withdrawalEventResponse.amount,
+                    nonce = nonce,
+                    signature = evmSignature,
+                ).let {
+                    it.refresh(flush = true)
+                    Withdrawal.fromEntity(it)
+                }
+            }
+
+            runBlocking {
+                sequencerClient.withdraw(
+                    fromAddress.toSequencerId().value,
+                    Asset(symbol.name),
+                    withdrawalEventResponse.amount,
+                    nonce = nonce.toBigInteger(),
+                    evmSignature = evmSignature,
+                    withdrawal.id,
+                )
             }
         }
     }
