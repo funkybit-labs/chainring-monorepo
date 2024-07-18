@@ -9,7 +9,7 @@ class ChainWorker(
 ) {
     private val contractsPublisher = ContractsPublisher(blockchainClient)
 
-    private val blockProcessor = BlockProcessor(blockchainClient)
+    private val blockProcessor = BlockProcessor(blockchainClient, sequencerClient)
     private val blockchainTransactionHandler =
         BlockchainTransactionHandler(blockchainClient, sequencerClient)
     private val blockchainDepositHandler =

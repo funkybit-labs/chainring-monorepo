@@ -180,6 +180,11 @@ export default [
                 "name": "_feeAccount",
                 "type": "address",
                 "internalType": "address"
+            },
+            {
+                "name": "_sovereignWithdrawalDelay",
+                "type": "uint256",
+                "internalType": "uint256"
             }
         ],
         "outputs": [
@@ -301,6 +306,21 @@ export default [
     },
     {
         "type": "function",
+        "name": "setSovereignWithdrawalDelay",
+        "inputs": [
+            {
+                "name": "_sovereignWithdrawalDelay",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "outputs": [
+            
+        ],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
         "name": "setSubmitter",
         "inputs": [
             {
@@ -313,6 +333,70 @@ export default [
             
         ],
         "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "sovereignWithdrawal",
+        "inputs": [
+            {
+                "name": "_token",
+                "type": "address",
+                "internalType": "address"
+            },
+            {
+                "name": "_amount",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "outputs": [
+            
+        ],
+        "stateMutability": "nonpayable"
+    },
+    {
+        "type": "function",
+        "name": "sovereignWithdrawalDelay",
+        "inputs": [
+            
+        ],
+        "outputs": [
+            {
+                "name": "",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "stateMutability": "view"
+    },
+    {
+        "type": "function",
+        "name": "sovereignWithdrawals",
+        "inputs": [
+            {
+                "name": "",
+                "type": "address",
+                "internalType": "address"
+            }
+        ],
+        "outputs": [
+            {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+            },
+            {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+            },
+            {
+                "name": "timestamp",
+                "type": "uint256",
+                "internalType": "uint256"
+            }
+        ],
+        "stateMutability": "view"
     },
     {
         "type": "function",
@@ -598,6 +682,31 @@ export default [
                 "type": "uint8",
                 "indexed": false,
                 "internalType": "enum IExchange.ErrorCode"
+            }
+        ],
+        "anonymous": false
+    },
+    {
+        "type": "event",
+        "name": "WithdrawalRequested",
+        "inputs": [
+            {
+                "name": "from",
+                "type": "address",
+                "indexed": true,
+                "internalType": "address"
+            },
+            {
+                "name": "token",
+                "type": "address",
+                "indexed": false,
+                "internalType": "address"
+            },
+            {
+                "name": "amount",
+                "type": "uint256",
+                "indexed": false,
+                "internalType": "uint256"
             }
         ],
         "anonymous": false

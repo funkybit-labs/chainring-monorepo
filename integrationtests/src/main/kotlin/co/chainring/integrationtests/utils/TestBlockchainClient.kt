@@ -1,15 +1,20 @@
 package co.chainring.integrationtests.utils
 
+import co.chainring.contracts.generated.Exchange
 import co.chainring.contracts.generated.MockERC20
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientConfig
+import co.chainring.core.blockchain.ContractType
+import co.chainring.core.model.Address
 import co.chainring.core.model.TxHash
 import org.awaitility.kotlin.await
 import org.awaitility.kotlin.withAlias
+import org.web3j.crypto.Credentials
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.Response
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.protocol.core.methods.response.VoidResponse
+import org.web3j.tx.RawTransactionManager
 import org.web3j.utils.Numeric
 import java.math.BigInteger
 import kotlin.time.Duration.Companion.milliseconds
@@ -18,6 +23,7 @@ import kotlin.time.toJavaDuration
 
 class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : BlockchainClient(blockchainConfig) {
     fun loadERC20Mock(address: String) = MockERC20.load(address, web3j, transactionManager, gasProvider)
+    fun loadExchange(address: String) = Exchange.load(address, web3j, transactionManager, gasProvider)
 
     fun waitForTransactionReceipt(txHash: TxHash): TransactionReceipt {
         var receipt: TransactionReceipt? = null
@@ -88,4 +94,30 @@ class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : Blockchai
         web3jService,
         VoidResponse::class.java,
     ).send()
+
+    fun sovereignWithdrawal(senderCredentials: Credentials, tokenContractAddress: Address, amount: BigInteger): TxHash {
+        val exchangeContractAddress = getContractAddress(ContractType.Exchange).value
+        val txManager = RawTransactionManager(
+            web3j,
+            // custom sender credentials
+            senderCredentials,
+            chainId.value.toLong(),
+            receiptProcessor,
+        )
+
+        val sovereignWithdrawalFunction = loadExchange(exchangeContractAddress)
+            .sovereignWithdrawal(tokenContractAddress.value, amount)
+            .encodeFunctionCall()
+
+        return txManager.sendTransaction(
+            web3j.ethGasPrice().send().gasPrice,
+            gasProvider.gasLimit,
+            exchangeContractAddress,
+            sovereignWithdrawalFunction,
+            BigInteger.ZERO,
+        )
+            .transactionHash
+            .let { TxHash(it) }
+            .also { logger.debug { "Sovereign withdrawal requested, txHash: $it" } }
+    }
 }
