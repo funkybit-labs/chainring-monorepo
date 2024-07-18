@@ -66,6 +66,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     )
 
     private val enableTestRoutes = System.getenv("ENABLE_TEST_ROUTES")?.toBoolean() ?: true
+    private val enableAdminRoutes = System.getenv("ENABLE_ADMIN_ROUTES")?.toBoolean() ?: true
     private val faucetMode = System.getenv("FAUCET_MODE")
         ?.let { FaucetMode.valueOf(it) }
         ?: FaucetMode.AllSymbols
@@ -131,6 +132,9 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
 
                         if (enableTestRoutes) {
                             routes += TestRoutes(sequencerClient).routes
+                        }
+                        if (enableAdminRoutes) {
+                            routes += AdminRoutes(sequencerClient).routes
                         }
                         if (faucetMode != FaucetMode.Off) {
                             routes += faucetRoutes.faucet

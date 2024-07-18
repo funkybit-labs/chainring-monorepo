@@ -28,6 +28,13 @@ interface TraceRecorder {
         CreateWithdrawal,
         CreateDeposit,
         WS,
+        FaucetDrip,
+        CreateSymbol,
+        ListSymbols,
+        PatchSymbol,
+        CreateMarket,
+        ListMarkets,
+        PatchMarket,
     }
 
     data class Trace(

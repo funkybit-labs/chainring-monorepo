@@ -134,7 +134,7 @@ open class TestWithDb {
         tickSize: BigDecimal,
         lastPrice: BigDecimal,
     ): MarketEntity =
-        MarketEntity.create(baseSymbol, quoteSymbol, tickSize, lastPrice)
+        MarketEntity.create(baseSymbol, quoteSymbol, tickSize, lastPrice, "test")
 
     protected fun createWallet(address: Address = Address.generate()): WalletEntity =
         WalletEntity.getOrCreate(address)
