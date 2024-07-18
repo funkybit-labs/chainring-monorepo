@@ -2,8 +2,9 @@ package co.chainring.sequencer.apps.services
 
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
-import co.chainring.apps.api.model.websocket.TradeCreated
+import co.chainring.apps.api.model.websocket.TradesCreated
 import co.chainring.core.evm.ECHelper
+import co.chainring.core.model.Address
 import co.chainring.core.model.FeeRate
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.Symbol
@@ -39,7 +40,6 @@ import co.chainring.core.sequencer.orderId
 import co.chainring.core.sequencer.sequencerOrderId
 import co.chainring.core.sequencer.sequencerWalletId
 import co.chainring.core.sequencer.withdrawalId
-import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
 import co.chainring.sequencer.proto.BackToBackOrder
 import co.chainring.sequencer.proto.Order
@@ -270,6 +270,7 @@ object SequencerResponseProcessorService {
         val limitsChanged = mutableSetOf<Pair<WalletEntity, MarketEntity>>()
 
         // handle trades
+        val executionsCreatedByWallet = mutableMapOf<Address, MutableList<OrderExecutionEntity>>()
         val tradesWithTakerOrder: List<Pair<TradeEntity, OrderEntity>> = response.tradesCreatedList.mapNotNull { trade ->
             logger.debug { "Trade Created: buyOrderGuid=${trade.buyOrderGuid}, sellOrderGuid=${trade.sellOrderGuid}, amount=${trade.amount.toBigInteger()} levelIx=${trade.levelIx}, buyerFee=${trade.buyerFee.toBigInteger()}, sellerFee=${trade.sellerFee.toBigInteger()}" }
             val buyOrder = OrderEntity.findBySequencerOrderId(trade.buyOrderGuid)
@@ -288,10 +289,11 @@ object SequencerResponseProcessorService {
                 )
 
                 // create executions for both
-                listOf(buyOrder, sellOrder).forEach { order ->
+                listOf(Pair(buyOrder, sellOrder), Pair(sellOrder, buyOrder)).forEach { (order, counterOrder) ->
                     val execution = OrderExecutionEntity.create(
                         timestamp = timestamp,
                         orderEntity = order,
+                        counterOrderEntity = counterOrder,
                         tradeEntity = tradeEntity,
                         role = if (orderIdsInRequest.contains(order.sequencerOrderId?.value)) {
                             ExecutionRole.Taker
@@ -308,13 +310,9 @@ object SequencerResponseProcessorService {
                     )
 
                     execution.refresh(flush = true)
-                    logger.debug { "Sending TradeCreated for order ${order.guid}" }
-                    broadcasterNotifications.add(
-                        BroadcasterNotification(
-                            TradeCreated(execution.toTradeResponse()),
-                            recipient = order.wallet.address,
-                        ),
-                    )
+                    executionsCreatedByWallet
+                        .getOrPut(execution.order.wallet.address) { mutableListOf() }
+                        .add(execution)
                 }
 
                 // build the transaction to settle
@@ -322,6 +320,16 @@ object SequencerResponseProcessorService {
             } else {
                 null
             }
+        }
+
+        executionsCreatedByWallet.forEach { (walletAddress, executions) ->
+            logger.debug { "Sending TradesCreated to wallet $walletAddress" }
+            broadcasterNotifications.add(
+                BroadcasterNotification(
+                    TradesCreated(executions.map { it.toTradeResponse() }),
+                    recipient = walletAddress,
+                ),
+            )
         }
 
         // update all orders that have changed

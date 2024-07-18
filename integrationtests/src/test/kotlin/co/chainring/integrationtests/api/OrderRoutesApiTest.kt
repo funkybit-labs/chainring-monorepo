@@ -33,6 +33,7 @@ import co.chainring.integrationtests.testutils.waitForBalance
 import co.chainring.integrationtests.utils.AssetAmount
 import co.chainring.integrationtests.utils.ExchangeContractManager
 import co.chainring.integrationtests.utils.ExpectedBalance
+import co.chainring.integrationtests.utils.ExpectedTrade
 import co.chainring.integrationtests.utils.Faucet
 import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.Wallet
@@ -50,9 +51,9 @@ import co.chainring.integrationtests.utils.assertOrderCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertOrderUpdatedMessageReceived
 import co.chainring.integrationtests.utils.assertOrdersMessageReceived
 import co.chainring.integrationtests.utils.assertPricesMessageReceived
-import co.chainring.integrationtests.utils.assertTradeCreatedMessageReceived
-import co.chainring.integrationtests.utils.assertTradeUpdatedMessageReceived
+import co.chainring.integrationtests.utils.assertTradesCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertTradesMessageReceived
+import co.chainring.integrationtests.utils.assertTradesUpdatedMessageReceived
 import co.chainring.integrationtests.utils.blocking
 import co.chainring.integrationtests.utils.inFundamentalUnits
 import co.chainring.integrationtests.utils.ofAsset
@@ -590,12 +591,16 @@ class OrderRoutesApiTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertMarketOrderCreatedMessageReceived(marketBuyOrderApiResponse)
-            assertTradeCreatedMessageReceived(
-                order = marketBuyOrderApiResponse,
-                price = updatedLimitSellOrderApiResponse.order.price,
-                amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount.fixedAmount()),
-                fee = AssetAmount(quoteSymbol, "0.0001516671"),
-                settlementStatus = SettlementStatus.Pending,
+            assertTradesCreatedMessageReceived(
+                listOf(
+                    ExpectedTrade(
+                        order = marketBuyOrderApiResponse,
+                        price = updatedLimitSellOrderApiResponse.order.price,
+                        amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount.fixedAmount()),
+                        fee = AssetAmount(quoteSymbol, "0.0001516671"),
+                        settlementStatus = SettlementStatus.Pending,
+                    ),
+                ),
             )
             assertOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
@@ -613,12 +618,16 @@ class OrderRoutesApiTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradeCreatedMessageReceived(
-                order = updatedLimitSellOrderApiResponse,
-                price = updatedLimitSellOrderApiResponse.order.price,
-                amount = AssetAmount(baseSymbol, "0.00043210"),
-                fee = AssetAmount(quoteSymbol, "0.00007583355"),
-                settlementStatus = SettlementStatus.Pending,
+            assertTradesCreatedMessageReceived(
+                listOf(
+                    ExpectedTrade(
+                        order = updatedLimitSellOrderApiResponse,
+                        price = updatedLimitSellOrderApiResponse.order.price,
+                        amount = AssetAmount(baseSymbol, "0.00043210"),
+                        fee = AssetAmount(quoteSymbol, "0.00007583355"),
+                        settlementStatus = SettlementStatus.Pending,
+                    ),
+                ),
             )
             assertOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Partial, msg.order.status)
@@ -718,9 +727,10 @@ class OrderRoutesApiTest : OrderBaseTest() {
                 ExpectedBalance(takerStartingQuoteBalance - notional - takerFee),
             ),
         )
-        takerWsClient.assertTradeUpdatedMessageReceived { msg ->
-            assertEquals(marketBuyOrderApiResponse.orderId, msg.trade.orderId)
-            assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
+        takerWsClient.assertTradesUpdatedMessageReceived { msg ->
+            assertEquals(1, msg.trades.size)
+            assertEquals(marketBuyOrderApiResponse.orderId, msg.trades[0].orderId)
+            assertEquals(SettlementStatus.Completed, msg.trades[0].settlementStatus)
         }
 
         makerWsClient.assertBalancesMessageReceived(
@@ -729,9 +739,10 @@ class OrderRoutesApiTest : OrderBaseTest() {
                 ExpectedBalance(makerStartingQuoteBalance + notional - makerFee),
             ),
         )
-        makerWsClient.assertTradeUpdatedMessageReceived { msg ->
-            assertEquals(updatedLimitSellOrderApiResponse.order.orderId, msg.trade.orderId)
-            assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
+        makerWsClient.assertTradesUpdatedMessageReceived { msg ->
+            assertEquals(1, msg.trades.size)
+            assertEquals(updatedLimitSellOrderApiResponse.order.orderId, msg.trades[0].orderId)
+            assertEquals(SettlementStatus.Completed, msg.trades[0].settlementStatus)
         }
 
         // place a sell order and see it gets executed
@@ -744,12 +755,16 @@ class OrderRoutesApiTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
-            assertTradeCreatedMessageReceived(
-                order = marketSellOrderApiResponse,
-                price = BigDecimal("17.500"),
-                amount = AssetAmount(baseSymbol, "0.00012345"),
-                fee = AssetAmount(quoteSymbol, "0.0000432075"),
-                settlementStatus = SettlementStatus.Pending,
+            assertTradesCreatedMessageReceived(
+                listOf(
+                    ExpectedTrade(
+                        order = marketSellOrderApiResponse,
+                        price = BigDecimal("17.500"),
+                        amount = AssetAmount(baseSymbol, "0.00012345"),
+                        fee = AssetAmount(quoteSymbol, "0.0000432075"),
+                        settlementStatus = SettlementStatus.Pending,
+                    ),
+                ),
             )
             assertOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Partial, msg.order.status)
@@ -767,12 +782,16 @@ class OrderRoutesApiTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradeCreatedMessageReceived(
-                order = updatedLimitBuyOrderApiResponse,
-                price = updatedLimitBuyOrderApiResponse.order.price,
-                amount = AssetAmount(baseSymbol, "0.00012345"),
-                fee = AssetAmount(quoteSymbol, "0.00002160375"),
-                settlementStatus = SettlementStatus.Pending,
+            assertTradesCreatedMessageReceived(
+                listOf(
+                    ExpectedTrade(
+                        order = updatedLimitBuyOrderApiResponse,
+                        price = updatedLimitBuyOrderApiResponse.order.price,
+                        amount = AssetAmount(baseSymbol, "0.00012345"),
+                        fee = AssetAmount(quoteSymbol, "0.00002160375"),
+                        settlementStatus = SettlementStatus.Pending,
+                    ),
+                ),
             )
             assertOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
@@ -851,9 +870,10 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     ExpectedBalance(takerStartingQuoteBalance - (notional + takerFee) + (notional2 - takerFee2)),
                 ),
             )
-            assertTradeUpdatedMessageReceived { msg ->
-                assertEquals(marketSellOrderApiResponse.orderId, msg.trade.orderId)
-                assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
+            assertTradesUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.trades.size)
+                assertEquals(marketSellOrderApiResponse.orderId, msg.trades[0].orderId)
+                assertEquals(SettlementStatus.Completed, msg.trades[0].settlementStatus)
             }
         }
 
@@ -878,9 +898,10 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     ExpectedBalance(makerStartingQuoteBalance + (notional - makerFee) - (notional2 + makerFee2)),
                 ),
             )
-            assertTradeUpdatedMessageReceived { msg ->
-                assertEquals(updatedLimitBuyOrderApiResponse.order.orderId, msg.trade.orderId)
-                assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
+            assertTradesUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.trades.size)
+                assertEquals(updatedLimitBuyOrderApiResponse.order.orderId, msg.trades[0].orderId)
+                assertEquals(SettlementStatus.Completed, msg.trades[0].settlementStatus)
             }
         }
 
@@ -1146,7 +1167,9 @@ class OrderRoutesApiTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertOrderCreatedMessageReceived()
-            repeat(5) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived { msg ->
+                assertEquals(5, msg.trades.size)
+            }
             assertOrderUpdatedMessageReceived()
             assertBalancesMessageReceived()
             assertPricesMessageReceived(market.id) { msg ->
@@ -1168,7 +1191,9 @@ class OrderRoutesApiTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            repeat(5) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived { msg ->
+                assertEquals(5, msg.trades.size)
+            }
             repeat(5) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
             assertPricesMessageReceived(market.id) { msg ->
@@ -1311,12 +1336,16 @@ class OrderRoutesApiTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertMarketOrderCreatedMessageReceived(marketBuyOrderApiResponse)
-            assertTradeCreatedMessageReceived(
-                order = marketBuyOrderApiResponse,
-                price = (limitSellOrderApiResponse.order as CreateOrderApiRequest.Limit).price,
-                amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount.fixedAmount()),
-                fee = AssetAmount(quoteSymbol, "0.001002"),
-                settlementStatus = SettlementStatus.Pending,
+            assertTradesCreatedMessageReceived(
+                listOf(
+                    ExpectedTrade(
+                        order = marketBuyOrderApiResponse,
+                        price = (limitSellOrderApiResponse.order as CreateOrderApiRequest.Limit).price,
+                        amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount.fixedAmount()),
+                        fee = AssetAmount(quoteSymbol, "0.001002"),
+                        settlementStatus = SettlementStatus.Pending,
+                    ),
+                ),
             )
             assertOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
@@ -1334,12 +1363,16 @@ class OrderRoutesApiTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradeCreatedMessageReceived(
-                order = limitSellOrderApiResponse,
-                price = (limitSellOrderApiResponse.order as CreateOrderApiRequest.Limit).price,
-                amount = AssetAmount(baseSymbol, "0.05"),
-                fee = AssetAmount(quoteSymbol, "0.000501"),
-                settlementStatus = SettlementStatus.Pending,
+            assertTradesCreatedMessageReceived(
+                listOf(
+                    ExpectedTrade(
+                        order = limitSellOrderApiResponse,
+                        price = (limitSellOrderApiResponse.order as CreateOrderApiRequest.Limit).price,
+                        amount = AssetAmount(baseSymbol, "0.05"),
+                        fee = AssetAmount(quoteSymbol, "0.000501"),
+                        settlementStatus = SettlementStatus.Pending,
+                    ),
+                ),
             )
             assertOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Partial, msg.order.status)
@@ -1397,9 +1430,10 @@ class OrderRoutesApiTest : OrderBaseTest() {
                 ExpectedBalance(takerStartingQuoteBalance - notional - takerFee),
             ),
         )
-        takerWsClient.assertTradeUpdatedMessageReceived { msg ->
-            assertEquals(marketBuyOrderApiResponse.orderId, msg.trade.orderId)
-            assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
+        takerWsClient.assertTradesUpdatedMessageReceived { msg ->
+            assertEquals(1, msg.trades.size)
+            assertEquals(marketBuyOrderApiResponse.orderId, msg.trades[0].orderId)
+            assertEquals(SettlementStatus.Completed, msg.trades[0].settlementStatus)
         }
 
         makerWsClient.assertBalancesMessageReceived(
@@ -1408,9 +1442,10 @@ class OrderRoutesApiTest : OrderBaseTest() {
                 ExpectedBalance(makerStartingQuoteBalance + notional - makerFee),
             ),
         )
-        makerWsClient.assertTradeUpdatedMessageReceived { msg ->
-            assertEquals(limitSellOrderApiResponse.orderId, msg.trade.orderId)
-            assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
+        makerWsClient.assertTradesUpdatedMessageReceived { msg ->
+            assertEquals(1, msg.trades.size)
+            assertEquals(limitSellOrderApiResponse.orderId, msg.trades[0].orderId)
+            assertEquals(SettlementStatus.Completed, msg.trades[0].settlementStatus)
         }
 
         // place a sell order and see it gets executed
@@ -1423,12 +1458,16 @@ class OrderRoutesApiTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
-            assertTradeCreatedMessageReceived(
-                order = marketSellOrderApiResponse,
-                price = BigDecimal("0.999"),
-                amount = AssetAmount(baseSymbol, "0.012345"),
-                fee = AssetAmount(quoteSymbol, "0.0002466531"),
-                settlementStatus = SettlementStatus.Pending,
+            assertTradesCreatedMessageReceived(
+                listOf(
+                    ExpectedTrade(
+                        order = marketSellOrderApiResponse,
+                        price = BigDecimal("0.999"),
+                        amount = AssetAmount(baseSymbol, "0.012345"),
+                        fee = AssetAmount(quoteSymbol, "0.0002466531"),
+                        settlementStatus = SettlementStatus.Pending,
+                    ),
+                ),
             )
             assertOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
@@ -1446,12 +1485,16 @@ class OrderRoutesApiTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradeCreatedMessageReceived(
-                order = limitBuyOrderApiResponse,
-                price = (limitBuyOrderApiResponse.order as CreateOrderApiRequest.Limit).price,
-                amount = AssetAmount(baseSymbol, "0.012345"),
-                fee = AssetAmount(quoteSymbol, "0.00012332655"),
-                settlementStatus = SettlementStatus.Pending,
+            assertTradesCreatedMessageReceived(
+                listOf(
+                    ExpectedTrade(
+                        order = limitBuyOrderApiResponse,
+                        price = (limitBuyOrderApiResponse.order as CreateOrderApiRequest.Limit).price,
+                        amount = AssetAmount(baseSymbol, "0.012345"),
+                        fee = AssetAmount(quoteSymbol, "0.00012332655"),
+                        settlementStatus = SettlementStatus.Pending,
+                    ),
+                ),
             )
             assertOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Partial, msg.order.status)
@@ -1503,9 +1546,10 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     ExpectedBalance(takerStartingQuoteBalance - (notional + takerFee) + (notional2 - takerFee2)),
                 ),
             )
-            assertTradeUpdatedMessageReceived { msg ->
-                assertEquals(marketSellOrderApiResponse.orderId, msg.trade.orderId)
-                assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
+            assertTradesUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.trades.size)
+                assertEquals(marketSellOrderApiResponse.orderId, msg.trades[0].orderId)
+                assertEquals(SettlementStatus.Completed, msg.trades[0].settlementStatus)
             }
         }
 
@@ -1517,9 +1561,10 @@ class OrderRoutesApiTest : OrderBaseTest() {
                     ExpectedBalance(makerStartingQuoteBalance + (notional - makerFee) - (notional2 + makerFee2)),
                 ),
             )
-            assertTradeUpdatedMessageReceived { msg ->
-                assertEquals(limitBuyOrderApiResponse.orderId, msg.trade.orderId)
-                assertEquals(SettlementStatus.Completed, msg.trade.settlementStatus)
+            assertTradesUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.trades.size)
+                assertEquals(limitBuyOrderApiResponse.orderId, msg.trades[0].orderId)
+                assertEquals(SettlementStatus.Completed, msg.trades[0].settlementStatus)
             }
         }
 
@@ -1699,14 +1744,18 @@ class OrderRoutesApiTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertOrderCreatedMessageReceived()
-            repeat(5) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived { msg ->
+                assertEquals(5, msg.trades.size)
+            }
             assertOrderUpdatedMessageReceived()
             assertBalancesMessageReceived()
             assertLimitsMessageReceived(market, base = BigDecimal("0.018"), quote = BigDecimal("1.78161858"))
         }
 
         makerWsClient.apply {
-            repeat(5) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived { msg ->
+                assertEquals(5, msg.trades.size)
+            }
             repeat(5) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived(market, base = BigDecimal("0.182"), quote = BigDecimal("1.81784079"))

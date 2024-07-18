@@ -24,6 +24,7 @@ import co.chainring.apps.api.model.processingError
 import co.chainring.apps.api.model.unexpectedError
 import co.chainring.apps.api.services.ExchangeApiService
 import co.chainring.core.model.Symbol
+import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
@@ -305,6 +306,8 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
                             Clock.System.now(),
                             OrderId("1234"),
                             MarketId("BTC/ETH"),
+                            ExecutionRole.Taker,
+                            counterOrderId = OrderId("4321"),
                             OrderSide.Buy,
                             12345.toBigInteger(),
                             17.61.toBigDecimal(),

@@ -1,4 +1,4 @@
-import { Order, OrderSide, Trade } from 'apiClient'
+import { Order, OrderSide } from 'apiClient'
 import React, { useCallback, useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import { Address, formatUnits } from 'viem'
@@ -17,6 +17,12 @@ import { scaledDecimalToBigint } from 'utils/pricesUtils'
 import { ExpandableValue } from 'components/common/ExpandableValue'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
+import {
+  rollupTrades,
+  OrderTradesGroup
+} from 'components/Screens/HomeScreen/OrdersAndTradesWidget/tradeRollup'
+import arrowRightIcon from 'assets/arrow-right.svg'
+import arrowDownIcon from 'assets/arrow-down.svg'
 
 type Tab = 'Orders' | 'Trade History'
 
@@ -32,52 +38,79 @@ export default function OrdersAndTradesWidget({
   const [orders, setOrders] = useState<Order[]>(() => [])
   const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null)
   const [showCancelModal, setShowCancelModal] = useState<boolean>(false)
-  const [trades, setTrades] = useState<Trade[]>(() => [])
+  const [orderTradeGroups, setOrderTradeGroups] = useState<OrderTradesGroup[]>(
+    () => []
+  )
   const [selectedTab, setSelectedTab] = useState<Tab>('Orders')
   const switchToEthChain = useSwitchToEthChain()
 
   useWebsocketSubscription({
     topics: useMemo(() => [ordersTopic, tradesTopic], []),
-    handler: useCallback((message: Publishable) => {
-      if (message.type === 'Orders') {
-        setOrders(message.orders)
-      } else if (message.type === 'OrderCreated') {
-        setOrders(
-          produce((draft) => {
-            draft.unshift(message.order)
+    handler: useCallback(
+      (message: Publishable) => {
+        if (message.type === 'Orders') {
+          setOrders(message.orders)
+        } else if (message.type === 'OrderCreated') {
+          setOrders(
+            produce((draft) => {
+              draft.unshift(message.order)
+            })
+          )
+        } else if (message.type === 'OrderUpdated') {
+          setOrders(
+            produce((draft) => {
+              const updatedOrder = message.order
+              const index = draft.findIndex(
+                (order) => order.id === updatedOrder.id
+              )
+              if (index !== -1) draft[index] = updatedOrder
+            })
+          )
+        } else if (message.type === 'Trades') {
+          setOrderTradeGroups((prevState) => {
+            const expanded = new Set<string>()
+            prevState.forEach((orderTradeGroup) => {
+              if (orderTradeGroup.expanded) {
+                expanded.add(orderTradeGroup.id)
+              }
+            })
+
+            const newState = rollupTrades(message.trades, markets)
+            // make sure rows that were expanded stay expanded
+            newState.forEach((orderTradeGroup) => {
+              orderTradeGroup.expanded = expanded.has(orderTradeGroup.id)
+            })
+
+            return newState
           })
-        )
-      } else if (message.type === 'OrderUpdated') {
-        setOrders(
-          produce((draft) => {
-            const updatedOrder = message.order
-            const index = draft.findIndex(
-              (order) => order.id === updatedOrder.id
-            )
-            if (index !== -1) draft[index] = updatedOrder
-          })
-        )
-      } else if (message.type === 'Trades') {
-        setTrades(message.trades)
-      } else if (message.type === 'TradeCreated') {
-        setTrades(
-          produce((draft) => {
-            draft.unshift(message.trade)
-          })
-        )
-      } else if (message.type === 'TradeUpdated') {
-        setTrades(
-          produce((draft) => {
-            const updatedTrade = message.trade
-            const index = draft.findIndex(
-              (trade) =>
-                trade.id === updatedTrade.id && trade.side === updatedTrade.side
-            )
-            if (index !== -1) draft[index] = updatedTrade
-          })
-        )
-      }
-    }, [])
+        } else if (message.type === 'TradesCreated') {
+          setOrderTradeGroups(
+            produce((draft) => {
+              rollupTrades(message.trades, markets).forEach(
+                (orderTradesGroup) => draft.unshift(orderTradesGroup)
+              )
+            })
+          )
+        } else if (message.type === 'TradesUpdated') {
+          setOrderTradeGroups(
+            produce((draft) => {
+              rollupTrades(message.trades, markets).forEach(
+                (updatedOrderTradesGroup) => {
+                  const index = draft.findIndex(
+                    (orderTradeGroup) =>
+                      orderTradeGroup.id === updatedOrderTradesGroup.id
+                  )
+                  if (index !== -1) {
+                    draft[index] = updatedOrderTradesGroup
+                  }
+                }
+              )
+            })
+          )
+        }
+      },
+      [markets]
+    )
   })
 
   function openCancelModal(order: Order) {
@@ -88,7 +121,7 @@ export default function OrdersAndTradesWidget({
   function ordersContent() {
     return (
       <>
-        <div className="max-h-96 min-h-24 overflow-scroll">
+        <div className="h-96 overflow-scroll">
           <table className="relative w-full text-left text-sm">
             <thead className="sticky top-0 z-10 bg-darkBluishGray9 font-normal text-darkBluishGray2">
               <tr key="header">
@@ -264,13 +297,26 @@ export default function OrdersAndTradesWidget({
     }
   }
 
+  function toggleExpandOrderTradesGroup(groupId: string) {
+    setOrderTradeGroups(
+      produce((draft) => {
+        const aggregateIndex = draft.findIndex((ta) => ta.id === groupId)
+        if (aggregateIndex !== -1) {
+          const tradeAggregate = draft[aggregateIndex]
+          tradeAggregate.expanded = !tradeAggregate.expanded
+        }
+      })
+    )
+  }
+
   function tradeHistoryContent() {
     return (
       <>
-        <div className="max-h-96 min-h-24 overflow-scroll">
+        <div className="h-96 overflow-scroll">
           <table className="relative w-full text-left text-sm">
             <thead className="sticky top-0 z-10 bg-darkBluishGray9 font-normal text-darkBluishGray2">
               <tr key="header">
+                <td className="pl-4"></td>
                 <td className="pl-4">Date</td>
                 <td className="pl-4">Sell</td>
                 <td className="pl-4">Buy</td>
@@ -286,74 +332,156 @@ export default function OrdersAndTradesWidget({
               </tr>
             </thead>
             <tbody>
-              {trades.map((trade) => {
-                const market = markets.getById(trade.marketId)
-
+              {orderTradeGroups.map((orderTradesGroup) => {
                 return (
-                  <tr
-                    key={`${trade.id}-${trade.side}`}
-                    className="duration-200 ease-in-out hover:cursor-default hover:bg-darkBluishGray6"
-                  >
-                    <td className="h-12 rounded-l pl-4">
-                      <span className="mr-2 inline-block text-lightBluishGray5">
-                        {format(trade.timestamp, 'MM/dd')}
-                      </span>
-                      <br className="narrow:hidden" />
-                      <span className="whitespace-nowrap text-white">
-                        {format(trade.timestamp, 'HH:mm:ss a')}
-                      </span>
-                    </td>
-                    <td className="pl-4">
-                      <SymbolAndChain
-                        symbol={
-                          trade.side === 'Buy'
-                            ? market.quoteSymbol
-                            : market.baseSymbol
-                        }
-                      />
-                    </td>
-                    <td className="pl-4">
-                      <SymbolAndChain
-                        symbol={
-                          trade.side === 'Buy'
-                            ? market.baseSymbol
-                            : market.quoteSymbol
-                        }
-                      />
-                    </td>
-                    <td className="hidden pl-4 narrow:table-cell">
-                      {displayAmount(
-                        trade.amount,
-                        trade.side,
-                        market,
-                        trade.price
-                      )}
-                    </td>
-                    <td className="hidden pl-4 narrow:table-cell">
-                      {displayPrice(trade.price, trade.side, market)}
-                    </td>
-                    <td className="table-cell pl-4 narrow:hidden">
-                      {formatUnits(trade.amount, market.baseSymbol.decimals)}
-                      <br />
-                      {trade.price.toFixed(market.quoteDecimalPlaces)}
-                    </td>
-
-                    <td className="pl-4">
-                      <ExpandableValue
-                        value={formatUnits(
-                          trade.feeAmount,
-                          market.quoteSymbol.decimals
+                  <React.Fragment key={orderTradesGroup.id}>
+                    <tr
+                      key={orderTradesGroup.id}
+                      className="duration-200 ease-in-out hover:cursor-default hover:bg-darkBluishGray6"
+                      onClick={() =>
+                        toggleExpandOrderTradesGroup(orderTradesGroup.id)
+                      }
+                    >
+                      <td className="rounded-l pl-4">
+                        {orderTradesGroup.trades.length > 1 &&
+                          (orderTradesGroup.expanded ? (
+                            <img className="size-3" src={arrowDownIcon} />
+                          ) : (
+                            <img className="size-3" src={arrowRightIcon} />
+                          ))}
+                      </td>
+                      <td className="h-12 pl-4">
+                        <span className="mr-2 inline-block text-lightBluishGray5">
+                          {format(orderTradesGroup.timestamp, 'MM/dd')}
+                        </span>
+                        <br className="narrow:hidden" />
+                        <span className="whitespace-nowrap text-white">
+                          {format(orderTradesGroup.timestamp, 'HH:mm:ss a')}
+                        </span>
+                      </td>
+                      <td className="pl-4">
+                        <SymbolAndChain symbol={orderTradesGroup.sellSymbol} />
+                      </td>
+                      <td className="pl-4">
+                        <SymbolAndChain symbol={orderTradesGroup.buySymbol} />
+                      </td>
+                      <td className="hidden w-96 pl-4 narrow:table-cell">
+                        <ExpandableValue
+                          value={formatUnits(
+                            orderTradesGroup.aggregatedAmount,
+                            orderTradesGroup.sellSymbol.decimals
+                          )}
+                        />{' '}
+                        {orderTradesGroup.sellSymbol.displayName()}
+                        {' ('}
+                        {orderTradesGroup.sellSymbol.chainName}
+                        {')'}
+                      </td>
+                      <td className="hidden pl-4 narrow:table-cell">
+                        {orderTradesGroup.aggregatedPrice.toFixed(
+                          orderTradesGroup.priceDecimalPlaces
                         )}
-                      />{' '}
-                      <SymbolAndChain
-                        symbol={market.quoteSymbol}
-                        noIcon={true}
-                      />
-                    </td>
-                    <td className="rounded-r px-4 text-center">
-                      <Status status={trade.settlementStatus} />
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="table-cell pl-4 narrow:hidden">
+                        {formatUnits(
+                          orderTradesGroup.aggregatedAmount,
+                          orderTradesGroup.sellSymbol.decimals
+                        )}
+                        <br />
+                        {orderTradesGroup.aggregatedPrice.toFixed(
+                          orderTradesGroup.priceDecimalPlaces
+                        )}
+                      </td>
+
+                      <td className="pl-4">
+                        <ExpandableValue
+                          value={formatUnits(
+                            orderTradesGroup.aggregatedFeeAmount,
+                            orderTradesGroup.feeSymbol.decimals
+                          )}
+                        />{' '}
+                        <SymbolAndChain
+                          symbol={orderTradesGroup.feeSymbol}
+                          noIcon={true}
+                        />
+                      </td>
+                      <td className="rounded-r px-4 text-center">
+                        <Status status={orderTradesGroup.settlementStatus} />
+                      </td>
+                    </tr>
+                    {orderTradesGroup.trades.length > 1 &&
+                      orderTradesGroup.expanded &&
+                      orderTradesGroup.trades.map((orderTrade) => {
+                        return (
+                          <tr
+                            key={`${orderTradesGroup.id}-${orderTrade.id}`}
+                            className="bg-darkBluishGray10/[0.5] text-xs duration-200 ease-in-out hover:cursor-default hover:bg-darkBluishGray6"
+                          >
+                            <td className="rounded-l pl-4"></td>
+                            <td className="h-12 pl-7"></td>
+                            <td className="pl-7">
+                              <SymbolAndChain
+                                symbol={orderTrade.sellSymbol}
+                                className={'text-xs'}
+                                iconSize={4}
+                              />
+                            </td>
+                            <td className="pl-7">
+                              <SymbolAndChain
+                                symbol={orderTrade.buySymbol}
+                                className={'text-xs'}
+                                iconSize={4}
+                              />
+                            </td>
+                            <td className="hidden pl-7 narrow:table-cell">
+                              <ExpandableValue
+                                value={formatUnits(
+                                  orderTrade.amount,
+                                  orderTrade.sellSymbol.decimals
+                                )}
+                              />{' '}
+                              {orderTrade.sellSymbol.displayName()}
+                              {' ('}
+                              {orderTrade.sellSymbol.chainName}
+                              {')'}
+                            </td>
+                            <td className="hidden pl-7 narrow:table-cell">
+                              {orderTrade.price.toFixed(
+                                orderTrade.priceDecimalPlaces
+                              )}
+                            </td>
+                            <td className="table-cell pl-7 narrow:hidden">
+                              {formatUnits(
+                                orderTrade.amount,
+                                orderTrade.sellSymbol.decimals
+                              )}
+                              <br />
+                              {orderTrade.price.toFixed(
+                                orderTrade.priceDecimalPlaces
+                              )}
+                            </td>
+                            <td className="pl-7">
+                              {orderTrade.feeAmount > 0 && (
+                                <>
+                                  <ExpandableValue
+                                    value={formatUnits(
+                                      orderTrade.feeAmount,
+                                      orderTrade.feeSymbol.decimals
+                                    )}
+                                  />{' '}
+                                  <SymbolAndChain
+                                    symbol={orderTrade.feeSymbol}
+                                    className={'text-xs'}
+                                    noIcon={true}
+                                  />
+                                </>
+                              )}
+                            </td>
+                            <td className="rounded-r px-4 text-center"></td>
+                          </tr>
+                        )
+                      })}
+                  </React.Fragment>
                 )
               })}
             </tbody>

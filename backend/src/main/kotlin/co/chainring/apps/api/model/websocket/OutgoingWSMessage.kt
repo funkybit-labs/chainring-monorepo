@@ -85,15 +85,15 @@ data class Trades(
 ) : Publishable()
 
 @Serializable
-@SerialName("TradeCreated")
-data class TradeCreated(
-    val trade: Trade,
+@SerialName("TradesCreated")
+data class TradesCreated(
+    val trades: List<Trade>,
 ) : Publishable()
 
 @Serializable
-@SerialName("TradeUpdated")
-data class TradeUpdated(
-    val trade: Trade,
+@SerialName("TradesUpdated")
+data class TradesUpdated(
+    val trades: List<Trade>,
 ) : Publishable()
 
 @Serializable

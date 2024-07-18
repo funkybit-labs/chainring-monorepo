@@ -13,8 +13,8 @@ import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
-import co.chainring.apps.api.model.websocket.TradeCreated
-import co.chainring.apps.api.model.websocket.TradeUpdated
+import co.chainring.apps.api.model.websocket.TradesCreated
+import co.chainring.apps.api.model.websocket.TradesUpdated
 import co.chainring.apps.api.model.websocket.Trades
 import co.chainring.integrationtests.utils.ApiCallFailure
 import co.chainring.core.model.Address
@@ -86,19 +86,20 @@ class Maker(
 
     override fun handleWebsocketMessage(message: Publishable) {
         when (message) {
-            is TradeCreated -> {
-                logger.info { "$id: received trade created" }
-                pendingTrades.add(message.trade)
+            is TradesCreated -> {
+                logger.info { "$id: received trades created" }
+                pendingTrades.addAll(message.trades)
             }
 
-            is TradeUpdated -> {
-                logger.info { "$id: received trade update" }
-                val trade = message.trade
-                if (trade.settlementStatus == SettlementStatus.Pending) {
-                    pendingTrades.add(trade)
-                } else if (trade.settlementStatus == SettlementStatus.Completed) {
-                    pendingTrades.removeIf { it.id == trade.id }
-                    settledTrades.add(trade)
+            is TradesUpdated -> {
+                logger.info { "$id: received trades update" }
+                message.trades.forEach { trade ->
+                    if (trade.settlementStatus == SettlementStatus.Pending) {
+                        pendingTrades.add(trade)
+                    } else if (trade.settlementStatus == SettlementStatus.Completed) {
+                        pendingTrades.removeIf { it.id == trade.id }
+                        settledTrades.add(trade)
+                    }
                 }
             }
 

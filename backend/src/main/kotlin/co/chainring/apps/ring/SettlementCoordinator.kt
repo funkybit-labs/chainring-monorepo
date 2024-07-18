@@ -1,6 +1,6 @@
 package co.chainring.apps.ring
 
-import co.chainring.apps.api.model.websocket.TradeUpdated
+import co.chainring.apps.api.model.websocket.TradesUpdated
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.DefaultBlockParam
 import co.chainring.core.evm.Adjustment
@@ -111,9 +111,7 @@ class SettlementCoordinator(
                     if (failedTrades.isNotEmpty()) {
                         // if any trades failed settling, complete them
                         // they will be marked as failed and sequencer will be called to revert the settlements
-                        failedTrades.forEach {
-                            completeSettlement(it, batch.preparationTxBlockNumbers())
-                        }
+                        completeSettlement(failedTrades, batch.preparationTxBlockNumbers())
 
                         // rollback the batches
                         updateBatchToRollingBack(batch)
@@ -156,9 +154,7 @@ class SettlementCoordinator(
         val tradesSettling = TradeEntity.findSettling()
 
         batch.markAsCompleted()
-        tradesSettling.forEach {
-            completeSettlement(it, batch.submissionTxBlockNumbers())
-        }
+        completeSettlement(tradesSettling, batch.submissionTxBlockNumbers())
     }
 
     private fun createNextBatch(): SettlementBatchEntity? {
@@ -172,10 +168,8 @@ class SettlementCoordinator(
         val pendingRollbacks = tradesToPrepare.filter { it.settlementStatus == SettlementStatus.PendingRollback }
         if (pendingRollbacks.isNotEmpty()) {
             TradeEntity.markAsFailedSettling(pendingRollbacks.map { it.tradeHash }.toSet(), "Manually Rolled Back")
-            pendingRollbacks.forEach {
-                it.refresh(true)
-                completeSettlement(it, chainBlockNumbers = emptyMap())
-            }
+            pendingRollbacks.forEach { it.refresh(true) }
+            completeSettlement(pendingRollbacks, chainBlockNumbers = emptyMap())
             return null
         }
 
@@ -409,71 +403,77 @@ class SettlementCoordinator(
             symbolMap.getValue(it.quoteSymbolGuid.value).chainId.value == chainId
     }
 
-    private fun completeSettlement(tradeEntity: TradeEntity, chainBlockNumbers: Map<ChainId, BigInteger?>) {
+    private fun completeSettlement(trades: List<TradeEntity>, chainBlockNumbers: Map<ChainId, BigInteger?>) {
         val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
-        val executions = tradeEntity.executions
 
-        if (tradeEntity.settlementStatus == SettlementStatus.FailedSettling) {
-            logger.error { "settlement failed for ${tradeEntity.guid.value} - error is <${tradeEntity.error}>" }
+        trades.forEach { tradeEntity ->
+            val executions = tradeEntity.executions
 
-            tradeEntity.fail()
+            if (tradeEntity.settlementStatus == SettlementStatus.FailedSettling) {
+                logger.error { "settlement failed for ${tradeEntity.guid.value} - error is <${tradeEntity.error}>" }
 
-            val buyExecution = executions.first { it.order.side == OrderSide.Buy }
-            val buyOrder = buyExecution.order
+                tradeEntity.fail()
 
-            val sellExecution = executions.first { it.order.side == OrderSide.Sell }
-            val sellOrder = sellExecution.order
+                val buyExecution = executions.first { it.order.side == OrderSide.Buy }
+                val buyOrder = buyExecution.order
 
-            val market = tradeEntity.market
+                val sellExecution = executions.first { it.order.side == OrderSide.Sell }
+                val sellOrder = sellExecution.order
 
-            val sequencerResponse = runBlocking {
-                sequencerClient.failSettlement(
-                    buyWallet = buyOrder.wallet.address.toSequencerId().value,
-                    sellWallet = sellOrder.wallet.address.toSequencerId().value,
-                    marketId = tradeEntity.marketGuid.value,
-                    buyOrderId = buyOrder.guid.value,
-                    sellOrderId = sellOrder.guid.value,
-                    amount = tradeEntity.amount,
-                    levelIx = tradeEntity.price.divideToIntegralValue(market.tickSize).toInt(),
-                    buyerFee = buyExecution.feeAmount,
-                    sellerFee = sellExecution.feeAmount,
+                val market = tradeEntity.market
+
+                val sequencerResponse = runBlocking {
+                    sequencerClient.failSettlement(
+                        buyWallet = buyOrder.wallet.address.toSequencerId().value,
+                        sellWallet = sellOrder.wallet.address.toSequencerId().value,
+                        marketId = tradeEntity.marketGuid.value,
+                        buyOrderId = buyOrder.guid.value,
+                        sellOrderId = sellOrder.guid.value,
+                        amount = tradeEntity.amount,
+                        levelIx = tradeEntity.price.divideToIntegralValue(market.tickSize).toInt(),
+                        buyerFee = buyExecution.feeAmount,
+                        sellerFee = sellExecution.feeAmount,
+                    )
+                }
+                if (sequencerResponse.error == SequencerError.None) {
+                    logger.debug { "Successfully notified sequencer" }
+                } else {
+                    logger.error { "Sequencer failed with error ${sequencerResponse.error} - failed settlements" }
+                }
+            } else {
+                logger.debug { "settlement completed for ${tradeEntity.guid}" }
+                tradeEntity.settle()
+
+                // update the onchain balances
+                val wallets = executions.map { it.order.wallet }
+                val market = getMarket(tradeEntity.marketGuid.value)
+                val symbols = listOf(market.baseSymbolGuid.value, market.quoteSymbolGuid.value)
+                val baseSymbolChainId = symbolMap.getValue(market.baseSymbolGuid.value).chainId.value
+                val quoteSymbolChainId = symbolMap.getValue(market.quoteSymbolGuid.value).chainId.value
+                if (baseSymbolChainId == quoteSymbolChainId) {
+                    updateBalances(wallets, symbols, baseSymbolChainId, chainBlockNumbers[baseSymbolChainId])
+                } else {
+                    updateBalances(wallets, listOf(market.baseSymbolGuid.value), baseSymbolChainId, chainBlockNumbers[baseSymbolChainId])
+                    updateBalances(wallets, listOf(market.quoteSymbolGuid.value), quoteSymbolChainId, chainBlockNumbers[quoteSymbolChainId])
+                }
+
+                wallets.forEach { wallet ->
+                    broadcasterNotifications.add(BroadcasterNotification.walletBalances(wallet))
+                }
+            }
+        }
+
+        trades
+            .flatMap { it.executions }
+            .groupBy { it.order.wallet.address }
+            .forEach { (walletAddress, executions) ->
+                broadcasterNotifications.add(
+                    BroadcasterNotification(
+                        TradesUpdated(executions.map { it.toTradeResponse() }),
+                        recipient = walletAddress,
+                    ),
                 )
             }
-            if (sequencerResponse.error == SequencerError.None) {
-                logger.debug { "Successfully notified sequencer" }
-            } else {
-                logger.error { "Sequencer failed with error ${sequencerResponse.error} - failed settlements" }
-            }
-        } else {
-            logger.debug { "settlement completed for ${tradeEntity.guid}" }
-            tradeEntity.settle()
-
-            // update the onchain balances
-            val wallets = executions.map { it.order.wallet }
-            val market = getMarket(tradeEntity.marketGuid.value)
-            val symbols = listOf(market.baseSymbolGuid.value, market.quoteSymbolGuid.value)
-            val baseSymbolChainId = symbolMap.getValue(market.baseSymbolGuid.value).chainId.value
-            val quoteSymbolChainId = symbolMap.getValue(market.quoteSymbolGuid.value).chainId.value
-            if (baseSymbolChainId == quoteSymbolChainId) {
-                updateBalances(wallets, symbols, baseSymbolChainId, chainBlockNumbers[baseSymbolChainId])
-            } else {
-                updateBalances(wallets, listOf(market.baseSymbolGuid.value), baseSymbolChainId, chainBlockNumbers[baseSymbolChainId])
-                updateBalances(wallets, listOf(market.quoteSymbolGuid.value), quoteSymbolChainId, chainBlockNumbers[quoteSymbolChainId])
-            }
-
-            wallets.forEach { wallet ->
-                broadcasterNotifications.add(BroadcasterNotification.walletBalances(wallet))
-            }
-        }
-
-        executions.forEach { execution ->
-            broadcasterNotifications.add(
-                BroadcasterNotification(
-                    TradeUpdated(execution.toTradeResponse()),
-                    recipient = execution.order.wallet.address,
-                ),
-            )
-        }
 
         publishBroadcasterNotifications(broadcasterNotifications)
     }

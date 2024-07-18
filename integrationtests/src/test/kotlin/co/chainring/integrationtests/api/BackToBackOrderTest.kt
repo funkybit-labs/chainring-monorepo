@@ -20,7 +20,7 @@ import co.chainring.integrationtests.utils.assertBalancesMessageReceived
 import co.chainring.integrationtests.utils.assertLimitsMessageReceived
 import co.chainring.integrationtests.utils.assertOrderCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertOrderUpdatedMessageReceived
-import co.chainring.integrationtests.utils.assertTradeCreatedMessageReceived
+import co.chainring.integrationtests.utils.assertTradesCreatedMessageReceived
 import co.chainring.integrationtests.utils.ofAsset
 import co.chainring.sequencer.core.notional
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -129,21 +129,22 @@ class BackToBackOrderTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertOrderCreatedMessageReceived()
-            assertTradeCreatedMessageReceived {
-                assertEquals(btcbtc2Market.id, it.trade.marketId)
-                assertEquals(OrderSide.Sell, it.trade.side)
-                assertEquals(takerStartingBaseBalance.inFundamentalUnits, it.trade.amount)
-                assertEquals(BigDecimal("0.95").setScale(18), it.trade.price)
-                assertEquals(BigInteger.ZERO, it.trade.feeAmount)
-                assertEquals(btc2.name, it.trade.feeSymbol.value)
-            }
-            assertTradeCreatedMessageReceived {
-                assertEquals(btc2Eth2Market.id, it.trade.marketId)
-                assertEquals(OrderSide.Sell, it.trade.side)
-                assertEquals((BigDecimal("0.95") * BigDecimal("0.6")).toFundamentalUnits(btc2.decimals), it.trade.amount)
-                assertEquals(BigDecimal("18.00").setScale(18), it.trade.price)
-                assertEquals(BigDecimal("0.2052").toFundamentalUnits(eth2.decimals), it.trade.feeAmount)
-                assertEquals(eth2.name, it.trade.feeSymbol.value)
+            assertTradesCreatedMessageReceived {
+                assertEquals(2, it.trades.size)
+
+                assertEquals(btcbtc2Market.id, it.trades[0].marketId)
+                assertEquals(OrderSide.Sell, it.trades[0].side)
+                assertEquals(takerStartingBaseBalance.inFundamentalUnits, it.trades[0].amount)
+                assertEquals(BigDecimal("0.95").setScale(18), it.trades[0].price)
+                assertEquals(BigInteger.ZERO, it.trades[0].feeAmount)
+                assertEquals(btc2.name, it.trades[0].feeSymbol.value)
+
+                assertEquals(btc2Eth2Market.id, it.trades[1].marketId)
+                assertEquals(OrderSide.Sell, it.trades[1].side)
+                assertEquals((BigDecimal("0.95") * BigDecimal("0.6")).toFundamentalUnits(btc2.decimals), it.trades[1].amount)
+                assertEquals(BigDecimal("18.00").setScale(18), it.trades[1].price)
+                assertEquals(BigDecimal("0.2052").toFundamentalUnits(eth2.decimals), it.trades[1].feeAmount)
+                assertEquals(eth2.name, it.trades[1].feeSymbol.value)
             }
             assertOrderUpdatedMessageReceived {
                 assertEquals(BigDecimal("0.6").toFundamentalUnits(market.baseDecimals), it.order.amount)
@@ -159,7 +160,9 @@ class BackToBackOrderTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            repeat(2) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived {
+                assertEquals(2, it.trades.size)
+            }
             repeat(2) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived(secondMarket.id)
@@ -312,21 +315,22 @@ class BackToBackOrderTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertOrderCreatedMessageReceived()
-            assertTradeCreatedMessageReceived {
-                assertEquals(btcbtc2Market.id, it.trade.marketId)
-                assertEquals(OrderSide.Sell, it.trade.side)
+            assertTradesCreatedMessageReceived {
+                assertEquals(2, it.trades.size)
+
+                assertEquals(btcbtc2Market.id, it.trades[0].marketId)
+                assertEquals(OrderSide.Sell, it.trades[0].side)
                 // assertEquals(takerStartingBaseBalance.inFundamentalUnits, it.trade.amount)
-                assertEquals(BigDecimal("1.01").setScale(18), it.trade.price)
-                assertEquals(BigInteger.ZERO, it.trade.feeAmount)
-                assertEquals(btc2.name, it.trade.feeSymbol.value)
-            }
-            assertTradeCreatedMessageReceived {
-                assertEquals(btc2Usdc2Market.id, it.trade.marketId)
-                assertEquals(OrderSide.Sell, it.trade.side)
-                assertEquals(BigDecimal("2.999999999999999999").toFundamentalUnits(btc2.decimals), it.trade.amount)
-                assertEquals(BigDecimal("66000.00").setScale(18), it.trade.price)
-                assertEquals(BigDecimal("3959.999999").toFundamentalUnits(usdc2.decimals), it.trade.feeAmount)
-                assertEquals(usdc2.name, it.trade.feeSymbol.value)
+                assertEquals(BigDecimal("1.01").setScale(18), it.trades[0].price)
+                assertEquals(BigInteger.ZERO, it.trades[0].feeAmount)
+                assertEquals(btc2.name, it.trades[0].feeSymbol.value)
+
+                assertEquals(btc2Usdc2Market.id, it.trades[1].marketId)
+                assertEquals(OrderSide.Sell, it.trades[1].side)
+                assertEquals(BigDecimal("2.999999999999999999").toFundamentalUnits(btc2.decimals), it.trades[1].amount)
+                assertEquals(BigDecimal("66000.00").setScale(18), it.trades[1].price)
+                assertEquals(BigDecimal("3959.999999").toFundamentalUnits(usdc2.decimals), it.trades[1].feeAmount)
+                assertEquals(usdc2.name, it.trades[1].feeSymbol.value)
             }
             assertOrderUpdatedMessageReceived {
                 assertEquals(BigDecimal("3.9").toFundamentalUnits(market.baseDecimals), it.order.amount)
@@ -342,7 +346,9 @@ class BackToBackOrderTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            repeat(2) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived {
+                assertEquals(2, it.trades.size)
+            }
             repeat(2) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived(secondMarket.id)
@@ -501,21 +507,22 @@ class BackToBackOrderTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertOrderCreatedMessageReceived()
-            assertTradeCreatedMessageReceived {
-                assertEquals(btc2Eth2Market.id, it.trade.marketId)
-                assertEquals(OrderSide.Buy, it.trade.side)
-                assertEquals(bridgeOrderAmount.inFundamentalUnits, it.trade.amount)
-                assertEquals(quotePrice.setScale(18), it.trade.price)
-                assertEquals(BigDecimal("0.189").toFundamentalUnits(quoteSymbol.decimals), it.trade.feeAmount)
-                assertEquals(eth2.name, it.trade.feeSymbol.value)
-            }
-            assertTradeCreatedMessageReceived {
-                assertEquals(btcbtc2Market.id, it.trade.marketId)
-                assertEquals(OrderSide.Buy, it.trade.side)
-                assertEquals(baseOrderAmount.inFundamentalUnits, it.trade.amount)
-                assertEquals(bridgePrice.setScale(18), it.trade.price)
-                assertEquals(BigInteger.ZERO, it.trade.feeAmount)
-                assertEquals(btc2.name, it.trade.feeSymbol.value)
+            assertTradesCreatedMessageReceived {
+                assertEquals(2, it.trades.size)
+
+                assertEquals(btc2Eth2Market.id, it.trades[0].marketId)
+                assertEquals(OrderSide.Buy, it.trades[0].side)
+                assertEquals(bridgeOrderAmount.inFundamentalUnits, it.trades[0].amount)
+                assertEquals(quotePrice.setScale(18), it.trades[0].price)
+                assertEquals(BigDecimal("0.189").toFundamentalUnits(quoteSymbol.decimals), it.trades[0].feeAmount)
+                assertEquals(eth2.name, it.trades[0].feeSymbol.value)
+
+                assertEquals(btcbtc2Market.id, it.trades[1].marketId)
+                assertEquals(OrderSide.Buy, it.trades[1].side)
+                assertEquals(baseOrderAmount.inFundamentalUnits, it.trades[1].amount)
+                assertEquals(bridgePrice.setScale(18), it.trades[1].price)
+                assertEquals(BigInteger.ZERO, it.trades[1].feeAmount)
+                assertEquals(btc2.name, it.trades[1].feeSymbol.value)
             }
             assertOrderUpdatedMessageReceived {
                 assertEquals(baseOrderAmount.inFundamentalUnits, it.order.amount)
@@ -531,7 +538,9 @@ class BackToBackOrderTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            repeat(2) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived {
+                assertEquals(2, it.trades.size)
+            }
             repeat(2) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived(market.id)
@@ -691,21 +700,22 @@ class BackToBackOrderTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertOrderCreatedMessageReceived()
-            assertTradeCreatedMessageReceived {
-                assertEquals(btc2Eth2Market.id, it.trade.marketId)
-                assertEquals(OrderSide.Buy, it.trade.side)
-                assertEquals(AssetAmount(btc2, firstOrderAmount).inFundamentalUnits, it.trade.amount)
-                assertEquals(quotePrice.setScale(18), it.trade.price)
-                assertEquals(BigDecimal("0.287984666627276666").toFundamentalUnits(quoteSymbol.decimals), it.trade.feeAmount)
-                assertEquals(eth2.name, it.trade.feeSymbol.value)
-            }
-            assertTradeCreatedMessageReceived {
-                assertEquals(btcbtc2Market.id, it.trade.marketId)
-                assertEquals(OrderSide.Buy, it.trade.side)
-                assertEquals(baseOrderAmount.inFundamentalUnits, it.trade.amount)
-                assertEquals(bridgePrice.setScale(18), it.trade.price)
-                assertEquals(BigInteger.ZERO, it.trade.feeAmount)
-                assertEquals(btc2.name, it.trade.feeSymbol.value)
+            assertTradesCreatedMessageReceived {
+                assertEquals(2, it.trades.size)
+
+                assertEquals(btc2Eth2Market.id, it.trades[0].marketId)
+                assertEquals(OrderSide.Buy, it.trades[0].side)
+                assertEquals(AssetAmount(btc2, firstOrderAmount).inFundamentalUnits, it.trades[0].amount)
+                assertEquals(quotePrice.setScale(18), it.trades[0].price)
+                assertEquals(BigDecimal("0.287984666627276666").toFundamentalUnits(quoteSymbol.decimals), it.trades[0].feeAmount)
+                assertEquals(eth2.name, it.trades[0].feeSymbol.value)
+
+                assertEquals(btcbtc2Market.id, it.trades[1].marketId)
+                assertEquals(OrderSide.Buy, it.trades[1].side)
+                assertEquals(baseOrderAmount.inFundamentalUnits, it.trades[1].amount)
+                assertEquals(bridgePrice.setScale(18), it.trades[1].price)
+                assertEquals(BigInteger.ZERO, it.trades[1].feeAmount)
+                assertEquals(btc2.name, it.trades[1].feeSymbol.value)
             }
             assertOrderUpdatedMessageReceived {
                 assertEquals(it.order.status, OrderStatus.Partial)
@@ -720,7 +730,9 @@ class BackToBackOrderTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            repeat(2) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived {
+                assertEquals(2, it.trades.size)
+            }
             repeat(2) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived(market.id)
