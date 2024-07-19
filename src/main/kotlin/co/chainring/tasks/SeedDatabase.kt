@@ -46,7 +46,8 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                         contractAddress = contractAddress,
                         decimals = symbol.decimals.toUByte(),
                         description = symbol.description,
-                        withdrawalFee = symbol.withdrawalFee.toFundamentalUnits(symbol.decimals)
+                        withdrawalFee = symbol.withdrawalFee.toFundamentalUnits(symbol.decimals),
+                        iconUrl = symbol.iconUrl
                     ).also {
                         it.flush()
                         println("Created symbol ${symbol.name} with guid=${it.guid.value}")
@@ -57,6 +58,7 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                         it.contractAddress = contractAddress
                         it.decimals = symbol.decimals.toUByte()
                         it.withdrawalFee = symbol.withdrawalFee.toFundamentalUnits(symbol.decimals)
+                        it.iconUrl = symbol.iconUrl
                         it.flush()
                         println("Updated symbol ${it.name} with guid=${it.guid.value}")
                     }
