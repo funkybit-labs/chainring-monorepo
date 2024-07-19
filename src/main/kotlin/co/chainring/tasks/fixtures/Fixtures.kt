@@ -30,7 +30,8 @@ data class Fixtures(
         val chainId: ChainId,
         val isNative: Boolean,
         val decimals: Int,
-        val withdrawalFee: BigDecimal
+        val withdrawalFee: BigDecimal,
+        val iconUrl: String = "https://chainring-web-icons.s3.us-east-2.amazonaws.com/symbols/${name.split(":")[0].lowercase()}.svg"
     ) {
         val id: SymbolId = SymbolId(chainId, name)
     }
