@@ -11,8 +11,8 @@ import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
-import co.chainring.apps.api.model.websocket.TradeCreated
-import co.chainring.apps.api.model.websocket.TradeUpdated
+import co.chainring.apps.api.model.websocket.TradesCreated
+import co.chainring.apps.api.model.websocket.TradesUpdated
 import co.chainring.apps.api.model.websocket.Trades
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
@@ -91,22 +91,25 @@ class Taker(
 
     override fun handleWebsocketMessage(message: Publishable) {
         when (message) {
-            is TradeCreated -> {
-                TraceRecorder.full.finishWSRecording(message.trade.orderId.value, WSSpans.tradeCreated)
-                logger.info { "$id: received trade created" }
-                pendingTrades.add(message.trade)
+            is TradesCreated -> {
+                logger.info { "$id: received trades created" }
+                message.trades.forEach { trade ->
+                    TraceRecorder.full.finishWSRecording(trade.orderId.value, WSSpans.tradeCreated)
+                }
+                pendingTrades.addAll(message.trades)
             }
 
-            is TradeUpdated -> {
-                logger.info { "$id: received trade update" }
-                val trade = message.trade
-                if (trade.settlementStatus == SettlementStatus.Pending) {
-                    TraceRecorder.full.finishWSRecording(trade.id.value, WSSpans.tradeCreated)
-                    pendingTrades.add(trade)
-                } else if (trade.settlementStatus == SettlementStatus.Completed) {
-                    TraceRecorder.full.finishWSRecording(message.trade.orderId.value, WSSpans.tradeSettled)
-                    pendingTrades.removeIf { it.id == trade.id }
-                    settledTrades.add(trade)
+            is TradesUpdated -> {
+                logger.info { "$id: received trades update" }
+                message.trades.forEach { trade ->
+                    if (trade.settlementStatus == SettlementStatus.Pending) {
+                        TraceRecorder.full.finishWSRecording(trade.id.value, WSSpans.tradeCreated)
+                        pendingTrades.add(trade)
+                    } else if (trade.settlementStatus == SettlementStatus.Completed) {
+                        TraceRecorder.full.finishWSRecording(trade.orderId.value, WSSpans.tradeSettled)
+                        pendingTrades.removeIf { it.id == trade.id }
+                        settledTrades.add(trade)
+                    }
                 }
             }
 

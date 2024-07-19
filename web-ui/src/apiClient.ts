@@ -297,6 +297,8 @@ export const TradeSchema = z.object({
   id: z.string(),
   timestamp: z.coerce.date(),
   orderId: z.string(),
+  executionRole: ExecutionRoleSchema,
+  counterOrderId: z.string(),
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),

@@ -34,6 +34,7 @@ object OrderExecutionTable : GUIDTable<ExecutionId>("order_execution", ::Executi
     val createdAt = timestamp("created_at")
     val timestamp = timestamp("timestamp").index()
     val orderGuid = reference("order_guid", OrderTable).index()
+    val counterOrderGuid = reference("counter_order_guid", OrderTable).index()
     val tradeGuid = reference("trade_guid", TradeTable).index()
     val role = customEnumeration(
         "role",
@@ -52,6 +53,8 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             id = this.trade.guid.value,
             orderId = this.orderGuid.value,
             marketId = this.marketGuid?.value ?: this.order.marketGuid.value,
+            executionRole = this.role,
+            counterOrderId = this.counterOrderGuid.value,
             timestamp = this.timestamp,
             side = this.order.side,
             amount = this.trade.amount,
@@ -67,6 +70,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
         fun create(
             timestamp: Instant,
             orderEntity: OrderEntity,
+            counterOrderEntity: OrderEntity,
             tradeEntity: TradeEntity,
             role: ExecutionRole,
             feeAmount: BigInteger,
@@ -77,6 +81,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             this.createdAt = now
             this.timestamp = timestamp
             this.order = orderEntity
+            this.counterOrderGuid = counterOrderEntity.guid
             this.trade = tradeEntity
             this.role = role
             this.feeAmount = feeAmount
@@ -102,6 +107,33 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             }.toList()
         }
 
+        fun listLatestForWallet(wallet: WalletEntity, maxSequencerResponses: Int): List<OrderExecutionEntity> {
+            val sequencerResponseNumbers = TradeTable
+                .join(OrderExecutionTable, JoinType.INNER, TradeTable.guid, OrderExecutionTable.tradeGuid)
+                .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
+                .select(TradeTable.responseSequence)
+                .withDistinct(true)
+                .where {
+                    OrderTable.walletGuid.eq(wallet.guid)
+                }
+                .orderBy(TradeTable.responseSequence, SortOrder.DESC)
+                .limit(maxSequencerResponses)
+                .mapNotNull { it[TradeTable.responseSequence] }
+
+            return OrderExecutionTable
+                .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
+                .join(TradeTable, JoinType.INNER, TradeTable.guid, OrderExecutionTable.tradeGuid)
+                .select(OrderExecutionTable.columns)
+                .where {
+                    OrderTable.walletGuid.eq(wallet.guid)
+                        .and(TradeTable.responseSequence.inList(sequencerResponseNumbers))
+                }
+                .orderBy(Pair(TradeTable.responseSequence, SortOrder.DESC), Pair(TradeTable.sequenceId, SortOrder.ASC))
+                .map {
+                    OrderExecutionEntity.wrapRow(it)
+                }.toList()
+        }
+
         fun listForWallet(wallet: WalletEntity, beforeTimestamp: Instant, limit: Int): List<OrderExecutionEntity> {
             return OrderExecutionTable
                 .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
@@ -121,6 +153,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
     var createdAt by OrderExecutionTable.createdAt
     var timestamp by OrderExecutionTable.timestamp
     var orderGuid by OrderExecutionTable.orderGuid
+    var counterOrderGuid by OrderExecutionTable.counterOrderGuid
     var order by OrderEntity referencedOn OrderExecutionTable.orderGuid
     var tradeGuid by OrderExecutionTable.tradeGuid
     var trade by TradeEntity referencedOn OrderExecutionTable.tradeGuid

@@ -17,7 +17,8 @@ export const ohlcDurationsMs: Record<OHLCDuration, number> = {
 export function mergeOHLC(
   draft: OHLC[],
   incoming: OHLC[],
-  duration: OHLCDuration
+  duration: OHLCDuration,
+  currentTimeMs: number = new Date().getTime()
 ): OHLC[] {
   // merge new data
   incoming.forEach((newItem) => {
@@ -27,22 +28,32 @@ export function mergeOHLC(
     )
     if (index == -1) {
       // fill gaps before pushing new ohlc
-      fillGaps(draft, newItem.start.getTime(), ohlcDurationsMs[duration])
+      fillGaps(
+        draft,
+        newItem.start.getTime(),
+        ohlcDurationsMs[duration],
+        currentTimeMs
+      )
 
       draft.push(newItem)
     } else {
       draft[index] = newItem
     }
   })
-  fillGaps(draft, Date.now(), ohlcDurationsMs[duration])
+  fillGaps(draft, Date.now(), ohlcDurationsMs[duration], currentTimeMs)
   return draft
 }
 
-function fillGaps(draft: OHLC[], untilTime: number, ohlcDuration: number) {
+function fillGaps(
+  draft: OHLC[],
+  untilTime: number,
+  ohlcDuration: number,
+  currentTimeMs: number
+) {
   while (
     draft.length > 0 &&
     untilTime - draft[draft.length - 1].start.getTime() > ohlcDuration &&
-    draft[draft.length - 1].start.getTime() + ohlcDuration < Date.now()
+    draft[draft.length - 1].start.getTime() + ohlcDuration < currentTimeMs
   ) {
     const lastItem = draft[draft.length - 1]
 

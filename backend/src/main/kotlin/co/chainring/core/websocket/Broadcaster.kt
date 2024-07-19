@@ -10,9 +10,9 @@ import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
-import co.chainring.apps.api.model.websocket.TradeCreated
-import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
+import co.chainring.apps.api.model.websocket.TradesCreated
+import co.chainring.apps.api.model.websocket.TradesUpdated
 import co.chainring.apps.api.wsUnauthorized
 import co.chainring.core.model.Address
 import co.chainring.core.model.db.BalanceEntity
@@ -197,10 +197,9 @@ class Broadcaster(val db: Database) {
                         SubscriptionTopic.Trades,
                         Trades(
                             OrderExecutionEntity
-                                .listForWallet(
+                                .listLatestForWallet(
                                     WalletEntity.getOrCreate(client.principal),
-                                    beforeTimestamp = Clock.System.now(),
-                                    limit = 100,
+                                    maxSequencerResponses = 100,
                                 ).map(OrderExecutionEntity::toTradeResponse),
                         ),
                     ),
@@ -304,7 +303,7 @@ class Broadcaster(val db: Database) {
                 updatePrices(notification.message)
                 SubscriptionTopic.Prices(notification.message.market, notification.message.duration)
             }
-            is Trades, is TradeCreated, is TradeUpdated -> SubscriptionTopic.Trades
+            is Trades, is TradesCreated, is TradesUpdated -> SubscriptionTopic.Trades
             is Balances -> SubscriptionTopic.Balances
             is Limits -> SubscriptionTopic.Limits(notification.message.marketId)
         }

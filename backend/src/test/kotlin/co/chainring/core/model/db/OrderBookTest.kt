@@ -1106,8 +1106,9 @@ class OrderBookTest : TestWithDb() {
                     0L,
                 )
 
-                listOf(trade.buyOrder, trade.sellOrder).forEach { orderId ->
+                listOf(Pair(trade.buyOrder, trade.sellOrder), Pair(trade.sellOrder, trade.buyOrder)).forEach { (orderId, counterOrderId) ->
                     val order = OrderEntity[orderId]
+                    val counterOrder = OrderEntity[counterOrderId]
                     assertTrue(
                         order.status == OrderStatus.Filled || order.status == OrderStatus.Partial,
                         "Order must be filled or partially filled",
@@ -1115,6 +1116,7 @@ class OrderBookTest : TestWithDb() {
                     OrderExecutionEntity.create(
                         timestamp = tradeEntity.timestamp,
                         orderEntity = order,
+                        counterOrderEntity = counterOrder,
                         tradeEntity = tradeEntity,
                         role = if (order.type == OrderType.Market) ExecutionRole.Taker else ExecutionRole.Maker,
                         feeAmount = BigInteger.ZERO,

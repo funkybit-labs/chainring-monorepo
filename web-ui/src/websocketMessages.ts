@@ -91,17 +91,17 @@ export const TradesSchema = z.object({
 })
 export type Trades = z.infer<typeof TradesSchema>
 
-export const TradeCreatedSchema = z.object({
-  type: z.literal('TradeCreated'),
-  trade: TradeSchema
+export const TradesCreatedSchema = z.object({
+  type: z.literal('TradesCreated'),
+  trades: z.array(TradeSchema)
 })
-export type TradeCreated = z.infer<typeof TradeCreatedSchema>
+export type TradesCreated = z.infer<typeof TradesCreatedSchema>
 
-export const TradeUpdatedSchema = z.object({
-  type: z.literal('TradeUpdated'),
-  trade: TradeSchema
+export const TradesUpdatedSchema = z.object({
+  type: z.literal('TradesUpdated'),
+  trades: z.array(TradeSchema)
 })
-export type TradeUpdated = z.infer<typeof TradeUpdatedSchema>
+export type TradesUpdated = z.infer<typeof TradesUpdatedSchema>
 
 export const OrdersSchema = z.object({
   type: z.literal('Orders'),
@@ -139,8 +139,8 @@ export const PublishableSchema = z.discriminatedUnion('type', [
   OrderBookSchema,
   PricesSchema,
   TradesSchema,
-  TradeCreatedSchema,
-  TradeUpdatedSchema,
+  TradesCreatedSchema,
+  TradesUpdatedSchema,
   OrdersSchema,
   BalancesSchema,
   OrderCreatedSchema,

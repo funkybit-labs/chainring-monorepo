@@ -16,12 +16,14 @@ import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
-import co.chainring.apps.api.model.websocket.TradeCreated
-import co.chainring.apps.api.model.websocket.TradeUpdated
 import co.chainring.apps.api.model.websocket.Trades
+import co.chainring.apps.api.model.websocket.TradesCreated
+import co.chainring.apps.api.model.websocket.TradesUpdated
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OrderEntity
+import co.chainring.core.model.db.OrderId
+import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.SettlementStatus
 import co.chainring.core.utils.fromFundamentalUnits
 import kotlinx.serialization.encodeToString
@@ -220,38 +222,45 @@ fun WsClient.assertOrderUpdatedMessageReceived(assertions: (OrderUpdated) -> Uni
 fun WsClient.assertTradesMessageReceived(assertions: (Trades) -> Unit = {}): Trades =
     assertMessageReceived<Trades>(SubscriptionTopic.Trades, assertions)
 
-fun WsClient.assertTradeCreatedMessageReceived(assertions: (TradeCreated) -> Unit = {}): TradeCreated =
-    assertMessageReceived<TradeCreated>(SubscriptionTopic.Trades, assertions)
+fun WsClient.assertTradesCreatedMessageReceived(assertions: (TradesCreated) -> Unit = {}): TradesCreated =
+    assertMessageReceived<TradesCreated>(SubscriptionTopic.Trades, assertions)
 
-fun WsClient.assertTradeCreatedMessageReceived(order: CreateOrderApiResponse, price: BigDecimal, amount: AssetAmount, fee: AssetAmount, settlementStatus: SettlementStatus): TradeCreated =
-    assertMessageReceived<TradeCreated>(SubscriptionTopic.Trades) { msg ->
-        assertEquals(order.orderId, msg.trade.orderId)
-        assertEquals(order.order.marketId, msg.trade.marketId)
-        assertEquals(order.order.side, msg.trade.side)
-        assertEquals(0, price.compareTo(msg.trade.price), "Price does not match Expected: $price Actual: ${msg.trade.price}")
-        assertEquals(amount.amount, msg.trade.amount.fromFundamentalUnits(amount.symbol.decimals), "Amount does not match")
-        assertEquals(fee.amount, msg.trade.feeAmount.fromFundamentalUnits(fee.symbol.decimals), "Fee does not match")
-        assertEquals(fee.symbol.name, msg.trade.feeSymbol.value)
-        assertEquals(settlementStatus, msg.trade.settlementStatus)
+data class ExpectedTrade(
+    val orderId: OrderId,
+    val marketId: MarketId,
+    val orderSide: OrderSide,
+    val price: BigDecimal,
+    val amount: AssetAmount,
+    val fee: AssetAmount,
+    val settlementStatus: SettlementStatus,
+) {
+    constructor(order: CreateOrderApiResponse, price: BigDecimal, amount: AssetAmount, fee: AssetAmount, settlementStatus: SettlementStatus) :
+        this(order.orderId, order.order.marketId, order.order.side, price, amount, fee, settlementStatus)
+
+    constructor(order: UpdateOrderApiResponse, price: BigDecimal, amount: AssetAmount, fee: AssetAmount, settlementStatus: SettlementStatus) :
+        this(order.order.orderId, order.order.marketId, order.order.side, price, amount, fee, settlementStatus)
+}
+
+fun WsClient.assertTradesCreatedMessageReceived(expectedTrades: List<ExpectedTrade>): TradesCreated =
+    assertMessageReceived<TradesCreated>(SubscriptionTopic.Trades) { msg ->
+        assertEquals(expectedTrades.size, msg.trades.size)
+        expectedTrades.zip(msg.trades).forEach { (expectedTrade, trade) ->
+            assertEquals(expectedTrade.orderId, trade.orderId)
+            assertEquals(expectedTrade.marketId, trade.marketId)
+            assertEquals(expectedTrade.orderSide, trade.side)
+            assertEquals(0, expectedTrade.price.compareTo(trade.price), "Price does not match Expected: ${expectedTrade.price} Actual: ${trade.price}")
+            assertEquals(expectedTrade.amount.amount, trade.amount.fromFundamentalUnits(expectedTrade.amount.symbol.decimals), "Amount does not match")
+            assertEquals(expectedTrade.fee.amount, trade.feeAmount.fromFundamentalUnits(expectedTrade.fee.symbol.decimals), "Fee does not match")
+            assertEquals(expectedTrade.fee.symbol.name, trade.feeSymbol.value)
+            assertEquals(expectedTrade.settlementStatus, trade.settlementStatus)
+        }
     }
 
-fun WsClient.assertTradeCreatedMessageReceived(order: UpdateOrderApiResponse, price: BigDecimal, amount: AssetAmount, fee: AssetAmount, settlementStatus: SettlementStatus): TradeCreated =
-    assertMessageReceived<TradeCreated>(SubscriptionTopic.Trades) { msg ->
-        assertEquals(order.order.orderId, msg.trade.orderId)
-        assertEquals(order.order.marketId, msg.trade.marketId)
-        assertEquals(order.order.side, msg.trade.side)
-        assertEquals(0, price.compareTo(msg.trade.price), "Price does not match")
-        assertEquals(amount.amount, msg.trade.amount.fromFundamentalUnits(amount.symbol.decimals), "Amount does not match")
-        assertEquals(fee.amount, msg.trade.feeAmount.fromFundamentalUnits(fee.symbol.decimals), "Fee does not match")
-        assertEquals(fee.symbol.name, msg.trade.feeSymbol.value)
-        assertEquals(settlementStatus, msg.trade.settlementStatus)
-    }
+fun WsClient.assertTradesUpdatedMessageReceived(assertions: (TradesUpdated) -> Unit = {}): TradesUpdated =
+    assertMessageReceived<TradesUpdated>(SubscriptionTopic.Trades, assertions)
 
-fun WsClient.assertTradeUpdatedMessageReceived(assertions: (TradeUpdated) -> Unit = {}): TradeUpdated =
-    assertMessageReceived<TradeUpdated>(SubscriptionTopic.Trades, assertions)
-
-fun assertContainsTradeUpdatedMessage(messages: List<OutgoingWSMessage.Publish>, assertions: (TradeUpdated) -> Unit = {}) =
-    assertContainsMessage<TradeUpdated>(messages, SubscriptionTopic.Trades, assertions)
+fun assertContainsTradesUpdatedMessage(messages: List<OutgoingWSMessage.Publish>, assertions: (TradesUpdated) -> Unit = {}) =
+    assertContainsMessage<TradesUpdated>(messages, SubscriptionTopic.Trades, assertions)
 
 fun WsClient.assertBalancesMessageReceived(assertions: (Balances) -> Unit = {}): Balances =
     assertMessageReceived<Balances>(SubscriptionTopic.Balances, assertions)

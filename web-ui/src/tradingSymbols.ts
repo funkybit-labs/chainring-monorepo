@@ -1,9 +1,33 @@
 import TradingSymbol from 'tradingSymbol'
+import { ConfigurationApiResponse } from 'apiClient'
 
 export default class TradingSymbols {
   native: TradingSymbol[]
   erc20: TradingSymbol[]
   private symbolByName: Map<string, TradingSymbol>
+
+  static fromConfig(config: ConfigurationApiResponse): TradingSymbols {
+    return new TradingSymbols(
+      config.chains
+        .map((chain) =>
+          chain.symbols.map(
+            (symbol) =>
+              new TradingSymbol(
+                symbol.name,
+                chain.name,
+                symbol.description,
+                symbol.contractAddress,
+                symbol.decimals,
+                chain.id,
+                symbol.faucetSupported,
+                symbol.withdrawalFee,
+                symbol.iconUrl
+              )
+          )
+        )
+        .reduce((accumulator, value) => accumulator.concat(value), [])
+    )
+  }
 
   constructor(symbols: TradingSymbol[]) {
     this.native = symbols.filter((s) => s.contractAddress === null)!

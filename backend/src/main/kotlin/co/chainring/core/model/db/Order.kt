@@ -421,7 +421,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             val weightedAveragePriceCol = TradeTable.price.times(TradeTable.amount).sum().div(TradeTable.amount.sum())
 
             val (lastTradePrice, prevTradePrice) = OrderExecutionTable
-                .leftJoin(OrderTable)
+                .join(OrderTable, JoinType.LEFT, OrderExecutionTable.orderGuid, OrderTable.guid)
                 .leftJoin(TradeTable)
                 .select(weightedAveragePriceCol)
                 .where { OrderTable.marketGuid.eq(market.guid) }

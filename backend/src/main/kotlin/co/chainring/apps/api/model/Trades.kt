@@ -1,6 +1,7 @@
 package co.chainring.apps.api.model
 
 import co.chainring.core.model.Symbol
+import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
@@ -15,6 +16,8 @@ data class Trade(
     val timestamp: Instant,
     val orderId: OrderId,
     val marketId: MarketId,
+    val executionRole: ExecutionRole,
+    val counterOrderId: OrderId,
     val side: OrderSide,
     val amount: BigIntegerJson,
     val price: BigDecimalJson,

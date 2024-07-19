@@ -22,7 +22,7 @@ import co.chainring.integrationtests.utils.assertBalancesMessageReceived
 import co.chainring.integrationtests.utils.assertLimitsMessageReceived
 import co.chainring.integrationtests.utils.assertOrderCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertOrderUpdatedMessageReceived
-import co.chainring.integrationtests.utils.assertTradeCreatedMessageReceived
+import co.chainring.integrationtests.utils.assertTradesCreatedMessageReceived
 import co.chainring.integrationtests.utils.ofAsset
 import co.chainring.integrationtests.utils.sum
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -112,7 +112,9 @@ class OrderPercentageSwapTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertOrderCreatedMessageReceived()
-            repeat(4) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived { msg ->
+                assertEquals(4, msg.trades.size)
+            }
             assertOrderUpdatedMessageReceived {
                 assertEquals(BigDecimal("0.1").toFundamentalUnits(market.baseDecimals), it.order.amount)
             }
@@ -126,7 +128,9 @@ class OrderPercentageSwapTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            repeat(4) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived { msg ->
+                assertEquals(4, msg.trades.size)
+            }
             repeat(4) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived(market, base = BigDecimal("0.1"), quote = BigDecimal("10341.50"))
@@ -251,14 +255,18 @@ class OrderPercentageSwapTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertOrderCreatedMessageReceived()
-            repeat(4) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived { msg ->
+                assertEquals(4, msg.trades.size)
+            }
             assertOrderUpdatedMessageReceived()
             assertBalancesMessageReceived()
             assertLimitsMessageReceived(market, base = BigDecimal("0.1"), quote = BigDecimal("0"))
         }
 
         makerWsClient.apply {
-            repeat(4) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived { msg ->
+                assertEquals(4, msg.trades.size)
+            }
             repeat(4) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived(market, base = BigDecimal("0.06"), quote = BigDecimal("6781.5"))
@@ -380,14 +388,18 @@ class OrderPercentageSwapTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertOrderCreatedMessageReceived()
-            repeat(limitOrders.size) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived { msg ->
+                assertEquals(limitOrders.size, msg.trades.size)
+            }
             assertOrderUpdatedMessageReceived()
             assertBalancesMessageReceived()
             assertLimitsMessageReceived(market.id)
         }
 
         makerWsClient.apply {
-            repeat(limitOrders.size) { assertTradeCreatedMessageReceived() }
+            assertTradesCreatedMessageReceived { msg ->
+                assertEquals(limitOrders.size, msg.trades.size)
+            }
             repeat(limitOrders.size) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived(market.id)
