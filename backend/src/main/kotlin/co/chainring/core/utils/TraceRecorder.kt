@@ -35,6 +35,10 @@ interface TraceRecorder {
         CreateMarket,
         ListMarkets,
         PatchMarket,
+        ListAdmins,
+        AddAdmin,
+        RemoveAdmin,
+        SetFeeRates,
     }
 
     data class Trace(

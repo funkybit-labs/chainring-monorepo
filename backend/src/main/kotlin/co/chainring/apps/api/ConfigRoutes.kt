@@ -7,6 +7,7 @@ import co.chainring.apps.api.model.Chain
 import co.chainring.apps.api.model.ConfigurationApiResponse
 import co.chainring.apps.api.model.DeployedContract
 import co.chainring.apps.api.model.Market
+import co.chainring.apps.api.model.Role
 import co.chainring.apps.api.model.SymbolInfo
 import co.chainring.core.model.Address
 import co.chainring.core.model.FeeRate
@@ -106,7 +107,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                         ),
                     ),
             )
-        } bindContract Method.GET to { _ ->
+        } bindContract Method.GET to { request ->
             transaction {
                 Response(Status.OK).with(
                     responseBody of
@@ -170,6 +171,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                 Status.OK,
                 responseBody to
                     AccountConfigurationApiResponse(
+                        role = Role.User,
                         newSymbols = listOf(
                             SymbolInfo(
                                 name = "RING",
@@ -188,6 +190,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                 Response(Status.OK).with(
                     responseBody of
                         AccountConfigurationApiResponse(
+                            role = if (WalletEntity.findByAddress(request.principal)?.isAdmin == true) Role.Admin else Role.User,
                             newSymbols = SymbolEntity.symbolsToAddToWallet(request.principal).map {
                                 SymbolInfo(
                                     it.name,

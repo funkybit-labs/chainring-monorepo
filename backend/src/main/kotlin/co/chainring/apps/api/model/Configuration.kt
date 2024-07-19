@@ -14,9 +14,15 @@ data class ConfigurationApiResponse(
     val feeRates: FeeRates,
 )
 
+enum class Role {
+    User,
+    Admin,
+}
+
 @Serializable
 data class AccountConfigurationApiResponse(
     val newSymbols: List<SymbolInfo>,
+    val role: Role,
 )
 
 @Serializable

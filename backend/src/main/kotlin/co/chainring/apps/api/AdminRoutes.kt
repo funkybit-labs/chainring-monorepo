@@ -7,12 +7,15 @@ import co.chainring.apps.api.model.BigDecimalJson
 import co.chainring.apps.api.model.BigIntegerJson
 import co.chainring.apps.api.model.RequestProcessingError
 import co.chainring.core.model.Address
+import co.chainring.core.model.FeeRate
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.WithdrawalFee
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.SymbolEntity
+import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.utils.fromFundamentalUnits
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -349,6 +352,99 @@ class AdminRoutes(
         }
     }
 
+    private val listAdmins: ContractRoute = run {
+        val responseBody = Body.auto<List<Address>>().toLens()
+
+        "admin/admin" meta {
+            operationId = "list-admins"
+            summary = "List Admins"
+            security = signedTokenSecurity.and(adminSecurity)
+            tags += listOf(Tag("admin"))
+            returning(
+                Status.OK,
+                responseBody to listOf(
+                    Address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
+                ),
+            )
+        } bindContract Method.GET to { _ ->
+            Response(Status.OK).with(
+                responseBody of transaction {
+                    WalletEntity.getAdminAddresses()
+                },
+            )
+        }
+    }
+
+    private val adminAddressPathParam = Path.map(::Address, Address::value).of("adminAddress", "Admin Address")
+    private val addAdmin: ContractRoute = run {
+        "admin/admin" / adminAddressPathParam meta {
+            operationId = "add-admin"
+            summary = "Add Admin"
+            security = signedTokenSecurity.and(adminSecurity)
+            tags += listOf(Tag("admin"))
+            returning(Status.CREATED)
+        } bindContract Method.PUT to { address ->
+            { _ ->
+                transaction {
+                    WalletEntity.getOrCreate(address).isAdmin = true
+                }
+                Response(Status.CREATED)
+            }
+        }
+    }
+
+    private val removeAdmin: ContractRoute = run {
+        "admin/admin" / adminAddressPathParam meta {
+            operationId = "remove-admin"
+            summary = "Remove Admin"
+            security = signedTokenSecurity.and(adminSecurity)
+            tags += listOf(Tag("admin"))
+            returning(Status.NO_CONTENT)
+        } bindContract Method.DELETE to { address ->
+            { _ ->
+                transaction {
+                    WalletEntity.findByAddress(address)?.let { it.isAdmin = false }
+                }
+                Response(Status.NO_CONTENT)
+            }
+        }
+    }
+
+    private val setFeeRates: ContractRoute = run {
+        val requestBody = Body.auto<FeeRates>().toLens()
+        "admin/fee-rates" meta {
+            operationId = "set-fee-rates"
+            summary = "Set Fee Rates"
+            security = signedTokenSecurity.and(adminSecurity)
+            tags += listOf(Tag("admin"))
+            receiving(requestBody to FeeRates(FeeRate(100), FeeRate(200)))
+            returning(Status.CREATED)
+        } bindContract Method.POST to { request ->
+            val payload = requestBody(request)
+            runBlocking {
+                val(origFeeRates, feeRates) = transaction {
+                    Pair(
+                        FeeRates.fetch(),
+                        FeeRates(payload.maker, payload.taker).also { it.persist() },
+                    )
+                }
+                sequencerClient.setFeeRates(feeRates).let { response ->
+                    if (response.hasError()) {
+                        try {
+                            transaction {
+                                origFeeRates.persist()
+                            }
+                        } catch (e: Exception) {
+                            throw RequestProcessingError("Unable to set fee rates in sequencer: ${response.error}, and could not revert changes in DB: ${e.message}")
+                        }
+                        throw RequestProcessingError("Unable to set fee rates in sequencer: ${response.error}")
+                    }
+                }
+            }
+            Response(Status.CREATED)
+        }
+    }
+
     val routes = listOf(
         createSymbol,
         listSymbols,
@@ -356,5 +452,9 @@ class AdminRoutes(
         createMarket,
         listMarkets,
         patchMarket,
+        listAdmins,
+        addAdmin,
+        removeAdmin,
+        setFeeRates,
     )
 }
