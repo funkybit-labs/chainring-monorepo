@@ -41,30 +41,24 @@ describe('PricesUtils', () => {
     }
   }
 
-  it.skip('should work as a no-op', () => {
-    expect(
-      mergeOHLC(
-        [ohlc(60000, 'P1M', 2, 4, 1, 3)],
-        [ohlc(12000, 'P1M', 2, 4, 1, 3)],
-        'P1M'
-      )
-    ).toStrictEqual([ohlc(1000, 'P1M', 2, 4, 1, 3)])
-  })
-  it.skip('should replace ohlc matched by start', () => {
+  it('should replace ohlc matched by start', () => {
     expect(
       mergeOHLC(
         [ohlc(60000, 'P1M', 2, 4, 1, 3)],
         [ohlc(60000, 'P1M', 2, 5, 1, 5)],
-        'P1M'
+        'P1M',
+        60000
       )
     ).toStrictEqual([ohlc(60000, 'P1M', 2, 5, 1, 5)])
   })
-  it.skip('should replace and add ohlc matched by start', () => {
+
+  it('should replace and add ohlc matched by start', () => {
     expect(
       mergeOHLC(
         [ohlc(60000, 'P1M', 2, 4, 1, 3), ohlc(120000, 'P1M', 2, 4, 1, 3)],
         [ohlc(120000, 'P1M', 2, 5, 1, 5), ohlc(180000, 'P1M', 3, 3, 3, 3)],
-        'P1M'
+        'P1M',
+        180000
       )
     ).toStrictEqual([
       ohlc(60000, 'P1M', 2, 4, 1, 3),
@@ -72,19 +66,22 @@ describe('PricesUtils', () => {
       ohlc(180000, 'P1M', 3, 3, 3, 3)
     ])
   })
-  it.skip('should fill-in any gaps', () => {
+
+  it('should fill-in any gaps', () => {
     expect(
       mergeOHLC(
         [ohlc(60000, 'P1M', 2, 4, 1, 3), ohlc(120000, 'P1M', 3, 5, 0, 4)],
         [ohlc(300000, 'P1M', 2, 5, 1, 5)],
-        'P1M'
+        'P1M',
+        360001
       )
     ).toStrictEqual([
       ohlc(60000, 'P1M', 2, 4, 1, 3),
       ohlc(120000, 'P1M', 3, 5, 0, 4),
       ohlc(180000, 'P1M', 4, 4, 4, 4),
       ohlc(240000, 'P1M', 4, 4, 4, 4),
-      ohlc(300000, 'P1M', 2, 5, 1, 5)
+      ohlc(300000, 'P1M', 2, 5, 1, 5),
+      ohlc(360000, 'P1M', 5, 5, 5, 5)
     ])
   })
 })
