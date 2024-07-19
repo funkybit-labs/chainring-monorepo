@@ -101,6 +101,7 @@ export default function OrdersAndTradesWidget({
                       orderTradeGroup.id === updatedOrderTradesGroup.id
                   )
                   if (index !== -1) {
+                    updatedOrderTradesGroup.expanded = draft[index].expanded
                     draft[index] = updatedOrderTradesGroup
                   }
                 }
