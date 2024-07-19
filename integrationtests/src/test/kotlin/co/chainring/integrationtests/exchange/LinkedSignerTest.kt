@@ -54,6 +54,7 @@ class LinkedSignerTest : OrderBaseTest() {
         assertTrue(apiClient.tryListWithdrawals().isRight())
         // set a linked client in API but not on chain yet so backend/API does not know about it
         apiClient.linkedSignerEcKeyPair = linkedSignerKeyPair
+        apiClient.switchChain(config.chains[0].id)
         // the api call should fail with a 401, since auth token signed with key not linked yet
         assertEquals(apiClient.tryListWithdrawals().leftOrNull()?.httpCode, 401)
 
