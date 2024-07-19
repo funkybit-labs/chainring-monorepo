@@ -78,6 +78,7 @@ dependencies {
 
     implementation("org.telegram:telegrambots-longpolling:7.2.1")
     implementation("org.telegram:telegrambots-client:7.2.1")
+    implementation("aws.sdk.kotlin:s3:1.2.51")
 }
 
 tasks.test {

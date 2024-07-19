@@ -111,11 +111,6 @@ class TelegramMiniAppApiTest {
                         achieved = false,
                     ),
                     GetUserApiResponse.Goal(
-                        TelegramMiniAppGoal.Id.DiscordSubscription,
-                        reward = "200".crPoints(),
-                        achieved = false,
-                    ),
-                    GetUserApiResponse.Goal(
                         TelegramMiniAppGoal.Id.MediumSubscription,
                         reward = "200".crPoints(),
                         achieved = false,
@@ -158,11 +153,6 @@ class TelegramMiniAppApiTest {
                             TelegramMiniAppGoal.Id.GithubSubscription,
                             reward = "200".crPoints(),
                             achieved = true,
-                        ),
-                        GetUserApiResponse.Goal(
-                            TelegramMiniAppGoal.Id.DiscordSubscription,
-                            reward = "200".crPoints(),
-                            achieved = false,
                         ),
                         GetUserApiResponse.Goal(
                             TelegramMiniAppGoal.Id.MediumSubscription,

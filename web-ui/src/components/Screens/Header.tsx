@@ -9,17 +9,21 @@ import Menu from 'assets/Menu.svg'
 import { FaucetModal } from 'components/Screens/HomeScreen/faucet/FaucetModal'
 import faucetIcon from 'assets/faucet.svg'
 import { useValidChain } from 'hooks/useValidChain'
+import { useQuery } from '@tanstack/react-query'
+import { apiClient } from 'apiClient'
 
 export type Tab = 'Swap' | 'Limit' | 'Dashboard'
 
 export function Header({
   initialTab,
   markets,
-  onTabChange
+  onTabChange,
+  onShowAdmin
 }: {
   initialTab: Tab
   markets: Markets
   onTabChange: (newTab: Tab) => void
+  onShowAdmin: () => void
 }) {
   const { open: openWalletConnectModal } = useWeb3Modal()
   const account = useAccount()
@@ -42,6 +46,7 @@ export function Header({
         setShowMenu(false)
       }
     }
+
     if (showMenu) {
       document.addEventListener('keydown', escapeHandler, false)
     }
@@ -49,6 +54,11 @@ export function Header({
       document.removeEventListener('keydown', escapeHandler, false)
     }
   }, [showMenu])
+
+  const accountConfigQuery = useQuery({
+    queryKey: ['accountConfiguration'],
+    queryFn: apiClient.getAccountConfiguration
+  })
 
   const validChain = useValidChain()
 
@@ -129,15 +139,26 @@ export function Header({
     window.scrollBy({ top: -80, behavior: 'smooth' })
     setShowMenu(false)
   }
+  const isAdmin = useMemo(() => {
+    return accountConfigQuery.data && accountConfigQuery.data.role === 'Admin'
+  }, [accountConfigQuery.data])
 
   return (
     <>
       <div className="fixed z-50 grid h-20 w-full grid-cols-[max-content_1fr_max-content] place-items-center bg-darkBluishGray10 p-0 text-sm text-darkBluishGray1">
         <span className="justify-self-start">
           <img
-            className="m-6 hidden h-10 narrow:inline-block"
+            className={classNames(
+              'm-6 hidden h-10 narrow:inline-block',
+              isAdmin && 'cursor-pointer'
+            )}
             src={logo}
             alt="ChainRing"
+            onClick={() => {
+              if (isAdmin) {
+                onShowAdmin()
+              }
+            }}
           />
           <div className="m-4 inline-block cursor-pointer rounded-sm bg-darkBluishGray7 p-2 narrow:hidden">
             <img

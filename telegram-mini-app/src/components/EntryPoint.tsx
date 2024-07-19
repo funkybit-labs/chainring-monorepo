@@ -124,7 +124,7 @@ export default function EntryPoint() {
     }
   } else if (userQuery.isError) {
     return (
-      <div className="flex h-screen items-center justify-center text-white">
+      <div className="flex h-screen items-center justify-center bg-darkBluishGray8 text-white">
         Something went wrong, please try again later
       </div>
     )

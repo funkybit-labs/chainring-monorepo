@@ -48,6 +48,28 @@ const SymbolSchema = z.object({
 
 export type SymbolType = z.infer<typeof SymbolSchema>
 
+const AdminSymbolSchema = z.object({
+  chainId: z.number(),
+  name: z.string(),
+  description: z.string(),
+  contractAddress: AddressSchema.nullable(),
+  decimals: z.number(),
+  iconUrl: z.string(),
+  withdrawalFee: z.coerce.bigint(),
+  addToWallets: z.boolean()
+})
+
+export type AdminSymbol = z.infer<typeof AdminSymbolSchema>
+
+const AdminMarketSchema = z.object({
+  id: z.string(),
+  tickSize: decimal(),
+  lastPrice: decimal(),
+  minFee: z.coerce.bigint()
+})
+
+export type AdminMarket = z.infer<typeof AdminMarketSchema>
+
 const ChainSchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -87,7 +109,8 @@ export type ConfigurationApiResponse = z.infer<
 >
 
 export const AccountConfigurationApiResponseSchema = z.object({
-  newSymbols: z.array(SymbolSchema)
+  newSymbols: z.array(SymbolSchema),
+  role: z.enum(['User', 'Admin'])
 })
 export type AccountConfigurationApiResponse = z.infer<
   typeof AccountConfigurationApiResponseSchema
@@ -551,6 +574,193 @@ export const apiClient = new Zodios(apiBaseUrl, [
       }
     ],
     response: z.any(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'post',
+    path: '/v1/admin/fee-rates',
+    alias: 'setFeeRates',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: FeeRatesSchema
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'get',
+    path: '/v1/admin/admin',
+    alias: 'listAdmins',
+    parameters: [],
+    response: z.array(AddressSchema),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'put',
+    path: '/v1/admin/admin/:address',
+    alias: 'addAdmin',
+    parameters: [
+      {
+        name: 'address',
+        type: 'Path',
+        schema: AddressSchema
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'delete',
+    path: '/v1/admin/admin/:address',
+    alias: 'removeAdmin',
+    parameters: [
+      {
+        name: 'address',
+        type: 'Path',
+        schema: AddressSchema
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'get',
+    path: '/v1/admin/symbol',
+    alias: 'listSymbols',
+    parameters: [],
+    response: z.array(AdminSymbolSchema),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'post',
+    path: '/v1/admin/symbol',
+    alias: 'addSymbol',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: AdminSymbolSchema
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'patch',
+    path: '/v1/admin/symbol/:symbol',
+    alias: 'patchSymbol',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: AdminSymbolSchema
+      },
+      {
+        name: 'symbol',
+        type: 'Path',
+        schema: z.string()
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'get',
+    path: '/v1/admin/market',
+    alias: 'listMarkets',
+    parameters: [],
+    response: z.array(AdminMarketSchema),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'post',
+    path: '/v1/admin/market',
+    alias: 'addMarket',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: AdminMarketSchema
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'patch',
+    path: '/v1/admin/market/:base/:quote',
+    alias: 'patchMarket',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: AdminMarketSchema
+      },
+      {
+        name: 'base',
+        type: 'Path',
+        schema: z.string()
+      },
+      {
+        name: 'quote',
+        type: 'Path',
+        schema: z.string()
+      }
+    ],
+    response: z.undefined(),
     errors: [
       {
         status: 'default',
