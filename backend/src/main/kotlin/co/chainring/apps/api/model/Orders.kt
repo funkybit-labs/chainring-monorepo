@@ -110,25 +110,6 @@ data class CreateOrderApiResponse(
 )
 
 @Serializable
-data class UpdateOrderApiRequest(
-    val orderId: OrderId,
-    val marketId: MarketId,
-    val side: OrderSide,
-    val amount: BigIntegerJson,
-    val price: BigDecimalJson,
-    val nonce: String,
-    val signature: EvmSignature,
-    val verifyingChainId: ChainId,
-)
-
-@Serializable
-data class UpdateOrderApiResponse(
-    val requestStatus: RequestStatus,
-    val error: ApiError?,
-    val order: UpdateOrderApiRequest,
-)
-
-@Serializable
 enum class RequestStatus {
     Accepted,
     Rejected,
@@ -230,7 +211,6 @@ sealed class Order {
 data class BatchOrdersApiRequest(
     val marketId: MarketId,
     val createOrders: List<CreateOrderApiRequest>,
-    val updateOrders: List<UpdateOrderApiRequest>,
     val cancelOrders: List<CancelOrderApiRequest>,
 )
 
@@ -242,6 +222,5 @@ data class OrdersApiResponse(
 @Serializable
 data class BatchOrdersApiResponse(
     val createdOrders: List<CreateOrderApiResponse>,
-    val updatedOrders: List<UpdateOrderApiResponse>,
     val canceledOrders: List<CancelOrderApiResponse>,
 )

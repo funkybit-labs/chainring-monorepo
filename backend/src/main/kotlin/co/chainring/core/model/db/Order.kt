@@ -34,9 +34,7 @@ import org.jetbrains.exposed.sql.decimalLiteral
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
 import org.jetbrains.exposed.sql.sum
-import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.RoundingMode
@@ -110,14 +108,6 @@ data class CreateOrderAssignment(
     val signature: EvmSignature,
     val sequencerOrderId: SequencerOrderId,
     val sequencerTimeNs: BigInteger,
-)
-
-data class UpdateOrderAssignment(
-    val orderId: OrderId,
-    val amount: BigInteger,
-    val levelIx: Int?,
-    val nonce: BigInteger,
-    val signature: EvmSignature,
 )
 
 object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
@@ -251,8 +241,8 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
     }
 
     companion object : EntityClass<OrderId, OrderEntity>(OrderTable) {
-        fun batchUpdate(market: MarketEntity, wallet: WalletEntity, createAssignments: List<CreateOrderAssignment>, updateAssignments: List<UpdateOrderAssignment>, backToBackMarket: MarketEntity? = null) {
-            if (createAssignments.isEmpty() && updateAssignments.isEmpty()) {
+        fun batchCreate(market: MarketEntity, wallet: WalletEntity, createAssignments: List<CreateOrderAssignment>, backToBackMarket: MarketEntity? = null) {
+            if (createAssignments.isEmpty()) {
                 return
             }
             val now = Clock.System.now()
@@ -273,20 +263,6 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 this[OrderTable.sequencerOrderId] = assignment.sequencerOrderId.value
                 this[OrderTable.sequencerTimeNs] = assignment.sequencerTimeNs.toBigDecimal()
                 this[OrderTable.secondMarketGuid] = backToBackMarket?.guid
-            }
-            if (updateAssignments.isNotEmpty()) {
-                BatchUpdateStatement(OrderTable).apply {
-                    updateAssignments.forEach { assignment ->
-                        addBatch(EntityID(assignment.orderId, OrderTable))
-                        this[OrderTable.amount] = assignment.amount.toBigDecimal()
-                        this[OrderTable.price] = assignment.levelIx?.let { market.tickSize.multiply(it.toBigDecimal()) }
-                        this[OrderTable.nonce] = assignment.nonce.toByteArrayNoSign().toHex(false)
-                        this[OrderTable.signature] = assignment.signature.value
-                        this[BalanceTable.updatedAt] = now
-                        this[BalanceTable.updatedBy] = "system"
-                    }
-                    execute(TransactionManager.current())
-                }
             }
         }
 

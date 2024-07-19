@@ -88,7 +88,6 @@ class OrderPercentageSwapTest : OrderBaseTest() {
                         ),
                     )
                 },
-                updateOrders = listOf(),
                 cancelOrders = listOf(),
             ),
         )
@@ -230,7 +229,6 @@ class OrderPercentageSwapTest : OrderBaseTest() {
                         ),
                     )
                 },
-                updateOrders = listOf(),
                 cancelOrders = listOf(),
             ),
         )
@@ -368,7 +366,6 @@ class OrderPercentageSwapTest : OrderBaseTest() {
                         ),
                     )
                 },
-                updateOrders = listOf(),
                 cancelOrders = listOf(),
             ),
         )

@@ -411,92 +411,6 @@ class TestMarket {
         addOrder(6L, Order.Type.MarketBuy, "1", "0", OrderDisposition.Rejected)
     }
 
-    @Test
-    fun testUpdateOrderCrossingLimitSellOrders() {
-        validateBidAndOffer(-1, -1, -1, -1)
-
-        addOrder(1L, Order.Type.LimitBuy, "5", "17.300")
-        addOrder(2L, Order.Type.LimitBuy, "5", "17.500")
-        addOrder(3L, Order.Type.LimitSell, "5", "17.550")
-        addOrder(4L, Order.Type.LimitSell, "5", "17.700")
-        validateBidAndOffer(
-            bestBidIx = "17.500".levelIx(market),
-            minBidIx = "17.300".levelIx(market),
-            bestOfferIx = "17.550".levelIx(market),
-            maxOfferIx = "17.700".levelIx(market),
-        )
-
-        // update limit sell that crosses - fully filled
-        updateOrder(3L, Order.Type.LimitSell, "5", "17.450", OrderDisposition.Filled, counterOrderGuid = 2L)
-        validateBidAndOffer(
-            bestBidIx = "17.300".levelIx(market),
-            minBidIx = "17.300".levelIx(market),
-            bestOfferIx = "17.700".levelIx(market),
-            maxOfferIx = "17.700".levelIx(market),
-        )
-
-        // add back similar orders
-        addOrder(5L, Order.Type.LimitBuy, "5", "17.500")
-        addOrder(6L, Order.Type.LimitSell, "5", "17.550")
-        validateBidAndOffer(
-            bestBidIx = "17.500".levelIx(market),
-            minBidIx = "17.300".levelIx(market),
-            bestOfferIx = "17.550".levelIx(market),
-            maxOfferIx = "17.700".levelIx(market),
-        )
-        // update limit sell that crosses - partially filled
-        updateOrder(6L, Order.Type.LimitSell, "7", "17.450", OrderDisposition.PartiallyFilled, counterOrderGuid = 5L)
-        validateBidAndOffer(
-            bestBidIx = "17.300".levelIx(market),
-            minBidIx = "17.300".levelIx(market),
-            bestOfferIx = "17.450".levelIx(market),
-            maxOfferIx = "17.700".levelIx(market),
-        )
-    }
-
-    @Test
-    fun testUpdateOrderCrossingLimitBuyOrders() {
-        validateBidAndOffer(-1, -1, -1, -1)
-
-        addOrder(1L, Order.Type.LimitBuy, "5", "17.300")
-        addOrder(2L, Order.Type.LimitBuy, "5", "17.500")
-        addOrder(3L, Order.Type.LimitSell, "5", "17.550")
-        addOrder(4L, Order.Type.LimitSell, "5", "17.700")
-        validateBidAndOffer(
-            bestBidIx = "17.500".levelIx(market),
-            minBidIx = "17.300".levelIx(market),
-            bestOfferIx = "17.550".levelIx(market),
-            maxOfferIx = "17.700".levelIx(market),
-        )
-
-        // update limit buy that crosses - fully filled
-        updateOrder(2L, Order.Type.LimitBuy, "5", "17.550", OrderDisposition.Filled, counterOrderGuid = 3L)
-        validateBidAndOffer(
-            bestBidIx = "17.300".levelIx(market),
-            minBidIx = "17.300".levelIx(market),
-            bestOfferIx = "17.700".levelIx(market),
-            maxOfferIx = "17.700".levelIx(market),
-        )
-
-        // add back similar orders
-        addOrder(5L, Order.Type.LimitBuy, "5", "17.500")
-        addOrder(6L, Order.Type.LimitSell, "5", "17.550")
-        validateBidAndOffer(
-            bestBidIx = "17.500".levelIx(market),
-            minBidIx = "17.300".levelIx(market),
-            bestOfferIx = "17.550".levelIx(market),
-            maxOfferIx = "17.700".levelIx(market),
-        )
-        // update limit sell that crosses - partially filled
-        updateOrder(5L, Order.Type.LimitBuy, "7", "17.550", OrderDisposition.PartiallyFilled, counterOrderGuid = 6L)
-        validateBidAndOffer(
-            bestBidIx = "17.550".levelIx(market),
-            minBidIx = "17.300".levelIx(market),
-            bestOfferIx = "17.700".levelIx(market),
-            maxOfferIx = "17.700".levelIx(market),
-        )
-    }
-
     private fun addOrder(guid: Long, orderType: Order.Type, amount: String, price: String, expectedDisposition: OrderDisposition = OrderDisposition.Accepted, counterOrderGuid: Long? = null) {
         val response = market.applyOrderBatch(
             orderBatch {
@@ -691,40 +605,6 @@ class TestMarket {
         addOrder(8L, Order.Type.LimitBuy, amount, "35", expectedDisposition = OrderDisposition.Accepted)
         assertNotNull(market.levels.get("35".levelIx(market)))
         assertNull(market.levels.get("36".levelIx(market)))
-        updateOrder(8L, Order.Type.LimitBuy, amount, "36", expectedDisposition = OrderDisposition.Accepted)
-        assertNull(market.levels.get("35".levelIx(market)))
-        assertNotNull(market.levels.get("36".levelIx(market)))
-    }
-
-    private fun updateOrder(guid: Long, orderType: Order.Type, amount: String, price: String, expectedDisposition: OrderDisposition = OrderDisposition.Accepted, counterOrderGuid: Long? = null) {
-        val response = market.applyOrderBatch(
-            orderBatch {
-                this.marketId = market.id.value
-                this.wallet = 1L
-                this.ordersToChange.add(
-                    order {
-                        this.guid = guid
-                        this.type = orderType
-                        this.amount = BigInteger(amount).toIntegerValue()
-                        this.levelIx = price.levelIx(market)
-                    },
-                )
-            },
-            FeeRates(FeeRate(1), FeeRate(1)),
-        )
-        if (response.createdTrades.isNotEmpty()) {
-            if (orderType == Order.Type.MarketSell || orderType == Order.Type.LimitSell) {
-                assertEquals(response.createdTrades.first().sellOrderGuid, guid)
-                assertEquals(response.createdTrades.first().buyOrderGuid, counterOrderGuid)
-            } else {
-                assertEquals(response.createdTrades.first().buyOrderGuid, guid)
-                assertEquals(response.createdTrades.first().sellOrderGuid, counterOrderGuid)
-            }
-        }
-        assertEquals(
-            expectedDisposition,
-            response.ordersChanged.first { it.guid == guid }.disposition,
-        )
     }
 
     private fun cancelOrders(guids: List<Long>) {

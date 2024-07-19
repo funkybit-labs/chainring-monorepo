@@ -161,23 +161,6 @@ const CreateOrderApiResponseSchema = z.object({
   requestStatus: RequestStatusSchema
 })
 
-const UpdateOrderRequestSchema = z.object({
-  type: z.literal('limit'),
-  orderId: z.string(),
-  amount: z.coerce.bigint(),
-  price: decimal(),
-  marketId: z.string(),
-  side: OrderSideSchema,
-  nonce: z.string(),
-  signature: z.string(),
-  verifyingChainId: z.number()
-})
-export type UpdateOrderRequest = z.infer<typeof UpdateOrderRequestSchema>
-
-const UpdateOrderApiResponseSchema = z.object({
-  requestStatus: RequestStatusSchema
-})
-
 const CancelOrderRequestSchema = z.object({
   orderId: z.string(),
   amount: z.coerce.bigint(),
@@ -439,30 +422,6 @@ export const apiClient = new Zodios(apiBaseUrl, [
       }
     ],
     response: CreateOrderApiResponseSchema,
-    errors: [
-      {
-        status: 'default',
-        schema: ApiErrorsSchema
-      }
-    ]
-  },
-  {
-    method: 'patch',
-    path: '/v1/orders/:id',
-    alias: 'updateOrder',
-    parameters: [
-      {
-        name: 'id',
-        type: 'Path',
-        schema: z.string()
-      },
-      {
-        name: 'payload',
-        type: 'Body',
-        schema: UpdateOrderRequestSchema
-      }
-    ],
-    response: UpdateOrderApiResponseSchema,
     errors: [
       {
         status: 'default',

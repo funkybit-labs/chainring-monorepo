@@ -3,7 +3,6 @@ package co.chainring.apps.api
 import co.chainring.apps.api.Examples.cancelOrderResponse
 import co.chainring.apps.api.Examples.createLimitOrderResponse
 import co.chainring.apps.api.Examples.createMarketOrderResponse
-import co.chainring.apps.api.Examples.updateLimitOrderResponse
 import co.chainring.apps.api.middleware.principal
 import co.chainring.apps.api.middleware.signedTokenSecurity
 import co.chainring.apps.api.model.BatchOrdersApiRequest
@@ -16,8 +15,6 @@ import co.chainring.apps.api.model.OrdersApiResponse
 import co.chainring.apps.api.model.RequestStatus
 import co.chainring.apps.api.model.Trade
 import co.chainring.apps.api.model.TradesApiResponse
-import co.chainring.apps.api.model.UpdateOrderApiRequest
-import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.errorResponse
 import co.chainring.apps.api.model.orderNotFoundError
 import co.chainring.apps.api.model.processingError
@@ -93,42 +90,6 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             } else {
                 response.error?.let { errorResponse(Status.UNPROCESSABLE_ENTITY, it) } ?: unexpectedError()
             }
-        }
-    }
-
-    fun updateOrder(): ContractRoute {
-        val requestBody = Body.auto<UpdateOrderApiRequest>().toLens()
-        val responseBody = Body.auto<UpdateOrderApiResponse>().toLens()
-
-        return "orders" / orderIdPathParam meta {
-            operationId = "update-order"
-            summary = "Update order"
-            security = signedTokenSecurity
-            tags += listOf(Tag("order"))
-            receiving(
-                requestBody to Examples.updateLimitOrderRequest,
-            )
-            returning(
-                Status.OK,
-                responseBody to Examples.updateLimitOrderResponse,
-            )
-        } bindContract Method.PATCH to { orderId ->
-            fun handle(request: Request): Response {
-                val apiRequest: UpdateOrderApiRequest = requestBody(request)
-                return if (orderId != apiRequest.orderId) {
-                    processingError("Invalid order id")
-                } else {
-                    val response = exchangeApiService.updateOrder(request.principal, apiRequest)
-                    if (response.requestStatus == RequestStatus.Accepted) {
-                        Response(Status.OK).with(
-                            responseBody of response,
-                        )
-                    } else {
-                        response.error?.let { errorResponse(Status.UNPROCESSABLE_ENTITY, it) } ?: unexpectedError()
-                    }
-                }
-            }
-            ::handle
         }
     }
 
@@ -265,9 +226,6 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
                         Examples.createLimitOrderRequest,
                     ),
                     listOf(
-                        Examples.updateLimitOrderRequest,
-                    ),
-                    listOf(
                         Examples.cancelOrderRequest,
                     ),
                 ),
@@ -276,7 +234,6 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
                 Status.OK,
                 responseBody to BatchOrdersApiResponse(
                     createdOrders = listOf(createMarketOrderResponse, createLimitOrderResponse),
-                    updatedOrders = listOf(updateLimitOrderResponse),
                     canceledOrders = listOf(cancelOrderResponse),
                 ),
             )

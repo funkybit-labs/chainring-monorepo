@@ -101,7 +101,6 @@ open class SequencerClient {
         marketId: MarketId,
         wallet: Long,
         ordersToAdd: List<Order>,
-        ordersToChange: List<Order>,
         ordersToCancel: List<OrderId>,
         cancelAll: Boolean = false,
     ): SequencerResponse {
@@ -113,9 +112,6 @@ open class SequencerClient {
                     this.wallet = wallet
                     this.ordersToAdd.addAll(
                         ordersToAdd.map { toOrderDSL(it) },
-                    )
-                    this.ordersToChange.addAll(
-                        ordersToChange.map { toOrderDSL(it) },
                     )
                     this.ordersToCancel.addAll(
                         ordersToCancel.map { toCancelOrderDSL(it) },
@@ -351,7 +347,7 @@ open class SequencerClient {
         wallet: Long,
         orderId: OrderId,
     ): SequencerResponse {
-        return orderBatch(marketId, wallet, emptyList(), emptyList(), listOf(orderId))
+        return orderBatch(marketId, wallet, emptyList(), listOf(orderId))
     }
 
     suspend fun cancelOrders(
@@ -360,7 +356,7 @@ open class SequencerClient {
         orderIds: List<OrderId>,
         cancelAll: Boolean = false,
     ): SequencerResponse {
-        return orderBatch(marketId, wallet, emptyList(), emptyList(), orderIds, cancelAll = cancelAll)
+        return orderBatch(marketId, wallet, emptyList(), orderIds, cancelAll = cancelAll)
     }
 
     suspend fun reset(): SequencerResponse {

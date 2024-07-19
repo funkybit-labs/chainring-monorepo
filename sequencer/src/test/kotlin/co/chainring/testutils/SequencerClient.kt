@@ -7,7 +7,6 @@ import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.core.Clock
 import co.chainring.sequencer.core.MarketId
-import co.chainring.sequencer.core.OrderGuid
 import co.chainring.sequencer.core.WalletAddress
 import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
@@ -129,30 +128,6 @@ class SequencerClient(clock: Clock) {
             assertEquals(OrderDisposition.Accepted, it.ordersChangedList.first().disposition)
             it.ordersChangedList.first()
         }
-
-    fun changeOrder(
-        market: Market,
-        guid: OrderGuid,
-        amount: BigDecimal,
-        price: BigDecimal,
-        wallet: WalletAddress,
-    ) = sequencer.processRequest(
-        sequencerRequest {
-            this.guid = UUID.randomUUID().toString()
-            this.type = SequencerRequest.Type.ApplyOrderBatch
-            this.orderBatch = orderBatch {
-                this.marketId = market.id.value
-                this.wallet = wallet.value
-                this.ordersToChange.add(
-                    order {
-                        this.guid = guid.value
-                        this.amount = amount.toFundamentalUnits(market.baseDecimals).toIntegerValue()
-                        this.levelIx = price.divideToIntegralValue(market.tickSize).toInt()
-                    },
-                )
-            }
-        },
-    )
 
     fun cancelOrder(market: Market, guid: Long, wallet: WalletAddress) =
         sequencer.processRequest(

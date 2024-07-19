@@ -107,53 +107,6 @@ data class Market(
                 )
             }
         }
-        orderBatch.ordersToChangeList.forEach { orderChange ->
-            val validationResult = validateOrderForWallet(orderBatch.wallet, orderChange.guid)
-            if (validationResult == OrderChangeRejected.Reason.None) {
-                ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
-                    val side = order.level.side
-                    changeOrder(orderChange, feeRates)?.let { changeOrderResult: ChangeOrderResult ->
-                        ordersChanged.add(
-                            orderChanged {
-                                this.guid = orderChange.guid
-                                this.disposition = changeOrderResult.disposition
-                            },
-                        )
-                        consumptionChanges.merge(
-                            changeOrderResult.wallet,
-                            Pair(changeOrderResult.baseAssetDelta, changeOrderResult.quoteAssetDelta),
-                            ::sumBigIntegerPair,
-                        )
-                        changeOrderResult.executions.forEach { execution ->
-                            processExecution(
-                                wallet = orderBatch.wallet.toWalletAddress(),
-                                takerOrder = order {
-                                    this.guid = orderChange.guid
-                                    // type is not available on orderChange, therefore resolving from the level
-                                    this.type = if (side == BookSide.Buy) Order.Type.LimitBuy else Order.Type.LimitSell
-                                    this.amount = orderChange.amount
-                                    this.levelIx = orderChange.levelIx
-                                },
-                                execution = execution,
-                                createdTrades = createdTrades,
-                                ordersChanged = ordersChanged,
-                                balanceChanges = balanceChanges,
-                                consumptionChanges = consumptionChanges,
-                                feeRates = feeRates,
-                                null,
-                            )
-                        }
-                    }
-                }
-            } else {
-                ordersChangeRejected.add(
-                    orderChangeRejected {
-                        this.guid = orderChange.guid
-                        this.reason = validationResult
-                    },
-                )
-            }
-        }
         orderBatch.ordersToAddList.forEach { order ->
             val orderResult = addOrder(orderBatch.wallet, order, feeRates)
             ordersChanged.add(
@@ -867,75 +820,6 @@ data class Market(
         }
     }
 
-    // this will change an order's price and quantity.
-    // if the price change would cross the market order will be filled (partially)
-    private fun changeOrder(orderChange: Order, feeRates: FeeRates): ChangeOrderResult? {
-        return ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order ->
-            val level = order.level
-            val newLevelIx = orderChange.levelIx
-            val newQuantity = orderChange.amount.toBigInteger()
-            val quantityDelta = newQuantity - order.quantity
-            if (newLevelIx == level.ix) {
-                // price stays same, quantity changes
-                val baseAssetDelta = if (level.side == BookSide.Buy) BigInteger.ZERO else quantityDelta
-                val quoteAssetDelta = if (level.side == BookSide.Buy) notionalPlusFee(quantityDelta, level.price, baseDecimals, quoteDecimals, order.feeRate) else BigInteger.ZERO
-                level.totalQuantity += quantityDelta
-                order.quantity = newQuantity
-                ChangeOrderResult(order.wallet, OrderDisposition.Accepted, noExecutions, baseAssetDelta, quoteAssetDelta)
-            } else {
-                // price change results into deleting existing and re-adding new order
-                val (baseAssetDelta, quoteAssetDelta) = if (level.side == BookSide.Buy) {
-                    val previousNotionalAndFee = notionalPlusFee(order.quantity, level.price, baseDecimals, quoteDecimals, order.feeRate)
-                    val newLevelPrice = price(newLevelIx)
-
-                    val notionalDelta = if (newLevelIx >= bestOfferIx) {
-                        // with the updated price limit order crosses the market
-                        val (_, availableQuantity) = clearingPriceAndQuantityForMarketBuy(orderChange.amount.toBigInteger(), stopAtLevelIx = newLevelIx)
-                        val remainingQuantity = orderChange.amount.toBigInteger() - availableQuantity
-
-                        // traded on crossing market notional chuck should be excluded from quoteAssetDelta
-                        val limitChunkNotionalAndFee = notionalPlusFee(remainingQuantity, newLevelPrice, baseDecimals, quoteDecimals, feeRates.maker)
-
-                        limitChunkNotionalAndFee - previousNotionalAndFee
-                    } else {
-                        val orderChangeNotionalAndFee = notionalPlusFee(newQuantity, newLevelPrice, baseDecimals, quoteDecimals, feeRates.maker)
-                        orderChangeNotionalAndFee - previousNotionalAndFee
-                    }
-
-                    // update bestBid only when order stays on the book
-                    if ((bestBidIx == -1 || newLevelIx > bestBidIx) && (previousNotionalAndFee + notionalDelta) > BigInteger.ZERO) bestBidIx = newLevelIx
-
-                    Pair(BigInteger.ZERO, notionalDelta)
-                } else {
-                    val marketChunkQuantity = clearingQuantityForMarketSell(newQuantity, stopAtLevelIx = newLevelIx)
-                    val limitChunkQuantity = order.quantity - marketChunkQuantity
-
-                    // update bestOffer only when order stays on the book
-                    if ((bestOfferIx == -1 || newLevelIx < bestOfferIx) && limitChunkQuantity > BigInteger.ZERO) bestOfferIx = newLevelIx
-
-                    Pair(limitChunkQuantity - order.quantity, BigInteger.ZERO)
-                }
-
-                // note: Order is reset during removal, should not be used after reset
-                // note: Level might be reset in case when the last order was removed
-                val wallet = order.wallet
-                val side = level.side
-                removeOrder(order.guid)
-
-                val addOrderResult = addOrder(
-                    wallet.value,
-                    order {
-                        this.guid = orderChange.guid
-                        this.type = if (side == BookSide.Buy) Order.Type.LimitBuy else Order.Type.LimitSell
-                        this.amount = orderChange.amount
-                        this.levelIx = orderChange.levelIx
-                    },
-                    feeRates,
-                )
-                ChangeOrderResult(wallet, addOrderResult.disposition, addOrderResult.executions, baseAssetDelta, quoteAssetDelta)
-            }
-        }
-    }
     private fun validateOrderForWallet(wallet: Long, orderGuid: Long): OrderChangeRejected.Reason {
         return ordersByGuid[orderGuid.toOrderGuid()]?.let { order ->
             if (wallet == order.wallet.value) {
