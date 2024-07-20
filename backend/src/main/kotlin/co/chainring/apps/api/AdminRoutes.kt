@@ -95,14 +95,14 @@ class AdminRoutes(
                         contractAddress = payload.contractAddress,
                         decimals = payload.decimals,
                         addToWallets = payload.addToWallets,
-                        withdrawalFee = payload.withdrawalFee,
+                        withdrawalFee = BigInteger.ZERO,
                         description = payload.description,
                         iconUrl = payload.iconUrl,
                     )
                 }
                 sequencerClient.setWithdrawalFees(
                     listOf(
-                        WithdrawalFee(Symbol(symbol.name), symbol.withdrawalFee),
+                        WithdrawalFee(Symbol(symbol.name), payload.withdrawalFee),
                     ),
                 ).let { response ->
                     if (response.hasError()) {
@@ -192,7 +192,6 @@ class AdminRoutes(
                             symbol.addToWallets,
                         )
                         symbol.description = payload.description
-                        symbol.withdrawalFee = payload.withdrawalFee
                         symbol.addToWallets = payload.addToWallets
                         symbol.iconUrl = payload.iconUrl
                         symbol.updatedAt = Clock.System.now()
@@ -210,7 +209,6 @@ class AdminRoutes(
                                     transaction {
                                         val symbol = SymbolEntity.forName(symbolName)
                                         symbol.description = originalData.description
-                                        symbol.withdrawalFee = originalData.withdrawalFee
                                         symbol.addToWallets = originalData.addToWallets
                                         symbol.iconUrl = originalData.iconUrl
                                     }
@@ -256,7 +254,7 @@ class AdminRoutes(
                             tickSize = payload.tickSize,
                             lastPrice = payload.lastPrice,
                             createdBy = request.principal.value,
-                            minFee = payload.minFee,
+                            minFee = BigInteger.ZERO,
                         ),
                         baseSymbol,
                         quoteSymbol,
@@ -267,7 +265,7 @@ class AdminRoutes(
                     tickSize = market.tickSize,
                     baseDecimals = baseSymbol.decimals.toInt(),
                     quoteDecimals = quoteSymbol.decimals.toInt(),
-                    minFee = market.minFee.fromFundamentalUnits(quoteSymbol.decimals),
+                    minFee = payload.minFee.fromFundamentalUnits(quoteSymbol.decimals),
                 ).let { response ->
                     if (response.hasError()) {
                         try {
@@ -335,12 +333,6 @@ class AdminRoutes(
                 val payload = requestBody(request)
                 runBlocking {
                     val marketId = MarketId("$baseSymbol/$quoteSymbol")
-                    transaction {
-                        val market = MarketEntity.findById(marketId)!!
-                        market.minFee = payload.minFee
-                        market.updatedAt = Clock.System.now()
-                        market.updatedBy = request.principal.value
-                    }
                     sequencerClient.setMarketMinFees(mapOf(marketId to payload.minFee)).let { response ->
                         if (response.hasError()) {
                             throw RequestProcessingError("Unable to set market min fees in sequencer: ${response.error}")
@@ -422,21 +414,8 @@ class AdminRoutes(
         } bindContract Method.POST to { request ->
             val payload = requestBody(request)
             runBlocking {
-                val(origFeeRates, feeRates) = transaction {
-                    Pair(
-                        FeeRates.fetch(),
-                        FeeRates(payload.maker, payload.taker).also { it.persist() },
-                    )
-                }
-                sequencerClient.setFeeRates(feeRates).let { response ->
+                sequencerClient.setFeeRates(FeeRates(payload.maker, payload.taker)).let { response ->
                     if (response.hasError()) {
-                        try {
-                            transaction {
-                                origFeeRates.persist()
-                            }
-                        } catch (e: Exception) {
-                            throw RequestProcessingError("Unable to set fee rates in sequencer: ${response.error}, and could not revert changes in DB: ${e.message}")
-                        }
                         throw RequestProcessingError("Unable to set fee rates in sequencer: ${response.error}")
                     }
                 }

@@ -156,11 +156,13 @@ object SequencerResponseProcessorService {
             SequencerRequest.Type.AddMarket -> {
                 if (response.error == SequencerError.None) {
                     response.marketsCreatedList.forEach { marketCreated ->
-                        MarketEntity[MarketId(marketCreated.marketId)].let {
+                        MarketEntity[MarketId(marketCreated.marketId)].apply {
                             // TODO delete min/max allowed price OR apply logical dynamic range
-                            it.minAllowedBidPrice = BigDecimal.ZERO
-                            it.maxAllowedOfferPrice = Integer.MAX_VALUE.toBigDecimal()
-                            it.minFee = if (marketCreated.hasMinFee()) marketCreated.minFee.toBigInteger() else BigInteger.ZERO
+                            minAllowedBidPrice = BigDecimal.ZERO
+                            maxAllowedOfferPrice = Integer.MAX_VALUE.toBigDecimal()
+                            minFee = if (marketCreated.hasMinFee()) marketCreated.minFee.toBigInteger() else BigInteger.ZERO
+                            updatedAt = Clock.System.now()
+                            updatedBy = "seq:${response.sequence}"
                         }
                     }
                 }
@@ -169,7 +171,11 @@ object SequencerResponseProcessorService {
             SequencerRequest.Type.SetWithdrawalFees -> {
                 if (response.error == SequencerError.None) {
                     response.withdrawalFeesSetList.forEach {
-                        SymbolEntity.forName(it.asset).withdrawalFee = it.value.toBigInteger()
+                        SymbolEntity.forName(it.asset).apply {
+                            withdrawalFee = it.value.toBigInteger()
+                            updatedAt = Clock.System.now()
+                            updatedBy = "seq:${response.sequence}"
+                        }
                     }
                 }
             }
@@ -177,7 +183,11 @@ object SequencerResponseProcessorService {
             SequencerRequest.Type.SetMarketMinFees -> {
                 if (response.error == SequencerError.None) {
                     response.marketMinFeesSetList.forEach { entry ->
-                        MarketEntity.findById(MarketId(entry.marketId))?.minFee = entry.minFee.toBigInteger()
+                        MarketEntity.findById(MarketId(entry.marketId))?.apply {
+                            minFee = entry.minFee.toBigInteger()
+                            updatedAt = Clock.System.now()
+                            updatedBy = "seq:${response.sequence}"
+                        }
                     }
                 }
             }
