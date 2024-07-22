@@ -16,14 +16,18 @@ import co.chainring.core.model.db.WalletEntity
 import co.chainring.integrationtests.testutils.AppUnderTestRunner
 import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.assertError
+import org.awaitility.kotlin.await
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.extension.ExtendWith
 import java.math.BigInteger
+import java.time.Duration
 import kotlin.test.Test
 
 @ExtendWith(AppUnderTestRunner::class)
 class AdminRouteTest {
+    private val sequencerResponseTimeout = Duration.ofMillis(1000)
+
     @Test
     fun `test admin management`() {
         val apiClient = TestApiClient()
@@ -54,7 +58,9 @@ class AdminRouteTest {
 
         val newFeeRates = FeeRates(FeeRate(feeRates.maker.value + 1L), FeeRate(feeRates.taker.value + 2L))
         apiClient.setFeeRates(newFeeRates)
-        assertEquals(newFeeRates, apiClient.getConfiguration().feeRates)
+        await.atMost(sequencerResponseTimeout).untilAsserted {
+            assertEquals(newFeeRates, apiClient.getConfiguration().feeRates)
+        }
     }
 
     @Test
@@ -82,6 +88,9 @@ class AdminRouteTest {
         }
         try {
             apiClient.createSymbol(adminRequest)
+            await.atMost(sequencerResponseTimeout).until {
+                transaction { SymbolEntity.forName(symbolName) }.withdrawalFee == BigInteger.valueOf(100)
+            }
             val dbSymbol = transaction {
                 val symbol = SymbolEntity.forName(symbolName)
                 assertEquals(symbol.decimals, 18.toUByte())
@@ -110,8 +119,11 @@ class AdminRouteTest {
                     withdrawalFee = BigInteger.ONE,
                 ),
             )
-            transaction {
-                dbSymbol.refresh()
+            await.atMost(sequencerResponseTimeout).until {
+                transaction {
+                    dbSymbol.refresh()
+                }
+                dbSymbol.withdrawalFee == BigInteger.ONE
             }
             assertEquals(dbSymbol.decimals, 18.toUByte())
             assertEquals(dbSymbol.iconUrl, "changed.svg")
@@ -166,6 +178,10 @@ class AdminRouteTest {
                     addToWallets = false,
                 ),
             )
+            await.atMost(sequencerResponseTimeout).until {
+                apiClient.listSymbols().firstOrNull { it.name == symbolName2 } != null
+            }
+
             apiClient.createMarket(
                 AdminRoutes.Companion.AdminMarket(
                     id = marketId,
@@ -174,6 +190,9 @@ class AdminRouteTest {
                     minFee = BigInteger.TEN,
                 ),
             )
+            await.atMost(sequencerResponseTimeout).until {
+                transaction { MarketEntity.findById(marketId) }?.minFee == BigInteger.TEN
+            }
             val dbMarket = transaction {
                 val market = MarketEntity.findById(marketId)!!
                 assertEquals(market.baseSymbol.name, symbolName1)
@@ -196,10 +215,9 @@ class AdminRouteTest {
                     minFee = BigInteger.ONE,
                 ),
             )
-            transaction {
-                dbMarket.refresh()
+            await.atMost(sequencerResponseTimeout).until {
+                transaction { MarketEntity.findById(marketId)!! }.minFee == BigInteger.ONE
             }
-            assertEquals(BigInteger.ONE, dbMarket.minFee)
         } finally {
             transaction {
                 MarketEntity.findById(marketId)?.delete()
