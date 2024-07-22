@@ -12,12 +12,9 @@ import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.Deposit
 import co.chainring.apps.api.model.DepositApiResponse
 import co.chainring.apps.api.model.Market
-import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.RequestProcessingError
 import co.chainring.apps.api.model.RequestStatus
-import co.chainring.apps.api.model.UpdateOrderApiRequest
-import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.Withdrawal
 import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.core.evm.ECHelper
@@ -74,7 +71,6 @@ class ExchangeApiService(
                 BatchOrdersApiRequest(
                     marketId = apiRequest.marketId,
                     createOrders = listOf(apiRequest),
-                    updateOrders = emptyList(),
                     cancelOrders = emptyList(),
                 ),
             ).createdOrders.first()
@@ -135,27 +131,12 @@ class ExchangeApiService(
         return CreateOrderApiResponse(orderId, RequestStatus.Accepted, null, orderRequest)
     }
 
-    fun updateOrder(
-        walletAddress: Address,
-        apiRequest: UpdateOrderApiRequest,
-    ): UpdateOrderApiResponse {
-        return orderBatch(
-            walletAddress,
-            BatchOrdersApiRequest(
-                marketId = apiRequest.marketId,
-                createOrders = emptyList(),
-                updateOrders = listOf(apiRequest),
-                cancelOrders = emptyList(),
-            ),
-        ).updatedOrders.first()
-    }
-
     fun orderBatch(
         walletAddress: Address,
         batchOrdersRequest: BatchOrdersApiRequest,
     ): BatchOrdersApiResponse {
-        if (batchOrdersRequest.cancelOrders.isEmpty() && batchOrdersRequest.updateOrders.isEmpty() && batchOrdersRequest.createOrders.isEmpty()) {
-            return BatchOrdersApiResponse(emptyList(), emptyList(), emptyList())
+        if (batchOrdersRequest.cancelOrders.isEmpty() && batchOrdersRequest.createOrders.isEmpty()) {
+            return BatchOrdersApiResponse(emptyList(), emptyList())
         }
 
         val createOrderRequestsByOrderId = batchOrdersRequest.createOrders.associateBy { OrderId.generate() }
@@ -209,39 +190,6 @@ class ExchangeApiService(
             )
         }
 
-        val ordersToUpdate = batchOrdersRequest.updateOrders.map { orderRequest ->
-            ensurePriceIsMultipleOfTickSize(market, orderRequest.price)
-            ensureOrderMarketIdMatchesBatchMarketId(orderRequest.marketId, batchOrdersRequest)
-
-            verifyEIP712Signature(
-                walletAddress,
-                EIP712Transaction.Order(
-                    walletAddress,
-                    baseChainId = baseSymbol.chainId.value,
-                    baseToken = baseSymbol.contractAddress ?: Address.zero,
-                    quoteChainId = quoteSymbol.chainId.value,
-                    quoteToken = quoteSymbol.contractAddress ?: Address.zero,
-                    amount = OrderAmount.Fixed(if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate()),
-                    price = orderRequest.price.toFundamentalUnits(quoteSymbol.decimals),
-                    nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
-                    signature = orderRequest.signature,
-                ),
-                verifyingChainId = orderRequest.verifyingChainId,
-            )
-
-            SequencerClient.Order(
-                sequencerOrderId = orderRequest.orderId.toSequencerId().value,
-                amount = orderRequest.amount,
-                levelIx = orderRequest.price.divideToIntegralValue(market.tickSize).toInt(),
-                orderType = toSequencerOrderType(false, orderRequest.side),
-                nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
-                signature = orderRequest.signature,
-                orderId = orderRequest.orderId,
-                chainId = orderRequest.verifyingChainId,
-                percentage = null,
-            )
-        }
-
         val ordersToCancel = batchOrdersRequest.cancelOrders.map { orderRequest ->
             ensureOrderMarketIdMatchesBatchMarketId(orderRequest.marketId, batchOrdersRequest)
 
@@ -261,7 +209,7 @@ class ExchangeApiService(
         }
 
         val response = runBlocking {
-            sequencerClient.orderBatch(market.id, walletAddress.toSequencerId().value, ordersToAdd, ordersToUpdate, ordersToCancel)
+            sequencerClient.orderBatch(market.id, walletAddress.toSequencerId().value, ordersToAdd, ordersToCancel)
         }
 
         when (response.error) {
@@ -279,14 +227,6 @@ class ExchangeApiService(
                     requestStatus = RequestStatus.Accepted,
                     error = null,
                     order = request,
-                )
-            },
-            batchOrdersRequest.updateOrders.map {
-                val rejected = failedUpdatesOrCancels[it.orderId.toSequencerId().value]
-                UpdateOrderApiResponse(
-                    requestStatus = if (rejected == null) RequestStatus.Accepted else RequestStatus.Rejected,
-                    error = rejected?.reason?.let { reason -> ApiError(ReasonCode.RejectedBySequencer, reasonToMessage(reason)) },
-                    order = it,
                 )
             },
             batchOrdersRequest.cancelOrders.map {
@@ -370,7 +310,6 @@ class ExchangeApiService(
             BatchOrdersApiRequest(
                 marketId = cancelOrderApiRequest.marketId,
                 createOrders = emptyList(),
-                updateOrders = emptyList(),
                 cancelOrders = listOf(cancelOrderApiRequest),
             ),
         ).canceledOrders.first()

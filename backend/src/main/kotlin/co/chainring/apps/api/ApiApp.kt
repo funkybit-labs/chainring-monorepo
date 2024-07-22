@@ -115,7 +115,6 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                             configRoutes.getAccountConfiguration,
                             configRoutes.markSymbolAsAdded,
                             orderRoutes.createOrder(),
-                            orderRoutes.updateOrder(),
                             orderRoutes.cancelOrder(),
                             orderRoutes.getOrder(),
                             orderRoutes.listOrders(),

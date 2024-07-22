@@ -4,7 +4,6 @@ import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
-import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.websocket.Balances
 import co.chainring.apps.api.model.websocket.IncomingWSMessage
 import co.chainring.apps.api.model.websocket.Limits
@@ -185,22 +184,6 @@ fun WsClient.assertLimitOrderCreatedMessageReceived(expected: CreateOrderApiResp
         }
     }
 
-fun WsClient.assertLimitOrderUpdatedMessageReceived(expected: UpdateOrderApiResponse): OrderUpdated =
-    assertMessageReceived<OrderUpdated>(SubscriptionTopic.Orders) { msg ->
-        assertEquals(expected.order.orderId, msg.order.id)
-        assertEquals(expected.order.amount, msg.order.amount)
-        assertEquals(expected.order.side, msg.order.side)
-        assertEquals(expected.order.marketId, msg.order.marketId)
-        assertEquals(0, expected.order.price.compareTo((msg.order as Order.Limit).price))
-        assertNotNull(msg.order.timing.createdAt)
-        assertNotNull(msg.order.timing.updatedAt)
-        transaction {
-            val orderEntity = OrderEntity[expected.order.orderId]
-            assertEquals(BigInteger(expected.order.nonce, 16), BigInteger(orderEntity.nonce, 16))
-            assertEquals(expected.order.signature.value, orderEntity.signature)
-        }
-    }
-
 fun WsClient.assertMarketOrderCreatedMessageReceived(expected: CreateOrderApiResponse): OrderCreated =
     assertMessageReceived<OrderCreated>(SubscriptionTopic.Orders) { msg ->
         assertIs<Order.Market>(msg.order)
@@ -236,9 +219,6 @@ data class ExpectedTrade(
 ) {
     constructor(order: CreateOrderApiResponse, price: BigDecimal, amount: AssetAmount, fee: AssetAmount, settlementStatus: SettlementStatus) :
         this(order.orderId, order.order.marketId, order.order.side, price, amount, fee, settlementStatus)
-
-    constructor(order: UpdateOrderApiResponse, price: BigDecimal, amount: AssetAmount, fee: AssetAmount, settlementStatus: SettlementStatus) :
-        this(order.order.orderId, order.order.marketId, order.order.side, price, amount, fee, settlementStatus)
 }
 
 fun WsClient.assertTradesCreatedMessageReceived(expectedTrades: List<ExpectedTrade>): TradesCreated =

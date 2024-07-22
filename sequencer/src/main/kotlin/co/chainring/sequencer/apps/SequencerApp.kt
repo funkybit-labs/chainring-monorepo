@@ -5,7 +5,6 @@ import co.chainring.sequencer.core.Asset
 import co.chainring.sequencer.core.Clock
 import co.chainring.sequencer.core.FeeRate
 import co.chainring.sequencer.core.FeeRates
-import co.chainring.sequencer.core.LevelOrder
 import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.SequencerState
@@ -779,23 +778,6 @@ class SequencerApp(
                     )
                 }
                 else -> {}
-            }
-        }
-        orderBatch.ordersToChangeList.forEach { orderChange: Order ->
-            market.ordersByGuid[orderChange.guid.toOrderGuid()]?.let { order: LevelOrder ->
-                val (oldBaseAssets, oldQuoteAssets) = market.assetsReservedForOrder(order)
-                if (oldBaseAssets > BigInteger.ZERO) { // LimitSell
-                    baseAssetsRequired.merge(
-                        order.wallet,
-                        orderChange.amount.toBigInteger() - order.quantity,
-                        ::sumBigIntegers,
-                    )
-                }
-                if (oldQuoteAssets > BigInteger.ZERO) { // LimitBuy
-                    val previousNotionalAndFee = notionalPlusFee(order.quantity, order.level.price, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)
-                    val notionalAndFee = calculateLimitBuyOrderNotionalPlusFee(orderChange, market)
-                    quoteAssetsRequired.merge(order.wallet, notionalAndFee - previousNotionalAndFee, ::sumBigIntegers)
-                }
             }
         }
         orderBatch.ordersToCancelList.forEach { cancelOrder ->

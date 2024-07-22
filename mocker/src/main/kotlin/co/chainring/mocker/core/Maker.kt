@@ -286,7 +286,6 @@ class Maker(
             BatchOrdersApiRequest(
                 marketId = marketId,
                 createOrders = createOrders,
-                updateOrders = emptyList(),
                 cancelOrders = cancelOrders
             )
         ).onLeft {

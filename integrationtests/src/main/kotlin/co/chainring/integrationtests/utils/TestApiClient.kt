@@ -22,9 +22,6 @@ import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.OrdersApiResponse
-import co.chainring.apps.api.model.RequestStatus
-import co.chainring.apps.api.model.UpdateOrderApiRequest
-import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.MarketMinFee
@@ -263,33 +260,6 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
 
     override fun batchOrders(apiRequest: BatchOrdersApiRequest): BatchOrdersApiResponse =
         tryBatchOrders(apiRequest).assertSuccess()
-
-    override fun updateOrder(apiRequest: UpdateOrderApiRequest): UpdateOrderApiResponse {
-        return tryUpdateOrder(apiRequest).assertSuccess()
-    }
-
-    fun updateOrder(market: Market, createOrderApiResponse: CreateOrderApiResponse, amount: BigDecimal, price: BigDecimal, wallet: Wallet): UpdateOrderApiResponse {
-        val request = UpdateOrderApiRequest(
-            orderId = createOrderApiResponse.orderId,
-            marketId = createOrderApiResponse.order.marketId,
-            side = createOrderApiResponse.order.side,
-            amount = amount.toFundamentalUnits(market.baseDecimals),
-            price = price,
-            nonce = generateOrderNonce(),
-            signature = EvmSignature.emptySignature(),
-            verifyingChainId = ChainId.empty,
-        ).let {
-            wallet.signOrder(it)
-        }
-
-        val response = updateOrder(request)
-
-        assertEquals(response.requestStatus, RequestStatus.Accepted)
-        assertIs<UpdateOrderApiRequest>(response.order)
-        assertEquals(request.amount, response.order.amount)
-        assertEquals(request.price, response.order.price)
-        return response
-    }
 
     override fun cancelOrder(apiRequest: CancelOrderApiRequest) =
         tryCancelOrder(apiRequest).assertSuccess()

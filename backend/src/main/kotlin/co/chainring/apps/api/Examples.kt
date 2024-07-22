@@ -10,8 +10,6 @@ import co.chainring.apps.api.model.Deposit
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.RequestStatus
-import co.chainring.apps.api.model.UpdateOrderApiRequest
-import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.Withdrawal
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Symbol
@@ -50,17 +48,6 @@ object Examples {
         verifyingChainId = ChainId.empty,
     )
 
-    val updateLimitOrderRequest = UpdateOrderApiRequest(
-        orderId = OrderId("123"),
-        amount = BigInteger("100"),
-        price = BigDecimal("100"),
-        marketId = MarketId("BTC/ETH"),
-        side = OrderSide.Buy,
-        nonce = "123",
-        signature = EvmSignature.emptySignature(),
-        verifyingChainId = ChainId.empty,
-    )
-
     val createMarketOrderResponse = CreateOrderApiResponse(
         orderId = OrderId.generate(),
         requestStatus = RequestStatus.Accepted,
@@ -73,12 +60,6 @@ object Examples {
         requestStatus = RequestStatus.Accepted,
         error = null,
         order = createLimitOrderRequest,
-    )
-
-    val updateLimitOrderResponse = UpdateOrderApiResponse(
-        requestStatus = RequestStatus.Accepted,
-        error = null,
-        order = updateLimitOrderRequest,
     )
 
     val cancelOrderRequest = CancelOrderApiRequest(

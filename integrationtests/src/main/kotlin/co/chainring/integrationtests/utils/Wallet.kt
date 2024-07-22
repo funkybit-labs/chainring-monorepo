@@ -7,7 +7,6 @@ import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.SymbolInfo
-import co.chainring.apps.api.model.UpdateOrderApiRequest
 import co.chainring.core.blockchain.ChainManager
 import co.chainring.core.blockchain.ContractType
 import co.chainring.core.evm.EIP712Helper
@@ -278,12 +277,6 @@ class Wallet(
             verifyingChainId = this.currentChainId,
         )
     }
-
-    fun signOrder(request: UpdateOrderApiRequest): UpdateOrderApiRequest =
-        request.copy(
-            signature = limitOrderEip712TxSignature(request.marketId, OrderAmount.Fixed(request.amount), request.price, request.side, request.nonce),
-            verifyingChainId = this.currentChainId,
-        )
 
     fun signCancelOrder(request: CancelOrderApiRequest): CancelOrderApiRequest {
         val tx = EIP712Transaction.CancelOrder(

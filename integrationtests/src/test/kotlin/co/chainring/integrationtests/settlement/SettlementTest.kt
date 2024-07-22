@@ -41,6 +41,7 @@ import co.chainring.integrationtests.utils.assertPricesMessageReceived
 import co.chainring.integrationtests.utils.assertTradesCreatedMessageReceived
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.extension.ExtendWith
 import java.math.BigDecimal
 import kotlin.test.Test
@@ -131,7 +132,6 @@ class SettlementTest : OrderBaseTest() {
                         marketOrder(OrderSide.Buy, BigDecimal("0.1")),
                         marketOrder(OrderSide.Sell, BigDecimal("0.1")),
                     ),
-                    updateOrders = listOf(),
                     cancelOrders = listOf(),
                 ),
             )
@@ -1166,6 +1166,7 @@ class SettlementTest : OrderBaseTest() {
 
     @Test
     fun `settlement failure - manually rollback trade`() {
+        Assumptions.assumeTrue((System.getenv("INTEGRATION_RUN") ?: "0") != "1")
         val market = btcEthMarket
         val baseSymbol = btc
         val quoteSymbol = eth

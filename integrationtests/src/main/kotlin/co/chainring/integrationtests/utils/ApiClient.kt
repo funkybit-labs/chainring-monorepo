@@ -24,8 +24,6 @@ import co.chainring.apps.api.model.ListDepositsApiResponse
 import co.chainring.apps.api.model.ListWithdrawalsApiResponse
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
-import co.chainring.apps.api.model.UpdateOrderApiRequest
-import co.chainring.apps.api.model.UpdateOrderApiResponse
 import co.chainring.apps.api.model.WithdrawalApiResponse
 import co.chainring.core.blockchain.checksumAddress
 import co.chainring.core.evm.ECHelper
@@ -188,16 +186,6 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
             Request.Builder()
                 .url("$apiServerRootUrl/v1/batch/orders")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
-                .build()
-                .withAuthHeaders(ecKeyPair),
-        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
-
-    fun tryUpdateOrder(apiRequest: UpdateOrderApiRequest): Either<ApiCallFailure, UpdateOrderApiResponse> =
-        executeAndTrace(
-            TraceRecorder.Op.UpdateOrder,
-            Request.Builder()
-                .url("$apiServerRootUrl/v1/orders/${apiRequest.orderId}")
-                .patch(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
@@ -443,10 +431,6 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
 
     open fun batchOrders(apiRequest: BatchOrdersApiRequest): BatchOrdersApiResponse =
         tryBatchOrders(apiRequest).throwOrReturn()
-
-    open fun updateOrder(apiRequest: UpdateOrderApiRequest): UpdateOrderApiResponse {
-        return tryUpdateOrder(apiRequest).throwOrReturn()
-    }
 
     open fun cancelOrder(apiRequest: CancelOrderApiRequest) =
         tryCancelOrder(apiRequest).throwOrReturn()

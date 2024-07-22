@@ -3,13 +3,11 @@ package co.chainring.apps.api.model
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketId
-import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import org.junit.jupiter.api.Test
-import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.test.assertEquals
 
@@ -24,17 +22,6 @@ class BatchOrderSerializerTest {
         verifyingChainId = ChainId.empty,
     )
 
-    private val updateLimitOrderRequest = UpdateOrderApiRequest(
-        orderId = OrderId.generate(),
-        amount = BigInteger("1000"),
-        price = BigDecimal("101000"),
-        marketId = MarketId("BTC/ETH"),
-        side = OrderSide.Buy,
-        nonce = "123",
-        signature = EvmSignature.emptySignature(),
-        verifyingChainId = ChainId.empty,
-    )
-
     @Test
     fun `test decode`() {
         val createOrderString = Json.encodeToString(createMarketOrderRequest as CreateOrderApiRequest)
@@ -44,7 +31,6 @@ class BatchOrderSerializerTest {
         val batchOrderApiRequest = BatchOrdersApiRequest(
             marketId = MarketId("BTC/ETC"),
             createOrders = listOf(createMarketOrderRequest, createMarketOrderRequest),
-            updateOrders = listOf(updateLimitOrderRequest),
             cancelOrders = emptyList(),
         )
         val batchOrderString = Json.encodeToString(batchOrderApiRequest)

@@ -28,7 +28,6 @@ import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.OrderType
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.TradeEntity
-import co.chainring.core.model.db.UpdateOrderAssignment
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
@@ -108,9 +107,6 @@ object SequencerResponseProcessorService {
                         request.orderBatch.ordersToAddList.forEach {
                             logger.debug { "add - ${it.guid} ${it.externalGuid} ${it.type} ${it.amount.toBigInteger()} ${it.levelIx}" }
                         }
-                        request.orderBatch.ordersToChangeList.forEach {
-                            logger.debug { "change - ${it.guid} ${it.externalGuid} ${it.type} ${it.amount.toBigInteger()} ${it.levelIx}" }
-                        }
                         request.orderBatch.ordersToCancelList.forEach {
                             logger.debug { "cancel - ${it.guid} ${it.externalGuid}" }
                         }
@@ -125,8 +121,7 @@ object SequencerResponseProcessorService {
                         handleOrderBatchUpdates(request.orderBatch, wallet, response)
                         handleSequencerResponse(
                             response,
-                            ordersBeingUpdated = request.orderBatch.ordersToChangeList.map { it.guid },
-                            orderIdsInRequest = (request.orderBatch.ordersToAddList + request.orderBatch.ordersToChangeList).map { it.guid },
+                            orderIdsInRequest = request.orderBatch.ordersToAddList.map { it.guid },
                         )
                     }
                 }
@@ -200,7 +195,7 @@ object SequencerResponseProcessorService {
         if (response.error != SequencerError.None) response.error.name else defaultMessage
 
     private fun handleOrderBatchUpdates(orderBatch: OrderBatch, wallet: WalletEntity, response: SequencerResponse) {
-        if (orderBatch.ordersToAddList.isNotEmpty() || orderBatch.ordersToChangeList.isNotEmpty()) {
+        if (orderBatch.ordersToAddList.isNotEmpty()) {
             val createAssignments = orderBatch.ordersToAddList.map {
                 CreateOrderAssignment(
                     it.externalGuid.orderId(),
@@ -214,24 +209,10 @@ object SequencerResponseProcessorService {
                     response.processingTime.toBigInteger(),
                 )
             }
-            val ordersChangeRejected = response.ordersChangeRejectedList.map { it.guid }.toSet()
 
-            val updateAssignments = orderBatch.ordersToChangeList.mapNotNull {
-                if (!ordersChangeRejected.contains(it.guid)) {
-                    UpdateOrderAssignment(
-                        it.externalGuid.orderId(),
-                        it.amount.toBigInteger(),
-                        it.levelIx,
-                        it.nonce.toBigInteger(),
-                        it.signature.toEvmSignature(),
-                    )
-                } else {
-                    null
-                }
-            }
             val market = getMarket(MarketId(orderBatch.marketId))
 
-            OrderEntity.batchUpdate(market, wallet, createAssignments, updateAssignments)
+            OrderEntity.batchCreate(market, wallet, createAssignments)
 
             val createdOrders = OrderEntity.listOrdersWithExecutions(createAssignments.map { it.orderId }).map { it.toOrderResponse() }
             val limitOrdersCreated = createdOrders.count { it is co.chainring.apps.api.model.Order.Limit } > 0
@@ -260,7 +241,7 @@ object SequencerResponseProcessorService {
         val market = getMarket(MarketId(backToBackOrder.marketIdsList[0]))
         val backToBackMarket = getMarket(MarketId(backToBackOrder.marketIdsList[1]))
 
-        OrderEntity.batchUpdate(market, wallet, listOf(createAssignment), listOf(), backToBackMarket = backToBackMarket)
+        OrderEntity.batchCreate(market, wallet, listOf(createAssignment), backToBackMarket = backToBackMarket)
 
         val createdOrder = OrderEntity.listOrdersWithExecutions(listOf(createAssignment.orderId)).map { it.toOrderResponse() }.first()
 
