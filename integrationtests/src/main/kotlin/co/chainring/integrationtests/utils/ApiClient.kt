@@ -51,7 +51,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
-import okhttp3.internal.EMPTY_REQUEST
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
@@ -165,7 +164,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
             TraceRecorder.Op.MarkSymbolAsAdded,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/account-config/$symbolName")
-                .post(EMPTY_REQUEST)
+                .post("".toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)

@@ -17,6 +17,7 @@ import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.sequencer.SequencerClient
+import co.chainring.core.utils.IconUtils.resolveSymbolUrl
 import co.chainring.core.utils.fromFundamentalUnits
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
@@ -88,6 +89,7 @@ class AdminRoutes(
         } bindContract Method.POST to { request ->
             runBlocking {
                 val payload = requestBody(request)
+                val url = resolveSymbolUrl(payload.iconUrl)
                 val symbol = transaction {
                     SymbolEntity.create(
                         chainId = payload.chainId,
@@ -97,7 +99,7 @@ class AdminRoutes(
                         addToWallets = payload.addToWallets,
                         withdrawalFee = BigInteger.ZERO,
                         description = payload.description,
-                        iconUrl = payload.iconUrl,
+                        iconUrl = url,
                     )
                 }
                 sequencerClient.setWithdrawalFees(
@@ -179,6 +181,7 @@ class AdminRoutes(
             { request ->
                 val payload = requestBody(request)
                 runBlocking {
+                    val url = resolveSymbolUrl(payload.iconUrl)
                     val originalData = transaction {
                         val symbol = SymbolEntity.forName(symbolName)
                         val originalData = AdminSymbol(
@@ -193,7 +196,7 @@ class AdminRoutes(
                         )
                         symbol.description = payload.description
                         symbol.addToWallets = payload.addToWallets
-                        symbol.iconUrl = payload.iconUrl
+                        symbol.iconUrl = url
                         symbol.updatedAt = Clock.System.now()
                         symbol.updatedBy = request.principal.value
                         originalData

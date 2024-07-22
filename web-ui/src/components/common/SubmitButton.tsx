@@ -8,13 +8,15 @@ export default function SubmitButton({
   onClick,
   caption,
   error,
-  status
+  status,
+  className
 }: {
   disabled: boolean
   onClick: () => void
   caption: () => string | JSX.Element
   error: string | null | undefined
   status: SubmitStatus
+  className?: string
 }) {
   return (
     <>
@@ -29,7 +31,8 @@ export default function SubmitButton({
               ? 'bg-statusRed hover:bg-statusRed'
               : disabled
                 ? 'bg-neutralGray focus:ring-mutedGray'
-                : 'bg-primary5 hover:bg-primary5 focus:ring-lightBackground'
+                : 'bg-primary5 hover:bg-primary5 focus:ring-lightBackground',
+          className
         )}
         onClick={onClick}
       >
