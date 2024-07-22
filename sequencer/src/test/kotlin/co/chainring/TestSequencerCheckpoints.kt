@@ -11,6 +11,7 @@ import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.OrderGuid
 import co.chainring.sequencer.core.SequencerState
+import co.chainring.sequencer.core.checkpointsQueue
 import co.chainring.sequencer.core.queueHome
 import co.chainring.sequencer.core.toBigDecimal
 import co.chainring.sequencer.core.toBigInteger
@@ -19,8 +20,6 @@ import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.core.toMarketId
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.GatewayGrpcKt
-import co.chainring.sequencer.proto.MarketCheckpoint
-import co.chainring.sequencer.proto.MetaInfoCheckpoint
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.Order.Type
 import co.chainring.sequencer.proto.OrderDisposition
@@ -50,7 +49,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.io.FileInputStream
+import org.junit.jupiter.api.assertThrows
 import java.lang.System.getenv
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -58,8 +57,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.io.path.createDirectories
-import kotlin.io.path.name
 import kotlin.random.Random
 import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.seconds
@@ -68,7 +65,6 @@ class TestSequencerCheckpoints {
     private val isOnCI = (getenv("CI_RUN") ?: "0") == "1"
     private val currentTime = AtomicLong(System.currentTimeMillis())
     private val testDirPath = Path.of(queueHome, "test")
-    private val checkpointsPath = Path.of(testDirPath.toString(), "checkpoints")
 
     private val wallet1 = 123456789L.toWalletAddress()
     private val wallet2 = 555111555L.toWalletAddress()
@@ -85,7 +81,6 @@ class TestSequencerCheckpoints {
     @BeforeEach
     fun beforeEach() {
         testDirPath.toFile().deleteRecursively()
-        checkpointsPath.createDirectories()
     }
 
     @Test
@@ -107,11 +102,14 @@ class TestSequencerCheckpoints {
             .timeProvider(currentTime::get)
             .build()
 
+        val checkpointsQueue = ChronicleQueue.singleBuilder(Path.of(testDirPath.toString(), "checkpoints"))
+            .build()
+
         assertQueueFilesCount(inputQueue, 0)
-        assertCheckpointsCount(checkpointsPath, 0)
+        assertCheckpointsCount(checkpointsQueue, 0)
 
         val gatewayApp = GatewayApp(GatewayConfig(port = 5339), inputQueue, outputQueue, sequencedQueue)
-        val sequencerApp = SequencerApp(Clock(), inputQueue, outputQueue, checkpointsPath)
+        val sequencerApp = SequencerApp(Clock(), inputQueue, outputQueue, checkpointsQueue)
 
         try {
             sequencerApp.start()
@@ -390,7 +388,7 @@ class TestSequencerCheckpoints {
             }
 
             assertQueueFilesCount(inputQueue, 2)
-            assertCheckpointsCount(checkpointsPath, 1)
+            assertCheckpointsCount(checkpointsQueue, 1)
             assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 11)
 
             currentTime.addAndGet(60.seconds.inWholeMilliseconds)
@@ -413,35 +411,7 @@ class TestSequencerCheckpoints {
                 ).success,
             )
 
-            assertCheckpointsCount(checkpointsPath, 2)
-
-            sequencerApp.stop()
-            corruptLatestCheckpoint()
-            sequencerApp.start()
-
-            currentTime.addAndGet(1.seconds.inWholeMilliseconds)
-
-            gateway.applyOrderBatch(
-                orderBatch {
-                    this.guid = UUID.randomUUID().toString()
-                    this.marketId = btcEthMarketId.value
-                    this.wallet = wallet2.value
-                    this.ordersToAdd.add(
-                        order {
-                            this.guid = Random.nextLong()
-                            this.amount = BigDecimal("0.0011").inSats().toIntegerValue()
-                            this.levelIx = 0
-                            this.type = Order.Type.MarketBuy
-                        },
-                    )
-                },
-            ).also {
-                assertTrue(it.success)
-                assertEquals(3, it.sequencerResponse.ordersChangedCount)
-            }
-
-            assertCheckpointsCount(checkpointsPath, 2)
-            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 13)
+            assertCheckpointsCount(checkpointsQueue, 2)
         } finally {
             gatewayApp.stop()
             sequencerApp.stop()
@@ -459,10 +429,15 @@ class TestSequencerCheckpoints {
         }
     }
 
-    private fun assertCheckpointsCount(path: Path, expectedCount: Long) {
-        Files.list(path).use { list ->
-            assertEquals(expectedCount, list.count())
-        }
+    private fun assertCheckpointsCount(checkpointsQueue: ChronicleQueue, expectedCount: Long) {
+        assertEquals(
+            expectedCount,
+            if (checkpointsQueue.lastIndex() == -1L) {
+                0
+            } else {
+                (checkpointsQueue as SingleChronicleQueue).countExcerpts(checkpointsQueue.firstIndex(), checkpointsQueue.lastIndex()) + 1
+            },
+        )
     }
 
     private fun assertOutputQueueContainsNoDuplicates(outputQueue: ChronicleQueue, expectedMessagesCount: Int) {
@@ -493,26 +468,6 @@ class TestSequencerCheckpoints {
 
         assertEquals(expectedMessagesCount, processedRequestGuids.size)
     }
-
-    private fun corruptLatestCheckpoint() {
-        // delete checkpoint for one of the markets
-        Files
-            .list(latestCheckpointPath())
-            .filter { it.fileName.toString().startsWith("market_") }
-            .toList()
-            .first()
-            .toFile()
-            .delete()
-    }
-
-    private fun latestCheckpointPath(): Path =
-        Files.list(checkpointsPath).toList()
-            .map { it.fileName.name.toLong() }
-            .maxOf { it }
-            .toString()
-            .let {
-                Path.of(checkpointsPath.toString(), it)
-            }
 
     @Test
     fun `test state storing and loading - empty`() {
@@ -969,16 +924,22 @@ class TestSequencerCheckpoints {
         )
     }
 
+    @Test
+    fun `restoring from checkpoint throws on cycle mismatch`() {
+        val initialState = SequencerState()
+        initialState.persist(checkpointsQueue, 1)
+
+        assertThrows<RuntimeException>("Invalid cycle in the checkpoint. Expected 2, got 1") {
+            SequencerState().apply { load(checkpointsQueue, 2) }
+        }
+    }
+
     private fun verifySerialization(initialState: SequencerState) {
-        checkpointsPath.toFile().deleteRecursively()
-        checkpointsPath.createDirectories()
+        verifyMarketsCheckpoints(initialState)
 
-        val checkpointPath = Path.of(checkpointsPath.toString(), "1")
-        initialState.persist(checkpointPath)
+        initialState.persist(checkpointsQueue, 1)
 
-        verifySerializedOrdersContent(initialState, checkpointPath)
-
-        val restoredState = SequencerState().apply { load(checkpointPath) }
+        val restoredState = SequencerState().apply { load(checkpointsQueue, 1) }
 
         initialState.markets.values.forEach { initialStateMarket ->
             val restoredStateMarket = restoredState.markets.getValue(initialStateMarket.id)
@@ -1020,35 +981,25 @@ class TestSequencerCheckpoints {
         assertEquals(initialState, restoredState)
     }
 
-    private fun verifySerializedOrdersContent(initialState: SequencerState, checkpointPath: Path) {
-        val marketIds = FileInputStream(Path.of(checkpointPath.toString(), "metainfo").toFile()).use { inputStream ->
-            MetaInfoCheckpoint.parseFrom(inputStream).marketsList.map(::MarketId)
-        }
-        assertEquals(initialState.markets.keys, marketIds.toSet())
+    private fun verifyMarketsCheckpoints(initialState: SequencerState) {
+        initialState.markets.values.forEach { market ->
+            val marketCheckpoint = market.toCheckpoint()
 
-        marketIds.forEach { marketId ->
-            val marketCheckpointFileName = "market_${marketId.baseAsset()}_${marketId.quoteAsset()}"
-            FileInputStream(Path.of(checkpointPath.toString(), marketCheckpointFileName).toFile()).use { inputStream ->
-                val marketCheckpoint = MarketCheckpoint.parseFrom(inputStream)
+            assertEquals(market.id, marketCheckpoint.id.toMarketId())
+            assertEquals(market.tickSize, marketCheckpoint.tickSize.toBigDecimal())
+            assertEquals(market.maxOrdersPerLevel, marketCheckpoint.maxOrdersPerLevel)
+            assertEquals(market.baseDecimals, marketCheckpoint.baseDecimals)
+            assertEquals(market.quoteDecimals, marketCheckpoint.quoteDecimals)
 
-                initialState.markets[marketId]!!.let { initialMarket ->
-                    assertEquals(initialMarket.id, marketCheckpoint.id.toMarketId())
-                    assertEquals(initialMarket.tickSize, marketCheckpoint.tickSize.toBigDecimal())
-                    assertEquals(initialMarket.maxOrdersPerLevel, marketCheckpoint.maxOrdersPerLevel)
-                    assertEquals(initialMarket.baseDecimals, marketCheckpoint.baseDecimals)
-                    assertEquals(initialMarket.quoteDecimals, marketCheckpoint.quoteDecimals)
-
-                    // verify checkpoint contains exact number of orders
-                    assertEquals(
-                        initialMarket.ordersByGuid.map { (_, v) -> v.guid }.toSet(),
-                        marketCheckpoint.levelsList.map { level ->
-                            level.ordersList.map {
-                                OrderGuid(it.guid)
-                            }
-                        }.flatten().toSet(),
-                    )
-                }
-            }
+            // verify checkpoint contains exact number of orders
+            assertEquals(
+                market.ordersByGuid.map { (_, v) -> v.guid }.toSet(),
+                marketCheckpoint.levelsList.map { level ->
+                    level.ordersList.map {
+                        OrderGuid(it.guid)
+                    }
+                }.flatten().toSet(),
+            )
         }
     }
 

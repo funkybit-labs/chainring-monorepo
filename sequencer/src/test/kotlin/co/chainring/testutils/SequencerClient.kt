@@ -34,7 +34,7 @@ import kotlin.random.Random
 import kotlin.test.assertNotNull
 
 class SequencerClient(clock: Clock) {
-    private val sequencer = SequencerApp(clock, checkpointsPath = null)
+    private val sequencer = SequencerApp(clock, checkpointsQueue = null)
 
     data class Asset(
         val name: String,

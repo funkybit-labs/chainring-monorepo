@@ -3,11 +3,10 @@ package co.chainring.sequencer
 import co.chainring.sequencer.apps.GatewayApp
 import co.chainring.sequencer.apps.SequencerApp
 import co.chainring.sequencer.apps.SequencerResponseProcessorApp
+import co.chainring.sequencer.core.checkpointsQueue
 import co.chainring.sequencer.core.inputQueue
 import co.chainring.sequencer.core.outputQueue
-import co.chainring.sequencer.core.queueHome
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.nio.file.Path
 import kotlin.system.exitProcess
 
 private val logger = KotlinLogging.logger {}
@@ -37,8 +36,8 @@ fun main(args: Array<String>) {
     try {
         val sequencer = when (mode) {
             Mode.All, Mode.Sequencer -> SequencerApp(
-                checkpointsPath = if (System.getenv("CHECKPOINTS_ENABLED").toBoolean()) {
-                    Path.of(queueHome, "checkpoints")
+                checkpointsQueue = if (System.getenv("CHECKPOINTS_ENABLED").toBoolean()) {
+                    checkpointsQueue
                 } else {
                     null
                 },

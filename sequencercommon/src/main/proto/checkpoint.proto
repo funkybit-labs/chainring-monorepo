@@ -12,13 +12,6 @@ message WithdrawalFee {
   IntegerValue value = 2;
 }
 
-message MetaInfoCheckpoint {
-  repeated string markets = 1;
-  uint64 makerFeeRate = 2;
-  uint64 takerFeeRate = 3;
-  repeated WithdrawalFee withdrawalFees = 4;
-}
-
 message BalancesCheckpoint {
   repeated Balance balances = 1;
 
