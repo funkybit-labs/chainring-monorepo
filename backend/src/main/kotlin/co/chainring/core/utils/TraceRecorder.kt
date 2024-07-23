@@ -16,6 +16,7 @@ interface TraceRecorder {
         UpdateOrder,
         CancelOrder,
         GetOrder,
+        GetOrderBook,
         ListOrders,
         CancelOpenOrders,
         BatchOrders,

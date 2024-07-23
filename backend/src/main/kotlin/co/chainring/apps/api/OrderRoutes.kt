@@ -13,29 +13,19 @@ import co.chainring.apps.api.model.CreateOrderApiResponse
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrdersApiResponse
 import co.chainring.apps.api.model.RequestStatus
-import co.chainring.apps.api.model.Trade
-import co.chainring.apps.api.model.TradesApiResponse
 import co.chainring.apps.api.model.errorResponse
 import co.chainring.apps.api.model.orderNotFoundError
 import co.chainring.apps.api.model.processingError
 import co.chainring.apps.api.model.unexpectedError
 import co.chainring.apps.api.services.ExchangeApiService
-import co.chainring.core.model.Symbol
-import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
-import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
-import co.chainring.core.model.db.SettlementStatus
-import co.chainring.core.model.db.TradeId
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.toOrderResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
-import kotlinx.datetime.toInstant
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.Tag
 import org.http4k.contract.div
@@ -240,55 +230,6 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
         } bindContract Method.POST to { request ->
             Response(Status.OK).with(
                 responseBody of exchangeApiService.orderBatch(request.principal, requestBody(request)),
-            )
-        }
-    }
-
-    fun listTrades(): ContractRoute {
-        val responseBody = Body.auto<TradesApiResponse>().toLens()
-
-        return "trades" meta {
-            operationId = "list-trades"
-            summary = "List trades"
-            security = signedTokenSecurity
-            tags += listOf(Tag("trade"))
-            queries += Query.string().optional("before-timestamp", "Return trades executed before provided timestamp")
-            queries += Query.string().optional("limit", "Number of trades to return")
-            returning(
-                Status.OK,
-                responseBody to TradesApiResponse(
-                    listOf(
-                        Trade(
-                            TradeId("trade_1234"),
-                            Clock.System.now(),
-                            OrderId("1234"),
-                            MarketId("BTC/ETH"),
-                            ExecutionRole.Taker,
-                            counterOrderId = OrderId("4321"),
-                            OrderSide.Buy,
-                            12345.toBigInteger(),
-                            17.61.toBigDecimal(),
-                            500.toBigInteger(),
-                            Symbol("ETH"),
-                            SettlementStatus.Pending,
-                        ),
-                    ),
-                ),
-            )
-        } bindContract Method.GET to { request ->
-            val timestamp = request.query("before-timestamp")?.toInstant() ?: Instant.DISTANT_FUTURE
-            val limit = request.query("limit")?.toInt() ?: 100
-
-            val trades = transaction {
-                OrderExecutionEntity.listForWallet(
-                    wallet = WalletEntity.getOrCreate(request.principal),
-                    beforeTimestamp = timestamp,
-                    limit = limit,
-                ).map { it.toTradeResponse() }
-            }
-
-            Response(Status.OK).with(
-                responseBody of TradesApiResponse(trades = trades),
             )
         }
     }

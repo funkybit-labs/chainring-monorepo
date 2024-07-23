@@ -2,6 +2,7 @@ package co.chainring.core.services
 
 import co.chainring.core.model.Address
 import co.chainring.core.model.db.ChainId
+import co.chainring.testfixtures.DbTestHelpers.createChain
 import co.chainring.testutils.TestWithDb
 import org.awaitility.kotlin.await
 import org.jetbrains.exposed.sql.transactions.TransactionManager

@@ -16,6 +16,7 @@ import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.DepositApiResponse
 import co.chainring.apps.api.model.FaucetApiRequest
 import co.chainring.apps.api.model.FaucetApiResponse
+import co.chainring.apps.api.model.GetOrderBookApiResponse
 import co.chainring.apps.api.model.ListDepositsApiResponse
 import co.chainring.apps.api.model.ListWithdrawalsApiResponse
 import co.chainring.apps.api.model.Market
@@ -282,6 +283,9 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
 
     override fun cancelOpenOrders() =
         tryCancelOpenOrders().assertSuccess()
+
+    override fun getOrderBook(marketId: MarketId): GetOrderBookApiResponse =
+        tryGetOrderBook(marketId).assertSuccess()
 
     override fun createDeposit(apiRequest: CreateDepositApiRequest): DepositApiResponse =
         tryCreateDeposit(apiRequest).assertSuccess()

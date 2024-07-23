@@ -4,21 +4,18 @@ import co.chainring.apps.api.model.websocket.LastTrade
 import co.chainring.apps.api.model.websocket.LastTradeDirection
 import co.chainring.apps.api.model.websocket.OrderBook
 import co.chainring.apps.api.model.websocket.OrderBookEntry
-import co.chainring.core.model.SequencerOrderId
-import co.chainring.core.model.Symbol
-import co.chainring.core.utils.generateHexString
-import co.chainring.core.utils.toFundamentalUnits
+import co.chainring.testfixtures.DbTestHelpers.createChain
+import co.chainring.testfixtures.DbTestHelpers.createMarket
+import co.chainring.testfixtures.DbTestHelpers.createNativeSymbol
+import co.chainring.testfixtures.DbTestHelpers.createSymbol
+import co.chainring.testfixtures.DbTestHelpers.createWallet
+import co.chainring.testfixtures.OrderBookTestHelper.Order
+import co.chainring.testfixtures.OrderBookTestHelper.Trade
+import co.chainring.testfixtures.OrderBookTestHelper.verifyOrderBook
 import co.chainring.testutils.TestWithDb
-import kotlinx.datetime.Clock
-import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.math.BigDecimal
-import java.math.BigInteger
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class OrderBookTest : TestWithDb() {
@@ -64,6 +61,7 @@ class OrderBookTest : TestWithDb() {
             ordersInDb = listOf(
                 Order(
                     OrderId("order_1"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -73,6 +71,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_2"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -82,6 +81,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_3"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -91,6 +91,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_4"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -100,6 +101,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_5"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -132,6 +134,7 @@ class OrderBookTest : TestWithDb() {
             ordersInDb = listOf(
                 Order(
                     OrderId("order_1"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -141,6 +144,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_2"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -150,6 +154,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_3"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -181,6 +186,7 @@ class OrderBookTest : TestWithDb() {
             ordersInDb = listOf(
                 Order(
                     OrderId("order_1"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -190,6 +196,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_2"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -199,6 +206,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_3"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -208,6 +216,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_4"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -217,6 +226,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_5"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -226,6 +236,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_6"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -235,6 +246,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_7"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -244,6 +256,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_8"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -279,6 +292,7 @@ class OrderBookTest : TestWithDb() {
             ordersInDb = listOf(
                 Order(
                     OrderId("order_1"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -288,6 +302,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_2"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -297,6 +312,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_3"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -306,6 +322,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_4"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -315,6 +332,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_5"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -324,6 +342,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_6"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Market,
@@ -333,6 +352,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_7"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -342,6 +362,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_8"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -351,6 +372,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_9"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -360,6 +382,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_11"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -369,6 +392,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_12"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -378,6 +402,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_13"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -387,6 +412,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_14"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -396,6 +422,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_15"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -405,6 +432,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_16"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -414,6 +442,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_17"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -423,6 +452,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_18"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -432,6 +462,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_19"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -467,6 +498,7 @@ class OrderBookTest : TestWithDb() {
             ordersInDb = listOf(
                 Order(
                     OrderId("order_1"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -476,6 +508,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_2"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -485,6 +518,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_3"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -494,6 +528,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_4"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -535,6 +570,7 @@ class OrderBookTest : TestWithDb() {
             ordersInDb = listOf(
                 Order(
                     OrderId("order_1"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -544,6 +580,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_2"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -553,6 +590,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_3"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -562,6 +600,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_4"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -571,6 +610,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_5"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -580,6 +620,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_6"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -629,6 +670,7 @@ class OrderBookTest : TestWithDb() {
             ordersInDb = listOf(
                 Order(
                     OrderId("order_1"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -638,6 +680,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_2"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -647,6 +690,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_3"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -656,6 +700,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_4"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -665,6 +710,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_5"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -674,6 +720,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_6"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -723,6 +770,7 @@ class OrderBookTest : TestWithDb() {
             ordersInDb = listOf(
                 Order(
                     OrderId("order_1"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -732,6 +780,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_2"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -741,6 +790,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_3"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -750,6 +800,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_4"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -759,6 +810,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_5"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -768,6 +820,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_6"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -817,6 +870,7 @@ class OrderBookTest : TestWithDb() {
             ordersInDb = listOf(
                 Order(
                     OrderId("order_1"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -826,6 +880,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_2"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -835,6 +890,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_3"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -844,6 +900,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_4"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -853,6 +910,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_5"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -862,6 +920,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_6"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -871,6 +930,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_7"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -928,6 +988,7 @@ class OrderBookTest : TestWithDb() {
             ordersInDb = listOf(
                 Order(
                     OrderId("order_1"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -937,6 +998,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_2"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -946,6 +1008,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_3"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -955,6 +1018,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_4"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -964,6 +1028,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_5"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -973,6 +1038,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_6"),
+                    wallets.random(),
                     btcEthMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -982,6 +1048,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_7"),
+                    wallets.random(),
                     ethUsdcMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -991,6 +1058,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_8"),
+                    wallets.random(),
                     ethUsdcMarket,
                     OrderSide.Sell,
                     OrderType.Limit,
@@ -1000,6 +1068,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_9"),
+                    wallets.random(),
                     ethUsdcMarket,
                     OrderSide.Buy,
                     OrderType.Limit,
@@ -1009,6 +1078,7 @@ class OrderBookTest : TestWithDb() {
                 ),
                 Order(
                     OrderId("order_10"),
+                    wallets.random(),
                     ethUsdcMarket,
                     OrderSide.Sell,
                     OrderType.Market,
@@ -1059,75 +1129,12 @@ class OrderBookTest : TestWithDb() {
         )
     }
 
-    data class Order(
-        val id: OrderId,
-        val market: MarketId,
-        val side: OrderSide,
-        val type: OrderType,
-        val status: OrderStatus,
-        val price: BigDecimal?,
-        val amount: BigDecimal,
-    )
-
-    data class Trade(
-        val market: MarketId,
-        val timeSinceHappened: Duration,
-        val buyOrder: OrderId,
-        val sellOrder: OrderId,
-        val amount: BigDecimal,
-        val price: BigDecimal,
-    )
-
-    private fun verifyOrderBook(marketId: MarketId, ordersInDb: List<Order>, tradesInDb: List<Trade>, expected: OrderBook) {
-        transaction {
-            val market = MarketEntity[marketId]
-
-            ordersInDb.forEachIndexed { i, order ->
-                createOrder(
-                    MarketEntity[order.market], wallets.random(),
-                    order.side, order.type, order.amount, order.price, order.status,
-                    SequencerOrderId(i.toLong()),
-                    order.id,
-                )
-            }
-
-            TransactionManager.current().commit()
-
-            val now = Clock.System.now()
-            tradesInDb.forEach { trade ->
-                val tradeMarket = MarketEntity[trade.market]
-
-                val tradeEntity = TradeEntity.create(
-                    now.minus(trade.timeSinceHappened),
-                    tradeMarket,
-                    amount = trade.amount.toFundamentalUnits(tradeMarket.baseSymbol.decimals),
-                    price = trade.price,
-                    tradeHash = generateHexString(32),
-                    0L,
-                )
-
-                listOf(Pair(trade.buyOrder, trade.sellOrder), Pair(trade.sellOrder, trade.buyOrder)).forEach { (orderId, counterOrderId) ->
-                    val order = OrderEntity[orderId]
-                    val counterOrder = OrderEntity[counterOrderId]
-                    assertTrue(
-                        order.status == OrderStatus.Filled || order.status == OrderStatus.Partial,
-                        "Order must be filled or partially filled",
-                    )
-                    OrderExecutionEntity.create(
-                        timestamp = tradeEntity.timestamp,
-                        orderEntity = order,
-                        counterOrderEntity = counterOrder,
-                        tradeEntity = tradeEntity,
-                        role = if (order.type == OrderType.Market) ExecutionRole.Taker else ExecutionRole.Maker,
-                        feeAmount = BigInteger.ZERO,
-                        feeSymbol = Symbol(order.market.quoteSymbol.name),
-                    )
-                }
-            }
-
-            TransactionManager.current().commit()
-
-            assertEquals(expected, OrderEntity.getOrderBook(market))
-        }
+    private fun verifyOrderBook(
+        marketId: MarketId,
+        ordersInDb: List<Order>,
+        tradesInDb: List<Trade>,
+        expected: OrderBook,
+    ) {
+        verifyOrderBook(marketId, ordersInDb, tradesInDb, expected, OrderEntity::getOrderBook)
     }
 }

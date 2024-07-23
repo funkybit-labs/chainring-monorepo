@@ -2,6 +2,11 @@ package co.chainring.core.model.db
 
 import co.chainring.core.model.Symbol
 import co.chainring.core.utils.generateHexString
+import co.chainring.testfixtures.DbTestHelpers.createChain
+import co.chainring.testfixtures.DbTestHelpers.createMarket
+import co.chainring.testfixtures.DbTestHelpers.createNativeSymbol
+import co.chainring.testfixtures.DbTestHelpers.createSymbol
+import co.chainring.testfixtures.DbTestHelpers.createWallet
 import co.chainring.testutils.TestWithDb
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.dao.id.EntityID
