@@ -51,58 +51,72 @@ data class SequencerState(
     }
 
     fun load(checkpointsQueue: RollingChronicleQueue, expectedCycle: Int) {
-        val checkpointsTailer = checkpointsQueue.createTailer()
-        checkpointsTailer.moveToIndex(checkpointsQueue.lastIndex())
-        checkpointsTailer.readingDocument().use { docCtx ->
-            val wire = docCtx.wire()!!
-            val cycle = wire.read("cycle").readInt()
+        measureNanoTime {
+            val checkpointsTailer = checkpointsQueue.createTailer()
+            checkpointsTailer.moveToIndex(checkpointsQueue.lastIndex())
+            checkpointsTailer.readingDocument().use { docCtx ->
+                val wire = docCtx.wire()!!
+                val cycle = wire.read("cycle").readInt()
 
-            if (cycle != expectedCycle) {
-                throw RuntimeException("Invalid cycle in the checkpoint. Expected $expectedCycle, got $cycle")
-            }
-
-            logger.debug { "Restoring from checkpoint for cycle $cycle" }
-            feeRates = FeeRates(
-                maker = FeeRate(wire.read("makerFeeRate").readLong()),
-                taker = FeeRate(wire.read("takerFeeRate").readLong()),
-            )
-
-            wire.read("withdrawalFees").sequence(withdrawalFees) { map, v ->
-                while (v.hasNextSequenceItem()) {
-                    val fees = WithdrawalFee.parseFrom(v.bytes())
-                    map[Symbol(fees.asset)] = fees.value.toBigInteger()
+                if (cycle != expectedCycle) {
+                    throw RuntimeException("Invalid cycle in the checkpoint. Expected $expectedCycle, got $cycle")
                 }
-            }
 
-            measureNanoTime {
-                val balancesCheckpoint = BalancesCheckpoint.parseFrom(wire.read("balances").bytes())
-                balancesCheckpoint.balancesList.forEach { balanceCheckpoint ->
-                    val walletAddress = balanceCheckpoint.wallet.toWalletAddress()
-                    val asset = balanceCheckpoint.asset.toAsset()
-                    balances.getOrPut(walletAddress) { mutableMapOf() }[asset] = balanceCheckpoint.amount.toBigInteger()
-                    if (balanceCheckpoint.consumedCount > 0) {
-                        consumed.getOrPut(walletAddress) { mutableMapOf() }.getOrPut(asset) { mutableMapOf() }.putAll(
-                            balanceCheckpoint.consumedList.associate {
-                                it.marketId.toMarketId() to it.consumed.toBigInteger()
-                            },
-                        )
+                logger.debug { "Restoring from checkpoint for cycle $cycle" }
+
+                measureNanoTime {
+                    feeRates = FeeRates(
+                        maker = FeeRate(wire.read("makerFeeRate").readLong()),
+                        taker = FeeRate(wire.read("takerFeeRate").readLong()),
+                    )
+
+                    wire.read("withdrawalFees").sequence(withdrawalFees) { map, v ->
+                        while (v.hasNextSequenceItem()) {
+                            val fees = WithdrawalFee.parseFrom(v.bytes())
+                            map[Symbol(fees.asset)] = fees.value.toBigInteger()
+                        }
                     }
+                }.let {
+                    logger.debug { "load of fee rates took ${humanReadableNanoseconds(it)}" }
                 }
-            }.let {
-                logger.debug { "load of balances took ${humanReadableNanoseconds(it)}" }
-            }
 
-            measureNanoTime {
-                wire.read("markets").sequence(markets) { map, v ->
-                    while (v.hasNextSequenceItem()) {
-                        val marketCheckpoint = MarketCheckpoint.parseFrom(v.bytes())
-                        val market = Market.fromCheckpoint(marketCheckpoint)
-                        map[market.id] = market
+                measureNanoTime {
+                    val balancesCheckpoint = BalancesCheckpoint.parseFrom(wire.read("balances").bytes())
+                    balancesCheckpoint.balancesList.forEach { balanceCheckpoint ->
+                        val walletAddress = balanceCheckpoint.wallet.toWalletAddress()
+                        val asset = balanceCheckpoint.asset.toAsset()
+                        balances.getOrPut(walletAddress) { mutableMapOf() }[asset] = balanceCheckpoint.amount.toBigInteger()
+                        if (balanceCheckpoint.consumedCount > 0) {
+                            consumed.getOrPut(walletAddress) { mutableMapOf() }.getOrPut(asset) { mutableMapOf() }.putAll(
+                                balanceCheckpoint.consumedList.associate {
+                                    it.marketId.toMarketId() to it.consumed.toBigInteger()
+                                },
+                            )
+                        }
                     }
+                }.let {
+                    logger.debug { "load of balances took ${humanReadableNanoseconds(it)}" }
                 }
-            }.let {
-                logger.debug { "load all ${markets.size} markets took ${humanReadableNanoseconds(it)}" }
+
+                measureNanoTime {
+                    wire.read("markets").sequence(markets) { map, v ->
+                        while (v.hasNextSequenceItem()) {
+                            var market: Market
+                            measureNanoTime {
+                                val marketCheckpoint = MarketCheckpoint.parseFrom(v.bytes())
+                                market = Market.fromCheckpoint(marketCheckpoint)
+                                map[market.id] = market
+                            }.let {
+                                logger.debug { "load of market ${market.id} took ${humanReadableNanoseconds(it)}" }
+                            }
+                        }
+                    }
+                }.let {
+                    logger.debug { "load all ${markets.size} markets took ${humanReadableNanoseconds(it)}" }
+                }
             }
+        }.let {
+            logger.debug { "load of checkpoint took ${humanReadableNanoseconds(it)}" }
         }
     }
 
