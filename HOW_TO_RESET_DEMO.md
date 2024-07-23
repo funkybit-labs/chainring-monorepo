@@ -61,6 +61,29 @@ and then truncate db tables using favourite SQL editor. In this way OHLC records
 -- delete from key_value_store where key = 'LastProcessedOutputIndex';
 ```
 
+## Reset anvil (if necessary)
+
+First stop anvil and otterscan:
+```
+python3 ecs-deploy.py stop --env demo --services anvil,anvil2,otterscan,otterscan2
+```
+
+Next, in `terraform/demo/main.tf` change the `mount_efs_volume = true` lines to `mount_efs_volume = false` and run `terraform apply`.  
+Then, in `terraform/demo/main.tf` change the `mount_efs_volume = false` lines back to `mount_efs_volume = true` and re-run `terraform apply`.
+
+Now, upgrade anvil so it gets the new efs volume in its task config, and then start anvil and otterscan:
+
+```
+python3 ecs-deploy.py upgrade --env demo --services anvil,anvil2
+python3 ecs-deploy.py start --env demo --services anvil,anvil2
+python3 ecs-deploy.py start --env demo --services otterscan,otterscan2
+```
+
+Finally, null out any symbol contract addresses in the DB so that they get redeployed
+```
+-- update symbol set contract_address = null;
+```
+
 ## Start & seed
 Start ring and sequencer
 ```
