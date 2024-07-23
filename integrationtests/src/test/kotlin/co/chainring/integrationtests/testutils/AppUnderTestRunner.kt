@@ -85,7 +85,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                     private val gatewayApp = GatewayApp(GatewayConfig(port = 5337))
                     private val sequencerApp = SequencerApp(
                         // we want sequencer to start from the clean-slate
-                        checkpointsPath = null,
+                        checkpointsQueue = null,
                         inSandboxMode = true,
                     )
                     private val sequencerResponseProcessorApp = SequencerResponseProcessorApp(

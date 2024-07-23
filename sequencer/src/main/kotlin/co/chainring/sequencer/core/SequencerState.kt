@@ -6,19 +6,15 @@ import co.chainring.sequencer.proto.BalancesCheckpoint
 import co.chainring.sequencer.proto.BalancesCheckpointKt.BalanceKt.consumption
 import co.chainring.sequencer.proto.BalancesCheckpointKt.balance
 import co.chainring.sequencer.proto.MarketCheckpoint
-import co.chainring.sequencer.proto.MetaInfoCheckpoint
 import co.chainring.sequencer.proto.StateDump
+import co.chainring.sequencer.proto.WithdrawalFee
 import co.chainring.sequencer.proto.balancesCheckpoint
 import co.chainring.sequencer.proto.feeRates
-import co.chainring.sequencer.proto.metaInfoCheckpoint
 import co.chainring.sequencer.proto.stateDump
 import co.chainring.sequencer.proto.withdrawalFee
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.io.FileInputStream
-import java.io.FileOutputStream
+import net.openhft.chronicle.queue.impl.RollingChronicleQueue
 import java.math.BigInteger
-import java.nio.file.Path
-import kotlin.io.path.createDirectories
 import kotlin.system.measureNanoTime
 
 typealias BalanceByAsset = MutableMap<Asset, BigInteger>
@@ -54,104 +50,108 @@ data class SequencerState(
         withdrawalFees.clear()
     }
 
-    fun load(sourceDir: Path) {
+    fun load(checkpointsQueue: RollingChronicleQueue, expectedCycle: Int) {
         measureNanoTime {
-            FileInputStream(Path.of(sourceDir.toString(), "balances").toFile()).use { inputStream ->
-                val balancesCheckpoint = BalancesCheckpoint.parseFrom(inputStream)
-                balancesCheckpoint.balancesList.forEach { balanceCheckpoint ->
-                    val walletAddress = balanceCheckpoint.wallet.toWalletAddress()
-                    val asset = balanceCheckpoint.asset.toAsset()
-                    balances.getOrPut(walletAddress) { mutableMapOf() }[asset] = balanceCheckpoint.amount.toBigInteger()
-                    if (balanceCheckpoint.consumedCount > 0) {
-                        consumed.getOrPut(walletAddress) { mutableMapOf() }.getOrPut(asset) { mutableMapOf() }.putAll(
-                            balanceCheckpoint.consumedList.associate {
-                                it.marketId.toMarketId() to it.consumed.toBigInteger()
-                            },
-                        )
-                    }
+            val checkpointsTailer = checkpointsQueue.createTailer()
+            checkpointsTailer.moveToIndex(checkpointsQueue.lastIndex())
+            checkpointsTailer.readingDocument().use { docCtx ->
+                val wire = docCtx.wire()!!
+                val cycle = wire.read("cycle").readInt()
+
+                if (cycle != expectedCycle) {
+                    throw RuntimeException("Invalid cycle in the checkpoint. Expected $expectedCycle, got $cycle")
                 }
-            }
-        }.let {
-            logger.debug { "load of balances took ${humanReadableNanoseconds(it)}" }
-        }
 
-        measureNanoTime {
-            val metaInfoCheckpoint = FileInputStream(Path.of(sourceDir.toString(), "metainfo").toFile()).use { inputStream ->
-                MetaInfoCheckpoint.parseFrom(inputStream)
-            }
+                logger.debug { "Restoring from checkpoint for cycle $cycle" }
 
-            feeRates = FeeRates(
-                maker = FeeRate(metaInfoCheckpoint.makerFeeRate),
-                taker = FeeRate(metaInfoCheckpoint.takerFeeRate),
-            )
-
-            val marketIds = metaInfoCheckpoint.marketsList.map(::MarketId)
-
-            marketIds.forEach { marketId ->
                 measureNanoTime {
-                    val marketCheckpointFileName = "market_${marketId.baseAsset()}_${marketId.quoteAsset()}"
-                    FileInputStream(Path.of(sourceDir.toString(), marketCheckpointFileName).toFile()).use { inputStream ->
-                        val marketCheckpoint = MarketCheckpoint.parseFrom(inputStream)
-                        val market = Market.fromCheckpoint(marketCheckpoint)
-                        markets[market.id] = market
+                    feeRates = FeeRates(
+                        maker = FeeRate(wire.read("makerFeeRate").readLong()),
+                        taker = FeeRate(wire.read("takerFeeRate").readLong()),
+                    )
+
+                    wire.read("withdrawalFees").sequence(withdrawalFees) { map, v ->
+                        while (v.hasNextSequenceItem()) {
+                            val fees = WithdrawalFee.parseFrom(v.bytes())
+                            map[Symbol(fees.asset)] = fees.value.toBigInteger()
+                        }
                     }
                 }.let {
-                    logger.debug { "load of marketId market took ${humanReadableNanoseconds(it)}" }
+                    logger.debug { "load of fee rates took ${humanReadableNanoseconds(it)}" }
+                }
+
+                measureNanoTime {
+                    val balancesCheckpoint = BalancesCheckpoint.parseFrom(wire.read("balances").bytes())
+                    balancesCheckpoint.balancesList.forEach { balanceCheckpoint ->
+                        val walletAddress = balanceCheckpoint.wallet.toWalletAddress()
+                        val asset = balanceCheckpoint.asset.toAsset()
+                        balances.getOrPut(walletAddress) { mutableMapOf() }[asset] = balanceCheckpoint.amount.toBigInteger()
+                        if (balanceCheckpoint.consumedCount > 0) {
+                            consumed.getOrPut(walletAddress) { mutableMapOf() }.getOrPut(asset) { mutableMapOf() }.putAll(
+                                balanceCheckpoint.consumedList.associate {
+                                    it.marketId.toMarketId() to it.consumed.toBigInteger()
+                                },
+                            )
+                        }
+                    }
+                }.let {
+                    logger.debug { "load of balances took ${humanReadableNanoseconds(it)}" }
+                }
+
+                measureNanoTime {
+                    wire.read("markets").sequence(markets) { map, v ->
+                        while (v.hasNextSequenceItem()) {
+                            var market: Market
+                            measureNanoTime {
+                                val marketCheckpoint = MarketCheckpoint.parseFrom(v.bytes())
+                                market = Market.fromCheckpoint(marketCheckpoint)
+                                map[market.id] = market
+                            }.let {
+                                logger.debug { "load of market ${market.id} took ${humanReadableNanoseconds(it)}" }
+                            }
+                        }
+                    }
+                }.let {
+                    logger.debug { "load all ${markets.size} markets took ${humanReadableNanoseconds(it)}" }
                 }
             }
-
-            withdrawalFees =
-                metaInfoCheckpoint.withdrawalFeesList.associate { Symbol(it.asset) to it.value.toBigInteger() }
-                    .toMutableMap()
         }.let {
-            logger.debug { "load all ${markets.size} markets took ${humanReadableNanoseconds(it)}" }
+            logger.debug { "load of checkpoint took ${humanReadableNanoseconds(it)}" }
         }
     }
 
-    fun persist(destinationDir: Path) {
-        destinationDir.createDirectories()
-
-        // we are writing a list of markets into a separate file first so that
-        // when loading we could be sure that checkpoint files for all markets are present
-        FileOutputStream(Path.of(destinationDir.toString(), "metainfo").toFile()).use { outputStream ->
-            val marketIds = this.markets.keys.map { it.value }.sorted()
-            metaInfoCheckpoint {
-                this.markets.addAll(marketIds)
-                this.makerFeeRate = feeRates.maker.value
-                this.takerFeeRate = feeRates.taker.value
-                this.withdrawalFees.addAll(
-                    this@SequencerState.withdrawalFees.map {
-                        withdrawalFee {
-                            this.asset = it.key.value
-                            this.value = it.value.toIntegerValue()
-                        }
-                    },
-                )
-            }.writeTo(outputStream)
-        }
-
+    fun persist(checkpointsQueue: RollingChronicleQueue, currentCycle: Int) {
         measureNanoTime {
-            FileOutputStream(Path.of(destinationDir.toString(), "balances").toFile()).use { outputStream ->
-                getBalancesCheckpoint().writeTo(outputStream)
+            val checkpointsAppender = checkpointsQueue.acquireAppender()
+
+            checkpointsAppender.writingDocument().use { docCtx ->
+                docCtx.wire()!!
+                    .write("cycle")
+                    .int32(currentCycle)
+                    .write("makerFeeRate")!!
+                    .int64(feeRates.maker.value)
+                    .write("takerFeeRate")
+                    .int64(feeRates.taker.value)
+                    .write("withdrawalFees")
+                    .sequence(
+                        this@SequencerState.withdrawalFees.map {
+                            withdrawalFee {
+                                this.asset = it.key.value
+                                this.value = it.value.toIntegerValue()
+                            }.toByteArray()
+                        },
+                    )
+                    .write("balances")
+                    .bytes(getBalancesCheckpoint().toByteArray())
+                    .write("markets")
+                    .sequence(
+                        this@SequencerState.markets.values.sortedBy { it.id.value }.map { market ->
+                            market.toCheckpoint().toByteArray()
+                        },
+                    )
             }
         }.let {
-            logger.debug { "persist of balances took ${humanReadableNanoseconds(it)}" }
-        }
-
-        measureNanoTime {
-            markets.forEach { (id, market) ->
-                measureNanoTime {
-                    val fileName = "market_${id.baseAsset()}_${id.quoteAsset()}"
-
-                    FileOutputStream(Path.of(destinationDir.toString(), fileName).toFile()).use { outputStream ->
-                        market.toCheckpoint().writeTo(outputStream)
-                    }
-                }.let {
-                    logger.debug { "persist of $id market took ${humanReadableNanoseconds(it)}" }
-                }
-            }
-        }.let {
-            logger.debug { "persist all ${markets.size} markets took ${humanReadableNanoseconds(it)}" }
+            logger.debug { "persist took ${humanReadableNanoseconds(it)}" }
         }
     }
 
