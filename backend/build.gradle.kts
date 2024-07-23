@@ -5,6 +5,7 @@ plugins {
     kotlin("plugin.serialization") version "1.9.23"
     id("org.jmailen.kotlinter") version "4.2.0"
     id("com.google.cloud.tools.jib") version "3.4.1"
+    id("java-test-fixtures")
     application
 }
 
@@ -69,6 +70,7 @@ dependencies {
     implementation("io.github.novacrypto:Base58:2022.01.17")
 
     testImplementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
+    testFixturesImplementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
 
     implementation("io.grpc:grpc-kotlin-stub:$grpcKotlinStubVersion")
     implementation("io.grpc:grpc-protobuf:$grpcProtobufVersion")

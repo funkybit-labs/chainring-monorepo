@@ -22,9 +22,9 @@ data class ApiErrors(val errors: List<ApiError>)
 @Serializable
 enum class ReasonCode {
     OrderNotFound,
-
     WithdrawalNotFound,
     DepositNotFound,
+    MarketNotFound,
 
     SignatureNotValid,
     UnexpectedError,

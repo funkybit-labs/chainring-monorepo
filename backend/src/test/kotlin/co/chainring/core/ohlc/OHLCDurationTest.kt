@@ -5,6 +5,10 @@ import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OHLCEntity
+import co.chainring.testfixtures.DbTestHelpers.createChain
+import co.chainring.testfixtures.DbTestHelpers.createMarket
+import co.chainring.testfixtures.DbTestHelpers.createNativeSymbol
+import co.chainring.testfixtures.DbTestHelpers.createSymbol
 import co.chainring.testutils.TestWithDb
 import kotlinx.datetime.Instant
 import org.jetbrains.exposed.sql.transactions.transaction

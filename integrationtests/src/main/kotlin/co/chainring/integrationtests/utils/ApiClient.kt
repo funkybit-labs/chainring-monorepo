@@ -20,6 +20,7 @@ import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.DepositApiResponse
 import co.chainring.apps.api.model.FaucetApiRequest
 import co.chainring.apps.api.model.FaucetApiResponse
+import co.chainring.apps.api.model.GetOrderBookApiResponse
 import co.chainring.apps.api.model.ListDepositsApiResponse
 import co.chainring.apps.api.model.ListWithdrawalsApiResponse
 import co.chainring.apps.api.model.Order
@@ -229,6 +230,18 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .build()
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
+
+    fun tryGetOrderBook(marketId: MarketId): Either<ApiCallFailure, GetOrderBookApiResponse> =
+        executeAndTrace(
+            TraceRecorder.Op.GetOrderBook,
+            Request.Builder()
+                .url(
+                    "$apiServerRootUrl/v1/order-book".toHttpUrl().newBuilder().addPathSegment(marketId.value).build(),
+                )
+                .get()
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
     fun tryCreateDeposit(apiRequest: CreateDepositApiRequest): Either<ApiCallFailure, DepositApiResponse> =
         executeAndTrace(
@@ -442,6 +455,9 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
 
     open fun cancelOpenOrders() =
         tryCancelOpenOrders().throwOrReturn()
+
+    open fun getOrderBook(marketId: MarketId): GetOrderBookApiResponse =
+        tryGetOrderBook(marketId).throwOrReturn()
 
     open fun createDeposit(apiRequest: CreateDepositApiRequest): DepositApiResponse =
         tryCreateDeposit(apiRequest).throwOrReturn()

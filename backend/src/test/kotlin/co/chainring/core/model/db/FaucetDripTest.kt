@@ -1,6 +1,8 @@
 package co.chainring.core.model.db
 
 import co.chainring.core.model.Address
+import co.chainring.testfixtures.DbTestHelpers.createChain
+import co.chainring.testfixtures.DbTestHelpers.createSymbol
 import co.chainring.testutils.TestWithDb
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction

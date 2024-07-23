@@ -366,6 +366,9 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         fun getOrderBooks(markets: List<MarketEntity>): List<OrderBook> =
             markets.map { getOrderBook(it) }
 
+        fun getOrderBook(marketId: MarketId): OrderBook =
+            getOrderBook(MarketEntity[marketId])
+
         fun getOrderBook(market: MarketEntity): OrderBook {
             val priceScale = market.tickSize.stripTrailingZeros().scale() + 1
 
