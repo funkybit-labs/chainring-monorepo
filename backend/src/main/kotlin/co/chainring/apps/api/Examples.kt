@@ -24,6 +24,7 @@ import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.OrderStatus
+import co.chainring.core.model.db.TradeId
 import co.chainring.core.model.db.WithdrawalId
 import co.chainring.core.model.db.WithdrawalStatus
 import kotlinx.datetime.Clock
@@ -90,6 +91,7 @@ object Examples {
         originalAmount = BigInteger("100"),
         executions = listOf(
             Order.Execution(
+                tradeId = TradeId.generate(),
                 timestamp = Clock.System.now(),
                 amount = BigInteger("50"),
                 price = BigDecimal("500"),
@@ -117,6 +119,7 @@ object Examples {
         originalAmount = BigInteger("100"),
         executions = listOf(
             Order.Execution(
+                tradeId = TradeId.generate(),
                 timestamp = Clock.System.now(),
                 amount = BigInteger("50"),
                 price = BigDecimal("500"),
