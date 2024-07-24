@@ -538,6 +538,7 @@ class OrderRoutesApiTest : OrderBaseTest() {
         val trade = getTradesForOrders(listOf(marketBuyOrderApiResponse.orderId)).first().also {
             assertAmount(AssetAmount(baseSymbol, "0.00043210"), it.amount)
             assertAmount(AssetAmount(quoteSymbol, "17.550"), it.price)
+            assertEquals(takerApiClient.getOrder(marketBuyOrderApiResponse.orderId).executions.first().tradeId, it.id.value)
         }
 
         takerWsClient.apply {

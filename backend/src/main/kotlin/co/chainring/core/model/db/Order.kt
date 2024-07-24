@@ -167,6 +167,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 originalAmount = this.originalAmount,
                 executions = executions.map { execution ->
                     Order.Execution(
+                        tradeId = execution.trade.guid.value,
                         timestamp = execution.timestamp,
                         amount = execution.trade.amount,
                         price = execution.trade.price,
@@ -194,6 +195,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 originalAmount = this.originalAmount,
                 executions = executions.map { execution ->
                     Order.Execution(
+                        tradeId = execution.trade.guid.value,
                         timestamp = execution.timestamp,
                         amount = execution.trade.amount,
                         price = execution.trade.price,
@@ -221,6 +223,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 price = this.price!!,
                 executions = executions.map { execution ->
                     Order.Execution(
+                        tradeId = execution.trade.guid.value,
                         timestamp = execution.timestamp,
                         amount = execution.trade.amount,
                         price = execution.trade.price,
