@@ -11,7 +11,6 @@ import co.chainring.core.utils.toFundamentalUnits
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.Tag
-import org.http4k.contract.div
 import org.http4k.contract.meta
 import org.http4k.core.Body
 import org.http4k.core.Method

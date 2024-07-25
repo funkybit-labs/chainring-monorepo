@@ -5,6 +5,7 @@ import { apiClient, Balance, FeeRates, Order, OrderSide } from 'apiClient'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import {
   balancesTopic,
+  limitsForMarket,
   limitsTopic,
   OrderBook,
   orderBookTopic,
@@ -243,15 +244,14 @@ export function SwapInternals({
           ordersTopic,
           orderBookTopic(market.marketIds[0]),
           orderBookTopic(market.marketIds[1]),
-          limitsTopic(market.marketIds[0]),
-          limitsTopic(market.marketIds[1])
+          limitsTopic
         ]
       } else {
         return [
           balancesTopic,
           ordersTopic,
           orderBookTopic(market.id),
-          limitsTopic(market.id)
+          limitsTopic
         ]
       }
     }, [market]),
@@ -265,14 +265,29 @@ export function SwapInternals({
           } else {
             setOrderBook(message)
           }
-        } else if (message.type === 'MarketLimits') {
+        } else if (message.type === 'Limits') {
           if (market.isBackToBack()) {
-            message.marketId == market.marketIds[0]
-              ? setBaseLimit(message.base)
-              : setQuoteLimit(message.quote)
+            const firstMarketLimits = limitsForMarket(
+              message,
+              market.marketIds[0]
+            )
+            if (firstMarketLimits) {
+              setBaseLimit(firstMarketLimits.base)
+            }
+
+            const lastMarketLimits = limitsForMarket(
+              message,
+              market.marketIds[market.marketIds.length - 1]
+            )
+            if (lastMarketLimits) {
+              setQuoteLimit(lastMarketLimits.quote)
+            }
           } else {
-            setBaseLimit(message.base)
-            setQuoteLimit(message.quote)
+            const marketLimits = limitsForMarket(message, market.id)
+            if (marketLimits) {
+              setBaseLimit(marketLimits.base)
+              setQuoteLimit(marketLimits.quote)
+            }
           }
         } else if (message.type === 'Balances') {
           setBalances(message.balances)
