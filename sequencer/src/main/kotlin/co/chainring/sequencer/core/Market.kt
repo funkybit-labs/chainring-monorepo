@@ -12,11 +12,9 @@ import co.chainring.sequencer.proto.OrderChangeRejected
 import co.chainring.sequencer.proto.OrderChanged
 import co.chainring.sequencer.proto.OrderDisposition
 import co.chainring.sequencer.proto.TradeCreated
-import co.chainring.sequencer.proto.balanceChange
 import co.chainring.sequencer.proto.bidOfferState
 import co.chainring.sequencer.proto.copy
 import co.chainring.sequencer.proto.marketCheckpoint
-import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderChangeRejected
 import co.chainring.sequencer.proto.orderChanged
 import co.chainring.sequencer.proto.tradeCreated
@@ -173,18 +171,7 @@ data class Market(
         return AddOrdersResult(
             ordersChanged,
             createdTrades,
-            balanceChanges.mapNotNull { (k, delta) ->
-                if (delta != BigInteger.ZERO) {
-                    val (wallet, asset) = k
-                    balanceChange {
-                        this.wallet = wallet.value
-                        this.asset = asset.value
-                        this.delta = delta.toIntegerValue()
-                    }
-                } else {
-                    null
-                }
-            },
+            balanceChanges.asBalanceChangesList(),
             consumptionChanges.flatMap {
                 listOf(
                     ConsumptionChange(
@@ -331,9 +318,17 @@ data class Market(
                         null
                     } else {
                         // invert the notional calculation using the remaining notional amount
-                        val remainingNotional = (limit - total)
+                        val remainingNotionalPlusFee = (limit - total)
+
+                        // Reduce remainingNotionalPlusFee by the expected fee
+                        // Example calculation: when remainingNotionalPlusFee is 204 and fee is 2% we should end up with remainingNotional=200
+                        // Formula is: remainingNotional = (204 / (100 + 2)) * 2
+                        val feeRateInPercents = levelOrder.feeRate.inPercents().toBigDecimal()
+                        val fee = ((remainingNotionalPlusFee.toBigDecimal() / (BigDecimal(100).setScale(10) + feeRateInPercents)) * feeRateInPercents).toBigInteger()
+                        val remainingNotional = remainingNotionalPlusFee - fee
+
                         levelOrder.quantity = (remainingNotional.toBigDecimal() / price).movePointRight(baseDecimals - quoteDecimals).toBigInteger()
-                        total += remainingNotional
+                        total += remainingNotionalPlusFee
                         orderChanged {
                             this.guid = levelOrder.guid.value
                             this.disposition = OrderDisposition.AutoReduced

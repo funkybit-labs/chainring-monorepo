@@ -265,7 +265,7 @@ export function SwapInternals({
           } else {
             setOrderBook(message)
           }
-        } else if (message.type === 'Limits') {
+        } else if (message.type === 'MarketLimits') {
           if (market.isBackToBack()) {
             message.marketId == market.marketIds[0]
               ? setBaseLimit(message.base)

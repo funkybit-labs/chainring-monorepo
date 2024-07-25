@@ -62,6 +62,7 @@ import co.chainring.core.model.db.migrations.V63_SymbolIconUrls
 import co.chainring.core.model.db.migrations.V64_AddIsAdminToWallet
 import co.chainring.core.model.db.migrations.V65_WalletLinkedSigner
 import co.chainring.core.model.db.migrations.V66_AddCounterOrderIdToOrderExecution
+import co.chainring.core.model.db.migrations.V67_AddLimitTable
 import co.chainring.core.model.db.migrations.V6_MarketTable
 import co.chainring.core.model.db.migrations.V7_OrderTable
 import co.chainring.core.model.db.migrations.V8_ExecutionsAndTrades
@@ -134,4 +135,5 @@ val migrations = listOf(
     V64_AddIsAdminToWallet(),
     V65_WalletLinkedSigner(),
     V66_AddCounterOrderIdToOrderExecution(),
+    V67_AddLimitTable(),
 )

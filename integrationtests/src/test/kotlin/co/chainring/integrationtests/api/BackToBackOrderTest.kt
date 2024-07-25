@@ -112,8 +112,10 @@ class BackToBackOrderTest : OrderBaseTest() {
         assertEquals(1, limitBuyOrder1.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
         assertEquals(1, limitBuyOrder2.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
 
-        repeat(2) { makerWsClient.assertOrderCreatedMessageReceived() }
-        makerWsClient.assertLimitsMessageReceived(secondMarket.id)
+        repeat(2) {
+            makerWsClient.assertOrderCreatedMessageReceived()
+            makerWsClient.assertLimitsMessageReceived()
+        }
 
         assertEquals(2, makerApiClient.listOrders(listOf(OrderStatus.Open), null).orders.size)
 
@@ -154,7 +156,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                     ExpectedBalance(quoteSymbol, total = BigDecimal("0"), available = BigDecimal("10.0548")),
                 ),
             )
-            assertLimitsMessageReceived(market.id)
+            assertLimitsMessageReceived()
         }
 
         makerWsClient.apply {
@@ -163,7 +165,7 @@ class BackToBackOrderTest : OrderBaseTest() {
             }
             repeat(2) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
-            assertLimitsMessageReceived(secondMarket.id)
+            assertLimitsMessageReceived()
         }
 
         val takerOrders = takerApiClient.listOrders(emptyList(), market.id).orders
@@ -296,8 +298,10 @@ class BackToBackOrderTest : OrderBaseTest() {
         assertEquals(1, limitBuyOrder1.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
         assertEquals(1, limitBuyOrder2.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
 
-        repeat(2) { makerWsClient.assertOrderCreatedMessageReceived() }
-        makerWsClient.assertLimitsMessageReceived(secondMarket.id)
+        repeat(2) {
+            makerWsClient.assertOrderCreatedMessageReceived()
+            makerWsClient.assertLimitsMessageReceived()
+        }
 
         assertEquals(2, makerApiClient.listOrders(listOf(OrderStatus.Open), null).orders.size)
 
@@ -338,7 +342,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                     ExpectedBalance(quoteSymbol, total = BigDecimal("0"), available = BigDecimal("194040")),
                 ),
             )
-            assertLimitsMessageReceived(market.id)
+            assertLimitsMessageReceived()
         }
 
         makerWsClient.apply {
@@ -347,7 +351,7 @@ class BackToBackOrderTest : OrderBaseTest() {
             }
             repeat(2) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
-            assertLimitsMessageReceived(secondMarket.id)
+            assertLimitsMessageReceived()
         }
 
         val takerOrders = takerApiClient.listOrders(emptyList(), market.id).orders
@@ -486,9 +490,10 @@ class BackToBackOrderTest : OrderBaseTest() {
         assertEquals(1, limitSellOrder1.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
         assertEquals(1, limitSellOrder2.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
 
-        makerWsClient.assertOrderCreatedMessageReceived()
-        makerWsClient.assertLimitsMessageReceived(market.id)
-        makerWsClient.assertOrderCreatedMessageReceived()
+        repeat(2) {
+            makerWsClient.assertOrderCreatedMessageReceived()
+            makerWsClient.assertLimitsMessageReceived()
+        }
 
         assertEquals(2, makerApiClient.listOrders(listOf(OrderStatus.Open), null).orders.size)
 
@@ -528,7 +533,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                     ExpectedBalance(quoteSymbol, total = BigDecimal("10"), available = BigDecimal("0.361")),
                 ),
             )
-            assertLimitsMessageReceived(secondMarket.id)
+            assertLimitsMessageReceived()
         }
 
         makerWsClient.apply {
@@ -537,7 +542,7 @@ class BackToBackOrderTest : OrderBaseTest() {
             }
             repeat(2) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
-            assertLimitsMessageReceived(market.id)
+            assertLimitsMessageReceived()
         }
 
         val takerOrders = takerApiClient.listOrders(emptyList(), market.id).orders
@@ -677,9 +682,10 @@ class BackToBackOrderTest : OrderBaseTest() {
         assertEquals(1, limitSellOrder1.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
         assertEquals(1, limitSellOrder2.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
 
-        makerWsClient.assertOrderCreatedMessageReceived()
-        makerWsClient.assertLimitsMessageReceived(market.id)
-        makerWsClient.assertOrderCreatedMessageReceived()
+        repeat(2) {
+            makerWsClient.assertOrderCreatedMessageReceived()
+            makerWsClient.assertLimitsMessageReceived()
+        }
 
         assertEquals(2, makerApiClient.listOrders(listOf(OrderStatus.Open), null).orders.size)
 
@@ -718,7 +724,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                     ExpectedBalance(quoteSymbol, total = BigDecimal("30"), available = BigDecimal("15.312782002008890029")),
                 ),
             )
-            assertLimitsMessageReceived(secondMarket.id)
+            assertLimitsMessageReceived()
         }
 
         makerWsClient.apply {
@@ -727,7 +733,7 @@ class BackToBackOrderTest : OrderBaseTest() {
             }
             repeat(2) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
-            assertLimitsMessageReceived(market.id)
+            assertLimitsMessageReceived()
         }
 
         val takerOrders = takerApiClient.listOrders(emptyList(), market.id).orders

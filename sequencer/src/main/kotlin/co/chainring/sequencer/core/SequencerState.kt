@@ -41,6 +41,17 @@ data class SequencerState(
     var withdrawalFees: MutableMap<Symbol, BigInteger> = mutableMapOf(),
 ) {
     private val logger = KotlinLogging.logger {}
+    private val marketIdsByAsset = mutableMapOf<Asset, MutableList<MarketId>>()
+
+    fun addMarket(market: Market) {
+        markets[market.id] = market
+        val (baseAsset, quoteAsset) = market.id.assets()
+        marketIdsByAsset.getOrPut(baseAsset) { mutableListOf() }.add(market.id)
+        marketIdsByAsset.getOrPut(quoteAsset) { mutableListOf() }.add(market.id)
+    }
+
+    fun getMarketIdsByAsset(asset: Asset): List<MarketId> =
+        marketIdsByAsset.getOrElse(asset) { mutableListOf() }.toList()
 
     fun clear() {
         balances.clear()
@@ -99,13 +110,13 @@ data class SequencerState(
                 }
 
                 measureNanoTime {
-                    wire.read("markets").sequence(markets) { map, v ->
+                    wire.read("markets").sequence(markets) { _, v ->
                         while (v.hasNextSequenceItem()) {
                             var market: Market
                             measureNanoTime {
                                 val marketCheckpoint = MarketCheckpoint.parseFrom(v.bytes())
                                 market = Market.fromCheckpoint(marketCheckpoint)
-                                map[market.id] = market
+                                addMarket(market)
                             }.let {
                                 logger.debug { "load of market ${market.id} took ${humanReadableNanoseconds(it)}" }
                             }

@@ -129,6 +129,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                             withdrawalRoutes.getWithdrawal,
                             withdrawalRoutes.createWithdrawal,
                             withdrawalRoutes.listWithdrawals,
+                            LimitsRoutes.getLimits,
                         )
 
                         if (enableTestRoutes) {

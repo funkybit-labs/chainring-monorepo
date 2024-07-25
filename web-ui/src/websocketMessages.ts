@@ -127,11 +127,16 @@ export const OrderUpdatedSchema = z.object({
 })
 export type OrderUpdated = z.infer<typeof OrderUpdatedSchema>
 
-export const LimitsSchema = z.object({
-  type: z.literal('Limits'),
+export const MarketLimitsSchema = z.object({
   marketId: z.string(),
   base: z.coerce.bigint(),
   quote: z.coerce.bigint()
+})
+export type MarketLimits = z.infer<typeof MarketLimitsSchema>
+
+export const LimitsSchema = z.object({
+  type: z.literal('Limits'),
+  limits: z.array(MarketLimitsSchema)
 })
 export type Limits = z.infer<typeof LimitsSchema>
 

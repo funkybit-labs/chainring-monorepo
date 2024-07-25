@@ -20,6 +20,7 @@ import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.DepositApiResponse
 import co.chainring.apps.api.model.FaucetApiRequest
 import co.chainring.apps.api.model.FaucetApiResponse
+import co.chainring.apps.api.model.GetLimitsApiResponse
 import co.chainring.apps.api.model.GetOrderBookApiResponse
 import co.chainring.apps.api.model.ListDepositsApiResponse
 import co.chainring.apps.api.model.ListWithdrawalsApiResponse
@@ -243,6 +244,16 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
+    fun tryGetLimits(): Either<ApiCallFailure, GetLimitsApiResponse> =
+        executeAndTrace(
+            TraceRecorder.Op.GetLimits,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/limits")
+                .get()
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
+
     fun tryCreateDeposit(apiRequest: CreateDepositApiRequest): Either<ApiCallFailure, DepositApiResponse> =
         executeAndTrace(
             TraceRecorder.Op.CreateDeposit,
@@ -458,6 +469,9 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
 
     open fun getOrderBook(marketId: MarketId): GetOrderBookApiResponse =
         tryGetOrderBook(marketId).throwOrReturn()
+
+    open fun getLimits(): GetLimitsApiResponse =
+        tryGetLimits().throwOrReturn()
 
     open fun createDeposit(apiRequest: CreateDepositApiRequest): DepositApiResponse =
         tryCreateDeposit(apiRequest).throwOrReturn()

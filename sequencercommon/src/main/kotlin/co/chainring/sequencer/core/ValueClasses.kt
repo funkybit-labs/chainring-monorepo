@@ -31,8 +31,16 @@ value class MarketId(val value: String) {
             "Invalid market ID"
         }
     }
+
+    fun assets(): Pair<Asset, Asset> {
+        val assets = value.split('/', limit = 2)
+        return Pair(assets[0].toAsset(), assets[1].toAsset())
+    }
+
     fun baseAsset() = value.split('/', limit = 2)[0].toAsset()
+
     fun quoteAsset() = value.split('/', limit = 2)[1].toAsset()
+
     override fun toString(): String = value
 }
 
@@ -60,7 +68,12 @@ value class FeeRate(val value: Long) {
 
         val zero = FeeRate(0)
 
+        // 1.0 means 1%
         fun fromPercents(percents: Double): FeeRate =
             FeeRate((BigDecimal(percents) * BigDecimal(MAX_VALUE) / BigDecimal(100)).toLong())
     }
+
+    // 1% would be returned as 1.0
+    fun inPercents(): Double =
+        (100 * value).toDouble() / MAX_VALUE
 }

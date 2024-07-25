@@ -1,10 +1,13 @@
 package co.chainring.testutils
 
+import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.WalletAddress
+import co.chainring.sequencer.core.toBigInteger
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.SequencerResponse
 import org.junit.jupiter.api.Assertions.assertEquals
 import java.math.BigDecimal
+import java.math.BigInteger
 
 data class ExpectedTrade(
     val buyOrderGuid: Long,
@@ -84,4 +87,26 @@ fun SequencerResponse.assertBalanceChanges(
         expectedChanges.map { it.copy(third = it.third.setScale(it.second.decimals)) },
         changes,
     )
+}
+
+data class ExpectedLimitsUpdate(
+    val wallet: WalletAddress,
+    val marketId: MarketId,
+    val base: BigInteger,
+    val quote: BigInteger,
+)
+
+fun SequencerResponse.assertLimits(
+    expected: List<ExpectedLimitsUpdate>,
+) {
+    val actual = limitsUpdatedList.map {
+        ExpectedLimitsUpdate(
+            it.wallet.toWalletAddress(),
+            MarketId(it.marketId),
+            it.base.toBigInteger(),
+            it.quote.toBigInteger(),
+        )
+    }
+
+    assertEquals(expected.sortedWith(compareBy({ it.wallet.value }, { it.marketId.value })), actual)
 }

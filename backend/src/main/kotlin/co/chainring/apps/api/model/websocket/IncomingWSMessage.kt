@@ -50,5 +50,5 @@ sealed class SubscriptionTopic {
 
     @Serializable
     @SerialName("Limits")
-    data class Limits(val marketId: MarketId) : SubscriptionTopic()
+    data object Limits : SubscriptionTopic()
 }

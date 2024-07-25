@@ -2,7 +2,7 @@ package co.chainring.apps.api.model.websocket
 
 import co.chainring.apps.api.model.Balance
 import co.chainring.apps.api.model.BigDecimalJson
-import co.chainring.apps.api.model.BigIntegerJson
+import co.chainring.apps.api.model.MarketLimits
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.Trade
 import co.chainring.core.model.db.MarketId
@@ -123,7 +123,8 @@ data class OrderUpdated(
 @Serializable
 @SerialName("Limits")
 data class Limits(
-    val marketId: MarketId,
-    val base: BigIntegerJson,
-    val quote: BigIntegerJson,
+    val limits: List<
+        @Serializable(with = MarketLimits.AsArraySerializer::class)
+        MarketLimits,
+        >,
 ) : Publishable()

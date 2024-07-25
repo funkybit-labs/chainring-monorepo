@@ -95,7 +95,7 @@ class OrderPercentageSwapTest : OrderBaseTest() {
         assertEquals(4, createBatchLimitOrders.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
 
         repeat(4) { makerWsClient.assertOrderCreatedMessageReceived() }
-        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal.ZERO, quote = BigDecimal("10410"))
+        makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal.ZERO, quote = BigDecimal("10314.1"))
 
         assertEquals(4, makerApiClient.listOrders(listOf(OrderStatus.Open), null).orders.size)
 
@@ -132,7 +132,7 @@ class OrderPercentageSwapTest : OrderBaseTest() {
             }
             repeat(4) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
-            assertLimitsMessageReceived(market, base = BigDecimal("0.1"), quote = BigDecimal("10341.50"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0.1"), quote = BigDecimal("10314.1"))
         }
 
         val takerOrders = takerApiClient.listOrders(emptyList(), market.id).orders
@@ -371,7 +371,7 @@ class OrderPercentageSwapTest : OrderBaseTest() {
         )
 
         repeat(limitOrders.size) { makerWsClient.assertOrderCreatedMessageReceived() }
-        makerWsClient.assertLimitsMessageReceived(market.id)
+        makerWsClient.assertLimitsMessageReceived()
 
         assertEquals(limitOrders.size, makerApiClient.listOrders(listOf(OrderStatus.Open), null).orders.size)
 
@@ -390,7 +390,7 @@ class OrderPercentageSwapTest : OrderBaseTest() {
             }
             assertOrderUpdatedMessageReceived()
             assertBalancesMessageReceived()
-            assertLimitsMessageReceived(market.id)
+            assertLimitsMessageReceived()
         }
 
         makerWsClient.apply {
@@ -399,7 +399,7 @@ class OrderPercentageSwapTest : OrderBaseTest() {
             }
             repeat(limitOrders.size) { assertOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
-            assertLimitsMessageReceived(market.id)
+            assertLimitsMessageReceived()
         }
 
         val takerOrders = takerApiClient.listOrders(emptyList(), market.id).orders
