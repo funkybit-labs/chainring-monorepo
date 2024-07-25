@@ -1,8 +1,7 @@
 package co.chainring.core.model.db
 
 import co.chainring.apps.api.model.MarketLimits
-import co.chainring.core.model.db.migrations.V33_SettlementBatch.V33_ChainSettlementBatchTable.nullable
-import co.chainring.sequencer.core.toBigInteger
+import co.chainring.core.model.db.LimitTable.nullable
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.dao.Entity
 import org.jetbrains.exposed.dao.EntityClass
