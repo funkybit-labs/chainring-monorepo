@@ -37,12 +37,16 @@ sealed class SubscriptionTopic {
     data class Prices(val marketId: MarketId, val duration: OHLCDuration) : SubscriptionTopic()
 
     @Serializable
-    @SerialName("Trades")
-    data object Trades : SubscriptionTopic()
+    @SerialName("MyTrades")
+    data object MyTrades : SubscriptionTopic()
 
     @Serializable
-    @SerialName("Orders")
-    data object Orders : SubscriptionTopic()
+    @SerialName("MarketTrades")
+    data class MarketTrades(val marketId: MarketId) : SubscriptionTopic()
+
+    @Serializable
+    @SerialName("MyOrders")
+    data object MyOrders : SubscriptionTopic()
 
     @Serializable
     @SerialName("Balances")

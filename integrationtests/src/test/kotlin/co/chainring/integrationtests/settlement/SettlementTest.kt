@@ -5,10 +5,10 @@ import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.websocket.LastTrade
 import co.chainring.apps.api.model.websocket.LastTradeDirection
+import co.chainring.apps.api.model.websocket.MyTradesUpdated
 import co.chainring.apps.api.model.websocket.OrderBook
 import co.chainring.apps.api.model.websocket.OrderBookEntry
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
-import co.chainring.apps.api.model.websocket.TradesUpdated
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.ExecutionRole
@@ -24,21 +24,21 @@ import co.chainring.integrationtests.testutils.OrderBaseTest
 import co.chainring.integrationtests.testutils.waitForFinalizedWithdrawal
 import co.chainring.integrationtests.utils.AssetAmount
 import co.chainring.integrationtests.utils.ExpectedBalance
-import co.chainring.integrationtests.utils.ExpectedTrade
+import co.chainring.integrationtests.utils.MyExpectedTrade
 import co.chainring.integrationtests.utils.assertAmount
 import co.chainring.integrationtests.utils.assertBalancesMessageReceived
 import co.chainring.integrationtests.utils.assertContainsBalancesMessage
 import co.chainring.integrationtests.utils.assertContainsLimitsMessage
-import co.chainring.integrationtests.utils.assertContainsTradesUpdatedMessage
-import co.chainring.integrationtests.utils.assertLimitOrderCreatedMessageReceived
+import co.chainring.integrationtests.utils.assertContainsMyTradesUpdatedMessage
 import co.chainring.integrationtests.utils.assertLimitsMessageReceived
-import co.chainring.integrationtests.utils.assertMarketOrderCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertMessagesReceived
+import co.chainring.integrationtests.utils.assertMyLimitOrderCreatedMessageReceived
+import co.chainring.integrationtests.utils.assertMyMarketOrderCreatedMessageReceived
+import co.chainring.integrationtests.utils.assertMyOrderCreatedMessageReceived
+import co.chainring.integrationtests.utils.assertMyOrderUpdatedMessageReceived
+import co.chainring.integrationtests.utils.assertMyTradesCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertOrderBookMessageReceived
-import co.chainring.integrationtests.utils.assertOrderCreatedMessageReceived
-import co.chainring.integrationtests.utils.assertOrderUpdatedMessageReceived
 import co.chainring.integrationtests.utils.assertPricesMessageReceived
-import co.chainring.integrationtests.utils.assertTradesCreatedMessageReceived
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assumptions
@@ -87,7 +87,7 @@ class SettlementTest : OrderBaseTest() {
             price = BigDecimal("17.50"),
             makerWallet,
         )
-        makerWsClient.assertLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
+        makerWsClient.assertMyLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
         listOf(makerWsClient, takerWsClient).forEach { wsClient ->
             wsClient.assertOrderBookMessageReceived(market.id) {}
         }
@@ -100,7 +100,7 @@ class SettlementTest : OrderBaseTest() {
             price = BigDecimal("17.6"),
             makerWallet,
         )
-        makerWsClient.assertLimitOrderCreatedMessageReceived(limitSellOrderApiResponse)
+        makerWsClient.assertMyLimitOrderCreatedMessageReceived(limitSellOrderApiResponse)
         listOf(makerWsClient, takerWsClient).forEach { wsClient ->
             wsClient.assertOrderBookMessageReceived(market.id) {}
         }
@@ -137,12 +137,12 @@ class SettlementTest : OrderBaseTest() {
 
         takerWsClient.apply {
             repeat(batches.size) {
-                repeat(2) { assertOrderCreatedMessageReceived() }
-                assertTradesCreatedMessageReceived {
+                repeat(2) { assertMyOrderCreatedMessageReceived() }
+                assertMyTradesCreatedMessageReceived {
                     assertEquals(setOf(SettlementStatus.Pending), it.trades.map { trade -> trade.settlementStatus }.toSet())
                 }
                 repeat(2) {
-                    assertOrderUpdatedMessageReceived { msg ->
+                    assertMyOrderUpdatedMessageReceived { msg ->
                         assertEquals(OrderStatus.Filled, msg.order.status)
                     }
                 }
@@ -249,7 +249,7 @@ class SettlementTest : OrderBaseTest() {
             price = BigDecimal("17.55"),
             makerWallet,
         )
-        makerWsClient.assertLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
+        makerWsClient.assertMyLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
 
         listOf(makerWsClient, takerWsClient).forEach { wsClient ->
             wsClient.assertOrderBookMessageReceived(
@@ -275,10 +275,10 @@ class SettlementTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
-            assertTradesCreatedMessageReceived(
+            assertMyMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = marketSellOrderApiResponse,
                         price = BigDecimal("17.55"),
                         amount = AssetAmount(baseSymbol, marketSellOrderApiResponse.order.amount.fixedAmount()),
@@ -287,7 +287,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
                 assertEquals(1, msg.order.executions.size)
                 assertAmount(AssetAmount(baseSymbol, "0.08"), msg.order.executions[0].amount)
@@ -303,9 +303,9 @@ class SettlementTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradesCreatedMessageReceived(
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = limitBuyOrderApiResponse,
                         price = BigDecimal("17.55"),
                         amount = AssetAmount(baseSymbol, "0.08"),
@@ -314,7 +314,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
                 assertEquals(1, msg.order.executions.size)
                 assertAmount(AssetAmount(baseSymbol, "0.08"), msg.order.executions[0].amount)
@@ -359,7 +359,7 @@ class SettlementTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertMessagesReceived(3) { messages ->
-                assertContainsTradesUpdatedMessage(messages) { msg ->
+                assertContainsMyTradesUpdatedMessage(messages) { msg ->
                     assertEquals(1, msg.trades.size)
                     assertEquals(marketSellOrderApiResponse.orderId, msg.trades[0].orderId)
                     assertEquals(SettlementStatus.Failed, msg.trades[0].settlementStatus)
@@ -378,7 +378,7 @@ class SettlementTest : OrderBaseTest() {
 
         makerWsClient.apply {
             assertMessagesReceived(3) { messages ->
-                assertContainsTradesUpdatedMessage(messages) { msg ->
+                assertContainsMyTradesUpdatedMessage(messages) { msg ->
                     assertEquals(1, msg.trades.size)
                     assertEquals(limitBuyOrderApiResponse.orderId, msg.trades[0].orderId)
                     assertEquals(SettlementStatus.Failed, msg.trades[0].settlementStatus)
@@ -414,7 +414,7 @@ class SettlementTest : OrderBaseTest() {
                 AssetAmount(quoteSymbol, "10"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         val (makerApiClient, makerWallet, makerWsClient) = setupTrader(
@@ -426,7 +426,7 @@ class SettlementTest : OrderBaseTest() {
                 AssetAmount(baseSymbol, "0.05"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         val (maker2ApiClient, maker2Wallet, maker2WsClient) = setupTrader(
@@ -438,7 +438,7 @@ class SettlementTest : OrderBaseTest() {
                 AssetAmount(baseSymbol, "0.03"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         // starting onchain balances
@@ -485,7 +485,7 @@ class SettlementTest : OrderBaseTest() {
             makerWallet,
         )
         makerWsClient.apply {
-            assertLimitOrderCreatedMessageReceived(limitSellOrderApiResponse)
+            assertMyLimitOrderCreatedMessageReceived(limitSellOrderApiResponse)
             assertLimitsMessageReceived()
         }
 
@@ -497,7 +497,7 @@ class SettlementTest : OrderBaseTest() {
             maker2Wallet,
         )
         maker2WsClient.apply {
-            assertLimitOrderCreatedMessageReceived(limitSellOrder2ApiResponse)
+            assertMyLimitOrderCreatedMessageReceived(limitSellOrder2ApiResponse)
             assertLimitsMessageReceived()
         }
 
@@ -510,17 +510,17 @@ class SettlementTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMarketOrderCreatedMessageReceived(marketBuyOrderApiResponse)
-            assertTradesCreatedMessageReceived(
+            assertMyMarketOrderCreatedMessageReceived(marketBuyOrderApiResponse)
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = marketBuyOrderApiResponse,
                         price = BigDecimal("17.50"),
                         amount = baseSymbolMakerTradeAmount,
                         fee = AssetAmount(quoteSymbol, "0.0105"),
                         settlementStatus = SettlementStatus.Pending,
                     ),
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = marketBuyOrderApiResponse,
                         price = BigDecimal("17.50"),
                         amount = baseSymbolMakerTradeAmount,
@@ -529,7 +529,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
                 assertEquals(2, msg.order.executions.size)
                 assertAmount(baseSymbolMakerTradeAmount, msg.order.executions[0].amount)
@@ -543,9 +543,9 @@ class SettlementTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradesCreatedMessageReceived(
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = limitSellOrderApiResponse,
                         price = BigDecimal("17.50"),
                         amount = baseSymbolMakerTradeAmount,
@@ -554,7 +554,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
                 assertEquals(1, msg.order.executions.size)
                 assertAmount(AssetAmount(baseSymbol, "0.03"), msg.order.executions[0].amount)
@@ -565,9 +565,9 @@ class SettlementTest : OrderBaseTest() {
         }
 
         maker2WsClient.apply {
-            assertTradesCreatedMessageReceived(
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = limitSellOrder2ApiResponse,
                         price = BigDecimal("17.50"),
                         amount = baseSymbolMakerTradeAmount,
@@ -576,7 +576,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
                 assertEquals(1, msg.order.executions.size)
                 assertAmount(AssetAmount(baseSymbol, "0.03"), msg.order.executions[0].amount)
@@ -610,7 +610,7 @@ class SettlementTest : OrderBaseTest() {
         takerWsClient.apply {
             assertMessagesReceived(5) { messages ->
                 println(messages)
-                messages.filter { it.topic == SubscriptionTopic.Trades && it.data is TradesUpdated }.map { it.data as TradesUpdated }.forEach { msg ->
+                messages.filter { it.topic == SubscriptionTopic.MyTrades && it.data is MyTradesUpdated }.map { it.data as MyTradesUpdated }.forEach { msg ->
                     msg.trades.forEach { trade ->
                         when (trade.settlementStatus) {
                             SettlementStatus.Failed -> {
@@ -630,7 +630,7 @@ class SettlementTest : OrderBaseTest() {
 
         makerWsClient.apply {
             assertMessagesReceived(3) { messages ->
-                assertContainsTradesUpdatedMessage(messages) { msg ->
+                assertContainsMyTradesUpdatedMessage(messages) { msg ->
                     assertEquals(1, msg.trades.size)
                     assertEquals(limitSellOrderApiResponse.orderId, msg.trades[0].orderId)
                     assertEquals(SettlementStatus.Failed, msg.trades[0].settlementStatus)
@@ -649,7 +649,7 @@ class SettlementTest : OrderBaseTest() {
 
         maker2WsClient.apply {
             assertMessagesReceived(3) { messages ->
-                assertContainsTradesUpdatedMessage(messages) { msg ->
+                assertContainsMyTradesUpdatedMessage(messages) { msg ->
                     assertEquals(1, msg.trades.size)
                     assertEquals(limitSellOrder2ApiResponse.orderId, msg.trades[0].orderId)
                     assertEquals(SettlementStatus.Completed, msg.trades[0].settlementStatus)
@@ -686,7 +686,7 @@ class SettlementTest : OrderBaseTest() {
                 AssetAmount(quoteSymbol, "0.4"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         val (makerApiClient, makerWallet, makerWsClient) = setupTrader(
@@ -699,7 +699,7 @@ class SettlementTest : OrderBaseTest() {
                 AssetAmount(quoteSymbol, "0.55"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         // starting onchain balances
@@ -761,7 +761,7 @@ class SettlementTest : OrderBaseTest() {
             makerWallet,
         )
         makerWsClient.apply {
-            assertLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
+            assertMyLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
             assertLimitsMessageReceived(market, base = BigDecimal("0"), quote = BigDecimal("0.4692808"))
         }
 
@@ -774,10 +774,10 @@ class SettlementTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
-            assertTradesCreatedMessageReceived(
+            assertMyMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = marketSellOrderApiResponse,
                         price = BigDecimal("0.999"),
                         amount = AssetAmount(baseSymbol, marketSellOrderApiResponse.order.amount.fixedAmount()),
@@ -786,7 +786,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
                 assertEquals(1, msg.order.executions.size)
                 assertAmount(AssetAmount(baseSymbol, "0.08"), msg.order.executions[0].amount)
@@ -802,9 +802,9 @@ class SettlementTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradesCreatedMessageReceived(
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = limitBuyOrderApiResponse,
                         price = BigDecimal("0.999"),
                         amount = AssetAmount(baseSymbol, "0.08"),
@@ -813,7 +813,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
                 assertEquals(1, msg.order.executions.size)
                 assertAmount(AssetAmount(baseSymbol, "0.08"), msg.order.executions[0].amount)
@@ -845,7 +845,7 @@ class SettlementTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertMessagesReceived(3) { messages ->
-                assertContainsTradesUpdatedMessage(messages) { msg ->
+                assertContainsMyTradesUpdatedMessage(messages) { msg ->
                     assertEquals(1, msg.trades.size)
                     assertEquals(marketSellOrderApiResponse.orderId, msg.trades[0].orderId)
                     assertEquals(SettlementStatus.Failed, msg.trades[0].settlementStatus)
@@ -864,7 +864,7 @@ class SettlementTest : OrderBaseTest() {
 
         makerWsClient.apply {
             assertMessagesReceived(3) { messages ->
-                assertContainsTradesUpdatedMessage(messages) { msg ->
+                assertContainsMyTradesUpdatedMessage(messages) { msg ->
                     assertEquals(1, msg.trades.size)
                     assertEquals(limitBuyOrderApiResponse.orderId, msg.trades[0].orderId)
                     assertEquals(SettlementStatus.Failed, msg.trades[0].settlementStatus)
@@ -902,7 +902,7 @@ class SettlementTest : OrderBaseTest() {
                 AssetAmount(quoteSymbol, "0.1"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         val (makerApiClient, makerWallet, makerWsClient) = setupTrader(
@@ -914,7 +914,7 @@ class SettlementTest : OrderBaseTest() {
                 AssetAmount(baseSymbol, "0.05"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         val (maker2ApiClient, maker2Wallet, maker2WsClient) = setupTrader(
@@ -926,7 +926,7 @@ class SettlementTest : OrderBaseTest() {
                 AssetAmount(baseSymbol, "0.03"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         // starting onchain balances
@@ -973,7 +973,7 @@ class SettlementTest : OrderBaseTest() {
             makerWallet,
         )
         makerWsClient.apply {
-            assertLimitOrderCreatedMessageReceived(limitSellOrderApiResponse)
+            assertMyLimitOrderCreatedMessageReceived(limitSellOrderApiResponse)
             assertLimitsMessageReceived()
         }
 
@@ -985,7 +985,7 @@ class SettlementTest : OrderBaseTest() {
             maker2Wallet,
         )
         maker2WsClient.apply {
-            assertLimitOrderCreatedMessageReceived(limitSellOrder2ApiResponse)
+            assertMyLimitOrderCreatedMessageReceived(limitSellOrder2ApiResponse)
             assertLimitsMessageReceived()
         }
 
@@ -998,17 +998,17 @@ class SettlementTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMarketOrderCreatedMessageReceived(marketBuyOrderApiResponse)
-            assertTradesCreatedMessageReceived(
+            assertMyMarketOrderCreatedMessageReceived(marketBuyOrderApiResponse)
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = marketBuyOrderApiResponse,
                         price = BigDecimal("0.999"),
                         amount = baseSymbolMakerTradeAmount,
                         fee = AssetAmount(quoteSymbol, "0.0005994"),
                         settlementStatus = SettlementStatus.Pending,
                     ),
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = marketBuyOrderApiResponse,
                         price = BigDecimal("0.999"),
                         amount = baseSymbolMakerTradeAmount,
@@ -1017,7 +1017,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
                 assertEquals(2, msg.order.executions.size)
                 assertAmount(baseSymbolMakerTradeAmount, msg.order.executions[0].amount)
@@ -1031,9 +1031,9 @@ class SettlementTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradesCreatedMessageReceived(
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = limitSellOrderApiResponse,
                         price = BigDecimal("0.999"),
                         amount = baseSymbolMakerTradeAmount,
@@ -1042,7 +1042,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
                 assertEquals(1, msg.order.executions.size)
                 assertAmount(baseSymbolMakerTradeAmount, msg.order.executions[0].amount)
@@ -1053,9 +1053,9 @@ class SettlementTest : OrderBaseTest() {
         }
 
         maker2WsClient.apply {
-            assertTradesCreatedMessageReceived(
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = limitSellOrder2ApiResponse,
                         price = BigDecimal("0.999"),
                         amount = baseSymbolMakerTradeAmount,
@@ -1064,7 +1064,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
                 assertEquals(1, msg.order.executions.size)
                 assertAmount(AssetAmount(baseSymbol, "0.03"), msg.order.executions[0].amount)
@@ -1098,7 +1098,7 @@ class SettlementTest : OrderBaseTest() {
         takerWsClient.apply {
             assertMessagesReceived(5) { messages ->
                 println(messages)
-                messages.filter { it.topic == SubscriptionTopic.Trades && it.data is TradesUpdated }.map { it.data as TradesUpdated }.forEach { msg ->
+                messages.filter { it.topic == SubscriptionTopic.MyTrades && it.data is MyTradesUpdated }.map { it.data as MyTradesUpdated }.forEach { msg ->
                     msg.trades.forEach { trade ->
                         when (trade.settlementStatus) {
                             SettlementStatus.Failed -> {
@@ -1118,7 +1118,7 @@ class SettlementTest : OrderBaseTest() {
 
         makerWsClient.apply {
             assertMessagesReceived(3) { messages ->
-                assertContainsTradesUpdatedMessage(messages) { msg ->
+                assertContainsMyTradesUpdatedMessage(messages) { msg ->
                     assertEquals(1, msg.trades.size)
                     assertEquals(limitSellOrderApiResponse.orderId, msg.trades[0].orderId)
                     assertEquals(SettlementStatus.Failed, msg.trades[0].settlementStatus)
@@ -1137,7 +1137,7 @@ class SettlementTest : OrderBaseTest() {
 
         maker2WsClient.apply {
             assertMessagesReceived(3) { messages ->
-                assertContainsTradesUpdatedMessage(messages) { msg ->
+                assertContainsMyTradesUpdatedMessage(messages) { msg ->
                     assertEquals(1, msg.trades.size)
                     assertEquals(limitSellOrder2ApiResponse.orderId, msg.trades[0].orderId)
                     assertEquals(SettlementStatus.Completed, msg.trades[0].settlementStatus)
@@ -1176,7 +1176,7 @@ class SettlementTest : OrderBaseTest() {
                 AssetAmount(quoteSymbol, "2"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         val (makerApiClient, makerWallet, makerWsClient) = setupTrader(
@@ -1189,7 +1189,7 @@ class SettlementTest : OrderBaseTest() {
                 AssetAmount(quoteSymbol, "2"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         val makerStartingBaseBalance = makerWallet.getExchangeBalance(baseSymbol)
@@ -1206,7 +1206,7 @@ class SettlementTest : OrderBaseTest() {
             makerWallet,
         )
         makerWsClient.apply {
-            assertLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
+            assertMyLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
             assertLimitsMessageReceived(market, base = BigDecimal("0"), quote = BigDecimal("0.58196"))
         }
 
@@ -1221,10 +1221,10 @@ class SettlementTest : OrderBaseTest() {
         val manuallyRolledBack = waitForPendingTradeAndMarkFailed(marketSellOrderApiResponse.orderId)
 
         takerWsClient.apply {
-            assertMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
-            assertTradesCreatedMessageReceived(
+            assertMyMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = marketSellOrderApiResponse,
                         price = BigDecimal("17.55"),
                         amount = AssetAmount(baseSymbol, marketSellOrderApiResponse.order.amount.fixedAmount()),
@@ -1233,7 +1233,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
                 assertEquals(1, msg.order.executions.size)
                 assertAmount(AssetAmount(baseSymbol, "0.08"), msg.order.executions[0].amount)
@@ -1249,9 +1249,9 @@ class SettlementTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradesCreatedMessageReceived(
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = limitBuyOrderApiResponse,
                         price = BigDecimal("17.55"),
                         amount = AssetAmount(baseSymbol, "0.08"),
@@ -1260,7 +1260,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
                 assertEquals(1, msg.order.executions.size)
                 assertAmount(AssetAmount(baseSymbol, "0.08"), msg.order.executions[0].amount)
@@ -1289,7 +1289,7 @@ class SettlementTest : OrderBaseTest() {
 
             takerWsClient.apply {
                 assertMessagesReceived(3) { messages ->
-                    assertContainsTradesUpdatedMessage(messages) { msg ->
+                    assertContainsMyTradesUpdatedMessage(messages) { msg ->
                         assertEquals(1, msg.trades.size)
                         assertEquals(marketSellOrderApiResponse.orderId, msg.trades[0].orderId)
                         assertEquals(SettlementStatus.Failed, msg.trades[0].settlementStatus)
@@ -1307,7 +1307,7 @@ class SettlementTest : OrderBaseTest() {
 
             makerWsClient.apply {
                 assertMessagesReceived(3) { messages ->
-                    assertContainsTradesUpdatedMessage(messages) { msg ->
+                    assertContainsMyTradesUpdatedMessage(messages) { msg ->
                         assertEquals(1, msg.trades.size)
                         assertEquals(limitBuyOrderApiResponse.orderId, msg.trades[0].orderId)
                         assertEquals(SettlementStatus.Failed, msg.trades[0].settlementStatus)
@@ -1345,7 +1345,7 @@ class SettlementTest : OrderBaseTest() {
                 AssetAmount(baseSymbol, "0.4"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         val (makerApiClient, makerWallet, makerWsClient) = setupTrader(
@@ -1358,7 +1358,7 @@ class SettlementTest : OrderBaseTest() {
                 AssetAmount(quoteSymbol, "10"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         // starting onchain balances
@@ -1378,7 +1378,7 @@ class SettlementTest : OrderBaseTest() {
             makerWallet,
         )
         makerWsClient.apply {
-            assertLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
+            assertMyLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
             assertLimitsMessageReceived()
         }
 
@@ -1401,10 +1401,10 @@ class SettlementTest : OrderBaseTest() {
         ).withdrawal
 
         takerWsClient.apply {
-            assertMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
-            assertTradesCreatedMessageReceived(
+            assertMyMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = marketSellOrderApiResponse,
                         price = BigDecimal("17.55"),
                         amount = AssetAmount(baseSymbol, marketSellOrderApiResponse.order.amount.fixedAmount()),
@@ -1413,7 +1413,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Filled, msg.order.status)
                 assertEquals(1, msg.order.executions.size)
             }
@@ -1440,9 +1440,9 @@ class SettlementTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradesCreatedMessageReceived(
+            assertMyTradesCreatedMessageReceived(
                 listOf(
-                    ExpectedTrade(
+                    MyExpectedTrade(
                         order = limitBuyOrderApiResponse,
                         price = BigDecimal("17.55"),
                         amount = AssetAmount(baseSymbol, "0.1"),
@@ -1451,7 +1451,7 @@ class SettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Partial, msg.order.status)
             }
             assertBalancesMessageReceived(
@@ -1478,7 +1478,7 @@ class SettlementTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertMessagesReceived(2) { messages ->
-                assertContainsTradesUpdatedMessage(messages) { msg ->
+                assertContainsMyTradesUpdatedMessage(messages) { msg ->
                     assertEquals(1, msg.trades.size)
                     assertEquals(marketSellOrderApiResponse.orderId, msg.trades[0].orderId)
                     assertEquals(SettlementStatus.Completed, msg.trades[0].settlementStatus)

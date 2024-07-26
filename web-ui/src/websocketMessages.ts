@@ -4,8 +4,8 @@ import { BalanceSchema, OrderSchema, TradeSchema } from 'apiClient'
 export type SubscriptionTopic =
   | { type: 'OrderBook'; marketId: string }
   | { type: 'Prices'; marketId: string; duration: string }
-  | { type: 'Trades' }
-  | { type: 'Orders' }
+  | { type: 'MyTrades' }
+  | { type: 'MyOrders' }
   | { type: 'Balances' }
   | { type: 'Limits' }
 
@@ -20,8 +20,8 @@ export function pricesTopic(
   return { type: 'Prices', marketId, duration }
 }
 
-export const tradesTopic: SubscriptionTopic = { type: 'Trades' }
-export const ordersTopic: SubscriptionTopic = { type: 'Orders' }
+export const myTradesTopic: SubscriptionTopic = { type: 'MyTrades' }
+export const myOrdersTopic: SubscriptionTopic = { type: 'MyOrders' }
 export const balancesTopic: SubscriptionTopic = { type: 'Balances' }
 export const limitsTopic: SubscriptionTopic = { type: 'Limits' }
 
@@ -82,29 +82,29 @@ export const PricesSchema = z.object({
 })
 export type Prices = z.infer<typeof PricesSchema>
 
-export const TradesSchema = z.object({
-  type: z.literal('Trades'),
+export const MyTradesSchema = z.object({
+  type: z.literal('MyTrades'),
   trades: z.array(TradeSchema)
 })
-export type Trades = z.infer<typeof TradesSchema>
+export type MyTrades = z.infer<typeof MyTradesSchema>
 
-export const TradesCreatedSchema = z.object({
-  type: z.literal('TradesCreated'),
+export const MyTradesCreatedSchema = z.object({
+  type: z.literal('MyTradesCreated'),
   trades: z.array(TradeSchema)
 })
-export type TradesCreated = z.infer<typeof TradesCreatedSchema>
+export type MyTradesCreated = z.infer<typeof MyTradesCreatedSchema>
 
-export const TradesUpdatedSchema = z.object({
-  type: z.literal('TradesUpdated'),
+export const MyTradesUpdatedSchema = z.object({
+  type: z.literal('MyTradesUpdated'),
   trades: z.array(TradeSchema)
 })
-export type TradesUpdated = z.infer<typeof TradesUpdatedSchema>
+export type MyTradesUpdated = z.infer<typeof MyTradesUpdatedSchema>
 
-export const OrdersSchema = z.object({
-  type: z.literal('Orders'),
+export const MyOrdersSchema = z.object({
+  type: z.literal('MyOrders'),
   orders: z.array(OrderSchema)
 })
-export type Orders = z.infer<typeof OrdersSchema>
+export type MyOrders = z.infer<typeof MyOrdersSchema>
 
 export const BalancesSchema = z.object({
   type: z.literal('Balances'),
@@ -112,17 +112,17 @@ export const BalancesSchema = z.object({
 })
 export type Balances = z.infer<typeof BalancesSchema>
 
-export const OrderCreatedSchema = z.object({
-  type: z.literal('OrderCreated'),
+export const MyOrderCreatedSchema = z.object({
+  type: z.literal('MyOrderCreated'),
   order: OrderSchema
 })
-export type OrderCreated = z.infer<typeof OrderCreatedSchema>
+export type MyOrderCreated = z.infer<typeof MyOrderCreatedSchema>
 
-export const OrderUpdatedSchema = z.object({
-  type: z.literal('OrderUpdated'),
+export const MyOrderUpdatedSchema = z.object({
+  type: z.literal('MyOrderUpdated'),
   order: OrderSchema
 })
-export type OrderUpdated = z.infer<typeof OrderUpdatedSchema>
+export type MyOrderUpdated = z.infer<typeof MyOrderUpdatedSchema>
 
 export const MarketLimitsSchema = z
   .tuple([
@@ -155,13 +155,13 @@ export function limitsForMarket(
 export const PublishableSchema = z.discriminatedUnion('type', [
   OrderBookSchema,
   PricesSchema,
-  TradesSchema,
-  TradesCreatedSchema,
-  TradesUpdatedSchema,
-  OrdersSchema,
+  MyTradesSchema,
+  MyTradesCreatedSchema,
+  MyTradesUpdatedSchema,
+  MyOrdersSchema,
   BalancesSchema,
-  OrderCreatedSchema,
-  OrderUpdatedSchema,
+  MyOrderCreatedSchema,
+  MyOrderUpdatedSchema,
   LimitsSchema
 ])
 export type Publishable = z.infer<typeof PublishableSchema>
