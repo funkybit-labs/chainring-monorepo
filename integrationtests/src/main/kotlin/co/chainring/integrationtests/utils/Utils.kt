@@ -2,6 +2,7 @@ package co.chainring.integrationtests.utils
 
 import co.chainring.apps.api.model.Balance
 import co.chainring.apps.api.model.SymbolInfo
+import co.chainring.apps.api.model.websocket.Limits
 import co.chainring.core.model.Symbol
 import co.chainring.core.utils.fromFundamentalUnits
 import co.chainring.core.utils.toFundamentalUnits
@@ -82,4 +83,8 @@ fun assertAmount(expectedAmount: AssetAmount, amount: BigDecimal) =
 fun assertFee(expectedAmount: AssetAmount, amount: BigInteger, symbol: Symbol) {
     assertEquals(expectedAmount, AssetAmount(expectedAmount.symbol, amount))
     assertEquals(expectedAmount.symbol.name, symbol.value)
+}
+
+fun verifyApiReturnsSameLimits(apiClient: TestApiClient, wsMessage: Limits) {
+    assertEquals(wsMessage.limits, apiClient.getLimits().limits)
 }

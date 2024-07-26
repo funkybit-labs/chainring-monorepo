@@ -35,6 +35,7 @@ import co.chainring.integrationtests.utils.subscribeToOrderBook
 import co.chainring.integrationtests.utils.subscribeToOrders
 import co.chainring.integrationtests.utils.subscribeToPrices
 import co.chainring.integrationtests.utils.subscribeToTrades
+import co.chainring.integrationtests.utils.verifyApiReturnsSameLimits
 import org.awaitility.kotlin.await
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.WsClient
@@ -60,10 +61,12 @@ open class OrderBaseTest {
         lateinit var usdc2: SymbolInfo
         lateinit var dai: SymbolInfo
         lateinit var btcEthMarket: Market
+        lateinit var btcEth2Market: Market
         lateinit var btc2Eth2Market: Market
         lateinit var btcUsdcMarket: Market
         lateinit var btc2Usdc2Market: Market
         lateinit var usdcDaiMarket: Market
+        lateinit var usdc2Dai2Market: Market
         lateinit var btcbtc2Market: Market
         lateinit var chainIdBySymbol: Map<String, ChainId>
 
@@ -73,7 +76,9 @@ open class OrderBaseTest {
             val config = TestApiClient.getConfiguration()
             val(chain1, chain2) = config.chains.map { it.id }
             usdcDaiMarket = config.markets.first { it.id.value == "USDC:$chain1/DAI:$chain1" }
+            usdc2Dai2Market = config.markets.first { it.id.value == "USDC:$chain2/DAI:$chain2" }
             btcEthMarket = config.markets.first { it.id.value == "BTC:$chain1/ETH:$chain1" }
+            btcEth2Market = config.markets.first { it.id.value == "BTC:$chain1/ETH:$chain2" }
             btc2Eth2Market = config.markets.first { it.id.value == "BTC:$chain2/ETH:$chain2" }
             btcUsdcMarket = config.markets.first { it.id.value == "BTC:$chain1/USDC:$chain1" }
             btc2Usdc2Market = config.markets.first { it.id.value == "BTC:$chain2/USDC:$chain2" }
@@ -134,8 +139,10 @@ open class OrderBaseTest {
             subscribeToBalances()
             assertBalancesMessageReceived()
 
-            subscribeToLimits(marketId)
-            assertLimitsMessageReceived(marketId)
+            subscribeToLimits()
+            assertLimitsMessageReceived().also { wsMessage ->
+                verifyApiReturnsSameLimits(apiClient, wsMessage)
+            }
         }
 
         airdrops.forEach {
@@ -157,7 +164,9 @@ open class OrderBaseTest {
             }
             wallet.depositAndMine(it)
             wsClient.assertBalancesMessageReceived()
-            wsClient.assertLimitsMessageReceived(marketId)
+            wsClient.assertLimitsMessageReceived().also { wsMessage ->
+                verifyApiReturnsSameLimits(apiClient, wsMessage)
+            }
         }
 
         assertBalances(deposits.map { ExpectedBalance(it) }, apiClient.getBalances().balances)

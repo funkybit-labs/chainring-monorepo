@@ -19,6 +19,7 @@ import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BroadcasterJobEntity
 import co.chainring.core.model.db.BroadcasterJobId
 import co.chainring.core.model.db.BroadcasterNotification
+import co.chainring.core.model.db.LimitEntity
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
@@ -102,7 +103,7 @@ class Broadcaster(val db: Database) {
             is SubscriptionTopic.Trades -> sendTrades(client)
             is SubscriptionTopic.Orders -> sendOrders(client)
             is SubscriptionTopic.Balances -> sendBalances(client)
-            is SubscriptionTopic.Limits -> sendLimits(topic, client)
+            is SubscriptionTopic.Limits -> sendLimits(client)
         }
     }
 
@@ -263,15 +264,16 @@ class Broadcaster(val db: Database) {
         }
     }
 
-    private fun sendLimits(topic: SubscriptionTopic.Limits, client: ConnectedClient) {
+    private fun sendLimits(client: ConnectedClient) {
         if (client.principal != null) {
             transaction {
                 client.send(
                     OutgoingWSMessage.Publish(
-                        topic,
-                        OrderEntity.getLimits(
-                            MarketEntity[topic.marketId],
-                            WalletEntity.getOrCreate(client.principal),
+                        SubscriptionTopic.Limits,
+                        Limits(
+                            LimitEntity.forWallet(
+                                WalletEntity.getOrCreate(client.principal),
+                            ),
                         ),
                     ),
                 )
@@ -305,7 +307,7 @@ class Broadcaster(val db: Database) {
             }
             is Trades, is TradesCreated, is TradesUpdated -> SubscriptionTopic.Trades
             is Balances -> SubscriptionTopic.Balances
-            is Limits -> SubscriptionTopic.Limits(notification.message.marketId)
+            is Limits -> SubscriptionTopic.Limits
         }
 
         val clients = if (notification.recipient == null) {

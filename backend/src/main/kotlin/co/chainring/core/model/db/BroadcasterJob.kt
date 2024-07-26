@@ -1,6 +1,7 @@
 package co.chainring.core.model.db
 
 import co.chainring.apps.api.model.websocket.Balances
+import co.chainring.apps.api.model.websocket.Limits
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.core.db.notifyDbListener
@@ -34,8 +35,8 @@ data class BroadcasterNotification(
         fun pricesForMarketPeriods(marketId: MarketId, duration: OHLCDuration, ohlc: List<OHLCEntity>, full: Boolean, dailyChange: Double): BroadcasterNotification =
             BroadcasterNotification(Prices(marketId, duration, ohlc.map { it.toWSResponse() }, full, dailyChange), null)
 
-        fun limits(wallet: WalletEntity, market: MarketEntity): BroadcasterNotification =
-            BroadcasterNotification(OrderEntity.getLimits(market, wallet), recipient = wallet.address)
+        fun limits(wallet: WalletEntity): BroadcasterNotification =
+            BroadcasterNotification(Limits(LimitEntity.forWallet(wallet)), recipient = wallet.address)
 
         fun walletBalances(wallet: WalletEntity): BroadcasterNotification =
             BroadcasterNotification(

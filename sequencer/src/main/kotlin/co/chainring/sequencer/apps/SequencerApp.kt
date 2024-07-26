@@ -9,6 +9,7 @@ import co.chainring.sequencer.core.Market
 import co.chainring.sequencer.core.MarketId
 import co.chainring.sequencer.core.SequencerState
 import co.chainring.sequencer.core.WalletAddress
+import co.chainring.sequencer.core.asBalanceChangesList
 import co.chainring.sequencer.core.notional
 import co.chainring.sequencer.core.notionalPlusFee
 import co.chainring.sequencer.core.sumBigIntegers
@@ -20,7 +21,7 @@ import co.chainring.sequencer.core.toIntegerValue
 import co.chainring.sequencer.core.toOrderGuid
 import co.chainring.sequencer.core.toWalletAddress
 import co.chainring.sequencer.proto.BackToBackOrder
-import co.chainring.sequencer.proto.BalanceChange
+import co.chainring.sequencer.proto.LimitsUpdate
 import co.chainring.sequencer.proto.Order
 import co.chainring.sequencer.proto.OrderBatch
 import co.chainring.sequencer.proto.OrderChangeRejected
@@ -30,8 +31,8 @@ import co.chainring.sequencer.proto.SequencerError
 import co.chainring.sequencer.proto.SequencerRequest
 import co.chainring.sequencer.proto.SequencerResponse
 import co.chainring.sequencer.proto.TradeCreated
-import co.chainring.sequencer.proto.balanceChange
 import co.chainring.sequencer.proto.copy
+import co.chainring.sequencer.proto.limitsUpdate
 import co.chainring.sequencer.proto.marketCreated
 import co.chainring.sequencer.proto.order
 import co.chainring.sequencer.proto.orderBatch
@@ -79,13 +80,15 @@ class SequencerApp(
                         error = SequencerError.MarketExists
                     }
                 } else {
-                    state.markets[marketId] = Market(
-                        id = marketId,
-                        tickSize = market.tickSize.toBigDecimal(),
-                        maxOrdersPerLevel = market.maxOrdersPerLevel,
-                        baseDecimals = market.baseDecimals,
-                        quoteDecimals = market.quoteDecimals,
-                        minFee = if (market.hasMinFee()) market.minFee.toBigInteger() else BigInteger.ZERO,
+                    state.addMarket(
+                        Market(
+                            id = marketId,
+                            tickSize = market.tickSize.toBigDecimal(),
+                            maxOrdersPerLevel = market.maxOrdersPerLevel,
+                            baseDecimals = market.baseDecimals,
+                            quoteDecimals = market.quoteDecimals,
+                            minFee = if (market.hasMinFee()) market.minFee.toBigInteger() else BigInteger.ZERO,
+                        ),
                     )
                 }
                 sequencerResponse {
@@ -106,6 +109,7 @@ class SequencerApp(
                     this.processingTime = clock.nanoTime() - startTime
                 }
             }
+
             SequencerRequest.Type.SetFeeRates -> {
                 var error: SequencerError? = null
 
@@ -181,6 +185,7 @@ class SequencerApp(
                 val trades: MutableList<TradeCreated> = mutableListOf()
                 val balanceChanges = mutableMapOf<Pair<WalletAddress, Asset>, BigInteger>()
                 val walletsAndAssetsWithBalanceChanges: MutableSet<Pair<WalletAddress, Asset>> = mutableSetOf()
+                val walletsWithLimitChanges: MutableSet<Pair<WalletAddress, MarketId>> = mutableSetOf()
                 val order = request.backToBackOrder!!.order
 
                 val error = if (request.backToBackOrder.marketIdsList.size != 2) {
@@ -205,6 +210,7 @@ class SequencerApp(
                                     trades,
                                     balanceChanges,
                                     walletsAndAssetsWithBalanceChanges,
+                                    walletsWithLimitChanges,
                                 )
 
                                 Order.Type.MarketBuy -> handleBackToBackBuyOrder(
@@ -215,6 +221,7 @@ class SequencerApp(
                                     trades,
                                     balanceChanges,
                                     walletsAndAssetsWithBalanceChanges,
+                                    walletsWithLimitChanges,
                                 )
 
                                 else -> SequencerError.InvalidBackToBackOrder
@@ -222,13 +229,15 @@ class SequencerApp(
                         }
                     }
                 }
+                ordersChanged.addAll(autoReduce(walletsAndAssetsWithBalanceChanges, walletsWithLimitChanges))
+
                 sequencerResponse {
                     this.sequence = sequence
                     this.guid = request.guid
                     this.ordersChanged.addAll(ordersChanged)
-                    this.ordersChanged.addAll(autoReduce(walletsAndAssetsWithBalanceChanges))
                     this.tradesCreated.addAll(trades)
-                    this.balancesChanged.addAll(mapBalanceChangeMapToResult(balanceChanges))
+                    this.balancesChanged.addAll(balanceChanges.asBalanceChangesList())
+                    this.limitsUpdated.addAll(calculateLimits(walletsWithLimitChanges))
                     this.error = error
                     this.createdAt = clock.currentTimeMillis()
                     this.processingTime = clock.nanoTime() - startTime
@@ -236,11 +245,12 @@ class SequencerApp(
             }
 
             SequencerRequest.Type.ApplyOrderBatch -> {
-                var ordersChanged: List<OrderChanged> = emptyList()
+                val ordersChanged: MutableList<OrderChanged> = mutableListOf()
                 var ordersChangeRejected: List<OrderChangeRejected> = emptyList()
                 var trades: List<TradeCreated> = emptyList()
-                var balanceChanges: List<BalanceChange> = emptyList()
+                val balanceChanges = mutableMapOf<Pair<WalletAddress, Asset>, BigInteger>()
                 val walletsAndAssetsWithBalanceChanges: MutableSet<Pair<WalletAddress, Asset>> = mutableSetOf()
+                val walletsWithLimitChanges: MutableSet<Pair<WalletAddress, MarketId>> = mutableSetOf()
                 val orderBatch = request.orderBatch!!
                 val error: SequencerError?
                 val marketId = MarketId(orderBatch.marketId)
@@ -252,39 +262,26 @@ class SequencerApp(
                     error = checkLimits(market, adjustedOrderBatch)
                     if (error == null) {
                         val result = market.applyOrderBatch(adjustedOrderBatch, state.feeRates)
-                        ordersChanged = result.ordersChanged
+                        ordersChanged.addAll(result.ordersChanged)
                         ordersChangeRejected = result.ordersChangeRejected
                         trades = result.createdTrades
-                        balanceChanges = result.balanceChanges
-                        // apply balance changes
-                        balanceChanges.forEach {
-                            state.balances.getOrPut(it.wallet.toWalletAddress()) {
-                                mutableMapOf()
-                            }.merge(
-                                it.asset.toAsset(),
-                                it.delta.toBigInteger(),
-                            ) { a, b -> BigInteger.ZERO.max(a + b) }
-                            walletsAndAssetsWithBalanceChanges.add(Pair(it.wallet.toWalletAddress(), it.asset.toAsset()))
-                        }
-                        // apply consumption changes
-                        result.consumptionChanges.forEach {
-                            if (it.delta != BigInteger.ZERO) {
-                                state.consumed.getOrPut(it.walletAddress) {
-                                    mutableMapOf()
-                                }.getOrPut(it.asset) {
-                                    mutableMapOf()
-                                }.merge(marketId, it.delta, ::sumBigIntegers)
-                            }
-                        }
+                        applyBalanceAndConsumptionChanges(
+                            market.id,
+                            result,
+                            walletsAndAssetsWithBalanceChanges,
+                            balanceChanges,
+                            walletsWithLimitChanges,
+                        )
+                        ordersChanged.addAll(autoReduce(walletsAndAssetsWithBalanceChanges, walletsWithLimitChanges))
                     }
                 }
                 sequencerResponse {
                     this.sequence = sequence
                     this.guid = orderBatch.guid
                     this.ordersChanged.addAll(ordersChanged)
-                    this.ordersChanged.addAll(autoReduce(walletsAndAssetsWithBalanceChanges))
                     this.tradesCreated.addAll(trades)
-                    this.balancesChanged.addAll(balanceChanges)
+                    this.balancesChanged.addAll(balanceChanges.asBalanceChangesList())
+                    this.limitsUpdated.addAll(calculateLimits(walletsWithLimitChanges))
                     error?.let {
                         this.error = it
                     }
@@ -300,6 +297,7 @@ class SequencerApp(
             SequencerRequest.Type.ApplyBalanceBatch -> {
                 val balanceBatch = request.balanceBatch!!
                 val balancesChanged = mutableMapOf<Pair<WalletAddress, Asset>, BigInteger>()
+                val walletsWithLimitChanges: MutableSet<Pair<WalletAddress, MarketId>> = mutableSetOf()
                 balanceBatch.depositsList.forEach { deposit ->
                     val wallet = deposit.wallet.toWalletAddress()
                     val asset = deposit.asset.toAsset()
@@ -364,11 +362,19 @@ class SequencerApp(
                     }
                 }
 
+                balancesChanged.keys.forEach { (wallet, asset) ->
+                    state
+                        .getMarketIdsByAsset(asset)
+                        .forEach { marketId ->
+                            walletsWithLimitChanges.add(Pair(wallet, marketId))
+                        }
+                }
+
                 sequencerResponse {
                     this.guid = balanceBatch.guid
                     this.sequence = sequence
-                    this.balancesChanged.addAll(mapBalanceChangeMapToResult(balancesChanged))
-                    this.ordersChanged.addAll(autoReduce(balancesChanged.keys))
+                    this.balancesChanged.addAll(balancesChanged.asBalanceChangesList())
+                    this.ordersChanged.addAll(autoReduce(balancesChanged.keys, walletsWithLimitChanges))
                     this.withdrawalsCreated.addAll(
                         withdrawalsCreated.map {
                             withdrawalCreated {
@@ -377,10 +383,12 @@ class SequencerApp(
                             }
                         },
                     )
+                    this.limitsUpdated.addAll(calculateLimits(walletsWithLimitChanges))
                     this.createdAt = clock.currentTimeMillis()
                     this.processingTime = clock.nanoTime() - startTime
                 }
             }
+
             SequencerRequest.Type.Reset -> {
                 if (inSandboxMode) {
                     state.clear()
@@ -400,6 +408,7 @@ class SequencerApp(
                     }
                 }
             }
+
             SequencerRequest.Type.GetState -> {
                 if (inSandboxMode) {
                     sequencerResponse {
@@ -419,6 +428,7 @@ class SequencerApp(
                     }
                 }
             }
+
             null, SequencerRequest.Type.UNRECOGNIZED -> {
                 sequencerResponse {
                     this.sequence = sequence
@@ -436,18 +446,31 @@ class SequencerApp(
         result: Market.AddOrdersResult,
         walletsAndAssetsWithBalanceChanges: MutableSet<Pair<WalletAddress, Asset>>,
         balanceChanges: MutableMap<Pair<WalletAddress, Asset>, BigInteger>,
+        walletsWithLimitChanges: MutableSet<Pair<WalletAddress, MarketId>>,
     ) {
         // apply balance changes
         result.balanceChanges.forEach {
-            balanceChanges.merge(Pair(it.wallet.toWalletAddress(), Asset(it.asset)), it.delta.toBigInteger(), ::sumBigIntegers)
-            state.balances.getOrPut(it.wallet.toWalletAddress()) {
-                mutableMapOf()
-            }.merge(
-                it.asset.toAsset(),
-                it.delta.toBigInteger(),
-            ) { a, b -> BigInteger.ZERO.max(a + b) }
-            walletsAndAssetsWithBalanceChanges.add(Pair(it.wallet.toWalletAddress(), it.asset.toAsset()))
+            val asset = Asset(it.asset)
+            val wallet = WalletAddress(it.wallet)
+            val walletAndAsset = Pair(wallet, asset)
+            val delta = it.delta.toBigInteger()
+
+            balanceChanges.merge(walletAndAsset, delta, ::sumBigIntegers)
+
+            state
+                .balances
+                .getOrPut(wallet) { mutableMapOf() }
+                .merge(asset, delta) { a, b -> BigInteger.ZERO.max(a + b) }
+
+            walletsAndAssetsWithBalanceChanges.add(walletAndAsset)
+
+            state
+                .getMarketIdsByAsset(asset)
+                .forEach { marketId ->
+                    walletsWithLimitChanges.add(Pair(wallet, marketId))
+                }
         }
+
         // apply consumption changes
         result.consumptionChanges.forEach {
             if (it.delta != BigInteger.ZERO) {
@@ -456,24 +479,23 @@ class SequencerApp(
                 }.getOrPut(it.asset) {
                     mutableMapOf()
                 }.merge(marketId, it.delta, ::sumBigIntegers)
+                walletsWithLimitChanges.add(Pair(it.walletAddress, marketId))
             }
         }
     }
 
-    private fun mapBalanceChangeMapToResult(balanceChanges: MutableMap<Pair<WalletAddress, Asset>, BigInteger>): List<BalanceChange> {
-        return balanceChanges.mapNotNull { (k, delta) ->
-            if (delta != BigInteger.ZERO) {
-                val (wallet, asset) = k
-                balanceChange {
+    private fun calculateLimits(walletsWithLimitChanges: Set<Pair<WalletAddress, MarketId>>): List<LimitsUpdate> =
+        walletsWithLimitChanges
+            .map { (wallet, marketId) ->
+                limitsUpdate {
                     this.wallet = wallet.value
-                    this.asset = asset.value
-                    this.delta = delta.toIntegerValue()
+                    this.marketId = marketId.value
+                    val (baseAsset, quoteAsset) = marketId.assets()
+                    this.base = ((state.balances[wallet]?.get(baseAsset) ?: BigInteger.ZERO) - (state.consumed[wallet]?.get(baseAsset)?.get(marketId) ?: BigInteger.ZERO)).toIntegerValue()
+                    this.quote = ((state.balances[wallet]?.get(quoteAsset) ?: BigInteger.ZERO) - (state.consumed[wallet]?.get(quoteAsset)?.get(marketId) ?: BigInteger.ZERO)).toIntegerValue()
                 }
-            } else {
-                null
             }
-        }
-    }
+            .sortedWith(compareBy(LimitsUpdate::getWallet, LimitsUpdate::getMarketId))
 
     private fun handleBackToBackSellOrder(
         request: BackToBackOrder,
@@ -483,6 +505,7 @@ class SequencerApp(
         trades: MutableList<TradeCreated>,
         balanceChanges: MutableMap<Pair<WalletAddress, Asset>, BigInteger>,
         walletsAndAssetsWithBalanceChanges: MutableSet<Pair<WalletAddress, Asset>>,
+        walletsWithLimitChanges: MutableSet<Pair<WalletAddress, MarketId>>,
     ): SequencerError {
         val walletAddress = request.wallet.toWalletAddress()
         val order = request.order
@@ -555,6 +578,7 @@ class SequencerApp(
                 firstOrderResult,
                 walletsAndAssetsWithBalanceChanges,
                 balanceChanges,
+                walletsWithLimitChanges,
             )
             ordersChanged.addAll(firstOrderResult.ordersChanged.filterNot { it.guid == order.guid })
             trades.addAll(firstOrderResult.createdTrades)
@@ -573,6 +597,7 @@ class SequencerApp(
                 secondOrderResult,
                 walletsAndAssetsWithBalanceChanges,
                 balanceChanges,
+                walletsWithLimitChanges,
             )
             ordersChanged.addAll(secondOrderResult.ordersChanged.filterNot { it.guid == order.guid })
             ordersChanged.add(
@@ -599,6 +624,7 @@ class SequencerApp(
         trades: MutableList<TradeCreated>,
         balanceChanges: MutableMap<Pair<WalletAddress, Asset>, BigInteger>,
         walletsAndAssetsWithBalanceChanges: MutableSet<Pair<WalletAddress, Asset>>,
+        walletsWithLimitChanges: MutableSet<Pair<WalletAddress, MarketId>>,
     ): SequencerError {
         val walletAddress = request.wallet.toWalletAddress()
         val order = request.order
@@ -660,6 +686,7 @@ class SequencerApp(
                 firstOrderResult,
                 walletsAndAssetsWithBalanceChanges,
                 balanceChanges,
+                walletsWithLimitChanges,
             )
             ordersChanged.addAll(firstOrderResult.ordersChanged.filterNot { it.guid == order.guid })
             trades.addAll(firstOrderResult.createdTrades)
@@ -684,6 +711,7 @@ class SequencerApp(
                 secondOrderResult,
                 walletsAndAssetsWithBalanceChanges,
                 balanceChanges,
+                walletsWithLimitChanges,
             )
             ordersChanged.addAll(secondOrderResult.ordersChanged.filterNot { it.guid == order.guid })
             ordersChanged.add(
@@ -740,16 +768,22 @@ class SequencerApp(
         }
     }
 
-    private fun autoReduce(walletsAndAssets: Collection<Pair<WalletAddress, Asset>>): List<OrderChanged> {
+    private fun autoReduce(
+        walletsAndAssets: Collection<Pair<WalletAddress, Asset>>,
+        walletsWithLimitChanges: MutableSet<Pair<WalletAddress, MarketId>>,
+    ): List<OrderChanged> {
         return walletsAndAssets.flatMap { (walletAddress, asset) ->
             state.consumed[walletAddress]?.get(asset)?.flatMap { (marketId, amount) ->
                 val balance = state.balances[walletAddress]?.get(asset) ?: BigInteger.ZERO
                 if (amount > balance) {
-                    state.markets[marketId]?.autoReduce(walletAddress, asset, balance) ?: emptyList()
+                    val changedOrders = state.markets[marketId]?.autoReduce(walletAddress, asset, balance) ?: emptyList()
+                    state.consumed.getValue(walletAddress).getValue(asset)[marketId] = balance
+                    walletsWithLimitChanges.add(Pair(walletAddress, marketId))
+                    changedOrders
                 } else {
                     emptyList()
                 }
-            } ?: emptyList()
+            }?.sortedBy { it.guid } ?: emptyList()
         }
     }
 

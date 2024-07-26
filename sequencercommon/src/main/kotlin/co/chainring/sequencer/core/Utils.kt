@@ -1,7 +1,9 @@
 package co.chainring.sequencer.core
 
+import co.chainring.sequencer.proto.BalanceChange
 import co.chainring.sequencer.proto.DecimalValue
 import co.chainring.sequencer.proto.IntegerValue
+import co.chainring.sequencer.proto.balanceChange
 import com.google.protobuf.ByteString
 import com.google.protobuf.kotlin.toByteString
 import java.math.BigDecimal
@@ -48,3 +50,17 @@ fun quantityFromNotionalAndPrice(notional: BigInteger, price: BigDecimal, baseDe
 
 fun notionalPlusFee(amount: IntegerValue, price: DecimalValue, baseDecimals: Int, quoteDecimals: Int, feeRate: FeeRate): BigInteger =
     notionalPlusFee(amount.toBigInteger(), price.toBigDecimal(), baseDecimals, quoteDecimals, feeRate)
+
+fun Map<Pair<WalletAddress, Asset>, BigInteger>.asBalanceChangesList(): List<BalanceChange> =
+    mapNotNull { (k, delta) ->
+        if (delta != BigInteger.ZERO) {
+            val (wallet, asset) = k
+            balanceChange {
+                this.wallet = wallet.value
+                this.asset = asset.value
+                this.delta = delta.toIntegerValue()
+            }
+        } else {
+            null
+        }
+    }

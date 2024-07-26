@@ -33,6 +33,13 @@ message BalanceChange {
   IntegerValue delta = 3;
 }
 
+message LimitsUpdate {
+  uint64 wallet = 1;
+  string marketId = 2;
+  IntegerValue base = 3;
+  IntegerValue quote = 4;
+}
+
 message MarketCreated {
   string marketId = 1;
   DecimalValue tickSize = 2;
@@ -112,6 +119,7 @@ message SequencerResponse {
   repeated WithdrawalFee withdrawalFeesSet = 14;
   repeated MarketMinFee marketMinFeesSet = 15;
   uint64 createdAt = 16;
+  repeated LimitsUpdate limitsUpdated = 17;
 }
 
 message Sequenced {

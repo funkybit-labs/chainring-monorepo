@@ -7,7 +7,7 @@ export type SubscriptionTopic =
   | { type: 'Trades' }
   | { type: 'Orders' }
   | { type: 'Balances' }
-  | { type: 'Limits'; marketId: string }
+  | { type: 'Limits' }
 
 export function orderBookTopic(marketId: string): SubscriptionTopic {
   return { type: 'OrderBook', marketId }
@@ -23,10 +23,7 @@ export function pricesTopic(
 export const tradesTopic: SubscriptionTopic = { type: 'Trades' }
 export const ordersTopic: SubscriptionTopic = { type: 'Orders' }
 export const balancesTopic: SubscriptionTopic = { type: 'Balances' }
-
-export function limitsTopic(marketId: string): SubscriptionTopic {
-  return { type: 'Limits', marketId }
-}
+export const limitsTopic: SubscriptionTopic = { type: 'Limits' }
 
 export type Publish = {
   type: 'Publish'
@@ -127,13 +124,33 @@ export const OrderUpdatedSchema = z.object({
 })
 export type OrderUpdated = z.infer<typeof OrderUpdatedSchema>
 
+export const MarketLimitsSchema = z
+  .tuple([
+    z.string(), // marketId
+    z.coerce.bigint(), // base
+    z.coerce.bigint() // quote
+  ])
+  .transform((tuple) => {
+    return {
+      marketId: tuple[0],
+      base: tuple[1],
+      quote: tuple[2]
+    }
+  })
+export type MarketLimits = z.infer<typeof MarketLimitsSchema>
+
 export const LimitsSchema = z.object({
   type: z.literal('Limits'),
-  marketId: z.string(),
-  base: z.coerce.bigint(),
-  quote: z.coerce.bigint()
+  limits: z.array(MarketLimitsSchema)
 })
 export type Limits = z.infer<typeof LimitsSchema>
+
+export function limitsForMarket(
+  limits: Limits,
+  marketId: string
+): MarketLimits | undefined {
+  return limits.limits.find((marketLimits) => marketLimits.marketId == marketId)
+}
 
 export const PublishableSchema = z.discriminatedUnion('type', [
   OrderBookSchema,

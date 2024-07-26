@@ -1,5 +1,6 @@
 package co.chainring.sequencer.apps.services
 
+import co.chainring.apps.api.model.MarketLimits
 import co.chainring.apps.api.model.websocket.OrderCreated
 import co.chainring.apps.api.model.websocket.OrderUpdated
 import co.chainring.apps.api.model.websocket.TradesCreated
@@ -16,6 +17,7 @@ import co.chainring.core.model.db.CreateOrderAssignment
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.FeeRates
+import co.chainring.core.model.db.LimitEntity
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
@@ -215,11 +217,9 @@ object SequencerResponseProcessorService {
             OrderEntity.batchCreate(market, wallet, createAssignments)
 
             val createdOrders = OrderEntity.listOrdersWithExecutions(createAssignments.map { it.orderId }).map { it.toOrderResponse() }
-            val limitOrdersCreated = createdOrders.count { it is co.chainring.apps.api.model.Order.Limit } > 0
 
             publishBroadcasterNotifications(
-                createdOrders.map { BroadcasterNotification(OrderCreated(it), wallet.address) } +
-                    if (limitOrdersCreated) listOf(BroadcasterNotification.limits(wallet, market)) else emptyList(),
+                createdOrders.map { BroadcasterNotification(OrderCreated(it), wallet.address) },
             )
         }
     }
@@ -258,7 +258,6 @@ object SequencerResponseProcessorService {
         }
 
         val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
-        val limitsChanged = mutableSetOf<Pair<WalletEntity, MarketEntity>>()
 
         // handle trades
         val executionsCreatedByWallet = mutableMapOf<Address, MutableList<OrderExecutionEntity>>()
@@ -344,7 +343,6 @@ object SequencerResponseProcessorService {
                     recipient = orderToUpdate.wallet.address,
                 ),
             )
-            limitsChanged.add(Pair(orderToUpdate.wallet, orderToUpdate.market))
         }
 
         val markets = MarketEntity.all().toList()
@@ -369,16 +367,6 @@ object SequencerResponseProcessorService {
             )
             walletMap.values.forEach {
                 broadcasterNotifications.add(BroadcasterNotification.walletBalances(it))
-            }
-
-            response.balancesChangedList.forEach { change ->
-                walletMap[change.wallet]?.also { wallet ->
-                    val symbol = getSymbol(change.asset)
-                    val symbolMarkets = markets.filter { it.baseSymbol.guid == symbol.guid || it.quoteSymbol.guid == symbol.guid }
-                    symbolMarkets.forEach { market ->
-                        limitsChanged.add(Pair(wallet, market))
-                    }
-                }
             }
         }
 
@@ -425,18 +413,31 @@ object SequencerResponseProcessorService {
             }
         }
 
-        val limitsNotifications = limitsChanged
-            .groupBy(
-                keySelector = { (wallet, _) -> wallet },
-                valueTransform = { (_, market) -> market },
-            )
-            .toList()
-            .sortedBy { (wallet, _) -> wallet.address.value }
-            .flatMap { (wallet, markets) ->
-                markets.sortedBy { it.guid }.map { market ->
-                    BroadcasterNotification.limits(wallet, market)
+        val walletsToNotifyAboutLimitsChanges = response
+            .limitsUpdatedList
+            .map { it.wallet }
+            .distinct()
+            .mapNotNull { WalletEntity.getBySequencerId(it.sequencerWalletId()) }
+
+        walletsToNotifyAboutLimitsChanges
+            .associateBy { it.sequencerId.value }
+            .also { walletsBySequencerId ->
+                val limitUpdates = response.limitsUpdatedList.map {
+                    Pair(
+                        walletsBySequencerId.getValue(it.wallet).guid.value,
+                        MarketLimits(
+                            MarketId(it.marketId),
+                            it.base.toBigInteger(),
+                            it.quote.toBigInteger(),
+                        ),
+                    )
                 }
+                LimitEntity.update(limitUpdates)
             }
+
+        val limitsNotifications = walletsToNotifyAboutLimitsChanges.map { wallet ->
+            BroadcasterNotification.limits(wallet)
+        }
 
         publishBroadcasterNotifications(broadcasterNotifications + orderBookNotifications + ohlcNotifications + limitsNotifications)
     }
