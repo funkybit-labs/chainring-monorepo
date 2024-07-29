@@ -58,6 +58,12 @@ and then truncate db tables using favourite SQL editor. In this way OHLC records
 -- truncate table wallet CASCADE;
 -- truncate table deployed_smart_contract CASCADE;
 -- truncate table faucet_drip;
+-- truncate table block;
+-- truncate table "limit";
+-- truncate table telegram_mini_app_user_reward;
+-- truncate table telegram_mini_app_game_reaction_time;
+-- truncate table telegram_mini_app_user cascade;
+-- truncate table wallet_linked_signer;
 -- delete from key_value_store where key = 'LastProcessedOutputIndex';
 ```
 
@@ -96,11 +102,6 @@ Bind sequencer and database to localhost via `bastion`
 ssh -L 5556:demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com:5432 -L 5338:demo-sequencer.chainring.co:5337 demo-bastion.chainring.co
 ```
 
-<mark>Make correct fee values are set in `Fixtures.kt`</mark> (CHAIN-292 to set 0.01 and 0.02)
-```
-    feeRates = FeeRates.fromPercents(maker = 0.01, taker = 0.02)
-```
-
 Seed database, Anvil and Sequencer 
 ```
 export DB_HOST="localhost"
@@ -113,6 +114,8 @@ export EVM_NETWORK_URL_Botanix="https://demo-anvil2.chainring.co"
 
 export SEQUENCER_HOST_NAME="localhost"
 export SEQUENCER_PORT="5338"
+export MAKER_FEE_RATE=0.01
+export TAKER_FEE_RATE=0.02
 
 make db_seed
 ```
