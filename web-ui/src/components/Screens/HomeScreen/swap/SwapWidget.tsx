@@ -324,10 +324,6 @@ export function SwapWidget({
                         return '✓'
                       } else if (sr.sellAssetsNeeded > 0n) {
                         return 'Insufficient Balance'
-                      } else if (sr.limitPriceTooLow) {
-                        return 'Price Too Low'
-                      } else if (sr.limitPriceTooHigh) {
-                        return 'Price Too High'
                       } else if (sr.amountTooLow) {
                         return 'Amount Too Low'
                       } else {
@@ -335,10 +331,7 @@ export function SwapWidget({
                       }
                     }}
                     status={
-                      sr.sellAssetsNeeded > 0n ||
-                      sr.limitPriceTooLow ||
-                      sr.limitPriceTooHigh ||
-                      sr.amountTooLow
+                      sr.sellAssetsNeeded > 0n || sr.amountTooLow
                         ? 'error'
                         : sr.mutation.status
                     }

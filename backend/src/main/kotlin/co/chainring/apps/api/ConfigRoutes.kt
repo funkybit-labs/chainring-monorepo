@@ -96,8 +96,6 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                 quoteDecimals = 6,
                                 tickSize = "0.01".toBigDecimal(),
                                 lastPrice = "0.995".toBigDecimal(),
-                                minAllowedBidPrice = "0.01".toBigDecimal(),
-                                maxAllowedOfferPrice = "3.49".toBigDecimal(),
                                 minFee = BigInteger.ONE,
                             ),
                         ),
@@ -147,8 +145,6 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                     quoteDecimals = market.quoteSymbol.decimals.toInt(),
                                     tickSize = market.tickSize,
                                     lastPrice = market.lastPrice,
-                                    minAllowedBidPrice = market.minAllowedBidPrice,
-                                    maxAllowedOfferPrice = market.maxAllowedOfferPrice,
                                     minFee = market.minFee,
                                 )
                             }.sortedWith(compareBy({ it.baseSymbol.value }, { it.quoteSymbol.value })),

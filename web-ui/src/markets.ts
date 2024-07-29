@@ -10,8 +10,6 @@ export class Market {
   readonly tickSize: Decimal
   readonly quoteDecimalPlaces: number
   readonly lastPrice: Decimal
-  readonly minAllowedBidPrice: Decimal
-  readonly maxAllowedOfferPrice: Decimal
   readonly minFee: bigint
   readonly marketIds: string[]
 
@@ -21,8 +19,6 @@ export class Market {
     quoteSymbol: TradingSymbol,
     tickSize: Decimal,
     lastPrice: Decimal,
-    minAllowedBidPrice: Decimal,
-    maxAllowedOfferPrice: Decimal,
     minFee: bigint,
     marketIds: string[]
   ) {
@@ -32,8 +28,6 @@ export class Market {
     this.tickSize = tickSize
     this.lastPrice = lastPrice
     this.quoteDecimalPlaces = this.tickSize.decimalPlaces() + 1
-    this.minAllowedBidPrice = minAllowedBidPrice
-    this.maxAllowedOfferPrice = maxAllowedOfferPrice
     this.minFee = minFee
     this.marketIds = marketIds
   }
@@ -60,8 +54,6 @@ export default class Markets {
           symbols.getByName(m.quoteSymbol),
           m.tickSize,
           m.lastPrice,
-          m.minAllowedBidPrice,
-          m.maxAllowedOfferPrice,
           m.minFee,
           []
         )
@@ -164,8 +156,6 @@ export default class Markets {
                       symbols.getByName(secondMarket.quoteSymbol),
                       secondMarket.tickSize,
                       firstMarket.lastPrice.mul(secondMarket.lastPrice),
-                      new Decimal(0),
-                      new Decimal(0),
                       secondMarket.minFee,
                       [firstMarket.id, secondMarket.id]
                     )

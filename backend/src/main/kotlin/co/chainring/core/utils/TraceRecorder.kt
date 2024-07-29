@@ -40,6 +40,7 @@ interface TraceRecorder {
         AddAdmin,
         RemoveAdmin,
         SetFeeRates,
+        GetLastPrice,
     }
 
     data class Trace(

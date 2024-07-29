@@ -90,8 +90,6 @@ describe('rollupTrades', () => {
         quoteDecimals: 6,
         tickSize: '25.000000000000000000',
         lastPrice: '61000.000000000000000000',
-        minAllowedBidPrice: '0.000000000000000000',
-        maxAllowedOfferPrice: '2147483647.000000000000000000',
         minFee: '20000'
       },
       {
@@ -102,8 +100,6 @@ describe('rollupTrades', () => {
         quoteDecimals: 18,
         tickSize: '0.010000000000000000',
         lastPrice: '2.160000000000000000',
-        minAllowedBidPrice: '0.000000000000000000',
-        maxAllowedOfferPrice: '2147483647.000000000000000000',
         minFee: '20000000000000000'
       }
     ],
