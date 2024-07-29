@@ -1,9 +1,10 @@
 package co.chainring.sequencer.apps.services
 
 import co.chainring.apps.api.model.MarketLimits
-import co.chainring.apps.api.model.websocket.OrderCreated
-import co.chainring.apps.api.model.websocket.OrderUpdated
-import co.chainring.apps.api.model.websocket.TradesCreated
+import co.chainring.apps.api.model.websocket.MarketTradesCreated
+import co.chainring.apps.api.model.websocket.MyOrderCreated
+import co.chainring.apps.api.model.websocket.MyOrderUpdated
+import co.chainring.apps.api.model.websocket.MyTradesCreated
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.model.Address
 import co.chainring.core.model.FeeRate
@@ -219,7 +220,7 @@ object SequencerResponseProcessorService {
             val createdOrders = OrderEntity.listOrdersWithExecutions(createAssignments.map { it.orderId }).map { it.toOrderResponse() }
 
             publishBroadcasterNotifications(
-                createdOrders.map { BroadcasterNotification(OrderCreated(it), wallet.address) },
+                createdOrders.map { BroadcasterNotification(MyOrderCreated(it), wallet.address) },
             )
         }
     }
@@ -246,7 +247,7 @@ object SequencerResponseProcessorService {
         val createdOrder = OrderEntity.listOrdersWithExecutions(listOf(createAssignment.orderId)).map { it.toOrderResponse() }.first()
 
         publishBroadcasterNotifications(
-            listOf(BroadcasterNotification(OrderCreated(createdOrder), wallet.address)),
+            listOf(BroadcasterNotification(MyOrderCreated(createdOrder), wallet.address)),
         )
     }
 
@@ -316,11 +317,27 @@ object SequencerResponseProcessorService {
             logger.debug { "Sending TradesCreated to wallet $walletAddress" }
             broadcasterNotifications.add(
                 BroadcasterNotification(
-                    TradesCreated(executions.map { it.toTradeResponse() }),
+                    MyTradesCreated(executions.map { it.toTradeResponse() }),
                     recipient = walletAddress,
                 ),
             )
         }
+
+        // schedule MarketTradesCreated notification
+        executionsCreatedByWallet
+            .values
+            .flatten()
+            .filter { it.role == ExecutionRole.Taker }
+            .sortedBy { it.trade.sequenceId }
+            .groupBy { it.trade.marketGuid.value }
+            .forEach { (marketId, takerExecutions) ->
+                broadcasterNotifications.add(
+                    BroadcasterNotification(
+                        MarketTradesCreated(marketId, takerExecutions.map(MarketTradesCreated::Trade)),
+                        recipient = null,
+                    ),
+                )
+            }
 
         // update all orders that have changed
         val orderChangedMap = response.ordersChangedList.mapNotNull { orderChanged ->
@@ -339,7 +356,7 @@ object SequencerResponseProcessorService {
             }
             broadcasterNotifications.add(
                 BroadcasterNotification(
-                    OrderUpdated(orderToUpdate.toOrderResponse(executions)),
+                    MyOrderUpdated(orderToUpdate.toOrderResponse(executions)),
                     recipient = orderToUpdate.wallet.address,
                 ),
             )

@@ -18,9 +18,9 @@ import co.chainring.integrationtests.utils.ExpectedBalance
 import co.chainring.integrationtests.utils.assertBalances
 import co.chainring.integrationtests.utils.assertBalancesMessageReceived
 import co.chainring.integrationtests.utils.assertLimitsMessageReceived
-import co.chainring.integrationtests.utils.assertOrderCreatedMessageReceived
-import co.chainring.integrationtests.utils.assertOrderUpdatedMessageReceived
-import co.chainring.integrationtests.utils.assertTradesCreatedMessageReceived
+import co.chainring.integrationtests.utils.assertMyOrderCreatedMessageReceived
+import co.chainring.integrationtests.utils.assertMyOrderUpdatedMessageReceived
+import co.chainring.integrationtests.utils.assertMyTradesCreatedMessageReceived
 import co.chainring.integrationtests.utils.ofAsset
 import co.chainring.sequencer.core.notional
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -48,7 +48,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 AssetAmount(quoteSymbol, "20"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         val (takerApiClient, takerWallet, takerWsClient) = setupTrader(
@@ -60,7 +60,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 AssetAmount(baseSymbol, "0.6"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         // starting onchain balances
@@ -113,7 +113,7 @@ class BackToBackOrderTest : OrderBaseTest() {
         assertEquals(1, limitBuyOrder2.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
 
         repeat(2) {
-            makerWsClient.assertOrderCreatedMessageReceived()
+            makerWsClient.assertMyOrderCreatedMessageReceived()
             makerWsClient.assertLimitsMessageReceived()
         }
 
@@ -128,8 +128,8 @@ class BackToBackOrderTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertOrderCreatedMessageReceived()
-            assertTradesCreatedMessageReceived {
+            assertMyOrderCreatedMessageReceived()
+            assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
 
                 assertEquals(btcbtc2Market.id, it.trades[0].marketId)
@@ -146,7 +146,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 assertEquals(BigDecimal("0.2052").toFundamentalUnits(eth2.decimals), it.trades[1].feeAmount)
                 assertEquals(eth2.name, it.trades[1].feeSymbol.value)
             }
-            assertOrderUpdatedMessageReceived {
+            assertMyOrderUpdatedMessageReceived {
                 assertEquals(BigDecimal("0.6").toFundamentalUnits(market.baseDecimals), it.order.amount)
                 assertEquals(it.order.status, OrderStatus.Filled)
             }
@@ -160,10 +160,10 @@ class BackToBackOrderTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradesCreatedMessageReceived {
+            assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
             }
-            repeat(2) { assertOrderUpdatedMessageReceived() }
+            repeat(2) { assertMyOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived()
         }
@@ -234,7 +234,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 AssetAmount(quoteSymbol, "400000"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         val (takerApiClient, takerWallet, takerWsClient) = setupTrader(
@@ -246,7 +246,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 AssetAmount(baseSymbol, "4.9"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         // starting onchain balances
@@ -299,7 +299,7 @@ class BackToBackOrderTest : OrderBaseTest() {
         assertEquals(1, limitBuyOrder2.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
 
         repeat(2) {
-            makerWsClient.assertOrderCreatedMessageReceived()
+            makerWsClient.assertMyOrderCreatedMessageReceived()
             makerWsClient.assertLimitsMessageReceived()
         }
 
@@ -314,8 +314,8 @@ class BackToBackOrderTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertOrderCreatedMessageReceived()
-            assertTradesCreatedMessageReceived {
+            assertMyOrderCreatedMessageReceived()
+            assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
 
                 assertEquals(btcbtc2Market.id, it.trades[0].marketId)
@@ -332,7 +332,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 assertEquals(BigDecimal("3959.999999").toFundamentalUnits(usdc2.decimals), it.trades[1].feeAmount)
                 assertEquals(usdc2.name, it.trades[1].feeSymbol.value)
             }
-            assertOrderUpdatedMessageReceived {
+            assertMyOrderUpdatedMessageReceived {
                 assertEquals(BigDecimal("3.9").toFundamentalUnits(market.baseDecimals), it.order.amount)
                 assertEquals(it.order.status, OrderStatus.Partial)
             }
@@ -346,10 +346,10 @@ class BackToBackOrderTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradesCreatedMessageReceived {
+            assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
             }
-            repeat(2) { assertOrderUpdatedMessageReceived() }
+            repeat(2) { assertMyOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived()
         }
@@ -420,7 +420,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 AssetAmount(baseSymbol, "0.9"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         val (takerApiClient, takerWallet, takerWsClient) = setupTrader(
@@ -433,7 +433,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 AssetAmount(quoteSymbol, "10"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         // starting onchain balances
@@ -491,7 +491,7 @@ class BackToBackOrderTest : OrderBaseTest() {
         assertEquals(1, limitSellOrder2.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
 
         repeat(2) {
-            makerWsClient.assertOrderCreatedMessageReceived()
+            makerWsClient.assertMyOrderCreatedMessageReceived()
             makerWsClient.assertLimitsMessageReceived()
         }
 
@@ -505,8 +505,8 @@ class BackToBackOrderTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertOrderCreatedMessageReceived()
-            assertTradesCreatedMessageReceived {
+            assertMyOrderCreatedMessageReceived()
+            assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
 
                 assertEquals(btc2Eth2Market.id, it.trades[0].marketId)
@@ -523,7 +523,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 assertEquals(BigInteger.ZERO, it.trades[1].feeAmount)
                 assertEquals(btc2.name, it.trades[1].feeSymbol.value)
             }
-            assertOrderUpdatedMessageReceived {
+            assertMyOrderUpdatedMessageReceived {
                 assertEquals(baseOrderAmount.inFundamentalUnits, it.order.amount)
                 assertEquals(it.order.status, OrderStatus.Filled)
             }
@@ -537,10 +537,10 @@ class BackToBackOrderTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradesCreatedMessageReceived {
+            assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
             }
-            repeat(2) { assertOrderUpdatedMessageReceived() }
+            repeat(2) { assertMyOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived()
         }
@@ -611,7 +611,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 AssetAmount(baseSymbol, "1.1"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         val (takerApiClient, takerWallet, takerWsClient) = setupTrader(
@@ -624,7 +624,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 AssetAmount(quoteSymbol, "30"),
             ),
             subscribeToOrderBook = false,
-            subscribeToOrderPrices = false,
+            subscribeToPrices = false,
         )
 
         // starting onchain balances
@@ -683,7 +683,7 @@ class BackToBackOrderTest : OrderBaseTest() {
         assertEquals(1, limitSellOrder2.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
 
         repeat(2) {
-            makerWsClient.assertOrderCreatedMessageReceived()
+            makerWsClient.assertMyOrderCreatedMessageReceived()
             makerWsClient.assertLimitsMessageReceived()
         }
 
@@ -697,8 +697,8 @@ class BackToBackOrderTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertOrderCreatedMessageReceived()
-            assertTradesCreatedMessageReceived {
+            assertMyOrderCreatedMessageReceived()
+            assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
 
                 assertEquals(btc2Eth2Market.id, it.trades[0].marketId)
@@ -715,7 +715,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 assertEquals(BigInteger.ZERO, it.trades[1].feeAmount)
                 assertEquals(btc2.name, it.trades[1].feeSymbol.value)
             }
-            assertOrderUpdatedMessageReceived {
+            assertMyOrderUpdatedMessageReceived {
                 assertEquals(it.order.status, OrderStatus.Partial)
             }
             assertBalancesMessageReceived(
@@ -728,10 +728,10 @@ class BackToBackOrderTest : OrderBaseTest() {
         }
 
         makerWsClient.apply {
-            assertTradesCreatedMessageReceived {
+            assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
             }
-            repeat(2) { assertOrderUpdatedMessageReceived() }
+            repeat(2) { assertMyOrderUpdatedMessageReceived() }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived()
         }

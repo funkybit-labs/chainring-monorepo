@@ -24,17 +24,17 @@ import co.chainring.integrationtests.utils.Wallet
 import co.chainring.integrationtests.utils.assertBalances
 import co.chainring.integrationtests.utils.assertBalancesMessageReceived
 import co.chainring.integrationtests.utils.assertLimitsMessageReceived
+import co.chainring.integrationtests.utils.assertMyOrdersMessageReceived
+import co.chainring.integrationtests.utils.assertMyTradesMessageReceived
 import co.chainring.integrationtests.utils.assertOrderBookMessageReceived
-import co.chainring.integrationtests.utils.assertOrdersMessageReceived
 import co.chainring.integrationtests.utils.assertPricesMessageReceived
-import co.chainring.integrationtests.utils.assertTradesMessageReceived
 import co.chainring.integrationtests.utils.blocking
 import co.chainring.integrationtests.utils.subscribeToBalances
 import co.chainring.integrationtests.utils.subscribeToLimits
+import co.chainring.integrationtests.utils.subscribeToMyOrders
+import co.chainring.integrationtests.utils.subscribeToMyTrades
 import co.chainring.integrationtests.utils.subscribeToOrderBook
-import co.chainring.integrationtests.utils.subscribeToOrders
 import co.chainring.integrationtests.utils.subscribeToPrices
-import co.chainring.integrationtests.utils.subscribeToTrades
 import co.chainring.integrationtests.utils.verifyApiReturnsSameLimits
 import org.awaitility.kotlin.await
 import org.http4k.client.WebsocketClient
@@ -114,7 +114,8 @@ open class OrderBaseTest {
         airdrops: List<AssetAmount>,
         deposits: List<AssetAmount>,
         subscribeToOrderBook: Boolean = true,
-        subscribeToOrderPrices: Boolean = true,
+        subscribeToPrices: Boolean = true,
+        subscribeToLimits: Boolean = true,
     ): Triple<TestApiClient, Wallet, WsClient> {
         val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
@@ -125,23 +126,25 @@ open class OrderBaseTest {
                 assertOrderBookMessageReceived(marketId)
             }
 
-            if (subscribeToOrderPrices) {
+            if (subscribeToPrices) {
                 subscribeToPrices(marketId)
                 assertPricesMessageReceived(marketId)
             }
 
-            subscribeToOrders()
-            assertOrdersMessageReceived()
+            subscribeToMyOrders()
+            assertMyOrdersMessageReceived()
 
-            subscribeToTrades()
-            assertTradesMessageReceived()
+            subscribeToMyTrades()
+            assertMyTradesMessageReceived()
 
             subscribeToBalances()
             assertBalancesMessageReceived()
 
-            subscribeToLimits()
-            assertLimitsMessageReceived().also { wsMessage ->
-                verifyApiReturnsSameLimits(apiClient, wsMessage)
+            if (subscribeToLimits) {
+                subscribeToLimits()
+                assertLimitsMessageReceived().also { wsMessage ->
+                    verifyApiReturnsSameLimits(apiClient, wsMessage)
+                }
             }
         }
 
@@ -164,8 +167,10 @@ open class OrderBaseTest {
             }
             wallet.depositAndMine(it)
             wsClient.assertBalancesMessageReceived()
-            wsClient.assertLimitsMessageReceived().also { wsMessage ->
-                verifyApiReturnsSameLimits(apiClient, wsMessage)
+            if (subscribeToLimits) {
+                wsClient.assertLimitsMessageReceived().also { wsMessage ->
+                    verifyApiReturnsSameLimits(apiClient, wsMessage)
+                }
             }
         }
 

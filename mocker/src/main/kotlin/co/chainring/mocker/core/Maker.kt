@@ -7,15 +7,15 @@ import co.chainring.apps.api.model.Market
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.websocket.Balances
-import co.chainring.apps.api.model.websocket.OrderCreated
-import co.chainring.apps.api.model.websocket.OrderUpdated
-import co.chainring.apps.api.model.websocket.Orders
+import co.chainring.apps.api.model.websocket.MyOrderCreated
+import co.chainring.apps.api.model.websocket.MyOrderUpdated
+import co.chainring.apps.api.model.websocket.MyOrders
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
-import co.chainring.apps.api.model.websocket.TradesCreated
-import co.chainring.apps.api.model.websocket.TradesUpdated
-import co.chainring.apps.api.model.websocket.Trades
+import co.chainring.apps.api.model.websocket.MyTradesCreated
+import co.chainring.apps.api.model.websocket.MyTradesUpdated
+import co.chainring.apps.api.model.websocket.MyTrades
 import co.chainring.integrationtests.utils.ApiCallFailure
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
@@ -74,8 +74,8 @@ class Maker(
         marketIds
             .map { SubscriptionTopic.Prices(it, OHLCDuration.P5M) } +
             listOf(
-                SubscriptionTopic.Trades,
-                SubscriptionTopic.Orders,
+                SubscriptionTopic.MyTrades,
+                SubscriptionTopic.MyOrders,
                 SubscriptionTopic.Balances
             )
 
@@ -86,12 +86,12 @@ class Maker(
 
     override fun handleWebsocketMessage(message: Publishable) {
         when (message) {
-            is TradesCreated -> {
+            is MyTradesCreated -> {
                 logger.info { "$id: received trades created" }
                 pendingTrades.addAll(message.trades)
             }
 
-            is TradesUpdated -> {
+            is MyTradesUpdated -> {
                 logger.info { "$id: received trades update" }
                 message.trades.forEach { trade ->
                     if (trade.settlementStatus == SettlementStatus.Pending) {
@@ -103,7 +103,7 @@ class Maker(
                 }
             }
 
-            is Trades -> {
+            is MyTrades -> {
                 logger.info { "$id: received ${message.trades.size} trade updates" }
                 message.trades.forEach { trade ->
                     if (trade.settlementStatus == SettlementStatus.Pending) {
@@ -122,11 +122,11 @@ class Maker(
                 logger.info { "$id: received balance update ${message.balances}" }
             }
 
-            is Orders, is OrderCreated, is OrderUpdated -> {
+            is MyOrders, is MyOrderCreated, is MyOrderUpdated -> {
                 val orders = when (message) {
-                    is Orders -> message.orders
-                    is OrderCreated -> listOf(message.order)
-                    is OrderUpdated -> listOf(message.order)
+                    is MyOrders -> message.orders
+                    is MyOrderCreated -> listOf(message.order)
+                    is MyOrderUpdated -> listOf(message.order)
                     else -> emptyList()
                 }
                 orders.forEach { order ->

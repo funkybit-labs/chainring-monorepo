@@ -1,6 +1,6 @@
 package co.chainring.apps.ring
 
-import co.chainring.apps.api.model.websocket.TradesUpdated
+import co.chainring.apps.api.model.websocket.MyTradesUpdated
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.DefaultBlockParam
 import co.chainring.core.evm.Adjustment
@@ -469,7 +469,7 @@ class SettlementCoordinator(
             .forEach { (walletAddress, executions) ->
                 broadcasterNotifications.add(
                     BroadcasterNotification(
-                        TradesUpdated(executions.map { it.toTradeResponse() }),
+                        MyTradesUpdated(executions.map { it.toTradeResponse() }),
                         recipient = walletAddress,
                     ),
                 )

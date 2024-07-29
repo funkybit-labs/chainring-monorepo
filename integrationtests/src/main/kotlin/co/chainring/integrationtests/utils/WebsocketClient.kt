@@ -8,17 +8,18 @@ import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.websocket.Balances
 import co.chainring.apps.api.model.websocket.IncomingWSMessage
 import co.chainring.apps.api.model.websocket.Limits
+import co.chainring.apps.api.model.websocket.MarketTradesCreated
+import co.chainring.apps.api.model.websocket.MyOrderCreated
+import co.chainring.apps.api.model.websocket.MyOrderUpdated
+import co.chainring.apps.api.model.websocket.MyOrders
+import co.chainring.apps.api.model.websocket.MyTrades
+import co.chainring.apps.api.model.websocket.MyTradesCreated
+import co.chainring.apps.api.model.websocket.MyTradesUpdated
 import co.chainring.apps.api.model.websocket.OrderBook
-import co.chainring.apps.api.model.websocket.OrderCreated
-import co.chainring.apps.api.model.websocket.OrderUpdated
-import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.Publishable
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
-import co.chainring.apps.api.model.websocket.Trades
-import co.chainring.apps.api.model.websocket.TradesCreated
-import co.chainring.apps.api.model.websocket.TradesUpdated
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OrderEntity
@@ -57,12 +58,16 @@ fun WsClient.subscribeToPrices(marketId: MarketId, duration: OHLCDuration = OHLC
     send(IncomingWSMessage.Subscribe(SubscriptionTopic.Prices(marketId, duration)))
 }
 
-fun WsClient.subscribeToOrders() {
-    send(IncomingWSMessage.Subscribe(SubscriptionTopic.Orders))
+fun WsClient.subscribeToMyOrders() {
+    send(IncomingWSMessage.Subscribe(SubscriptionTopic.MyOrders))
 }
 
-fun WsClient.subscribeToTrades() {
-    send(IncomingWSMessage.Subscribe(SubscriptionTopic.Trades))
+fun WsClient.subscribeToMyTrades() {
+    send(IncomingWSMessage.Subscribe(SubscriptionTopic.MyTrades))
+}
+
+fun WsClient.subscribeToMarketTrades(marketId: MarketId) {
+    send(IncomingWSMessage.Subscribe(SubscriptionTopic.MarketTrades(marketId)))
 }
 
 fun WsClient.subscribeToBalances() {
@@ -116,14 +121,14 @@ inline fun <reified M : Publishable> assertContainsMessage(messages: List<Outgoi
     assertions(msg!!.data as M)
 }
 
-fun WsClient.assertOrdersMessageReceived(assertions: (Orders) -> Unit = {}): Orders =
-    assertMessageReceived<Orders>(SubscriptionTopic.Orders, assertions)
+fun WsClient.assertMyOrdersMessageReceived(assertions: (MyOrders) -> Unit = {}): MyOrders =
+    assertMessageReceived<MyOrders>(SubscriptionTopic.MyOrders, assertions)
 
-fun WsClient.assertOrderCreatedMessageReceived(assertions: (OrderCreated) -> Unit = {}): OrderCreated =
-    assertMessageReceived<OrderCreated>(SubscriptionTopic.Orders, assertions)
+fun WsClient.assertMyOrderCreatedMessageReceived(assertions: (MyOrderCreated) -> Unit = {}): MyOrderCreated =
+    assertMessageReceived<MyOrderCreated>(SubscriptionTopic.MyOrders, assertions)
 
-fun WsClient.assertLimitOrderCreatedMessageReceived(expected: CreateOrderApiResponse): OrderCreated =
-    assertMessageReceived<OrderCreated>(SubscriptionTopic.Orders) { msg ->
+fun WsClient.assertMyLimitOrderCreatedMessageReceived(expected: CreateOrderApiResponse): MyOrderCreated =
+    assertMessageReceived<MyOrderCreated>(SubscriptionTopic.MyOrders) { msg ->
         assertIs<Order.Limit>(msg.order)
         assertEquals(expected.orderId, msg.order.id)
         assertEquals(expected.order.amount.fixedAmount(), msg.order.amount)
@@ -138,8 +143,8 @@ fun WsClient.assertLimitOrderCreatedMessageReceived(expected: CreateOrderApiResp
         }
     }
 
-fun WsClient.assertMarketOrderCreatedMessageReceived(expected: CreateOrderApiResponse): OrderCreated =
-    assertMessageReceived<OrderCreated>(SubscriptionTopic.Orders) { msg ->
+fun WsClient.assertMyMarketOrderCreatedMessageReceived(expected: CreateOrderApiResponse): MyOrderCreated =
+    assertMessageReceived<MyOrderCreated>(SubscriptionTopic.MyOrders) { msg ->
         assertIs<Order.Market>(msg.order)
         assertEquals(expected.orderId, msg.order.id)
         assertEquals(expected.order.amount.fixedAmount(), msg.order.amount)
@@ -153,16 +158,19 @@ fun WsClient.assertMarketOrderCreatedMessageReceived(expected: CreateOrderApiRes
         }
     }
 
-fun WsClient.assertOrderUpdatedMessageReceived(assertions: (OrderUpdated) -> Unit = {}): OrderUpdated =
-    assertMessageReceived<OrderUpdated>(SubscriptionTopic.Orders, assertions)
+fun WsClient.assertMyOrderUpdatedMessageReceived(assertions: (MyOrderUpdated) -> Unit = {}): MyOrderUpdated =
+    assertMessageReceived<MyOrderUpdated>(SubscriptionTopic.MyOrders, assertions)
 
-fun WsClient.assertTradesMessageReceived(assertions: (Trades) -> Unit = {}): Trades =
-    assertMessageReceived<Trades>(SubscriptionTopic.Trades, assertions)
+fun WsClient.assertMyTradesMessageReceived(assertions: (MyTrades) -> Unit = {}): MyTrades =
+    assertMessageReceived<MyTrades>(SubscriptionTopic.MyTrades, assertions)
 
-fun WsClient.assertTradesCreatedMessageReceived(assertions: (TradesCreated) -> Unit = {}): TradesCreated =
-    assertMessageReceived<TradesCreated>(SubscriptionTopic.Trades, assertions)
+fun WsClient.assertMyTradesCreatedMessageReceived(assertions: (MyTradesCreated) -> Unit = {}): MyTradesCreated =
+    assertMessageReceived<MyTradesCreated>(SubscriptionTopic.MyTrades, assertions)
 
-data class ExpectedTrade(
+fun WsClient.assertMarketTradesCreatedMessageReceived(marketId: MarketId, assertions: (MarketTradesCreated) -> Unit = {}): MarketTradesCreated =
+    assertMessageReceived<MarketTradesCreated>(SubscriptionTopic.MarketTrades(marketId), assertions)
+
+data class MyExpectedTrade(
     val orderId: OrderId,
     val marketId: MarketId,
     val orderSide: OrderSide,
@@ -175,8 +183,8 @@ data class ExpectedTrade(
         this(order.orderId, order.order.marketId, order.order.side, price, amount, fee, settlementStatus)
 }
 
-fun WsClient.assertTradesCreatedMessageReceived(expectedTrades: List<ExpectedTrade>): TradesCreated =
-    assertMessageReceived<TradesCreated>(SubscriptionTopic.Trades) { msg ->
+fun WsClient.assertMyTradesCreatedMessageReceived(expectedTrades: List<MyExpectedTrade>): MyTradesCreated =
+    assertMessageReceived<MyTradesCreated>(SubscriptionTopic.MyTrades) { msg ->
         assertEquals(expectedTrades.size, msg.trades.size)
         expectedTrades.zip(msg.trades).forEach { (expectedTrade, trade) ->
             assertEquals(expectedTrade.orderId, trade.orderId)
@@ -190,11 +198,11 @@ fun WsClient.assertTradesCreatedMessageReceived(expectedTrades: List<ExpectedTra
         }
     }
 
-fun WsClient.assertTradesUpdatedMessageReceived(assertions: (TradesUpdated) -> Unit = {}): TradesUpdated =
-    assertMessageReceived<TradesUpdated>(SubscriptionTopic.Trades, assertions)
+fun WsClient.assertMyTradesUpdatedMessageReceived(assertions: (MyTradesUpdated) -> Unit = {}): MyTradesUpdated =
+    assertMessageReceived<MyTradesUpdated>(SubscriptionTopic.MyTrades, assertions)
 
-fun assertContainsTradesUpdatedMessage(messages: List<OutgoingWSMessage.Publish>, assertions: (TradesUpdated) -> Unit = {}) =
-    assertContainsMessage<TradesUpdated>(messages, SubscriptionTopic.Trades, assertions)
+fun assertContainsMyTradesUpdatedMessage(messages: List<OutgoingWSMessage.Publish>, assertions: (MyTradesUpdated) -> Unit = {}) =
+    assertContainsMessage<MyTradesUpdated>(messages, SubscriptionTopic.MyTrades, assertions)
 
 fun WsClient.assertBalancesMessageReceived(assertions: (Balances) -> Unit = {}): Balances =
     assertMessageReceived<Balances>(SubscriptionTopic.Balances, assertions)

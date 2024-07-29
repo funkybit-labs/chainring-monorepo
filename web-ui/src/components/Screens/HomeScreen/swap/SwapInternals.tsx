@@ -9,7 +9,7 @@ import {
   limitsTopic,
   OrderBook,
   orderBookTopic,
-  ordersTopic,
+  myOrdersTopic,
   Publishable
 } from 'websocketMessages'
 import { Address, formatUnits } from 'viem'
@@ -241,7 +241,7 @@ export function SwapInternals({
       if (market.isBackToBack()) {
         return [
           balancesTopic,
-          ordersTopic,
+          myOrdersTopic,
           orderBookTopic(market.marketIds[0]),
           orderBookTopic(market.marketIds[1]),
           limitsTopic
@@ -249,7 +249,7 @@ export function SwapInternals({
       } else {
         return [
           balancesTopic,
-          ordersTopic,
+          myOrdersTopic,
           orderBookTopic(market.id),
           limitsTopic
         ]
@@ -291,7 +291,7 @@ export function SwapInternals({
           }
         } else if (message.type === 'Balances') {
           setBalances(message.balances)
-        } else if (message.type === 'OrderUpdated') {
+        } else if (message.type === 'MyOrderUpdated') {
           setLastOrder(message.order)
         }
       },

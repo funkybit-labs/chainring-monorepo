@@ -7,7 +7,7 @@ import { produce } from 'immer'
 import { calculateNotional, classNames } from 'utils'
 import Markets, { Market } from 'markets'
 import { useWebsocketSubscription } from 'contexts/websocket'
-import { ordersTopic, Publishable, tradesTopic } from 'websocketMessages'
+import { myOrdersTopic, Publishable, myTradesTopic } from 'websocketMessages'
 import { CancelOrderModal } from 'components/Screens/HomeScreen/CancelOrderModal'
 import { Status } from 'components/common/Status'
 import Trash from 'assets/Trash.svg'
@@ -45,18 +45,18 @@ export default function OrdersAndTradesWidget({
   const switchToEthChain = useSwitchToEthChain()
 
   useWebsocketSubscription({
-    topics: useMemo(() => [ordersTopic, tradesTopic], []),
+    topics: useMemo(() => [myOrdersTopic, myTradesTopic], []),
     handler: useCallback(
       (message: Publishable) => {
-        if (message.type === 'Orders') {
+        if (message.type === 'MyOrders') {
           setOrders(message.orders)
-        } else if (message.type === 'OrderCreated') {
+        } else if (message.type === 'MyOrderCreated') {
           setOrders(
             produce((draft) => {
               draft.unshift(message.order)
             })
           )
-        } else if (message.type === 'OrderUpdated') {
+        } else if (message.type === 'MyOrderUpdated') {
           setOrders(
             produce((draft) => {
               const updatedOrder = message.order
@@ -66,7 +66,7 @@ export default function OrdersAndTradesWidget({
               if (index !== -1) draft[index] = updatedOrder
             })
           )
-        } else if (message.type === 'Trades') {
+        } else if (message.type === 'MyTrades') {
           setOrderTradeGroups((prevState) => {
             const expanded = new Set<string>()
             prevState.forEach((orderTradeGroup) => {
@@ -83,7 +83,7 @@ export default function OrdersAndTradesWidget({
 
             return newState
           })
-        } else if (message.type === 'TradesCreated') {
+        } else if (message.type === 'MyTradesCreated') {
           setOrderTradeGroups(
             produce((draft) => {
               rollupTrades(message.trades, markets).forEach(
@@ -91,7 +91,7 @@ export default function OrdersAndTradesWidget({
               )
             })
           )
-        } else if (message.type === 'TradesUpdated') {
+        } else if (message.type === 'MyTradesUpdated') {
           setOrderTradeGroups(
             produce((draft) => {
               rollupTrades(message.trades, markets).forEach(

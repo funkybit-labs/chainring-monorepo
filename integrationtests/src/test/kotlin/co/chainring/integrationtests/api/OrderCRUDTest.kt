@@ -26,16 +26,16 @@ import co.chainring.integrationtests.utils.TestApiClient
 import co.chainring.integrationtests.utils.Wallet
 import co.chainring.integrationtests.utils.assertBalancesMessageReceived
 import co.chainring.integrationtests.utils.assertError
-import co.chainring.integrationtests.utils.assertLimitOrderCreatedMessageReceived
 import co.chainring.integrationtests.utils.assertLimitsMessageReceived
-import co.chainring.integrationtests.utils.assertOrderCreatedMessageReceived
-import co.chainring.integrationtests.utils.assertOrderUpdatedMessageReceived
-import co.chainring.integrationtests.utils.assertOrdersMessageReceived
+import co.chainring.integrationtests.utils.assertMyLimitOrderCreatedMessageReceived
+import co.chainring.integrationtests.utils.assertMyOrderCreatedMessageReceived
+import co.chainring.integrationtests.utils.assertMyOrderUpdatedMessageReceived
+import co.chainring.integrationtests.utils.assertMyOrdersMessageReceived
 import co.chainring.integrationtests.utils.blocking
 import co.chainring.integrationtests.utils.inFundamentalUnits
 import co.chainring.integrationtests.utils.subscribeToBalances
 import co.chainring.integrationtests.utils.subscribeToLimits
-import co.chainring.integrationtests.utils.subscribeToOrders
+import co.chainring.integrationtests.utils.subscribeToMyOrders
 import co.chainring.integrationtests.utils.verifyApiReturnsSameLimits
 import org.http4k.client.WebsocketClient
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -54,8 +54,8 @@ class OrderCRUDTest : OrderBaseTest() {
         val wallet = Wallet(apiClient)
 
         var wsClient = WebsocketClient.blocking(apiClient.authToken)
-        wsClient.subscribeToOrders()
-        val initialOrdersOverWs = wsClient.assertOrdersMessageReceived().orders
+        wsClient.subscribeToMyOrders()
+        val initialOrdersOverWs = wsClient.assertMyOrdersMessageReceived().orders
 
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()
@@ -107,7 +107,7 @@ class OrderCRUDTest : OrderBaseTest() {
         )
 
         // client is notified over websocket
-        wsClient.assertLimitOrderCreatedMessageReceived(createLimitOrderResponse)
+        wsClient.assertMyLimitOrderCreatedMessageReceived(createLimitOrderResponse)
         wsClient
             .assertLimitsMessageReceived(
                 listOf(
@@ -126,10 +126,10 @@ class OrderCRUDTest : OrderBaseTest() {
 
         // check that order is included in the orders list sent via websocket
         wsClient = WebsocketClient.blocking(apiClient.authToken)
-        wsClient.subscribeToOrders()
+        wsClient.subscribeToMyOrders()
         assertEquals(
             listOf(createLimitOrderResponse.orderId) + initialOrdersOverWs.map { it.id },
-            wsClient.assertOrdersMessageReceived().orders.map { it.id },
+            wsClient.assertMyOrdersMessageReceived().orders.map { it.id },
         )
 
         wsClient.subscribeToLimits()
@@ -137,7 +137,7 @@ class OrderCRUDTest : OrderBaseTest() {
 
         // cancel order is idempotent
         apiClient.cancelOrder(createLimitOrderResponse, wallet)
-        wsClient.assertOrderUpdatedMessageReceived { msg ->
+        wsClient.assertMyOrderUpdatedMessageReceived { msg ->
             assertEquals(createLimitOrderResponse.orderId, msg.order.id)
             assertEquals(OrderStatus.Cancelled, msg.order.status)
         }
@@ -168,8 +168,8 @@ class OrderCRUDTest : OrderBaseTest() {
         val wallet = Wallet(apiClient)
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
-        wsClient.subscribeToOrders()
-        wsClient.assertOrdersMessageReceived()
+        wsClient.subscribeToMyOrders()
+        wsClient.assertMyOrdersMessageReceived()
 
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()
@@ -188,8 +188,8 @@ class OrderCRUDTest : OrderBaseTest() {
             price = BigDecimal("2"),
             wallet,
         )
-        wsClient.assertLimitOrderCreatedMessageReceived(createTooSmallOrderResponse)
-        wsClient.assertOrderUpdatedMessageReceived { msg ->
+        wsClient.assertMyLimitOrderCreatedMessageReceived(createTooSmallOrderResponse)
+        wsClient.assertMyOrderUpdatedMessageReceived { msg ->
             assertEquals(createTooSmallOrderResponse.orderId, msg.order.id)
             assertEquals(OrderStatus.Rejected, msg.order.status)
         }
@@ -255,7 +255,7 @@ class OrderCRUDTest : OrderBaseTest() {
         )
 
         wsClient.apply {
-            assertLimitOrderCreatedMessageReceived(createLimitOrderResponse2)
+            assertMyLimitOrderCreatedMessageReceived(createLimitOrderResponse2)
         }
 
         // try updating and cancelling an order not created by this wallet - signature should fail
@@ -273,7 +273,7 @@ class OrderCRUDTest : OrderBaseTest() {
         // try update cancelled order
         apiClient.cancelOrder(createLimitOrderResponse2, wallet)
         wsClient.apply {
-            assertOrderUpdatedMessageReceived { msg ->
+            assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(createLimitOrderResponse2.orderId, msg.order.id)
                 assertEquals(OrderStatus.Cancelled, msg.order.status)
             }
@@ -336,8 +336,8 @@ class OrderCRUDTest : OrderBaseTest() {
         val wallet = Wallet(apiClient)
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
-        wsClient.subscribeToOrders()
-        wsClient.assertOrdersMessageReceived().orders
+        wsClient.subscribeToMyOrders()
+        wsClient.assertMyOrdersMessageReceived().orders
 
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()
@@ -360,7 +360,7 @@ class OrderCRUDTest : OrderBaseTest() {
                 price = BigDecimal("2"),
                 wallet,
             )
-            wsClient.assertOrderCreatedMessageReceived()
+            wsClient.assertMyOrderCreatedMessageReceived()
             wsClient.assertLimitsMessageReceived()
         }
         assertEquals(10, apiClient.listOrders(listOf(OrderStatus.Open, OrderStatus.Partial, OrderStatus.Filled), usdcDaiMarket.id).orders.size)
@@ -368,7 +368,7 @@ class OrderCRUDTest : OrderBaseTest() {
         apiClient.cancelOpenOrders()
 
         repeat(times = 10) {
-            wsClient.assertOrderUpdatedMessageReceived { msg ->
+            wsClient.assertMyOrderUpdatedMessageReceived { msg ->
                 assertEquals(OrderStatus.Cancelled, msg.order.status)
             }
         }

@@ -2,17 +2,18 @@ package co.chainring.core.websocket
 
 import co.chainring.apps.api.model.websocket.Balances
 import co.chainring.apps.api.model.websocket.Limits
+import co.chainring.apps.api.model.websocket.MarketTradesCreated
+import co.chainring.apps.api.model.websocket.MyOrderCreated
+import co.chainring.apps.api.model.websocket.MyOrderUpdated
+import co.chainring.apps.api.model.websocket.MyOrders
+import co.chainring.apps.api.model.websocket.MyTrades
+import co.chainring.apps.api.model.websocket.MyTradesCreated
+import co.chainring.apps.api.model.websocket.MyTradesUpdated
 import co.chainring.apps.api.model.websocket.OHLC
 import co.chainring.apps.api.model.websocket.OrderBook
-import co.chainring.apps.api.model.websocket.OrderCreated
-import co.chainring.apps.api.model.websocket.OrderUpdated
-import co.chainring.apps.api.model.websocket.Orders
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
-import co.chainring.apps.api.model.websocket.Trades
-import co.chainring.apps.api.model.websocket.TradesCreated
-import co.chainring.apps.api.model.websocket.TradesUpdated
 import co.chainring.apps.api.wsUnauthorized
 import co.chainring.core.model.Address
 import co.chainring.core.model.db.BalanceEntity
@@ -100,10 +101,11 @@ class Broadcaster(val db: Database) {
         when (topic) {
             is SubscriptionTopic.OrderBook -> sendOrderBook(topic, client)
             is SubscriptionTopic.Prices -> sendPrices(topic, client)
-            is SubscriptionTopic.Trades -> sendTrades(client)
-            is SubscriptionTopic.Orders -> sendOrders(client)
+            is SubscriptionTopic.MyTrades -> sendTrades(client)
+            is SubscriptionTopic.MyOrders -> sendOrders(client)
             is SubscriptionTopic.Balances -> sendBalances(client)
             is SubscriptionTopic.Limits -> sendLimits(client)
+            is SubscriptionTopic.MarketTrades -> {}
         }
     }
 
@@ -195,8 +197,8 @@ class Broadcaster(val db: Database) {
             transaction {
                 client.send(
                     OutgoingWSMessage.Publish(
-                        SubscriptionTopic.Trades,
-                        Trades(
+                        SubscriptionTopic.MyTrades,
+                        MyTrades(
                             OrderExecutionEntity
                                 .listLatestForWallet(
                                     WalletEntity.getOrCreate(client.principal),
@@ -237,8 +239,8 @@ class Broadcaster(val db: Database) {
             transaction {
                 client.send(
                     OutgoingWSMessage.Publish(
-                        SubscriptionTopic.Orders,
-                        Orders(
+                        SubscriptionTopic.MyOrders,
+                        MyOrders(
                             OrderEntity
                                 .listWithExecutionsForWallet(WalletEntity.getOrCreate(client.principal), limit = 100)
                                 .map(Pair<OrderEntity, List<OrderExecutionEntity>>::toOrderResponse),
@@ -300,12 +302,13 @@ class Broadcaster(val db: Database) {
                 orderBooksByMarket.replace(notification.message.marketId, notification.message) // update cached value
                 SubscriptionTopic.OrderBook(notification.message.marketId)
             }
-            is Orders, is OrderCreated, is OrderUpdated -> SubscriptionTopic.Orders
+            is MyOrders, is MyOrderCreated, is MyOrderUpdated -> SubscriptionTopic.MyOrders
             is Prices -> {
                 updatePrices(notification.message)
                 SubscriptionTopic.Prices(notification.message.market, notification.message.duration)
             }
-            is Trades, is TradesCreated, is TradesUpdated -> SubscriptionTopic.Trades
+            is MyTrades, is MyTradesCreated, is MyTradesUpdated -> SubscriptionTopic.MyTrades
+            is MarketTradesCreated -> SubscriptionTopic.MarketTrades(notification.message.marketId)
             is Balances -> SubscriptionTopic.Balances
             is Limits -> SubscriptionTopic.Limits
         }
