@@ -39,7 +39,6 @@ abstract class Actor(
     protected val wallet = Wallet(apiClient)
     protected var balances = mutableMapOf<String, BigInteger>()
     protected var pendingTrades = mutableListOf<Trade>()
-    protected var settledTrades = mutableListOf<Trade>()
 
     protected var websocket: WebSocket? = null
     protected abstract val websocketSubscriptionTopics: List<SubscriptionTopic>

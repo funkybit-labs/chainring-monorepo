@@ -108,7 +108,6 @@ class Taker(
                     } else if (trade.settlementStatus == SettlementStatus.Completed) {
                         TraceRecorder.full.finishWSRecording(trade.orderId.value, WSSpans.tradeSettled)
                         pendingTrades.removeIf { it.id == trade.id }
-                        settledTrades.add(trade)
                     }
                 }
             }
@@ -122,7 +121,6 @@ class Taker(
                     } else if (trade.settlementStatus == SettlementStatus.Completed) {
                         TraceRecorder.full.finishWSRecording(trade.orderId.value, WSSpans.tradeSettled)
                         pendingTrades.removeIf { it.id == trade.id }
-                        settledTrades.add(trade)
                     }
                 }
             }

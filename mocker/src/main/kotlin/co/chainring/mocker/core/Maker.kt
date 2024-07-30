@@ -98,7 +98,6 @@ class Maker(
                         pendingTrades.add(trade)
                     } else if (trade.settlementStatus == SettlementStatus.Completed) {
                         pendingTrades.removeIf { it.id == trade.id }
-                        settledTrades.add(trade)
                     }
                 }
             }
@@ -110,7 +109,6 @@ class Maker(
                         pendingTrades.add(trade)
                     } else if (trade.settlementStatus == SettlementStatus.Completed) {
                         pendingTrades.removeIf { it.id == trade.id }
-                        settledTrades.add(trade)
                     }
                 }
             }
