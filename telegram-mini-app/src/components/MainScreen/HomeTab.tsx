@@ -1,4 +1,3 @@
-import LogoOrange from 'assets/logo-orange.svg'
 import CoinPng from 'assets/coin.png'
 import TicketPng from 'assets/ticket.png'
 import GiftPng from 'assets/gift.png'
@@ -19,6 +18,7 @@ import { ProgressBar } from 'components/common/ProgressBar'
 import Decimal from 'decimal.js'
 import { Modal } from 'components/common/Modal'
 import { Alert } from 'components/EntryPoint'
+import Logo from 'components/common/Logo'
 
 export default function HomeTab({
   user,
@@ -92,71 +92,53 @@ export default function HomeTab({
 
   return (
     <div className="relative flex min-h-full select-none flex-col">
-      <div className="w-screen">
-        <div className="mx-4 flex justify-between gap-4 pt-4">
-          <img src={LogoOrange} alt="ChainRing" />
-          <div className="text-right">
-            <div className="font-sans font-semibold text-brightOrange">
-              When every
-            </div>
-            <div className="font-sans text-dullOrange">millisecond counts</div>
-          </div>
-        </div>
-      </div>
+      <Logo />
       <div className="flex grow flex-col justify-stretch">
         <div className="mx-6 flex grow flex-col justify-stretch">
-          <div className="mt-2 text-left text-2xl font-semibold text-white">
+          <div className="mt-2 text-left font-sans text-2xl font-semibold text-white">
             Your Balance
           </div>
-          <InfoPanel
-            icon={CoinPng}
-            info={<HeadSub head={decimalAsInt(balance)} sub={'CR POINTS'} />}
-            rounded="top"
-          />
+          <InfoPanel icon={CoinPng} rounded="top">
+            <HeadSub head={decimalAsInt(balance)} sub={'CR POINTS'} />
+          </InfoPanel>
           <div className="flex flex-row justify-stretch space-x-1">
             <InfoPanel
               icon={TicketPng}
-              info={
-                <HeadSub
-                  smallSub={true}
-                  head={gameTickets.toString()}
-                  sub={gameTickets == 1 ? 'TICKET' : 'TICKETS'}
-                />
-              }
               rounded={user.nextMilestoneAt ? 'none' : 'bottom'}
-            />
+            >
+              <HeadSub
+                style={'smallSub'}
+                head={gameTickets.toString()}
+                sub={gameTickets == 1 ? 'TICKET' : 'TICKETS'}
+              />
+            </InfoPanel>
             <InfoPanel
               icon={GiftPng}
-              info={
-                <HeadSub
-                  smallSub={true}
-                  head={
-                    user.invites === -1 ? 'Unlimited' : user.invites.toString()
-                  }
-                  sub={user.invites === 1 ? 'INVITE' : 'INVITES'}
-                />
-              }
               rounded={user.nextMilestoneAt ? 'none' : 'bottom'}
-            />
+            >
+              <HeadSub
+                style={'smallSub'}
+                head={
+                  user.invites === -1 ? 'Unlimited' : user.invites.toString()
+                }
+                sub={user.invites === 1 ? 'INVITE' : 'INVITES'}
+              />
+            </InfoPanel>
           </div>
           {user.nextMilestoneAt && (
-            <InfoPanel
-              icon={MilestonePng}
-              info={
-                <div className="flex flex-col">
-                  <span>NEXT MILESTONE IN</span>
-                  <ProgressBar
-                    value={balance}
-                    min={user.lastMilestone?.points ?? new Decimal(0)}
-                    max={user.nextMilestoneAt}
-                  />
-                  <span className="text-2xl">
-                    {decimalAsInt(user.nextMilestoneAt.minus(balance))} CR
-                  </span>
-                </div>
-              }
-              rounded="bottom"
-            />
+            <InfoPanel icon={MilestonePng} rounded="bottom">
+              <div className="flex flex-col">
+                <span>NEXT MILESTONE IN</span>
+                <ProgressBar
+                  value={balance}
+                  min={user.lastMilestone?.points ?? new Decimal(0)}
+                  max={user.nextMilestoneAt}
+                />
+                <span className="text-2xl">
+                  {decimalAsInt(user.nextMilestoneAt.minus(balance))} CR
+                </span>
+              </div>
+            </InfoPanel>
           )}
         </div>
         <div className="mb-4 w-full">

@@ -128,7 +128,6 @@ export default function EntryPoint() {
           user={userQuery.data}
           dismissedAlerts={dismissedAlerts}
           dismissAlert={(a) => {
-            alert(a)
             setDismissedAlerts([...dismissedAlerts, a])
           }}
         />

@@ -21,7 +21,7 @@ export default function MainScreen({
   const [activeTab, setActiveTab] = useState<TabId>('home')
 
   return (
-    <div className="h-full min-h-screen bg-mediumBlue pb-14">
+    <div className="h-full min-h-screen bg-mediumBlue pb-14 font-content">
       {(() => {
         switch (activeTab) {
           case 'home':

@@ -1,33 +1,54 @@
-import React from 'react'
+import React, { ReactElement } from 'react'
 import { classNames } from 'utils'
+
+export type HeadSubStyle = 'normal' | 'smallSub' | 'largeSub' | 'equal'
 
 export function HeadSub({
   head,
   sub,
-  smallSub
+  style
 }: {
   head: string
   sub: string
-  smallSub?: boolean
+  style?: HeadSubStyle
 }) {
   return (
     <div className="flex flex-col">
-      <span className="text-2xl">{head}</span>
-      <span className={classNames(smallSub && 'text-sm')}>{sub}</span>
+      <span
+        className={classNames(
+          'whitespace-nowrap',
+          style === 'largeSub' ? 'text-[16px]' : 'text-2xl'
+        )}
+      >
+        {head}
+      </span>
+      <span
+        className={classNames(
+          'whitespace-nowrap',
+          style === 'smallSub' && 'text-sm',
+          style === 'largeSub' && 'text-xl font-normal text-white/70',
+          style === 'equal' && 'text-2xl'
+        )}
+      >
+        {sub}
+      </span>
     </div>
   )
 }
 
 export type Rounded = 'top' | 'bottom' | 'both' | 'none'
+export type InfoPanelStyle = 'normal' | 'large'
 
 export function InfoPanel({
   icon,
-  info,
-  rounded
+  rounded,
+  style,
+  children
 }: {
   icon: string
-  info: JSX.Element
   rounded: Rounded
+  style?: InfoPanelStyle
+  children: ReactElement
 }) {
   return (
     <div
@@ -37,9 +58,13 @@ export function InfoPanel({
         (rounded === 'bottom' || rounded === 'both') && 'rounded-b-3xl'
       )}
     >
-      <div className="flex items-center justify-center gap-4 font-content font-medium text-white">
-        <img src={icon} className="h-auto w-16" alt="icon" />
-        {info}
+      <div className="flex w-full items-center justify-start gap-4 font-medium text-white">
+        <img
+          src={icon}
+          className={classNames('h-auto', style === 'large' ? 'w-32' : 'w-16')}
+          alt="icon"
+        />
+        {children}
       </div>
     </div>
   )
