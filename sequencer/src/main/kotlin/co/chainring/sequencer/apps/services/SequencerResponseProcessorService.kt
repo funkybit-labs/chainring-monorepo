@@ -155,9 +155,6 @@ object SequencerResponseProcessorService {
                 if (response.error == SequencerError.None) {
                     response.marketsCreatedList.forEach { marketCreated ->
                         MarketEntity[MarketId(marketCreated.marketId)].apply {
-                            // TODO delete min/max allowed price OR apply logical dynamic range
-                            minAllowedBidPrice = BigDecimal.ZERO
-                            maxAllowedOfferPrice = Integer.MAX_VALUE.toBigDecimal()
                             minFee = if (marketCreated.hasMinFee()) marketCreated.minFee.toBigInteger() else BigInteger.ZERO
                             updatedAt = Clock.System.now()
                             updatedBy = "seq:${response.sequence}"

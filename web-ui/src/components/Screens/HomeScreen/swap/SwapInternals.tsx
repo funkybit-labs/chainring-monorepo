@@ -59,8 +59,6 @@ export type SwapRender = {
   buyLimitPriceInputValue: string
   buyLimitPrice: Decimal
   limitPrice: Decimal
-  limitPriceTooLow: boolean
-  limitPriceTooHigh: boolean
   setPriceFromMarketPrice: (incrementDivisor?: bigint) => void
   noPriceFound: boolean
   canSubmit: boolean
@@ -841,12 +839,6 @@ export function SwapInternals({
   const canSubmit = useMemo(() => {
     if (mutation.isPending) return false
     if (baseAmount <= 0n) return false
-    if (
-      isLimitOrder &&
-      (limitPrice.lt(market.minAllowedBidPrice) ||
-        limitPrice.gt(market.maxAllowedOfferPrice))
-    )
-      return false
 
     if (side == 'Buy' && notional + fee > (quoteLimit || 0n)) return false
     if (side == 'Sell' && baseAmount > (baseLimit || 0n)) return false
@@ -858,15 +850,12 @@ export function SwapInternals({
     mutation.isPending,
     side,
     baseAmount,
-    limitPrice,
     notional,
     isLimitOrder,
     quoteLimit,
     baseLimit,
     noPriceFound,
     fee,
-    market.minAllowedBidPrice,
-    market.maxAllowedOfferPrice,
     amountTooLow
   ])
 
@@ -991,25 +980,6 @@ export function SwapInternals({
     secondMarketOrderBook
   ])
 
-  const [limitPriceTooLow, limitPriceTooHigh] = useMemo(() => {
-    const limitPriceTooLow =
-      isLimitOrder &&
-      limitPrice.gt(new Decimal(0)) &&
-      limitPrice.lt(market.minAllowedBidPrice)
-    const limitPriceTooHigh =
-      isLimitOrder && limitPrice.gt(market.maxAllowedOfferPrice)
-
-    return side === 'Sell'
-      ? [limitPriceTooLow, limitPriceTooHigh]
-      : [limitPriceTooHigh, limitPriceTooLow]
-  }, [
-    isLimitOrder,
-    limitPrice,
-    market.minAllowedBidPrice,
-    market.maxAllowedOfferPrice,
-    side
-  ])
-
   return Renderer({
     topBalance,
     topSymbol,
@@ -1034,8 +1004,6 @@ export function SwapInternals({
     buyLimitPriceInputValue,
     buyLimitPrice,
     limitPrice,
-    limitPriceTooLow,
-    limitPriceTooHigh,
     setPriceFromMarketPrice,
     noPriceFound,
     canSubmit,

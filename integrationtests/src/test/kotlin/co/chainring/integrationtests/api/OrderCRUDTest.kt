@@ -246,6 +246,23 @@ class OrderCRUDTest : OrderBaseTest() {
             ApiError(ReasonCode.ProcessingError, "Order price is not a multiple of tick size"),
         )
 
+        // try creating a limit order with a price that is too high (order's levelIx is an int and can overflow)
+        apiClient.tryCreateOrder(
+            wallet.signOrder(
+                CreateOrderApiRequest.Limit(
+                    nonce = generateOrderNonce(),
+                    marketId = usdcDaiMarket.id,
+                    side = OrderSide.Buy,
+                    amount = OrderAmount.Fixed(BigDecimal("1").inFundamentalUnits(usdc)),
+                    price = usdcDaiMarket.tickSize * (Int.MAX_VALUE.toBigInteger() + BigInteger.ONE).toBigDecimal(),
+                    signature = EvmSignature.emptySignature(),
+                    verifyingChainId = ChainId.empty,
+                ),
+            ),
+        ).assertError(
+            ApiError(ReasonCode.ProcessingError, "Order price is too large"),
+        )
+
         val createLimitOrderResponse2 = apiClient.createLimitOrder(
             usdcDaiMarket,
             OrderSide.Buy,

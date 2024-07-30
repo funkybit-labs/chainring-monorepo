@@ -106,3 +106,13 @@ class BigIntegerRangeIterator(
         return current++
     }
 }
+
+fun BigInteger.safeToInt(): Int? =
+    runCatching {
+        this.intValueExact()
+    }.recover { exception ->
+        when (exception) {
+            is ArithmeticException -> null
+            else -> throw exception
+        }
+    }.getOrNull()

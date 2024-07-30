@@ -20,6 +20,7 @@ import co.chainring.apps.api.model.CreateWithdrawalApiRequest
 import co.chainring.apps.api.model.DepositApiResponse
 import co.chainring.apps.api.model.FaucetApiRequest
 import co.chainring.apps.api.model.FaucetApiResponse
+import co.chainring.apps.api.model.GetLastPriceResponse
 import co.chainring.apps.api.model.GetLimitsApiResponse
 import co.chainring.apps.api.model.GetOrderBookApiResponse
 import co.chainring.apps.api.model.ListDepositsApiResponse
@@ -434,6 +435,17 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .withAuthHeaders(ecKeyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
+    fun tryGetLastPrice(marketId: MarketId): Either<ApiCallFailure, GetLastPriceResponse> =
+        executeAndTrace(
+            TraceRecorder.Op.GetLastPrice,
+            Request.Builder()
+                .url(
+                    "$apiServerRootUrl/v1/last-price".toHttpUrl().newBuilder().addPathSegment(marketId.value).build(),
+                )
+                .get()
+                .build(),
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
     private fun executeAndTrace(op: TraceRecorder.Op, request: Request): Response {
         return traceRecorder.record(op) {
             httpClient.newCall(request).execute()
@@ -522,6 +534,9 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
     open fun removeAdmin(address: Address) = tryRemoveAdmin(address).throwOrReturn()
 
     open fun setFeeRates(feeRates: FeeRates) = trySetFeeRates(feeRates).throwOrReturn()
+
+    open fun getLastPrice(marketId: MarketId): GetLastPriceResponse =
+        tryGetLastPrice(marketId).throwOrReturn()
 }
 
 fun <T> Either<ApiCallFailure, T>.throwOrReturn(): T {

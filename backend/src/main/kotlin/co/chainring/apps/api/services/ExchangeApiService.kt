@@ -38,6 +38,7 @@ import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.sequencer.SequencerClient
 import co.chainring.core.sequencer.toSequencerId
 import co.chainring.core.services.LinkedSignerService
+import co.chainring.core.utils.safeToInt
 import co.chainring.core.utils.toFundamentalUnits
 import co.chainring.core.utils.toHexBytes
 import co.chainring.sequencer.core.Asset
@@ -146,10 +147,14 @@ class ExchangeApiService(
         val quoteSymbol = getSymbolEntity(market.quoteSymbol)
 
         val ordersToAdd = createOrderRequestsByOrderId.map { (orderId, orderRequest) ->
-            val price = when (orderRequest) {
-                is CreateOrderApiRequest.Limit -> orderRequest.price
+            val levelIx = when (orderRequest) {
+                is CreateOrderApiRequest.Limit -> {
+                    ensurePriceIsMultipleOfTickSize(market, orderRequest.price)
+                    orderRequest.price.divideToIntegralValue(market.tickSize).toBigInteger().safeToInt()
+                        ?: throw RequestProcessingError("Order price is too large")
+                }
                 else -> null
-            }?.also { ensurePriceIsMultipleOfTickSize(market, it) }
+            }
 
             val percentage = when (orderRequest) {
                 is CreateOrderApiRequest.Market -> orderRequest.amount.percentage()
@@ -180,7 +185,7 @@ class ExchangeApiService(
             SequencerClient.Order(
                 sequencerOrderId = orderId.toSequencerId().value,
                 amount = orderRequest.amount.fixedAmount(),
-                levelIx = price?.divideToIntegralValue(market.tickSize)?.toInt(),
+                levelIx = levelIx,
                 orderType = toSequencerOrderType(orderRequest is CreateOrderApiRequest.Market, orderRequest.side),
                 nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
                 signature = orderRequest.signature,
@@ -352,8 +357,6 @@ class ExchangeApiService(
                         quoteDecimals = it.quoteSymbol.decimals.toInt(),
                         tickSize = it.tickSize,
                         lastPrice = it.lastPrice,
-                        minAllowedBidPrice = it.minAllowedBidPrice,
-                        maxAllowedOfferPrice = it.maxAllowedOfferPrice,
                         minFee = it.minFee,
                     )
                 }

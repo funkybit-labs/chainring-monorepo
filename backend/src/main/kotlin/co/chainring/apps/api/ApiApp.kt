@@ -130,6 +130,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                             withdrawalRoutes.createWithdrawal,
                             withdrawalRoutes.listWithdrawals,
                             LimitsRoutes.getLimits,
+                            PriceRoutes.getLastPriceForMarket,
                         )
 
                         if (enableTestRoutes) {

@@ -59,8 +59,6 @@ fun main() {
         quoteDecimals = 18,
         tickSize = BigDecimal("0.05"),
         lastPrice = BigDecimal("0.995"),
-        minAllowedBidPrice = BigDecimal("0.05"),
-        maxAllowedOfferPrice = BigDecimal("2"),
         minFee = BigInteger.ZERO
     )
     val priceFunction = PriceFunction.generateDeterministicHarmonicMovement(initialValue = 17.0, maxFluctuation = 1.5)
