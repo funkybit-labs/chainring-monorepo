@@ -69,9 +69,8 @@ jib {
     }
 
     to {
-        image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/mocker"
+        image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/mocker:${version}-${buildNumber}"
         credHelper.helper = "ecr-login"
-        tags = setOf("${version}-${buildNumber}")
     }
 
     container {
