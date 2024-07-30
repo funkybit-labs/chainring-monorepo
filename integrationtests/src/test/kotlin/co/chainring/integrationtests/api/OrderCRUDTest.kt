@@ -4,6 +4,7 @@ import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.CancelOrderApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.MarketLimits
+import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.core.model.EvmSignature
@@ -45,6 +46,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.test.Test
+import kotlin.test.assertIs
 
 @ExtendWith(AppUnderTestRunner::class)
 class OrderCRUDTest : OrderBaseTest() {
@@ -394,5 +396,69 @@ class OrderCRUDTest : OrderBaseTest() {
         assertTrue(apiClient.listOrders(emptyList(), usdcDaiMarket.id).orders.all { it.status == OrderStatus.Cancelled })
 
         wsClient.close()
+    }
+
+    @Test
+    fun `open orders should always be provided on reconnect`() {
+        val apiClient = TestApiClient()
+        val wallet = Wallet(apiClient)
+
+        val wsClient = WebsocketClient.blocking(apiClient.authToken)
+        wsClient.subscribeToMyOrders()
+        wsClient.assertMyOrdersMessageReceived().orders
+
+        wsClient.subscribeToBalances()
+        wsClient.assertBalancesMessageReceived()
+
+        Faucet.fundAndMine(wallet.address)
+        val daiAmountToDeposit = AssetAmount(dai, "30")
+        wallet.mintERC20AndMine(daiAmountToDeposit)
+        wallet.depositAndMine(daiAmountToDeposit)
+        waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(daiAmountToDeposit)))
+
+        val openOrderResponse = apiClient.createLimitOrder(
+            usdcDaiMarket,
+            OrderSide.Buy,
+            amount = BigDecimal("1"),
+            price = BigDecimal("2"),
+            wallet,
+        )
+        wsClient.assertMyOrderCreatedMessageReceived()
+
+        // create and cancel 120 orders
+        repeat(times = 120) {
+            val order = apiClient.createLimitOrder(
+                usdcDaiMarket,
+                OrderSide.Buy,
+                amount = BigDecimal("1"),
+                price = BigDecimal("2"),
+                wallet,
+            )
+            wsClient.assertMyOrderCreatedMessageReceived()
+            apiClient.cancelOrder(order, wallet)
+            wsClient.assertMyOrderUpdatedMessageReceived()
+        }
+        wsClient.close()
+
+        // on re-connect open orders are always provided
+        WebsocketClient.blocking(apiClient.authToken).apply {
+            subscribeToMyOrders()
+            assertMyOrdersMessageReceived { msg ->
+                assertEquals(101, msg.orders.size)
+
+                repeat(times = 100) {
+                    msg.orders[it].also { order ->
+                        assertIs<Order.Limit>(order)
+                        assertEquals(OrderStatus.Cancelled, order.status)
+                    }
+                }
+
+                msg.orders[100].also { order ->
+                    assertIs<Order.Limit>(order)
+                    assertEquals(OrderStatus.Open, order.status)
+                    assertEquals(openOrderResponse.orderId, order.id)
+                }
+            }
+        }
     }
 }
