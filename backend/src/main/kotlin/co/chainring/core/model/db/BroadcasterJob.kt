@@ -25,13 +25,6 @@ data class BroadcasterNotification(
     val recipient: Address?,
 ) {
     companion object {
-        fun orderBooksForMarkets(markets: List<MarketEntity>): List<BroadcasterNotification> =
-            OrderEntity
-                .getOrderBooks(markets)
-                .map { orderBook ->
-                    BroadcasterNotification(orderBook, recipient = null)
-                }
-
         fun pricesForMarketPeriods(marketId: MarketId, duration: OHLCDuration, ohlc: List<OHLCEntity>, full: Boolean, dailyChange: Double): BroadcasterNotification =
             BroadcasterNotification(Prices(marketId, duration, ohlc.map { it.toWSResponse() }, full, dailyChange), null)
 

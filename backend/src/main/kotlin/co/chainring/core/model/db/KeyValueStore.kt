@@ -33,6 +33,12 @@ object KeyValueStore : Table("key_value_store") {
         setValue(key, value.toString())
     }
 
+    fun incrementLong(key: String): Long {
+        val incrementedValue = (getLong(key) ?: 0L) + 1
+        setLong(key, incrementedValue)
+        return incrementedValue
+    }
+
     fun getInstant(key: String): Instant? {
         return getValue(key)?.toLong()?.let { Instant.fromEpochMilliseconds(it) }
     }

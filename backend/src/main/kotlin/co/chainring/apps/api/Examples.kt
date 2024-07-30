@@ -12,8 +12,7 @@ import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.RequestStatus
 import co.chainring.apps.api.model.Withdrawal
-import co.chainring.apps.api.model.websocket.LastTrade
-import co.chainring.apps.api.model.websocket.LastTradeDirection
+import co.chainring.apps.api.model.websocket.OrderBook
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.TxHash
@@ -178,26 +177,26 @@ object Examples {
 
     val getOrderBookApiResponse = GetOrderBookApiResponse(
         marketId = MarketId("BTC/ETH"),
-        buy = listOf(
-            GetOrderBookApiResponse.Entry(
+        bids = listOf(
+            OrderBook.Entry(
                 price = "16.75",
                 size = BigDecimal("1"),
             ),
-            GetOrderBookApiResponse.Entry(
+            OrderBook.Entry(
                 price = "16.70",
                 size = BigDecimal("2"),
             ),
         ),
-        sell = listOf(
-            GetOrderBookApiResponse.Entry(
+        asks = listOf(
+            OrderBook.Entry(
                 price = "16.80",
                 size = BigDecimal("1"),
             ),
-            GetOrderBookApiResponse.Entry(
+            OrderBook.Entry(
                 price = "16.85",
                 size = BigDecimal("2"),
             ),
         ),
-        last = LastTrade(price = "16.75", LastTradeDirection.Up),
+        last = OrderBook.LastTrade(price = "16.75", OrderBook.LastTradeDirection.Up),
     )
 }

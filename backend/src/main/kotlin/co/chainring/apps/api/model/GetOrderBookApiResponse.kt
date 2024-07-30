@@ -1,26 +1,21 @@
 package co.chainring.apps.api.model
-import co.chainring.apps.api.model.websocket.LastTrade
 import co.chainring.apps.api.model.websocket.OrderBook
+import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OrderBookSnapshot
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class GetOrderBookApiResponse(
     val marketId: MarketId,
-    val buy: List<Entry>,
-    val sell: List<Entry>,
-    val last: LastTrade,
+    val bids: List<OrderBook.Entry>,
+    val asks: List<OrderBook.Entry>,
+    val last: OrderBook.LastTrade,
 ) {
-    @Serializable
-    data class Entry(
-        val price: String,
-        val size: BigDecimalJson,
-    )
-
-    constructor(orderBook: OrderBook) : this(
-        orderBook.marketId,
-        buy = orderBook.buy.map { Entry(it.price, it.size) },
-        sell = orderBook.sell.map { Entry(it.price, it.size) },
-        last = orderBook.last,
+    constructor(market: MarketEntity, snapshot: OrderBookSnapshot) : this(
+        market.id.value,
+        bids = snapshot.bids.map(OrderBook::Entry),
+        asks = snapshot.asks.map(OrderBook::Entry),
+        last = OrderBook.LastTrade(snapshot.last),
     )
 }

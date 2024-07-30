@@ -5,6 +5,8 @@ import co.chainring.apps.api.model.websocket.MarketTradesCreated
 import co.chainring.apps.api.model.websocket.MyOrderCreated
 import co.chainring.apps.api.model.websocket.MyOrderUpdated
 import co.chainring.apps.api.model.websocket.MyTradesCreated
+import co.chainring.apps.api.model.websocket.OrderBook
+import co.chainring.apps.api.model.websocket.OrderBookDiff
 import co.chainring.core.evm.ECHelper
 import co.chainring.core.model.Address
 import co.chainring.core.model.FeeRate
@@ -18,11 +20,13 @@ import co.chainring.core.model.db.CreateOrderAssignment
 import co.chainring.core.model.db.DepositEntity
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.FeeRates
+import co.chainring.core.model.db.KeyValueStore
 import co.chainring.core.model.db.LimitEntity
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OHLCEntity
+import co.chainring.core.model.db.OrderBookSnapshot
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
@@ -331,9 +335,10 @@ object SequencerResponseProcessorService {
             .sortedBy { it.trade.sequenceId }
             .groupBy { it.trade.marketGuid.value }
             .forEach { (marketId, takerExecutions) ->
+                val seqNumber = KeyValueStore.incrementLong("WebsocketMsgSeqNumber:MarketTradesCreated:${marketId.value}")
                 broadcasterNotifications.add(
                     BroadcasterNotification(
-                        MarketTradesCreated(marketId, takerExecutions.map(MarketTradesCreated::Trade)),
+                        MarketTradesCreated(seqNumber, marketId, takerExecutions.map(MarketTradesCreated::Trade)),
                         recipient = null,
                     ),
                 )
@@ -387,11 +392,28 @@ object SequencerResponseProcessorService {
             }
         }
 
-        val orderBookNotifications = BroadcasterNotification.orderBooksForMarkets(
-            OrderEntity
-                .getOrdersMarkets(response.ordersChangedList.map { it.guid })
-                .sortedBy { it.guid },
-        )
+        val marketsWithOrderChanges = OrderEntity
+            .getOrdersMarkets(response.ordersChangedList.map { it.guid })
+            .sortedBy { it.guid }
+
+        val orderBookNotifications = marketsWithOrderChanges.flatMap { market ->
+            val prevSnapshot = OrderBookSnapshot.get(market)
+            val newSnapshot = OrderBookSnapshot.calculate(market)
+            val diff = newSnapshot.diff(prevSnapshot)
+            newSnapshot.save(market)
+            val seqNumber = KeyValueStore.incrementLong("WebsocketMsgSeqNumber:OrderBookDiff:${market.id.value.value}")
+
+            listOf(
+                BroadcasterNotification(
+                    OrderBook(market, newSnapshot),
+                    recipient = null,
+                ),
+                BroadcasterNotification(
+                    OrderBookDiff(seqNumber, market, diff),
+                    recipient = null,
+                ),
+            )
+        }
 
         val lastPriceByMarket = mutableMapOf<MarketId, BigDecimal>()
         val ohlcNotifications = tradesWithTakerOrder

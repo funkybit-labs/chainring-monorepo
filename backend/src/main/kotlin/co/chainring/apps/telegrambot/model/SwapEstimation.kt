@@ -5,7 +5,7 @@ import co.chainring.apps.api.model.OrderAmount
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.MarketEntity
-import co.chainring.core.model.db.OrderEntity
+import co.chainring.core.model.db.OrderBookSnapshot
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.SymbolEntity
 import co.chainring.core.utils.generateOrderNonce
@@ -89,10 +89,10 @@ private fun getBaseToQuoteSwapPrice(market: MarketEntity, baseAmount: BigDecimal
     val quoteScale = market.quoteSymbol.decimals
     val zeroQuote = BigDecimal.ZERO.setScale(quoteScale)
 
-    val orderBook = OrderEntity.getOrderBook(market)
+    val orderBook = OrderBookSnapshot.get(market)
 
-    val levels = orderBook.buy.reversed().map {
-        Level(size = it.size.setScale(baseScale), price = it.price.toBigDecimal().setScale(quoteScale))
+    val levels = orderBook.bids.reversed().map {
+        Level(size = it.size.setScale(baseScale), price = it.price.setScale(quoteScale))
     }.toMutableList()
 
     var amountCovered: BigDecimal = zeroBase
@@ -125,10 +125,10 @@ private fun getQuoteToBaseSwapPrice(market: MarketEntity, quoteAmount: BigDecima
     val quoteScale = market.quoteSymbol.decimals
     val zeroQuote = BigDecimal.ZERO.setScale(quoteScale)
 
-    val orderBook = OrderEntity.getOrderBook(market)
+    val orderBook = OrderBookSnapshot.get(market)
 
-    val levels = orderBook.sell.map {
-        Level(size = it.size.setScale(baseScale), price = it.price.toBigDecimal().setScale(quoteScale))
+    val levels = orderBook.asks.map {
+        Level(size = it.size.setScale(baseScale), price = it.price.setScale(quoteScale))
     }.toMutableList()
 
     var amountCovered: BigDecimal = zeroQuote

@@ -1,9 +1,5 @@
 package co.chainring.core.model.db
 
-import co.chainring.apps.api.model.websocket.LastTrade
-import co.chainring.apps.api.model.websocket.LastTradeDirection
-import co.chainring.apps.api.model.websocket.OrderBook
-import co.chainring.apps.api.model.websocket.OrderBookEntry
 import co.chainring.testfixtures.DbTestHelpers.createChain
 import co.chainring.testfixtures.DbTestHelpers.createMarket
 import co.chainring.testfixtures.DbTestHelpers.createNativeSymbol
@@ -18,7 +14,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.time.Duration.Companion.seconds
 
-class OrderBookTest : TestWithDb() {
+class OrderBookSnapshotTest : TestWithDb() {
     private val btcEthMarket = MarketId("BTC:123/ETH:123")
     private val ethUsdcMarket = MarketId("ETH:123/USDC:123")
     private lateinit var wallets: List<WalletEntity>
@@ -42,13 +38,12 @@ class OrderBookTest : TestWithDb() {
             btcEthMarket,
             ordersInDb = emptyList(),
             tradesInDb = emptyList(),
-            expected = OrderBook(
-                marketId = btcEthMarket,
-                buy = emptyList(),
-                sell = emptyList(),
-                last = LastTrade(
+            expected = OrderBookSnapshot(
+                bids = emptyList(),
+                asks = emptyList(),
+                last = OrderBookSnapshot.LastTrade(
                     price = "0.000",
-                    direction = LastTradeDirection.Unchanged,
+                    direction = OrderBookSnapshot.LastTradeDirection.Unchanged,
                 ),
             ),
         )
@@ -111,17 +106,16 @@ class OrderBookTest : TestWithDb() {
                 ),
             ),
             tradesInDb = emptyList(),
-            expected = OrderBook(
-                marketId = btcEthMarket,
-                buy = listOf(
-                    OrderBookEntry(price = "17.550", size = "2.5".toBigDecimal()),
-                    OrderBookEntry(price = "17.500", size = "1.5".toBigDecimal()),
-                    OrderBookEntry(price = "17.400", size = "7".toBigDecimal()),
+            expected = OrderBookSnapshot(
+                bids = listOf(
+                    OrderBookSnapshot.Entry(price = "17.550", size = "2.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = "17.500", size = "1.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = "17.400", size = "7".toBigDecimal()),
                 ),
-                sell = emptyList(),
-                last = LastTrade(
+                asks = emptyList(),
+                last = OrderBookSnapshot.LastTrade(
                     price = "0.000",
-                    direction = LastTradeDirection.Unchanged,
+                    direction = OrderBookSnapshot.LastTradeDirection.Unchanged,
                 ),
             ),
         )
@@ -164,16 +158,15 @@ class OrderBookTest : TestWithDb() {
                 ),
             ),
             tradesInDb = emptyList(),
-            expected = OrderBook(
-                marketId = btcEthMarket,
-                buy = emptyList(),
-                sell = listOf(
-                    OrderBookEntry(price = "17.350", size = "2.5".toBigDecimal()),
-                    OrderBookEntry(price = "17.300", size = "5".toBigDecimal()),
+            expected = OrderBookSnapshot(
+                bids = emptyList(),
+                asks = listOf(
+                    OrderBookSnapshot.Entry(price = "17.350", size = "2.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = "17.300", size = "5".toBigDecimal()),
                 ),
-                last = LastTrade(
+                last = OrderBookSnapshot.LastTrade(
                     price = "0.000",
-                    direction = LastTradeDirection.Unchanged,
+                    direction = OrderBookSnapshot.LastTradeDirection.Unchanged,
                 ),
             ),
         )
@@ -266,20 +259,19 @@ class OrderBookTest : TestWithDb() {
                 ),
             ),
             tradesInDb = emptyList(),
-            expected = OrderBook(
-                marketId = btcEthMarket,
-                buy = listOf(
-                    OrderBookEntry(price = "17.550", size = "2.5".toBigDecimal()),
-                    OrderBookEntry(price = "17.500", size = "1.5".toBigDecimal()),
-                    OrderBookEntry(price = "17.400", size = "7".toBigDecimal()),
+            expected = OrderBookSnapshot(
+                bids = listOf(
+                    OrderBookSnapshot.Entry(price = "17.550", size = "2.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = "17.500", size = "1.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = "17.400", size = "7".toBigDecimal()),
                 ),
-                sell = listOf(
-                    OrderBookEntry(price = "17.350", size = "2.5".toBigDecimal()),
-                    OrderBookEntry(price = "17.300", size = "5".toBigDecimal()),
+                asks = listOf(
+                    OrderBookSnapshot.Entry(price = "17.350", size = "2.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = "17.300", size = "5".toBigDecimal()),
                 ),
-                last = LastTrade(
+                last = OrderBookSnapshot.LastTrade(
                     price = "0.000",
-                    direction = LastTradeDirection.Unchanged,
+                    direction = OrderBookSnapshot.LastTradeDirection.Unchanged,
                 ),
             ),
         )
@@ -472,20 +464,19 @@ class OrderBookTest : TestWithDb() {
                 ),
             ),
             tradesInDb = emptyList(),
-            expected = OrderBook(
-                marketId = btcEthMarket,
-                buy = listOf(
-                    OrderBookEntry(price = "17.550", size = "2.5".toBigDecimal()),
-                    OrderBookEntry(price = "17.500", size = "1.5".toBigDecimal()),
-                    OrderBookEntry(price = "17.400", size = "7".toBigDecimal()),
+            expected = OrderBookSnapshot(
+                bids = listOf(
+                    OrderBookSnapshot.Entry(price = "17.550", size = "2.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = "17.500", size = "1.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = "17.400", size = "7".toBigDecimal()),
                 ),
-                sell = listOf(
-                    OrderBookEntry(price = "17.350", size = "2.5".toBigDecimal()),
-                    OrderBookEntry(price = "17.300", size = "5".toBigDecimal()),
+                asks = listOf(
+                    OrderBookSnapshot.Entry(price = "17.350", size = "2.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = "17.300", size = "5".toBigDecimal()),
                 ),
-                last = LastTrade(
+                last = OrderBookSnapshot.LastTrade(
                     price = "0.000",
-                    direction = LastTradeDirection.Unchanged,
+                    direction = OrderBookSnapshot.LastTradeDirection.Unchanged,
                 ),
             ),
         )
@@ -547,17 +538,16 @@ class OrderBookTest : TestWithDb() {
                     price = "17.40".toBigDecimal(),
                 ),
             ),
-            expected = OrderBook(
-                marketId = btcEthMarket,
-                buy = listOf(
-                    OrderBookEntry(price = "17.500", size = "1".toBigDecimal()),
+            expected = OrderBookSnapshot(
+                bids = listOf(
+                    OrderBookSnapshot.Entry(price = "17.500", size = "1".toBigDecimal()),
                 ),
-                sell = listOf(
-                    OrderBookEntry(price = "17.550", size = "2".toBigDecimal()),
+                asks = listOf(
+                    OrderBookSnapshot.Entry(price = "17.550", size = "2".toBigDecimal()),
                 ),
-                last = LastTrade(
+                last = OrderBookSnapshot.LastTrade(
                     price = "17.400",
-                    direction = LastTradeDirection.Up,
+                    direction = OrderBookSnapshot.LastTradeDirection.Up,
                 ),
             ),
         )
@@ -647,17 +637,16 @@ class OrderBookTest : TestWithDb() {
                     price = "17.40".toBigDecimal(),
                 ),
             ),
-            expected = OrderBook(
-                marketId = btcEthMarket,
-                buy = listOf(
-                    OrderBookEntry(price = "17.500", size = "1".toBigDecimal()),
+            expected = OrderBookSnapshot(
+                bids = listOf(
+                    OrderBookSnapshot.Entry(price = "17.500", size = "1".toBigDecimal()),
                 ),
-                sell = listOf(
-                    OrderBookEntry(price = "17.550", size = "2".toBigDecimal()),
+                asks = listOf(
+                    OrderBookSnapshot.Entry(price = "17.550", size = "2".toBigDecimal()),
                 ),
-                last = LastTrade(
+                last = OrderBookSnapshot.LastTrade(
                     price = "17.400",
-                    direction = LastTradeDirection.Down,
+                    direction = OrderBookSnapshot.LastTradeDirection.Down,
                 ),
             ),
         )
@@ -747,17 +736,16 @@ class OrderBookTest : TestWithDb() {
                     price = "17.45".toBigDecimal(),
                 ),
             ),
-            expected = OrderBook(
-                marketId = btcEthMarket,
-                buy = listOf(
-                    OrderBookEntry(price = "17.500", size = "1".toBigDecimal()),
+            expected = OrderBookSnapshot(
+                bids = listOf(
+                    OrderBookSnapshot.Entry(price = "17.500", size = "1".toBigDecimal()),
                 ),
-                sell = listOf(
-                    OrderBookEntry(price = "17.550", size = "2".toBigDecimal()),
+                asks = listOf(
+                    OrderBookSnapshot.Entry(price = "17.550", size = "2".toBigDecimal()),
                 ),
-                last = LastTrade(
+                last = OrderBookSnapshot.LastTrade(
                     price = "17.450",
-                    direction = LastTradeDirection.Up,
+                    direction = OrderBookSnapshot.LastTradeDirection.Up,
                 ),
             ),
         )
@@ -847,17 +835,16 @@ class OrderBookTest : TestWithDb() {
                     price = "17.40".toBigDecimal(),
                 ),
             ),
-            expected = OrderBook(
-                marketId = btcEthMarket,
-                buy = listOf(
-                    OrderBookEntry(price = "17.500", size = "1".toBigDecimal()),
+            expected = OrderBookSnapshot(
+                bids = listOf(
+                    OrderBookSnapshot.Entry(price = "17.500", size = "1".toBigDecimal()),
                 ),
-                sell = listOf(
-                    OrderBookEntry(price = "17.550", size = "2".toBigDecimal()),
+                asks = listOf(
+                    OrderBookSnapshot.Entry(price = "17.550", size = "2".toBigDecimal()),
                 ),
-                last = LastTrade(
+                last = OrderBookSnapshot.LastTrade(
                     price = "17.400",
-                    direction = LastTradeDirection.Unchanged,
+                    direction = OrderBookSnapshot.LastTradeDirection.Unchanged,
                 ),
             ),
         )
@@ -965,17 +952,16 @@ class OrderBookTest : TestWithDb() {
                     price = "17.35".toBigDecimal(),
                 ),
             ),
-            expected = OrderBook(
-                marketId = btcEthMarket,
-                buy = listOf(
-                    OrderBookEntry(price = "17.500", size = "1".toBigDecimal()),
+            expected = OrderBookSnapshot(
+                bids = listOf(
+                    OrderBookSnapshot.Entry(price = "17.500", size = "1".toBigDecimal()),
                 ),
-                sell = listOf(
-                    OrderBookEntry(price = "17.550", size = "2".toBigDecimal()),
+                asks = listOf(
+                    OrderBookSnapshot.Entry(price = "17.550", size = "2".toBigDecimal()),
                 ),
-                last = LastTrade(
+                last = OrderBookSnapshot.LastTrade(
                     price = "17.420",
-                    direction = LastTradeDirection.Up,
+                    direction = OrderBookSnapshot.LastTradeDirection.Up,
                 ),
             ),
         )
@@ -1113,17 +1099,16 @@ class OrderBookTest : TestWithDb() {
                     price = "3000".toBigDecimal(),
                 ),
             ),
-            expected = OrderBook(
-                marketId = btcEthMarket,
-                buy = listOf(
-                    OrderBookEntry(price = "17.500", size = "1".toBigDecimal()),
+            expected = OrderBookSnapshot(
+                bids = listOf(
+                    OrderBookSnapshot.Entry(price = "17.500", size = "1".toBigDecimal()),
                 ),
-                sell = listOf(
-                    OrderBookEntry(price = "17.550", size = "2".toBigDecimal()),
+                asks = listOf(
+                    OrderBookSnapshot.Entry(price = "17.550", size = "2".toBigDecimal()),
                 ),
-                last = LastTrade(
+                last = OrderBookSnapshot.LastTrade(
                     price = "17.450",
-                    direction = LastTradeDirection.Up,
+                    direction = OrderBookSnapshot.LastTradeDirection.Up,
                 ),
             ),
         )
@@ -1133,8 +1118,8 @@ class OrderBookTest : TestWithDb() {
         marketId: MarketId,
         ordersInDb: List<Order>,
         tradesInDb: List<Trade>,
-        expected: OrderBook,
+        expected: OrderBookSnapshot,
     ) {
-        verifyOrderBook(marketId, ordersInDb, tradesInDb, expected, OrderEntity::getOrderBook)
+        verifyOrderBook(marketId, ordersInDb, tradesInDb, expected, OrderBookSnapshot::get)
     }
 }

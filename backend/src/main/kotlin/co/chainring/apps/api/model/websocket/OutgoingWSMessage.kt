@@ -8,8 +8,10 @@ import co.chainring.apps.api.model.BigIntegerSerializer
 import co.chainring.apps.api.model.MarketLimits
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.Trade
+import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
+import co.chainring.core.model.db.OrderBookSnapshot
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderSide
 import co.chainring.core.model.db.TradeId
@@ -54,29 +56,67 @@ sealed class Publishable
 @SerialName("OrderBook")
 data class OrderBook(
     val marketId: MarketId,
-    val buy: List<OrderBookEntry>,
-    val sell: List<OrderBookEntry>,
+    val buy: List<Entry>,
+    val sell: List<Entry>,
     val last: LastTrade,
-) : Publishable()
+) : Publishable() {
+    constructor(market: MarketEntity, snapshot: OrderBookSnapshot) :
+        this(market.id.value, snapshot)
 
-@Serializable
-data class OrderBookEntry(
-    val price: String,
-    val size: BigDecimalJson,
-)
+    constructor(marketId: MarketId, snapshot: OrderBookSnapshot) :
+        this(marketId, buy = snapshot.bids.map(::Entry), sell = snapshot.asks.map(::Entry), last = LastTrade(snapshot.last))
 
-@Serializable
-enum class LastTradeDirection {
-    Up,
-    Down,
-    Unchanged,
+    @Serializable
+    data class Entry(
+        val price: String,
+        val size: BigDecimalJson,
+    ) {
+        constructor(snapshotEntry: OrderBookSnapshot.Entry) :
+            this(snapshotEntry.price.toPlainString(), snapshotEntry.size)
+    }
+
+    @Serializable
+    data class LastTrade(
+        val price: String,
+        val direction: LastTradeDirection,
+    ) {
+        constructor(snapshotLastTrade: OrderBookSnapshot.LastTrade) :
+            this(
+                price = snapshotLastTrade.price.toPlainString(),
+                direction = when (snapshotLastTrade.direction) {
+                    OrderBookSnapshot.LastTradeDirection.Up -> LastTradeDirection.Up
+                    OrderBookSnapshot.LastTradeDirection.Down -> LastTradeDirection.Down
+                    OrderBookSnapshot.LastTradeDirection.Unchanged -> LastTradeDirection.Unchanged
+                },
+            )
+    }
+
+    @Serializable
+    enum class LastTradeDirection {
+        Up,
+        Down,
+        Unchanged,
+    }
 }
 
 @Serializable
-data class LastTrade(
-    val price: String,
-    val direction: LastTradeDirection,
-)
+@SerialName("OrderBookDiff")
+data class OrderBookDiff(
+    val sequenceNumber: Long,
+    val marketId: MarketId,
+    val buy: List<OrderBook.Entry>,
+    val sell: List<OrderBook.Entry>,
+    val last: OrderBook.LastTrade?,
+) : Publishable() {
+    constructor(sequenceNumber: Long, market: MarketEntity, diff: OrderBookSnapshot.Diff) :
+        this(
+            sequenceNumber,
+            market.id.value,
+            buy = diff.bids.map(OrderBook::Entry),
+            sell = diff.asks.map(OrderBook::Entry),
+            last = diff.last?.let(OrderBook::LastTrade),
+        )
+}
 
 @Serializable
 @SerialName("Prices")
@@ -113,6 +153,7 @@ data class MyTradesCreated(
 @Serializable
 @SerialName("MarketTradesCreated")
 data class MarketTradesCreated(
+    val sequenceNumber: Long,
     val marketId: MarketId,
     val trades: List<Trade>,
 ) : Publishable() {

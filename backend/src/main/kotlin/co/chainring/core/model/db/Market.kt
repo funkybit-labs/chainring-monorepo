@@ -89,4 +89,7 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
         toReal = { it.toBigInteger() },
         toColumn = { it.toBigDecimal() },
     )
+
+    fun priceScale(): Int =
+        tickSize.stripTrailingZeros().scale() + 1
 }

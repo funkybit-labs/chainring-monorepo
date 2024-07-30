@@ -24,6 +24,7 @@ import co.chainring.core.model.db.KeyValueStore
 import co.chainring.core.model.db.LimitTable
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCTable
+import co.chainring.core.model.db.OrderBookSnapshotTable
 import co.chainring.core.model.db.OrderExecutionTable
 import co.chainring.core.model.db.OrderTable
 import co.chainring.core.model.db.SettlementBatchTable
@@ -231,6 +232,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             OrderExecutionTable.deleteAll()
             TradeTable.deleteAll()
             OrderTable.deleteAll()
+            OrderBookSnapshotTable.deleteAll()
             ChainSettlementBatchTable.deleteAll()
             SettlementBatchTable.deleteAll()
             DepositTable.deleteAll()

@@ -174,6 +174,7 @@ class MarketTradesBroadcastingTest : OrderBaseTest() {
 
         marketTradesObserver.assertMarketTradesCreatedMessageReceived(market.id) { msg ->
             assertEquals(5, msg.trades.size)
+            assertEquals(1, msg.sequenceNumber)
             assertEquals(
                 buyTrades.map {
                     MarketTradesCreated.Trade(
@@ -239,6 +240,7 @@ class MarketTradesBroadcastingTest : OrderBaseTest() {
 
         marketTradesObserver.assertMarketTradesCreatedMessageReceived(market.id) { msg ->
             assertEquals(2, msg.trades.size)
+            assertEquals(2, msg.sequenceNumber)
             assertEquals(
                 sellTrades.map {
                     MarketTradesCreated.Trade(
