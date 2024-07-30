@@ -9,11 +9,20 @@ anvil_image:
 otterscan_image:
 	cd docker/otterscan && docker build -t otterscan -f ./Dockerfile .&& cd ../..
 
+bitcoin_image:
+	cd docker/bitcoin && make build && cd ../..
+
 stop_containers:
 	docker-compose down --remove-orphans
 
 start_containers: stop_containers
 	docker-compose down --remove-orphans && docker-compose up -d
+
+stop_arch_containers:
+	docker-compose -f ./docker-compose-arch.yaml down
+
+start_arch_containers: stop_arch_containers
+	docker-compose -f ./docker-compose-arch.yaml  up -d
 
 start_ci_containers: stop_containers
 	docker-compose -f ./docker-compose-ci.yaml down --remove-orphans && docker-compose -f ./docker-compose-ci.yaml up -d

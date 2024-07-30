@@ -25,6 +25,27 @@ data class BlockchainClientConfig(
     val sovereignWithdrawalDelaySeconds: BigInteger,
 )
 
+enum class SmartFeeMode {
+    ECONOMICAL,
+    CONSERVATIVE,
+}
+
+data class FeeEstimationSettings(
+    val blocks: Int,
+    val mode: SmartFeeMode,
+    val minValue: Int,
+    val maxValue: Int,
+)
+
+data class BitcoinBlockchainClientConfig(
+    val url: String,
+    val net: String,
+    val enableBasicAuth: Boolean,
+    val user: String,
+    val password: String,
+    val feeSettings: FeeEstimationSettings,
+)
+
 object ChainManager {
 
     private val chainNames = (System.getenv("EVM_CHAINS") ?: "localhost:8545,localhost:8546").split(",").map { it.trim() }
@@ -79,6 +100,14 @@ object ChainManager {
             sovereignWithdrawalDelaySeconds = bigIntegerValue(chainName, "SOVEREIGN_WITHDRAWAL_DELAY_SECONDS", "604800"),
         )
     }
+    val bitcoinBlockchainClientConfig = BitcoinBlockchainClientConfig(
+        url = System.getenv("BITCOIN_NETWORK_RPC_URL") ?: "http://localhost:18443",
+        net = System.getenv("BITCOIN_NETWORK_NAME") ?: "org.bitcoin.test",
+        enableBasicAuth = (System.getenv("BITCOIN_NETWORK_ENABLE_BASIC_AUTH") ?: "true").toBoolean(),
+        user = System.getenv("BITCOIN_NETWORK_RPC_USER") ?: "user",
+        password = System.getenv("BITCOIN_NETWORK_RPC_PASSWORD") ?: "password",
+        feeSettings = FeeEstimationSettings(1, SmartFeeMode.CONSERVATIVE, 5, 50),
+    )
 
     private val blockchainClientsByChainId: Map<ChainId, BlockchainClient> by lazy {
         blockchainConfigs.associate {
