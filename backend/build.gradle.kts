@@ -113,9 +113,8 @@ jib {
     }
 
     to {
-        image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/backend"
+        image = "851725450525.dkr.ecr.us-east-2.amazonaws.com/backend:${version}-${buildNumber}"
         credHelper.helper = "ecr-login"
-        tags = setOf("${version}-${buildNumber}")
     }
 
     container {
