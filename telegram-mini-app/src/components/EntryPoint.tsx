@@ -9,10 +9,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isErrorFromAlias } from '@zodios/core'
 import { Button } from 'components/common/Button'
 
+export type Alert = 'checkin' | 'milestone'
+
 export default function EntryPoint() {
   const queryClient = useQueryClient()
   const [showInviteError, setShowInviteError] = useState(false)
   const [inviteCode, setInviteCode] = useState<string | null>(null)
+  const [dismissedAlerts, setDismissedAlerts] = useState<Alert[]>([])
 
   const userQuery = useQuery({
     queryKey: userQueryKey,
@@ -120,7 +123,16 @@ export default function EntryPoint() {
         </div>
       )
     } else {
-      return <MainScreen user={userQuery.data} />
+      return (
+        <MainScreen
+          user={userQuery.data}
+          dismissedAlerts={dismissedAlerts}
+          dismissAlert={(a) => {
+            alert(a)
+            setDismissedAlerts([...dismissedAlerts, a])
+          }}
+        />
+      )
     }
   } else if (userQuery.isError) {
     return (

@@ -56,7 +56,7 @@ object TelegramMiniAppRoutes {
                     ),
                     invites = 0L,
                     inviteCode = TelegramMiniAppInviteCode("12345"),
-                    nextMilestoneIn = BigDecimal.ZERO,
+                    nextMilestoneAt = BigDecimal.ZERO,
                     lastMilestone = null,
                 ),
             )
@@ -110,7 +110,7 @@ object TelegramMiniAppRoutes {
                     ),
                     inviteCode = TelegramMiniAppInviteCode("12345"),
                     invites = 0L,
-                    nextMilestoneIn = BigDecimal.ZERO,
+                    nextMilestoneAt = BigDecimal.ZERO,
                     lastMilestone = null,
                 ),
             )
@@ -166,7 +166,7 @@ object TelegramMiniAppRoutes {
                     ),
                     inviteCode = TelegramMiniAppInviteCode("12345"),
                     invites = 0L,
-                    nextMilestoneIn = BigDecimal.ZERO,
+                    nextMilestoneAt = BigDecimal.ZERO,
                     lastMilestone = null,
                 ),
             )

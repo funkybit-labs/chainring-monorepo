@@ -23,7 +23,7 @@ data class GetUserApiResponse(
     val checkInStreak: CheckInStreak,
     val invites: Long,
     val inviteCode: TelegramMiniAppInviteCode,
-    val nextMilestoneIn: BigDecimalJson?,
+    val nextMilestoneAt: BigDecimalJson?,
     val lastMilestone: Milestone?,
 ) {
     companion object {
@@ -55,12 +55,13 @@ data class GetUserApiResponse(
                 },
                 invites = user.invites,
                 inviteCode = user.inviteCode,
-                nextMilestoneIn = nextMilestone?.let { it.cp - fullBalance },
+                nextMilestoneAt = nextMilestone?.cp,
                 lastMilestone = user.lastMilestoneGrantedAt?.let { grantedAt ->
                     previousMilestone?.let {
                         Milestone(
                             invites = previousMilestone.invites,
                             grantedAt = grantedAt,
+                            points = previousMilestone.cp,
                         )
                     }
                 },
@@ -87,6 +88,7 @@ data class GetUserApiResponse(
     data class Milestone(
         val invites: Long,
         val grantedAt: Instant,
+        val points: BigDecimalJson,
     )
 }
 

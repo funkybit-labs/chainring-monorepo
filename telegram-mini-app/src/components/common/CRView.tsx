@@ -18,8 +18,13 @@ export function CRView({
   if (format === 'short') {
     suffix = ' CR'
   } else if (format === 'full') {
-    suffix = ' CR Points'
+    suffix = ' CR POINTS'
   }
 
-  return `${formattedValue}${suffix}`
+  return (
+    <div className="flex flex-col">
+      <span className="text-2xl">{formattedValue}</span>
+      <span>{suffix}</span>
+    </div>
+  )
 }

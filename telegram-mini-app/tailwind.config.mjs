@@ -6,7 +6,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', ...defaultTheme.fontFamily.sans]
+        sans: ['Inter', ...defaultTheme.fontFamily.sans],
+        content: ['Rubik', ...defaultTheme.fontFamily.sans]
       },
       fontSize: {
         'xxs': '0.625rem',  // 10px
@@ -53,14 +54,18 @@ export default {
       gameBlack: "#1E1E1E",
       gameRed: "#FF7169",
       gameDisabled: "#646161",
+
+      // new colors
+      modalBlue: "#211E5B",
+      mediumBlue: "#19173D",
+      darkBlue: "#110F31",
+      orangeStart: "#FF8E25",
+      orangeStop: "#F6791F",
+      brightOrange: "#FF8A00",
+      dullOrange: "#A75A00",
     },
   },
   plugins: [
     require('@tailwindcss/forms')
   ],
-  safelist: [
-    {
-      pattern: /text-status/,
-    }
-  ]
 }
