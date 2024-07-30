@@ -27,6 +27,7 @@ import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OHLCEntity
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
+import co.chainring.core.model.db.OrderStatus
 import co.chainring.core.model.db.WalletEntity
 import co.chainring.core.model.db.toOrderResponse
 import co.chainring.core.model.toChecksumAddress
@@ -236,18 +237,28 @@ class Broadcaster(val db: Database) {
 
     private fun sendOrders(client: ConnectedClient) {
         if (client.principal != null) {
-            transaction {
-                client.send(
-                    OutgoingWSMessage.Publish(
-                        SubscriptionTopic.MyOrders,
-                        MyOrders(
-                            OrderEntity
-                                .listWithExecutionsForWallet(WalletEntity.getOrCreate(client.principal), limit = 100)
-                                .map(Pair<OrderEntity, List<OrderExecutionEntity>>::toOrderResponse),
-                        ),
-                    ),
+            val combinedOrderResponses = transaction {
+                val openOrders = OrderEntity.listWithExecutionsForWallet(
+                    WalletEntity.getOrCreate(client.principal),
+                    statuses = listOf(OrderStatus.Open, OrderStatus.Partial),
                 )
+                val recentOrders = OrderEntity.listWithExecutionsForWallet(
+                    WalletEntity.getOrCreate(client.principal),
+                    limit = 100,
+                )
+
+                (openOrders + recentOrders)
+                    .distinctBy { it.first.id }
+                    .sortedByDescending { it.first.createdAt }
+                    .map(Pair<OrderEntity, List<OrderExecutionEntity>>::toOrderResponse)
             }
+
+            client.send(
+                OutgoingWSMessage.Publish(
+                    SubscriptionTopic.MyOrders,
+                    MyOrders(combinedOrderResponses),
+                ),
+            )
         }
     }
 
