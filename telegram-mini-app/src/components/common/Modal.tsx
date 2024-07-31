@@ -42,7 +42,7 @@ export function Modal({
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <Dialog.Panel className="mx-4 w-full overflow-hidden rounded bg-modalBlue text-left align-middle transition-all">
+                <Dialog.Panel className="mx-4 w-full overflow-hidden rounded-2xl bg-modalBlue text-left align-middle transition-all">
                   <div className="flex flex-col">
                     <span
                       className="mx-2 my-1 cursor-pointer self-end text-white"

@@ -1,7 +1,7 @@
 import React, { ReactElement } from 'react'
 import { classNames } from 'utils'
 
-export type HeadSubStyle = 'normal' | 'smallSub' | 'largeSub' | 'equal'
+export type HeadSubStyle = 'standard' | 'smallSub' | 'largeSub' | 'equal'
 
 export function HeadSub({
   head,

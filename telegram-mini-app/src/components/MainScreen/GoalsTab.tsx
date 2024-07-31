@@ -14,6 +14,37 @@ import { ProgressBar } from 'components/common/ProgressBar'
 import Decimal from 'decimal.js'
 import { Modal } from 'components/common/Modal'
 import Logo from 'components/common/Logo'
+import { useClose } from '@headlessui/react'
+
+function GoalAchieved({ goalAchieved }: { goalAchieved?: UserGoal }) {
+  const [goalAchievedIconSrc, goalAchievedDescription] = useMemo(() => {
+    if (goalAchieved) {
+      return goalInfo(goalAchieved.id)
+    } else {
+      return ['', '']
+    }
+  }, [goalAchieved])
+
+  const close = useClose()
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <img
+        className="size-32"
+        src={goalAchievedIconSrc}
+        alt={goalAchievedDescription}
+      />
+      <div className="text-2xl font-normal text-brightOrange">
+        +{goalAchieved?.reward?.toString() ?? ''} CR
+      </div>
+      <div className="text-center text-lg leading-6 text-white">
+        Thank you for subscribing to our {goalAchievedDescription}. Complete
+        more goals for more CR.
+      </div>
+      <Button className={'mt-2'} caption={() => 'Yay!'} onClick={close} />
+    </div>
+  )
+}
 
 export default function GoalsTab({ user }: { user: User }) {
   const goalCount = user.goals.length
@@ -26,14 +57,6 @@ export default function GoalsTab({ user }: { user: User }) {
     .reduce((a, v) => a.plus(v), new Decimal(0))
   const [showGoalAchievedModal, setShowGoalAchievedModal] = useState(false)
   const [goalAchieved, setGoalAchieved] = useState<UserGoal>()
-
-  const [goalAchievedIconSrc, goalAchievedDescription] = useMemo(() => {
-    if (goalAchieved) {
-      return goalInfo(goalAchieved.id)
-    } else {
-      return ['', '']
-    }
-  }, [goalAchieved])
 
   return (
     <>
@@ -80,20 +103,7 @@ export default function GoalsTab({ user }: { user: User }) {
               onClosed={() => {}}
               isOpen={showGoalAchievedModal}
             >
-              <div className="flex flex-col items-center gap-2">
-                <img
-                  className="size-32"
-                  src={goalAchievedIconSrc}
-                  alt={goalAchievedDescription}
-                />
-                <div className="text-2xl font-normal text-brightOrange">
-                  +{goalAchieved?.reward?.toString() ?? ''} CR
-                </div>
-                <div className="text-center text-lg leading-6 text-white">
-                  Thank you for subscribing to our {goalAchievedDescription}.
-                  Complete more goals for more CR.
-                </div>
-              </div>
+              <GoalAchieved goalAchieved={goalAchieved} />
             </Modal>
           )}
         </div>
@@ -166,7 +176,8 @@ function GoalRow({
             className={classNames(
               'my-0.5 py-2 !bg-modalBlue',
               status === 'rewardReady' && '!bg-white/50',
-              status === 'achieved' && '!bg-brightOrange/50 !opacity-100'
+              status === 'achieved' &&
+                '!bg-brightOrange !bg-opacity-70 !opacity-100'
             )}
             caption={() => (
               <div className="whitespace-nowrap px-1 font-medium">

@@ -2,9 +2,14 @@ import React from 'react'
 import { CheckInStreak } from 'apiClient'
 import FirePng from 'assets/fire.png'
 import { decimalAsInt } from 'utils/format'
+import { Button } from 'components/common/Button'
+import { useClose } from '@headlessui/react'
+
 export function CheckInStreakWidget({ streak }: { streak: CheckInStreak }) {
   const daysLabel = streak.days === 1 ? 'day' : 'days'
   const ticketsLabel = streak.gameTickets === 1 ? 'ticket' : 'tickets'
+
+  const close = useClose()
 
   return (
     <div className="flex flex-col items-center justify-center text-center">
@@ -17,6 +22,7 @@ export function CheckInStreakWidget({ streak }: { streak: CheckInStreak }) {
         +{decimalAsInt(streak.reward)} CR and {streak.gameTickets}{' '}
         {ticketsLabel}.
       </div>
+      <Button className={'mt-2'} caption={() => 'Yay!'} onClick={close} />
     </div>
   )
 }

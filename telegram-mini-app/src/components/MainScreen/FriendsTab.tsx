@@ -46,12 +46,12 @@ export default function FriendsTab({ user }: { user: User }) {
         <InfoPanel
           icon={GiftPng}
           rounded={hasReferralBalance ? 'none' : 'top'}
-          style={hasReferralBalance ? 'normal' : 'large'}
+          style={hasReferralBalance ? 'standard' : 'large'}
         >
           <HeadSub
             head={user.invites.toString()}
             sub={user.invites === 1 ? 'INVITE LEFT' : 'INVITES LEFT'}
-            style={hasReferralBalance ? 'normal' : 'equal'}
+            style={hasReferralBalance ? 'standard' : 'equal'}
           />
         </InfoPanel>
         <div className="mx-auto mt-2 flex w-full justify-stretch rounded-t-3xl bg-darkBlue px-6 py-4">

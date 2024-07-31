@@ -4,12 +4,15 @@ import FlagPng from 'assets/flag.png'
 import GiftPng from 'assets/gift.png'
 import { InfoPanel } from 'components/common/InfoPanel'
 import { classNames } from 'utils'
+import { Button } from 'components/common/Button'
+import { useClose } from '@headlessui/react'
 
 export function MilestoneReachedWidget({
   milestone
 }: {
   milestone: LastMilestone
 }) {
+  const close = useClose()
   return (
     <div className="flex flex-col items-center justify-center text-center">
       <img src={FlagPng} alt="Milestone Reached" className="size-32" />
@@ -41,6 +44,7 @@ export function MilestoneReachedWidget({
           </div>
         </div>
       </InfoPanel>
+      <Button className={'mt-2'} caption={() => 'Yay!'} onClick={close} />
     </div>
   )
 }
