@@ -2,11 +2,16 @@ import Decimal from 'decimal.js'
 import React, { Fragment, useEffect, useRef, useState } from 'react'
 import { ApiErrorsSchema } from 'apiClient'
 import { BrowserView, isBrowser, MobileView } from 'react-device-detect'
-import GameLogoSvg from 'assets/game-logo.svg'
-import ArrowDownSvg from 'assets/arrow-down.svg'
+import BombPng from 'assets/bomb.png'
+import FlagPng from 'assets/flag.png'
 import { Button } from 'components/common/Button'
 import { classNames } from 'utils'
-import { CRView } from 'components/common/CRView'
+import XSvg from 'assets/X.svg'
+import LogoSvg from 'assets/logo-orange-no-words.svg'
+import GameBasePng from 'assets/game-base.png'
+import TrophyPng from 'assets/trophy.png'
+import { InfoPanel } from 'components/common/InfoPanel'
+import { decimalAsInt } from 'utils/format'
 
 export type ReactionGameResult = {
   percentile: number
@@ -47,7 +52,9 @@ export function ReactionGame({
     const randomDelay = Math.random() * 3000 + 2000
     readyTimeoutRef.current = setTimeout(() => {
       if (circleRef.current) {
-        circleRef.current.classList.add('bg-gameBlue')
+        circleRef.current.classList.add('bg-gradient-to-b')
+        circleRef.current.classList.add('from-gameBlueStart/50')
+        circleRef.current.classList.add('to-gameBlueStop')
       }
       setGameState('ready')
       startTimeRef.current = Date.now()
@@ -109,13 +116,22 @@ export function ReactionGame({
     }
   }
 
+  const percentilesLeadin = (percentile: number) => {
+    if (percentile >= 75) {
+      return 'Congratulations!'
+    } else if (percentile >= 25) {
+      return 'Not bad!'
+    } else {
+      return 'Keep trying!'
+    }
+  }
   const percentilesMessage = (percentile: number) => {
     if (percentile >= 75) {
-      return `Congratulations! You are faster than ${percentile}% of ChainRin users!`
+      return `You are faster than ${percentile}% of ChainRin users!`
     } else if (percentile >= 25) {
-      return `Not bad! You are faster than ${percentile}% of ChainRing users!`
+      return `You are faster than ${percentile}% of ChainRing users!`
     } else {
-      return `Keep trying! You are faster than ${percentile}% of ChainRing users! `
+      return `You are faster than ${percentile}% of ChainRing users! `
     }
   }
 
@@ -123,13 +139,17 @@ export function ReactionGame({
     if (circleRef.current) {
       circleRef.current.classList.remove(
         'animate-gameOrangeBlink',
-        'bg-gameBlue'
+        'bg-gradient-to-b',
+        'from-gameBlueStart/50',
+        'to-gameBlueStop'
       )
 
       if (gameState === 'waiting') {
         circleRef.current.classList.add('animate-gameOrangeBlink')
       } else if (gameState === 'ready' || gameState === 'finished') {
-        circleRef.current.classList.add('bg-gameBlue')
+        circleRef.current.classList.add('bg-gradient-to-b')
+        circleRef.current.classList.add('from-gameBlueStart/50')
+        circleRef.current.classList.add('to-gameBlueStop')
       }
     }
   }, [gameState])
@@ -153,22 +173,36 @@ export function ReactionGame({
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex cursor-default select-none flex-col items-center justify-center bg-darkBluishGray10 text-white">
+    <div className="fixed inset-0 z-50 flex cursor-default select-none flex-col items-center justify-center bg-mediumBlue text-white">
       <div className="flex w-full flex-col items-center justify-center text-white">
         {(gameState === 'idle' ||
           gameState === 'waiting' ||
           gameState === 'early' ||
           gameState === 'late') && (
-          <div className="absolute left-0 top-4 w-full px-10 text-center text-xl">
-            Are you faster than the blink of an eye?
+          <div className="absolute left-0 top-4 flex w-full flex-row px-10 text-center font-sans text-2xl">
+            <img src={LogoSvg} alt="ChainRing" />
+            <div className="ml-4 text-start">
+              Are you faster than
+              <br />
+              the blink of an eye?
+            </div>
           </div>
         )}
         {gameState === 'finished' && gameResult && (
           <div className="absolute left-0 top-4 flex w-full flex-col px-10 text-center text-xl">
-            <span>{percentilesMessage(gameResult.percentile)}</span>
-            <span className="mt-4">
-              +<CRView amount={gameResult.reward} format={'full'} />
-            </span>
+            <InfoPanel icon={TrophyPng} rounded={'both'}>
+              <div className={'flex flex-col text-left font-sans'}>
+                <div className={'text-2xl text-white'}>
+                  +{decimalAsInt(gameResult.reward)} CR POINTS
+                </div>
+                <div className={'text-sm'}>
+                  <span className="text-brightOrange">
+                    {percentilesLeadin(gameResult.percentile)}
+                  </span>{' '}
+                  {percentilesMessage(gameResult.percentile)}
+                </div>
+              </div>
+            </InfoPanel>
           </div>
         )}
         {gameState === 'finished' && apiError && (
@@ -180,22 +214,22 @@ export function ReactionGame({
           onClick={onClose}
           className="absolute right-4 top-2 font-light text-white"
         >
-          X
+          <img src={XSvg} alt="close" />
         </button>
       </div>
 
       <div className="flex items-center justify-center text-white">
         <div className="relative">
-          <img src={GameLogoSvg} className="size-[213px]" alt="Game" />
+          <img src={GameBasePng} className="size-[231px]" alt="Game" />
           <div
             ref={circleRef}
             onMouseDown={handleTimeMeasure}
             onTouchStart={handleTimeMeasure}
-            className="absolute inset-0 m-auto flex size-[158px] cursor-pointer items-center justify-center rounded-full"
+            className="absolute inset-0 -right-0.5 -top-1.5 m-auto flex size-[188px] cursor-pointer items-center justify-center rounded-full bg-gradient-to-b from-gameBlueStart/50 to-gameBlueStop"
           >
             {gameState === 'finished' && (
               <span
-                className="text-2xl font-extrabold text-gameBlack"
+                className="font-sans text-3xl font-semibold text-white"
                 style={{
                   WebkitTextStroke: '0.75px white'
                 }}
@@ -216,17 +250,13 @@ export function ReactionGame({
       <div className="flex w-full items-center justify-center text-white">
         {gameState === 'finished' && (
           <div>
-            <div className="absolute bottom-36 left-0 flex w-full flex-col px-10 text-center text-xl">
-              You’re still much slower than ChainRing though...
-            </div>
-
-            <div className="absolute bottom-9 left-0 flex w-full">
+            <div className="absolute bottom-16 left-0 flex w-full">
               <Scale measuredTime={elapsedTime} />
             </div>
           </div>
         )}
 
-        <div className="absolute bottom-6 w-full items-center justify-center px-6 text-center text-xl">
+        <div className="absolute bottom-12 w-full items-center justify-center px-6 text-center text-xl">
           {(gameState === 'idle' || gameState === 'finished') && (
             <Button
               caption={() => {
@@ -242,24 +272,25 @@ export function ReactionGame({
                 if (!apiError && tickets > 0) startGame()
                 else onClose()
               }}
-              className={classNames(
-                'mt-4 w-full border-2 !bg-darkBluishGray10 p-2',
-                tickets <= 0 ? '!border-gameDisabled' : '!border-primary5'
-              )}
+              className={classNames('my-4 w-full p-2 !bg-brightOrange/70')}
+              disabled={tickets <= 0}
             />
           )}
           {(gameState === 'waiting' ||
             gameState === 'early' ||
             gameState === 'late') && (
-            <div>
-              <BrowserView>
-                Press the spacebar when the ring turns{' '}
-                <span className="text-gameBlue">blue!</span>
-              </BrowserView>
-              <MobileView>
-                Tap on the ring when it turns{' '}
-                <span className="text-gameBlue">blue!</span>
-              </MobileView>
+            <div className={'flex flex-row align-middle'}>
+              <img src={BombPng} className="size-16" />
+              <div className={'ml-4 text-left font-sans text-xl'}>
+                <BrowserView>
+                  Press the spacebar when the ring turns{' '}
+                  <span className="text-gameBlue">blue</span>
+                </BrowserView>
+                <MobileView>
+                  Tap on the ring when it turns{' '}
+                  <span className="text-gameBlue">blue</span>
+                </MobileView>
+              </div>
             </div>
           )}
         </div>
@@ -364,7 +395,7 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
   }
 
   return (
-    <div className="relative h-24 w-full overflow-hidden">
+    <div className="relative min-h-24 w-full overflow-visible">
       {ticks.map((tick, index) => (
         <div
           key={index}
@@ -385,12 +416,12 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
                 left: `calc(${getTickPosition(measuredTime)}%)`
               }}
             >
-              <div className="absolute left-1/2 top-1 w-2 -translate-x-1/2">
-                <img src={ArrowDownSvg} className="size-[30px]" alt="You" />
+              <div className="absolute -top-6 left-6 size-16 -translate-x-1/2">
+                <img src={FlagPng} alt="You" />
               </div>
-              <span className="absolute top-8 -translate-x-1/2 text-xs text-gameOrange">
+              <div className="absolute -top-10 left-6 -translate-x-1/2 text-xs text-gameOrange">
                 You
-              </span>
+              </div>
             </div>
           )}
           {!tick.isYouTick && (

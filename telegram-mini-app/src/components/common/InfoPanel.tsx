@@ -37,7 +37,7 @@ export function HeadSub({
 }
 
 export type Rounded = 'top' | 'bottom' | 'both' | 'none'
-export type InfoPanelStyle = 'normal' | 'large'
+export type InfoPanelStyle = 'standard' | 'large'
 
 export function InfoPanel({
   icon,

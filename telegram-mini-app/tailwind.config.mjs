@@ -2,7 +2,7 @@
 const defaultTheme = require('tailwindcss/defaultTheme')
 
 export default {
-  content: ['./src/**/*.{mjs,js,ts,jsx,tsx}'],
+  content: ['./src/**/*.{mjs,js,ts,jsx,tsx,css}'],
   theme: {
     extend: {
       fontFamily: {
@@ -20,7 +20,7 @@ export default {
         },
         gameOrangeBlink: {
           '0%, 100%': { backgroundColor: 'transparent' },
-          '50%': { backgroundColor: '#FFA337' },
+          '50%': { background: 'linear-gradient(to bottom, #FFA857, #FF710B)', opacity: 0.7 },
         },
       },
       animation: {
@@ -63,6 +63,8 @@ export default {
       orangeStop: "#F6791F",
       brightOrange: "#FF8A00",
       dullOrange: "#A75A00",
+      gameBlueStart: "#00C2FF",
+      gameBlueStop: "#57C3FF",
     },
   },
   plugins: [

@@ -39,16 +39,23 @@ export default function HomeTab({
 
   useEffect(() => {
     if (
+      !isGameMode &&
       !dismissedAlerts.includes('checkin') &&
       user.checkInStreak.grantedAt.getTime() + fiveMinutesInMs >
         new Date().getTime()
     ) {
       setShowCheckinAward(true)
     }
-  }, [user.checkInStreak.grantedAt, dismissedAlerts, fiveMinutesInMs])
+  }, [
+    user.checkInStreak.grantedAt,
+    dismissedAlerts,
+    fiveMinutesInMs,
+    isGameMode
+  ])
 
   useEffect(() => {
     if (
+      !isGameMode &&
       !dismissedAlerts.includes('milestone') &&
       user.lastMilestone &&
       user.lastMilestone.grantedAt.getTime() + fiveMinutesInMs >
@@ -56,7 +63,7 @@ export default function HomeTab({
     ) {
       setShowMilestoneReached(true)
     }
-  }, [user.lastMilestone, dismissedAlerts, fiveMinutesInMs])
+  }, [user.lastMilestone, dismissedAlerts, fiveMinutesInMs, isGameMode])
 
   const enterGame = () => {
     setGameMode(true)
@@ -147,8 +154,10 @@ export default function HomeTab({
         {showCheckinAward ? (
           <Modal
             close={() => {
-              setShowCheckinAward(false)
-              dismissAlert('checkin')
+              if (!isGameMode) {
+                setShowCheckinAward(false)
+                dismissAlert('checkin')
+              }
             }}
             isOpen={showCheckinAward}
             onClosed={() => {}}
@@ -158,8 +167,10 @@ export default function HomeTab({
         ) : showMilestoneReached ? (
           <Modal
             close={() => {
-              setShowMilestoneReached(false)
-              dismissAlert('milestone')
+              if (!isGameMode) {
+                setShowMilestoneReached(false)
+                dismissAlert('milestone')
+              }
             }}
             isOpen={showMilestoneReached}
             onClosed={() => {}}
