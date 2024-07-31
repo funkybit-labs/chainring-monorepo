@@ -100,7 +100,7 @@ class TelegramMiniAppApiTest {
             assertEquals(1, it.checkInStreak.gameTickets)
 
             assertEquals(5, it.invites)
-            assertEquals("980".crPoints(), it.nextMilestoneIn)
+            assertEquals("1000".crPoints(), it.nextMilestoneAt)
             assertNull(it.lastMilestone)
 
             assertEquals(
@@ -365,7 +365,7 @@ class TelegramMiniAppApiTest {
             assertEquals(1, it.checkInStreak.gameTickets)
 
             assertEquals(5, it.invites)
-            assertEquals("980".crPoints(), it.nextMilestoneIn)
+            assertEquals("1000".crPoints(), it.nextMilestoneAt)
             assertNull(it.lastMilestone)
         }
 
@@ -383,7 +383,7 @@ class TelegramMiniAppApiTest {
                 assertEquals("1020".crPoints(), it.balance)
                 assertEquals(8, it.invites)
 
-                assertEquals("980".crPoints(), it.nextMilestoneIn)
+                assertEquals("2000".crPoints(), it.nextMilestoneAt)
 
                 val lastMilestone = it.lastMilestone
                 assertNotNull(lastMilestone)
@@ -400,7 +400,7 @@ class TelegramMiniAppApiTest {
                 assertEquals("2020".crPoints(), it.balance)
                 assertEquals(11, it.invites)
 
-                assertEquals("6980".crPoints(), it.nextMilestoneIn)
+                assertEquals("9000".crPoints(), it.nextMilestoneAt)
 
                 val lastMilestone = it.lastMilestone
                 assertNotNull(lastMilestone)
@@ -418,7 +418,7 @@ class TelegramMiniAppApiTest {
                 assertEquals("12120".crPoints(), it.balance)
                 assertEquals(14, it.invites)
 
-                assertEquals("23880".crPoints(), it.nextMilestoneIn)
+                assertEquals("36000".crPoints(), it.nextMilestoneAt)
 
                 val lastMilestone = it.lastMilestone
                 assertNotNull(lastMilestone)
@@ -439,7 +439,7 @@ class TelegramMiniAppApiTest {
                 assertEquals(-1, it.invites)
 
                 // null because the last milestone was reached already
-                assertNull(it.nextMilestoneIn)
+                assertNull(it.nextMilestoneAt)
 
                 val lastMilestone = it.lastMilestone
                 assertNotNull(lastMilestone)
