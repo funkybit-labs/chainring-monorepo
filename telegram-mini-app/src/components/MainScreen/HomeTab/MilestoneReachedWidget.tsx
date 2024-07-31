@@ -44,7 +44,7 @@ export function MilestoneReachedWidget({
           </div>
         </div>
       </InfoPanel>
-      <Button className={'mt-2'} caption={() => 'Yay!'} onClick={close} />
+      <Button className={'mt-2 p-1'} caption={() => 'Ok'} onClick={close} />
     </div>
   )
 }

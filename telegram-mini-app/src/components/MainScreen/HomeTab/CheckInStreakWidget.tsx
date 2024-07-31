@@ -22,7 +22,7 @@ export function CheckInStreakWidget({ streak }: { streak: CheckInStreak }) {
         +{decimalAsInt(streak.reward)} CR and {streak.gameTickets}{' '}
         {ticketsLabel}.
       </div>
-      <Button className={'mt-2'} caption={() => 'Yay!'} onClick={close} />
+      <Button className={'mt-2 p-1'} caption={() => 'Ok'} onClick={close} />
     </div>
   )
 }
