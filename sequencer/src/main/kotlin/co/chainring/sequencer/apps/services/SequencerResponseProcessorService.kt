@@ -37,6 +37,7 @@ import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.model.db.publishBroadcasterNotifications
 import co.chainring.core.model.db.toOrderResponse
 import co.chainring.core.model.toEvmSignature
+import co.chainring.core.sequencer.clientOrderId
 import co.chainring.core.sequencer.depositId
 import co.chainring.core.sequencer.orderId
 import co.chainring.core.sequencer.sequencerOrderId
@@ -198,15 +199,16 @@ object SequencerResponseProcessorService {
         if (orderBatch.ordersToAddList.isNotEmpty()) {
             val createAssignments = orderBatch.ordersToAddList.map {
                 CreateOrderAssignment(
-                    it.externalGuid.orderId(),
-                    it.nonce.toBigInteger(),
-                    toOrderType(it.type),
-                    toOrderSide(it.type),
-                    it.amount.toBigInteger(),
-                    it.levelIx,
-                    it.signature.toEvmSignature(),
-                    it.guid.sequencerOrderId(),
-                    response.processingTime.toBigInteger(),
+                    orderId = it.externalGuid.orderId(),
+                    clientOrderId = it.clientOrderGuid?.takeIf { it.isNotEmpty() }?.clientOrderId(),
+                    nonce = it.nonce.toBigInteger(),
+                    type = toOrderType(it.type),
+                    side = toOrderSide(it.type),
+                    amount = it.amount.toBigInteger(),
+                    levelIx = it.levelIx,
+                    signature = it.signature.toEvmSignature(),
+                    sequencerOrderId = it.guid.sequencerOrderId(),
+                    sequencerTimeNs = response.processingTime.toBigInteger(),
                 )
             }
 
@@ -225,15 +227,16 @@ object SequencerResponseProcessorService {
     private fun handleBackToBackMarketOrder(backToBackOrder: BackToBackOrder, wallet: WalletEntity, response: SequencerResponse) {
         val createAssignment =
             CreateOrderAssignment(
-                backToBackOrder.order.externalGuid.orderId(),
-                backToBackOrder.order.nonce.toBigInteger(),
-                OrderType.BackToBackMarket,
-                toOrderSide(backToBackOrder.order.type),
-                backToBackOrder.order.amount.toBigInteger(),
-                backToBackOrder.order.levelIx,
-                backToBackOrder.order.signature.toEvmSignature(),
-                backToBackOrder.order.guid.sequencerOrderId(),
-                response.processingTime.toBigInteger(),
+                orderId = backToBackOrder.order.externalGuid.orderId(),
+                clientOrderId = backToBackOrder.order.clientOrderGuid?.takeIf { it.isNotEmpty() }?.clientOrderId(),
+                nonce = backToBackOrder.order.nonce.toBigInteger(),
+                type = OrderType.BackToBackMarket,
+                side = toOrderSide(backToBackOrder.order.type),
+                amount = backToBackOrder.order.amount.toBigInteger(),
+                levelIx = backToBackOrder.order.levelIx,
+                signature = backToBackOrder.order.signature.toEvmSignature(),
+                sequencerOrderId = backToBackOrder.order.guid.sequencerOrderId(),
+                sequencerTimeNs = response.processingTime.toBigInteger(),
             )
 
         val market = getMarket(MarketId(backToBackOrder.marketIdsList[0]))

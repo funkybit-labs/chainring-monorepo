@@ -4,6 +4,7 @@ import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.Percentage
 import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.ClientOrderId
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
@@ -65,6 +66,7 @@ sealed class CreateOrderApiRequest {
     abstract val amount: OrderAmount
     abstract val signature: EvmSignature
     abstract val verifyingChainId: ChainId
+    abstract val clientOrderId: ClientOrderId?
 
     @Serializable
     @SerialName("market")
@@ -75,6 +77,7 @@ sealed class CreateOrderApiRequest {
         override val amount: OrderAmount,
         override val signature: EvmSignature,
         override val verifyingChainId: ChainId,
+        override val clientOrderId: ClientOrderId? = null,
     ) : CreateOrderApiRequest()
 
     @Serializable
@@ -87,6 +90,7 @@ sealed class CreateOrderApiRequest {
         override val amount: OrderAmount,
         override val signature: EvmSignature,
         override val verifyingChainId: ChainId,
+        override val clientOrderId: ClientOrderId? = null,
     ) : CreateOrderApiRequest()
 
     @Serializable
@@ -99,12 +103,14 @@ sealed class CreateOrderApiRequest {
         val price: BigDecimalJson,
         override val signature: EvmSignature,
         override val verifyingChainId: ChainId,
+        override val clientOrderId: ClientOrderId? = null,
     ) : CreateOrderApiRequest()
 }
 
 @Serializable
 data class CreateOrderApiResponse(
     val orderId: OrderId,
+    val clientOrderId: ClientOrderId?,
     val requestStatus: RequestStatus,
     val error: ApiError?,
     val order: CreateOrderApiRequest,
@@ -139,6 +145,7 @@ data class CancelOrderApiResponse(
 @JsonClassDiscriminator("type")
 sealed class Order {
     abstract val id: OrderId
+    abstract val clientOrderId: ClientOrderId?
     abstract val status: OrderStatus
     abstract val marketId: MarketId
     abstract val side: OrderSide
@@ -151,6 +158,7 @@ sealed class Order {
     @SerialName("market")
     data class Market(
         override val id: OrderId,
+        override val clientOrderId: ClientOrderId?,
         override val status: OrderStatus,
         override val marketId: MarketId,
         override val side: OrderSide,
@@ -164,6 +172,7 @@ sealed class Order {
     @SerialName("backToBackMarket")
     data class BackToBackMarket(
         override val id: OrderId,
+        override val clientOrderId: ClientOrderId?,
         override val status: OrderStatus,
         override val marketId: MarketId,
         val secondMarketId: MarketId,
@@ -178,6 +187,7 @@ sealed class Order {
     @SerialName("limit")
     data class Limit(
         override val id: OrderId,
+        override val clientOrderId: ClientOrderId?,
         override val status: OrderStatus,
         override val marketId: MarketId,
         override val side: OrderSide,

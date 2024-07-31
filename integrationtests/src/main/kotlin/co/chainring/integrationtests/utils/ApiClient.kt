@@ -34,6 +34,7 @@ import co.chainring.core.evm.EIP712Helper
 import co.chainring.core.model.Address
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.ClientOrderId
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketId
@@ -207,6 +208,16 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
             TraceRecorder.Op.GetOrder,
             Request.Builder()
                 .url("$apiServerRootUrl/v1/orders/$id")
+                .get()
+                .build()
+                .withAuthHeaders(ecKeyPair),
+        ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
+
+    fun tryGetOrder(id: ClientOrderId): Either<ApiCallFailure, Order> =
+        executeAndTrace(
+            TraceRecorder.Op.GetOrder,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/orders/external:$id")
                 .get()
                 .build()
                 .withAuthHeaders(ecKeyPair),
@@ -471,6 +482,9 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
         tryCancelOrder(apiRequest).throwOrReturn()
 
     open fun getOrder(id: OrderId): Order =
+        tryGetOrder(id).throwOrReturn()
+
+    open fun getOrder(id: ClientOrderId): Order =
         tryGetOrder(id).throwOrReturn()
 
     open fun listOrders(statuses: List<OrderStatus> = emptyList(), marketId: MarketId? = null): OrdersApiResponse =

@@ -18,6 +18,7 @@ import co.chainring.apps.api.model.orderNotFoundError
 import co.chainring.apps.api.model.processingError
 import co.chainring.apps.api.model.unexpectedError
 import co.chainring.apps.api.services.ExchangeApiService
+import co.chainring.core.model.db.ClientOrderId
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
@@ -46,6 +47,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
     private val logger = KotlinLogging.logger {}
 
     private val orderIdPathParam = Path.map(::OrderId, OrderId::value).of("orderId", "Order Id")
+    private val orderIdOrClientOrderIdPathParam = Path.of("orderIdOrClientOrderId", "Order Id or Client Order Id")
 
     fun createOrder(): ContractRoute {
         val requestBody = Body.auto<CreateOrderApiRequest>().toLens()
@@ -116,7 +118,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
     fun getOrder(): ContractRoute {
         val responseBody = Body.auto<Order>().toLens()
 
-        return "orders" / orderIdPathParam meta {
+        return "orders" / orderIdOrClientOrderIdPathParam meta {
             operationId = "get-order"
             summary = "Get order"
             security = signedTokenSecurity
@@ -129,10 +131,17 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
                 Status.OK,
                 responseBody to Examples.limitOrderResponse,
             )
-        } bindContract Method.GET to { orderId ->
+        } bindContract Method.GET to { orderIdOrClientOrderId ->
             { _: Request ->
                 transaction {
-                    when (val order = OrderEntity.findById(orderId)) {
+                    val order = if (orderIdOrClientOrderId.startsWith("external:")) {
+                        val clientOrderId = ClientOrderId(orderIdOrClientOrderId.removePrefix("external:"))
+                        OrderEntity.findByClientOrderId(clientOrderId)
+                    } else {
+                        OrderEntity.findById(OrderId(orderIdOrClientOrderId))
+                    }
+
+                    when (order) {
                         null -> orderNotFoundError
                         else -> Response(Status.OK).with(
                             responseBody of order.toOrderResponse(OrderExecutionEntity.findForOrder(order)),

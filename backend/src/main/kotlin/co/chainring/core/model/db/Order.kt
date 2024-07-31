@@ -38,6 +38,12 @@ import java.math.RoundingMode
 
 @Serializable
 @JvmInline
+value class ClientOrderId(val value: String) {
+    override fun toString(): String = value
+}
+
+@Serializable
+@JvmInline
 value class OrderId(override val value: String) : EntityId {
     companion object {
         fun generate(): OrderId = OrderId(TypeId.generate("order").toString())
@@ -97,6 +103,7 @@ enum class OrderStatus {
 
 data class CreateOrderAssignment(
     val orderId: OrderId,
+    val clientOrderId: ClientOrderId?,
     val nonce: BigInteger,
     val type: OrderType,
     val side: OrderSide,
@@ -141,6 +148,7 @@ object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
     val closedBy = varchar("closed_by", 10485760).nullable()
     val signature = varchar("signature", 10485760)
     val sequencerOrderId = long("sequencer_order_id").uniqueIndex().nullable()
+    val clientOrderId = varchar("client_order_id", 10485760).uniqueIndex().nullable()
     val sequencerTimeNs = decimal("sequencer_time_ns", 30, 0)
     val secondMarketGuid = reference("second_market_guid", MarketTable).nullable()
 
@@ -157,6 +165,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         return when (type) {
             OrderType.Market -> Order.Market(
                 id = this.id.value,
+                clientOrderId = this.clientOrderId,
                 status = this.status,
                 marketId = this.marketGuid.value,
                 side = this.side,
@@ -184,6 +193,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
 
             OrderType.BackToBackMarket -> Order.BackToBackMarket(
                 id = this.id.value,
+                clientOrderId = this.clientOrderId,
                 status = this.status,
                 marketId = this.marketGuid.value,
                 secondMarketId = this.secondMarketGuid!!.value,
@@ -212,6 +222,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
 
             OrderType.Limit -> Order.Limit(
                 id = this.id.value,
+                clientOrderId = this.clientOrderId,
                 status = this.status,
                 marketId = this.marketGuid.value,
                 side = this.side,
@@ -263,12 +274,19 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 this[OrderTable.sequencerOrderId] = assignment.sequencerOrderId.value
                 this[OrderTable.sequencerTimeNs] = assignment.sequencerTimeNs.toBigDecimal()
                 this[OrderTable.secondMarketGuid] = backToBackMarket?.guid
+                this[OrderTable.clientOrderId] = assignment.clientOrderId?.value
             }
         }
 
         fun findBySequencerOrderId(sequencerOrderId: Long): OrderEntity? {
             return OrderEntity.find {
                 OrderTable.sequencerOrderId.eq(sequencerOrderId)
+            }.firstOrNull()
+        }
+
+        fun findByClientOrderId(clientOrderId: ClientOrderId): OrderEntity? {
+            return OrderEntity.find {
+                OrderTable.clientOrderId.eq(clientOrderId.value)
             }.firstOrNull()
         }
 
@@ -480,6 +498,10 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
     var signature by OrderTable.signature
     var sequencerOrderId by OrderTable.sequencerOrderId.transform(
         toReal = { it?.let { SequencerOrderId(it) } },
+        toColumn = { it?.value },
+    )
+    var clientOrderId by OrderTable.clientOrderId.transform(
+        toReal = { it?.let { ClientOrderId(it) } },
         toColumn = { it?.value },
     )
     var sequencerTimeNs by OrderTable.sequencerTimeNs.transform(

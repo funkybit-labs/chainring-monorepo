@@ -54,6 +54,7 @@ object Examples {
 
     val createMarketOrderResponse = CreateOrderApiResponse(
         orderId = OrderId.generate(),
+        clientOrderId = null,
         requestStatus = RequestStatus.Accepted,
         error = null,
         order = createMarketOrderRequest,
@@ -61,6 +62,7 @@ object Examples {
 
     val createLimitOrderResponse = CreateOrderApiResponse(
         orderId = OrderId.generate(),
+        clientOrderId = null,
         requestStatus = RequestStatus.Accepted,
         error = null,
         order = createLimitOrderRequest,
@@ -84,6 +86,7 @@ object Examples {
 
     val marketOrderResponse = Order.Market(
         id = OrderId.generate(),
+        clientOrderId = null,
         status = OrderStatus.Partial,
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
@@ -111,6 +114,7 @@ object Examples {
 
     val limitOrderResponse = Order.Limit(
         id = OrderId.generate(),
+        clientOrderId = null,
         status = OrderStatus.Open,
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,

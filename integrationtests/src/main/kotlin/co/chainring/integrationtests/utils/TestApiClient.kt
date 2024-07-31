@@ -31,6 +31,7 @@ import co.chainring.core.model.MarketMinFee
 import co.chainring.core.model.Percentage
 import co.chainring.core.model.WithdrawalFee
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.ClientOrderId
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketId
@@ -191,7 +192,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
     override fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
         tryCreateOrder(apiRequest).assertSuccess()
 
-    fun createLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: Wallet, linkedSignerEcKeyPair: ECKeyPair? = null): CreateOrderApiResponse {
+    fun createLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: Wallet, clientOrderId: ClientOrderId? = null, linkedSignerEcKeyPair: ECKeyPair? = null): CreateOrderApiResponse {
         val request = CreateOrderApiRequest.Limit(
             nonce = generateOrderNonce(),
             marketId = market.id,
@@ -200,6 +201,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             price = price,
             signature = EvmSignature.emptySignature(),
             verifyingChainId = ChainId.empty,
+            clientOrderId = clientOrderId,
         ).let { wallet.signOrder(it, linkedSignerEcKeyPair = linkedSignerEcKeyPair) }
 
         val response = createOrder(request)
@@ -210,7 +212,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
         return response
     }
 
-    fun tryCreateLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: Wallet, linkedSignerEcKeyPair: ECKeyPair? = null): Either<ApiCallFailure, CreateOrderApiResponse> {
+    fun tryCreateLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: Wallet, clientOrderId: ClientOrderId? = null, linkedSignerEcKeyPair: ECKeyPair? = null): Either<ApiCallFailure, CreateOrderApiResponse> {
         val request = CreateOrderApiRequest.Limit(
             nonce = generateOrderNonce(),
             marketId = market.id,
@@ -219,12 +221,13 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             price = price,
             signature = EvmSignature.emptySignature(),
             verifyingChainId = ChainId.empty,
+            clientOrderId = clientOrderId,
         ).let { wallet.signOrder(it, linkedSignerEcKeyPair = linkedSignerEcKeyPair) }
 
         return tryCreateOrder(request)
     }
 
-    fun createMarketOrder(market: Market, side: OrderSide, amount: BigDecimal?, wallet: Wallet, percentage: Percentage? = null): CreateOrderApiResponse {
+    fun createMarketOrder(market: Market, side: OrderSide, amount: BigDecimal?, wallet: Wallet, clientOrderId: ClientOrderId? = null, percentage: Percentage? = null): CreateOrderApiResponse {
         val request = CreateOrderApiRequest.Market(
             nonce = generateOrderNonce(),
             marketId = market.id,
@@ -232,6 +235,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             amount = amount?.let { OrderAmount.Fixed(it.toFundamentalUnits(market.baseDecimals)) } ?: OrderAmount.Percent(percentage!!),
             signature = EvmSignature.emptySignature(),
             verifyingChainId = ChainId.empty,
+            clientOrderId = clientOrderId,
         ).let { wallet.signOrder(it) }
 
         val response = createOrder(request)
@@ -242,7 +246,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
         return response
     }
 
-    fun createBackToBackMarketOrder(markets: List<Market>, side: OrderSide, amount: BigDecimal?, wallet: Wallet, percentage: Percentage? = null): CreateOrderApiResponse {
+    fun createBackToBackMarketOrder(markets: List<Market>, side: OrderSide, amount: BigDecimal?, wallet: Wallet, clientOrderId: ClientOrderId? = null, percentage: Percentage? = null): CreateOrderApiResponse {
         val request = CreateOrderApiRequest.BackToBackMarket(
             nonce = generateOrderNonce(),
             marketId = markets[0].id,
@@ -251,6 +255,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             amount = amount?.let { OrderAmount.Fixed(it.toFundamentalUnits(markets[0].baseDecimals)) } ?: OrderAmount.Percent(percentage!!),
             signature = EvmSignature.emptySignature(),
             verifyingChainId = ChainId.empty,
+            clientOrderId = clientOrderId,
         ).let { wallet.signOrder(it) }
 
         val response = createOrder(request)
@@ -278,6 +283,9 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
         )
 
     override fun getOrder(id: OrderId): Order =
+        tryGetOrder(id).assertSuccess()
+
+    override fun getOrder(id: ClientOrderId): Order =
         tryGetOrder(id).assertSuccess()
 
     override fun listOrders(statuses: List<OrderStatus>, marketId: MarketId?): OrdersApiResponse =
