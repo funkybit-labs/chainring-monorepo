@@ -78,7 +78,7 @@ export function TabButton({
       className={classNames(
         'flex gap-2 items-center p-4 cursor-pointer rounded-xl text-xs',
         active
-          ? 'text-primary4 bg-brightOrange bg-opacity-10'
+          ? 'text-brightOrange bg-brightOrange bg-opacity-10'
           : 'border-transparent'
       )}
       onClick={onClick}

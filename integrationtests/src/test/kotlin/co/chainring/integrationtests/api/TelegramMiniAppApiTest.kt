@@ -416,13 +416,13 @@ class TelegramMiniAppApiTest {
             .getUser()
             .also {
                 assertEquals("12120".crPoints(), it.balance)
-                assertEquals(14, it.invites)
+                assertEquals(22, it.invites)
 
                 assertEquals("36000".crPoints(), it.nextMilestoneAt)
 
                 val lastMilestone = it.lastMilestone
                 assertNotNull(lastMilestone)
-                assertEquals(3, lastMilestone.invites)
+                assertEquals(11, lastMilestone.invites)
                 assertTrue { lastMilestone.grantedAt > now }
             }
 

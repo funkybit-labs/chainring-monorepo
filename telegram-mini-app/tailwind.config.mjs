@@ -29,18 +29,6 @@ export default {
       }
     },
     colors: {
-      darkBluishGray10: "#1F2A39",
-      darkBluishGray9: "#253447",
-      darkBluishGray8: "#2A3F59",
-      darkBluishGray7: "#314965",
-      darkBluishGray6: "#34557C",
-      darkBluishGray5: "#406087",
-      darkBluishGray4: "#54749A",
-      darkBluishGray3: "#6382A8",
-      darkBluishGray2: "#7F9CBF",
-      darkBluishGray1: "#95B2D4",
-      lightBluishGray2: "#EBEEF4",
-      lightBluishGray5: "#CDD1D7",
       primary4: "#FFA337",
       primary5: "#FF8A00",
       blue5: "#426d9e",

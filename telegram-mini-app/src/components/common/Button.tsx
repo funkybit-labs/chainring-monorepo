@@ -13,7 +13,7 @@ export function Button({ caption, disabled, onClick, className }: Props) {
       className={classNames(
         'overflow-ellipsis overflow-hidden border-transparent rounded-[50px]',
         'transition-colors duration-300 ease-in-out text-white',
-        'bg-primary5 text-white',
+        'bg-brightOrange text-white',
         'px-4',
         disabled && 'opacity-50',
         className

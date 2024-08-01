@@ -70,10 +70,10 @@ export default function EntryPoint() {
   } else if (userQuery.isSuccess) {
     if (userQuery.data === null) {
       return (
-        <div className="flex h-screen flex-col justify-center gap-12 bg-darkBluishGray10">
+        <div className="flex h-screen flex-col justify-center gap-12 bg-mediumBlue">
           {showInviteError && (
             <div className="fixed inset-0 flex flex-col items-center justify-center bg-black/75 p-6">
-              <div className="w-full max-w-lg rounded-lg bg-darkBluishGray10 p-6 shadow-lg">
+              <div className="w-full max-w-lg rounded-lg bg-mediumBlue p-6 shadow-lg">
                 <div className="mb-4 flex flex-col text-lg font-semibold text-white">
                   <div className="mb-1">Invalid invite code.</div>
                   <div>
@@ -102,7 +102,7 @@ export default function EntryPoint() {
             </div>
           </div>
           <div className="mb-6 flex flex-col px-8">
-            <div className="mb-4 text-center text-darkBluishGray2">
+            <div className="mb-4 text-center text-white">
               Join our community and earn CR Points!
             </div>
             <Button
@@ -135,7 +135,7 @@ export default function EntryPoint() {
     }
   } else if (userQuery.isError) {
     return (
-      <div className="flex h-screen items-center justify-center bg-darkBluishGray8 text-white">
+      <div className="flex h-screen items-center justify-center bg-mediumBlue text-white">
         Something went wrong, please try again later
       </div>
     )

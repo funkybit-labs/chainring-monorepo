@@ -126,13 +126,7 @@ export function ReactionGame({
     }
   }
   const percentilesMessage = (percentile: number) => {
-    if (percentile >= 75) {
-      return `You are faster than ${percentile}% of ChainRin users!`
-    } else if (percentile >= 25) {
-      return `You are faster than ${percentile}% of ChainRing users!`
-    } else {
-      return `You are faster than ${percentile}% of ChainRing users! `
-    }
+    return `You are faster than ${percentile}% of ChainRing users!`
   }
 
   useEffect(() => {
