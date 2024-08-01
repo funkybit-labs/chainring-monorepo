@@ -151,3 +151,18 @@ resource "aws_route53_record" "fb-xyz-mx" {
 }
 
 
+resource "aws_route53_record" "fb-it-a" {
+  zone_id = aws_route53_zone.fb-it.zone_id
+  name    = "funkybit.it"
+  type    = "A"
+  ttl     = "300"
+  records = ["${data.dns_a_record_set.chainring-apex.addrs.0}"]
+}
+
+resource "aws_route53_record" "fb-it-mx" {
+  zone_id = aws_route53_zone.fb-it.zone_id
+  name    = ""
+  type    = "MX"
+  ttl     = "3600"
+  records = ["1 smtp.google.com"]
+}

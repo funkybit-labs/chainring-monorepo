@@ -121,6 +121,10 @@ resource "aws_route53_zone" "fb-xyz" {
   name = "funkybit.xyz"
 }
 
+resource "aws_route53_zone" "fb-it" {
+  name = "funkybit.it"
+}
+
 resource "aws_key_pair" "baregate" {
   key_name   = "baregate-key"
   public_key = var.baregate_key
