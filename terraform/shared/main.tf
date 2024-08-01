@@ -122,7 +122,7 @@ resource "aws_route53_zone" "fb-xyz" {
 }
 
 resource "aws_route53_zone" "fb-it" {
-  name = "funkybit.it"
+  name = "funkyb.it"
 }
 
 resource "aws_key_pair" "baregate" {
