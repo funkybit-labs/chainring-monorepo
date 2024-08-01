@@ -101,3 +101,68 @@ resource "aws_route53_record" "apex-labs" {
   ttl     = "300"
   records = ["${data.dns_a_record_set.chainring-apex.addrs.0}"]
 }
+
+resource "aws_route53_record" "fb-fun-a" {
+  zone_id = aws_route53_zone.fb-fun.zone_id
+  name    = "funkybit.fun"
+  type    = "A"
+  ttl     = "300"
+  records = ["${data.dns_a_record_set.chainring-apex.addrs.0}"]
+}
+
+resource "aws_route53_record" "fb-fun-mx" {
+  zone_id = aws_route53_zone.fb-fun.zone_id
+  name    = ""
+  type    = "MX"
+  ttl     = "3600"
+  records = ["1 smtp.google.com"]
+}
+
+resource "aws_route53_record" "fb-co-a" {
+  zone_id = aws_route53_zone.fb-co.zone_id
+  name    = "funkybit.co"
+  type    = "A"
+  ttl     = "300"
+  records = ["${data.dns_a_record_set.chainring-apex.addrs.0}"]
+}
+
+resource "aws_route53_record" "fb-co-mx" {
+  zone_id = aws_route53_zone.fb-co.zone_id
+  name    = ""
+  type    = "MX"
+  ttl     = "3600"
+  records = ["1 smtp.google.com"]
+}
+
+resource "aws_route53_record" "fb-xyz-a" {
+  zone_id = aws_route53_zone.fb-xyz.zone_id
+  name    = "funkybit.xyz"
+  type    = "A"
+  ttl     = "300"
+  records = ["${data.dns_a_record_set.chainring-apex.addrs.0}"]
+}
+
+resource "aws_route53_record" "fb-xyz-mx" {
+  zone_id = aws_route53_zone.fb-xyz.zone_id
+  name    = ""
+  type    = "MX"
+  ttl     = "3600"
+  records = ["1 smtp.google.com"]
+}
+
+
+resource "aws_route53_record" "fb-it-a" {
+  zone_id = aws_route53_zone.fb-it.zone_id
+  name    = "funkyb.it"
+  type    = "A"
+  ttl     = "300"
+  records = ["${data.dns_a_record_set.chainring-apex.addrs.0}"]
+}
+
+resource "aws_route53_record" "fb-it-mx" {
+  zone_id = aws_route53_zone.fb-it.zone_id
+  name    = ""
+  type    = "MX"
+  ttl     = "3600"
+  records = ["1 smtp.google.com"]
+}

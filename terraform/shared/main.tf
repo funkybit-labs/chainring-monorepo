@@ -109,6 +109,22 @@ resource "aws_route53_zone" "zone-labs" {
   name = "chainringlabs.com"
 }
 
+resource "aws_route53_zone" "fb-fun" {
+  name = "funkybit.fun"
+}
+
+resource "aws_route53_zone" "fb-co" {
+  name = "funkybit.co"
+}
+
+resource "aws_route53_zone" "fb-xyz" {
+  name = "funkybit.xyz"
+}
+
+resource "aws_route53_zone" "fb-it" {
+  name = "funkyb.it"
+}
+
 resource "aws_key_pair" "baregate" {
   key_name   = "baregate-key"
   public_key = var.baregate_key
