@@ -9,6 +9,7 @@ import co.chainring.core.model.SequencerOrderId
 import co.chainring.core.model.SequencerWalletId
 import co.chainring.core.model.WithdrawalFee
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.ClientOrderId
 import co.chainring.core.model.db.DepositId
 import co.chainring.core.model.db.FeeRates
 import co.chainring.core.model.db.MarketId
@@ -55,6 +56,10 @@ fun String.orderId(): OrderId {
     return OrderId(this)
 }
 
+fun String.clientOrderId(): ClientOrderId {
+    return ClientOrderId(this)
+}
+
 fun String.withdrawalId(): WithdrawalId {
     return WithdrawalId(this)
 }
@@ -86,6 +91,7 @@ open class SequencerClient {
         val nonce: BigInteger?,
         val signature: EvmSignature?,
         val orderId: OrderId,
+        val clientOrderId: ClientOrderId?,
         val chainId: ChainId,
         val percentage: Int?,
     )
@@ -385,6 +391,7 @@ open class SequencerClient {
         this.externalGuid = order.orderId.value
         this.chainId = order.chainId.value.toInt()
         this.percentage = order.percentage ?: 0
+        this.clientOrderGuid = order.clientOrderId?.value ?: ""
     }
 
     private fun toCancelOrderDSL(orderId: OrderId) = cancelOrder {

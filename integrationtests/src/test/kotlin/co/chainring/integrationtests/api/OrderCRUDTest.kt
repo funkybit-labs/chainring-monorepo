@@ -9,6 +9,7 @@ import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.ReasonCode
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
+import co.chainring.core.model.db.ClientOrderId
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
@@ -160,6 +161,68 @@ class OrderCRUDTest : OrderBaseTest() {
 
         val cancelledOrder = apiClient.getOrder(createLimitOrderResponse.orderId)
         assertEquals(OrderStatus.Cancelled, cancelledOrder.status)
+
+        wsClient.close()
+    }
+
+    @Test
+    fun `CRUD order with clientOrderId`() {
+        val apiClient = TestApiClient()
+        val wallet = Wallet(apiClient)
+
+        var wsClient = WebsocketClient.blocking(apiClient.authToken)
+        wsClient.subscribeToMyOrders()
+        val initialOrdersOverWs = wsClient.assertMyOrdersMessageReceived().orders
+
+        wsClient.subscribeToBalances()
+        wsClient.assertBalancesMessageReceived()
+
+        wsClient.subscribeToLimits()
+        wsClient.assertLimitsMessageReceived()
+
+        Faucet.fundAndMine(wallet.address)
+
+        val daiAmountToDeposit = AssetAmount(dai, "14")
+        wallet.mintERC20AndMine(daiAmountToDeposit)
+        wallet.depositAndMine(daiAmountToDeposit)
+        waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(daiAmountToDeposit)))
+
+        wsClient.assertLimitsMessageReceived()
+
+        val expectedClientOrderId = ClientOrderId("client-order-id-123")
+
+        val createLimitOrderResponse = apiClient.createLimitOrder(
+            clientOrderId = expectedClientOrderId,
+            market = usdcDaiMarket,
+            side = OrderSide.Buy,
+            amount = BigDecimal("1"),
+            price = BigDecimal("2"),
+            wallet = wallet,
+        )
+        assertEquals(expectedClientOrderId, createLimitOrderResponse.clientOrderId)
+
+        // client is notified over websocket
+        wsClient.assertMyLimitOrderCreatedMessageReceived(createLimitOrderResponse)
+        wsClient.assertLimitsMessageReceived()
+        wsClient.close()
+
+        // check that order is included in the orders list sent via websocket
+        wsClient = WebsocketClient.blocking(apiClient.authToken)
+        wsClient.subscribeToMyOrders()
+        assertEquals(
+            listOf(createLimitOrderResponse.clientOrderId) + initialOrdersOverWs.map { it.clientOrderId },
+            wsClient.assertMyOrdersMessageReceived().orders.map { it.clientOrderId },
+        )
+
+        wsClient.subscribeToLimits()
+        wsClient.assertLimitsMessageReceived()
+
+        // verify that order can be fetched by any of IDs
+        val orderByClientOderId = apiClient.getOrder(expectedClientOrderId)
+        assertEquals(OrderStatus.Open, orderByClientOderId.status)
+
+        val orderById = apiClient.getOrder(createLimitOrderResponse.orderId)
+        assertEquals(orderByClientOderId, orderById)
 
         wsClient.close()
     }

@@ -118,6 +118,7 @@ class ExchangeApiService(
                     signature = orderRequest.signature,
                     orderId = orderId,
                     chainId = orderRequest.verifyingChainId,
+                    clientOrderId = orderRequest.clientOrderId,
                     percentage = orderRequest.amount.percentage(),
                 ),
             )
@@ -129,7 +130,7 @@ class ExchangeApiService(
             else -> throw RequestProcessingError("Unable to process request - ${response.error}")
         }
 
-        return CreateOrderApiResponse(orderId, RequestStatus.Accepted, null, orderRequest)
+        return CreateOrderApiResponse(orderId, clientOrderId = null, RequestStatus.Accepted, error = null, orderRequest)
     }
 
     fun orderBatch(
@@ -191,6 +192,7 @@ class ExchangeApiService(
                 signature = orderRequest.signature,
                 orderId = orderId,
                 chainId = orderRequest.verifyingChainId,
+                clientOrderId = orderRequest.clientOrderId,
                 percentage = percentage,
             )
         }
@@ -229,6 +231,7 @@ class ExchangeApiService(
             createOrderRequestsByOrderId.map { (orderId, request) ->
                 CreateOrderApiResponse(
                     orderId = orderId,
+                    clientOrderId = request.clientOrderId,
                     requestStatus = RequestStatus.Accepted,
                     error = null,
                     order = request,

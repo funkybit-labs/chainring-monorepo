@@ -64,6 +64,7 @@ import co.chainring.core.model.db.migrations.V65_WalletLinkedSigner
 import co.chainring.core.model.db.migrations.V66_AddCounterOrderIdToOrderExecution
 import co.chainring.core.model.db.migrations.V67_AddLimitTable
 import co.chainring.core.model.db.migrations.V68_RemoveMinMaxOfferPriceFromMarket
+import co.chainring.core.model.db.migrations.V69_ClientOrderId
 import co.chainring.core.model.db.migrations.V6_MarketTable
 import co.chainring.core.model.db.migrations.V7_OrderTable
 import co.chainring.core.model.db.migrations.V8_ExecutionsAndTrades
@@ -138,4 +139,5 @@ val migrations = listOf(
     V66_AddCounterOrderIdToOrderExecution(),
     V67_AddLimitTable(),
     V68_RemoveMinMaxOfferPriceFromMarket(),
+    V69_ClientOrderId(),
 )
