@@ -2,7 +2,7 @@ import Decimal from 'decimal.js'
 import React, { Fragment, useEffect, useRef, useState } from 'react'
 import { ApiErrorsSchema } from 'apiClient'
 import { BrowserView, isBrowser, MobileView } from 'react-device-detect'
-import BombPng from 'assets/bomb.png'
+import StopwatchSvg from 'assets/stopwatch.svg'
 import FlagPng from 'assets/flag.png'
 import { Button } from 'components/common/Button'
 import { classNames } from 'utils'
@@ -280,7 +280,7 @@ export function ReactionGame({
             gameState === 'early' ||
             gameState === 'late') && (
             <div className={'flex flex-row align-middle'}>
-              <img src={BombPng} className="size-16" />
+              <img src={StopwatchSvg} className="size-16" />
               <div className={'ml-4 text-left font-sans text-xl'}>
                 <BrowserView>
                   Press the spacebar when the ring turns{' '}

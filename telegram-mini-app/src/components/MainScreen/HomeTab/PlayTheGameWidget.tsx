@@ -1,5 +1,5 @@
 import React from 'react'
-import CoinPng from 'assets/coin.png'
+import CoinSvg from 'assets/coin.svg'
 
 export function PlayTheGameWidget({
   onEnterGame
@@ -10,7 +10,7 @@ export function PlayTheGameWidget({
     <div onClick={onEnterGame} className="mx-6">
       <div className="mx-auto mt-2 flex flex-col items-stretch rounded-3xl bg-darkBlue px-6 py-4">
         <div className="flex flex-row">
-          <img src={CoinPng} className="inline h-16 w-auto" alt="icon" />
+          <img src={CoinSvg} className="inline h-16 w-auto" alt="icon" />
           <div className="text-2xl text-white">
             Are you faster than
             <br />

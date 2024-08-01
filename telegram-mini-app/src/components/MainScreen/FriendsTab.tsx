@@ -1,6 +1,6 @@
 import GiftPng from 'assets/gift.png'
-import CoinPng from 'assets/coin.png'
-import FriendsPng from 'assets/friends.png'
+import CoinSvg from 'assets/coin.svg'
+import FriendsSvg from 'assets/friends.svg'
 import { Button } from 'components/common/Button'
 import { User } from 'apiClient'
 import React, { useMemo } from 'react'
@@ -36,7 +36,7 @@ export default function FriendsTab({ user }: { user: User }) {
           Friends
         </div>
         {hasReferralBalance && (
-          <InfoPanel icon={CoinPng} rounded={'top'}>
+          <InfoPanel icon={CoinSvg} rounded={'top'}>
             <HeadSub
               head={decimalAsInt(user.referralBalance)}
               sub="EARNED THROUGH INVITE"
@@ -57,7 +57,7 @@ export default function FriendsTab({ user }: { user: User }) {
         <div className="mx-auto mt-2 flex w-full justify-stretch rounded-t-3xl bg-darkBlue px-6 py-4">
           <div className="flex w-full items-center justify-start gap-4 font-medium text-white">
             <div className="flex w-full flex-col items-center gap-2">
-              <img src={FriendsPng} alt="Invite Friends" className="w-16" />
+              <img src={FriendsSvg} alt="Invite Friends" className="w-16" />
               <div className="text-center text-xl text-white">
                 Invite a friend &
                 <br />

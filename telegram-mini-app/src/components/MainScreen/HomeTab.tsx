@@ -1,5 +1,5 @@
-import CoinPng from 'assets/coin.png'
-import TicketPng from 'assets/ticket.png'
+import CoinSvg from 'assets/coin.svg'
+import TicketSvg from 'assets/ticket.svg'
 import GiftPng from 'assets/gift.png'
 import MilestonePng from 'assets/milestone.png'
 import { apiClient, User, userQueryKey } from 'apiClient'
@@ -105,12 +105,12 @@ export default function HomeTab({
           <div className="mt-2 text-left font-sans text-2xl font-semibold text-white">
             Your Balance
           </div>
-          <InfoPanel icon={CoinPng} rounded="top">
+          <InfoPanel icon={CoinSvg} rounded="top">
             <HeadSub head={decimalAsInt(balance)} sub={'CR POINTS'} />
           </InfoPanel>
           <div className="flex flex-row justify-stretch space-x-1">
             <InfoPanel
-              icon={TicketPng}
+              icon={TicketSvg}
               rounded={user.nextMilestoneAt ? 'none' : 'bottom'}
             >
               <HeadSub

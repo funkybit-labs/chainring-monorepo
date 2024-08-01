@@ -9,9 +9,9 @@ data class TelegramMiniAppMilestoneReward(val cp: BigDecimal, val invites: Long)
         val milestones = listOf(
             TelegramMiniAppMilestoneReward(cp = "1000".crPoints(), invites = 3),
             TelegramMiniAppMilestoneReward(cp = "2000".crPoints(), invites = 3),
-            TelegramMiniAppMilestoneReward(cp = "9000".crPoints(), invites = 3),
-            TelegramMiniAppMilestoneReward(cp = "36000".crPoints(), invites = 6),
-            TelegramMiniAppMilestoneReward(cp = "126000".crPoints(), invites = 10),
+            TelegramMiniAppMilestoneReward(cp = "9000".crPoints(), invites = 11),
+            TelegramMiniAppMilestoneReward(cp = "36000".crPoints(), invites = 15),
+            TelegramMiniAppMilestoneReward(cp = "126000".crPoints(), invites = 20),
             TelegramMiniAppMilestoneReward(cp = "378000".crPoints(), invites = -1),
         )
     }
