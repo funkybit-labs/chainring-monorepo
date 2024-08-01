@@ -9,7 +9,7 @@ test -d venv || python3 -m venv venv
 
 Prepare ssh conf (`.ssh/config`)
 ```
-Host demo-bastion.chainring.co
+Host demo-bastion.funkybit.fun
 User ec2-user
 IdentityFile ~/.ssh/chainring_bastion_id_rsa
 
@@ -27,7 +27,7 @@ python3 ecs-deploy.py stop --env demo --services mocker,api,telegrambot,ring,seq
 ## Truncate data
 Connect to sequencer's baregate instance and drop queues
 ```
-ssh -J demo-bastion.chainring.co demo-baregate
+ssh -J demo-bastion.funkybit.fun demo-baregate
 
 cd /data/queues/demo/
 sudo rm -rf *
@@ -36,7 +36,7 @@ exit
 
 Connect to `bastion` and bind database to local port using port forwarding
 ```
-ssh -L 5556:demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com:5432 demo-bastion.chainring.co
+ssh -L 5556:demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com:5432 demo-bastion.funkybit.fun
 ```
 
 and then truncate db tables using favourite SQL editor. In this way OHLC records will be preserved.
@@ -100,7 +100,7 @@ python3 ecs-deploy.py start --env demo --services sequencer,garp
 
 Bind sequencer and database to localhost via `bastion`
 ```
-ssh -L 5556:demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com:5432 -L 5338:demo-sequencer.chainring.co:5337 demo-bastion.chainring.co
+ssh -L 5556:demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com:5432 -L 5338:demo-sequencer.funkybit.fun:5337 demo-bastion.funkybit.fun
 ```
 
 Seed database, Anvil and Sequencer 
@@ -110,8 +110,8 @@ export DB_PORT="5556"
 export DB_PASSWORD="DEMO_DB_CLUSTER_PASSWORD"
 
 export EVM_CHAINS="Bitlayer,Botanix"
-export EVM_NETWORK_URL_Bitlayer="https://demo-anvil.chainring.co"
-export EVM_NETWORK_URL_Botanix="https://demo-anvil2.chainring.co"
+export EVM_NETWORK_URL_Bitlayer="https://demo-anvil.funkybit.fun"
+export EVM_NETWORK_URL_Botanix="https://demo-anvil2.funkybit.fun"
 
 export SEQUENCER_HOST_NAME="localhost"
 export SEQUENCER_PORT="5338"

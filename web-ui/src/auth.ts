@@ -33,7 +33,7 @@ async function signAuthToken(
 ): Promise<string> {
   try {
     const message = {
-      message: `[ChainRing Labs] Please sign this message to verify your ownership of this wallet address. This action will not cost any gas fees.`,
+      message: `[funkybit] Please sign this message to verify your ownership of this wallet address. This action will not cost any gas fees.`,
       address: address.toLowerCase(),
       chainId: chainId,
       timestamp: new Date().toISOString()
@@ -41,7 +41,7 @@ async function signAuthToken(
 
     const signature = await signTypedData(wagmiConfig, {
       domain: {
-        name: 'ChainRing Labs',
+        name: 'funkybit',
         chainId: chainId
       },
       types: {

@@ -5,7 +5,7 @@ locals {
 }
 
 resource "aws_s3_bucket" "app" {
-  bucket = "${var.name_prefix}-chainring-telegram-mini-app"
+  bucket = "${var.name_prefix}-funkybit-telegram-mini-app"
 }
 
 resource "aws_cloudfront_origin_access_control" "app" {

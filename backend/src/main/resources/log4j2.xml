@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration packages="co.chainring.core.utils" status="INFO">
+<Configuration packages="xyz.funkybit.core.utils" status="INFO">
     <Properties>
         <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1} TID:%tid, TN:"%tn" - %m%n</Property>
     </Properties>
@@ -13,7 +13,7 @@
         </Async>
     </Appenders>
     <Loggers>
-        <Logger name="co.chainring" level="debug" additivity="false">
+        <Logger name="xyz.funkybit" level="debug" additivity="false">
             <AppenderRef ref="AsyncAppender"/>
         </Logger>
         <Root level="error">

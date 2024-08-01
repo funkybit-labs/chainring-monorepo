@@ -2,10 +2,10 @@ environment:
   backend:
     DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     EVM_CHAINS: Bitlayer,Botanix
-    EVM_NETWORK_URL_Bitlayer: http://demo-anvil.chainring.co:8545
-    EVM_NETWORK_URL_Botanix: http://demo-anvil2.chainring.co:8545
+    EVM_NETWORK_URL_Bitlayer: http://demo-anvil.funkybit.fun:8545
+    EVM_NETWORK_URL_Botanix: http://demo-anvil2.funkybit.fun:8545
     AUTH_TOKEN_VALIDITY_INTERVAL: P30D
-    SEQUENCER_HOST_NAME: demo-sequencer.chainring.co
+    SEQUENCER_HOST_NAME: demo-sequencer.funkybit.fun
     SEQUENCER_PORT: "5337"
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
@@ -31,27 +31,27 @@ environment:
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
   telegrambot:
     DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
-    API_URL: http://demo-api.chainring.co:9000
+    API_URL: http://demo-api.funkybit.fun:9000
     EVM_CHAINS: Bitlayer,Botanix
-    EVM_NETWORK_URL_Bitlayer: http://demo-anvil.chainring.co:8545
-    EVM_NETWORK_URL_Botanix: http://demo-anvil2.chainring.co:8545
+    EVM_NETWORK_URL_Bitlayer: http://demo-anvil.funkybit.fun:8545
+    EVM_NETWORK_URL_Botanix: http://demo-anvil2.funkybit.fun:8545
     FAUCET_SUPPORTED: "true"
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
   anvil2:
     CHAIN_ID: "31339"
   otterscan:
-    ERIGON_URL: https://demo-anvil.chainring.co
-    NET_NAME: "ChainRing Demo BitLayer"
+    ERIGON_URL: https://demo-anvil.funkybit.fun
+    NET_NAME: "funkybit Demo BitLayer"
     NATIVE_CURRENCY_NAME: "Demo BitLayer BTC"
   otterscan2:
-    ERIGON_URL: https://demo-anvil2.chainring.co
-    NET_NAME: "ChainRing Demo Botanix"
+    ERIGON_URL: https://demo-anvil2.funkybit.fun
+    NET_NAME: "funkybit Demo Botanix"
     NATIVE_CURRENCY_NAME: "Demo Botanix BTC"
   mocker:
-    API_URL: http://demo-api.chainring.co:9000
+    API_URL: http://demo-api.funkybit.fun:9000
     EVM_CHAINS: Bitlayer,Botanix
-    EVM_NETWORK_URL_Bitlayer: http://demo-anvil.chainring.co:8545
-    EVM_NETWORK_URL_Botanix: http://demo-anvil2.chainring.co:8545
+    EVM_NETWORK_URL_Bitlayer: http://demo-anvil.funkybit.fun:8545
+    EVM_NETWORK_URL_Botanix: http://demo-anvil2.funkybit.fun:8545
     MARKETS: "BTC:31338/ETH:31338,BTC:31338/ETH:31339,BTC:31338/BTC:31339,BTC:31338/USDC:31338,USDC:31338/DAI:31338"
     BTC_31338_ETH_31338_PRICE_BASELINE: "17.5"
     BTC_31338_ETH_31338_INITIAL_BASE_BALANCE: "1"

@@ -31,6 +31,6 @@ exports.handler = async (event) => {
             'Access-Control-Allow-Headers': 'Content-Type',
             'Content-Type': 'application/json'
         },
-        body: '{"error":{"code":418,"message":"ChainRing is currently undergoing maintenance, we\'ll be back soon."}}'
+        body: '{"error":{"code":418,"message":"funkybit is currently undergoing maintenance, we\'ll be back soon."}}'
     };
 };

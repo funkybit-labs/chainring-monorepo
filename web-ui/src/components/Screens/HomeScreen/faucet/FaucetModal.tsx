@@ -76,7 +76,7 @@ export function FaucetModal({
       isOpen={isOpen}
       close={close}
       onClosed={() => {}}
-      title={"ChainRing's Testnet Faucet"}
+      title={"funkybit's Testnet Faucet"}
     >
       <div className="w-full overflow-y-auto text-sm text-white ">
         <div className="mb-4 flex flex-col gap-2">

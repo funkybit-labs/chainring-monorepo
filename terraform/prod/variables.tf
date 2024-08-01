@@ -19,7 +19,7 @@ terraform {
   required_version = "1.5.7"
 
   backend "s3" {
-    bucket = "chainring-terraform-state"
+    bucket = "funkybit-terraform-state"
     key    = "prod/main.tfstate"
     region = "us-east-2"
   }

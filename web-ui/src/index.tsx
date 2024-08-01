@@ -30,7 +30,7 @@ const Root = () => {
       {maintenance && (
         <div className="fixed z-[100] flex w-full flex-row place-items-center justify-center bg-red p-0 text-white opacity-80">
           <span className="animate-bounce">
-            ChainRing is currently undergoing maintenance, we&apos;ll be back
+            funkybit is currently undergoing maintenance, we&apos;ll be back
             soon.
           </span>
         </div>

@@ -2,10 +2,10 @@ environment:
   backend:
     DB_HOST: test-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     EVM_CHAINS: anvil,anvil2
-    EVM_NETWORK_URL_anvil: http://test-anvil.chainring.co:8545
-    EVM_NETWORK_URL_anvil2: http://test-anvil2.chainring.co:8545
+    EVM_NETWORK_URL_anvil: http://test-anvil.funkybit.fun:8545
+    EVM_NETWORK_URL_anvil2: http://test-anvil2.funkybit.fun:8545
     AUTH_TOKEN_VALIDITY_INTERVAL: P1D
-    SEQUENCER_HOST_NAME: test-sequencer.chainring.co
+    SEQUENCER_HOST_NAME: test-sequencer.funkybit.fun
     SEQUENCER_PORT: "5337"
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
     ENABLE_TEST_ROUTES: "true"
@@ -22,17 +22,17 @@ environment:
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
   telegrambot:
     DB_HOST: test-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
-    API_URL: http://test-api.chainring.co:9000
+    API_URL: http://test-api.funkybit.fun:9000
     EVM_CHAINS: anvil,anvil2
-    EVM_NETWORK_URL_anvil: http://test-anvil.chainring.co:8545
-    EVM_NETWORK_URL_anvil2: http://test-anvil2.chainring.co:8545
+    EVM_NETWORK_URL_anvil: http://test-anvil.funkybit.fun:8545
+    EVM_NETWORK_URL_anvil2: http://test-anvil2.funkybit.fun:8545
     FAUCET_SUPPORTED: "true"
   anvil2:
     CHAIN_ID: "31339"
   otterscan:
-    ERIGON_URL: https://test-anvil.chainring.co
+    ERIGON_URL: https://test-anvil.funkybit.fun
   otterscan2:
-    ERIGON_URL: https://test-anvil2.chainring.co
+    ERIGON_URL: https://test-anvil2.funkybit.fun
 services:
   api:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend

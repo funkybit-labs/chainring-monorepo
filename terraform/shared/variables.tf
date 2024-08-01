@@ -11,19 +11,19 @@ variable "cidr_prefix" {
 }
 
 variable "zone" {
-  default = "chainring.co"
+  default = "funkybit.fun"
 }
 
 variable "baregate_key" {
-  default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMQDAKaDVS7aPVdcl9JLZu7Int0uM8PU1f34aKo4GoM1 baregate-key@chainring"
+  default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMQDAKaDVS7aPVdcl9JLZu7Int0uM8PU1f34aKo4GoM1 baregate-key@funkybit"
 }
 
 variable "deployer_key" {
-  default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE7/1w7LSANgOrUQ1gSpwk+vJfc2vDAkOQHCFdHpg0uR deployer-key@chainring"
+  default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE7/1w7LSANgOrUQ1gSpwk+vJfc2vDAkOQHCFdHpg0uR deployer-key@funkybit"
 }
 
 variable "loadtest_key" {
-  default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP8nY8Ix9r2Rh2Lxj0Kk9gQ0TupmCR4e+Sgh86sEPjUO loadtest-key@chainring"
+  default = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP8nY8Ix9r2Rh2Lxj0Kk9gQ0TupmCR4e+Sgh86sEPjUO loadtest-key@funkybit"
 }
 
 
@@ -31,7 +31,7 @@ terraform {
   required_version = "1.5.7"
 
   backend "s3" {
-    bucket = "chainring-terraform-state"
+    bucket = "funkybit-terraform-state"
     key    = "shared/main.tfstate"
     region = "us-east-2"
   }

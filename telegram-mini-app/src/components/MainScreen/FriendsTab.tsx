@@ -17,7 +17,7 @@ export default function FriendsTab({ user }: { user: User }) {
 
   const handleInviteFriend = () => {
     const inviteLink = `https://t.me/${tgBotId}/${tgMiniAppId}?startapp=${user.inviteCode}`
-    const text = `Hey, join me on ChainRing!`
+    const text = `Hey, join me on funkybit!`
 
     const shareLike = `https://t.me/share/url?url=${inviteLink}&text=${text}`
 

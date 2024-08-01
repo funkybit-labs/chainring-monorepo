@@ -7,10 +7,10 @@ import { apiClient, ConfigurationApiResponseSchema } from 'apiClient'
 const walletConnectProjectId = '03908a0893516a0f391370f3a9349b8e'
 
 const walletConnectMetadata = {
-  name: 'ChainRing',
+  name: 'funkybit',
   description: 'The first cross-chain DEX built on Bitcoin',
   url: '', // origin must match your domain & subdomain
-  icons: ['https://avatars.githubusercontent.com/u/37784886']
+  icons: ['https://avatars.githubusercontent.com/u/37784886'] // TODO CHAIN-423 - update for funkybit
 }
 
 export let allChains: [Chain, ...Chain[]]

@@ -3,7 +3,7 @@ from gateway_pb2_grpc import GatewayStub
 from order_pb2 import Order
 from time import time
 
-channel = grpc.insecure_channel('test-sequencer.chainring.co:5337')
+channel = grpc.insecure_channel('test-sequencer.funkybit.fun:5337')
 stub = GatewayStub(channel)
 order = Order(guid = "guid", market = "market", orderType = Order.MarketBuy, address = "address", amount = "0x123", price = 43.2)
 

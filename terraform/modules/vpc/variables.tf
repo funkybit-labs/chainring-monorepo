@@ -7,6 +7,6 @@ variable "enable_dns_hostnames" {
   default = true
 }
 variable "zone" {
-  default = "chainring.co"
+  default = "funkybit.fun"
 }
 variable "name_prefix" {}

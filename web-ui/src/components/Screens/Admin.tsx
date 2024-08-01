@@ -137,7 +137,7 @@ export default function Admin({ onClose }: { onClose: () => void }) {
           style={'normal'}
           width={'normal'}
         />
-        <div className="text-lg">ChainRing Admin</div>
+        <div className="text-lg">funkybit admin</div>
         <div className="text-sm">{account.address}</div>
       </div>
     )

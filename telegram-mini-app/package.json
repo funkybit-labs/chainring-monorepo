@@ -1,6 +1,6 @@
 {
   "type": "module",
-  "name": "chainring-telegram-miniapp-ui",
+  "name": "funkybit-telegram-miniapp-ui",
   "version": "0.1.0",
   "private": true,
   "scripts": {

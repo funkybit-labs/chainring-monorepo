@@ -13,8 +13,8 @@ variable "user_keys" {
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM4OCE/lPa8hta76kcy6b5+qUtXsH9R5rbI6CfIjCWO6 bholzman@bhmbp16-2023",
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIECo8JAWZ7LP0U1xYRodpNbRO3zxkU6rU1BE6PD0A5Uh bflood@bfmbp16-2023",
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAyaGKbEqZSEdk1hFuCGWN7yhj5wfQQSAqkjHQDIiW5c aonyshchenko@aom1mbp.local",
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINlwrdUdiktRi8Lm7QAT1GfIVFb2nQ/FTOlDzhagxi4L imykolenko@chainring.co",
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF1s3MvVbgkp5p6VOmA2UCMeb2oR9c5FATM644ri9Ljy sburke@chainring.co",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINlwrdUdiktRi8Lm7QAT1GfIVFb2nQ/FTOlDzhagxi4L imykolenko@funkybit.fun",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF1s3MvVbgkp5p6VOmA2UCMeb2oR9c5FATM644ri9Ljy sburke@funkybit.fun",
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIq6h3epxqTxyD/KcAA4/w7p26NsQoLZ5FQeQumoiteT ci@chainring"
   ]
 }

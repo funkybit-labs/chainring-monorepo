@@ -4,7 +4,7 @@ plugins {
     application
 }
 
-group = "co.chainring"
+group = "xyz.funkybit"
 version = "1.0"
 
 repositories {
@@ -52,12 +52,12 @@ kotlin {
 }
 
 application {
-    mainClass = "co.chainring.mocker.MockerAppMainKt"
+    mainClass = "xyz.funkybit.mocker.MockerAppMainKt"
 }
 
 val buildNumber = System.getenv("BUILD_NUMBER") ?: "1"
 jib {
-    container.mainClass = "co.chainring.mocker.MockerAppMainKt"
+    container.mainClass = "xyz.funkybit.mocker.MockerAppMainKt"
 
     from {
         platforms {

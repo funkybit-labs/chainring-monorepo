@@ -3,7 +3,7 @@ locals {
 }
 
 resource "aws_s3_bucket" "access_logs" {
-  bucket = "${var.name_prefix}-chainring-alb-access-logs"
+  bucket = "${var.name_prefix}-funkybit-alb-access-logs"
 }
 
 # 033677994240 is the Elastic Load Balancing account ID for us-east-2, see https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html
