@@ -7,11 +7,8 @@ import co.chainring.apps.api.model.MarketLimits
 import co.chainring.apps.api.model.Order
 import co.chainring.apps.api.model.OrderAmount
 import co.chainring.apps.api.model.RequestStatus
-import co.chainring.apps.api.model.websocket.LastTrade
-import co.chainring.apps.api.model.websocket.LastTradeDirection
 import co.chainring.apps.api.model.websocket.OHLC
 import co.chainring.apps.api.model.websocket.OrderBook
-import co.chainring.apps.api.model.websocket.OrderBookEntry
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
 import co.chainring.core.model.db.ExecutionRole
@@ -122,10 +119,10 @@ class OrderExecutionTest : OrderBaseTest() {
                 OrderBook(
                     marketId = market.id,
                     buy = listOf(
-                        OrderBookEntry(price = "17.500", size = "0.00012345".toBigDecimal()),
+                        OrderBook.Entry(price = "17.500", size = "0.00012345".toBigDecimal()),
                     ),
                     sell = emptyList(),
-                    last = LastTrade("0.000", LastTradeDirection.Unchanged),
+                    last = OrderBook.LastTrade("0.000", OrderBook.LastTradeDirection.Unchanged),
                 ),
             )
         }
@@ -173,12 +170,12 @@ class OrderExecutionTest : OrderBaseTest() {
                 OrderBook(
                     marketId = market.id,
                     buy = listOf(
-                        OrderBookEntry(price = "17.500", size = "0.00012345".toBigDecimal()),
+                        OrderBook.Entry(price = "17.500", size = "0.00012345".toBigDecimal()),
                     ),
                     sell = listOf(
-                        OrderBookEntry(price = "17.550", size = "0.00054321".toBigDecimal()),
+                        OrderBook.Entry(price = "17.550", size = "0.00054321".toBigDecimal()),
                     ),
-                    last = LastTrade("0.000", LastTradeDirection.Unchanged),
+                    last = OrderBook.LastTrade("0.000", OrderBook.LastTradeDirection.Unchanged),
                 ),
             )
         }
@@ -278,12 +275,12 @@ class OrderExecutionTest : OrderBaseTest() {
                 OrderBook(
                     marketId = market.id,
                     buy = listOf(
-                        OrderBookEntry(price = "17.500", size = "0.00012345".toBigDecimal()),
+                        OrderBook.Entry(price = "17.500", size = "0.00012345".toBigDecimal()),
                     ),
                     sell = listOf(
-                        OrderBookEntry(price = "17.550", size = "0.00011111".toBigDecimal()),
+                        OrderBook.Entry(price = "17.550", size = "0.00011111".toBigDecimal()),
                     ),
-                    last = LastTrade("17.550", LastTradeDirection.Up),
+                    last = OrderBook.LastTrade("17.550", OrderBook.LastTradeDirection.Up),
                 ),
             )
         }
@@ -469,9 +466,9 @@ class OrderExecutionTest : OrderBaseTest() {
                     marketId = market.id,
                     buy = emptyList(),
                     sell = listOf(
-                        OrderBookEntry(price = "17.550", size = "0.00011111".toBigDecimal()),
+                        OrderBook.Entry(price = "17.550", size = "0.00011111".toBigDecimal()),
                     ),
-                    last = LastTrade("17.500", LastTradeDirection.Down),
+                    last = OrderBook.LastTrade("17.500", OrderBook.LastTradeDirection.Down),
                 ),
             )
         }
@@ -588,7 +585,7 @@ class OrderExecutionTest : OrderBaseTest() {
                     marketId = market.id,
                     buy = emptyList(),
                     sell = emptyList(),
-                    last = LastTrade("17.500", LastTradeDirection.Down),
+                    last = OrderBook.LastTrade("17.500", OrderBook.LastTradeDirection.Down),
                 ),
             )
         }
@@ -650,7 +647,7 @@ class OrderExecutionTest : OrderBaseTest() {
                     marketId = market.id,
                     buy = emptyList(),
                     sell = emptyList(),
-                    last = LastTrade("17.500", LastTradeDirection.Down),
+                    last = OrderBook.LastTrade("17.500", OrderBook.LastTradeDirection.Down),
                 ),
             )
 

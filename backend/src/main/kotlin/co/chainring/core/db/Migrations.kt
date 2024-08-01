@@ -66,6 +66,7 @@ import co.chainring.core.model.db.migrations.V67_AddLimitTable
 import co.chainring.core.model.db.migrations.V68_RemoveMinMaxOfferPriceFromMarket
 import co.chainring.core.model.db.migrations.V69_ClientOrderId
 import co.chainring.core.model.db.migrations.V6_MarketTable
+import co.chainring.core.model.db.migrations.V70_AddOrderBookSnapshotTable
 import co.chainring.core.model.db.migrations.V7_OrderTable
 import co.chainring.core.model.db.migrations.V8_ExecutionsAndTrades
 import co.chainring.core.model.db.migrations.V9_SymbolTable
@@ -140,4 +141,5 @@ val migrations = listOf(
     V67_AddLimitTable(),
     V68_RemoveMinMaxOfferPriceFromMarket(),
     V69_ClientOrderId(),
+    V70_AddOrderBookSnapshotTable(),
 )

@@ -3,8 +3,7 @@ package co.chainring.integrationtests.api
 import co.chainring.apps.api.model.ApiError
 import co.chainring.apps.api.model.GetOrderBookApiResponse
 import co.chainring.apps.api.model.ReasonCode
-import co.chainring.apps.api.model.websocket.LastTrade
-import co.chainring.apps.api.model.websocket.LastTradeDirection
+import co.chainring.apps.api.model.websocket.OrderBook
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OrderId
 import co.chainring.core.model.db.OrderSide
@@ -41,11 +40,11 @@ class OrderBookTest : OrderBaseTest() {
             tradesInDb = emptyList(),
             expected = GetOrderBookApiResponse(
                 marketId = btcEthMarket.id,
-                buy = emptyList(),
-                sell = emptyList(),
-                last = LastTrade(
+                bids = emptyList(),
+                asks = emptyList(),
+                last = OrderBook.LastTrade(
                     price = "0.000",
-                    direction = LastTradeDirection.Unchanged,
+                    direction = OrderBook.LastTradeDirection.Unchanged,
                 ),
             ),
             getOrderBook = { marketId ->
@@ -141,18 +140,18 @@ class OrderBookTest : OrderBaseTest() {
             tradesInDb = emptyList(),
             expected = GetOrderBookApiResponse(
                 marketId = btcEthMarket.id,
-                buy = listOf(
-                    GetOrderBookApiResponse.Entry(price = "17.550", size = "2.5".toBigDecimal()),
-                    GetOrderBookApiResponse.Entry(price = "17.500", size = "1.5".toBigDecimal()),
-                    GetOrderBookApiResponse.Entry(price = "17.400", size = "7".toBigDecimal()),
+                bids = listOf(
+                    OrderBook.Entry(price = "17.550", size = "2.5".toBigDecimal()),
+                    OrderBook.Entry(price = "17.500", size = "1.5".toBigDecimal()),
+                    OrderBook.Entry(price = "17.400", size = "7".toBigDecimal()),
                 ),
-                sell = listOf(
-                    GetOrderBookApiResponse.Entry(price = "17.350", size = "2.5".toBigDecimal()),
-                    GetOrderBookApiResponse.Entry(price = "17.300", size = "5".toBigDecimal()),
+                asks = listOf(
+                    OrderBook.Entry(price = "17.350", size = "2.5".toBigDecimal()),
+                    OrderBook.Entry(price = "17.300", size = "5".toBigDecimal()),
                 ),
-                last = LastTrade(
+                last = OrderBook.LastTrade(
                     price = "0.000",
-                    direction = LastTradeDirection.Unchanged,
+                    direction = OrderBook.LastTradeDirection.Unchanged,
                 ),
             ),
             getOrderBook = { marketId ->

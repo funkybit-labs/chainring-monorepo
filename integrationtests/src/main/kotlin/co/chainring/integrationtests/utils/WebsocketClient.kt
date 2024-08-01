@@ -16,6 +16,7 @@ import co.chainring.apps.api.model.websocket.MyTrades
 import co.chainring.apps.api.model.websocket.MyTradesCreated
 import co.chainring.apps.api.model.websocket.MyTradesUpdated
 import co.chainring.apps.api.model.websocket.OrderBook
+import co.chainring.apps.api.model.websocket.OrderBookDiff
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.Publishable
@@ -52,6 +53,10 @@ fun WsClient.send(message: IncomingWSMessage) {
 
 fun WsClient.subscribeToOrderBook(marketId: MarketId) {
     send(IncomingWSMessage.Subscribe(SubscriptionTopic.OrderBook(marketId)))
+}
+
+fun WsClient.subscribeToIncrementalOrderBook(marketId: MarketId) {
+    send(IncomingWSMessage.Subscribe(SubscriptionTopic.IncrementalOrderBook(marketId)))
 }
 
 fun WsClient.subscribeToPrices(marketId: MarketId, duration: OHLCDuration = OHLCDuration.P5M) {
@@ -225,6 +230,11 @@ fun WsClient.assertOrderBookMessageReceived(marketId: MarketId, assertions: (Ord
 
 fun WsClient.assertOrderBookMessageReceived(marketId: MarketId, expected: OrderBook): OrderBook =
     assertMessageReceived<OrderBook>(SubscriptionTopic.OrderBook(marketId)) { msg ->
+        assertEquals(expected, msg)
+    }
+
+fun WsClient.assertOrderBookDiffMessageReceived(marketId: MarketId, expected: OrderBookDiff): OrderBookDiff =
+    assertMessageReceived<OrderBookDiff>(SubscriptionTopic.IncrementalOrderBook(marketId)) { msg ->
         assertEquals(expected, msg)
     }
 

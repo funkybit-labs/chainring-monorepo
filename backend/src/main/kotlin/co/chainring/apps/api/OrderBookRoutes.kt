@@ -6,7 +6,7 @@ import co.chainring.apps.api.model.ReasonCode
 import co.chainring.apps.api.model.notFoundError
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
-import co.chainring.core.model.db.OrderEntity
+import co.chainring.core.model.db.OrderBookSnapshot
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.Tag
 import org.http4k.contract.div
@@ -41,7 +41,7 @@ object OrderBookRoutes {
                 transaction {
                     MarketEntity.findById(marketId)?.let { market ->
                         Response(Status.OK).with(
-                            responseBody of GetOrderBookApiResponse(OrderEntity.getOrderBook(market)),
+                            responseBody of GetOrderBookApiResponse(market, OrderBookSnapshot.get(market)),
                         )
                     } ?: notFoundError(ReasonCode.MarketNotFound, "Unknown market")
                 }

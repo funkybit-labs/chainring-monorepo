@@ -33,6 +33,10 @@ sealed class SubscriptionTopic {
     data class OrderBook(val marketId: MarketId) : SubscriptionTopic()
 
     @Serializable
+    @SerialName("IncrementalOrderBook")
+    data class IncrementalOrderBook(val marketId: MarketId) : SubscriptionTopic()
+
+    @Serializable
     @SerialName("Prices")
     data class Prices(val marketId: MarketId, val duration: OHLCDuration) : SubscriptionTopic()
 

@@ -3,11 +3,8 @@ package co.chainring.integrationtests.settlement
 import co.chainring.apps.api.model.BatchOrdersApiRequest
 import co.chainring.apps.api.model.CreateOrderApiRequest
 import co.chainring.apps.api.model.OrderAmount
-import co.chainring.apps.api.model.websocket.LastTrade
-import co.chainring.apps.api.model.websocket.LastTradeDirection
 import co.chainring.apps.api.model.websocket.MyTradesUpdated
 import co.chainring.apps.api.model.websocket.OrderBook
-import co.chainring.apps.api.model.websocket.OrderBookEntry
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
 import co.chainring.core.model.EvmSignature
 import co.chainring.core.model.db.ChainId
@@ -257,10 +254,10 @@ class SettlementTest : OrderBaseTest() {
                 OrderBook(
                     marketId = market.id,
                     buy = listOf(
-                        OrderBookEntry(price = "17.550", size = "0.08".toBigDecimal()),
+                        OrderBook.Entry(price = "17.550", size = "0.08".toBigDecimal()),
                     ),
                     sell = emptyList(),
-                    last = LastTrade("0.000", LastTradeDirection.Unchanged),
+                    last = OrderBook.LastTrade("0.000", OrderBook.LastTradeDirection.Unchanged),
                 ),
             )
         }
@@ -336,7 +333,7 @@ class SettlementTest : OrderBaseTest() {
                     marketId = market.id,
                     buy = listOf(),
                     sell = listOf(),
-                    last = LastTrade("17.550", LastTradeDirection.Up),
+                    last = OrderBook.LastTrade("17.550", OrderBook.LastTradeDirection.Up),
                 ),
             )
         }

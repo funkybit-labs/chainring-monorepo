@@ -11,6 +11,7 @@ import co.chainring.apps.api.model.websocket.MyTradesCreated
 import co.chainring.apps.api.model.websocket.MyTradesUpdated
 import co.chainring.apps.api.model.websocket.OHLC
 import co.chainring.apps.api.model.websocket.OrderBook
+import co.chainring.apps.api.model.websocket.OrderBookDiff
 import co.chainring.apps.api.model.websocket.OutgoingWSMessage
 import co.chainring.apps.api.model.websocket.Prices
 import co.chainring.apps.api.model.websocket.SubscriptionTopic
@@ -25,6 +26,7 @@ import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
 import co.chainring.core.model.db.OHLCDuration
 import co.chainring.core.model.db.OHLCEntity
+import co.chainring.core.model.db.OrderBookSnapshot
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderStatus
@@ -101,6 +103,7 @@ class Broadcaster(val db: Database) {
 
         when (topic) {
             is SubscriptionTopic.OrderBook -> sendOrderBook(topic, client)
+            is SubscriptionTopic.IncrementalOrderBook -> sendOrderBook(topic, client)
             is SubscriptionTopic.Prices -> sendPrices(topic, client)
             is SubscriptionTopic.MyTrades -> sendTrades(client)
             is SubscriptionTopic.MyOrders -> sendOrders(client)
@@ -227,10 +230,21 @@ class Broadcaster(val db: Database) {
         pricesDailyChangeByMarket[key.marketId] = message.dailyChange
     }
 
+    private fun getOrderBook(marketId: MarketId): OrderBook =
+        orderBooksByMarket.getOrPut(marketId) {
+            transaction {
+                OrderBook(marketId, OrderBookSnapshot.get(marketId))
+            }
+        }
+
     private fun sendOrderBook(topic: SubscriptionTopic.OrderBook, client: ConnectedClient) {
-        orderBooksByMarket.getOrPut(topic.marketId) {
-            transaction { OrderEntity.getOrderBook(MarketEntity[topic.marketId]) }
-        }.also { orderBook ->
+        getOrderBook(topic.marketId).also { orderBook ->
+            client.send(OutgoingWSMessage.Publish(topic, orderBook))
+        }
+    }
+
+    private fun sendOrderBook(topic: SubscriptionTopic.IncrementalOrderBook, client: ConnectedClient) {
+        getOrderBook(topic.marketId).also { orderBook ->
             client.send(OutgoingWSMessage.Publish(topic, orderBook))
         }
     }
@@ -313,6 +327,7 @@ class Broadcaster(val db: Database) {
                 orderBooksByMarket.replace(notification.message.marketId, notification.message) // update cached value
                 SubscriptionTopic.OrderBook(notification.message.marketId)
             }
+            is OrderBookDiff -> SubscriptionTopic.IncrementalOrderBook(notification.message.marketId)
             is MyOrders, is MyOrderCreated, is MyOrderUpdated -> SubscriptionTopic.MyOrders
             is Prices -> {
                 updatePrices(notification.message)

@@ -5,6 +5,7 @@ import co.chainring.core.model.Symbol
 import co.chainring.core.model.db.ExecutionRole
 import co.chainring.core.model.db.MarketEntity
 import co.chainring.core.model.db.MarketId
+import co.chainring.core.model.db.OrderBookSnapshot
 import co.chainring.core.model.db.OrderEntity
 import co.chainring.core.model.db.OrderExecutionEntity
 import co.chainring.core.model.db.OrderId
@@ -96,6 +97,15 @@ object OrderBookTestHelper {
                         feeSymbol = Symbol(order.market.quoteSymbol.name),
                     )
                 }
+            }
+
+            TransactionManager.current().commit()
+
+            (ordersInDb.map { it.market } + tradesInDb.map { it.market }).distinct().forEach { marketId ->
+                val market = MarketEntity[marketId]
+                OrderBookSnapshot
+                    .calculate(market)
+                    .save(market)
             }
 
             TransactionManager.current().commit()

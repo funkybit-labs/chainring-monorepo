@@ -47,6 +47,7 @@ and then truncate db tables using favourite SQL editor. In this way OHLC records
 -- truncate table order_execution CASCADE;
 -- truncate table trade CASCADE;
 -- truncate table "order" CASCADE;
+-- truncate table order_book_snapshot;
 -- truncate table chain_settlement_batch CASCADE;
 -- truncate table settlement_batch CASCADE;
 -- truncate table deposit CASCADE;
