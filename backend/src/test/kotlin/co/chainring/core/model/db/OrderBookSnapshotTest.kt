@@ -12,6 +12,7 @@ import co.chainring.testutils.TestWithDb
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.math.BigDecimal
 import kotlin.time.Duration.Companion.seconds
 
 class OrderBookSnapshotTest : TestWithDb() {
@@ -42,7 +43,7 @@ class OrderBookSnapshotTest : TestWithDb() {
                 bids = emptyList(),
                 asks = emptyList(),
                 last = OrderBookSnapshot.LastTrade(
-                    price = "0.000",
+                    price = BigDecimal("0.000"),
                     direction = OrderBookSnapshot.LastTradeDirection.Unchanged,
                 ),
             ),
@@ -108,13 +109,13 @@ class OrderBookSnapshotTest : TestWithDb() {
             tradesInDb = emptyList(),
             expected = OrderBookSnapshot(
                 bids = listOf(
-                    OrderBookSnapshot.Entry(price = "17.550", size = "2.5".toBigDecimal()),
-                    OrderBookSnapshot.Entry(price = "17.500", size = "1.5".toBigDecimal()),
-                    OrderBookSnapshot.Entry(price = "17.400", size = "7".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.550"), size = "2.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.500"), size = "1.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.400"), size = "7".toBigDecimal()),
                 ),
                 asks = emptyList(),
                 last = OrderBookSnapshot.LastTrade(
-                    price = "0.000",
+                    price = BigDecimal("0.000"),
                     direction = OrderBookSnapshot.LastTradeDirection.Unchanged,
                 ),
             ),
@@ -161,11 +162,11 @@ class OrderBookSnapshotTest : TestWithDb() {
             expected = OrderBookSnapshot(
                 bids = emptyList(),
                 asks = listOf(
-                    OrderBookSnapshot.Entry(price = "17.350", size = "2.5".toBigDecimal()),
-                    OrderBookSnapshot.Entry(price = "17.300", size = "5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.350"), size = "2.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.300"), size = "5".toBigDecimal()),
                 ),
                 last = OrderBookSnapshot.LastTrade(
-                    price = "0.000",
+                    price = BigDecimal("0.000"),
                     direction = OrderBookSnapshot.LastTradeDirection.Unchanged,
                 ),
             ),
@@ -261,16 +262,16 @@ class OrderBookSnapshotTest : TestWithDb() {
             tradesInDb = emptyList(),
             expected = OrderBookSnapshot(
                 bids = listOf(
-                    OrderBookSnapshot.Entry(price = "17.550", size = "2.5".toBigDecimal()),
-                    OrderBookSnapshot.Entry(price = "17.500", size = "1.5".toBigDecimal()),
-                    OrderBookSnapshot.Entry(price = "17.400", size = "7".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.550"), size = "2.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.500"), size = "1.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.400"), size = "7".toBigDecimal()),
                 ),
                 asks = listOf(
-                    OrderBookSnapshot.Entry(price = "17.350", size = "2.5".toBigDecimal()),
-                    OrderBookSnapshot.Entry(price = "17.300", size = "5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.350"), size = "2.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.300"), size = "5".toBigDecimal()),
                 ),
                 last = OrderBookSnapshot.LastTrade(
-                    price = "0.000",
+                    price = BigDecimal("0.000"),
                     direction = OrderBookSnapshot.LastTradeDirection.Unchanged,
                 ),
             ),
@@ -466,16 +467,16 @@ class OrderBookSnapshotTest : TestWithDb() {
             tradesInDb = emptyList(),
             expected = OrderBookSnapshot(
                 bids = listOf(
-                    OrderBookSnapshot.Entry(price = "17.550", size = "2.5".toBigDecimal()),
-                    OrderBookSnapshot.Entry(price = "17.500", size = "1.5".toBigDecimal()),
-                    OrderBookSnapshot.Entry(price = "17.400", size = "7".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.550"), size = "2.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.500"), size = "1.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.400"), size = "7".toBigDecimal()),
                 ),
                 asks = listOf(
-                    OrderBookSnapshot.Entry(price = "17.350", size = "2.5".toBigDecimal()),
-                    OrderBookSnapshot.Entry(price = "17.300", size = "5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.350"), size = "2.5".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.300"), size = "5".toBigDecimal()),
                 ),
                 last = OrderBookSnapshot.LastTrade(
-                    price = "0.000",
+                    price = BigDecimal("0.000"),
                     direction = OrderBookSnapshot.LastTradeDirection.Unchanged,
                 ),
             ),
@@ -540,13 +541,13 @@ class OrderBookSnapshotTest : TestWithDb() {
             ),
             expected = OrderBookSnapshot(
                 bids = listOf(
-                    OrderBookSnapshot.Entry(price = "17.500", size = "1".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.500"), size = "1".toBigDecimal()),
                 ),
                 asks = listOf(
-                    OrderBookSnapshot.Entry(price = "17.550", size = "2".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.550"), size = "2".toBigDecimal()),
                 ),
                 last = OrderBookSnapshot.LastTrade(
-                    price = "17.400",
+                    price = BigDecimal("17.400"),
                     direction = OrderBookSnapshot.LastTradeDirection.Up,
                 ),
             ),
@@ -639,13 +640,13 @@ class OrderBookSnapshotTest : TestWithDb() {
             ),
             expected = OrderBookSnapshot(
                 bids = listOf(
-                    OrderBookSnapshot.Entry(price = "17.500", size = "1".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.500"), size = "1".toBigDecimal()),
                 ),
                 asks = listOf(
-                    OrderBookSnapshot.Entry(price = "17.550", size = "2".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.550"), size = "2".toBigDecimal()),
                 ),
                 last = OrderBookSnapshot.LastTrade(
-                    price = "17.400",
+                    price = BigDecimal("17.400"),
                     direction = OrderBookSnapshot.LastTradeDirection.Down,
                 ),
             ),
@@ -738,13 +739,13 @@ class OrderBookSnapshotTest : TestWithDb() {
             ),
             expected = OrderBookSnapshot(
                 bids = listOf(
-                    OrderBookSnapshot.Entry(price = "17.500", size = "1".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.500"), size = "1".toBigDecimal()),
                 ),
                 asks = listOf(
-                    OrderBookSnapshot.Entry(price = "17.550", size = "2".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.550"), size = "2".toBigDecimal()),
                 ),
                 last = OrderBookSnapshot.LastTrade(
-                    price = "17.450",
+                    price = BigDecimal("17.450"),
                     direction = OrderBookSnapshot.LastTradeDirection.Up,
                 ),
             ),
@@ -837,13 +838,13 @@ class OrderBookSnapshotTest : TestWithDb() {
             ),
             expected = OrderBookSnapshot(
                 bids = listOf(
-                    OrderBookSnapshot.Entry(price = "17.500", size = "1".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.500"), size = "1".toBigDecimal()),
                 ),
                 asks = listOf(
-                    OrderBookSnapshot.Entry(price = "17.550", size = "2".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.550"), size = "2".toBigDecimal()),
                 ),
                 last = OrderBookSnapshot.LastTrade(
-                    price = "17.400",
+                    price = BigDecimal("17.400"),
                     direction = OrderBookSnapshot.LastTradeDirection.Unchanged,
                 ),
             ),
@@ -954,13 +955,13 @@ class OrderBookSnapshotTest : TestWithDb() {
             ),
             expected = OrderBookSnapshot(
                 bids = listOf(
-                    OrderBookSnapshot.Entry(price = "17.500", size = "1".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.500"), size = "1".toBigDecimal()),
                 ),
                 asks = listOf(
-                    OrderBookSnapshot.Entry(price = "17.550", size = "2".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.550"), size = "2".toBigDecimal()),
                 ),
                 last = OrderBookSnapshot.LastTrade(
-                    price = "17.420",
+                    price = BigDecimal("17.420"),
                     direction = OrderBookSnapshot.LastTradeDirection.Up,
                 ),
             ),
@@ -1101,13 +1102,13 @@ class OrderBookSnapshotTest : TestWithDb() {
             ),
             expected = OrderBookSnapshot(
                 bids = listOf(
-                    OrderBookSnapshot.Entry(price = "17.500", size = "1".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.500"), size = "1".toBigDecimal()),
                 ),
                 asks = listOf(
-                    OrderBookSnapshot.Entry(price = "17.550", size = "2".toBigDecimal()),
+                    OrderBookSnapshot.Entry(price = BigDecimal("17.550"), size = "2".toBigDecimal()),
                 ),
                 last = OrderBookSnapshot.LastTrade(
-                    price = "17.450",
+                    price = BigDecimal("17.450"),
                     direction = OrderBookSnapshot.LastTradeDirection.Up,
                 ),
             ),

@@ -16,6 +16,7 @@ class MarketTradesCreatedWsMessageSerializationTest {
     @Test
     fun `test market trades are serialized into array`() {
         val message = MarketTradesCreated(
+            sequenceNumber = 123,
             MarketId("BTC/ETH"),
             listOf(
                 MarketTradesCreated.Trade(
@@ -28,7 +29,7 @@ class MarketTradesCreatedWsMessageSerializationTest {
             ),
         )
         val str = Json.encodeToString(message)
-        assertEquals("{\"marketId\":\"BTC/ETH\",\"trades\":[[\"t1\",\"Buy\",\"1\",\"10\",1722001494355]]}", str)
+        assertEquals("{\"sequenceNumber\":123,\"marketId\":\"BTC/ETH\",\"trades\":[[\"t1\",\"Buy\",\"1\",\"10\",1722001494355]]}", str)
         assertEquals(message, Json.decodeFromString<MarketTradesCreated>(str))
     }
 }
