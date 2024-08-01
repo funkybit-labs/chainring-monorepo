@@ -7,3 +7,4 @@ cache
 broadcast
 lib
 .DS_Store
+.arch-data
