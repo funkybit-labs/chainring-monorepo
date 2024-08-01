@@ -100,29 +100,29 @@ class TelegramMiniAppApiTest {
             assertEquals(1, it.checkInStreak.gameTickets)
 
             assertEquals(5, it.invites)
-            assertEquals("980".crPoints(), it.nextMilestoneIn)
+            assertEquals("1000".crPoints(), it.nextMilestoneAt)
             assertNull(it.lastMilestone)
 
             assertEquals(
                 listOf(
                     GetUserApiResponse.Goal(
                         TelegramMiniAppGoal.Id.GithubSubscription,
-                        reward = "200".crPoints(),
+                        reward = "240".crPoints(),
                         achieved = false,
                     ),
                     GetUserApiResponse.Goal(
                         TelegramMiniAppGoal.Id.MediumSubscription,
-                        reward = "200".crPoints(),
+                        reward = "240".crPoints(),
                         achieved = false,
                     ),
                     GetUserApiResponse.Goal(
                         TelegramMiniAppGoal.Id.LinkedinSubscription,
-                        reward = "200".crPoints(),
+                        reward = "240".crPoints(),
                         achieved = false,
                     ),
                     GetUserApiResponse.Goal(
                         TelegramMiniAppGoal.Id.XSubscription,
-                        reward = "200".crPoints(),
+                        reward = "240".crPoints(),
                         achieved = false,
                     ),
                 ),
@@ -146,27 +146,27 @@ class TelegramMiniAppApiTest {
         apiClient
             .claimReward(ClaimRewardApiRequest(TelegramMiniAppGoal.Id.GithubSubscription))
             .also {
-                assertEquals("220".crPoints(), it.balance)
+                assertEquals("260".crPoints(), it.balance)
                 assertEquals(
                     listOf(
                         GetUserApiResponse.Goal(
                             TelegramMiniAppGoal.Id.GithubSubscription,
-                            reward = "200".crPoints(),
+                            reward = "240".crPoints(),
                             achieved = true,
                         ),
                         GetUserApiResponse.Goal(
                             TelegramMiniAppGoal.Id.MediumSubscription,
-                            reward = "200".crPoints(),
+                            reward = "240".crPoints(),
                             achieved = false,
                         ),
                         GetUserApiResponse.Goal(
                             TelegramMiniAppGoal.Id.LinkedinSubscription,
-                            reward = "200".crPoints(),
+                            reward = "240".crPoints(),
                             achieved = false,
                         ),
                         GetUserApiResponse.Goal(
                             TelegramMiniAppGoal.Id.XSubscription,
-                            reward = "200".crPoints(),
+                            reward = "240".crPoints(),
                             achieved = false,
                         ),
                     ),
@@ -178,7 +178,7 @@ class TelegramMiniAppApiTest {
         apiClient
             .claimReward(ClaimRewardApiRequest(TelegramMiniAppGoal.Id.GithubSubscription))
             .also {
-                assertEquals("220".crPoints(), it.balance)
+                assertEquals("260".crPoints(), it.balance)
             }
     }
 
@@ -365,7 +365,7 @@ class TelegramMiniAppApiTest {
             assertEquals(1, it.checkInStreak.gameTickets)
 
             assertEquals(5, it.invites)
-            assertEquals("980".crPoints(), it.nextMilestoneIn)
+            assertEquals("1000".crPoints(), it.nextMilestoneAt)
             assertNull(it.lastMilestone)
         }
 
@@ -383,7 +383,7 @@ class TelegramMiniAppApiTest {
                 assertEquals("1020".crPoints(), it.balance)
                 assertEquals(8, it.invites)
 
-                assertEquals("980".crPoints(), it.nextMilestoneIn)
+                assertEquals("2000".crPoints(), it.nextMilestoneAt)
 
                 val lastMilestone = it.lastMilestone
                 assertNotNull(lastMilestone)
@@ -400,7 +400,7 @@ class TelegramMiniAppApiTest {
                 assertEquals("2020".crPoints(), it.balance)
                 assertEquals(11, it.invites)
 
-                assertEquals("6980".crPoints(), it.nextMilestoneIn)
+                assertEquals("9000".crPoints(), it.nextMilestoneAt)
 
                 val lastMilestone = it.lastMilestone
                 assertNotNull(lastMilestone)
@@ -416,13 +416,13 @@ class TelegramMiniAppApiTest {
             .getUser()
             .also {
                 assertEquals("12120".crPoints(), it.balance)
-                assertEquals(14, it.invites)
+                assertEquals(22, it.invites)
 
-                assertEquals("23880".crPoints(), it.nextMilestoneIn)
+                assertEquals("36000".crPoints(), it.nextMilestoneAt)
 
                 val lastMilestone = it.lastMilestone
                 assertNotNull(lastMilestone)
-                assertEquals(3, lastMilestone.invites)
+                assertEquals(11, lastMilestone.invites)
                 assertTrue { lastMilestone.grantedAt > now }
             }
 
@@ -439,7 +439,7 @@ class TelegramMiniAppApiTest {
                 assertEquals(-1, it.invites)
 
                 // null because the last milestone was reached already
-                assertNull(it.nextMilestoneIn)
+                assertNull(it.nextMilestoneAt)
 
                 val lastMilestone = it.lastMilestone
                 assertNotNull(lastMilestone)
@@ -484,7 +484,7 @@ class TelegramMiniAppApiTest {
         lThreeInvitee
             .claimReward(ClaimRewardApiRequest(TelegramMiniAppGoal.Id.GithubSubscription))
             .also {
-                assertEquals("220".crPoints(), it.balance)
+                assertEquals("260".crPoints(), it.balance)
                 assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
             }
 
@@ -503,11 +503,11 @@ class TelegramMiniAppApiTest {
             assertEquals("2".crPoints(), it.referralBalance)
         }
         lTwoInvitee.getUser().also {
-            assertEquals("42".crPoints(), it.balance)
-            assertEquals("22".crPoints(), it.referralBalance)
+            assertEquals("46".crPoints(), it.balance)
+            assertEquals("26".crPoints(), it.referralBalance)
         }
         lThreeInvitee.getUser().also {
-            assertEquals("220".crPoints(), it.balance)
+            assertEquals("260".crPoints(), it.balance)
             assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
         }
 
@@ -522,15 +522,15 @@ class TelegramMiniAppApiTest {
             assertEquals("2.2".crPoints(), it.referralBalance)
         }
         lOneInvitee.getUser().also {
-            assertEquals("24.2".crPoints(), it.balance)
-            assertEquals("4.2".crPoints(), it.referralBalance)
+            assertEquals("24.6".crPoints(), it.balance)
+            assertEquals("4.6".crPoints(), it.referralBalance)
         }
         lTwoInvitee.getUser().also {
-            assertEquals("42".crPoints(), it.balance)
-            assertEquals("22".crPoints(), it.referralBalance)
+            assertEquals("46".crPoints(), it.balance)
+            assertEquals("26".crPoints(), it.referralBalance)
         }
         lThreeInvitee.getUser().also {
-            assertEquals("220".crPoints(), it.balance)
+            assertEquals("260".crPoints(), it.balance)
             assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
         }
 
@@ -541,19 +541,19 @@ class TelegramMiniAppApiTest {
         Thread.sleep(100L)
 
         lZeroInvitee.getUser().also {
-            assertEquals("22.42".crPoints(), it.balance)
-            assertEquals("2.42".crPoints(), it.referralBalance)
+            assertEquals("22.46".crPoints(), it.balance)
+            assertEquals("2.46".crPoints(), it.referralBalance)
         }
         lOneInvitee.getUser().also {
-            assertEquals("24.2".crPoints(), it.balance)
-            assertEquals("4.2".crPoints(), it.referralBalance)
+            assertEquals("24.6".crPoints(), it.balance)
+            assertEquals("4.6".crPoints(), it.referralBalance)
         }
         lTwoInvitee.getUser().also {
-            assertEquals("42".crPoints(), it.balance)
-            assertEquals("22".crPoints(), it.referralBalance)
+            assertEquals("46".crPoints(), it.balance)
+            assertEquals("26".crPoints(), it.referralBalance)
         }
         lThreeInvitee.getUser().also {
-            assertEquals("220".crPoints(), it.balance)
+            assertEquals("260".crPoints(), it.balance)
             assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
         }
 
@@ -564,19 +564,19 @@ class TelegramMiniAppApiTest {
         Thread.sleep(100L)
 
         lZeroInvitee.getUser().also {
-            assertEquals("22.42".crPoints(), it.balance)
-            assertEquals("2.42".crPoints(), it.referralBalance)
+            assertEquals("22.46".crPoints(), it.balance)
+            assertEquals("2.46".crPoints(), it.referralBalance)
         }
         lOneInvitee.getUser().also {
-            assertEquals("24.2".crPoints(), it.balance)
-            assertEquals("4.2".crPoints(), it.referralBalance)
+            assertEquals("24.6".crPoints(), it.balance)
+            assertEquals("4.6".crPoints(), it.referralBalance)
         }
         lTwoInvitee.getUser().also {
-            assertEquals("42".crPoints(), it.balance)
-            assertEquals("22".crPoints(), it.referralBalance)
+            assertEquals("46".crPoints(), it.balance)
+            assertEquals("26".crPoints(), it.referralBalance)
         }
         lThreeInvitee.getUser().also {
-            assertEquals("220".crPoints(), it.balance)
+            assertEquals("260".crPoints(), it.balance)
             assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
         }
         justUser.getUser().also {
@@ -588,7 +588,7 @@ class TelegramMiniAppApiTest {
             user.isBot = TelegramMiniAppUserIsBot.Yes
             TelegramMiniAppUserRewardEntity.createReactionGameReward(user, BigDecimal("280"))
         }
-        assertEquals("500".crPoints(), lThreeInvitee.getUser().balance)
+        assertEquals("540".crPoints(), lThreeInvitee.getUser().balance)
 
         // distribute referral rewards (no one should get referral points from lThreeInvitee)
         transaction {
@@ -597,19 +597,19 @@ class TelegramMiniAppApiTest {
         Thread.sleep(100L)
 
         lZeroInvitee.getUser().also {
-            assertEquals("22.42".crPoints(), it.balance)
-            assertEquals("2.42".crPoints(), it.referralBalance)
+            assertEquals("22.46".crPoints(), it.balance)
+            assertEquals("2.46".crPoints(), it.referralBalance)
         }
         lOneInvitee.getUser().also {
-            assertEquals("24.2".crPoints(), it.balance)
-            assertEquals("4.2".crPoints(), it.referralBalance)
+            assertEquals("24.6".crPoints(), it.balance)
+            assertEquals("4.6".crPoints(), it.referralBalance)
         }
         lTwoInvitee.getUser().also {
-            assertEquals("42".crPoints(), it.balance)
-            assertEquals("22".crPoints(), it.referralBalance)
+            assertEquals("46".crPoints(), it.balance)
+            assertEquals("26".crPoints(), it.referralBalance)
         }
         lThreeInvitee.getUser().also {
-            assertEquals("500".crPoints(), it.balance)
+            assertEquals("540".crPoints(), it.balance)
             assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
         }
         justUser.getUser().also {

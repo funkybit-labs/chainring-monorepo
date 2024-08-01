@@ -1,10 +1,9 @@
-import LogoHSvg from 'assets/logo-h.svg'
-import CRSvg from 'assets/cr.svg'
+import CoinSvg from 'assets/coin.svg'
 import TicketSvg from 'assets/ticket.svg'
-import InviteSvg from 'assets/invite.svg'
-import MillisecondsSvg from 'assets/milliseconds.svg'
+import GiftPng from 'assets/gift.png'
+import MilestonePng from 'assets/milestone.png'
 import { apiClient, User, userQueryKey } from 'apiClient'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ReactionGame,
@@ -13,14 +12,58 @@ import {
 import { PlayTheGameWidget } from 'components/MainScreen/HomeTab/PlayTheGameWidget'
 import { CheckInStreakWidget } from 'components/MainScreen/HomeTab/CheckInStreakWidget'
 import { MilestoneReachedWidget } from 'components/MainScreen/HomeTab/MilestoneReachedWidget'
-import { CRView } from 'components/common/CRView'
+import { HeadSub, InfoPanel } from 'components/common/InfoPanel'
+import { decimalAsInt } from 'utils/format'
+import { ProgressBar } from 'components/common/ProgressBar'
+import Decimal from 'decimal.js'
+import { Modal } from 'components/common/Modal'
+import { Alert } from 'components/EntryPoint'
+import Logo from 'components/common/Logo'
 
-export default function HomeTab({ user }: { user: User }) {
+export default function HomeTab({
+  user,
+  dismissedAlerts,
+  dismissAlert
+}: {
+  user: User
+  dismissedAlerts: Alert[]
+  dismissAlert: (a: Alert) => void
+}) {
   const queryClient = useQueryClient()
   const [balance, setBalance] = useState(user.balance)
   const [gameTickets, setGameTickets] = useState(user.gameTickets)
   const [isGameMode, setGameMode] = useState(false)
+  const [showCheckinAward, setShowCheckinAward] = useState(false)
+  const [showMilestoneReached, setShowMilestoneReached] = useState(false)
   const fiveMinutesInMs = 5 * 60 * 1000
+
+  useEffect(() => {
+    if (
+      !isGameMode &&
+      !dismissedAlerts.includes('checkin') &&
+      user.checkInStreak.grantedAt.getTime() + fiveMinutesInMs >
+        new Date().getTime()
+    ) {
+      setShowCheckinAward(true)
+    }
+  }, [
+    user.checkInStreak.grantedAt,
+    dismissedAlerts,
+    fiveMinutesInMs,
+    isGameMode
+  ])
+
+  useEffect(() => {
+    if (
+      !isGameMode &&
+      !dismissedAlerts.includes('milestone') &&
+      user.lastMilestone &&
+      user.lastMilestone.grantedAt.getTime() + fiveMinutesInMs >
+        new Date().getTime()
+    ) {
+      setShowMilestoneReached(true)
+    }
+  }, [user.lastMilestone, dismissedAlerts, fiveMinutesInMs, isGameMode])
 
   const enterGame = () => {
     setGameMode(true)
@@ -55,65 +98,86 @@ export default function HomeTab({ user }: { user: User }) {
   }
 
   return (
-    <div className="relative flex min-h-full select-none flex-col pb-10">
-      <div>
-        <div className="mx-4 flex gap-4 pt-4">
-          <img src={LogoHSvg} />
-          <div className="text-left text-lg font-semibold text-white">
-            When every millisecond counts
+    <div className="relative flex min-h-full select-none flex-col">
+      <Logo />
+      <div className="flex grow flex-col justify-stretch">
+        <div className="mx-6 flex grow flex-col justify-stretch">
+          <div className="mt-2 text-left font-sans text-2xl font-semibold text-white">
+            Your Balance
           </div>
-        </div>
-        <div className="mr-4 mt-4">
-          <img src={MillisecondsSvg} />
-        </div>
-      </div>
-      <div className="flex grow flex-col justify-center">
-        <div className="flex grow flex-col items-center justify-center">
-          <div className="mt-2 text-center text-sm text-darkBluishGray2">
-            Your balance
+          <InfoPanel icon={CoinSvg} rounded="top">
+            <HeadSub head={decimalAsInt(balance)} sub={'CR POINTS'} />
+          </InfoPanel>
+          <div className="flex flex-row justify-stretch space-x-1">
+            <InfoPanel
+              icon={TicketSvg}
+              rounded={user.nextMilestoneAt ? 'none' : 'bottom'}
+            >
+              <HeadSub
+                style={'smallSub'}
+                head={gameTickets.toString()}
+                sub={gameTickets == 1 ? 'TICKET' : 'TICKETS'}
+              />
+            </InfoPanel>
+            <InfoPanel
+              icon={GiftPng}
+              rounded={user.nextMilestoneAt ? 'none' : 'bottom'}
+            >
+              <HeadSub
+                style={'smallSub'}
+                head={
+                  user.invites === -1 ? 'Unlimited' : user.invites.toString()
+                }
+                sub={user.invites === 1 ? 'INVITE' : 'INVITES'}
+              />
+            </InfoPanel>
           </div>
-          <div className="mx-auto mt-2 flex w-4/5 flex-col items-center justify-center rounded-lg bg-darkBluishGray9 px-5 py-4">
-            <div className="flex items-center justify-center gap-4 text-xl font-bold text-white">
-              <img src={CRSvg} className="size-7" alt="CR icon" />
-              <CRView amount={balance} format={'full'} />
-            </div>
-            {user.nextMilestoneIn && (
-              <div className="mt-2 flex w-full flex-col">
-                <div className="text-center text-sm text-white">
-                  Next milestone in <CRView amount={user.nextMilestoneIn} />!
-                </div>
+          {user.nextMilestoneAt && (
+            <InfoPanel icon={MilestonePng} rounded="bottom">
+              <div className="flex flex-col">
+                <span>NEXT MILESTONE IN</span>
+                <ProgressBar
+                  value={balance}
+                  min={user.lastMilestone?.points ?? new Decimal(0)}
+                  max={user.nextMilestoneAt}
+                />
+                <span className="text-2xl">
+                  {decimalAsInt(user.nextMilestoneAt.minus(balance))} CR
+                </span>
               </div>
-            )}
-          </div>
-          <div className="mx-auto mt-2 flex w-4/5 items-center justify-center gap-4 rounded-lg bg-darkBluishGray9 px-5 py-4 text-xl font-bold text-white">
-            <img src={TicketSvg} className="size-7" alt="Ticket icon" />
-            {gameTickets} Game Tickets
-          </div>
-          <div className="mx-auto mt-2 flex w-4/5 items-center justify-center gap-4 rounded-lg bg-darkBluishGray9 px-5 py-4 text-xl font-bold text-white">
-            <img src={InviteSvg} className="size-7" alt="Invites icon" />
-            {user.invites === -1
-              ? 'Unlimited Invites'
-              : `${user.invites} Invite${user.invites === 1 ? '' : 's'} Left`}
-          </div>
-        </div>
-        <div className="mx-auto my-4 flex flex-col place-content-between">
-          {user.checkInStreak.grantedAt.getTime() + fiveMinutesInMs >
-            new Date().getTime() && (
-            <CheckInStreakWidget streak={user.checkInStreak} />
+            </InfoPanel>
           )}
-          <div className="flex w-full flex-col place-content-between">
-            {user.lastMilestone &&
-              user.lastMilestone.grantedAt.getTime() + fiveMinutesInMs >
-                new Date().getTime() && (
-                <div className="flex flex-col ">
-                  <MilestoneReachedWidget milestone={user.lastMilestone} />
-                </div>
-              )}
-          </div>
         </div>
-        <div className="mb-4 flex flex-col items-center justify-center">
+        <div className="mb-4 w-full">
           {gameTickets > 0 && <PlayTheGameWidget onEnterGame={enterGame} />}
         </div>
+        {showCheckinAward ? (
+          <Modal
+            close={() => {
+              if (!isGameMode) {
+                setShowCheckinAward(false)
+                dismissAlert('checkin')
+              }
+            }}
+            isOpen={showCheckinAward}
+            onClosed={() => {}}
+          >
+            <CheckInStreakWidget streak={user.checkInStreak} />
+          </Modal>
+        ) : showMilestoneReached ? (
+          <Modal
+            close={() => {
+              if (!isGameMode) {
+                setShowMilestoneReached(false)
+                dismissAlert('milestone')
+              }
+            }}
+            isOpen={showMilestoneReached}
+            onClosed={() => {}}
+          >
+            <MilestoneReachedWidget milestone={user.lastMilestone!} />
+          </Modal>
+        ) : null}
         {isGameMode && (
           <ReactionGame
             tickets={gameTickets}

@@ -1,43 +1,143 @@
-import { GoalsSvg } from 'components/icons'
 import GithubIconSvg from 'assets/github-icon.svg'
 import MediumIconSvg from 'assets/medium-icon.svg'
 import LinkedInIconSvg from 'assets/linkedin-icon.svg'
 import XIconSvg from 'assets/x-icon.svg'
-import CheckmarkSvg from 'assets/checkmark.svg'
 import { Button } from 'components/common/Button'
 import { classNames } from 'utils'
-import { apiClient, User, UserGoal, userQueryKey } from 'apiClient'
+import { apiClient, GoalId, User, UserGoal, userQueryKey } from 'apiClient'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useWebApp } from '@vkruglikov/react-telegram-web-app'
-import { useState } from 'react'
-import { CRView } from 'components/common/CRView'
+import React, { useMemo, useState } from 'react'
+import { HeadSub, InfoPanel } from 'components/common/InfoPanel'
+import KeyPng from 'assets/key.png'
+import { ProgressBar } from 'components/common/ProgressBar'
+import Decimal from 'decimal.js'
+import { Modal } from 'components/common/Modal'
+import Logo from 'components/common/Logo'
+import { useClose } from '@headlessui/react'
+
+function GoalAchieved({ goalAchieved }: { goalAchieved?: UserGoal }) {
+  const [goalAchievedIconSrc, goalAchievedDescription] = useMemo(() => {
+    if (goalAchieved) {
+      return goalInfo(goalAchieved.id)
+    } else {
+      return ['', '']
+    }
+  }, [goalAchieved])
+
+  const close = useClose()
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <img
+        className="size-32"
+        src={goalAchievedIconSrc}
+        alt={goalAchievedDescription}
+      />
+      <div className="text-2xl font-normal text-brightOrange">
+        +{goalAchieved?.reward?.toString() ?? ''} CR
+      </div>
+      <div className="text-center text-lg leading-6 text-white">
+        Thank you for subscribing to our {goalAchievedDescription}. Complete
+        more goals for more CR.
+      </div>
+      <Button className={'mt-2 p-1'} caption={() => 'Ok'} onClick={close} />
+    </div>
+  )
+}
 
 export default function GoalsTab({ user }: { user: User }) {
+  const goalCount = user.goals.length
+  const achievedGoals = user.goals.filter((g) => g.achieved)
+  const availableReward = user.goals
+    .map((g) => g.reward)
+    .reduce((a, v) => a.plus(v), new Decimal(0))
+  const earnedReward = achievedGoals
+    .map((g) => g.reward)
+    .reduce((a, v) => a.plus(v), new Decimal(0))
+  const [showGoalAchievedModal, setShowGoalAchievedModal] = useState(false)
+  const [goalAchieved, setGoalAchieved] = useState<UserGoal>()
+
   return (
     <>
-      <div className="fixed left-0 top-0 flex w-full select-none flex-col justify-between gap-2 px-4 pb-3 pt-4">
-        <div className="flex justify-center text-white">
-          <GoalsSvg className="size-[60px]" />
-        </div>
-        <div className="flex justify-center gap-2">
-          <div className="font-bold text-white">
-            {user.goals.filter((g) => !g.achieved).length}/{user.goals.length}
+      <div className="relative flex select-none flex-col">
+        <Logo />
+        <div className="mx-6 flex flex-col">
+          <div className="mt-2 text-left font-sans text-2xl font-semibold text-white">
+            Goals
           </div>
-          <div className="text-darkBluishGray2">Goals available</div>
-        </div>
-      </div>
-      <div className="h-full pt-32">
-        <div className="flex h-full flex-col gap-4 overflow-auto px-4">
-          {user.goals.map((goal) => {
-            return <GoalRow key={goal.id} goal={goal} />
-          })}
+
+          <InfoPanel icon={KeyPng} rounded="top">
+            <div className="flex flex-col">
+              <span>
+                GOALS ({achievedGoals.length}/{goalCount})
+              </span>
+              <ProgressBar
+                value={new Decimal(achievedGoals.length)}
+                min={new Decimal(0)}
+                max={new Decimal(goalCount)}
+              />
+              <span className="text-2xl">
+                {earnedReward.toString()}/{availableReward.toString()} CR
+              </span>
+            </div>
+          </InfoPanel>
+          <div className="flex flex-col gap-0 overflow-auto">
+            {user.goals.map((goal, ix) => {
+              return (
+                <GoalRow
+                  key={goal.id}
+                  goal={goal}
+                  isLast={ix === user.goals.length - 1}
+                  onAchieved={() => {
+                    setGoalAchieved(goal)
+                    setShowGoalAchievedModal(true)
+                  }}
+                />
+              )
+            })}
+          </div>
+          {showGoalAchievedModal && (
+            <Modal
+              close={() => setShowGoalAchievedModal(false)}
+              onClosed={() => {}}
+              isOpen={showGoalAchievedModal}
+            >
+              <GoalAchieved goalAchieved={goalAchieved} />
+            </Modal>
+          )}
         </div>
       </div>
     </>
   )
 }
 
-function GoalRow({ goal }: { goal: UserGoal }) {
+function goalInfo(goalId: GoalId) {
+  switch (goalId) {
+    case 'GithubSubscription':
+      return [GithubIconSvg, 'Github', 'https://github.com/Chainring-Inc']
+    case 'MediumSubscription':
+      return [MediumIconSvg, 'Medium', 'https://chainring.medium.com/']
+    case 'LinkedinSubscription':
+      return [
+        LinkedInIconSvg,
+        'LinkedIn',
+        'https://www.linkedin.com/company/chainring-inc/'
+      ]
+    case 'XSubscription':
+      return [XIconSvg, 'X (Twitter)', 'https://twitter.com/chainring_fin']
+  }
+}
+
+function GoalRow({
+  goal,
+  isLast,
+  onAchieved
+}: {
+  goal: UserGoal
+  isLast: boolean
+  onAchieved: () => void
+}) {
   const queryClient = useQueryClient()
   const telegramWebApp = useWebApp()
   const [status, setStatus] = useState<
@@ -48,6 +148,7 @@ function GoalRow({ goal }: { goal: UserGoal }) {
     mutationFn: async () => apiClient.claimReward({ goalId: goal.id }),
     onSuccess: () => {
       setStatus('achieved')
+      onAchieved()
       return queryClient.invalidateQueries({ queryKey: userQueryKey })
     },
     onError: () => {
@@ -55,77 +156,52 @@ function GoalRow({ goal }: { goal: UserGoal }) {
     }
   })
 
-  const [iconSrc, description, url] = (() => {
-    switch (goal.id) {
-      case 'GithubSubscription':
-        return [
-          GithubIconSvg,
-          'Github Subscription',
-          'https://github.com/Chainring-Inc'
-        ]
-      case 'MediumSubscription':
-        return [
-          MediumIconSvg,
-          'Medium Subscription',
-          'https://chainring.medium.com/'
-        ]
-      case 'LinkedinSubscription':
-        return [
-          LinkedInIconSvg,
-          'LinkedIn Subscription',
-          'https://www.linkedin.com/company/chainring-inc/'
-        ]
-      case 'XSubscription':
-        return [
-          XIconSvg,
-          'X (Twitter) Subscription',
-          'https://twitter.com/chainring_fin'
-        ]
-    }
-  })()
+  const [iconSrc, description, url] = goalInfo(goal.id)
 
   return (
-    <div
-      className={classNames(
-        'bg-darkBluishGray9 rounded-lg px-4 py-2 text-white flex justify-between border-2 select-none',
-        status == 'achieved' ? 'border-primary5' : 'border-darkBluishGray9'
-      )}
-    >
-      <div className="flex items-center justify-between gap-4">
-        <img src={iconSrc} className="size-[32px]" />
-        <div>
-          <div className="font-semibold text-white">{description}</div>
-          <div className="text-sm text-darkBluishGray1">
-            <CRView amount={goal.reward} />s
-          </div>
-        </div>
-      </div>
-      {status == 'achieved' ? (
-        <div className="flex w-[65px] items-center justify-center">
-          <img src={CheckmarkSvg} />
-        </div>
-      ) : (
-        <Button
-          disabled={status === 'linkOpened' || claimRewardMutation.isPending}
-          className="my-0.5"
-          caption={() => (
-            <div className="whitespace-nowrap px-1 font-semibold">
-              {status == 'rewardReady' ? 'Claim' : 'GO'}
-            </div>
-          )}
-          onClick={() => {
-            if (status == 'notAchieved') {
-              telegramWebApp.openLink(url)
-              setStatus('linkOpened')
-              window.setTimeout(() => {
-                setStatus('rewardReady')
-              }, 4000)
-            } else if (status == 'rewardReady') {
-              claimRewardMutation.mutate()
-            }
-          }}
+    <InfoPanel icon={iconSrc} rounded={isLast ? 'bottom' : 'none'}>
+      <>
+        <HeadSub
+          head={description}
+          sub={`${goal.reward} CRs`}
+          style={'largeSub'}
         />
-      )}
-    </div>
+        <div className="flex w-full justify-end">
+          <Button
+            disabled={
+              status === 'linkOpened' ||
+              status === 'achieved' ||
+              claimRewardMutation.isPending
+            }
+            className={classNames(
+              'my-0.5 py-2 !bg-modalBlue',
+              status === 'rewardReady' && '!bg-white/50',
+              status === 'achieved' &&
+                '!bg-brightOrange !bg-opacity-70 !opacity-100'
+            )}
+            caption={() => (
+              <div className="whitespace-nowrap px-1 font-medium">
+                {status === 'rewardReady'
+                  ? 'Claim'
+                  : status === 'achieved'
+                    ? 'Subscribed'
+                    : 'Subscribe'}
+              </div>
+            )}
+            onClick={() => {
+              if (status == 'notAchieved') {
+                telegramWebApp.openLink(url)
+                setStatus('linkOpened')
+                window.setTimeout(() => {
+                  setStatus('rewardReady')
+                }, 4000)
+              } else if (status == 'rewardReady') {
+                claimRewardMutation.mutate()
+              }
+            }}
+          />
+        </div>
+      </>
+    </InfoPanel>
   )
 }

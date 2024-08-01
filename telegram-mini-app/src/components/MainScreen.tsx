@@ -5,25 +5,40 @@ import FriendsTab from 'components/MainScreen/FriendsTab'
 import { ReactElement, useState } from 'react'
 import { classNames } from 'utils'
 import { User } from 'apiClient'
+import { Alert } from 'components/EntryPoint'
 
 type TabId = 'home' | 'goals' | 'friends'
 
-export default function MainScreen({ user }: { user: User }) {
+export default function MainScreen({
+  user,
+  dismissedAlerts,
+  dismissAlert
+}: {
+  user: User
+  dismissedAlerts: Alert[]
+  dismissAlert: (a: Alert) => void
+}) {
   const [activeTab, setActiveTab] = useState<TabId>('home')
 
   return (
-    <div className="h-full min-h-screen bg-darkBluishGray10 pb-14">
+    <div className="h-full min-h-screen bg-mediumBlue pb-14 font-content">
       {(() => {
         switch (activeTab) {
           case 'home':
-            return <HomeTab user={user} />
+            return (
+              <HomeTab
+                user={user}
+                dismissedAlerts={dismissedAlerts}
+                dismissAlert={dismissAlert}
+              />
+            )
           case 'goals':
             return <GoalsTab user={user} />
           case 'friends':
             return <FriendsTab user={user} />
         }
       })()}
-      <div className="fixed bottom-0 left-0 z-20 flex h-12 w-full justify-between bg-darkBluishGray10 px-4 py-3 text-white">
+      <div className="fixed bottom-0 left-0 z-20 flex h-16 w-full justify-between rounded-t-3xl bg-darkBlue px-4 py-3 text-white">
         <TabButton
           title="Home"
           icon={<HomeSvg />}
@@ -61,8 +76,10 @@ export function TabButton({
   return (
     <div
       className={classNames(
-        'flex gap-2 items-center px-4 pb-1.5 border-b-2 cursor-pointer',
-        active ? 'text-primary4 border-primary4' : 'border-transparent'
+        'flex gap-2 items-center p-4 cursor-pointer rounded-xl text-xs',
+        active
+          ? 'text-brightOrange bg-brightOrange bg-opacity-10'
+          : 'border-transparent'
       )}
       onClick={onClick}
     >

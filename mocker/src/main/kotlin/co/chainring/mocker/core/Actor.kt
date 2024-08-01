@@ -118,7 +118,6 @@ abstract class Actor(
 
     private fun depositNoFaucet() {
         val config = apiClient.getConfiguration()
-        val gasFeesAmount = BigDecimal("0.1").movePointRight(18).toBigInteger()
         var deposited = false
         logger.debug { "$id: going to deposit (no faucet)" }
         while (!deposited) {
