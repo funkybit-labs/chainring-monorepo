@@ -11,7 +11,7 @@ export function PlayTheGameWidget({
       <div className="mx-auto mt-2 flex flex-col items-stretch rounded-3xl bg-darkBlue px-6 py-4">
         <div className="flex flex-row">
           <img src={CoinSvg} className="inline h-16 w-auto" alt="icon" />
-          <div className="text-2xl text-white">
+          <div className="ml-4 text-2xl text-white">
             Are you faster than
             <br />
             the blink of an eye?
