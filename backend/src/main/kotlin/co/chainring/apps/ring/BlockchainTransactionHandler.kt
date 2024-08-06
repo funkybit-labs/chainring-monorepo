@@ -5,6 +5,7 @@ import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientException
 import co.chainring.core.blockchain.BlockchainServerException
 import co.chainring.core.blockchain.DefaultBlockParam
+import co.chainring.core.db.serializableTransaction
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.db.BalanceChange
 import co.chainring.core.model.db.BalanceEntity
@@ -33,14 +34,12 @@ import co.chainring.sequencer.proto.SequencerError
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.crypto.Hash.sha3
 import org.web3j.crypto.RawTransaction
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.Contract
 import org.web3j.utils.Numeric
 import java.math.BigInteger
-import java.sql.Connection
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.milliseconds
 import org.jetbrains.exposed.sql.transactions.transaction as dbTransaction
@@ -101,7 +100,7 @@ class BlockchainTransactionHandler(
                             }
                         }
                     } else {
-                        settlementBatchInProgress = dbTransaction {
+                        settlementBatchInProgress = serializableTransaction {
                             if (tryAcquireAdvisoryLock(chainId.value.toLong())) {
                                 processSettlementBatch()
                             } else {
@@ -672,7 +671,7 @@ class BlockchainTransactionHandler(
     }
 
     private fun onWithdrawalComplete(withdrawalEntity: WithdrawalEntity, error: String?, withdrawAmount: BigInteger?) {
-        transaction(Connection.TRANSACTION_SERIALIZABLE) {
+        serializableTransaction {
             val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
             val tx = withdrawalEntity.transactionData!! as EIP712Transaction.WithdrawTx
             withdrawalEntity.update(
