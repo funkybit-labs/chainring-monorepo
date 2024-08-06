@@ -3,6 +3,7 @@ package co.chainring.apps.ring
 import co.chainring.apps.api.model.websocket.MyTradesUpdated
 import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.DefaultBlockParam
+import co.chainring.core.db.serializableTransaction
 import co.chainring.core.evm.Adjustment
 import co.chainring.core.evm.BatchSettlement
 import co.chainring.core.evm.ECHelper.sha3
@@ -42,10 +43,8 @@ import kotlinx.datetime.Clock
 import org.web3j.abi.DefaultFunctionEncoder
 import java.math.BigDecimal
 import java.math.BigInteger
-import java.sql.Connection
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.milliseconds
-import org.jetbrains.exposed.sql.transactions.transaction as dbTransaction
 
 class SettlementCoordinator(
     blockchainClients: List<BlockchainClient>,
@@ -71,7 +70,7 @@ class SettlementCoordinator(
             logger.debug { "Batch Settlement coordinator thread starting" }
             while (true) {
                 try {
-                    val batchInProgress = dbTransaction(Connection.TRANSACTION_SERIALIZABLE) {
+                    val batchInProgress = serializableTransaction {
                         if (tryAcquireAdvisoryLock(advisoryLockKey)) {
                             processSettlementBatch()
                         } else {
