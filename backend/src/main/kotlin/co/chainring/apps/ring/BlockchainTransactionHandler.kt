@@ -40,6 +40,7 @@ import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.Contract
 import org.web3j.utils.Numeric
 import java.math.BigInteger
+import java.sql.Connection
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.milliseconds
 import org.jetbrains.exposed.sql.transactions.transaction as dbTransaction
@@ -671,7 +672,7 @@ class BlockchainTransactionHandler(
     }
 
     private fun onWithdrawalComplete(withdrawalEntity: WithdrawalEntity, error: String?, withdrawAmount: BigInteger?) {
-        transaction {
+        transaction(Connection.TRANSACTION_SERIALIZABLE) {
             val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
             val tx = withdrawalEntity.transactionData!! as EIP712Transaction.WithdrawTx
             withdrawalEntity.update(
