@@ -16,6 +16,7 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import java.math.BigInteger
+import java.sql.Connection
 import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -47,7 +48,7 @@ class BlockchainDepositHandler(
             while (true) {
                 try {
                     Thread.sleep(pollingIntervalInMs)
-                    transaction {
+                    transaction(Connection.TRANSACTION_SERIALIZABLE) {
                         refreshPendingDeposits()
                     }
                 } catch (ie: InterruptedException) {

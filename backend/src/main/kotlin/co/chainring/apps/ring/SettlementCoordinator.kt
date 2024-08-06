@@ -42,6 +42,7 @@ import kotlinx.datetime.Clock
 import org.web3j.abi.DefaultFunctionEncoder
 import java.math.BigDecimal
 import java.math.BigInteger
+import java.sql.Connection
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.milliseconds
 import org.jetbrains.exposed.sql.transactions.transaction as dbTransaction
@@ -70,7 +71,7 @@ class SettlementCoordinator(
             logger.debug { "Batch Settlement coordinator thread starting" }
             while (true) {
                 try {
-                    val batchInProgress = dbTransaction {
+                    val batchInProgress = dbTransaction(Connection.TRANSACTION_SERIALIZABLE) {
                         if (tryAcquireAdvisoryLock(advisoryLockKey)) {
                             processSettlementBatch()
                         } else {
