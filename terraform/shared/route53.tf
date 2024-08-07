@@ -118,6 +118,39 @@ resource "aws_route53_record" "fb-fun-mx" {
   records = ["1 smtp.google.com"]
 }
 
+resource "aws_route53_record" "fb-fun-cname1" {
+  zone_id = aws_route53_zone.fb-fun.zone_id
+  name    = "www.funkybit.fun"
+  type    = "CNAME"
+  ttl     = "300"
+  records = ["funkybit.fun"]
+}
+
+resource "aws_route53_record" "fb-fun-cname2" {
+  zone_id = aws_route53_zone.fb-fun.zone_id
+  name    = "w3dev.funkybit.fun"
+  type    = "CNAME"
+  ttl     = "300"
+  records = ["funkybit.fun"]
+}
+
+resource "aws_route53_record" "fb-fun-cname3" {
+  zone_id = aws_route53_zone.fb-fun.zone_id
+  name    = "docs.funkybit.fun"
+  type    = "CNAME"
+  ttl     = "300"
+  records = ["9a4e771167-hosting.gitbook.io"]
+}
+
+resource "aws_route53_record" "fb-fun-txt1" {
+  zone_id = aws_route53_zone.fb-fun.zone_id
+  name    = ""
+  type    = "TXT"
+  ttl     = "3600"
+  records = ["google-site-verification=FWrje7XGlau98ClwegSSUopNXOJwMgri2D8-Zv4PHDg"]
+}
+
+
 resource "aws_route53_record" "fb-co-a" {
   zone_id = aws_route53_zone.fb-co.zone_id
   name    = "funkybit.co"
