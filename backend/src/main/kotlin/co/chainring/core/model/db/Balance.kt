@@ -14,7 +14,6 @@ import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
 import org.jetbrains.exposed.sql.transactions.TransactionManager
-import java.math.BigDecimal
 import java.math.BigInteger
 
 @Serializable
@@ -76,21 +75,17 @@ class BalanceEntity(guid: EntityID<BalanceId>) : GUIDEntity<BalanceId>(guid) {
             updateBalances(
                 changes.map { change ->
                     val startingBalanceEntity = startingBalances.firstOrNull { it.wallet.guid.value == change.walletId && it.symbol.guid.value == change.symbolId }
-                    val startingBalance = startingBalanceEntity?.balance
                     BalanceUpdateAssignment(
+                        id = startingBalanceEntity?.guid ?: EntityID(BalanceId.generate(), BalanceTable),
                         walletId = change.walletId,
                         symbolId = change.symbolId,
-                        delta = when (change) {
+                        value = when (change) {
                             is BalanceChange.Delta -> change.amount
-                            is BalanceChange.Replace -> change.amount - (startingBalance ?: BigInteger.ZERO)
-                        },
-                        balanceId = startingBalanceEntity?.guid?.value ?: BalanceId.generate(),
-                        balanceBefore = startingBalance,
-                        balanceAfter = when (change) {
-                            is BalanceChange.Delta -> (startingBalance ?: BigInteger.ZERO) + change.amount
                             is BalanceChange.Replace -> change.amount
                         },
-                        balanceType,
+                        balanceBefore = startingBalanceEntity != null,
+                        balanceType = balanceType,
+                        changeType = change,
                     )
                 },
             )
@@ -118,13 +113,13 @@ class BalanceEntity(guid: EntityID<BalanceId>) : GUIDEntity<BalanceId>(guid) {
         }
 
         private data class BalanceUpdateAssignment(
+            val id: EntityID<BalanceId>,
             val walletId: WalletId,
             val symbolId: SymbolId,
-            val delta: BigInteger,
-            val balanceId: BalanceId,
-            val balanceBefore: BigInteger?,
-            val balanceAfter: BigInteger,
+            val value: BigInteger,
+            val balanceBefore: Boolean,
             val balanceType: BalanceType,
+            val changeType: BalanceChange,
         )
 
         private fun updateBalances(assignments: List<BalanceUpdateAssignment>) {
@@ -132,37 +127,57 @@ class BalanceEntity(guid: EntityID<BalanceId>) : GUIDEntity<BalanceId>(guid) {
                 return
             }
             val now = Clock.System.now()
-            val (updateAssignments, insertAssignments) = assignments.partition { it.balanceBefore != null }
+            val (updateAssignments, insertAssignments) = assignments.partition { it.balanceBefore }
             BalanceTable.batchInsert(insertAssignments) { assignment ->
-                this[BalanceTable.guid] = assignment.balanceId
+                this[BalanceTable.guid] = assignment.id
                 this[BalanceTable.createdAt] = now
                 this[BalanceTable.createdBy] = "system"
                 this[BalanceTable.updatedAt] = now
                 this[BalanceTable.updatedBy] = "system"
                 this[BalanceTable.symbolGuid] = assignment.symbolId
-                this[BalanceTable.balance] = assignment.balanceAfter.toBigDecimal()
+                this[BalanceTable.balance] = assignment.value.toBigDecimal()
                 this[BalanceTable.walletGuid] = assignment.walletId
                 this[BalanceTable.type] = assignment.balanceType
             }
             if (updateAssignments.isNotEmpty()) {
-                BatchUpdateStatement(BalanceTable).apply {
-                    updateAssignments.forEach { assignment ->
-                        addBatch(EntityID(assignment.balanceId, BalanceTable))
-                        this[BalanceTable.balance] = assignment.balanceAfter.toBigDecimal()
-                        this[BalanceTable.updatedAt] = now
-                        this[BalanceTable.updatedBy] = "system"
+                val (deltaUpdateAssignments, replaceUpdateAssignments) = updateAssignments.partition { it.changeType is BalanceChange.Delta }
+                if (deltaUpdateAssignments.isNotEmpty()) {
+                    TransactionManager.current().exec(
+                        """
+                    UPDATE ${BalanceTable.nameInDatabaseCase()}
+                       SET ${BalanceTable.balance.nameInDatabaseCase()} = ${BalanceTable.balance.nameInDatabaseCase()} + data_table.value
+                      FROM (
+                        SELECT unnest(?) as guid, unnest(?) as value
+                      ) AS data_table
+                     WHERE ${BalanceTable.nameInDatabaseCase()}.${BalanceTable.guid.nameInDatabaseCase()} = data_table.guid
+                        """.trimIndent(),
+                        listOf(
+                            ArrayColumnType(BalanceTable.guid.columnType) to deltaUpdateAssignments.map { it.id }
+                                .toTypedArray(),
+                            ArrayColumnType(BalanceTable.balance.columnType) to deltaUpdateAssignments.map { it.value }
+                                .toTypedArray(),
+                        ),
+                    )
+                }
+                if (replaceUpdateAssignments.isNotEmpty()) {
+                    BatchUpdateStatement(BalanceTable).apply {
+                        replaceUpdateAssignments.forEach { assignment ->
+                            addBatch(assignment.id)
+                            this[BalanceTable.balance] = assignment.value.toBigDecimal()
+                            this[BalanceTable.updatedAt] = now
+                            this[BalanceTable.updatedBy] = "system"
+                        }
+                        execute(TransactionManager.current())
                     }
-                    execute(TransactionManager.current())
                 }
             }
             BalanceLogTable.batchInsert(assignments) { assignment ->
                 this[BalanceLogTable.guid] = BalanceLogId.generate()
                 this[BalanceLogTable.createdAt] = now
                 this[BalanceLogTable.createdBy] = "system"
-                this[BalanceLogTable.balanceGuid] = EntityID(assignment.balanceId, BalanceTable)
-                this[BalanceLogTable.delta] = assignment.delta.toBigDecimal()
-                this[BalanceLogTable.balanceBefore] = assignment.balanceBefore?.toBigDecimal() ?: BigDecimal.ZERO
-                this[BalanceLogTable.balanceAfter] = assignment.balanceAfter.toBigDecimal()
+                this[BalanceLogTable.balanceGuid] = assignment.id
+                this[BalanceLogTable.amount] = assignment.value.toBigDecimal()
+                this[BalanceLogTable.isReplacement] = assignment.changeType is BalanceChange.Replace
             }
         }
 

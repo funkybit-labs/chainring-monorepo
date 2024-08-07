@@ -15,8 +15,7 @@ value class BalanceLogId(override val value: String) : EntityId {
 object BalanceLogTable : GUIDTable<BalanceLogId>("balance_log", ::BalanceLogId) {
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
-    val balanceBefore = (decimal("balance_before", 30, 0))
-    val balanceAfter = (decimal("balance_after", 30, 0))
-    val delta = (decimal("delta", 30, 0))
+    val amount = (decimal("amount", 30, 0))
+    val isReplacement = bool("is_replacement")
     val balanceGuid = reference("balance_guid", BalanceTable).index()
 }
