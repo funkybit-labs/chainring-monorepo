@@ -5,13 +5,11 @@ import kotlinx.serialization.json.Json
 import org.apache.commons.dbcp2.BasicDataSource
 import org.jetbrains.exposed.dao.Entity
 import org.jetbrains.exposed.dao.EntityClass
-import org.jetbrains.exposed.exceptions.ExposedSQLException
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.DatabaseConfig
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.transactions.TransactionManager
-import org.jetbrains.exposed.sql.transactions.transaction
 import java.lang.System.getenv
 import java.sql.ResultSet
 import java.time.Duration
@@ -93,23 +91,3 @@ fun <T : Entity<Q>, Q : Comparable<Q>> Transaction.executeRaw(sql: String, entit
 
 fun <T : Entity<Q>, Q : Comparable<Q>> Transaction.entityFromResultSet(rs: ResultSet, entity: EntityClass<Q, T>): T =
     entity.wrapRow(ResultRow.create(rs, entity.table.columns.mapIndexed { index, field -> field to index }.toMap()))
-
-fun <T> serializableTransaction(tx: Transaction.() -> T): T {
-    var retriesLeft = 10
-    while (true) {
-        try {
-            return transaction {
-                tx()
-            }
-        } catch (se: ExposedSQLException) {
-            if (se.sqlState == "40001") { // serialization_failure
-                retriesLeft -= 1
-                if (retriesLeft == 0) {
-                    throw(se)
-                }
-            } else {
-                throw (se)
-            }
-        }
-    }
-}

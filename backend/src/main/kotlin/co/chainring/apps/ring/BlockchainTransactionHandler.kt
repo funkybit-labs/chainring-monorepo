@@ -5,7 +5,6 @@ import co.chainring.core.blockchain.BlockchainClient
 import co.chainring.core.blockchain.BlockchainClientException
 import co.chainring.core.blockchain.BlockchainServerException
 import co.chainring.core.blockchain.DefaultBlockParam
-import co.chainring.core.db.serializableTransaction
 import co.chainring.core.evm.EIP712Transaction
 import co.chainring.core.model.db.BalanceChange
 import co.chainring.core.model.db.BalanceEntity
@@ -34,6 +33,7 @@ import co.chainring.sequencer.proto.SequencerError
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
+import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.crypto.Hash.sha3
 import org.web3j.crypto.RawTransaction
 import org.web3j.protocol.core.methods.response.TransactionReceipt
@@ -100,7 +100,7 @@ class BlockchainTransactionHandler(
                             }
                         }
                     } else {
-                        settlementBatchInProgress = serializableTransaction {
+                        settlementBatchInProgress = dbTransaction {
                             if (tryAcquireAdvisoryLock(chainId.value.toLong())) {
                                 processSettlementBatch()
                             } else {
@@ -671,7 +671,7 @@ class BlockchainTransactionHandler(
     }
 
     private fun onWithdrawalComplete(withdrawalEntity: WithdrawalEntity, error: String?, withdrawAmount: BigInteger?) {
-        serializableTransaction {
+        transaction {
             val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
             val tx = withdrawalEntity.transactionData!! as EIP712Transaction.WithdrawTx
             withdrawalEntity.update(

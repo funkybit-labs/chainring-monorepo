@@ -1,7 +1,6 @@
 package co.chainring.apps.ring
 
 import co.chainring.core.blockchain.BlockchainClient
-import co.chainring.core.db.serializableTransaction
 import co.chainring.core.model.db.BalanceChange
 import co.chainring.core.model.db.BalanceEntity
 import co.chainring.core.model.db.BalanceType
@@ -14,6 +13,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import java.math.BigInteger
 import kotlin.concurrent.thread
@@ -47,7 +47,7 @@ class BlockchainDepositHandler(
             while (true) {
                 try {
                     Thread.sleep(pollingIntervalInMs)
-                    serializableTransaction {
+                    transaction {
                         refreshPendingDeposits()
                     }
                 } catch (ie: InterruptedException) {
