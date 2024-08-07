@@ -166,7 +166,7 @@ class OrderBookDiffBroadcastingTest : OrderBaseTest() {
         repeat(3) { makerWsClient.assertMyOrderCreatedMessageReceived() }
         makerWsClient.assertMyOrderUpdatedMessageReceived()
 
-        takerApiClient.createMarketOrder(
+        val marketOrderResponse = takerApiClient.createMarketOrder(
             market,
             OrderSide.Buy,
             amount = AssetAmount(baseSymbol, "0.004").amount,
@@ -299,6 +299,8 @@ class OrderBookDiffBroadcastingTest : OrderBaseTest() {
                 ),
             )
         }
+
+        waitForSettlementToFinish(getTradesForOrders(listOf(marketOrderResponse.orderId)).map { it.id.value })
 
         makerWsClient.close()
         orderBookObserver.close()

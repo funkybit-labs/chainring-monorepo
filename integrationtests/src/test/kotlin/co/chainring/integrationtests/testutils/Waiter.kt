@@ -6,6 +6,7 @@ import co.chainring.core.model.db.DepositTable
 import co.chainring.core.model.db.SettlementBatchEntity
 import co.chainring.core.model.db.SettlementBatchStatus
 import co.chainring.core.model.db.SettlementBatchTable
+import co.chainring.core.model.db.TradeEntity
 import co.chainring.core.model.db.WithdrawalEntity
 import co.chainring.core.model.db.WithdrawalStatus
 import co.chainring.core.model.db.WithdrawalTable
@@ -35,7 +36,8 @@ fun waitForActivityToComplete() {
         waitFor(4000L) {
             transaction {
                 runCatching { Faucet.mine() }
-                SettlementBatchEntity.count(SettlementBatchTable.status.neq(SettlementBatchStatus.Completed)) == 0L &&
+                TradeEntity.findPendingForNewSettlementBatch().isEmpty() &&
+                    SettlementBatchEntity.count(SettlementBatchTable.status.neq(SettlementBatchStatus.Completed)) == 0L &&
                     WithdrawalEntity.count(
                         WithdrawalTable.status.notInList(
                             listOf(
@@ -61,7 +63,7 @@ fun waitForActivityToComplete() {
                     SettlementBatchEntity.all().map { it.status }
                 }, withdrawals=${WithdrawalEntity.all().map { it.status }}, deposits=${
                     DepositEntity.all().map { it.status }
-                }"
+                }, pending trades = ${TradeEntity.findPendingForNewSettlementBatch().map {it.id.value}}"
             }
         }
     }
