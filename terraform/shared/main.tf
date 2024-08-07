@@ -98,7 +98,7 @@ moved {
 }
 
 resource "aws_route53_zone" "zone" {
-  name = var.zone
+  name = var.chainring_zone
 }
 
 resource "aws_route53_zone" "zone-finance" {

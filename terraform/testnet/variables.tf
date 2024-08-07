@@ -18,7 +18,7 @@ variable "cidr_prefix" {
 data "terraform_remote_state" "shared" {
   backend = "s3"
   config = {
-    bucket = "chainring-terraform-state"
+    bucket = "funkybit-terraform-state"
     key    = "shared/main.tfstate"
     region = var.aws_region
   }
@@ -39,7 +39,7 @@ terraform {
   required_version = "1.5.7"
 
   backend "s3" {
-    bucket = "chainring-terraform-state"
+    bucket = "funkybit-terraform-state"
     key    = "testnet/main.tfstate"
     region = "us-east-2"
   }

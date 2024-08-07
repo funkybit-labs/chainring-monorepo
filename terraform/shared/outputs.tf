@@ -1,5 +1,5 @@
 output "zone" {
-  value = aws_route53_zone.zone
+  value = aws_route53_zone.fb-fun
 }
 
 output "ci_role_arn" {
