@@ -34,7 +34,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -L 5434:test-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com:5432 ec2-user@test-bastion.funkybit.fun -N &
           sleep 2  # to give the SSH tunnel time to be set up
-          DB_PASSWORD=$(aws --region us-east-2 secretsmanager get-secret-value --secret-id 'arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2' | jq -r '.SecretString' | jq -r '.password') \
+          DB_PASSWORD=$(aws --region us-east-2 secretsmanager get-secret-value --secret-id 'arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-a00059f0-7cd7-4989-bd67-7af9e5899397-cWukH6' | jq -r '.SecretString' | jq -r '.password') \
              ./gradlew check
         env:
           DB_PORT: 5434
