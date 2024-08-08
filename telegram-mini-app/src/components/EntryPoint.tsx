@@ -1,7 +1,7 @@
 import 'tailwindcss/tailwind.css'
-import React, { useState } from 'react'
-import LogoVSvg from 'assets/logo-v.svg'
-import MillisecondsSvg from 'assets/milliseconds.svg'
+import React, { useEffect, useState } from 'react'
+import logo from 'assets/funkybit-orange-logo.png'
+import logoWords from 'assets/logo-words.png'
 import MainScreen from 'components/MainScreen'
 import Spinner from 'components/common/Spinner'
 import { apiClient, ApiErrorsSchema, userQueryKey } from 'apiClient'
@@ -11,11 +11,15 @@ import { Button } from 'components/common/Button'
 
 export type Alert = 'checkin' | 'milestone'
 
+type SplashAnimationStep = 'none' | 'spin' | 'words' | 'signup' | 'complete'
+
 export default function EntryPoint() {
   const queryClient = useQueryClient()
   const [showInviteError, setShowInviteError] = useState(false)
   const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [dismissedAlerts, setDismissedAlerts] = useState<Alert[]>([])
+  const [animationStep, setAnimationStep] =
+    useState<SplashAnimationStep>('none')
 
   const userQuery = useQuery({
     queryKey: userQueryKey,
@@ -61,6 +65,33 @@ export default function EntryPoint() {
     signUpMutation.mutate()
   }
 
+  useEffect(() => {
+    if (
+      !showInviteError &&
+      animationStep === 'none' &&
+      userQuery.isSuccess &&
+      userQuery.data === null
+    ) {
+      setAnimationStep('spin')
+      window.setTimeout(() => {
+        setAnimationStep('words')
+        window.setTimeout(() => {
+          setAnimationStep('signup')
+        }, 3000)
+      }, 2000)
+    }
+  }, [userQuery, animationStep, showInviteError])
+
+  useEffect(() => {
+    if (animationStep === 'signup') {
+      setAnimationStep('complete')
+      const query = new URLSearchParams(window.location.search)
+      const code = query.get('tgWebAppStartParam')
+      setInviteCode(code)
+      signUpMutation.mutate()
+    }
+  }, [animationStep, signUpMutation])
+
   if (userQuery.isPending) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -95,30 +126,29 @@ export default function EntryPoint() {
             </div>
           )}
           <div className="flex flex-col items-center justify-center">
-            <img src={LogoVSvg} />
-            <img src={MillisecondsSvg} className="my-8 mr-8" />
-            <div className="mx-8 text-center text-3xl font-semibold text-white">
-              When every millisecond counts
-            </div>
-          </div>
-          <div className="mb-6 flex flex-col px-8">
-            <div className="mb-4 text-center text-white">
-              Join our community and earn CR Points!
-            </div>
-            <Button
-              caption={() => (
-                <div className="py-3 text-lg font-semibold">
-                  Lets get started
-                </div>
-              )}
-              disabled={signUpMutation.isPending}
-              onClick={() => {
-                const query = new URLSearchParams(window.location.search)
-                const code = query.get('tgWebAppStartParam')
-                setInviteCode(code)
-                signUpMutation.mutate()
-              }}
-            />
+            {animationStep === 'spin' && (
+              <img
+                className="size-16 origin-[28px_32px] animate-spin"
+                src={logo}
+                alt="funkybit"
+              />
+            )}
+            {animationStep === 'words' && (
+              <div>
+                <img className="inline size-16" src={logo} alt="funkybit" />
+                <img
+                  className="inline h-8 animate-wordArtSlide"
+                  src={logoWords}
+                  alt="funkybit"
+                />
+              </div>
+            )}
+            {(animationStep === 'signup' || animationStep === 'complete') && (
+              <div>
+                <img className="inline size-16" src={logo} alt="funkybit" />
+                <img className="inline h-8" src={logoWords} alt="funkybit" />
+              </div>
+            )}
           </div>
         </div>
       )

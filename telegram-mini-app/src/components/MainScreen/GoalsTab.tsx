@@ -35,11 +35,11 @@ function GoalAchieved({ goalAchieved }: { goalAchieved?: UserGoal }) {
         alt={goalAchievedDescription}
       />
       <div className="text-2xl font-normal text-brightOrange">
-        +{goalAchieved?.reward?.toString() ?? ''} CR
+        +{goalAchieved?.reward?.toString() ?? ''} FB
       </div>
       <div className="text-center text-lg leading-6 text-white">
         Thank you for subscribing to our {goalAchievedDescription}. Complete
-        more goals for more CR.
+        more goals for more FB.
       </div>
       <Button className={'mt-2 p-1'} caption={() => 'Ok'} onClick={close} />
     </div>
@@ -78,7 +78,7 @@ export default function GoalsTab({ user }: { user: User }) {
                 max={new Decimal(goalCount)}
               />
               <span className="text-2xl">
-                {earnedReward.toString()}/{availableReward.toString()} CR
+                {earnedReward.toString()}/{availableReward.toString()} FB
               </span>
             </div>
           </InfoPanel>
@@ -163,7 +163,7 @@ function GoalRow({
       <>
         <HeadSub
           head={description}
-          sub={`${goal.reward} CRs`}
+          sub={`${goal.reward} FBs`}
           style={'largeSub'}
         />
         <div className="flex w-full justify-end">

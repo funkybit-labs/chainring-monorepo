@@ -22,10 +22,20 @@ export default {
           '0%, 100%': { backgroundColor: 'transparent' },
           '50%': { background: 'linear-gradient(to bottom, #FFA857, #FF710B)', opacity: 0.7 },
         },
+        wordArtSlide: {
+          '0%': {transform: 'translateX(300px)'},
+          '75%': {transform: 'translateX(-45px)'},
+          '85%': {transform: 'translateX(15px)'},
+          '90%': {transform: 'translateX(-10px)'},
+          '95%': {transform: 'translateX(10px)'},
+          '97%': {transform: 'translateX(-5px)'},
+          '100%': {transform: 'translateX(0px)'}
+        }
       },
       animation: {
         swivel: 'swivel 0.5s linear',
         gameOrangeBlink: 'gameOrangeBlink 1.5s steps(1, end) infinite',
+        wordArtSlide: 'wordArtSlide 0.4s ease-out'
       }
     },
     colors: {

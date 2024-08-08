@@ -19,7 +19,7 @@ export function CheckInStreakWidget({ streak }: { streak: CheckInStreak }) {
       </div>
       <div className="text-sm text-white">Check in streak</div>
       <div className="mt-8 text-xl text-brightOrange">
-        +{decimalAsInt(streak.reward)} CR and {streak.gameTickets}{' '}
+        +{decimalAsInt(streak.reward)} FB and {streak.gameTickets}{' '}
         {ticketsLabel}.
       </div>
       <Button className={'mt-2 p-1'} caption={() => 'Ok'} onClick={close} />
