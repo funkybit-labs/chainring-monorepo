@@ -8,7 +8,7 @@ import "checkpoint.proto";
 import "trade.proto";
 
 option java_multiple_files = true;
-option java_package = "co.chainring.sequencer.proto";
+option java_package = "xyz.funkybit.sequencer.proto";
 option java_outer_classname = "SequencerSchema";
 
 message OrderChanged {

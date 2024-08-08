@@ -280,15 +280,7 @@ export function SwapModal({
                           sr.lastOrder?.status ?? ''
                         )
                       ) {
-                        const ns = sr.lastOrder?.timing?.sequencerTimeNs
-                        if (ns) {
-                          const us = new Decimal(
-                            ns.toString()
-                          ).dividedToIntegerBy(1000)
-                          return '✓ Swapped in ' + us + 'µs'
-                        } else {
-                          return '✓ Swapped'
-                        }
+                        return '✓ Swapped'
                       } else if (sr.mutation.isSuccess) {
                         return '✓ Submitted'
                       } else if (sr.amountTooLow) {

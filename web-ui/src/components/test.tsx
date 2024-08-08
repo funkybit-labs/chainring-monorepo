@@ -18,7 +18,7 @@ describe('<App />', () => {
         </WagmiProvider>
       )
 
-      expect(screen.getAllByAltText('ChainRing')[0]).toBeInTheDocument()
+      expect(screen.getAllByAltText('funkybit')[0]).toBeInTheDocument()
 
       expect(
         screen.getByRole('button', {

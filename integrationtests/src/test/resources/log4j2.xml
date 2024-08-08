@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration packages="co.chainring.integrationtests.utils" status="INFO">
+<Configuration packages="xyz.funkybit.integrationtests.utils" status="INFO">
     <Properties>
         <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1} TID:%tid, TN:"%tn" - %m%n</Property>
     </Properties>
@@ -14,10 +14,10 @@
         <TestLoggingAppender name="TestLoggingAppender"/>
     </Appenders>
     <Loggers>
-        <Logger name="co.chainring" level="debug" additivity="false">
+        <Logger name="xyz.funkybit" level="debug" additivity="false">
             <AppenderRef ref="AsyncAppender"/>
         </Logger>
-        <Logger name="co.chainring.core.repeater.tasks" level="error" additivity="false">
+        <Logger name="xyz.funkybit.core.repeater.tasks" level="error" additivity="false">
             <AppenderRef ref="AsyncAppender"/>
             <AppenderRef ref="TestLoggingAppender"/>
         </Logger>

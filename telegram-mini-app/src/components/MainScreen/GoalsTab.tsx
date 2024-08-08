@@ -115,17 +115,17 @@ export default function GoalsTab({ user }: { user: User }) {
 function goalInfo(goalId: GoalId) {
   switch (goalId) {
     case 'GithubSubscription':
-      return [GithubIconSvg, 'Github', 'https://github.com/Chainring-Inc']
+      return [GithubIconSvg, 'Github', 'https://github.com/funkybit']
     case 'MediumSubscription':
-      return [MediumIconSvg, 'Medium', 'https://chainring.medium.com/']
+      return [MediumIconSvg, 'Medium', 'https://funkybit.medium.com/']
     case 'LinkedinSubscription':
       return [
         LinkedInIconSvg,
         'LinkedIn',
-        'https://www.linkedin.com/company/chainring-inc/'
+        'https://www.linkedin.com/company/funkybit/'
       ]
     case 'XSubscription':
-      return [XIconSvg, 'X (Twitter)', 'https://twitter.com/chainring_fin']
+      return [XIconSvg, 'X (Twitter)', 'https://twitter.com/funkybit-labs']
   }
 }
 

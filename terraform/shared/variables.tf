@@ -10,7 +10,7 @@ variable "cidr_prefix" {
   default = "10.30"
 }
 
-variable "zone" {
+variable "chainring_zone" {
   default = "chainring.co"
 }
 
@@ -31,7 +31,7 @@ terraform {
   required_version = "1.5.7"
 
   backend "s3" {
-    bucket = "chainring-terraform-state"
+    bucket = "funkybit-terraform-state"
     key    = "shared/main.tfstate"
     region = "us-east-2"
   }

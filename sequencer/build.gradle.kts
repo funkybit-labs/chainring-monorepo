@@ -90,7 +90,7 @@ java {
 }
 
 application {
-    mainClass.set("co.chainring.sequencer.MainKt")
+    mainClass.set("xyz.funkybit.sequencer.MainKt")
     applicationDefaultJvmArgs = chronicleJvmArgs
 }
 

@@ -51,7 +51,7 @@ jobs:
         uses: ./.github/actions/setup-aws
       - name: Deploy to ${{ inputs.environment }} environment
         working-directory: ./telegram-mini-app
-        run: aws s3 sync dist/ s3://${{ inputs.environment }}-chainring-telegram-mini-app/
+        run: aws s3 sync dist/ s3://${{ inputs.environment }}-funkybit-telegram-mini-app/
       - name: Install jq
         uses: dcarbone/install-jq-action@v2
       - name: invalidate cloudfront cache

@@ -14,7 +14,7 @@ PARAMS=$(jq -n \
     assetsURLPrefix: $assetsURLPrefix,
     experimental: $experimental,
     branding: {
-      siteName: "ChainRing",
+      siteName: "funkybit",
       networkTitle: $netName,
       hideAnnouncements: false
     },

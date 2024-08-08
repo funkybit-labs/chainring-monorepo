@@ -9,7 +9,7 @@ plugins {
     application
 }
 
-group = "co.chainring"
+group = "xyz.funkybit"
 version = "1.0"
 
 repositories {
@@ -99,7 +99,7 @@ java {
 }
 
 application {
-    mainClass.set("co.chainring.MainKt")
+    mainClass.set("xyz.funkybit.MainKt")
 }
 
 val buildNumber = System.getenv("BUILD_NUMBER") ?: "1"

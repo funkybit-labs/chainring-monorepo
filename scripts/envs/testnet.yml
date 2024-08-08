@@ -9,7 +9,7 @@ environment:
     BLOCK_EXPLORER_URL_Bitlayer: https://testnet.btrscan.com
     BLOCK_EXPLORER_URL_Base: https://base-sepolia.blockscout.com
     AUTH_TOKEN_VALIDITY_INTERVAL: P7D
-    SEQUENCER_HOST_NAME: testnet-sequencer.chainring.co
+    SEQUENCER_HOST_NAME: testnet-sequencer.funkybit.fun
     SEQUENCER_PORT: "5337"
     EVM_FEE_ACCOUNT_ADDRESS: "0x5E027795ec717ae1cAfa705F93720C02aB429b95"
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
@@ -31,7 +31,7 @@ environment:
     SLACK_ERROR_REPORTING_CHANNEL_ID: C0723AASGTH
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
   mocker:
-    API_URL: http://testnet-api.chainring.co:9000
+    API_URL: http://testnet-api.funkybit.fun:9000
     EVM_CHAINS: Bitlayer,Base
     EVM_NETWORK_URL_Bitlayer: https://testnet-rpc.bitlayer.org
     EVM_NETWORK_URL_Base: https://sepolia.base.org

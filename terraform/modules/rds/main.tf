@@ -28,8 +28,8 @@ resource "aws_rds_cluster" "db_cluster" {
   engine                      = "aurora-postgresql"
   engine_version              = "16.1"
   manage_master_user_password = true
-  master_username             = "chainring"
-  database_name               = "chainring"
+  master_username             = "funkybit"
+  database_name               = "funkybit"
   db_subnet_group_name        = aws_db_subnet_group.db_subnet_group.name
   backup_retention_period     = 7
   preferred_backup_window     = "08:00-08:30"

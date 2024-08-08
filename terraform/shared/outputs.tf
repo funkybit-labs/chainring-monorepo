@@ -1,13 +1,5 @@
 output "zone" {
-  value = aws_route53_zone.zone
-}
-
-output "finance_zone" {
-  value = aws_route53_zone.zone-finance
-}
-
-output "labs_zone" {
-  value = aws_route53_zone.zone-labs
+  value = aws_route53_zone.fb-fun
 }
 
 output "ci_role_arn" {

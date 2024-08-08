@@ -18,20 +18,20 @@ variable "cidr_prefix" {
 data "terraform_remote_state" "shared" {
   backend = "s3"
   config = {
-    bucket = "chainring-terraform-state"
+    bucket = "funkybit-terraform-state"
     key    = "shared/main.tfstate"
     region = var.aws_region
   }
 }
 
-data "aws_acm_certificate" "chainring_us_east_1" {
-  domain    = "*.chainring.co"
+data "aws_acm_certificate" "funkybit_us_east_1" {
+  domain    = "*.funkybit.fun"
   key_types = ["EC_prime256v1"]
   provider  = aws.us_east_1
 }
 
-data "aws_acm_certificate" "chainring" {
-  domain    = "*.chainring.co"
+data "aws_acm_certificate" "funkybit" {
+  domain    = "*.funkybit.fun"
   key_types = ["EC_prime256v1"]
 }
 
@@ -39,7 +39,7 @@ terraform {
   required_version = "1.5.7"
 
   backend "s3" {
-    bucket = "chainring-terraform-state"
+    bucket = "funkybit-terraform-state"
     key    = "demo/main.tfstate"
     region = "us-east-2"
   }

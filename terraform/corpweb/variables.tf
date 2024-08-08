@@ -37,7 +37,7 @@ variable "static_ip_name" {
 
 variable "dns_zone" {
   type    = string
-  default = "chainring.co."
+  default = "funkybit.fun."
 }
 
 variable "primary_web" {
@@ -53,19 +53,19 @@ variable "development_web" {
 variable "publickey" {
   type        = string
   description = "Public key for access lightsail instance"
-  default     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO9/S8kIxj/lD2DFO8tBWfE2QoyP0tu5AqQf52KlLj8w sburke@chainring.co"
+  default     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO9/S8kIxj/lD2DFO8tBWfE2QoyP0tu5AqQf52KlLj8w sburke@funkybit.fun"
 }
 
 variable "publickey-name" {
   type    = string
-  default = "chainring-web"
+  default = "funkybit-web"
 }
 
 terraform {
   required_version = "1.5.7"
 
   backend "s3" {
-    bucket = "chainring-terraform-state"
+    bucket = "funkybit-terraform-state"
     key    = "lightsail/main.tfstate"
     region = "us-east-2"
   }

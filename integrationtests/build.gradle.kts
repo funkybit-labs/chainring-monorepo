@@ -6,7 +6,7 @@ plugins {
     id("org.jmailen.kotlinter") version "4.2.0"
 }
 
-group = "co.chainring"
+group = "xyz.funkybit"
 version = "1.0"
 
 repositories {

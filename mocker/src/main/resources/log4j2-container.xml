@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration packages="co.chainring.core.utils" status="INFO">
+<Configuration packages="xyz.funkybit.core.utils" status="INFO">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
             <JsonTemplateLayout eventTemplateUri="classpath:EcsLayout.json">
@@ -16,7 +16,7 @@
         </Async>
     </Appenders>
     <Loggers>
-        <Logger name="co.chainring" level="debug" additivity="false">
+        <Logger name="xyz.funkybit" level="debug" additivity="false">
             <AppenderRef ref="AsyncAppender"/>
         </Logger>
         <Root level="error">

@@ -2,7 +2,7 @@ import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
-group = "co.chainring"
+group = "xyz.funkybit"
 version = "1.0"
 
 repositories {
@@ -15,7 +15,7 @@ plugins {
 }
 
 application {
-    mainClass.set("co.chainring.LocalMainKt")
+    mainClass.set("xyz.funkybit.LocalMainKt")
 }
 
 tasks.withType<KotlinCompile> {
@@ -156,7 +156,7 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
                 commandLine(
                     "bash",
                     "-c",
-                    "web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${javaBackendWrappersOutputDir.absolutePath} -p co.chainring.contracts.generated"
+                    "web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${javaBackendWrappersOutputDir.absolutePath} -p xyz.funkybit.contracts.generated"
                 )
             }.also {
                 if (it.exitValue == 127) {
@@ -171,7 +171,7 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
                 commandLine(
                     "bash",
                     "-c",
-                    "web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${javaTestWrappersOutputDir.absolutePath} -p co.chainring.contracts.generated"
+                    "web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${javaTestWrappersOutputDir.absolutePath} -p xyz.funkybit.contracts.generated"
                 )
             }.also {
                 if (it.exitValue == 127) {
@@ -186,7 +186,7 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
                 commandLine(
                     "bash",
                     "-c",
-                    "web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${javaWrappersOutputDir.absolutePath} -p co.chainring.contracts.generated"
+                    "web3j generate solidity -b ${binFile.absolutePath} -a ${abiFile.absolutePath} -o ${javaWrappersOutputDir.absolutePath} -p xyz.funkybit.contracts.generated"
                 )
             }.also {
                 if (it.exitValue == 127) {

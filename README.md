@@ -1,6 +1,6 @@
-# ChainRing
+# funkybit
 
-ChainRing is a cross-chain DEX with a high-performance, low-latency off-chain sequencer.
+funkybit is a cross-chain DEX with a high-performance, low-latency off-chain sequencer.
 
 ## No License
 

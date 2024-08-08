@@ -47,10 +47,10 @@ services:
         tmpfs:
           size: 4294967296
     environment:
-      POSTGRES_USER: chainring
-      POSTGRES_PASSWORD: chainring
-      POSTGRES_DB: chainring
-      PGUSER: chainring # is used by psql inside container
+      POSTGRES_USER: funkybit
+      POSTGRES_PASSWORD: funkybit
+      POSTGRES_DB: funkybit
+      PGUSER: funkybit # is used by psql inside container
     ports:
       - "5432:5432"
   ut_db:
@@ -62,10 +62,10 @@ services:
         tmpfs:
           size: 4294967296
     environment:
-      POSTGRES_USER: chainring
-      POSTGRES_PASSWORD: chainring
-      POSTGRES_DB: chainring
-      PGUSER: chainring # is used by psql inside container
+      POSTGRES_USER: funkybit
+      POSTGRES_PASSWORD: funkybit
+      POSTGRES_DB: funkybit
+      PGUSER: funkybit # is used by psql inside container
     ports:
       - "5433:5432"
 

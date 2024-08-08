@@ -51,7 +51,7 @@ jobs:
         uses: ./.github/actions/setup-aws
       - name: Deploy to ${{ inputs.environment }} environment
         working-directory: ./web-ui
-        run: aws s3 sync dist/ s3://${{ inputs.environment }}-chainring-web/
+        run: aws s3 sync dist/ s3://${{ inputs.environment }}-funkybit-web/
       - name: Install jq
         uses: dcarbone/install-jq-action@v2
       - name: invalidate cloudfront cache

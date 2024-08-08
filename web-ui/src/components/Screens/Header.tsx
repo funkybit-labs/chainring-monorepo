@@ -153,7 +153,7 @@ export function Header({
               isAdmin && 'cursor-pointer'
             )}
             src={logo}
-            alt="ChainRing"
+            alt="funkybit"
             onClick={() => {
               if (isAdmin) {
                 onShowAdmin()
@@ -203,7 +203,7 @@ export function Header({
               <img
                 className="m-6 h-14 cursor-pointer"
                 src={logo}
-                alt="ChainRing"
+                alt="funkybit"
                 onClick={() => setShowMenu(false)}
               />
               <div className="m-6 cursor-pointer space-y-8 text-lg text-white">

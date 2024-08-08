@@ -1,6 +1,6 @@
 variable "github_org" {
   description = "Name of GitHub organization/user (case sensitive)"
-  default     = "Chainring-Inc"
+  default     = "funkybit-labs"
 }
 
 variable "repository_name" {

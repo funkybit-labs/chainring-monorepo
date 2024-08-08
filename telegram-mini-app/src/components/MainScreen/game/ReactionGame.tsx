@@ -126,7 +126,7 @@ export function ReactionGame({
     }
   }
   const percentilesMessage = (percentile: number) => {
-    return `You are faster than ${percentile}% of ChainRing users!`
+    return `You are faster than ${percentile}% of funkybit users!`
   }
 
   useEffect(() => {
@@ -174,7 +174,7 @@ export function ReactionGame({
           gameState === 'early' ||
           gameState === 'late') && (
           <div className="absolute left-0 top-4 flex w-full flex-row px-10 text-center font-sans text-2xl">
-            <img src={LogoSvg} alt="ChainRing" />
+            <img src={LogoSvg} alt="funkybit" />
             <div className="ml-4 text-start">
               Are you faster than
               <br />
@@ -299,14 +299,14 @@ const regularTicks = [
     label: '2.5s',
     timeMs: 2500,
     isYouTick: false,
-    isChainRingTick: false
+    isFunkybitTick: false
   },
   {
     description: 'Light from the earth to the moon',
     label: '1.3s',
     timeMs: 1300,
     isYouTick: false,
-    isChainRingTick: false
+    isFunkybitTick: false
   },
   { description: 'Heartbeat', label: '500ms', timeMs: 500, isYouTick: false },
   {
@@ -314,28 +314,28 @@ const regularTicks = [
     label: '150ms',
     timeMs: 150,
     isYouTick: false,
-    isChainRingTick: false
+    isFunkybitTick: false
   },
   {
     description: 'Lizard darts its tongue',
     label: '25ms',
     timeMs: 25,
     isYouTick: false,
-    isChainRingTick: false
+    isFunkybitTick: false
   },
   {
     description: 'Light from LA to NYC',
     label: '10ms',
     timeMs: 10,
     isYouTick: false,
-    isChainRingTick: false
+    isFunkybitTick: false
   },
   {
-    description: 'ChainRing',
+    description: 'funkybit',
     label: '1ms',
     timeMs: 1,
     isYouTick: false,
-    isChainRingTick: true
+    isFunkybitTick: true
   }
 ]
 
@@ -345,7 +345,7 @@ const extraTick = [
     label: '5',
     timeMs: 5000,
     isYouTick: false,
-    isChainRingTick: false
+    isFunkybitTick: false
   }
 ]
 
@@ -359,7 +359,7 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
       label: 'You',
       timeMs: measuredTime,
       isYouTick: true,
-      isChainRingTick: false
+      isFunkybitTick: false
     }
   ].sort((a, b) => b.timeMs - a.timeMs)
 
@@ -439,10 +439,10 @@ const Scale = ({ measuredTime }: { measuredTime: number }) => {
               <div
                 className={classNames(
                   'absolute top-0 transform -translate-x-1/2 text-center text-xxs whitespace-nowrap',
-                  index < currentTick && !tick.isChainRingTick
+                  index < currentTick && !tick.isFunkybitTick
                     ? 'opacity-0'
                     : index === currentTick ||
-                        (index < currentTick && tick.isChainRingTick)
+                        (index < currentTick && tick.isFunkybitTick)
                       ? 'opacity-100'
                       : 'opacity-0'
                 )}

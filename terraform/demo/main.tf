@@ -15,7 +15,7 @@ module "alb" {
   subnet_id_1     = module.vpc.public_subnet_id_1
   subnet_id_2     = module.vpc.public_subnet_id_2
   vpc             = module.vpc.vpc
-  certificate_arn = data.aws_acm_certificate.chainring.arn
+  certificate_arn = data.aws_acm_certificate.funkybit.arn
 }
 
 module "ecs" {
@@ -232,7 +232,7 @@ module "web" {
     aws.us_east_1 = aws.us_east_1
   }
   ci_role_arn     = data.terraform_remote_state.shared.outputs.ci_role_arn
-  certificate_arn = data.aws_acm_certificate.chainring_us_east_1.arn
+  certificate_arn = data.aws_acm_certificate.funkybit_us_east_1.arn
 }
 
 module "telegram_mini_app" {
@@ -243,7 +243,7 @@ module "telegram_mini_app" {
     aws.us_east_1 = aws.us_east_1
   }
   ci_role_arn     = data.terraform_remote_state.shared.outputs.ci_role_arn
-  certificate_arn = data.aws_acm_certificate.chainring_us_east_1.arn
+  certificate_arn = data.aws_acm_certificate.funkybit_us_east_1.arn
 }
 
 module "baregate" {
