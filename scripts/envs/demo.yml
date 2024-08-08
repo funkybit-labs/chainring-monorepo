@@ -76,7 +76,7 @@ services:
     is_essential: "true"
     environment: backend
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-d567d2ec-6ebb-4c6d-b48a-529eb09febfb-KMOVrv
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-cd9ad9b5-fbfb-4c83-8722-1058b4da13d5-Zww9oL
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
       TELEGRAM_BOT_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:demo/api/TELEGRAM_BOT_TOKEN-sKtZqG
   ring:
@@ -85,7 +85,7 @@ services:
     no_rolling_upgrade: "true"
     environment: backend
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-d567d2ec-6ebb-4c6d-b48a-529eb09febfb-KMOVrv
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-cd9ad9b5-fbfb-4c83-8722-1058b4da13d5-Zww9oL
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   telegrambot:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
@@ -93,7 +93,7 @@ services:
     environment: telegrambot
     no_rolling_upgrade: "true"
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-d567d2ec-6ebb-4c6d-b48a-529eb09febfb-KMOVrv
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-cd9ad9b5-fbfb-4c83-8722-1058b4da13d5-Zww9oL
       TELEGRAM_BOT_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:demo/telegrambot/TELEGRAM_BOT_TOKEN-p8R0DM
   anvil:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
@@ -127,7 +127,7 @@ services:
     no_rolling_upgrade: "true"
     environment: garp
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-d567d2ec-6ebb-4c6d-b48a-529eb09febfb-KMOVrv
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-cd9ad9b5-fbfb-4c83-8722-1058b4da13d5-Zww9oL
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   mocker:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/mocker
