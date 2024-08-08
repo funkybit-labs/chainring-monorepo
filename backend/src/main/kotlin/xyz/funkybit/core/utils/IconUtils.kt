@@ -7,7 +7,7 @@ import org.apache.commons.codec.binary.Base64
 import java.util.UUID
 
 object IconUtils {
-    private val BUCKET = System.getenv("WEB_ICON_BUCKET") ?: "funkybit-web-icons"
+    private val BUCKET = System.getenv("WEB_ICON_BUCKET") ?: "chainring-web-icons"
     private val REGION = System.getenv("WEB_ICON_REGION") ?: "us-east-2"
     suspend fun resolveSymbolUrl(url: String): String {
         return Regex("^data:([^;]*);(base64,)?(.*)$").matchEntire(url)?.let { match ->
