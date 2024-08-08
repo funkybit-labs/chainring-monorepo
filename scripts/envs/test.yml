@@ -40,20 +40,20 @@ services:
     is_essential: "true"
     environment: backend
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-a00059f0-7cd7-4989-bd67-7af9e5899397-cWukH6
   ring:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
     count: 1
     environment: backend
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-a00059f0-7cd7-4989-bd67-7af9e5899397-cWukH6
   telegrambot:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
     count: 1
     environment: telegrambot
     no_rolling_upgrade: "true"
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-a00059f0-7cd7-4989-bd67-7af9e5899397-cWukH6
       TELEGRAM_BOT_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:test/telegrambot/TELEGRAM_BOT_TOKEN-EJTdMA
   anvil:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
@@ -85,5 +85,5 @@ services:
     no_rolling_upgrade: "true"
     environment: garp
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-19a608f6-1f4b-4e6a-849f-27831fcf40de-vkcDz2
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-a00059f0-7cd7-4989-bd67-7af9e5899397-cWukH6
 
