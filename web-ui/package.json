@@ -1,6 +1,6 @@
 {
   "type": "module",
-  "name": "chainring-web-ui",
+  "name": "funkybit-web-ui",
   "version": "0.1.0",
   "private": true,
   "scripts": {

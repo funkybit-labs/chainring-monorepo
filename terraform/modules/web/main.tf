@@ -5,7 +5,7 @@ locals {
 }
 
 resource "aws_s3_bucket" "web" {
-  bucket = "${var.name_prefix}-chainring-web"
+  bucket = "${var.name_prefix}-funkybit-web"
 }
 
 resource "aws_cloudfront_origin_access_control" "web" {
