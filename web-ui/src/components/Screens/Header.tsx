@@ -1,4 +1,4 @@
-import logo from 'assets/logo-name.svg'
+import logo from 'assets/funkybit-orange-logo-name.png'
 import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { useAccount } from 'wagmi'
 import { addressDisplay, classNames, uniqueFilter } from 'utils'

@@ -7,7 +7,7 @@ import FlagPng from 'assets/flag.png'
 import { Button } from 'components/common/Button'
 import { classNames } from 'utils'
 import XSvg from 'assets/X.svg'
-import LogoSvg from 'assets/logo-orange-no-words.svg'
+import LogoPng from 'assets/funkybit-orange-logo.png'
 import GameBasePng from 'assets/game-base.png'
 import TrophyPng from 'assets/trophy.png'
 import { InfoPanel } from 'components/common/InfoPanel'
@@ -174,7 +174,7 @@ export function ReactionGame({
           gameState === 'early' ||
           gameState === 'late') && (
           <div className="absolute left-0 top-4 flex w-full flex-row px-10 text-center font-sans text-2xl">
-            <img src={LogoSvg} alt="funkybit" />
+            <img src={LogoPng} alt="funkybit" className="size-16" />
             <div className="ml-4 text-start">
               Are you faster than
               <br />
@@ -187,7 +187,7 @@ export function ReactionGame({
             <InfoPanel icon={TrophyPng} rounded={'both'}>
               <div className={'flex flex-col text-left font-sans'}>
                 <div className={'text-2xl text-white'}>
-                  +{decimalAsInt(gameResult.reward)} CR POINTS
+                  +{decimalAsInt(gameResult.reward)} FB POINTS
                 </div>
                 <div className={'text-sm'}>
                   <span className="text-brightOrange">

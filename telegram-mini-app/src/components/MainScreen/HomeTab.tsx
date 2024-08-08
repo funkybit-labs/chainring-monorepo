@@ -106,7 +106,7 @@ export default function HomeTab({
             Your Balance
           </div>
           <InfoPanel icon={CoinSvg} rounded="top">
-            <HeadSub head={decimalAsInt(balance)} sub={'CR POINTS'} />
+            <HeadSub head={decimalAsInt(balance)} sub={'FB POINTS'} />
           </InfoPanel>
           <div className="flex flex-row justify-stretch space-x-1">
             <InfoPanel
@@ -142,7 +142,7 @@ export default function HomeTab({
                   max={user.nextMilestoneAt}
                 />
                 <span className="text-2xl">
-                  {decimalAsInt(user.nextMilestoneAt.minus(balance))} CR
+                  {decimalAsInt(user.nextMilestoneAt.minus(balance))} FB
                 </span>
               </div>
             </InfoPanel>
