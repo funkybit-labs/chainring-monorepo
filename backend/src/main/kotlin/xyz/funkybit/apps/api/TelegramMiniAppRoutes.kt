@@ -30,6 +30,7 @@ import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppInviteCode
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserEntity
 import xyz.funkybit.core.model.telegram.miniapp.sum
 import java.math.BigDecimal
+import java.sql.SQLException
 
 object TelegramMiniAppRoutes {
     val getUser: ContractRoute = run {
@@ -117,22 +118,37 @@ object TelegramMiniAppRoutes {
         } bindContract Method.POST to { request ->
             val apiRequest = requestBody(request)
 
-            transaction {
-                val user = request.telegramMiniAppPrincipal.maybeUser
-                    ?: run {
-                        val inviter = apiRequest.inviteCode
-                            ?.let {
-                                TelegramMiniAppUserEntity.findByInviteCode(apiRequest.inviteCode)
-                                    ?.takeIf { it.invites == -1L || it.invites > 0L }
-                                    ?: return@transaction invalidInviteCodeError
-                            }
+            try {
+                transaction {
+                    val user = request.telegramMiniAppPrincipal.maybeUser
+                        ?: run {
+                            val inviter = apiRequest.inviteCode
+                                ?.let {
+                                    TelegramMiniAppUserEntity.findByInviteCode(apiRequest.inviteCode)
+                                        ?.takeIf { it.invites == -1L || it.invites > 0L }
+                                        ?: return@transaction invalidInviteCodeError
+                                }
 
-                        TelegramMiniAppUserEntity.create(request.telegramMiniAppPrincipal.userData.userId, invitedBy = inviter)
-                    }
+                            TelegramMiniAppUserEntity.create(
+                                request.telegramMiniAppPrincipal.userData.userId,
+                                invitedBy = inviter,
+                            )
+                        }
 
-                Response(Status.CREATED).with(
-                    responseBody of GetUserApiResponse.fromEntity(user),
-                )
+                    Response(Status.CREATED).with(
+                        responseBody of GetUserApiResponse.fromEntity(user),
+                    )
+                }
+            } catch (e: SQLException) {
+                if (e.message?.contains("duplicate key value violates unique constraint") == true) {
+                    Response(Status.CREATED).with(
+                        responseBody of transaction {
+                            GetUserApiResponse.fromEntity(TelegramMiniAppUserEntity.findByTelegramUserId(request.telegramMiniAppPrincipal.userData.userId)!!)
+                        },
+                    )
+                } else {
+                    throw(e)
+                }
             }
         }
     }
