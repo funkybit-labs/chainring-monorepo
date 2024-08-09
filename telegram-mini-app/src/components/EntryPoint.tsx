@@ -11,7 +11,13 @@ import { Button } from 'components/common/Button'
 
 export type Alert = 'checkin' | 'milestone'
 
-type SplashAnimationStep = 'none' | 'spin' | 'words' | 'signup' | 'complete'
+type SplashAnimationStep =
+  | 'none'
+  | 'spin'
+  | 'words'
+  | 'signup'
+  | 'completing'
+  | 'complete'
 
 export default function EntryPoint() {
   const queryClient = useQueryClient()
@@ -84,10 +90,12 @@ export default function EntryPoint() {
 
   useEffect(() => {
     if (animationStep === 'signup') {
-      setAnimationStep('complete')
+      setAnimationStep('completing')
       const query = new URLSearchParams(window.location.search)
       const code = query.get('tgWebAppStartParam')
       setInviteCode(code)
+    } else if (animationStep === 'completing') {
+      setAnimationStep('complete')
       signUpMutation.mutate()
     }
   }, [animationStep, signUpMutation])
@@ -143,7 +151,9 @@ export default function EntryPoint() {
                 />
               </div>
             )}
-            {(animationStep === 'signup' || animationStep === 'complete') && (
+            {(animationStep === 'signup' ||
+              animationStep === 'completing' ||
+              animationStep === 'complete') && (
               <div>
                 <img className="inline size-16" src={logo} alt="funkybit" />
                 <img className="inline h-8" src={logoWords} alt="funkybit" />

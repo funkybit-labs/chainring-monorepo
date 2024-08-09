@@ -30,6 +30,8 @@ import xyz.funkybit.integrationtests.utils.assertError
 import xyz.funkybit.integrationtests.utils.empty
 import java.math.BigDecimal
 import java.net.HttpURLConnection.HTTP_UNAUTHORIZED
+import kotlin.concurrent.thread
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -82,6 +84,27 @@ class TelegramMiniAppApiTest {
             ).toUrlFormEncoded()
 
             TelegramMiniAppApiClient.tryGetUser { mapOf("Authorization" to "Bearer $token").toHeaders() }
+        }
+    }
+
+    @Test
+    fun simultaneousSignup() {
+        (1..20).forEach {
+            var succeeded = 0
+            val userId = Random.nextLong()
+            val thread1 = thread(start = false) {
+                TelegramMiniAppApiClient(TelegramUserId(userId)).signUp()
+                succeeded += 1
+            }
+            val thread2 = thread(start = false) {
+                TelegramMiniAppApiClient(TelegramUserId(userId)).signUp()
+                succeeded += 1
+            }
+            thread1.start()
+            thread2.start()
+            thread1.join()
+            thread2.join()
+            assertEquals(2, succeeded)
         }
     }
 
