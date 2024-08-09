@@ -45,7 +45,7 @@ module "api" {
   zone                                    = data.terraform_remote_state.shared.outputs.zone
   tcp_ports                               = [9000]
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
-  icons_bucket_arn                        = data.terraform_remote_state.shared.outputs.icons_bucket_arn
+  icons_bucket                            = data.terraform_remote_state.shared.outputs.icons_bucket
 }
 
 module "ring" {

@@ -67,7 +67,7 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
           "StringEquals" : { "aws:ResourceTag/Name" : "${var.name_prefix}-db-cluster" }
         }
       }
-      ], (var.icons_bucket_arn == "" ? [] : [
+      ], (var.icons_bucket == {} ? [] : [
         {
           Action = [
             "s3:GetObject",
@@ -75,10 +75,32 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
             "s3:PutObjectAcl"
           ],
           Effect   = "Allow",
-          Resource = var.icons_bucket_arn
+          Resource = var.icons_bucket.arn
         }
       ]
     )])
+  })
+}
+
+resource "aws_s3_bucket_policy" "icon_policy" {
+  count  = var.icons_bucket == {} ? 0 : 1
+  bucket = var.icons_bucket.bucket
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          "AWS" : aws_iam_role.ecs_task_execution_role.arn
+        },
+        Action = [
+          "s3:PutObject",
+          "s3:PutObjectAcl"
+        ],
+        Resource = "${var.icons_bucket.arn}/*"
+      }
+    ]
   })
 }
 
