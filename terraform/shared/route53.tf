@@ -14,7 +14,8 @@ resource "aws_route53_record" "txt1" {
   records = ["1password-site-verification=56NVOBHTXJHU5A3ZVNGH2H7FXM",
     "atlassian-domain-verification=Y0P7zKXxIaRKMfHBLklUwVWj8CmqLh/MtxdFMl21vJ6w1WHtvyC/4Ch5TbytJ2E4",
     "google-site-verification=Cc88b5Qxy61HOJBvk06J5I3lr_eve-2i2was2VrQiKA",
-    "slack-domain-verification=Fg6eM5vWMqHccHvUt9Q1VZ042Hiom509s0VK40F3"
+    "slack-domain-verification=Fg6eM5vWMqHccHvUt9Q1VZ042Hiom509s0VK40F3",
+    "ZOOM_verify_z9xpqDX9SGNupFmvQUyHsC"
   ]
 }
 
