@@ -14,6 +14,8 @@ resource "aws_route53_record" "txt1" {
   records = ["1password-site-verification=56NVOBHTXJHU5A3ZVNGH2H7FXM",
     "atlassian-domain-verification=Y0P7zKXxIaRKMfHBLklUwVWj8CmqLh/MtxdFMl21vJ6w1WHtvyC/4Ch5TbytJ2E4",
     "google-site-verification=Cc88b5Qxy61HOJBvk06J5I3lr_eve-2i2was2VrQiKA",
+    "slack-domain-verification=Fg6eM5vWMqHccHvUt9Q1VZ042Hiom509s0VK40F3",
+    "ZOOM_verify_z9xpqDX9SGNupFmvQUyHsC"
   ]
 }
 
@@ -147,9 +149,11 @@ resource "aws_route53_record" "fb-fun-txt1" {
   name    = ""
   type    = "TXT"
   ttl     = "3600"
-  records = ["google-site-verification=FWrje7XGlau98ClwegSSUopNXOJwMgri2D8-Zv4PHDg"]
+  records = ["google-site-verification=FWrje7XGlau98ClwegSSUopNXOJwMgri2D8-Zv4PHDg",
+             "atlassian-domain-verification=Y0P7zKXxIaRKMfHBLklUwVWj8CmqLh/MtxdFMl21vJ6w1WHtvyC/4Ch5TbytJ2E4",
+             "slack-domain-verification=FpOzjWKvOATBp0cplgKmWzdelmzacougFRfb4sUc"
+            ]
 }
-
 
 resource "aws_route53_record" "fb-co-a" {
   zone_id = aws_route53_zone.fb-co.zone_id
