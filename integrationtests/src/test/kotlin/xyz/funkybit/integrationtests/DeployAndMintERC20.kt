@@ -19,7 +19,7 @@ class DeployAndMintERC20 {
     // DEFAULT_MAX_PRIORITY_FEE_PER_GAS_WEI_Chain2=...
     // EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY=...
     // @Test
-    fun `deploy and mint erc-20s`() {
+    fun deployAndMintErc20() {
         val tokenName = "FUNK"
         val decimals = BigInteger.valueOf(18L)
         val receiver = Address("0xA1AA16E2C4AAD014A89a6cF873B4bA5C31d060FC")

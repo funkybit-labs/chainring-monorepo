@@ -69,7 +69,7 @@ resource "aws_route53_record" "domain_root" {
   type    = "A"
   ttl     = "300"
   records = ["${aws_lightsail_static_ip.lightsail.ip_address}"]
- }
+}
 
 resource "aws_route53_record" "primary_web" {
   zone_id = data.aws_route53_zone.primary_hosted_zone.zone_id
