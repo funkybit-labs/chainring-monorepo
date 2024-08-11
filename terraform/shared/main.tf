@@ -166,6 +166,30 @@ resource "aws_s3_bucket_policy" "bucket_policy" {
         Resource = [
           "${aws_s3_bucket.icons.arn}/*"
         ]
+      },
+      {
+        Effect    = "Allow",
+        Principal = { "AWS" : "arn:aws:iam::851725450525:role/testnet-task" },
+        Action = [
+          "s3:GetObjectAcl",
+          "s3:PutObject",
+          "s3:PutObjectAcl"
+        ],
+        Resource = [
+          "${aws_s3_bucket.icons.arn}/*"
+        ]
+      },
+      {
+        Effect    = "Allow",
+        Principal = { "AWS" : "arn:aws:iam::851725450525:role/demo-task" },
+        Action = [
+          "s3:GetObjectAcl",
+          "s3:PutObject",
+          "s3:PutObjectAcl"
+        ],
+        Resource = [
+          "${aws_s3_bucket.icons.arn}/*"
+        ]
       }
     ]
   })

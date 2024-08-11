@@ -82,28 +82,6 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
   })
 }
 
-resource "aws_s3_bucket_policy" "icon_policy" {
-  count  = var.icons_bucket == {} ? 0 : 1
-  bucket = var.icons_bucket.bucket
-
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect = "Allow",
-        Principal = {
-          "AWS" : aws_iam_role.ecs_task_execution_role.arn
-        },
-        Action = [
-          "s3:PutObject",
-          "s3:PutObjectAcl"
-        ],
-        Resource = "${var.icons_bucket.arn}/*"
-      }
-    ]
-  })
-}
-
 resource "aws_security_group" "security_group" {
   name   = "${var.name_prefix}-${var.task_name}-ecs-task"
   vpc_id = var.vpc.id
