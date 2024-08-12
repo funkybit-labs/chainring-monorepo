@@ -370,11 +370,13 @@ object SequencerResponseProcessorService {
         val markets = MarketEntity.all().toList()
 
         // update balance changes
+        logger.debug { "Calculating balance changes" }
         if (response.balancesChangedList.isNotEmpty()) {
             val walletMap = WalletEntity.getBySequencerIds(
                 response.balancesChangedList.map { SequencerWalletId(it.wallet) }.toSet(),
             ).associateBy { it.sequencerId.value }
 
+            logger.debug { "updating balances" }
             BalanceEntity.updateBalances(
                 response.balancesChangedList.mapNotNull { change ->
                     walletMap[change.wallet]?.let {
@@ -387,20 +389,28 @@ object SequencerResponseProcessorService {
                 },
                 BalanceType.Available,
             )
+            logger.debug { "done updating balances" }
             walletMap.values.forEach {
                 broadcasterNotifications.add(BroadcasterNotification.walletBalances(it))
             }
         }
+        logger.debug { "Done calculating balance changes" }
 
         val marketsWithOrderChanges = OrderEntity
             .getOrdersMarkets(response.ordersChangedList.map { it.guid })
             .sortedBy { it.guid }
 
+        logger.debug { "Got markets with order changes, calculating order book notifications" }
         val orderBookNotifications = marketsWithOrderChanges.flatMap { market ->
+            logger.debug { "Market $market" }
             val prevSnapshot = OrderBookSnapshot.get(market)
+            logger.debug { "got old snapshot" }
             val newSnapshot = OrderBookSnapshot.calculate(market)
+            logger.debug { "calculated new snapshot" }
             val diff = newSnapshot.diff(prevSnapshot)
+            logger.debug { "calculated diff" }
             newSnapshot.save(market)
+            logger.debug { "saved new snapshot" }
             val seqNumber = KeyValueStore.incrementLong("WebsocketMsgSeqNumber:OrderBookDiff:${market.id.value.value}")
 
             listOf(
@@ -414,6 +424,7 @@ object SequencerResponseProcessorService {
                 ),
             )
         }
+        logger.debug { "Done calculating order book notifications" }
 
         val lastPriceByMarket = mutableMapOf<MarketId, BigDecimal>()
         val ohlcNotifications = tradesWithTakerOrder
@@ -445,6 +456,8 @@ object SequencerResponseProcessorService {
                         )
                     }
             }.flatten()
+
+        logger.debug { "Done calculating ohlc notifications" }
 
         markets.forEach { m ->
             lastPriceByMarket[m.id.value]?.let {
