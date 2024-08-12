@@ -127,16 +127,18 @@ abstract class Actor(
                     val deposits = config.chains.flatMap { chain ->
                         wallet.switchChain(chain.id)
                         chain.symbols.mapNotNull { symbol ->
-                            val balanceToDeposit = wallet.getWalletBalance(symbol)
-                            if (balanceToDeposit.inFundamentalUnits > BigInteger.ZERO) {
-                                val receipt = wallet.depositAndWaitForTxReceipt(balanceToDeposit)
-                                apiClient.createDeposit(
-                                    CreateDepositApiRequest(
-                                        symbol = Symbol(symbol.name),
-                                        amount = balanceToDeposit.inFundamentalUnits,
-                                        txHash = TxHash(receipt.transactionHash)
+                            if (markets.find { it.baseSymbol.value == symbol.name || it.quoteSymbol.value == symbol.name} != null) {
+                                val balanceToDeposit = wallet.getWalletBalance(symbol)
+                                if (balanceToDeposit.inFundamentalUnits > BigInteger.ZERO) {
+                                    val receipt = wallet.depositAndWaitForTxReceipt(balanceToDeposit)
+                                    apiClient.createDeposit(
+                                        CreateDepositApiRequest(
+                                            symbol = Symbol(symbol.name),
+                                            amount = balanceToDeposit.inFundamentalUnits,
+                                            txHash = TxHash(receipt.transactionHash)
+                                        )
                                     )
-                                )
+                                } else null
                             } else null
                         }
                     }
