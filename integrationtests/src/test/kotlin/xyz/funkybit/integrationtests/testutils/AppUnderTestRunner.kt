@@ -23,6 +23,7 @@ import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.WithdrawalFee
 import xyz.funkybit.core.model.db.BalanceLogTable
 import xyz.funkybit.core.model.db.BalanceTable
+import xyz.funkybit.core.model.db.BitcoinWalletStateTable
 import xyz.funkybit.core.model.db.BlockTable
 import xyz.funkybit.core.model.db.BlockchainTransactionTable
 import xyz.funkybit.core.model.db.BroadcasterJobTable
@@ -265,7 +266,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             WalletTable.deleteAll()
             OHLCTable.deleteAll()
             FaucetDripTable.deleteAll()
-
+            BitcoinWalletStateTable.deleteAll()
             notifyDbListener("broadcaster_ctl", "clear-cache")
         }
     }

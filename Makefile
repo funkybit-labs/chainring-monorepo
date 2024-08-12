@@ -25,7 +25,7 @@ start_arch_containers:
 
 start_ci_containers: stop_containers
 	docker compose -f ./docker-compose-ci.yaml down --remove-orphans && docker compose -f ./docker-compose-ci.yaml up -d
-	cd contracts && make start_ci_containers && cd ..
+	cd contracts && make start_ci_all_containers && cd ..
 
 anvil_logs:
 	docker compose logs anvil -f

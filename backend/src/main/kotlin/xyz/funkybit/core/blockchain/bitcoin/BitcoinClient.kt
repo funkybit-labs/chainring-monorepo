@@ -10,7 +10,9 @@ import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.rpc.BitcoinRpc
 import xyz.funkybit.core.model.rpc.BitcoinRpcParams
 import xyz.funkybit.core.model.rpc.BitcoinRpcRequest
+import xyz.funkybit.core.utils.bitcoin.inSatsAsDecimalString
 import java.math.BigDecimal
+import java.math.BigInteger
 import java.math.RoundingMode
 
 object BitcoinClient : JsonRpcClientBase(
@@ -29,6 +31,30 @@ object BitcoinClient : JsonRpcClientBase(
     val chainId = ChainId(8086u)
 
     fun getParams(): NetworkParameters = NetworkParameters.fromID(ChainManager.bitcoinBlockchainClientConfig.net)!!
+
+    fun mine(nBlocks: Int): List<String> {
+        return getValue(
+            BitcoinRpcRequest(
+                "generatetoaddress",
+                BitcoinRpcParams(listOf(nBlocks, bitcoinConfig.faucetAddress!!)),
+            ),
+        )
+    }
+
+    fun sendToAddress(address: String, amount: BigInteger): String {
+        return getValue(
+            BitcoinRpcRequest(
+                "sendtoaddress",
+                BitcoinRpcParams(listOf(address, amount.inSatsAsDecimalString())),
+            ),
+        )
+    }
+
+    fun sendToAddressAndMine(address: String, amount: BigInteger): String {
+        return sendToAddress(address, amount).also {
+            mine(1)
+        }
+    }
 
     fun getBlockCount(): Long {
         return getValue(
@@ -67,13 +93,13 @@ object BitcoinClient : JsonRpcClientBase(
         )
     }
 
-    open fun getRawTransaction(txId: String): BitcoinRpc.Transaction {
+    fun getRawTransaction(txId: String): BitcoinRpc.Transaction {
         return getValue(
             BitcoinRpcRequest(
                 "getrawtransaction",
                 BitcoinRpcParams(listOf(txId, true)),
             ),
-            false,
+            true,
         )
     }
 
