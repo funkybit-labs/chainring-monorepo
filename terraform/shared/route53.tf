@@ -150,9 +150,9 @@ resource "aws_route53_record" "fb-fun-txt1" {
   type    = "TXT"
   ttl     = "3600"
   records = ["google-site-verification=FWrje7XGlau98ClwegSSUopNXOJwMgri2D8-Zv4PHDg",
-             "atlassian-domain-verification=Y0P7zKXxIaRKMfHBLklUwVWj8CmqLh/MtxdFMl21vJ6w1WHtvyC/4Ch5TbytJ2E4",
-             "slack-domain-verification=FpOzjWKvOATBp0cplgKmWzdelmzacougFRfb4sUc"
-            ]
+    "atlassian-domain-verification=Y0P7zKXxIaRKMfHBLklUwVWj8CmqLh/MtxdFMl21vJ6w1WHtvyC/4Ch5TbytJ2E4",
+    "slack-domain-verification=FpOzjWKvOATBp0cplgKmWzdelmzacougFRfb4sUc"
+  ]
 }
 
 resource "aws_route53_record" "fb-co-a" {

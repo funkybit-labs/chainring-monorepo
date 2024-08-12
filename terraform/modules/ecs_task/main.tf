@@ -67,7 +67,7 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
           "StringEquals" : { "aws:ResourceTag/Name" : "${var.name_prefix}-db-cluster" }
         }
       }
-      ], (var.icons_bucket_arn == "" ? [] : [
+      ], (var.icons_bucket == {} ? [] : [
         {
           Action = [
             "s3:GetObject",
@@ -75,7 +75,7 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
             "s3:PutObjectAcl"
           ],
           Effect   = "Allow",
-          Resource = var.icons_bucket_arn
+          Resource = var.icons_bucket.arn
         }
       ]
     )])

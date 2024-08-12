@@ -35,12 +35,12 @@ environment:
     EVM_CHAINS: Bitlayer,Base
     EVM_NETWORK_URL_Bitlayer: https://testnet-rpc.bitlayer.org
     EVM_NETWORK_URL_Base: https://sepolia.base.org
-    MARKETS: "RING:200810/RING:84532"
-    RING_200810_RING_84532_PRICE_BASELINE: "1"
-    RING_200810_RING_84532_MAKER_PRIVATE_KEY_HEX: "0xde92c413268a6dba35bec3cd76639c7a3568de2ff3ff8c9d0b78efc9aa3e67c5"
-    RING_200810_RING_84532_MAKER_PRICE_STABILIZATION: "true" # maker always places liquidity around PRICE_BASELINE
-    RING_200810_RING_84532_MAKER_LIQUIDITY_PLACEMENT: "10000000000000000000" # percentage or absolute amount ("15%" OR "100000000000000000000")
-    RING_200810_RING_84532_TAKERS: "0"
+    MARKETS: "FUNK:200810/FUNK:84532"
+    FUNK_200810_FUNK_84532_PRICE_BASELINE: "1"
+    FUNK_200810_FUNK_84532_MAKER_PRIVATE_KEY_HEX: "0xde92c413268a6dba35bec3cd76639c7a3568de2ff3ff8c9d0b78efc9aa3e67c5"
+    FUNK_200810_FUNK_84532_MAKER_PRICE_STABILIZATION: "true" # maker always places liquidity around PRICE_BASELINE
+    FUNK_200810_FUNK_84532_MAKER_LIQUIDITY_PLACEMENT: "10000000000000000000" # percentage or absolute amount ("15%" OR "100000000000000000000")
+    FUNK_200810_FUNK_84532_TAKERS: "0"
     FAUCET_POSSIBLE: "0"
 services:
   api:
@@ -49,7 +49,7 @@ services:
     is_essential: "true"
     environment: backend
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-c66acd9d-f00f-43b2-b65d-f260a5b0a8f9-xyU8ZN
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-63c94ec4-89c5-4724-bcf6-ae8df7f3be12-uVtkH8
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
       EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/api/EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY-7XFaCF
   ring:
@@ -58,7 +58,7 @@ services:
     no_rolling_upgrade: "true"
     environment: backend
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-c66acd9d-f00f-43b2-b65d-f260a5b0a8f9-xyU8ZN
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-63c94ec4-89c5-4724-bcf6-ae8df7f3be12-uVtkH8
       EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/ring/EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY-2liWFE
       EVM_SUBMITTER_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/ring/EVM_SUBMITTER_PRIVATE_KEY-UkdEuD
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
@@ -77,7 +77,7 @@ services:
     no_rolling_upgrade: "true"
     environment: garp
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-c66acd9d-f00f-43b2-b65d-f260a5b0a8f9-xyU8ZN
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-63c94ec4-89c5-4724-bcf6-ae8df7f3be12-uVtkH8
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   mocker:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/mocker
