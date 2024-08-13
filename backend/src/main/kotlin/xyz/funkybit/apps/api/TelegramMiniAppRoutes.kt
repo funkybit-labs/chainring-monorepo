@@ -10,6 +10,8 @@ import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.core.with
 import org.http4k.format.KotlinxSerialization.auto
+import org.http4k.lens.Query
+import org.http4k.lens.boolean
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.middleware.telegramMiniAppPrincipal
 import xyz.funkybit.apps.api.middleware.telegramMiniAppSecurity
@@ -36,12 +38,14 @@ object TelegramMiniAppRoutes {
     val getUser: ContractRoute = run {
         val responseBody = Body.auto<GetUserApiResponse>().toLens()
         val errorResponseBody = Body.auto<ApiErrors>().toLens()
+        val firstTimeQuery = Query.boolean().required("firstTime")
 
         "user" meta {
             operationId = "telegram-mini-app-get-user"
             summary = "Get user"
             security = telegramMiniAppSecurity
             tags += listOf(Tag("tma"))
+            queries += firstTimeQuery
             returning(
                 Status.OK,
                 responseBody to GetUserApiResponse(
@@ -70,9 +74,13 @@ object TelegramMiniAppRoutes {
                 ),
             )
         } bindContract Method.GET to { request ->
+            val firstTime = firstTimeQuery(request)
             transaction {
                 request.telegramMiniAppPrincipal.maybeUser
                     ?.let {
+                        if (firstTime) {
+                            exec("""NOTIFY telegram_bot_app_ctl, '${request.telegramMiniAppPrincipal.userData.userId.value}:WelcomeBack'""")
+                        }
                         Response(Status.OK).with(
                             responseBody of GetUserApiResponse.fromEntity(it),
                         )
@@ -120,20 +128,21 @@ object TelegramMiniAppRoutes {
 
             try {
                 transaction {
-                    val user = request.telegramMiniAppPrincipal.maybeUser
-                        ?: run {
-                            val inviter = apiRequest.inviteCode
-                                ?.let {
-                                    TelegramMiniAppUserEntity.findByInviteCode(apiRequest.inviteCode)
-                                        ?.takeIf { it.invites == -1L || it.invites > 0L }
-                                        ?: return@transaction invalidInviteCodeError
-                                }
+                    val user = request.telegramMiniAppPrincipal.maybeUser ?: run {
+                        val inviter = apiRequest.inviteCode
+                            ?.let {
+                                TelegramMiniAppUserEntity.findByInviteCode(apiRequest.inviteCode)
+                                    ?.takeIf { it.invites == -1L || it.invites > 0L }
+                                    ?: return@transaction invalidInviteCodeError
+                            }
 
-                            TelegramMiniAppUserEntity.create(
-                                request.telegramMiniAppPrincipal.userData.userId,
-                                invitedBy = inviter,
-                            )
+                        TelegramMiniAppUserEntity.create(
+                            request.telegramMiniAppPrincipal.userData.userId,
+                            invitedBy = inviter,
+                        ).also {
+                            exec("""NOTIFY telegram_bot_app_ctl, '${request.telegramMiniAppPrincipal.userData.userId.value}:FirstTouch'""")
                         }
+                    }
 
                     Response(Status.CREATED).with(
                         responseBody of GetUserApiResponse.fromEntity(user),

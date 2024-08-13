@@ -37,7 +37,7 @@ class TelegramMiniAppApiClient(val telegramUserId: TelegramUserId) {
     fun tryGetUser(): Either<ApiCallFailure, GetUserApiResponse> =
         httpClient.newCall(
             Request.Builder()
-                .url("$apiServerRootUrl/tma/v1/user")
+                .url("$apiServerRootUrl/tma/v1/user?firstTime=false")
                 .get()
                 .build()
                 .withAuthHeaders(telegramUserId),
@@ -68,10 +68,10 @@ class TelegramMiniAppApiClient(val telegramUserId: TelegramUserId) {
         ).execute().toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     companion object {
-        fun tryGetUser(authHeadersProvider: (Request) -> Headers): Either<ApiCallFailure, GetUserApiResponse> =
+        fun tryGetUser(firstTime: Boolean, authHeadersProvider: (Request) -> Headers): Either<ApiCallFailure, GetUserApiResponse> =
             httpClient.newCall(
                 Request.Builder()
-                    .url("$apiServerRootUrl/tma/v1/user")
+                    .url("$apiServerRootUrl/tma/v1/user?firstTime=$firstTime")
                     .get()
                     .build().let {
                         it.addHeaders(authHeadersProvider(it))

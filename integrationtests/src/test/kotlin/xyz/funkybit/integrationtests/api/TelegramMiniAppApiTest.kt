@@ -46,11 +46,11 @@ class TelegramMiniAppApiTest {
     @Test
     fun authentication() {
         verifyAuthFailure("Authorization header is missing") {
-            TelegramMiniAppApiClient.tryGetUser { Headers.empty }
+            TelegramMiniAppApiClient.tryGetUser(false) { Headers.empty }
         }
 
         verifyAuthFailure("Invalid authentication scheme") {
-            TelegramMiniAppApiClient.tryGetUser { mapOf("Authorization" to "signature token").toHeaders() }
+            TelegramMiniAppApiClient.tryGetUser(false) { mapOf("Authorization" to "signature token").toHeaders() }
         }
 
         verifyAuthFailure("Hash is missing") {
@@ -66,7 +66,7 @@ class TelegramMiniAppApiTest {
                 Pair("user", json.encodeToString(user)),
             ).toUrlFormEncoded()
 
-            TelegramMiniAppApiClient.tryGetUser { mapOf("Authorization" to "Bearer $token").toHeaders() }
+            TelegramMiniAppApiClient.tryGetUser(false) { mapOf("Authorization" to "Bearer $token").toHeaders() }
         }
 
         verifyAuthFailure("Invalid signature") {
@@ -83,7 +83,7 @@ class TelegramMiniAppApiTest {
                 Pair("hash", "invalid".toByteArray().toHexString()),
             ).toUrlFormEncoded()
 
-            TelegramMiniAppApiClient.tryGetUser { mapOf("Authorization" to "Bearer $token").toHeaders() }
+            TelegramMiniAppApiClient.tryGetUser(false) { mapOf("Authorization" to "Bearer $token").toHeaders() }
         }
     }
 
@@ -116,11 +116,11 @@ class TelegramMiniAppApiTest {
             assertEquals("20".crPoints(), it.balance)
             assertEquals(0, "0".crPoints().compareTo(it.referralBalance))
 
-            assertEquals(1, it.gameTickets)
+            assertEquals(3, it.gameTickets)
 
             assertEquals(1, it.checkInStreak.days)
             assertEquals("20".crPoints(), it.checkInStreak.reward)
-            assertEquals(1, it.checkInStreak.gameTickets)
+            assertEquals(3, it.checkInStreak.gameTickets)
 
             assertEquals(5, it.invites)
             assertEquals("1000".crPoints(), it.nextMilestoneAt)
@@ -218,7 +218,7 @@ class TelegramMiniAppApiTest {
 
         val apiClient = TelegramMiniAppApiClient(TelegramUserId(123L))
         apiClient.signUp()
-        assertEquals(1, apiClient.getUser().gameTickets)
+        assertEquals(3, apiClient.getUser().gameTickets)
         assertEquals("20".crPoints(), apiClient.getUser().balance)
 
         apiClient
@@ -228,6 +228,11 @@ class TelegramMiniAppApiTest {
                 assertEquals(50, it.percentile)
                 assertEquals(0, "50".crPoints().compareTo(it.reward))
             }
+        // play two more times without earning points
+        apiClient
+            .recordReactionTime(ReactionTimeApiRequest(2000))
+        apiClient
+            .recordReactionTime(ReactionTimeApiRequest(3000))
 
         apiClient
             .tryRecordReactionTime(ReactionTimeApiRequest(200))
@@ -270,11 +275,11 @@ class TelegramMiniAppApiTest {
         apiClient.signUp().also {
             assertEquals("20".crPoints(), it.balance)
 
-            assertEquals(1, it.gameTickets)
+            assertEquals(3, it.gameTickets)
 
             assertEquals(1, it.checkInStreak.days)
             assertEquals("20".crPoints(), it.checkInStreak.reward)
-            assertEquals(1, it.checkInStreak.gameTickets)
+            assertEquals(3, it.checkInStreak.gameTickets)
         }
 
         // 2 days
@@ -285,21 +290,21 @@ class TelegramMiniAppApiTest {
         apiClient.getUser().also {
             assertEquals("45".crPoints(), it.balance)
 
-            assertEquals(3, it.gameTickets)
+            assertEquals(6, it.gameTickets)
 
             assertEquals(2, it.checkInStreak.days)
             assertEquals("25".crPoints(), it.checkInStreak.reward)
-            assertEquals(2, it.checkInStreak.gameTickets)
+            assertEquals(3, it.checkInStreak.gameTickets)
         }
         // idempotency
         apiClient.getUser().also {
             assertEquals("45".crPoints(), it.balance)
 
-            assertEquals(3, it.gameTickets)
+            assertEquals(6, it.gameTickets)
 
             assertEquals(2, it.checkInStreak.days)
             assertEquals("25".crPoints(), it.checkInStreak.reward)
-            assertEquals(2, it.checkInStreak.gameTickets)
+            assertEquals(3, it.checkInStreak.gameTickets)
         }
 
         // 3 days
@@ -309,7 +314,7 @@ class TelegramMiniAppApiTest {
         apiClient.getUser().also {
             assertEquals("75".crPoints(), it.balance)
 
-            assertEquals(6, it.gameTickets)
+            assertEquals(9, it.gameTickets)
 
             assertEquals(3, it.checkInStreak.days)
             assertEquals("30".crPoints(), it.checkInStreak.reward)
@@ -323,7 +328,7 @@ class TelegramMiniAppApiTest {
         apiClient.getUser().also {
             assertEquals("75".crPoints(), it.balance)
 
-            assertEquals(6, it.gameTickets)
+            assertEquals(9, it.gameTickets)
 
             assertEquals(3, it.checkInStreak.days)
             assertEquals("30".crPoints(), it.checkInStreak.reward)
@@ -336,7 +341,7 @@ class TelegramMiniAppApiTest {
         apiClient.getUser().also {
             assertEquals("75".crPoints(), it.balance)
 
-            assertEquals(6, it.gameTickets)
+            assertEquals(9, it.gameTickets)
 
             assertEquals(3, it.checkInStreak.days)
             assertEquals("30".crPoints(), it.checkInStreak.reward)
@@ -350,7 +355,7 @@ class TelegramMiniAppApiTest {
         apiClient.getUser().also {
             assertEquals("110".crPoints(), it.balance)
 
-            assertEquals(11, it.gameTickets)
+            assertEquals(14, it.gameTickets)
 
             assertEquals(4, it.checkInStreak.days)
             assertEquals("35".crPoints(), it.checkInStreak.reward)
@@ -364,11 +369,11 @@ class TelegramMiniAppApiTest {
         apiClient.getUser().also {
             assertEquals("130".crPoints(), it.balance)
 
-            assertEquals(12, it.gameTickets)
+            assertEquals(17, it.gameTickets)
 
             assertEquals(1, it.checkInStreak.days)
             assertEquals("20".crPoints(), it.checkInStreak.reward)
-            assertEquals(1, it.checkInStreak.gameTickets)
+            assertEquals(3, it.checkInStreak.gameTickets)
         }
     }
 
@@ -381,11 +386,11 @@ class TelegramMiniAppApiTest {
         apiClient.signUp().also {
             assertEquals("20".crPoints(), it.balance)
 
-            assertEquals(1, it.gameTickets)
+            assertEquals(3, it.gameTickets)
 
             assertEquals(1, it.checkInStreak.days)
             assertEquals("20".crPoints(), it.checkInStreak.reward)
-            assertEquals(1, it.checkInStreak.gameTickets)
+            assertEquals(3, it.checkInStreak.gameTickets)
 
             assertEquals(5, it.invites)
             assertEquals("1000".crPoints(), it.nextMilestoneAt)

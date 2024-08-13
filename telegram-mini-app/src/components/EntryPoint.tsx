@@ -26,21 +26,27 @@ export default function EntryPoint() {
   const [dismissedAlerts, setDismissedAlerts] = useState<Alert[]>([])
   const [animationStep, setAnimationStep] =
     useState<SplashAnimationStep>('none')
+  const [firstTime, setFirstTime] = useState(true)
 
   const userQuery = useQuery({
     queryKey: userQueryKey,
     retry: false,
     queryFn: async () =>
-      apiClient.getUser().catch((error) => {
-        if (
-          isErrorFromAlias(apiClient.api, 'getUser', error) &&
-          error.response.data.errors[0].reason === 'SignupRequired'
-        ) {
-          return null
-        } else {
-          throw error
-        }
-      })
+      apiClient
+        .getUser({ queries: { firstTime } })
+        .catch((error) => {
+          if (
+            isErrorFromAlias(apiClient.api, 'getUser', error) &&
+            error.response.data.errors[0].reason === 'SignupRequired'
+          ) {
+            return null
+          } else {
+            throw error
+          }
+        })
+        .finally(() => {
+          setFirstTime(false)
+        })
   })
 
   const signUpMutation = useMutation({
