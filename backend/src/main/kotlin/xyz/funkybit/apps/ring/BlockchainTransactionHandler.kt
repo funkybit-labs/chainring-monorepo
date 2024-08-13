@@ -8,6 +8,7 @@ import org.web3j.crypto.Hash.sha3
 import org.web3j.crypto.RawTransaction
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.Contract
+import org.web3j.tx.exceptions.ContractCallException
 import org.web3j.utils.Numeric
 import xyz.funkybit.contracts.generated.Exchange
 import xyz.funkybit.core.blockchain.BlockchainClient
@@ -711,28 +712,52 @@ class BlockchainTransactionHandler(
         }
     }
 
+    private fun getAsOfBlockOrLater(blockNumber: DefaultBlockParam.BlockNumber, query: (blockParam: DefaultBlockParam) -> String): String {
+        try {
+            return query(blockNumber)
+        } catch (e: ContractCallException) {
+            e.message?.let {
+                Regex(
+                    "Contract Call has been reverted by the EVM with the reason: 'BlockOutOfRangeError: block height is (\\d+) but requested was (\\d+)'.",
+                ).matchEntire(it)?.let { matchResult ->
+                    if (matchResult.groups.size == 3) {
+                        val blockHeight = matchResult.groups[1]!!.value.toBigInteger()
+                        val requestedHeight = matchResult.groups[2]!!.value.toBigInteger()
+                        if (blockHeight > requestedHeight) {
+                            return getAsOfBlockOrLater(DefaultBlockParam.BlockNumber(blockHeight), query)
+                        }
+                    }
+                }
+            }
+            throw(e)
+        }
+    }
+
     private fun getOnChainBatchHash(blockNumber: BigInteger?): String {
-        return blockchainClient.batchHash(
-            blockNumber?.let {
-                DefaultBlockParam.BlockNumber(it)
-            } ?: DefaultBlockParam.Latest,
-        )
+        return blockNumber?.let {
+            val blockParam = DefaultBlockParam.BlockNumber(it)
+            getAsOfBlockOrLater(blockParam) { bp ->
+                blockchainClient.batchHash(bp)
+            }
+        } ?: blockchainClient.batchHash(DefaultBlockParam.Latest)
     }
 
     private fun getOnChainLastSettlementBatchHash(blockNumber: BigInteger?): String {
-        return blockchainClient.lastSettlementBatchHash(
-            blockNumber?.let {
-                DefaultBlockParam.BlockNumber(it)
-            } ?: DefaultBlockParam.Latest,
-        )
+        return blockNumber?.let {
+            val blockParam = DefaultBlockParam.BlockNumber(it)
+            getAsOfBlockOrLater(blockParam) { bp ->
+                blockchainClient.lastSettlementBatchHash(bp)
+            }
+        } ?: blockchainClient.lastSettlementBatchHash(DefaultBlockParam.Latest)
     }
 
     private fun getOnChainLastWithdrawalBatchHash(blockNumber: BigInteger?): String {
-        return blockchainClient.lastWithdrawalBatchHash(
-            blockNumber?.let {
-                DefaultBlockParam.BlockNumber(it)
-            } ?: DefaultBlockParam.Latest,
-        )
+        return blockNumber?.let {
+            val blockParam = DefaultBlockParam.BlockNumber(it)
+            getAsOfBlockOrLater(blockParam) { bp ->
+                blockchainClient.lastWithdrawalBatchHash(bp)
+            }
+        } ?: blockchainClient.lastWithdrawalBatchHash(DefaultBlockParam.Latest)
     }
 }
 
