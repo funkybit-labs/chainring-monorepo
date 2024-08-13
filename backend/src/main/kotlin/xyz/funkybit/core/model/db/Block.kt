@@ -5,6 +5,7 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
+import org.web3j.protocol.core.methods.response.EthBlock
 import java.math.BigInteger
 
 @Serializable
@@ -25,6 +26,9 @@ object BlockTable : GUIDTable<BlockHash>("block", ::BlockHash) {
 
 class BlockEntity(guid: EntityID<BlockHash>) : GUIDEntity<BlockHash>(guid) {
     companion object : EntityClass<BlockHash, BlockEntity>(BlockTable) {
+        fun create(blockFromRpcNode: EthBlock.Block, chainId: ChainId): BlockEntity =
+            create(BlockHash(blockFromRpcNode.hash), blockFromRpcNode.number, BlockHash(blockFromRpcNode.parentHash), chainId)
+
         fun create(hash: BlockHash, number: BigInteger, parentHash: BlockHash, chainId: ChainId): BlockEntity =
             BlockEntity.new(hash) {
                 this.number = number
@@ -49,4 +53,7 @@ class BlockEntity(guid: EntityID<BlockHash>) : GUIDEntity<BlockHash>(guid) {
         toReal = ::BlockHash,
         toColumn = { it.value },
     )
+
+    val hash: String
+        get() = guid.value.value
 }
