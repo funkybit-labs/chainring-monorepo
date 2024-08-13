@@ -1,5 +1,7 @@
 package xyz.funkybit.integrationtests.utils
 
+import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.datetime.Clock
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
@@ -29,13 +31,14 @@ import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigDecimal
 import java.math.BigInteger
+import kotlin.time.Duration
 
 class Wallet(
     val walletKeypair: ECKeyPair,
     val chains: List<Chain>,
     val apiClient: ApiClient,
 ) {
-
+    val logger = KotlinLogging.logger {}
     companion object {
         operator fun invoke(apiClient: ApiClient): Wallet {
             val config = apiClient.getConfiguration().chains
@@ -176,11 +179,22 @@ class Wallet(
             BigInteger.ZERO,
         )
 
-        return blockchainClientsByChainId.getValue(currentChainId).sendTransaction(
-            Address(exchangeContractByChainId.getValue(currentChainId).contractAddress),
-            exchangeContractByChainId.getValue(currentChainId).deposit(erc20TokenAddress(symbol)?.value, amount).encodeFunctionCall(),
-            BigInteger.ZERO,
-        )
+        // when talking to an RPC node pool, we might have to try this a few times to get the proper nonce
+        // try for up to a minute
+        val start = Clock.System.now()
+        while (Clock.System.now().minus(start) < Duration.parse("1m")) {
+            try {
+                return blockchainClientsByChainId.getValue(currentChainId).sendTransaction(
+                    Address(exchangeContractByChainId.getValue(currentChainId).contractAddress),
+                    exchangeContractByChainId.getValue(currentChainId).deposit(erc20TokenAddress(symbol)?.value, amount)
+                        .encodeFunctionCall(),
+                    BigInteger.ZERO,
+                )
+            } catch (e: Exception) {
+                logger.warn(e) { "ERC-20 deposit transaction failed, retrying" }
+            }
+        }
+        throw RuntimeException("Unable to complete ERC-20 deposit")
     }
 
     fun setLinkedSigner(linkedSigner: String, digest: ByteArray, signature: EvmSignature): TransactionReceipt {
