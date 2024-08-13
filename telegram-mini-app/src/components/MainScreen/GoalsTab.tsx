@@ -115,17 +115,17 @@ export default function GoalsTab({ user }: { user: User }) {
 function goalInfo(goalId: GoalId) {
   switch (goalId) {
     case 'GithubSubscription':
-      return [GithubIconSvg, 'Github', 'https://github.com/funkybit']
+      return [GithubIconSvg, 'Github', 'https://github.com/funkybit-labs']
     case 'MediumSubscription':
-      return [MediumIconSvg, 'Medium', 'https://funkybit.medium.com/']
+      return [MediumIconSvg, 'Medium', 'https://funkybit-fun.medium.com/']
     case 'LinkedinSubscription':
       return [
         LinkedInIconSvg,
         'LinkedIn',
-        'https://www.linkedin.com/company/funkybit/'
+        'https://www.linkedin.com/company/funkybit-inc/'
       ]
     case 'XSubscription':
-      return [XIconSvg, 'X (Twitter)', 'https://twitter.com/funkybit-labs']
+      return [XIconSvg, 'X (Twitter)', 'https://x.com/funkybit_fun']
   }
 }
 

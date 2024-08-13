@@ -100,6 +100,13 @@ export const apiClient = new Zodios(apiBaseUrl, [
     path: '/v1/user',
     alias: 'getUser',
     response: UserSchema,
+    parameters: [
+      {
+        name: 'firstTime',
+        type: 'Query',
+        schema: z.boolean()
+      }
+    ],
     errors: [
       {
         status: 'default',

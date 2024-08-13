@@ -12,8 +12,8 @@ data class TelegramMiniAppCheckInStreakDailyReward(val day: Int, val cp: BigDeci
 
     companion object {
         val streakDailyRewards = listOf(
-            TelegramMiniAppCheckInStreakDailyReward(1, cp = "20".crPoints(), gameTickets = 1),
-            TelegramMiniAppCheckInStreakDailyReward(2, cp = "25".crPoints(), gameTickets = 2),
+            TelegramMiniAppCheckInStreakDailyReward(1, cp = "20".crPoints(), gameTickets = 3),
+            TelegramMiniAppCheckInStreakDailyReward(2, cp = "25".crPoints(), gameTickets = 3),
             TelegramMiniAppCheckInStreakDailyReward(3, cp = "30".crPoints(), gameTickets = 3),
             TelegramMiniAppCheckInStreakDailyReward(4, cp = "35".crPoints(), gameTickets = 5),
             TelegramMiniAppCheckInStreakDailyReward(5, cp = "40".crPoints(), gameTickets = 7),

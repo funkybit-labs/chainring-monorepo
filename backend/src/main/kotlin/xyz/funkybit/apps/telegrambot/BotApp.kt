@@ -28,7 +28,7 @@ val faucetSupported = System.getenv("FAUCET_SUPPORTED")?.toBoolean() ?: true
 
 enum class TelegramUserMessage {
     FirstTouch,
-    WelcomeBack
+    WelcomeBack,
 }
 
 class BotApp : BaseApp(dbConfig = DbConfig()) {
@@ -50,6 +50,19 @@ class BotApp : BaseApp(dbConfig = DbConfig()) {
 
     private var stopRequested = false
 
+    private val welcomeBackMessages = listOf(
+        "Welcome back! Time to earn some more points and keep the funk alive! 💥",
+        "funkybit’s missed you! Ready to score big with some more challenges? 🎮",
+        "Hey, welcome back! Let’s see how fast those reflexes are today! ⚡️",
+        "You’re back! Ready to top your high score and rack up some points? 🎯",
+        "The points are calling, and funkybit’s got more fun in store for you! 🏆",
+        "funkybit is back in action—let’s see if you’ve still got that reaction-time magic! ✨",
+        "Good to see you again! Ready to follow, play, and earn? 🚀",
+        "You’re back! Time to earn some more rewards and level up your funkybit game! 🎉",
+        "The points are waiting! Let’s get those social follows and game wins rolling! 🎯",
+        "Welcome back, point master! Ready to make your mark today? 🏅",
+    )
+
     private val pgListener = PgListener(db, "telegram_bot_app-listener", "telegram_bot_app_ctl", {}) { notification ->
         val controlMessage = notification.parameter
         if (controlMessage.contains(':')) {
@@ -57,10 +70,15 @@ class BotApp : BaseApp(dbConfig = DbConfig()) {
             if (parts.size >= 2) {
                 val telegramUserId = TelegramUserId(parts[0].toLong())
                 val message = TelegramUserMessage.valueOf(parts[1])
-                client.sendMessage(Output.SendMessage(telegramUserId, when (message) {
-                    TelegramUserMessage.FirstTouch -> "Hello, welcome to funkybit!"
-                    TelegramUserMessage.WelcomeBack -> "Welcome back, great to see you again."
-                }))
+                client.sendMessage(
+                    Output.SendMessage(
+                        telegramUserId,
+                        when (message) {
+                            TelegramUserMessage.FirstTouch -> "\uD83C\uDF89 Welcome to funkybit! You’re about to earn points for being awesome—whether it’s following us or crushing our reaction-time game. Ready to get funky and rack up some rewards?"
+                            TelegramUserMessage.WelcomeBack -> welcomeBackMessages.random()
+                        },
+                    ),
+                )
             }
         }
     }
