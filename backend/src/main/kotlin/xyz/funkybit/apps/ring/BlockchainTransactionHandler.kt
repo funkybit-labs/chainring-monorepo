@@ -743,19 +743,21 @@ class BlockchainTransactionHandler(
     }
 
     private fun getOnChainLastSettlementBatchHash(blockNumber: BigInteger?): String {
-        return blockchainClient.lastSettlementBatchHash(
-            blockNumber?.let {
-                DefaultBlockParam.BlockNumber(it)
-            } ?: DefaultBlockParam.Latest,
-        )
+        return blockNumber?.let {
+            val blockParam = DefaultBlockParam.BlockNumber(it)
+            getAsOfBlockOrLater(blockParam) { bp ->
+                blockchainClient.lastSettlementBatchHash(bp)
+            }
+        } ?: blockchainClient.lastSettlementBatchHash(DefaultBlockParam.Latest)
     }
 
     private fun getOnChainLastWithdrawalBatchHash(blockNumber: BigInteger?): String {
-        return blockchainClient.lastWithdrawalBatchHash(
-            blockNumber?.let {
-                DefaultBlockParam.BlockNumber(it)
-            } ?: DefaultBlockParam.Latest,
-        )
+        return blockNumber?.let {
+            val blockParam = DefaultBlockParam.BlockNumber(it)
+            getAsOfBlockOrLater(blockParam) { bp ->
+                blockchainClient.lastWithdrawalBatchHash(bp)
+            }
+        } ?: blockchainClient.lastWithdrawalBatchHash(DefaultBlockParam.Latest)
     }
 }
 
