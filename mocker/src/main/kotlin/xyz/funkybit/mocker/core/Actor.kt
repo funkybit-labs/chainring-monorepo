@@ -47,6 +47,7 @@ abstract class Actor(
     protected var markets = setOf<Market>()
     private lateinit var chainIdBySymbol: Map<String, ChainId>
     private val faucetPossible = (System.getenv("FAUCET_POSSIBLE") ?: "0") == "1"
+    private val noFaucetNativeDepositRatio = (System.getenv("NO_FAUCET_NATIVE_DEPOSIT_RATIO") ?: "0.5").toBigDecimal()
 
     open fun start() {
         logger.info { "$id: starting" }
@@ -128,7 +129,16 @@ abstract class Actor(
                         wallet.switchChain(chain.id)
                         chain.symbols.mapNotNull { symbol ->
                             if (markets.find { it.baseSymbol.value == symbol.name || it.quoteSymbol.value == symbol.name} != null) {
-                                val balanceToDeposit = wallet.getWalletBalance(symbol)
+                                val balanceToDeposit = if (symbol.contractAddress == null) {
+                                    wallet.getWalletBalance(symbol).let { assetAmount ->
+                                        AssetAmount(
+                                            assetAmount.symbol,
+                                            assetAmount.amount.multiply(noFaucetNativeDepositRatio)
+                                        )
+                                    }
+                                } else {
+                                    wallet.getWalletBalance(symbol)
+                                }
                                 if (balanceToDeposit.inFundamentalUnits > BigInteger.ZERO) {
                                     val receipt = wallet.depositAndWaitForTxReceipt(balanceToDeposit)
                                     apiClient.createDeposit(
