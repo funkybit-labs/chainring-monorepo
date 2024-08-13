@@ -120,7 +120,9 @@ object TelegramMiniAppRoutes {
 
             try {
                 transaction {
-                    val user = request.telegramMiniAppPrincipal.maybeUser
+                    val user = request.telegramMiniAppPrincipal.maybeUser.also {
+                        exec("""NOTIFY telegram_bot_app_ctl, '${request.telegramMiniAppPrincipal.userData.userId.value}:WelcomeBack'""")
+                    }
                         ?: run {
                             val inviter = apiRequest.inviteCode
                                 ?.let {
@@ -129,6 +131,7 @@ object TelegramMiniAppRoutes {
                                         ?: return@transaction invalidInviteCodeError
                                 }
 
+                            exec("""NOTIFY telegram_bot_app_ctl, '${request.telegramMiniAppPrincipal.userData.userId.value}:FirstTouch'""")
                             TelegramMiniAppUserEntity.create(
                                 request.telegramMiniAppPrincipal.userData.userId,
                                 invitedBy = inviter,

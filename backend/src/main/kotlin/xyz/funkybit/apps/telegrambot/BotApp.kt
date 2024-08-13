@@ -3,6 +3,7 @@ package xyz.funkybit.apps.telegrambot
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import xyz.funkybit.apps.api.BaseApp
 import xyz.funkybit.apps.api.services.ExchangeApiService
 import xyz.funkybit.apps.telegrambot.model.Input
@@ -14,14 +15,21 @@ import xyz.funkybit.core.model.db.DepositStatus
 import xyz.funkybit.core.model.db.OrderEntity
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalStatus
+import xyz.funkybit.core.model.telegram.TelegramUserId
 import xyz.funkybit.core.model.telegram.bot.SessionState
 import xyz.funkybit.core.model.telegram.bot.TelegramBotUserEntity
 import xyz.funkybit.core.model.telegram.bot.TelegramMessageId
 import xyz.funkybit.core.sequencer.SequencerClient
+import xyz.funkybit.core.utils.PgListener
 import kotlin.concurrent.thread
 
 private val botToken = System.getenv("TELEGRAM_BOT_TOKEN") ?: ""
 val faucetSupported = System.getenv("FAUCET_SUPPORTED")?.toBoolean() ?: true
+
+enum class TelegramUserMessage {
+    FirstTouch,
+    WelcomeBack
+}
 
 class BotApp : BaseApp(dbConfig = DbConfig()) {
     override val logger = KotlinLogging.logger { }
@@ -42,6 +50,21 @@ class BotApp : BaseApp(dbConfig = DbConfig()) {
 
     private var stopRequested = false
 
+    private val pgListener = PgListener(db, "telegram_bot_app-listener", "telegram_bot_app_ctl", {}) { notification ->
+        val controlMessage = notification.parameter
+        if (controlMessage.contains(':')) {
+            val parts = controlMessage.split(':')
+            if (parts.size >= 2) {
+                val telegramUserId = TelegramUserId(parts[0].toLong())
+                val message = TelegramUserMessage.valueOf(parts[1])
+                client.sendMessage(Output.SendMessage(telegramUserId, when (message) {
+                    TelegramUserMessage.FirstTouch -> "Hello, welcome to funkybit!"
+                    TelegramUserMessage.WelcomeBack -> "Welcome back, great to see you again."
+                }))
+            }
+        }
+    }
+
     override fun start() {
         if (botToken.isEmpty()) {
             logger.error { "No bot token provided" }
@@ -53,6 +76,7 @@ class BotApp : BaseApp(dbConfig = DbConfig()) {
                     inputHandler.handle(input)
                 }
             })
+            pgListener.start()
             pendingSessionsRefresherThread.start()
             logger.info { "Started" }
         }
@@ -61,6 +85,7 @@ class BotApp : BaseApp(dbConfig = DbConfig()) {
     override fun stop() {
         logger.info { "Stopping" }
         stopRequested = true
+        pgListener.stop()
         client.stopPolling()
         pendingSessionsRefresherThread.join(1000)
         if (pendingSessionsRefresherThread.isAlive) {
