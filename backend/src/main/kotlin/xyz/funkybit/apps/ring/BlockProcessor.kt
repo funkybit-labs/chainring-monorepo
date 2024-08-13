@@ -7,6 +7,7 @@ import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.crypto.Keys
+import org.web3j.protocol.core.methods.response.EthBlock
 import org.web3j.protocol.core.methods.response.EthLog
 import org.web3j.protocol.core.methods.response.Log
 import org.web3j.tx.Contract
@@ -17,7 +18,6 @@ import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.BlockEntity
-import xyz.funkybit.core.model.db.BlockHash
 import xyz.funkybit.core.model.db.BlockTable
 import xyz.funkybit.core.model.db.ChainEntity
 import xyz.funkybit.core.model.db.DepositEntity
@@ -67,9 +67,21 @@ class BlockProcessor(
                             listOf()
                         }
                     }
+
                     for (blockNumber in blocksToProcess) {
-                        transaction {
-                            processBlock(blockNumber)
+                        logger.info { "Processing block $blockNumber, chainId=$chainId" }
+
+                        val blockFromRpcNode = blockchainClient.getBlock(blockNumber, withFullTxObjects = false)
+                        val lastProcessedBlock = transaction { getLastProcessedBlock() }
+                        if (lastProcessedBlock == null || blockFromRpcNode.parentHash == lastProcessedBlock.hash) {
+                            transaction {
+                                processBlock(blockFromRpcNode)
+                            }
+                        } else {
+                            transaction {
+                                handleFork(blockFromRpcNode, lastProcessedBlock)
+                            }
+                            break
                         }
                     }
                     Thread.sleep(pollingIntervalInMs)
@@ -83,54 +95,46 @@ class BlockProcessor(
         }
     }
 
+    private fun processBlock(blockFromRpcNode: EthBlock.Block) {
+        logger.info { "Storing block [number=${blockFromRpcNode.number},hash=${blockFromRpcNode.hash},parentHash=${blockFromRpcNode.parentHash}], chainId=$chainId" }
+        BlockEntity.create(blockFromRpcNode, chainId)
+
+        val getLogsResult = blockchainClient.getExchangeContractLogs(blockFromRpcNode.number)
+
+        if (getLogsResult.hasError()) {
+            throw RuntimeException("Failed to get logs, block=${blockFromRpcNode.number}, chainId=$chainId, error code: ${getLogsResult.error.code}, error message: ${getLogsResult.error.message}")
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        (getLogsResult.logs as List<EthLog.LogObject>).forEach { logResult ->
+            processLog(logResult.get())
+        }
+    }
+
     private val blocksNumberToCheckOnForkDetected =
         BigInteger.valueOf((System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toLongOrNull() ?: 1) + 1)
 
-    private fun processBlock(blockNumber: BigInteger) {
-        logger.info { "Processing block $blockNumber, chainId=$chainId" }
+    private fun handleFork(blockFromRpcNode: EthBlock.Block, lastProcessedBlock: BlockEntity) {
+        logger.error { "Fork detected: for block [height=${blockFromRpcNode.number},hash=${blockFromRpcNode.hash},parentHash=${blockFromRpcNode.parentHash}] latest block found in db is [height=${lastProcessedBlock.number},hash=${lastProcessedBlock.guid.value},parentHash=${lastProcessedBlock.parentGuid.value}]. Looking for split point starting at ${blockFromRpcNode.number}, chainId=$chainId" }
 
-        val blockFromRpcNode = blockchainClient.getBlock(blockNumber, withFullTxObjects = false)
-        val blockHash = BlockHash(blockFromRpcNode.hash)
-        val blockParentHash = BlockHash(blockFromRpcNode.parentHash)
-        val lastProcessedBlock = getLastProcessedBlock()
-
-        if (lastProcessedBlock == null || blockParentHash == lastProcessedBlock.guid.value) {
-            logger.info { "Storing block [number=$blockNumber,hash=$blockHash,parentHash=$blockParentHash], chainId=$chainId" }
-            BlockEntity.create(blockHash, blockNumber, blockParentHash, chainId)
-
-            val getLogsResult = blockchainClient.getExchangeContractLogs(blockNumber)
-
-            if (getLogsResult.hasError()) {
-                throw RuntimeException("Failed to get logs, block=$blockNumber, chainId=$chainId, error code: ${getLogsResult.error.code}, error message: ${getLogsResult.error.message}")
+        val blocksToRollback = BlockEntity
+            .getRecentBlocksUpToNumber(
+                blockFromRpcNode.number - blocksNumberToCheckOnForkDetected,
+                chainId,
+            )
+            .filter { processedBlock ->
+                processedBlock.hash != blockchainClient.getBlock(processedBlock.number, withFullTxObjects = false).hash
             }
 
-            @Suppress("UNCHECKED_CAST")
-            (getLogsResult.logs as List<EthLog.LogObject>).forEach { logResult ->
-                processLog(logResult.get())
-            }
+        val blockNumbersToRollback = blocksToRollback.map { it.number }
+
+        logger.info { "Rolling back blocks ${blockNumbersToRollback.joinToString(", ")}, chainId=$chainId" }
+
+        if (DepositEntity.countConfirmedOrCompleted(blockNumbersToRollback, chainId) > 0) {
+            logger.error { "Failed to rollback due to finalized deposits in blocks to rollback, chainId=$chainId" }
         } else {
-            logger.error { "It looks like we forked: for block [height=$blockNumber,hash=$blockHash,parentHash=$blockParentHash] latest block found in db is [height=${lastProcessedBlock.number},hash=${lastProcessedBlock.guid.value},parentHash=${lastProcessedBlock.parentGuid.value}]. Looking for split point starting at $blockNumber, chainId=$chainId" }
-
-            val blocksToRollback = BlockEntity
-                .getRecentBlocksUpToNumber(
-                    blockNumber - blocksNumberToCheckOnForkDetected,
-                    chainId,
-                )
-                .filter { processedBlock ->
-                    val blockHashFromRpcNode = BlockHash(blockchainClient.getBlock(blockFromRpcNode.number, withFullTxObjects = false).hash)
-                    processedBlock.id.value != blockHashFromRpcNode
-                }
-
-            val blockNumbersToRollback = blocksToRollback.map { it.number }
-
-            logger.info { "Rolling back blocks ${blockNumbersToRollback.joinToString(", ")}, chainId=$chainId" }
-
-            if (DepositEntity.countConfirmedOrCompleted(blockNumbersToRollback, chainId) > 0) {
-                logger.error { "Failed to rollback due to finalized deposits in blocks to rollback, chainId=$chainId" }
-            } else {
-                DepositEntity.markAsFailedByBlockNumbers(blockNumbersToRollback, chainId, error = "Fork rollback")
-                blocksToRollback.forEach(BlockEntity::delete)
-            }
+            DepositEntity.markAsFailedByBlockNumbers(blockNumbersToRollback, chainId, error = "Fork rollback")
+            blocksToRollback.forEach(BlockEntity::delete)
         }
     }
 
