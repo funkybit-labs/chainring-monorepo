@@ -149,8 +149,10 @@ abstract class Actor(
                             if (balance.available > initialBalances.first { it.symbol == balance.symbol }.available) {
                                 fundedAssets.add(balance.symbol.value)
                             }
-                            balances[balance.symbol.value] = balance.available
                         }
+                    }
+                    apiClient.getBalances().balances.forEach { balance ->
+                        balances[balance.symbol.value] = balance.available
                     }
                 }
                 deposited = true
