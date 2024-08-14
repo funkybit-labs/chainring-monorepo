@@ -1,10 +1,18 @@
-name: Restart anvil
+name: Upgrade services
 
 on:
   workflow_call:
     inputs:
       environment:
         description: 'Environment'
+        required: true
+        type: string
+      services:
+        description: 'Services'
+        required: true
+        type: string
+      tag:
+        description: 'Image tag'
         required: true
         type: string
 
@@ -14,7 +22,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  restart-anvil:
+  upgrade-services:
     runs-on: ubuntu-latest
     permissions:
       # needed for aws credentials
@@ -29,10 +37,9 @@ jobs:
           cache: 'pip'
       - name: Setup AWS
         uses: ./.github/actions/setup-aws
-      - name: Stop and start
+      - name: Upgrade services
         run: |
           cd scripts
           test -d venv || python3 -m venv venv
           . ./venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
-          python3 ecs-deploy.py stop --env demo --services anvil,anvil2
-          python3 ecs-deploy.py start --env demo --services anvil,anvil2
+          python3 ecs-deploy.py upgrade --env ${{ inputs.environment }} --services ${{ inputs.services }} --tag ${{ inputs.tag }}
