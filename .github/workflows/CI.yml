@@ -28,26 +28,63 @@ jobs:
     name: Build Telegram Mini App
     uses: ./.github/workflows/build-telegram-mini-app.yml
 
+  stop_backend:
+    name: Stop Backend
+    if: ${{ github.event_name == 'push' }}
+    needs: [ build_push_backend, build_frontend, build_telegram_mini_app ]
+    permissions:
+      id-token: write # needed for aws credentials
+      contents: read
+    uses: ./.github/workflows/deploy-backend.yml
+    with:
+      action: stop
+      environment: test
+      tag: ${{ needs.build_push_backend.outputs.docker_image_tag }}
+
   deprecate_contracts:
     name: Deprecate Contracts
     if: ${{ github.event_name == 'push' }}
-    needs: [ build_push_backend, build_frontend, build_telegram_mini_app ]
+    needs: [ stop_backend ]
     permissions:
       id-token: write # needed for aws credentials
       contents: read
     uses: ./.github/workflows/deprecate-contracts.yml
     secrets: inherit # needs access to secrets.CI_BASTION_KEY
 
-  deploy_backend:
+  restart_anvil:
+    name: Restart Anvil
+    if: ${{ github.event_name == 'push' }}
+    needs: [ deprecate_contracts ]
+    permissions:
+      id-token: write # needed for aws credentials
+      contents: read
+    uses: ./.github/workflows/restart-anvil.yml
+    with:
+      environment: test
+
+  upgrade_backend:
     name: Deploy Backend
     if: ${{ github.event_name == 'push' }}
-    needs: [ build_push_backend, build_frontend, build_telegram_mini_app, deprecate_contracts ]
+    needs: [ restart_anvil ]
     permissions:
       id-token: write # needed for aws credentials
       contents: read
     uses: ./.github/workflows/deploy-backend.yml
     with:
       action: upgrade
+      environment: test
+      tag: ${{ needs.build_push_backend.outputs.docker_image_tag }}
+
+  start_backend:
+    name: Stop Backend
+    if: ${{ github.event_name == 'push' }}
+    needs: [ upgrade_backend ]
+    permissions:
+      id-token: write # needed for aws credentials
+      contents: read
+    uses: ./.github/workflows/deploy-backend.yml
+    with:
+      action: start
       environment: test
       tag: ${{ needs.build_push_backend.outputs.docker_image_tag }}
 
@@ -75,7 +112,7 @@ jobs:
 
   integration_tests:
     name: Run integration tests
-    needs: [ deploy_backend, deploy_web_ui, deploy_telegram_mini_app ]
+    needs: [ start_backend, deploy_web_ui, deploy_telegram_mini_app ]
     if: ${{ github.event_name == 'push' }}
     permissions:
       id-token: write # needed for aws credentials

@@ -102,7 +102,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                     init {
                         migrateDatabase()
 
-                        // activate auto mining to speeding up blockchain seeding
+                        // activate auto mining to speed up blockchain seeding
                         blockchainClients.forEach {
                             it.setAutoMining(true)
                         }
@@ -159,7 +159,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                         val symbolContractAddresses = seedBlockchain(fixtures)
                         seedDatabase(fixtures, symbolContractAddresses)
 
-                        // during tests block will be mined manually
+                        // during tests blocks will be mined manually
                         blockchainClients.forEach {
                             it.setAutoMining(false)
                         }
