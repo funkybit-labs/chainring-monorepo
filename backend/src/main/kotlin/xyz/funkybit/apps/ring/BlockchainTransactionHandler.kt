@@ -718,7 +718,7 @@ class BlockchainTransactionHandler(
         } catch (e: ContractCallException) {
             e.message?.let {
                 Regex(
-                    "Contract Call has been reverted by the EVM with the reason: 'BlockOutOfRangeError: block height is (\\d+) but requested was (\\d+)'.",
+                    ".*Contract Call has been reverted by the EVM with the reason: 'BlockOutOfRangeError: block height is (\\d+) but requested was (\\d+)'.*",
                 ).matchEntire(it)?.let { matchResult ->
                     if (matchResult.groups.size == 3) {
                         val blockHeight = matchResult.groups[1]!!.value.toBigInteger()
