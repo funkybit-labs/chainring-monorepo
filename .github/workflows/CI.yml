@@ -39,7 +39,7 @@ jobs:
     secrets: inherit # needs access to secrets.CI_BASTION_KEY
 
   upgrade_backend:
-    name: Deploy Backend
+    name: Upgrade backend
     if: ${{ github.event_name == 'push' }}
     needs: [ clear_database ]
     permissions:
@@ -66,7 +66,7 @@ jobs:
   deploy_web_ui:
     name: Deploy Web UI
     if: ${{ github.event_name == 'push' }}
-    needs: [ build_push_backend, build_frontend ]
+    needs: [ start_services, build_frontend ]
     permissions:
       id-token: write # needed for aws credentials
       contents: read
@@ -77,7 +77,7 @@ jobs:
   deploy_telegram_mini_app:
     name: Deploy Telegram Mini App
     if: ${{ github.event_name == 'push' }}
-    needs: [ build_push_backend, build_telegram_mini_app ]
+    needs: [ start_services, build_telegram_mini_app ]
     permissions:
       id-token: write # needed for aws credentials
       contents: read
@@ -87,7 +87,7 @@ jobs:
 
   integration_tests:
     name: Run integration tests
-    needs: [ start_services, deploy_web_ui, deploy_telegram_mini_app ]
+    needs: [ start_services ]
     if: ${{ github.event_name == 'push' }}
     permissions:
       id-token: write # needed for aws credentials
