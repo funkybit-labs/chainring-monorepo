@@ -47,6 +47,7 @@ import xyz.funkybit.sequencer.proto.withdrawalCreated
 import java.lang.Thread.UncaughtExceptionHandler
 import java.math.BigInteger
 import kotlin.concurrent.thread
+import kotlin.math.exp
 import kotlin.system.exitProcess
 import xyz.funkybit.sequencer.core.checkpointsQueue as defaultCheckpointsQueue
 import xyz.funkybit.sequencer.core.inputQueue as defaultInputQueue
@@ -999,11 +1000,24 @@ class SequencerApp(
         if (inputTailer.moveToCycle(currentCycle)) {
             // restore from previous cycle's checkpoint unless we are in the first cycle
             if (currentCycle != inputQueue.firstCycle()) {
-                logger.debug { "Restoring from checkpoint" }
-                state.load(
-                    checkpointsQueue,
-                    expectedCycle = inputQueue.nextCycle(currentCycle, TailerDirection.BACKWARD),
-                )
+                var expectedCycle = inputQueue.nextCycle(currentCycle, TailerDirection.BACKWARD)
+                while (expectedCycle != inputQueue.firstCycle()) {
+                    logger.debug { "Restoring from checkpoint with expected cycle $expectedCycle" }
+                    try {
+                        state.load(
+                            checkpointsQueue,
+                            expectedCycle = expectedCycle
+                        )
+                        break
+                    } catch (e: Exception) {
+                        if (e.message?.contains("Invalid cycle in the checkpoint") == true) {
+                            expectedCycle -= 1
+                            logger.debug { "Could not find expected cycle, going backwards" }
+                        } else {
+                            throw(e)
+                        }
+                    }
+                }
                 logger.debug { "Restored from checkpoint" }
             }
         }
