@@ -16,11 +16,6 @@ on:
         required: true
         type: string
 
-# make sure it does not interfere with other jobs in progress
-concurrency:
-  group: ${{ github.ref_name }}
-  cancel-in-progress: false
-
 jobs:
   upgrade-services:
     runs-on: ubuntu-latest
