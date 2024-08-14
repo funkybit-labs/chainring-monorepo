@@ -56,7 +56,7 @@ class SequencerApp(
     val clock: Clock = Clock(),
     val inputQueue: RollingChronicleQueue = defaultInputQueue,
     val outputQueue: RollingChronicleQueue = defaultOutputQueue,
-    val checkpointsQueue: RollingChronicleQueue? = defaultCheckpointsQueue,
+    var checkpointsQueue: RollingChronicleQueue? = defaultCheckpointsQueue,
     val inSandboxMode: Boolean = System.getenv("SANDBOX_MODE").toBoolean(),
     private val strictReplayValidation: Boolean = System.getenv("STRICT_REPLAY_VALIDATION").toBoolean(),
 ) : BaseApp() {
@@ -887,9 +887,7 @@ class SequencerApp(
         sequencerThread = thread(start = false, name = "sequencer", isDaemon = false) {
             val inputTailer = inputQueue.createTailer("sequencer")
 
-            if (checkpointsQueue != null) {
-                restoreFromCheckpoint(inputTailer, checkpointsQueue)
-            }
+            checkpointsQueue?.let { restoreFromCheckpoint(inputTailer, it) }
 
             val lastSequenceNumberProcessedBeforeRestart = getLastSequenceNumberInOutputQueue()
             var requestsProcessedSinceStarted: Long = 0
@@ -899,8 +897,8 @@ class SequencerApp(
             while (!stop) {
                 val tailerState = inputTailer.state()
                 if (tailerState == TailerState.END_OF_CYCLE && tailerState != tailerPrevState) {
-                    if (checkpointsQueue != null) {
-                        saveCheckpoint(checkpointsQueue, inputTailer.cycle())
+                    checkpointsQueue?.let {
+                        saveCheckpoint(it, inputTailer.cycle())
                     }
                 }
 

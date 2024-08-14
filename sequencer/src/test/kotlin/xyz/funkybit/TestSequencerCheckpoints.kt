@@ -412,6 +412,53 @@ class TestSequencerCheckpoints {
             )
 
             assertCheckpointsCount(checkpointsQueue, 2)
+
+            // now move the cycle without the checkpoint queue being set
+            currentTime.addAndGet(60.seconds.inWholeMilliseconds)
+            val sequencerCheckpointsQueue = sequencerApp.checkpointsQueue
+            sequencerApp.checkpointsQueue = null
+            assertTrue(
+                gateway.applyOrderBatch(
+                    orderBatch {
+                        this.guid = UUID.randomUUID().toString()
+                        this.marketId = btcEthMarketId.value
+                        this.wallet = wallet1.value
+                        this.ordersToAdd.add(
+                            order {
+                                this.guid = Random.nextLong()
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.levelIx = "17.550".levelIx(btcEthMarketTickSize)
+                                this.type = Order.Type.LimitSell
+                            },
+                        )
+                    },
+                ).success,
+            )
+            sequencerApp.checkpointsQueue = sequencerCheckpointsQueue
+            sequencerApp.stop()
+            sequencerApp.start()
+
+            assertQueueFilesCount(inputQueue, 4)
+            assertCheckpointsCount(checkpointsQueue, 2)
+            assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 13)
+
+            assertTrue(
+                gateway.applyOrderBatch(
+                    orderBatch {
+                        this.guid = UUID.randomUUID().toString()
+                        this.marketId = btcEthMarketId.value
+                        this.wallet = wallet1.value
+                        this.ordersToAdd.add(
+                            order {
+                                this.guid = Random.nextLong()
+                                this.amount = BigDecimal("0.0005").inSats().toIntegerValue()
+                                this.levelIx = "17.550".levelIx(btcEthMarketTickSize)
+                                this.type = Order.Type.LimitSell
+                            },
+                        )
+                    },
+                ).success,
+            )
         } finally {
             gatewayApp.stop()
             sequencerApp.stop()
