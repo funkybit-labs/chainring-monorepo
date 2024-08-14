@@ -1,0 +1,33 @@
+name: Clear database
+
+on:
+  # Call from another workflow (CI)
+  workflow_call:
+
+# only one running job
+concurrency:
+  group: deprecate-contracts
+  cancel-in-progress: false
+
+jobs:
+  clear_database:
+    name: Clear database
+    runs-on: ubuntu-latest
+    permissions:
+      # needed for aws credentials
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup AWS
+        uses: ./.github/actions/setup-aws
+      - name: Configure SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CI_BASTION_KEY }}
+      - name: Clear database
+        run: |
+          ssh -o StrictHostKeyChecking=no -L 5434:test-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com:5432 ec2-user@test-bastion.funkybit.fun -N &
+          sleep 2  # to give the SSH tunnel time to be set up
+          PGPASSWORD=$(aws --region us-east-2 secretsmanager get-secret-value --secret-id 'arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-a00059f0-7cd7-4989-bd67-7af9e5899397-cWukH6' | jq -r '.SecretString' | jq -r '.password') \
+            psql --port=5434 --host=localhost --user=funkybit -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"

@@ -105,7 +105,7 @@ module "anvil" {
   tcp_ports                               = [8545]
   health_check                            = "/"
   health_check_status                     = "400"
-  mount_efs_volume                        = true
+  mount_efs_volume                        = false
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
   deployment_minimum_healthy_percent      = 0
   deployment_maximum_percent              = 100
@@ -159,7 +159,7 @@ module "anvil2" {
   tcp_ports                               = [8545]
   health_check                            = "/"
   health_check_status                     = "400"
-  mount_efs_volume                        = true
+  mount_efs_volume                        = false
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
   deployment_minimum_healthy_percent      = 0
   deployment_maximum_percent              = 100
