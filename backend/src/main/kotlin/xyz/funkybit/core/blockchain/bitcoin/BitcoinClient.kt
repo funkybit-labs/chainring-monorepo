@@ -6,7 +6,9 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import org.bitcoinj.core.NetworkParameters
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.SmartFeeMode
+import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.db.ChainId
+import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.rpc.BitcoinRpc
 import xyz.funkybit.core.model.rpc.BitcoinRpcParams
 import xyz.funkybit.core.model.rpc.BitcoinRpcRequest
@@ -27,8 +29,9 @@ object BitcoinClient : JsonRpcClientBase(
     override val logger = KotlinLogging.logger {}
 
     val bitcoinConfig = ChainManager.bitcoinBlockchainClientConfig
-
     val chainId = ChainId(8086u)
+    private val minFee = BigDecimal(bitcoinConfig.feeSettings.minValue)
+    private val maxFee = BigDecimal(bitcoinConfig.feeSettings.maxValue)
 
     fun getParams(): NetworkParameters = NetworkParameters.fromID(ChainManager.bitcoinBlockchainClientConfig.net)!!
 
@@ -36,74 +39,37 @@ object BitcoinClient : JsonRpcClientBase(
         return getValue(
             BitcoinRpcRequest(
                 "generatetoaddress",
-                BitcoinRpcParams(listOf(nBlocks, bitcoinConfig.faucetAddress!!)),
+                BitcoinRpcParams(listOf(nBlocks, bitcoinConfig.faucetAddress)),
             ),
         )
     }
 
-    fun sendToAddress(address: String, amount: BigInteger): String {
+    fun sendToAddress(address: BitcoinAddress, amount: BigInteger): TxHash {
         return getValue(
             BitcoinRpcRequest(
                 "sendtoaddress",
-                BitcoinRpcParams(listOf(address, amount.inSatsAsDecimalString())),
+                BitcoinRpcParams(listOf(address.value, amount.inSatsAsDecimalString())),
             ),
         )
     }
 
-    fun sendToAddressAndMine(address: String, amount: BigInteger): String {
+    fun sendToAddressAndMine(address: BitcoinAddress, amount: BigInteger): TxHash {
         return sendToAddress(address, amount).also {
             mine(1)
         }
     }
 
-    fun getBlockCount(): Long {
-        return getValue(
-            BitcoinRpcRequest(
-                "getblockcount",
-            ),
-        )
-    }
-
-    fun getBlockHash(blockHeight: Long): String {
-        return getValue(
-            BitcoinRpcRequest(
-                "getblockhash",
-                BitcoinRpcParams(listOf(blockHeight)),
-            ),
-        )
-    }
-
-    fun getBlock(blockhash: String, verbosity: Int = 2): BitcoinRpc.Block {
-        return getValue(
-            BitcoinRpcRequest(
-                "getblock",
-                BitcoinRpcParams(listOf(blockhash, verbosity)),
-            ),
-            false,
-        )
-    }
-
-    fun getBlockHeader(blockhash: String): BitcoinRpc.Block {
-        return getValue(
-            BitcoinRpcRequest(
-                "getblockheader",
-                BitcoinRpcParams(listOf(blockhash)),
-            ),
-            true,
-        )
-    }
-
-    fun getRawTransaction(txId: String): BitcoinRpc.Transaction {
+    fun getRawTransaction(txId: TxHash): BitcoinRpc.Transaction {
         return getValue(
             BitcoinRpcRequest(
                 "getrawtransaction",
-                BitcoinRpcParams(listOf(txId, true)),
+                BitcoinRpcParams(listOf(txId.value, true)),
             ),
             true,
         )
     }
 
-    fun sendRawTransaction(rawTransactionHex: String): String {
+    fun sendRawTransaction(rawTransactionHex: String): TxHash {
         return getValue(
             BitcoinRpcRequest(
                 "sendrawtransaction",
@@ -113,10 +79,10 @@ object BitcoinClient : JsonRpcClientBase(
         )
     }
 
-    fun estimateSmartFeeInSatPerVByte(): BigDecimal? {
+    fun estimateSmartFeeInSatPerVByte(): BigDecimal {
         return estimateSmartFee(bitcoinConfig.feeSettings.blocks, bitcoinConfig.feeSettings.mode).feeRate?.let {
-            scaleToSatoshiPerVByte(it)
-        }
+            maxFee.min(minFee.max(scaleToSatoshiPerVByte(it)))
+        } ?: minFee
     }
 
     private fun scaleToSatoshiPerVByte(btcPerVirtualKByte: BigDecimal) =

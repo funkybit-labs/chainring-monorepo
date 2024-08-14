@@ -12,8 +12,11 @@ import xyz.funkybit.core.db.DbConfig
 import xyz.funkybit.core.db.connect
 import xyz.funkybit.core.db.migrations
 import xyz.funkybit.core.db.upgrade
+import xyz.funkybit.core.model.db.ArchStateUtxoLogTable
+import xyz.funkybit.core.model.db.ArchStateUtxoTable
 import xyz.funkybit.core.model.db.BalanceLogTable
 import xyz.funkybit.core.model.db.BalanceTable
+import xyz.funkybit.core.model.db.BitcoinWalletStateTable
 import xyz.funkybit.core.model.db.BlockTable
 import xyz.funkybit.core.model.db.BlockchainTransactionTable
 import xyz.funkybit.core.model.db.BroadcasterJobTable
@@ -83,6 +86,9 @@ open class TestWithDb {
             MarketTable.deleteAll()
             SymbolTable.deleteAll()
             ChainTable.deleteAll()
+            BitcoinWalletStateTable.deleteAll()
+            ArchStateUtxoLogTable.deleteAll()
+            ArchStateUtxoTable.deleteAll()
         }
     }
 }

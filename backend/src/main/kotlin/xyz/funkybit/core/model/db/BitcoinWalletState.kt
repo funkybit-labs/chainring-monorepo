@@ -9,6 +9,8 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import xyz.funkybit.apps.api.model.BigIntegerJson
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.UtxoId
 
 @Serializable
 @JvmInline
@@ -22,9 +24,10 @@ value class BitcoinWalletStateId(override val value: String) : EntityId {
 
 @Serializable
 data class UnspentUtxo(
-    val utxoId: String,
+    val utxoId: UtxoId,
     val amount: BigIntegerJson,
     val blockHeight: Long?,
+    val reservedBy: String?,
 )
 
 object BitcoinWalletStateTable : GUIDTable<BitcoinWalletStateId>("bitcoin_wallet_state", ::BitcoinWalletStateId) {
@@ -37,7 +40,7 @@ object BitcoinWalletStateTable : GUIDTable<BitcoinWalletStateId>("bitcoin_wallet
 
 class BitcoinWalletStateEntity(guid: EntityID<BitcoinWalletStateId>) : GUIDEntity<BitcoinWalletStateId>(guid) {
     companion object : EntityClass<BitcoinWalletStateId, BitcoinWalletStateEntity>(BitcoinWalletStateTable) {
-        fun create(address: String, lastTxId: String?, unspentUtxos: List<UnspentUtxo>): BitcoinWalletStateEntity {
+        fun create(address: BitcoinAddress, lastTxId: TxHash?, unspentUtxos: List<UnspentUtxo>): BitcoinWalletStateEntity {
             return BitcoinWalletStateEntity.new(BitcoinWalletStateId.generate()) {
                 this.address = address
                 this.unspentUtxos = unspentUtxos
@@ -46,23 +49,29 @@ class BitcoinWalletStateEntity(guid: EntityID<BitcoinWalletStateId>) : GUIDEntit
             }
         }
 
-        fun findByAddress(address: String): BitcoinWalletStateEntity? {
+        fun findByAddress(address: BitcoinAddress): BitcoinWalletStateEntity? {
             return BitcoinWalletStateEntity.find {
-                BitcoinWalletStateTable.address.eq(address)
+                BitcoinWalletStateTable.address.eq(address.value)
             }.firstOrNull()
         }
     }
 
-    fun update(lastTxId: String?, unspentUtxos: List<UnspentUtxo>) {
+    fun update(lastTxId: TxHash?, unspentUtxos: List<UnspentUtxo>) {
         this.lastTxId = lastTxId
         this.unspentUtxos = unspentUtxos
         this.updatedAt = Clock.System.now()
     }
 
-    var address by BitcoinWalletStateTable.address
+    var address by BitcoinWalletStateTable.address.transform(
+        toReal = { BitcoinAddress(it) },
+        toColumn = { it.value },
+    )
 
     var unspentUtxos by BitcoinWalletStateTable.unspentUtxos
-    var lastTxId by BitcoinWalletStateTable.lastTxId
+    var lastTxId by BitcoinWalletStateTable.lastTxId.transform(
+        toReal = { it?.let(::TxHash) },
+        toColumn = { it?.value },
+    )
 
     var createdAt by BitcoinWalletStateTable.createdAt
     var updatedAt by BitcoinWalletStateTable.updatedAt

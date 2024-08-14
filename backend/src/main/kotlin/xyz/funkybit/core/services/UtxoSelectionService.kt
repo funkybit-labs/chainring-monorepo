@@ -3,7 +3,10 @@ package xyz.funkybit.core.services
 import io.github.oshai.kotlinlogging.KotlinLogging
 import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceApi
 import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.UtxoId
 import xyz.funkybit.core.model.db.BitcoinWalletStateEntity
+import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.UnspentUtxo
 import xyz.funkybit.core.utils.bitcoin.BitcoinInputsSelector
 import java.math.BigInteger
@@ -14,22 +17,23 @@ object UtxoSelectionService {
 
     private val inputsSelector = BitcoinInputsSelector()
 
-    fun selectUtxos(address: String, amount: BigInteger, fee: BigInteger): List<UnspentUtxo> {
+    fun selectUtxos(address: BitcoinAddress, amount: BigInteger, fee: BigInteger): List<UnspentUtxo> {
         val unspentUtxos = refreshUnspentUtxos(address)
         return inputsSelector.selectInputs(
             amount,
-            unspentUtxos,
+            unspentUtxos.filter { it.reservedBy == null },
             fee,
         )
     }
 
-    fun refreshUnspentUtxos(address: String): List<UnspentUtxo> {
+    fun refreshUnspentUtxos(address: BitcoinAddress): List<UnspentUtxo> {
         val bitcoinWalletState = BitcoinWalletStateEntity.findByAddress(address)
 
-        val previousUnspentUtxos = bitcoinWalletState?.unspentUtxos?.associate { it.utxoId to it }?.toMutableMap() ?: mutableMapOf()
+        val unspentUtxos = bitcoinWalletState?.unspentUtxos?.associate { it.utxoId to it }?.toMutableMap() ?: mutableMapOf()
 
-        val lastTxId = updateUtxoMap(previousUnspentUtxos, address, bitcoinWalletState?.lastTxId)
-        return previousUnspentUtxos.values.toList().also {
+        val lastTxId = updateUtxoMap(unspentUtxos, address, bitcoinWalletState?.lastTxId)
+        return unspentUtxos.values.toList().also {
+            logger.debug { "available amount is ${it.sumOf { u -> u.amount }}" }
             if (bitcoinWalletState != null) {
                 bitcoinWalletState.update(lastTxId, it)
             } else {
@@ -38,7 +42,25 @@ object UtxoSelectionService {
         }
     }
 
-    private fun updateUtxoMap(utxoMap: MutableMap<String, UnspentUtxo>, walletAddress: String, lastSeenTxId: String?): String? {
+    fun reserveUtxos(address: BitcoinAddress, utxoIds: Set<UtxoId>, reservedBy: String) {
+        BitcoinWalletStateEntity.findByAddress(address)?.let { state ->
+            state.update(
+                state.lastTxId,
+                state.unspentUtxos.map {
+                    if (utxoIds.contains(it.utxoId)) {
+                        if (it.reservedBy != null && it.reservedBy != reservedBy) {
+                            throw Exception("trying to reserve an already reserved utxo")
+                        }
+                        it.copy(reservedBy = reservedBy)
+                    } else {
+                        it
+                    }
+                },
+            )
+        }
+    }
+
+    private fun updateUtxoMap(utxoMap: MutableMap<UtxoId, UnspentUtxo>, walletAddress: BitcoinAddress, lastSeenTxId: TxHash?): TxHash? {
         logger.debug { "updating utxos for $walletAddress lastSeenTxId=$lastSeenTxId" }
 
         // mempool pagination is a little odd
@@ -56,7 +78,7 @@ object UtxoSelectionService {
         val allConfirmed = mutableListOf<MempoolSpaceApi.Transaction>()
 
         var (confirmed, unconfirmed) = MempoolSpaceClient.getTransactions(walletAddress, null).partition { it.status.confirmed }
-        val spentUtxosInMempool = unconfirmed.map { tx -> tx.vins.filter { it.prevOut.scriptPubKeyAddress == walletAddress }.map { "${it.txId}:${it.vout}" } }.flatten().toSet()
+        val spentUtxosInMempool = unconfirmed.map { tx -> tx.vins.filter { it.prevOut.scriptPubKeyAddress == walletAddress }.map { UtxoId.fromTxHashAndVout(it.txId, it.vout) } }.flatten().toSet()
         var hasMore = true
 
         while (hasMore) {
@@ -81,13 +103,13 @@ object UtxoSelectionService {
                 utxoMap.remove(it)
             }
             tx.vins.filter { it.prevOut.scriptPubKeyAddress == walletAddress }.forEach {
-                utxoMap.remove("${it.txId}:${it.vout}")
+                utxoMap.remove(UtxoId.fromTxHashAndVout(it.txId, it.vout))
             }
             tx.vouts.forEachIndexed { index, vout ->
                 if (vout.scriptPubKeyAddress == walletAddress) {
-                    val utxoId = "${tx.txId}:$index"
+                    val utxoId = UtxoId.fromTxHashAndVout(tx.txId, index)
                     if (!spentUtxosInMempool.contains(utxoId)) {
-                        utxoMap[utxoId] = UnspentUtxo(utxoId, vout.value, tx.status.blockHeight)
+                        utxoMap[utxoId] = UnspentUtxo(utxoId, vout.value, tx.status.blockHeight, null)
                     }
                 }
             }

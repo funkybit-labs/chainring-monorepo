@@ -7,6 +7,9 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import org.bitcoinj.core.ECKey
+import org.bitcoinj.core.NetworkParameters
+import org.bitcoinj.script.Script
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.Keys
 import xyz.funkybit.core.utils.generateHexString
@@ -28,10 +31,24 @@ sealed class Address {
     abstract fun canonicalize(): Address
 }
 
-@Serializable
+object BitcoinAddressSerializer : KSerializer<BitcoinAddress> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("BitcoinAddress", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: BitcoinAddress) = encoder.encodeString(value.value)
+    override fun deserialize(decoder: Decoder) = BitcoinAddress(decoder.decodeString())
+}
+
+@Serializable(with = BitcoinAddressSerializer::class)
 data class BitcoinAddress(val value: String) : Address() {
     override fun canonicalize() = BitcoinAddress(this.value)
     override fun toString() = this.value
+
+    companion object {
+        fun fromKey(params: NetworkParameters, key: ECKey): BitcoinAddress =
+            BitcoinAddress(org.bitcoinj.core.Address.fromKey(params, key, Script.ScriptType.P2WPKH).toString())
+    }
+
+    fun toBitcoinCoreAddress(params: NetworkParameters): org.bitcoinj.core.Address =
+        org.bitcoinj.core.Address.fromString(params, value)
 }
 
 @Serializable
