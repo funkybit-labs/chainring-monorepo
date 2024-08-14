@@ -42,6 +42,7 @@ jobs:
           EVM_NETWORK_URL_anvil: https://test-anvil.funkybit.fun
           EVM_NETWORK_URL_anvil2: https://test-anvil2.funkybit.fun
           INTEGRATION_RUN: 1
+          BITCOIN_NETWORK_ENABLED: "false"
           API_URL: https://test-api.funkybit.fun
           CI_RUN: 1
           SEQUENCER_HOST_NAME: test-sequencer.funkybit.fun
