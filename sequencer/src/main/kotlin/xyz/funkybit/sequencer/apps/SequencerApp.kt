@@ -1010,6 +1010,7 @@ class SequencerApp(
                         break
                     } catch (e: Exception) {
                         if (e.message?.contains("Invalid cycle in the checkpoint") == true) {
+                            inputTailer.moveToCycle(expectedCycle)
                             expectedCycle = inputQueue.nextCycle(expectedCycle, TailerDirection.BACKWARD)
                             logger.debug { "Could not find expected cycle, going backwards" }
                         } else {
