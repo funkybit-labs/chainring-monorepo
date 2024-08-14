@@ -60,6 +60,7 @@ class TestSchnorr {
                 true,
             ),
 
+            // public key not on the curve
             Arguments.of(
                 null,
                 "EEFDEA4CDB677750A420FEE807EACF21EB9898AE79B9768766E4FAA04A2D4A34".hexToByteArray(HexFormat.UpperCase),
@@ -70,6 +71,7 @@ class TestSchnorr {
                 false,
             ),
 
+            // has_square_y(R) is false
             Arguments.of(
                 null,
                 "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659".hexToByteArray(HexFormat.UpperCase),
@@ -80,6 +82,7 @@ class TestSchnorr {
                 false,
             ),
 
+            // negated message
             Arguments.of(
                 null,
                 "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659".hexToByteArray(HexFormat.UpperCase),
@@ -90,6 +93,7 @@ class TestSchnorr {
                 false,
             ),
 
+            // negated s value
             Arguments.of(
                 null,
                 "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659".hexToByteArray(HexFormat.UpperCase),
@@ -100,6 +104,7 @@ class TestSchnorr {
                 false,
             ),
 
+            // sG - eP is infinite. Test fails in single verification if has_square_y(inf) is defined as true and x(inf) as 0
             Arguments.of(
                 null,
                 "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659".hexToByteArray(HexFormat.UpperCase),
@@ -110,6 +115,7 @@ class TestSchnorr {
                 false,
             ),
 
+            // sG - eP is infinite. Test fails in single verification if has_square_y(inf) is defined as true and x(inf) as 1
             Arguments.of(
                 null,
                 "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659".hexToByteArray(HexFormat.UpperCase),
@@ -120,6 +126,7 @@ class TestSchnorr {
                 false,
             ),
 
+            // sig[0:32] is not an X coordinate on the curve
             Arguments.of(
                 null,
                 "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659".hexToByteArray(HexFormat.UpperCase),
@@ -130,6 +137,7 @@ class TestSchnorr {
                 false,
             ),
 
+            // sig[0:32] is equal to field size
             Arguments.of(
                 null,
                 "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659".hexToByteArray(HexFormat.UpperCase),
@@ -140,6 +148,7 @@ class TestSchnorr {
                 false,
             ),
 
+            // sig[32:64] is equal to curve order
             Arguments.of(
                 null,
                 "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659".hexToByteArray(HexFormat.UpperCase),
@@ -150,6 +159,7 @@ class TestSchnorr {
                 false,
             ),
 
+            // public key is not a valid X coordinate because it exceeds the field size
             Arguments.of(
                 null,
                 "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC30".hexToByteArray(HexFormat.UpperCase),
