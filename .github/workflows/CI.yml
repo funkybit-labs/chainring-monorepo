@@ -48,11 +48,11 @@ jobs:
     uses: ./.github/workflows/upgrade-services.yml
     with:
       environment: test
-      services: "api,ring,telegrambot,garp,sequencer"
+      services: "ring,api,telegrambot,garp,sequencer"
       tag: ${{ needs.build_push_backend.outputs.docker_image_tag }}
 
   start_services:
-    name: Stop Backend
+    name: Start services
     if: ${{ github.event_name == 'push' }}
     needs: [ upgrade_backend ]
     permissions:
@@ -98,7 +98,7 @@ jobs:
 
   stop_services:
     name: Stop services
-    if: ${{ github.event_name == 'push' && always() }}
+    if: ${{ github.event_name == 'push' && always() }} # always run this job, even if integration_tests job has failed or workflow cancelation was requested
     needs: [ integration_tests ]
     permissions:
       id-token: write # needed for aws credentials
