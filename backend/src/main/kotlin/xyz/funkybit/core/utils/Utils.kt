@@ -5,8 +5,8 @@ import kotlinx.datetime.Instant
 import org.bouncycastle.util.encoders.Hex
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.math.BigInteger
+import java.security.MessageDigest
 import java.security.SecureRandom
-import kotlin.text.HexFormat
 import kotlin.time.Duration
 
 fun humanReadable(duration: Duration): String {
@@ -116,3 +116,8 @@ fun BigInteger.safeToInt(): Int? =
             else -> throw exception
         }
     }.getOrNull()
+
+fun sha256(b: ByteArray?): ByteArray {
+    val digest = MessageDigest.getInstance("SHA-256")
+    return digest.digest(b)
+}
