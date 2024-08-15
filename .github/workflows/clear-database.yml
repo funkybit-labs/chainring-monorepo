@@ -4,11 +4,6 @@ on:
   # Call from another workflow (CI)
   workflow_call:
 
-# only one running job
-concurrency:
-  group: deprecate-contracts
-  cancel-in-progress: false
-
 jobs:
   clear_database:
     name: Clear database
