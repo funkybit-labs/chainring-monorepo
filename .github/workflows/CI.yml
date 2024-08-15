@@ -41,7 +41,7 @@ jobs:
   upgrade_backend:
     name: Upgrade backend
     if: ${{ github.event_name == 'push' }}
-    needs: [ clear_database ]
+    needs: [ build_push_backend, clear_database ]
     permissions:
       id-token: write # needed for aws credentials
       contents: read
