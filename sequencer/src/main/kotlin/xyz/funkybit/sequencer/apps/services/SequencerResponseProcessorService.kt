@@ -452,7 +452,7 @@ object SequencerResponseProcessorService {
                             duration = it.duration,
                             ohlc = listOf(it),
                             full = false,
-                            dailyChange = h24ClosePrice?.let { (weightedPrice.toDouble() - it.toDouble()) / it.toDouble() } ?: 0.0,
+                            dailyChange = h24ClosePrice?.let { closePrice -> (weightedPrice - closePrice) / closePrice } ?: BigDecimal.ZERO,
                         )
                     }
             }.flatten()

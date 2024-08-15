@@ -144,10 +144,10 @@ class SettlementTest : OrderBaseTest() {
                         assertEquals(OrderStatus.Filled, msg.order.status)
                     }
                 }
-                assertBalancesMessageReceived {}
-                assertOrderBookMessageReceived(market.id) {}
+                assertBalancesMessageReceived()
+                assertOrderBookMessageReceived(market.id)
                 repeat(2) {
-                    assertPricesMessageReceived(market.id) {}
+                    assertPricesMessageReceived(market.id)
                 }
                 assertLimitsMessageReceived()
             }

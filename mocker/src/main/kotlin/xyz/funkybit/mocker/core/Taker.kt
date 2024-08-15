@@ -185,7 +185,7 @@ class Taker(
                     logger.info { "$id: incremental price update: $message" }
                 }
                 message.ohlc.lastOrNull()?.let {
-                    marketPrices[message.market] = it.close.toBigDecimal()
+                    marketPrices[message.market] = it.close
                 }
             }
 
