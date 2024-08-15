@@ -115,7 +115,7 @@ class BlockProcessor(
         BigInteger.valueOf((System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toIntOrNull() ?: BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS) + 1L)
 
     private fun handleFork(blockFromRpcNode: EthBlock.Block, lastProcessedBlock: BlockEntity) {
-        logger.error { "Fork detected: for block [height=${blockFromRpcNode.number},hash=${blockFromRpcNode.hash},parentHash=${blockFromRpcNode.parentHash}] latest block found in db is [height=${lastProcessedBlock.number},hash=${lastProcessedBlock.guid.value},parentHash=${lastProcessedBlock.parentGuid.value}]. Looking for split point starting at ${blockFromRpcNode.number}, chainId=$chainId" }
+        logger.info { "Fork detected: for block [height=${blockFromRpcNode.number},hash=${blockFromRpcNode.hash},parentHash=${blockFromRpcNode.parentHash}] latest block found in db is [height=${lastProcessedBlock.number},hash=${lastProcessedBlock.guid.value},parentHash=${lastProcessedBlock.parentGuid.value}]. Looking for split point starting at ${blockFromRpcNode.number}, chainId=$chainId" }
 
         val blocksToRollback = BlockEntity
             .getRecentBlocksUpToNumber(
