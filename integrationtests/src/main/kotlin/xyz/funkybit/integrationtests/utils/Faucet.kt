@@ -1,6 +1,7 @@
 package xyz.funkybit.integrationtests.utils
 
 import org.web3j.protocol.core.methods.response.TransactionReceipt
+import xyz.funkybit.apps.ring.BlockchainDepositHandler
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.db.ChainId
@@ -18,7 +19,9 @@ object Faucet {
     fun fundAndMine(address: Address, amount: BigInteger? = null, chainId: ChainId? = null): TransactionReceipt {
         return blockchainClient(chainId).let { client ->
             val txHash = client.sendNativeDepositTx(address, amount ?: BigDecimal("0.05").toFundamentalUnits(18))
-            client.mine()
+            repeat(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS) {
+                client.mine()
+            }
             client.getTransactionReceipt(txHash)!!
         }
     }

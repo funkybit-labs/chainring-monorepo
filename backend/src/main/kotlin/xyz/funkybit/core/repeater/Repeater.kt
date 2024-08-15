@@ -8,7 +8,7 @@ import xyz.funkybit.core.utils.PgListener
 import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
-class Repeater(db: Database) {
+class Repeater(db: Database, val automaticTaskScheduling: Boolean = true) {
     private val logger = KotlinLogging.logger {}
 
     private val tasks = mapOf(
@@ -38,8 +38,10 @@ class Repeater(db: Database) {
 
     fun start() {
         logger.info { "Starting" }
-        tasks.values.forEach {
-            it.schedule(timer)
+        if (automaticTaskScheduling) {
+            tasks.values.forEach {
+                it.schedule(timer)
+            }
         }
         pgListener.start()
         logger.info { "Started" }

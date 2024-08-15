@@ -11,6 +11,7 @@ environment:
     ENABLE_TEST_ROUTES: "true"
     FAUCET_MODE: AllSymbols
     BITCOIN_NETWORK_ENABLED: "false"
+    REPEATER_AUTOMATIC_TASK_SCHEDULING: "false"
   sequencer:
     QUEUE_HOME: "/data/queues/test"
     CHECKPOINTS_ENABLED: "false"

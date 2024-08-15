@@ -8,16 +8,16 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.core.db.notifyDbListener
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
+import xyz.funkybit.integrationtests.testutils.isTestEnvRun
 import xyz.funkybit.integrationtests.utils.clearLogMessages
 import xyz.funkybit.integrationtests.utils.logMessages
-import java.lang.System.getenv
 import java.util.concurrent.TimeUnit
 
 @ExtendWith(AppUnderTestRunner::class)
 class GasMonitorTest {
     @Test
     fun `test gas monitor`() {
-        Assumptions.assumeTrue((getenv("INTEGRATION_RUN") ?: "0") != "1")
+        Assumptions.assumeFalse(isTestEnvRun())
         clearLogMessages()
         transaction {
             notifyDbListener("repeater_app_task_ctl", "gas_monitor:10000000000000")

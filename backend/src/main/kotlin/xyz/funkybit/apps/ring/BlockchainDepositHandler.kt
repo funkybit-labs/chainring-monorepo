@@ -24,10 +24,14 @@ import kotlin.time.Duration.Companion.minutes
 class BlockchainDepositHandler(
     private val blockchainClient: BlockchainClient,
     private val sequencerClient: SequencerClient,
-    private val numConfirmations: Int = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toIntOrNull() ?: 1,
+    private val numConfirmations: Int = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toIntOrNull() ?: DEFAULT_NUM_CONFIRMATIONS,
     private val pollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
     private val receiptMaxWaitTime: Duration = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_RECEIPT_MAX_WAIT_TIME_MS")?.toLongOrNull()?.milliseconds ?: 10.minutes,
 ) {
+    companion object {
+        const val DEFAULT_NUM_CONFIRMATIONS: Int = 2
+    }
+
     private val chainId = blockchainClient.chainId
     private var workerThread: Thread? = null
     val logger = KotlinLogging.logger {}

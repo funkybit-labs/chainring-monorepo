@@ -62,6 +62,8 @@ import xyz.funkybit.tasks.seedBlockchain
 import xyz.funkybit.tasks.seedDatabase
 import java.lang.System.getenv
 import java.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 // This extension allows us to start the app under test only once
 class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
@@ -84,7 +86,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                     val logger = KotlinLogging.logger {}
                     private val dbConfig = DbConfig()
                     private val apiApp = ApiApp(ApiAppConfig(httpPort = 9000, dbConfig = dbConfig))
-                    private val ringApp = RingApp(RingAppConfig(dbConfig = dbConfig))
+                    private val ringApp = RingApp(RingAppConfig(dbConfig = dbConfig, repeaterAutomaticTaskScheduling = false))
                     private val gatewayApp = GatewayApp(GatewayConfig(port = 5337))
                     private val sequencerApp = SequencerApp(
                         // we want sequencer to start from the clean-slate
@@ -97,8 +99,6 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                         onAbnormalStop = {},
                     )
 
-                    private val isIntegrationRun = (getenv("INTEGRATION_RUN") ?: "0") == "1"
-
                     init {
                         migrateDatabase()
 
@@ -107,7 +107,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                             it.setAutoMining(true)
                         }
 
-                        if (!isIntegrationRun) {
+                        if (!isTestEnvRun()) {
                             sequencerApp.start()
                             sequencerResponseProcessorApp.start()
                             gatewayApp.start()
@@ -162,12 +162,13 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                         // during tests blocks will be mined manually
                         blockchainClients.forEach {
                             it.setAutoMining(false)
+                            it.setIntervalMining(60.minutes)
                         }
                     }
 
                     @Throws(Throwable::class)
                     override fun close() {
-                        if (!isIntegrationRun) {
+                        if (!isTestEnvRun()) {
                             apiApp.stop()
                             ringApp.stop()
                             sequencerApp.stop()
@@ -176,7 +177,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
 
                         // revert back to interval mining for `test` env to work normally
                         blockchainClients.forEach {
-                            it.setIntervalMining()
+                            it.setIntervalMining(1.seconds)
                         }
                     }
                 }
@@ -266,3 +267,6 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
         }
     }
 }
+
+fun isTestEnvRun(): Boolean =
+    (getenv("TEST_ENV_RUN") ?: "0") == "1"

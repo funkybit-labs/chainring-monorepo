@@ -11,6 +11,7 @@ import xyz.funkybit.core.sequencer.SequencerClient
 
 data class RingAppConfig(
     val dbConfig: DbConfig = DbConfig(),
+    val repeaterAutomaticTaskScheduling: Boolean = System.getenv("REPEATER_AUTOMATIC_TASK_SCHEDULING")?.toBoolean() ?: true,
 )
 
 class RingApp(config: RingAppConfig = RingAppConfig()) : BaseApp(config.dbConfig) {
@@ -21,7 +22,7 @@ class RingApp(config: RingAppConfig = RingAppConfig()) : BaseApp(config.dbConfig
     private val chainWorkers = blockchainClients.map { ChainWorker(it, sequencerClient) }
     private val settlementCoordinator = SettlementCoordinator(blockchainClients, sequencerClient)
 
-    private val repeater = Repeater(db)
+    private val repeater = Repeater(db, config.repeaterAutomaticTaskScheduling)
 
     override fun start() {
         logger.info { "Starting" }

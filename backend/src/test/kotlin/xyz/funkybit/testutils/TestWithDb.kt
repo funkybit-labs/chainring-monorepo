@@ -43,12 +43,11 @@ import java.lang.System.getenv
 open class TestWithDb {
     companion object {
         private val logger = KotlinLogging.logger {}
-        private val isIntegrationRun = (getenv("INTEGRATION_RUN") ?: "0") == "1"
 
         @JvmStatic
         @BeforeAll
         fun beforeAll() {
-            Assumptions.assumeFalse(isIntegrationRun)
+            Assumptions.assumeFalse(isTestEnvRun())
             val db = Database.connect(DbConfig(port = 5433))
             db.upgrade(migrations, logger)
             TransactionManager.defaultDatabase = db
@@ -87,3 +86,6 @@ open class TestWithDb {
         }
     }
 }
+
+fun isTestEnvRun(): Boolean =
+    (getenv("TEST_ENV_RUN") ?: "0") == "1"

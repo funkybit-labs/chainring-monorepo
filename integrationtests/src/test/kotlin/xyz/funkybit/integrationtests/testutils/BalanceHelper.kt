@@ -7,6 +7,7 @@ import xyz.funkybit.core.model.db.BlockchainTransactionStatus
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalId
+import xyz.funkybit.core.model.db.WithdrawalStatus
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
 import xyz.funkybit.integrationtests.utils.Faucet
 import xyz.funkybit.integrationtests.utils.TestApiClient
@@ -43,11 +44,11 @@ fun waitForFinalizedWithdrawalWithForking(id: WithdrawalId) {
         }
 }
 
-fun waitForFinalizedWithdrawal(id: WithdrawalId) {
+fun waitForFinalizedWithdrawal(id: WithdrawalId, expectedStatus: WithdrawalStatus) {
     waitFor {
         Faucet.mine()
         transaction {
-            WithdrawalEntity[id].status.isFinal()
+            WithdrawalEntity[id].status == expectedStatus
         }
     }
 }
