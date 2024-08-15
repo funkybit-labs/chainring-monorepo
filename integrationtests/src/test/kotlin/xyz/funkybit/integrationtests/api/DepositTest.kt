@@ -12,10 +12,12 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.web3j.utils.Numeric
 import xyz.funkybit.apps.api.model.CreateDepositApiRequest
 import xyz.funkybit.apps.api.model.Deposit
+import xyz.funkybit.apps.ring.BlockchainDepositHandler
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
+import xyz.funkybit.integrationtests.testutils.isTestEnvRun
 import xyz.funkybit.integrationtests.testutils.waitForBalance
 import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
@@ -26,7 +28,6 @@ import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
 import xyz.funkybit.integrationtests.utils.blocking
 import xyz.funkybit.integrationtests.utils.subscribeToBalances
 import xyz.funkybit.tasks.fixtures.toChainSymbol
-import java.lang.System.getenv
 import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -76,7 +77,7 @@ class DepositTest {
 
             // test idempotence
             assertEquals(pendingBtcDeposit, apiClient.createDeposit(CreateDepositApiRequest(Symbol(btc.name), btcDepositAmount.inFundamentalUnits, btcDepositTxHash)).deposit)
-            wallet.currentBlockchainClient().mine()
+            wallet.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
 
             waitForBalance(
                 apiClient,
@@ -105,7 +106,7 @@ class DepositTest {
 
             assertEquals(listOf(pendingUsdcDeposit, btcDeposit), apiClient.listDeposits().deposits.filter { symbolFilterList.contains(it.symbol.value) })
 
-            wallet.currentBlockchainClient().mine()
+            wallet.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
 
             waitForBalance(
                 apiClient,
@@ -179,7 +180,7 @@ class DepositTest {
     @Test
     fun `test on chain deposit detection - forks are handled`() {
         // test is skipped in the test env
-        Assumptions.assumeTrue((getenv("INTEGRATION_RUN") ?: "0") != "1")
+        Assumptions.assumeFalse(isTestEnvRun())
 
         val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
@@ -211,7 +212,7 @@ class DepositTest {
         chainClient.mine()
 
         val deposit2TxHash = wallet.sendNativeDepositTx(AssetAmount(btc, "0.02").inFundamentalUnits)
-        chainClient.mine()
+        chainClient.mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
 
         await
             .withAlias("Waiting for deposit 2 to be completed")

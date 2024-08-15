@@ -13,6 +13,7 @@ import xyz.funkybit.apps.api.model.CreateOrderApiRequest
 import xyz.funkybit.apps.api.model.CreateWithdrawalApiRequest
 import xyz.funkybit.apps.api.model.OrderAmount
 import xyz.funkybit.apps.api.model.SymbolInfo
+import xyz.funkybit.apps.ring.BlockchainDepositHandler
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.evm.EIP712Helper
@@ -152,7 +153,7 @@ class Wallet(
             ),
         )
         val blockchainClient = blockchainClientsByChainId.getValue(currentChainId)
-        blockchainClient.mine()
+        blockchainClient.mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
         return blockchainClient.getTransactionReceipt(txHash)!!
     }
 

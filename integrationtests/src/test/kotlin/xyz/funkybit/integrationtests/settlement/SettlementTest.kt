@@ -22,6 +22,7 @@ import xyz.funkybit.core.utils.generateOrderNonce
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.OrderBaseTest
+import xyz.funkybit.integrationtests.testutils.isTestEnvRun
 import xyz.funkybit.integrationtests.testutils.waitForFinalizedWithdrawal
 import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
@@ -210,7 +211,7 @@ class SettlementTest : OrderBaseTest() {
             assertLimitsMessageReceived(market, base = takerStartingBaseBalance - baseWithdrawalAmount, quote = takerStartingQuoteBalance)
         }
 
-        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id, WithdrawalStatus.Complete)
 
         takerWsClient.apply {
             assertBalancesMessageReceived(
@@ -227,7 +228,7 @@ class SettlementTest : OrderBaseTest() {
             WithdrawalEntity[pendingBaseWithdrawal.id].status = WithdrawalStatus.Sequenced
         }
 
-        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id, WithdrawalStatus.Complete)
 
         takerWsClient.apply {
             assertBalancesMessageReceived(
@@ -455,7 +456,7 @@ class SettlementTest : OrderBaseTest() {
             assertLimitsMessageReceived(market, base = makerStartingBaseBalance - baseWithdrawalAmount, quote = makerStartingQuoteBalance)
         }
 
-        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id, WithdrawalStatus.Complete)
 
         makerWsClient.apply {
             assertBalancesMessageReceived()
@@ -467,7 +468,7 @@ class SettlementTest : OrderBaseTest() {
             WithdrawalEntity[pendingBaseWithdrawal.id].status = WithdrawalStatus.Sequenced
         }
 
-        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id, WithdrawalStatus.Complete)
 
         makerWsClient.apply {
             assertBalancesMessageReceived()
@@ -721,7 +722,7 @@ class SettlementTest : OrderBaseTest() {
             assertLimitsMessageReceived(market, base = takerStartingBaseBalance - baseWithdrawalAmount, quote = takerStartingQuoteBalance)
         }
 
-        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id, WithdrawalStatus.Complete)
 
         takerWsClient.apply {
             assertBalancesMessageReceived(
@@ -738,7 +739,7 @@ class SettlementTest : OrderBaseTest() {
             WithdrawalEntity[pendingBaseWithdrawal.id].status = WithdrawalStatus.Sequenced
         }
 
-        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id, WithdrawalStatus.Complete)
 
         takerWsClient.apply {
             assertBalancesMessageReceived(
@@ -943,7 +944,7 @@ class SettlementTest : OrderBaseTest() {
             assertLimitsMessageReceived(market, base = makerStartingBaseBalance - baseWithdrawalAmount, quote = makerStartingQuoteBalance)
         }
 
-        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id, WithdrawalStatus.Complete)
 
         makerWsClient.apply {
             assertBalancesMessageReceived()
@@ -955,7 +956,7 @@ class SettlementTest : OrderBaseTest() {
             WithdrawalEntity[pendingBaseWithdrawal.id].status = WithdrawalStatus.Sequenced
         }
 
-        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingBaseWithdrawal.id, WithdrawalStatus.Complete)
 
         makerWsClient.apply {
             assertBalancesMessageReceived()
@@ -1157,7 +1158,7 @@ class SettlementTest : OrderBaseTest() {
 
     @Test
     fun `settlement failure - manually rollback trade`() {
-        Assumptions.assumeTrue((System.getenv("INTEGRATION_RUN") ?: "0") != "1")
+        Assumptions.assumeFalse(isTestEnvRun())
         val market = btcEthMarket
         val baseSymbol = btc
         val quoteSymbol = eth
@@ -1499,7 +1500,7 @@ class SettlementTest : OrderBaseTest() {
         }
 
         // wait for the withdrawal to finalize and verify it completed and taker quote assets are zero
-        waitForFinalizedWithdrawal(pendingWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingWithdrawal.id, WithdrawalStatus.Complete)
         assertEquals(WithdrawalStatus.Complete, takerApiClient.getWithdrawal(pendingWithdrawal.id).withdrawal.status)
 
         takerWsClient.apply {

@@ -181,7 +181,7 @@ class WithdrawalTest {
                 ),
             )
 
-            waitForFinalizedWithdrawal(pendingUsdcWithdrawal.id)
+            waitForFinalizedWithdrawal(pendingUsdcWithdrawal.id, WithdrawalStatus.Complete)
 
             val usdcWithdrawal = apiClient.getWithdrawal(pendingUsdcWithdrawal.id).withdrawal
             assertEquals(WithdrawalStatus.Complete, usdcWithdrawal.status)
@@ -211,7 +211,7 @@ class WithdrawalTest {
                 ),
             ).withdrawal
             assertEquals(WithdrawalStatus.Pending, pendingUsdcWithdrawal2.status)
-            waitForFinalizedWithdrawal(pendingUsdcWithdrawal2.id)
+            waitForFinalizedWithdrawal(pendingUsdcWithdrawal2.id, WithdrawalStatus.Failed)
             val usdcWithdrawal2 = apiClient.getWithdrawal(pendingUsdcWithdrawal2.id).withdrawal
             assertEquals(WithdrawalStatus.Failed, usdcWithdrawal2.status)
             assertEquals("Insufficient Balance", usdcWithdrawal2.error)
@@ -332,7 +332,7 @@ class WithdrawalTest {
         val newDepositAmount = AssetAmount(usdc, "100")
         wallet.depositAndMine(newDepositAmount)
 
-        waitForFinalizedWithdrawal(pendingUsdcWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingUsdcWithdrawal.id, WithdrawalStatus.Complete)
         val usdcWithdrawal = apiClient.getWithdrawal(pendingUsdcWithdrawal.id).withdrawal
         assertEquals(WithdrawalStatus.Complete, usdcWithdrawal.status)
         assertEquals(initialDepositAmount.inFundamentalUnits, usdcWithdrawal.amount)
@@ -392,7 +392,7 @@ class WithdrawalTest {
             ),
         )
 
-        waitForFinalizedWithdrawal(pendingUsdcWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingUsdcWithdrawal.id, WithdrawalStatus.Complete)
 
         waitForBalance(
             apiClient,
@@ -406,7 +406,7 @@ class WithdrawalTest {
             WithdrawalEntity[pendingUsdcWithdrawal.id].status = WithdrawalStatus.Sequenced
         }
 
-        waitForFinalizedWithdrawal(pendingUsdcWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingUsdcWithdrawal.id, WithdrawalStatus.Complete)
 
         waitForBalance(
             apiClient,
@@ -443,7 +443,7 @@ class WithdrawalTest {
         var usdcWithdrawal2 = apiClient.getWithdrawal(pendingUsdcWithdrawal2.id).withdrawal
         assertEquals(AssetAmount(usdc, "800").inFundamentalUnits, usdcWithdrawal2.amount)
 
-        waitForFinalizedWithdrawal(pendingUsdcWithdrawal2.id)
+        waitForFinalizedWithdrawal(pendingUsdcWithdrawal2.id, WithdrawalStatus.Complete)
 
         usdcWithdrawal2 = apiClient.getWithdrawal(pendingUsdcWithdrawal2.id).withdrawal
         assertEquals(WithdrawalStatus.Complete, usdcWithdrawal2.status)
@@ -546,7 +546,7 @@ class WithdrawalTest {
             ),
         )
 
-        waitForFinalizedWithdrawal(pendingBtcWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingBtcWithdrawal.id, WithdrawalStatus.Complete)
 
         val btcWithdrawal = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
         assertEquals(WithdrawalStatus.Complete, btcWithdrawal.status)
@@ -575,7 +575,7 @@ class WithdrawalTest {
             )
         }
 
-        waitForFinalizedWithdrawal(pendingBtcWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingBtcWithdrawal.id, WithdrawalStatus.Failed)
 
         val btcWithdrawal2 = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
         assertEquals(WithdrawalStatus.Failed, btcWithdrawal2.status)

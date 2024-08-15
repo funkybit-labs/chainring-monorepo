@@ -17,6 +17,7 @@ import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.TxHash
 import java.math.BigInteger
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
@@ -81,9 +82,9 @@ class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : Blockchai
             VoidResponse::class.java,
         ).send()
 
-    fun setIntervalMining(interval: Int = 1): VoidResponse = Request(
+    fun setIntervalMining(interval: Duration = 1.seconds): VoidResponse = Request(
         "evm_setIntervalMining",
-        listOf(interval),
+        listOf(interval.inWholeSeconds),
         web3jService,
         VoidResponse::class.java,
     ).send()

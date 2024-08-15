@@ -108,7 +108,7 @@ class LinkedSignerTest : OrderBaseTest() {
             ),
         )
 
-        waitForFinalizedWithdrawal(pendingBtcWithdrawal.id)
+        waitForFinalizedWithdrawal(pendingBtcWithdrawal.id, WithdrawalStatus.Complete)
 
         val btcWithdrawal = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
         assertEquals(WithdrawalStatus.Complete, btcWithdrawal.status)
