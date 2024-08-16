@@ -55,6 +55,7 @@ data class BitcoinBlockchainClientConfig(
     val faucetAddress: String?,
     val privateKey: ByteArray,
     val changeDustThreshold: BigInteger,
+    val feeAccountAddress: BitcoinAddress,
 ) {
     val params: NetworkParameters = NetworkParameters.fromID(net)!!
     val submitterEcKey: ECKey = ECKey.fromPrivate(privateKey)
@@ -129,6 +130,8 @@ object ChainManager {
         faucetAddress = "bcrt1q3nyukkpkg6yj0y5tj6nj80dh67m30p963mzxy7",
         privateKey = (System.getenv("BITCOIN_SUBMITTER_PRIVATE_KEY") ?: "0x7ebc626d01c2d916c61dffee4ed2501f579009ad362360d82fcc30e3d8746cec").toHexBytes(),
         changeDustThreshold = BigInteger(System.getenv("BITCOIN_CHANGE_DUST_THRESHOLD") ?: "300"),
+        feeAccountAddress = BitcoinAddress(System.getenv("BITCOIN_FEE_ACCOUNT_ADDRESS") ?: "bcrt1qdca3sam9mldju3ssryrrcmjvd8pgnw30ccaggx"),
+        /* privKey for bcrt1qdca3sam9mldju3ssryrrcmjvd8pgnw30ccaggx = 0x614293096668ec4c26ede066b1570edc6bd6d663701dffb8247b63e7a3b0f566 */
     )
 
     private val blockchainClientsByChainId: Map<ChainId, BlockchainClient> by lazy {

@@ -1,22 +1,29 @@
 package xyz.funkybit.integrationtests.bitcoin
 
+import com.funkatronics.kborsh.Borsh
+import kotlinx.serialization.decodeFromByteArray
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.model.ExchangeState
 import xyz.funkybit.core.model.db.ArchStateUtxoEntity
+import xyz.funkybit.core.model.db.StateUtxoStatus
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.integrationtests.bitcoin.UtxoSelectionTest.Companion.waitForTx
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.isTestEnvRun
 import xyz.funkybit.integrationtests.testutils.triggerRepeaterTaskAndWaitForCompletion
+import xyz.funkybit.integrationtests.testutils.waitFor
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.test.assertEquals
 
+@OptIn(ExperimentalUnsignedTypes::class)
 @ExtendWith(AppUnderTestRunner::class)
 class ArchOnboardingTest {
 
@@ -26,16 +33,33 @@ class ArchOnboardingTest {
 
         triggerRepeaterTaskAndWaitForCompletion("arch_onboarding")
 
-        airdropToSubmitter()
+        airdropToSubmitter(wait = false) // for onboarding
+        airdropToSubmitter() // for initialization
 
         // notify the repeater app task
         triggerRepeaterTaskAndWaitForCompletion("arch_onboarding")
 
-        validateStateUtxo(
+        val stateUtxo = transaction { ArchStateUtxoEntity.getExchangeStateUtxo() }
+        validateStateUtxo(stateUtxo)
+        assertTrue(listOf(StateUtxoStatus.Onboarded, StateUtxoStatus.Initializing, StateUtxoStatus.Complete).contains(stateUtxo.status))
+
+        waitFor {
+            triggerRepeaterTaskAndWaitForCompletion("arch_onboarding")
             transaction {
-                ArchStateUtxoEntity.findExchangeStateUtxo()!!
-            },
-        )
+                ArchStateUtxoEntity.getExchangeStateUtxo().status == StateUtxoStatus.Complete
+            }
+        }
+
+        // verify state
+        transaction {
+            val utxoId = ArchStateUtxoEntity.getExchangeStateUtxo().utxoId
+            val utxoInfo = ArchNetworkClient.readUtxo(utxoId)
+            val exchangeState = Borsh.decodeFromByteArray<ExchangeState>(utxoInfo.data.toByteArray())
+            assertEquals(BitcoinClient.bitcoinConfig.feeAccountAddress, exchangeState.feeAccount)
+            assertEquals("", exchangeState.lastSettlementBatchHash)
+            assertEquals("", exchangeState.lastWithdrawalBatchHash)
+            assertEquals(BitcoinClient.bitcoinConfig.submitterXOnlyPublicKey.toHex(), utxoInfo.authority.bytes.toHex())
+        }
 
         // now verify token state utxo is onboarded
         airdropToSubmitter()
@@ -50,15 +74,16 @@ class ArchOnboardingTest {
         )
     }
 
-    private fun airdropToSubmitter() {
+    private fun airdropToSubmitter(wait: Boolean = true) {
         val txId = BitcoinClient.sendToAddressAndMine(
             BitcoinClient.bitcoinConfig.submitterAddress,
             BigInteger("6000"),
         )
-        waitForTx(BitcoinClient.bitcoinConfig.submitterAddress, txId)
+        if (wait) {
+            waitForTx(BitcoinClient.bitcoinConfig.submitterAddress, txId)
+        }
     }
 
-    @OptIn(ExperimentalUnsignedTypes::class)
     private fun validateStateUtxo(stateUtxo: ArchStateUtxoEntity) {
         BitcoinClient.mine(1)
         val tx = BitcoinClient.getRawTransaction(stateUtxo.utxoId.txId())
@@ -67,7 +92,6 @@ class ArchOnboardingTest {
 
         // verify no state data yet and the submitter is the authority
         val utxoInfo = ArchNetworkClient.readUtxo(stateUtxo.utxoId)
-        assertEquals("", utxoInfo.data.toByteArray().toHex(false))
-        assertEquals(BitcoinClient.bitcoinConfig.submitterXOnlyPublicKey.toHex(), utxoInfo.authority.toByteArray().toHex())
+        assertEquals(BitcoinClient.bitcoinConfig.submitterXOnlyPublicKey.toHex(), utxoInfo.authority.bytes.toHex())
     }
 }

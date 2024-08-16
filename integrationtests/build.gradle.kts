@@ -67,6 +67,7 @@ dependencies {
     implementation(project(":sequencer"))
     implementation(project(":sequencercommon"))
     implementation("org.bitcoinj:bitcoinj-core:0.16.3")
+    implementation("io.github.funkatronics:kborsh:0.1.0")
 
     testImplementation(project(mapOf("path" to ":")))
     testImplementation(testFixtures(project(":backend")))

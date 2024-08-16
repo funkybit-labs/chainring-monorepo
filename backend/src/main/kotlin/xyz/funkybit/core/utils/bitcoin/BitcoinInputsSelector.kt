@@ -18,7 +18,7 @@ class BitcoinInputsSelector(
         val totalAvailable = availableInputs.sumOf { it.amount }
 
         if (totalAvailable < amount + fee) {
-            throw BitcoinInsufficientFundsException("Insufficient funds, needed $amount, but only $totalAvailable BTC available")
+            throw BitcoinInsufficientFundsException("Insufficient funds, needed ${amount + fee}, but only $totalAvailable BTC available")
         }
 
         val selectionCandidates = (1..iterations).mapNotNull {

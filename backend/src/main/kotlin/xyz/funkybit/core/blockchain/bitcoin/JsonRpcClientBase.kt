@@ -2,6 +2,7 @@ package xyz.funkybit.core.blockchain.bitcoin
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -29,6 +30,14 @@ class BasicAuthInterceptor(user: String, password: String) : Interceptor {
         return chain.proceed(authenticatedRequest)
     }
 }
+
+@Serializable
+data class JsonRpcError(
+    val code: Int,
+    val message: String,
+)
+
+class JsonRpcException(val error: JsonRpcError) : Exception(error.message)
 
 open class JsonRpcClientBase(val url: String, interceptor: Interceptor? = null) {
     open val logger = KotlinLogging.logger {}
@@ -72,7 +81,7 @@ open class JsonRpcClientBase(val url: String, interceptor: Interceptor? = null) 
             in 200..204 -> {
                 when (val jsonBody = json.parseToJsonElement(httpResponseBody)) {
                     is JsonObject -> if (jsonBody.containsKey("error") && jsonBody["error"] != JsonNull) {
-                        throw Exception("got error ${jsonBody["error"]}")
+                        throw JsonRpcException(json.decodeFromJsonElement<JsonRpcError>(jsonBody["error"]!!))
                     } else {
                         jsonBody["result"]
                     }
@@ -82,11 +91,13 @@ open class JsonRpcClientBase(val url: String, interceptor: Interceptor? = null) 
             else -> {
                 // it seems to also give 500s with RPC errors or RPC errors embedded within a string
                 try {
-                    (json.parseToJsonElement(httpResponseBody) as JsonObject)["error"]
+                    (json.parseToJsonElement(httpResponseBody) as JsonObject)["error"]?.let {
+                        json.decodeFromJsonElement<JsonRpcError>(it)
+                    }
                 } catch (e: Exception) {
                     null
                 }?.let {
-                    throw Exception(it.toString())
+                    throw JsonRpcException(it)
                 }
                 throw Exception("Got an error (${httpResponse.code}) - $httpResponseBody")
             }

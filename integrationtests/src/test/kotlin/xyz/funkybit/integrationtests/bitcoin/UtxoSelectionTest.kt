@@ -47,7 +47,7 @@ class UtxoSelectionTest {
     }
 
     @Test
-    fun testUxtoSelection() {
+    fun testUtxoSelection() {
         Assumptions.assumeFalse(isTestEnvRun())
 
         // create a wallet
@@ -120,7 +120,7 @@ class UtxoSelectionTest {
     }
 
     @Test
-    fun testUxtoSelectionPagination() {
+    fun testUtxoSelectionPagination() {
         Assumptions.assumeFalse(isTestEnvRun())
 
         // create a wallet

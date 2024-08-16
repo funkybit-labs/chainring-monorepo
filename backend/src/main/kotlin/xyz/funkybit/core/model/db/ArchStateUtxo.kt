@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import xyz.funkybit.core.model.UtxoId
 
@@ -102,6 +103,12 @@ class ArchStateUtxoEntity(guid: EntityID<ArchStateUtxoId>) : GUIDEntity<ArchStat
             }.firstOrNull()
         }
 
+        fun getExchangeStateUtxo(): ArchStateUtxoEntity {
+            return ArchStateUtxoEntity.find {
+                ArchStateUtxoTable.type.eq(StateUtxoType.Exchange)
+            }.single()
+        }
+
         fun findTokenStateUtxo(symbolEntity: SymbolEntity): ArchStateUtxoEntity? {
             return ArchStateUtxoEntity.find {
                 ArchStateUtxoTable.type.eq(StateUtxoType.Token) and
@@ -113,6 +120,18 @@ class ArchStateUtxoEntity(guid: EntityID<ArchStateUtxoId>) : GUIDEntity<ArchStat
             return ArchStateUtxoEntity.find {
                 ArchStateUtxoTable.type.eq(StateUtxoType.Token)
             }.toList()
+        }
+
+        fun createLogEntry(stateUtxo: ArchStateUtxoEntity, utxoId: UtxoId) {
+            ArchStateUtxoLogTable.insert {
+                it[this.guid] = ArchStateUtxoLogId.generate()
+                it[this.archTxId] = stateUtxo.initializationTxId!!.value
+                it[this.archStateUtxoGuid] = stateUtxo.guid
+                it[this.createdAt] = Clock.System.now()
+                it[this.createdBy] = "system"
+                it[this.afterUtxoId] = utxoId.value
+                it[this.beforeUtxoId] = stateUtxo.utxoId.value
+            }
         }
     }
 
@@ -134,6 +153,18 @@ class ArchStateUtxoEntity(guid: EntityID<ArchStateUtxoId>) : GUIDEntity<ArchStat
         this.updatedBy = "system"
     }
 
+    fun markAsInitializing(archTxId: TxHash) {
+        this.status = StateUtxoStatus.Initializing
+        this.initializationTxId = archTxId
+        this.updatedAt = Clock.System.now()
+    }
+
+    fun updateUtxoId(utxoId: UtxoId) {
+        createLogEntry(this, utxoId)
+        this.utxoId = utxoId
+        this.updatedAt = Clock.System.now()
+    }
+
     var utxoId by ArchStateUtxoTable.utxoId.transform(
         toReal = { UtxoId(it) },
         toColumn = { it.value },
@@ -152,4 +183,9 @@ class ArchStateUtxoEntity(guid: EntityID<ArchStateUtxoId>) : GUIDEntity<ArchStat
     var createdBy by ArchStateUtxoTable.createdBy
     var updatedAt by ArchStateUtxoTable.updatedAt
     var updatedBy by ArchStateUtxoTable.updatedBy
+
+    var initializationTxId by ArchStateUtxoTable.initializationTxId.transform(
+        toReal = { it?.let { TxHash(it) } },
+        toColumn = { it?.value },
+    )
 }
