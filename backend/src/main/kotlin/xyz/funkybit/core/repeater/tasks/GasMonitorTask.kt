@@ -11,6 +11,8 @@ import kotlin.time.Duration.Companion.seconds
 class GasMonitorTask : RepeaterBaseTask(
     invokePeriod = 30.seconds,
 ) {
+    override val name: String = "gas_monitor"
+
     val logger = KotlinLogging.logger {}
 
     private var minimumGasUnitsOverride: BigInteger? = null

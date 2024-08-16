@@ -22,6 +22,8 @@ class ReferralPointsTask(val config: DailyPointBonusTaskConfig = DailyPointBonus
     invokePeriod = 1.minutes,
     maxPlannedExecutionTime = 10.seconds,
 ) {
+    override val name: String = "referral_points"
+
     private val logger = KotlinLogging.logger {}
 
     override fun runWithLock() {
