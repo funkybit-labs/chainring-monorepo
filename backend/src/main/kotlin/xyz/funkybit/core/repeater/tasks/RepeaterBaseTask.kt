@@ -2,17 +2,22 @@ package xyz.funkybit.core.repeater.tasks
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
+import org.jetbrains.exposed.sql.transactions.transaction
+import xyz.funkybit.core.db.notifyDbListener
 import java.util.TimerTask
 import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 
+const val REPEATER_APP_TASK_DONE_CHANNEL = "repeater_app_task_done"
+
 abstract class RepeaterBaseTask(
     val invokePeriod: Duration,
     val initialDelay: Duration = Duration.ZERO,
     val maxPlannedExecutionTime: Duration? = null,
 ) : TimerTask() {
+    abstract val name: String
 
     private val logger = KotlinLogging.logger {}
 
@@ -26,6 +31,9 @@ abstract class RepeaterBaseTask(
             try {
                 logger.debug { "Acquired lock for ${this.javaClass.simpleName}" }
                 runWithLock()
+                transaction {
+                    notifyDbListener(REPEATER_APP_TASK_DONE_CHANNEL, name)
+                }
             } catch (t: Throwable) {
                 logger.error(t) { "Error running ${this.javaClass.simpleName}" }
             } finally {

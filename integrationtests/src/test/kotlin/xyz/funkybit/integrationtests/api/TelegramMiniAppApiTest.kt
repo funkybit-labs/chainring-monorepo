@@ -16,7 +16,6 @@ import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.tma.ClaimRewardApiRequest
 import xyz.funkybit.apps.api.model.tma.GetUserApiResponse
 import xyz.funkybit.apps.api.model.tma.ReactionTimeApiRequest
-import xyz.funkybit.core.db.notifyDbListener
 import xyz.funkybit.core.model.telegram.TelegramUserId
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppGoal
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserEntity
@@ -24,6 +23,7 @@ import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserIsBot
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserRewardEntity
 import xyz.funkybit.core.utils.crPoints
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
+import xyz.funkybit.integrationtests.testutils.triggerRepeaterTaskAndWaitForCompletion
 import xyz.funkybit.integrationtests.utils.ApiCallFailure
 import xyz.funkybit.integrationtests.utils.TelegramMiniAppApiClient
 import xyz.funkybit.integrationtests.utils.assertError
@@ -517,10 +517,7 @@ class TelegramMiniAppApiTest {
             }
 
         // distribute referral rewards (3->2)
-        transaction {
-            notifyDbListener("repeater_app_task_ctl", "referral_points")
-        }
-        Thread.sleep(100L)
+        triggerRepeaterTaskAndWaitForCompletion("referral_points")
 
         lZeroInvitee.getUser().also {
             assertEquals("22".crPoints(), it.balance)
@@ -540,10 +537,7 @@ class TelegramMiniAppApiTest {
         }
 
         // distribute referral rewards (2->1)
-        transaction {
-            notifyDbListener("repeater_app_task_ctl", "referral_points")
-        }
-        Thread.sleep(100L)
+        triggerRepeaterTaskAndWaitForCompletion("referral_points")
 
         lZeroInvitee.getUser().also {
             assertEquals("22.2".crPoints(), it.balance)
@@ -563,10 +557,7 @@ class TelegramMiniAppApiTest {
         }
 
         // distribute referral rewards (1->0)
-        transaction {
-            notifyDbListener("repeater_app_task_ctl", "referral_points")
-        }
-        Thread.sleep(100L)
+        triggerRepeaterTaskAndWaitForCompletion("referral_points")
 
         lZeroInvitee.getUser().also {
             assertEquals("22.46".crPoints(), it.balance)
@@ -586,10 +577,7 @@ class TelegramMiniAppApiTest {
         }
 
         // distribute referral rewards (no changes)
-        transaction {
-            notifyDbListener("repeater_app_task_ctl", "referral_points")
-        }
-        Thread.sleep(100L)
+        triggerRepeaterTaskAndWaitForCompletion("referral_points")
 
         lZeroInvitee.getUser().also {
             assertEquals("22.46".crPoints(), it.balance)
@@ -619,10 +607,7 @@ class TelegramMiniAppApiTest {
         assertEquals("540".crPoints(), lThreeInvitee.getUser().balance)
 
         // distribute referral rewards (no one should get referral points from lThreeInvitee)
-        transaction {
-            notifyDbListener("repeater_app_task_ctl", "referral_points")
-        }
-        Thread.sleep(100L)
+        triggerRepeaterTaskAndWaitForCompletion("referral_points")
 
         lZeroInvitee.getUser().also {
             assertEquals("22.46".crPoints(), it.balance)

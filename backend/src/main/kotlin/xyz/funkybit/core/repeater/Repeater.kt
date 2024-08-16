@@ -8,17 +8,19 @@ import xyz.funkybit.core.utils.PgListener
 import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
-class Repeater(db: Database, val automaticTaskScheduling: Boolean = true) {
+const val REPEATER_APP_TASK_CTL_CHANNEL = "repeater_app_task_ctl"
+
+class Repeater(db: Database, private val automaticTaskScheduling: Boolean = true) {
     private val logger = KotlinLogging.logger {}
 
-    private val tasks = mapOf(
-        "gas_monitor" to GasMonitorTask(),
-        "referral_points" to ReferralPointsTask(),
-    )
+    private val tasks = listOf(
+        GasMonitorTask(),
+        ReferralPointsTask(),
+    ).associateBy { it.name }
 
     private val timer = ScheduledThreadPoolExecutor(8)
 
-    private val pgListener = PgListener(db, "repeater_app_task-listener", "repeater_app_task_ctl", {}) { notification ->
+    private val pgListener = PgListener(db, "repeater_app_task-listener", REPEATER_APP_TASK_CTL_CHANNEL, {}) { notification ->
         var repeaterTaskName = notification.parameter
         val args = mutableListOf<String>()
         if (repeaterTaskName.contains(':')) {
