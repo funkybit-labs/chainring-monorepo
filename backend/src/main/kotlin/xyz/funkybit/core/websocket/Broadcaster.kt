@@ -311,14 +311,23 @@ class Broadcaster(val db: Database) {
     private fun handleDbNotification(payload: String) {
         logger.debug { "received db notification with payload $payload" }
         try {
-            val notifications = transaction {
-                BroadcasterJobEntity.findById(BroadcasterJobId(payload))?.notificationData ?: emptyList()
-            }
+            if (payload == "clear-cache") {
+                clearCache()
+            } else {
+                val notifications = transaction {
+                    BroadcasterJobEntity.findById(BroadcasterJobId(payload))?.notificationData ?: emptyList()
+                }
 
-            notifications.forEach(::notify)
+                notifications.forEach(::notify)
+            }
         } catch (e: Exception) {
             logger.error(e) { "Broadcaster: Unhandled exception" }
         }
+    }
+
+    private fun clearCache() {
+        reloadPrices()
+        orderBooksByMarket.clear()
     }
 
     private fun notify(notification: BroadcasterNotification) {

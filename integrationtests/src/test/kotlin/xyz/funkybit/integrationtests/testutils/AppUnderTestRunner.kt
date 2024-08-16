@@ -17,6 +17,7 @@ import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.db.DbConfig
+import xyz.funkybit.core.db.notifyDbListener
 import xyz.funkybit.core.model.MarketMinFee
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.WithdrawalFee
@@ -264,6 +265,8 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             WalletTable.deleteAll()
             OHLCTable.deleteAll()
             FaucetDripTable.deleteAll()
+
+            notifyDbListener("broadcaster_ctl", "clear-cache")
         }
     }
 }
