@@ -43,6 +43,7 @@ import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.toOrderResponse
 import xyz.funkybit.core.model.toChecksumAddress
 import xyz.funkybit.core.utils.PgListener
+import java.math.BigDecimal
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Duration.Companion.hours
@@ -74,7 +75,7 @@ class Broadcaster(val db: Database) {
     private val lastPricePublish = mutableMapOf<Pair<MarketId, ConnectedClient>, Instant>()
     private val orderBooksByMarket = ConcurrentHashMap<MarketId, OrderBook>()
     private val pricesByMarketAndPeriod = ConcurrentHashMap<SubscriptionTopic.Prices, MutableList<OHLC>>()
-    private val pricesDailyChangeByMarket = ConcurrentHashMap<MarketId, Double>()
+    private val pricesDailyChangeByMarket = ConcurrentHashMap<MarketId, BigDecimal>()
 
     private val pgListener = PgListener(
         db,
@@ -157,7 +158,7 @@ class Broadcaster(val db: Database) {
                     ohlcs.lastOrNull()?.let { lastOhlc ->
                         val nowMinus24h = OHLCDuration.P1M.durationStart(Clock.System.now() - 24.hours)
                         OHLCEntity.findSingleByClosestStartTime(market, OHLCDuration.P1M, nowMinus24h)?.let { h24Ohlc ->
-                            pricesDailyChangeByMarket[market] = (lastOhlc.close - h24Ohlc.close.toDouble()) / h24Ohlc.close.toDouble()
+                            pricesDailyChangeByMarket[market] = (lastOhlc.close - h24Ohlc.close) / h24Ohlc.close
                         }
                     }
                 }
@@ -180,14 +181,14 @@ class Broadcaster(val db: Database) {
                 // 3360 is equivalent to 7 days of 5 minutes sticks
                 ohlc = pricesByMarketAndPeriod[topic]?.takeLast(3360) ?: listOf(),
                 full = true,
-                dailyChange = pricesDailyChangeByMarket[topic.marketId] ?: 0.0,
+                dailyChange = pricesDailyChangeByMarket[topic.marketId] ?: BigDecimal.ZERO,
             )
             else -> Prices(
                 market = topic.marketId,
                 duration = topic.duration,
                 ohlc = pricesByMarketAndPeriod[topic]?.takeLastWhile { it.start + it.duration.interval() > lastTimestamp } ?: listOf(),
                 full = false,
-                dailyChange = pricesDailyChangeByMarket[topic.marketId] ?: 0.0,
+                dailyChange = pricesDailyChangeByMarket[topic.marketId] ?: BigDecimal.ZERO,
             )
         }
 

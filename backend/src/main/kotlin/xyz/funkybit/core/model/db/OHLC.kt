@@ -113,10 +113,10 @@ class OHLCEntity(guid: EntityID<OHLCId>) : GUIDEntity<OHLCId>(guid) {
     fun toWSResponse(): OHLC {
         return OHLC(
             start = this.start,
-            open = this.open.toDouble(),
-            high = this.high.toDouble(),
-            low = this.low.toDouble(),
-            close = this.close.toDouble(),
+            open = this.open.stripTrailingZeros(),
+            high = this.high.stripTrailingZeros(),
+            low = this.low.stripTrailingZeros(),
+            close = this.close.stripTrailingZeros(),
             duration = this.duration,
         )
     }

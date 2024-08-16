@@ -57,6 +57,7 @@ import xyz.funkybit.integrationtests.utils.verifyApiReturnsSameLimits
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertIs
 
 @ExtendWith(AppUnderTestRunner::class)
@@ -296,10 +297,10 @@ class OrderExecutionTest : OrderBaseTest() {
                 assertEquals(
                     OHLC(
                         start = OHLCDuration.P5M.durationStart(trade.timestamp),
-                        open = 17.55,
-                        high = 17.55,
-                        low = 17.55,
-                        close = 17.55,
+                        open = BigDecimal("17.55"),
+                        high = BigDecimal("17.55"),
+                        low = BigDecimal("17.55"),
+                        close = BigDecimal("17.55"),
                         duration = OHLCDuration.P5M,
                     ),
                     msg.ohlc.last(),
@@ -314,10 +315,10 @@ class OrderExecutionTest : OrderBaseTest() {
                 assertEquals(
                     OHLC(
                         start = OHLCDuration.P5M.durationStart(trade.timestamp),
-                        open = 17.55,
-                        high = 17.55,
-                        low = 17.55,
-                        close = 17.55,
+                        open = BigDecimal("17.55"),
+                        high = BigDecimal("17.55"),
+                        low = BigDecimal("17.55"),
+                        close = BigDecimal("17.55"),
                         duration = OHLCDuration.P5M,
                     ),
                     msg.ohlc.last(),
@@ -502,17 +503,14 @@ class OrderExecutionTest : OrderBaseTest() {
 
         takerWsClient.apply {
             assertPricesMessageReceived(market.id) { msg ->
-                assertEquals(
-                    OHLC(
-                        start = OHLCDuration.P5M.durationStart(trade2.timestamp),
-                        open = 17.55,
-                        high = 17.55,
-                        low = 17.5,
-                        close = 17.5,
-                        duration = OHLCDuration.P5M,
-                    ),
-                    msg.ohlc.last(),
-                )
+                val lastOhlc = msg.ohlc.last()
+                assertEquals(OHLCDuration.P5M.durationStart(trade2.timestamp), lastOhlc.start)
+                // open and high props are asserted like this since sometimes trade1 and trade2 don't get into the same 5min bucket
+                assertContains(listOf(BigDecimal("17.5"), BigDecimal("17.55")), lastOhlc.open)
+                assertContains(listOf(BigDecimal("17.5"), BigDecimal("17.55")), lastOhlc.high)
+                assertEquals(BigDecimal("17.5"), lastOhlc.low)
+                assertEquals(BigDecimal("17.5"), lastOhlc.close)
+                assertEquals(OHLCDuration.P5M, lastOhlc.duration)
             }
 
             assertLimitsMessageReceived(market, base = BigDecimal("0.00030865"), quote = BigDecimal("1.9943821454"))
@@ -533,17 +531,14 @@ class OrderExecutionTest : OrderBaseTest() {
 
         makerWsClient.apply {
             assertPricesMessageReceived(market.id) { msg ->
-                assertEquals(
-                    OHLC(
-                        start = OHLCDuration.P5M.durationStart(trade2.timestamp),
-                        open = 17.55,
-                        high = 17.55,
-                        low = 17.5,
-                        close = 17.5,
-                        duration = OHLCDuration.P5M,
-                    ),
-                    msg.ohlc.last(),
-                )
+                val lastOhlc = msg.ohlc.last()
+                assertEquals(OHLCDuration.P5M.durationStart(trade2.timestamp), lastOhlc.start)
+                // open and high props are asserted like this since sometimes trade1 and trade2 don't get into the same 5min bucket
+                assertContains(listOf(BigDecimal("17.5"), BigDecimal("17.55")), lastOhlc.open)
+                assertContains(listOf(BigDecimal("17.5"), BigDecimal("17.55")), lastOhlc.high)
+                assertEquals(BigDecimal("17.5"), lastOhlc.low)
+                assertEquals(BigDecimal("17.5"), lastOhlc.close)
+                assertEquals(OHLCDuration.P5M, lastOhlc.duration)
             }
 
             assertLimitsMessageReceived(market, base = BigDecimal("0.19958024"), quote = BigDecimal("2.0053255427"))
@@ -800,10 +795,10 @@ class OrderExecutionTest : OrderBaseTest() {
                         // initial ohlc in the BTC/USDC market
                         // price is a weighted price across all order execution of market order
                         start = OHLCDuration.P5M.durationStart(Clock.System.now()),
-                        open = 68400.0,
-                        high = 68400.0,
-                        low = 68400.0,
-                        close = 68400.0,
+                        open = BigDecimal("68400"),
+                        high = BigDecimal("68400"),
+                        low = BigDecimal("68400"),
+                        close = BigDecimal("68400"),
                         duration = OHLCDuration.P5M,
                     ),
                     msg.ohlc.last(),
@@ -823,10 +818,10 @@ class OrderExecutionTest : OrderBaseTest() {
                 assertEquals(
                     OHLC(
                         start = OHLCDuration.P5M.durationStart(Clock.System.now()),
-                        open = 68400.0,
-                        high = 68400.0,
-                        low = 68400.0,
-                        close = 68400.0,
+                        open = BigDecimal("68400"),
+                        high = BigDecimal("68400"),
+                        low = BigDecimal("68400"),
+                        close = BigDecimal("68400"),
                         duration = OHLCDuration.P5M,
                     ),
                     msg.ohlc.last(),

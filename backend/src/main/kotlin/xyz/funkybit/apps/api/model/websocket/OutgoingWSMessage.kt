@@ -125,16 +125,16 @@ data class Prices(
     val duration: OHLCDuration,
     val ohlc: List<OHLC>,
     val full: Boolean,
-    val dailyChange: Double,
+    val dailyChange: BigDecimalJson,
 ) : Publishable()
 
 @Serializable
 data class OHLC(
     val start: Instant,
-    val open: Double,
-    val high: Double,
-    val low: Double,
-    val close: Double,
+    val open: BigDecimalJson,
+    val high: BigDecimalJson,
+    val low: BigDecimalJson,
+    val close: BigDecimalJson,
     val duration: OHLCDuration,
 )
 

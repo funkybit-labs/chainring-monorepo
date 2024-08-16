@@ -67,10 +67,10 @@ export type OHLCDuration = z.infer<typeof OHLCDurationSchema>
 const OHLCSchema = z.object({
   start: z.coerce.date(),
   duration: OHLCDurationSchema,
-  open: z.number(),
-  high: z.number(),
-  low: z.number(),
-  close: z.number()
+  open: z.coerce.number(),
+  high: z.coerce.number(),
+  low: z.coerce.number(),
+  close: z.coerce.number()
 })
 export type OHLC = z.infer<typeof OHLCSchema>
 
@@ -78,7 +78,7 @@ export const PricesSchema = z.object({
   type: z.literal('Prices'),
   full: z.boolean(),
   ohlc: z.array(OHLCSchema),
-  dailyChange: z.number()
+  dailyChange: z.coerce.number()
 })
 export type Prices = z.infer<typeof PricesSchema>
 

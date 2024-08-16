@@ -77,10 +77,10 @@ class OHLCDurationTest : TestWithDb() {
                 expected = OHLCDuration.entries.map {
                     OHLC(
                         start = it.durationStart(now),
-                        open = tradePrice.toDouble(),
-                        high = tradePrice.toDouble(),
-                        low = tradePrice.toDouble(),
-                        close = tradePrice.toDouble(),
+                        open = tradePrice,
+                        high = tradePrice,
+                        low = tradePrice,
+                        close = tradePrice,
                         duration = it,
                     )
                 }.toSet(),
@@ -99,10 +99,10 @@ class OHLCDurationTest : TestWithDb() {
                 expected = OHLCDuration.entries.map {
                     OHLC(
                         start = it.durationStart(now),
-                        open = tradePrice.toDouble(),
-                        high = higherTradePrice.toDouble(),
-                        low = tradePrice.toDouble(),
-                        close = higherTradePrice.toDouble(),
+                        open = tradePrice,
+                        high = higherTradePrice,
+                        low = tradePrice,
+                        close = higherTradePrice,
                         duration = it,
                     )
                 }.toSet(),
@@ -124,10 +124,10 @@ class OHLCDurationTest : TestWithDb() {
                 expected = OHLCDuration.entries.map {
                     OHLC(
                         start = it.durationStart(now),
-                        open = tradePrice.toDouble(),
-                        high = higherTradePrice.toDouble(),
-                        low = lowerTradePrice.toDouble(),
-                        close = lowerTradePrice.toDouble(),
+                        open = tradePrice,
+                        high = higherTradePrice,
+                        low = lowerTradePrice,
+                        close = lowerTradePrice,
                         duration = it,
                     )
                 }.toSet(),
@@ -150,18 +150,18 @@ class OHLCDurationTest : TestWithDb() {
                         OHLCDuration.P1M -> setOf(
                             OHLC(
                                 start = it.durationStart(now),
-                                open = tradePrice.toDouble(),
-                                high = higherTradePrice.toDouble(),
-                                low = lowerTradePrice.toDouble(),
-                                close = lowerTradePrice.toDouble(),
+                                open = tradePrice,
+                                high = higherTradePrice,
+                                low = lowerTradePrice,
+                                close = lowerTradePrice,
                                 duration = it,
                             ),
                             OHLC(
                                 start = it.durationStart(nextMinute),
-                                open = lowerTradePrice.toDouble(),
-                                high = lowerTradePrice.toDouble(),
-                                low = lowerTradePrice.toDouble(),
-                                close = lowerTradePrice.toDouble(),
+                                open = lowerTradePrice,
+                                high = lowerTradePrice,
+                                low = lowerTradePrice,
+                                close = lowerTradePrice,
                                 duration = it,
                             ),
                         )
@@ -169,10 +169,10 @@ class OHLCDurationTest : TestWithDb() {
                         else -> setOf(
                             OHLC(
                                 start = it.durationStart(now),
-                                open = tradePrice.toDouble(),
-                                high = higherTradePrice.toDouble(),
-                                low = lowerTradePrice.toDouble(),
-                                close = lowerTradePrice.toDouble(),
+                                open = tradePrice,
+                                high = higherTradePrice,
+                                low = lowerTradePrice,
+                                close = lowerTradePrice,
                                 duration = it,
                             ),
                         )
@@ -194,26 +194,26 @@ class OHLCDurationTest : TestWithDb() {
                         OHLCDuration.P1M -> setOf(
                             OHLC(
                                 start = it.durationStart(now),
-                                open = tradePrice.toDouble(),
-                                high = higherTradePrice.toDouble(),
-                                low = lowerTradePrice.toDouble(),
-                                close = lowerTradePrice.toDouble(),
+                                open = tradePrice,
+                                high = higherTradePrice,
+                                low = lowerTradePrice,
+                                close = lowerTradePrice,
                                 duration = it,
                             ),
                             OHLC(
                                 start = it.durationStart(nextMinute),
-                                open = lowerTradePrice.toDouble(),
-                                high = lowerTradePrice.toDouble(),
-                                low = lowerTradePrice.toDouble(),
-                                close = lowerTradePrice.toDouble(),
+                                open = lowerTradePrice,
+                                high = lowerTradePrice,
+                                low = lowerTradePrice,
+                                close = lowerTradePrice,
                                 duration = it,
                             ),
                             OHLC(
                                 start = it.durationStart(nextFiveMinutes),
-                                open = higherTradePrice.toDouble(),
-                                high = higherTradePrice.toDouble(),
-                                low = higherTradePrice.toDouble(),
-                                close = higherTradePrice.toDouble(),
+                                open = higherTradePrice,
+                                high = higherTradePrice,
+                                low = higherTradePrice,
+                                close = higherTradePrice,
                                 duration = it,
                             ),
                         )
@@ -221,18 +221,18 @@ class OHLCDurationTest : TestWithDb() {
                         OHLCDuration.P5M -> setOf(
                             OHLC(
                                 start = it.durationStart(nextMinute),
-                                open = tradePrice.toDouble(),
-                                high = higherTradePrice.toDouble(),
-                                low = lowerTradePrice.toDouble(),
-                                close = lowerTradePrice.toDouble(),
+                                open = tradePrice,
+                                high = higherTradePrice,
+                                low = lowerTradePrice,
+                                close = lowerTradePrice,
                                 duration = it,
                             ),
                             OHLC(
                                 start = it.durationStart(nextFiveMinutes),
-                                open = higherTradePrice.toDouble(),
-                                high = higherTradePrice.toDouble(),
-                                low = higherTradePrice.toDouble(),
-                                close = higherTradePrice.toDouble(),
+                                open = higherTradePrice,
+                                high = higherTradePrice,
+                                low = higherTradePrice,
+                                close = higherTradePrice,
                                 duration = it,
                             ),
                         )
@@ -240,10 +240,10 @@ class OHLCDurationTest : TestWithDb() {
                         else -> setOf(
                             OHLC(
                                 start = it.durationStart(now),
-                                open = tradePrice.toDouble(),
-                                high = higherTradePrice.toDouble(),
-                                low = lowerTradePrice.toDouble(),
-                                close = higherTradePrice.toDouble(),
+                                open = tradePrice,
+                                high = higherTradePrice,
+                                low = lowerTradePrice,
+                                close = higherTradePrice,
                                 duration = it,
                             ),
                         )

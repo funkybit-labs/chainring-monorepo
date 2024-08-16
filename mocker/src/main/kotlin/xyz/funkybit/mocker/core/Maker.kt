@@ -177,7 +177,7 @@ class Maker(
                     logger.info { "$id: full price update for ${message.market}" }
                     if (!quotesCreated) {
                         markets.find { it.id == message.market }?.let {
-                            createQuotes(message.market, levels, levelsSpread, message.ohlc.lastOrNull()?.close?.toBigDecimal() ?: BigDecimal.ONE)
+                            createQuotes(message.market, levels, levelsSpread, message.ohlc.lastOrNull()?.close ?: BigDecimal.ONE)
                             quotesCreated = true
                         }
                     }
@@ -185,7 +185,7 @@ class Maker(
                     if (message.ohlc.isNotEmpty()) {
                         logger.info { "$id: incremental price update $message" }
                         markets.find { it.id == message.market }?.let {
-                            adjustQuotes(it, message.ohlc.last().close.toBigDecimal())
+                            adjustQuotes(it, message.ohlc.last().close)
                         }
                     }
                 }
