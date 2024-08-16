@@ -9,7 +9,6 @@ import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.selectAll
-import org.web3j.crypto.Keys
 import xyz.funkybit.core.model.Address
 
 @Serializable
@@ -82,7 +81,7 @@ class WalletLinkedSignerEntity(guid: EntityID<WalletLinkedSignerId>) : GUIDEntit
                 .join(WalletTable, JoinType.INNER, WalletTable.guid, WalletLinkedSignerTable.walletGuid)
                 .selectAll()
                 .map {
-                    WalletLinkedSigner(Address(it[WalletTable.address]), it[WalletLinkedSignerTable.chainId].value, Address(it[WalletLinkedSignerTable.signerAddress]))
+                    WalletLinkedSigner(Address.auto(it[WalletTable.address]), it[WalletLinkedSignerTable.chainId].value, Address.auto(it[WalletLinkedSignerTable.signerAddress]))
                 }
         }
     }
@@ -91,8 +90,8 @@ class WalletLinkedSignerEntity(guid: EntityID<WalletLinkedSignerId>) : GUIDEntit
     var wallet by WalletEntity referencedOn WalletLinkedSignerTable.walletGuid
 
     var signerAddress by WalletLinkedSignerTable.signerAddress.transform(
-        toReal = { Address(Keys.toChecksumAddress(it)) },
-        toColumn = { it.value },
+        toReal = { Address.auto(it) },
+        toColumn = { it.canonicalize().toString() },
     )
 
     var chainId by WalletLinkedSignerTable.chainId

@@ -5,7 +5,7 @@ import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.DefaultBlockParam
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.utils.fromFundamentalUnits
 import java.math.BigInteger
@@ -45,7 +45,7 @@ class ExchangeContractManager {
     fun getFeeBalance(symbol: String): BigInteger {
         val blockchainClient = blockchainClients.getValue(symbolByChainId.getValue(symbol))
         val feeAccountAddress = blockchainClient.getFeeAccountAddress(DefaultBlockParam.Latest)
-        val tokenAddress = symbols.getValue(symbol).contractAddress ?: Address.zero
+        val tokenAddress = symbols.getValue(symbol).contractAddress ?: EvmAddress.zero
 
         return runBlocking {
             blockchainClient.getExchangeBalance(feeAccountAddress, tokenAddress, DefaultBlockParam.Latest)

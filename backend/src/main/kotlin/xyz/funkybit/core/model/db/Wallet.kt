@@ -6,10 +6,10 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.VarCharColumnType
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
-import org.web3j.crypto.Keys
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.SequencerWalletId
-import xyz.funkybit.core.model.toChecksumAddress
 import xyz.funkybit.core.sequencer.toSequencerId
 import java.lang.RuntimeException
 
@@ -17,7 +17,7 @@ import java.lang.RuntimeException
 @JvmInline
 value class WalletId(override val value: String) : EntityId {
     companion object {
-        fun generate(address: Address): WalletId = WalletId("wallet_${address.value}")
+        fun generate(address: Address): WalletId = WalletId("wallet_$address")
     }
 
     override fun toString(): String = value
@@ -51,7 +51,12 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
 
         fun findByAddress(address: Address): WalletEntity? {
             return WalletEntity.find {
-                WalletTable.address.eq(address.toChecksumAddress().value)
+                WalletTable.address.eq(
+                    when (address) {
+                        is EvmAddress -> address.canonicalize().value
+                        is BitcoinAddress -> address.canonicalize().value
+                    },
+                )
             }.firstOrNull()
         }
 
@@ -67,11 +72,11 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
             }.firstOrNull()
         }
 
-        fun getAdminAddresses(): List<Address> {
+        fun getAdminAddresses(): List<EvmAddress> {
             return WalletTable.select(listOf(WalletTable.address)).where {
                 WalletTable.isAdmin.eq(true)
             }.map {
-                Address(it[WalletTable.address])
+                EvmAddress(it[WalletTable.address])
             }
         }
     }
@@ -79,8 +84,13 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
     var createdAt by WalletTable.createdAt
     var createdBy by WalletTable.createdBy
     var address by WalletTable.address.transform(
-        toReal = { Address(Keys.toChecksumAddress(it)) },
-        toColumn = { it.value },
+        toReal = { Address.auto(it) },
+        toColumn = {
+            when (it) {
+                is EvmAddress -> it.value
+                is BitcoinAddress -> it.value
+            }
+        },
     )
     var sequencerId by WalletTable.sequencerId.transform(
         toReal = { SequencerWalletId(it) },

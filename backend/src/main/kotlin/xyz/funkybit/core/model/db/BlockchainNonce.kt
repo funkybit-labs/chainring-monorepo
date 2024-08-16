@@ -9,7 +9,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import org.web3j.crypto.Keys
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 
 object BlockchainNonceTable : IntIdTable("blockchain_nonce") {
     val key = (varchar("key", 10485760))
@@ -22,21 +22,21 @@ object BlockchainNonceTable : IntIdTable("blockchain_nonce") {
 
 class BlockchainNonceEntity(id: EntityID<Int>) : IntEntity(id) {
     companion object : IntEntityClass<BlockchainNonceEntity>(BlockchainNonceTable) {
-        fun findByKeyAndChain(address: Address, chainId: ChainId): BlockchainNonceEntity? {
+        fun findByKeyAndChain(address: EvmAddress, chainId: ChainId): BlockchainNonceEntity? {
             return BlockchainNonceEntity.find {
                 BlockchainNonceTable.key eq Keys.toChecksumAddress(address.value) and
                     BlockchainNonceTable.chainId.eq(chainId)
             }.firstOrNull()
         }
 
-        fun create(address: Address, chainId: ChainId) {
+        fun create(address: EvmAddress, chainId: ChainId) {
             BlockchainNonceTable.insert {
                 it[BlockchainNonceTable.key] = Keys.toChecksumAddress(address.value)
                 it[BlockchainNonceTable.chainId] = chainId
             }
         }
 
-        private fun lockForUpdate(address: Address, chainId: ChainId): BlockchainNonceEntity? {
+        private fun lockForUpdate(address: EvmAddress, chainId: ChainId): BlockchainNonceEntity? {
             return BlockchainNonceTable.selectAll()
                 .where {
                     BlockchainNonceTable.key eq Keys.toChecksumAddress(address.value) and BlockchainNonceTable.chainId.eq(chainId)
@@ -46,14 +46,14 @@ class BlockchainNonceEntity(id: EntityID<Int>) : IntEntity(id) {
                 .singleOrNull()
         }
 
-        fun getOrCreateForUpdate(address: Address, chainId: ChainId): BlockchainNonceEntity {
+        fun getOrCreateForUpdate(address: EvmAddress, chainId: ChainId): BlockchainNonceEntity {
             return lockForUpdate(address, chainId) ?: run {
                 create(address, chainId)
                 lockForUpdate(address, chainId)!!
             }
         }
 
-        fun clear(address: Address, chainId: ChainId) {
+        fun clear(address: EvmAddress, chainId: ChainId) {
             BlockchainNonceTable.update({
                 BlockchainNonceTable.key eq Keys.toChecksumAddress(address.value) and
                     BlockchainNonceTable.chainId.eq(chainId)

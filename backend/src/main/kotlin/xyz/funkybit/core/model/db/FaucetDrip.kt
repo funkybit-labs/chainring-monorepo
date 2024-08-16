@@ -9,7 +9,7 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.or
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 
@@ -33,7 +33,7 @@ object FaucetDripTable : GUIDTable<FaucetDripId>("faucet_drip", ::FaucetDripId) 
 class FaucetDripEntity(guid: EntityID<FaucetDripId>) : GUIDEntity<FaucetDripId>(guid) {
     companion object : EntityClass<FaucetDripId, FaucetDripEntity>(FaucetDripTable) {
         private val faucetRefreshInterval = System.getenv("FAUCET_REFRESH_INTERVAL")?.let { Duration.parse(it) } ?: 1.days
-        fun create(symbol: SymbolEntity, walletAddress: Address, ipAddress: String): FaucetDripEntity {
+        fun create(symbol: SymbolEntity, walletAddress: EvmAddress, ipAddress: String): FaucetDripEntity {
             return FaucetDripEntity.new(FaucetDripId.generate()) {
                 this.createdAt = Clock.System.now()
                 this.symbol = symbol
@@ -42,7 +42,7 @@ class FaucetDripEntity(guid: EntityID<FaucetDripId>) : GUIDEntity<FaucetDripId>(
             }
         }
 
-        fun eligible(symbol: SymbolEntity, walletAddress: Address, ipAddress: String): Boolean {
+        fun eligible(symbol: SymbolEntity, walletAddress: EvmAddress, ipAddress: String): Boolean {
             val refreshPeriodStart = Clock.System.now().minus(faucetRefreshInterval)
             return (
                 FaucetDripTable.select(FaucetDripTable.guid.count()).where {

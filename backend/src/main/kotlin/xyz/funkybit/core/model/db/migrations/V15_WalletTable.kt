@@ -7,13 +7,12 @@ import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.db.Migration
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.GUIDTable
 import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.WalletId
 import xyz.funkybit.core.model.db.WalletTable
 import xyz.funkybit.core.model.db.WithdrawalId
-import xyz.funkybit.core.model.db.WithdrawalTable.index
 import xyz.funkybit.core.sequencer.toSequencerId
 
 @Suppress("ClassName")
@@ -50,9 +49,9 @@ class V15_WalletTable : Migration() {
                 ).toSet().forEach { address ->
 
                 V15_WalletTable.insert {
-                    it[V15_WalletTable.guid] = WalletId.generate(Address(address))
+                    it[V15_WalletTable.guid] = WalletId.generate(EvmAddress(address))
                     it[V15_WalletTable.address] = address
-                    it[V15_WalletTable.sequencerId] = Address(address).toSequencerId().value
+                    it[V15_WalletTable.sequencerId] = EvmAddress(address).toSequencerId().value
                     it[V15_WalletTable.createdBy] = "V15_WalletTable"
                     it[V15_WalletTable.createdAt] = Clock.System.now()
                 }

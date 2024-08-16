@@ -6,7 +6,7 @@ import org.web3j.crypto.ECDSASignature
 import org.web3j.crypto.Hash
 import org.web3j.crypto.Keys
 import org.web3j.crypto.Sign
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.toEvmSignature
 import xyz.funkybit.core.utils.toHex
@@ -28,7 +28,7 @@ object ECHelper {
         return (signature.r + signature.s + signature.v).toHex().toEvmSignature()
     }
 
-    fun isValidSignature(messageHash: ByteArray, signature: EvmSignature, signerAddress: Address, linkedSignerAddress: Address? = null): Boolean {
+    fun isValidSignature(messageHash: ByteArray, signature: EvmSignature, signerAddress: EvmAddress, linkedSignerAddress: EvmAddress? = null): Boolean {
         val (r, s, v) = decodeSignature(signature)
         val ecdsaSig = ECDSASignature(r, s).toCanonicalised()
 

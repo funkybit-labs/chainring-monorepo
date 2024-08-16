@@ -3,7 +3,7 @@ package xyz.funkybit.integrationtests.utils
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import xyz.funkybit.apps.ring.BlockchainDepositHandler
 import xyz.funkybit.core.blockchain.ChainManager
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.utils.toFundamentalUnits
 import java.math.BigDecimal
@@ -16,7 +16,7 @@ object Faucet {
 
     private val blockchainClientsByChainId = blockchainClients.associateBy { it.chainId }
 
-    fun fundAndMine(address: Address, amount: BigInteger? = null, chainId: ChainId? = null): TransactionReceipt {
+    fun fundAndMine(address: EvmAddress, amount: BigInteger? = null, chainId: ChainId? = null): TransactionReceipt {
         return blockchainClient(chainId).let { client ->
             val txHash = client.sendNativeDepositTx(address, amount ?: BigDecimal("0.05").toFundamentalUnits(18))
             repeat(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS) {
@@ -26,7 +26,7 @@ object Faucet {
         }
     }
 
-    fun fundAndWaitForTxReceipt(address: Address, amount: BigInteger? = null, chainId: ChainId? = null): TransactionReceipt {
+    fun fundAndWaitForTxReceipt(address: EvmAddress, amount: BigInteger? = null, chainId: ChainId? = null): TransactionReceipt {
         return blockchainClient(chainId).let { client ->
             val txHash = client.sendNativeDepositTx(address, amount ?: BigDecimal("0.05").toFundamentalUnits(18))
             client.waitForTransactionReceipt(txHash)

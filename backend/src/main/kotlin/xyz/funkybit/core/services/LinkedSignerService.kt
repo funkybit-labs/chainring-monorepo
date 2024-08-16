@@ -8,6 +8,7 @@ import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.db.notifyDbListener
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WalletLinkedSigner
@@ -36,7 +37,7 @@ object LinkedSignerService {
             onNotifyLogic = { notification ->
                 val walletLinkedSigner =
                     Json.decodeFromJsonElement<WalletLinkedSigner>(Json.parseToJsonElement(notification.parameter))
-                if (walletLinkedSigner.signerAddress == Address.zero) {
+                if (walletLinkedSigner.signerAddress == EvmAddress.zero) {
                     removeSigner(walletLinkedSigner)
                 } else {
                     addSigner(walletLinkedSigner)
@@ -76,9 +77,9 @@ object LinkedSignerService {
 
     fun getLinkedSigner(walletAddress: Address, chainId: ChainId): Address? = linkedSignerByChain[chainId]?.get(walletAddress)
 
-    fun createOrUpdateWalletLinkedSigner(walletAddress: Address, chainId: ChainId, linkedSignerAddress: Address) {
+    fun createOrUpdateWalletLinkedSigner(walletAddress: EvmAddress, chainId: ChainId, linkedSignerAddress: EvmAddress) {
         val walletEntity = WalletEntity.getOrCreate(walletAddress)
-        if (linkedSignerAddress == Address.zero) {
+        if (linkedSignerAddress == EvmAddress.zero) {
             WalletLinkedSignerEntity.findByWalletAndChain(walletEntity, chainId)?.delete()
         } else {
             WalletLinkedSignerEntity.createOrUpdate(

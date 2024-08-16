@@ -9,7 +9,7 @@ import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.core.blockchain.BlockchainClient
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.ContractType
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.FeeRate
 import xyz.funkybit.core.model.db.FeeRates
 import xyz.funkybit.core.model.db.MarketId
@@ -88,7 +88,7 @@ class ConfigRouteTest {
         assertEquals(emptyList<SymbolInfo>(), apiClient.getAccountConfiguration().newSymbols)
         // add a symbol which can be added to a wallet
         val symbol = transaction {
-            SymbolEntity.create("RING", config.chains[0].id, Address.generate(), 18u, "Test funkybit Token", addToWallets = true, withdrawalFee = BigInteger.ZERO)
+            SymbolEntity.create("RING", config.chains[0].id, EvmAddress.generate(), 18u, "Test funkybit Token", addToWallets = true, withdrawalFee = BigInteger.ZERO)
         }
         try {
             assertEquals(

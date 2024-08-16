@@ -154,7 +154,7 @@ open class OrderBaseTest {
                 wallet.switchChain(chainId)
             }
             if (it.symbol.contractAddress == null) {
-                Faucet.fundAndMine(wallet.address, it.inFundamentalUnits, chainId)
+                Faucet.fundAndMine(wallet.evmAddress, it.inFundamentalUnits, chainId)
             } else {
                 wallet.mintERC20AndMine(it)
             }

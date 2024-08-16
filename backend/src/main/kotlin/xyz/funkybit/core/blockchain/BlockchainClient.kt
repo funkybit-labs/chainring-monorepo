@@ -39,6 +39,8 @@ import xyz.funkybit.contracts.generated.MockERC20
 import xyz.funkybit.contracts.generated.UUPSUpgradeable
 import xyz.funkybit.core.evm.BatchSettlement
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.ChainId
@@ -67,8 +69,8 @@ open class TransactionManagerWithNonceOverride(
         nonceOverride
 }
 
-fun Credentials.checksumAddress(): Address {
-    return Address(Keys.toChecksumAddress(this.address))
+fun Credentials.checksumAddress(): EvmAddress {
+    return EvmAddress(Keys.toChecksumAddress(this.address))
 }
 
 sealed class DefaultBlockParam {
@@ -123,7 +125,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
     )
 
     protected val submitterCredentials = Credentials.create(config.submitterPrivateKeyHex)
-    val submitterAddress: Address = submitterCredentials.checksumAddress()
+    val submitterAddress: EvmAddress = submitterCredentials.checksumAddress()
 
     val gasProvider = GasProvider(
         contractCreationLimit = config.contractCreationLimit,
@@ -179,19 +181,19 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
     }
 
     data class DeployedContract(
-        val proxyAddress: Address,
-        val implementationAddress: Address,
+        val proxyAddress: EvmAddress,
+        val implementationAddress: EvmAddress,
         val version: Int,
     )
 
-    fun deployOrUpgradeWithProxy(contractType: ContractType, existingProxyAddress: Address?): DeployedContract {
+    fun deployOrUpgradeWithProxy(contractType: ContractType, existingProxyAddress: EvmAddress?): DeployedContract {
         logger.debug { "Starting deployment for $contractType" }
 
         val (implementationContractAddress, version) = when (contractType) {
             ContractType.Exchange -> {
                 val implementationContract = Exchange.deploy(web3j, transactionManager, gasProvider).send()
                 Pair(
-                    Address(Keys.toChecksumAddress(implementationContract.contractAddress)),
+                    EvmAddress(Keys.toChecksumAddress(implementationContract.contractAddress)),
                     implementationContract.version.send().toInt(),
                 )
             }
@@ -233,7 +235,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
                     ).send()
                 }
             }
-            Address(Keys.toChecksumAddress(proxyContract.contractAddress))
+            EvmAddress(Keys.toChecksumAddress(proxyContract.contractAddress))
         }
 
         logger.debug { "Deployment complete for $contractType" }
@@ -282,7 +284,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
 
     suspend fun getExchangeBalance(address: Address, tokenAddress: Address, block: DefaultBlockParam): BigInteger {
         return exchangeContractCall(block) {
-            balances(address.value, tokenAddress.value)
+            balances(address.toString(), tokenAddress.toString())
         }.sendAsync().await()
     }
 
@@ -297,7 +299,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         }
 
     fun loadExchangeContract(address: Address): Exchange {
-        return Exchange.load(address.value, web3j, transactionManager, gasProvider)
+        return Exchange.load(address.toString(), web3j, transactionManager, gasProvider)
     }
 
     fun setContractAddress(contractType: ContractType, address: Address) {
@@ -338,7 +340,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
 
     fun getLogs(block: DefaultBlockParam, address: Address): EthLog =
         web3j
-            .ethGetLogs(EthFilter(block.toWeb3j(), block.toWeb3j(), address.value))
+            .ethGetLogs(EthFilter(block.toWeb3j(), block.toWeb3j(), address.toString()))
             .send()
 
     fun getExchangeContractLogs(block: BigInteger): EthLog =
@@ -356,7 +358,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         val response = web3j.ethCall(
             Transaction.createEthCallTransaction(
                 submitterCredentials.address,
-                contractMap[ContractType.Exchange]!!.value,
+                contractMap[ContractType.Exchange]!!.toString(),
                 data,
                 BigInteger.ZERO,
             ),
@@ -370,40 +372,45 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         }
     }
 
-    fun loadERC20(address: Address) = ERC20.load(address.value, web3j, transactionManager, gasProvider)
+    fun loadERC20(address: EvmAddress) = ERC20.load(address.value, web3j, transactionManager, gasProvider)
 
     fun signData(hash: ByteArray, linkedSignerEcKeyPair: ECKeyPair? = null): EvmSignature {
         val signature = Sign.signMessage(hash, linkedSignerEcKeyPair ?: credentials.ecKeyPair, false)
         return (signature.r + signature.s + signature.v).toHex().toEvmSignature()
     }
 
-    fun getBalance(walletAddress: Address, symbol: SymbolEntity): BigDecimal =
+    fun getBalance(walletAddress: EvmAddress, symbol: SymbolEntity): BigDecimal =
         runBlocking { asyncGetBalance(walletAddress, symbol) }
 
-    suspend fun asyncGetBalance(walletAddress: Address, symbol: SymbolEntity): BigDecimal =
+    suspend fun asyncGetBalance(walletAddress: EvmAddress, symbol: SymbolEntity): BigDecimal =
         (
             symbol.contractAddress
-                ?.let { contractAddress -> asyncGetERC20Balance(contractAddress, walletAddress) }
+                ?.let { contractAddress ->
+                    when (contractAddress) {
+                        is EvmAddress -> asyncGetERC20Balance(contractAddress, walletAddress)
+                        is BitcoinAddress -> BigInteger.ZERO
+                    }
+                }
                 ?: asyncGetNativeBalance(walletAddress)
             ).fromFundamentalUnits(symbol.decimals)
 
-    fun getNativeBalance(address: Address): BigInteger =
+    fun getNativeBalance(address: EvmAddress): BigInteger =
         runBlocking { asyncGetNativeBalance(address) }
 
-    suspend fun asyncGetNativeBalance(address: Address): BigInteger =
+    suspend fun asyncGetNativeBalance(address: EvmAddress): BigInteger =
         web3j.ethGetBalance(address.value, DefaultBlockParameter.valueOf("latest")).sendAsync().await().balance
 
-    fun getERC20Balance(erc20Address: Address, walletAddress: Address): BigInteger =
+    fun getERC20Balance(erc20Address: EvmAddress, walletAddress: EvmAddress): BigInteger =
         runBlocking { asyncGetERC20Balance(erc20Address, walletAddress) }
 
-    suspend fun asyncGetERC20Balance(erc20Address: Address, walletAddress: Address): BigInteger =
+    suspend fun asyncGetERC20Balance(erc20Address: EvmAddress, walletAddress: EvmAddress): BigInteger =
         loadERC20(erc20Address).balanceOf(walletAddress.value).sendAsync().await()
 
     fun sendTransaction(address: Address, data: String, amount: BigInteger): TxHash =
         transactionManager.sendTransaction(
             web3j.ethGasPrice().send().gasPrice,
             gasProvider.gasLimit,
-            address.value,
+            address.toString(),
             data,
             amount,
         ).transactionHash.let { TxHash(it) }
@@ -421,8 +428,8 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         exchangeContractCall(block, Exchange::lastWithdrawalBatchHash).send().toHex(false)
 
     fun sendMintERC20Tx(
-        tokenContractAddress: Address,
-        receiver: Address,
+        tokenContractAddress: EvmAddress,
+        receiver: EvmAddress,
         amount: BigInteger,
     ): TxHash =
         sendTransaction(
@@ -434,8 +441,8 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
             BigInteger.ZERO,
         )
 
-    fun getFeeAccountAddress(block: DefaultBlockParam): Address =
-        Address(Keys.toChecksumAddress(exchangeContractCall(block, Exchange::feeAccount).send()))
+    fun getFeeAccountAddress(block: DefaultBlockParam): EvmAddress =
+        EvmAddress(Keys.toChecksumAddress(exchangeContractCall(block, Exchange::feeAccount).send()))
 
     fun getSovereignWithdrawalDelay(block: DefaultBlockParam): BigInteger =
         exchangeContractCall(block, Exchange::sovereignWithdrawalDelay).send()

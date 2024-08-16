@@ -4,7 +4,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.blockchain.BlockchainClient
 import xyz.funkybit.core.blockchain.ContractType
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 
 class ContractsPublisher(val blockchainClient: BlockchainClient) {
@@ -20,16 +20,24 @@ class ContractsPublisher(val blockchainClient: BlockchainClient) {
                     logger.info { "Deploying contract: $contractType" }
                     deployOrUpgradeWithProxy(contractType, null)
                 } else if (deployedContract.deprecated) {
-                    logger.info { "Upgrading contract: $contractType" }
-                    deployOrUpgradeWithProxy(contractType, deployedContract.proxyAddress)
+                    deployedContract.proxyAddress.let {
+                        if (it is EvmAddress) {
+                            logger.info { "Upgrading contract: $contractType" }
+                            deployOrUpgradeWithProxy(contractType, it)
+                        }
+                    }
                 } else {
-                    blockchainClient.setContractAddress(contractType, deployedContract.proxyAddress)
+                    deployedContract.proxyAddress.let {
+                        if (it is EvmAddress) {
+                            blockchainClient.setContractAddress(contractType, it)
+                        }
+                    }
                 }
             }
         }
     }
 
-    private fun deployOrUpgradeWithProxy(contractType: ContractType, existingProxyAddress: Address?) {
+    private fun deployOrUpgradeWithProxy(contractType: ContractType, existingProxyAddress: EvmAddress?) {
         blockchainClient.deployOrUpgradeWithProxy(
             contractType,
             existingProxyAddress,

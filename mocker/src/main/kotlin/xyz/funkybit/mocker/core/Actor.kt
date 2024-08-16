@@ -190,19 +190,19 @@ abstract class Actor(
                         when (val nativeAmount = nativeAmountByChainId[chainId]) {
                             null -> {
                                 // put some balance enough to pay gas, but do not deposit
-                                Faucet.fundAndWaitForTxReceipt(wallet.address, gasFeesAmount, chainId)
+                                Faucet.fundAndWaitForTxReceipt(wallet.evmAddress, gasFeesAmount, chainId)
                             }
                             else -> {
-                                Faucet.fundAndWaitForTxReceipt(wallet.address, nativeAmount + gasFeesAmount, chainId)
+                                Faucet.fundAndWaitForTxReceipt(wallet.evmAddress, nativeAmount + gasFeesAmount, chainId)
 
                                 val nativeSymbol = config.chains.first { it.id == chainId }.symbols.first { it.contractAddress == null }
                                 val availableAmount = initialBalances.find { it.symbol.value == nativeSymbol.name }?.available ?: BigInteger.ZERO
                                 val deltaAmount = nativeAmount - availableAmount
 
                                 if (deltaAmount > BigInteger.ZERO) {
-                                    logger.debug { "Funding ${wallet.address} with ${deltaAmount * BigInteger.TWO} on chain $chainId" }
+                                    logger.debug { "Funding ${wallet.evmAddress} with ${deltaAmount * BigInteger.TWO} on chain $chainId" }
                                     wallet.switchChain(chainId)
-                                    logger.debug { "Native deposit $deltaAmount to ${wallet.address} on chain $chainId" }
+                                    logger.debug { "Native deposit $deltaAmount to ${wallet.evmAddress} on chain $chainId" }
                                     val receipt = wallet.depositAndWaitForTxReceipt(AssetAmount(nativeSymbol, deltaAmount))
                                     apiClient.createDeposit(CreateDepositApiRequest(
                                         symbol = Symbol(nativeSymbol.name),
@@ -210,7 +210,7 @@ abstract class Actor(
                                         txHash = TxHash(receipt.transactionHash)
                                     ))
                                 } else {
-                                    logger.debug { "Skipping funding for ${wallet.address}, available native balance $availableAmount" }
+                                    logger.debug { "Skipping funding for ${wallet.evmAddress}, available native balance $availableAmount" }
                                 }
                             }
                         }
@@ -224,7 +224,7 @@ abstract class Actor(
                         if (deltaAmount > BigInteger.ZERO) {
                             wallet.switchChain(chainId)
                             wallet.mintERC20AndWaitForReceipt(symbol, deltaAmount)
-                            logger.debug { "$symbol deposit $deltaAmount to ${wallet.address} on chain $chainId" }
+                            logger.debug { "$symbol deposit $deltaAmount to ${wallet.evmAddress} on chain $chainId" }
                             val receipt = wallet.depositAndWaitForTxReceipt(AssetAmount(symbolInfo, deltaAmount))
                             apiClient.createDeposit(CreateDepositApiRequest(
                                 symbol = Symbol(symbol),
@@ -232,7 +232,7 @@ abstract class Actor(
                                 txHash = TxHash(receipt.transactionHash)
                             ))
                         } else {
-                            logger.debug { "Skipping $symbol deposit to ${wallet.address} on chain $chainId, available balance $availableAmount" }
+                            logger.debug { "Skipping $symbol deposit to ${wallet.evmAddress} on chain $chainId, available balance $availableAmount" }
                         }
                     }
                     val fundedAssets = mutableSetOf<String>()

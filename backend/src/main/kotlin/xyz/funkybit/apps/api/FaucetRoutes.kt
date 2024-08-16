@@ -18,7 +18,8 @@ import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.RequestProcessingError
 import xyz.funkybit.apps.api.model.errorResponse
 import xyz.funkybit.core.blockchain.BlockchainClient
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.ChainId
@@ -41,7 +42,7 @@ class FaucetRoutes(private val faucetMode: FaucetMode, blockchainClients: Collec
             receiving(
                 requestBody to FaucetApiRequest(
                     symbol = Symbol("USDC"),
-                    address = Address.zero,
+                    address = EvmAddress.zero,
                 ),
             )
             returning(
@@ -88,11 +89,13 @@ class FaucetRoutes(private val faucetMode: FaucetMode, blockchainClients: Collec
                                         amountInFundamentalUnits,
                                     )
 
-                                    else -> blockchainClient.sendMintERC20Tx(
+                                    is EvmAddress -> blockchainClient.sendMintERC20Tx(
                                         tokenContractAddress,
                                         payload.address,
                                         amountInFundamentalUnits,
                                     )
+
+                                    is BitcoinAddress -> TODO()
                                 }
                             } else {
                                 throw RequestProcessingError(

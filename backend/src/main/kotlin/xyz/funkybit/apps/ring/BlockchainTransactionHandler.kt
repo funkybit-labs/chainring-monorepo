@@ -558,7 +558,7 @@ class BlockchainTransactionHandler(
                 gasProvider.getMaxPriorityFeePerGas(""),
                 gasProvider.getMaxFeePerGas(""),
                 gasProvider.gasLimit,
-                transactionData.to.value,
+                transactionData.to.toString(),
                 transactionData.data,
                 transactionData.value,
             )
@@ -592,7 +592,7 @@ class BlockchainTransactionHandler(
                         gasProvider.chainId,
                         nonce,
                         gasProvider.gasLimit,
-                        transactionData.to.value,
+                        transactionData.to.toString(),
                         transactionData.value,
                         transactionData.data,
                         gasProvider.getMaxPriorityFeePerGas(""),

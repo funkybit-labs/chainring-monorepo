@@ -17,6 +17,8 @@ import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.EvmAddress
 
 fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContractAddress>) {
     val db = Database.connect(DbConfig())
@@ -30,8 +32,15 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                 ChainEntity.create(chain.id, chain.name, chain.jsonRpcUrl, chain.blockExplorerNetName, chain.blockExplorerUrl, chain.networkType).flush()
                 println("Created chain ${chain.name} with id=${chain.id}")
             }
-            if (BlockchainNonceEntity.findByKeyAndChain(chain.submitterAddress, chain.id) == null) {
-                BlockchainNonceEntity.create(chain.submitterAddress, chain.id)
+            when (val submitter = chain.submitterAddress) {
+                is EvmAddress -> if (BlockchainNonceEntity.findByKeyAndChain(
+                        submitter,
+                        chain.id
+                    ) == null
+                ) {
+                    BlockchainNonceEntity.create(submitter, chain.id)
+                }
+                is BitcoinAddress -> TODO()
             }
         }
 

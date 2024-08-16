@@ -52,7 +52,7 @@ class LinkedSignerTest : OrderBaseTest() {
         val btcDepositAmount = AssetAmount(btc, "0.4")
         wallet.switchChain(chains[0].id)
 
-        Faucet.fundAndMine(wallet.address, amount = BigDecimal("0.5").toFundamentalUnits(18), chainId = wallet.currentChainId)
+        Faucet.fundAndMine(wallet.evmAddress, amount = BigDecimal("0.5").toFundamentalUnits(18), chainId = wallet.currentChainId)
 
         assertTrue(apiClient.tryListWithdrawals().isRight())
         // set a linked client in API but not on chain yet so backend/API does not know about it

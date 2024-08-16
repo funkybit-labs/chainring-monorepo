@@ -18,6 +18,8 @@ import org.jetbrains.exposed.sql.transactions.TransactionManager
 import xyz.funkybit.core.evm.EIP712Transaction
 import xyz.funkybit.core.evm.TokenAddressAndChain
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.toEvmSignature
 import java.math.BigDecimal
@@ -132,7 +134,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                     WithdrawalTable.walletGuid,
                     WalletTable.guid,
                 ).join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid).selectAll().where {
-                    WalletTable.address.eq(address.value)
+                    WalletTable.address.eq(address.toString())
                 }.orderBy(Pair(WithdrawalTable.createdAt, SortOrder.DESC)),
             ).toList()
         }
@@ -193,15 +195,21 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
         }
     }
 
-    fun toEip712Transaction() = EIP712Transaction.WithdrawTx(
-        this.wallet.address,
-        TokenAddressAndChain(this.symbol.contractAddress ?: Address.zero, this.symbol.chainId.value),
-        this.actualAmount ?: this.amount,
-        this.nonce,
-        this.amount == BigInteger.ZERO,
-        this.signature,
-        this.fee,
-    )
+    fun toEip712Transaction() = this.wallet.address.let {
+        when (it) {
+            is EvmAddress -> EIP712Transaction.WithdrawTx(
+                it,
+                TokenAddressAndChain(this.symbol.contractAddress ?: EvmAddress.zero, this.symbol.chainId.value),
+                this.actualAmount ?: this.amount,
+                this.nonce,
+                this.amount == BigInteger.ZERO,
+                this.signature,
+                this.fee,
+            )
+
+            is BitcoinAddress -> TODO()
+        }
+    }
 
     var nonce by WithdrawalTable.nonce
     var walletGuid by WithdrawalTable.walletGuid

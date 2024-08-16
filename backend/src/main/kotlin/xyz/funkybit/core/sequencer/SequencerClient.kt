@@ -3,10 +3,13 @@ package xyz.funkybit.core.sequencer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
+import org.bitcoinj.core.Base58
 import xyz.funkybit.apps.api.middleware.ServerSpans
 import xyz.funkybit.apps.api.middleware.Tracer
 import xyz.funkybit.core.evm.ECHelper
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.SequencerOrderId
 import xyz.funkybit.core.model.SequencerWalletId
@@ -73,6 +76,20 @@ fun Long.sequencerOrderId(): SequencerOrderId {
 }
 
 fun Address.toSequencerId(): SequencerWalletId {
+    return SequencerWalletId(
+        BigInteger(
+            1,
+            ECHelper.sha3(
+                when (this) {
+                    is EvmAddress -> this.value.toHexBytes()
+                    is BitcoinAddress -> Base58.decode(this.value)
+                },
+            ),
+        ).toLong(),
+    )
+}
+
+fun EvmAddress.toSequencerId(): SequencerWalletId {
     return SequencerWalletId(BigInteger(1, ECHelper.sha3(this.value.toHexBytes())).toLong())
 }
 

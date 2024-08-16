@@ -64,8 +64,8 @@ sealed class EIP712Transaction {
 
         override fun getMessage(): Map<String, String> {
             val message = mutableMapOf<String, String>()
-            message["sender"] = sender.value
-            message["token"] = token.address.value
+            message["sender"] = sender.toString()
+            message["token"] = token.address.toString()
             message["amount"] = if (withdrawAll) "0" else amount.toString()
             message["nonce"] = nonce.toString()
             return message
@@ -74,7 +74,7 @@ sealed class EIP712Transaction {
         override fun getTxData(sequence: Long): ByteArray {
             return serializeTx(
                 if (withdrawAll) ExchangeTransactions.TransactionType.WithdrawAll else ExchangeTransactions.TransactionType.Withdraw,
-                ExchangeTransactions.WithdrawWithSignature(ExchangeTransactions.Withdraw(sequence, sender.value, token.address.value, amount, nonce.toBigInteger(), fee), signature.toByteArray()),
+                ExchangeTransactions.WithdrawWithSignature(ExchangeTransactions.Withdraw(sequence, sender.toString(), token.address.toString(), amount, nonce.toBigInteger(), fee), signature.toByteArray()),
             )
         }
     }
@@ -113,11 +113,11 @@ sealed class EIP712Transaction {
 
         override fun getMessage(): Map<String, String> {
             return mapOf(
-                "sender" to sender.value,
+                "sender" to sender.toString(),
                 "baseChainId" to baseChainId.value.toString(),
-                "baseToken" to baseToken.value,
+                "baseToken" to baseToken.toString(),
                 "quoteChainId" to quoteChainId.value.toString(),
-                "quoteToken" to quoteToken.value,
+                "quoteToken" to quoteToken.toString(),
                 when (amount) {
                     is OrderAmount.Fixed -> "amount" to amount.value.toString()
                     is OrderAmount.Percent -> "percentage" to amount.value.value.toString()
@@ -155,7 +155,7 @@ sealed class EIP712Transaction {
 
         override fun getMessage(): Map<String, String> {
             return mapOf(
-                "sender" to sender.value,
+                "sender" to sender.toString(),
                 "marketId" to marketId.value,
                 "amount" to amount.toString(),
                 "nonce" to nonce.toString(),

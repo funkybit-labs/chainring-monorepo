@@ -25,6 +25,8 @@ import xyz.funkybit.core.evm.EIP712Helper
 import xyz.funkybit.core.evm.EIP712Transaction
 import xyz.funkybit.core.evm.TokenAddressAndChain
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
@@ -89,21 +91,25 @@ class ExchangeApiService(
         val market2 = getMarket(orderRequest.secondMarketId)
         val quoteSymbol = getSymbolEntity(market2.quoteSymbol)
 
-        verifyEIP712Signature(
-            walletAddress,
-            EIP712Transaction.Order(
-                walletAddress,
-                baseChainId = baseSymbol.chainId.value,
-                baseToken = baseSymbol.contractAddress ?: Address.zero,
-                quoteChainId = quoteSymbol.chainId.value,
-                quoteToken = quoteSymbol.contractAddress ?: Address.zero,
-                amount = if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
-                price = BigInteger.ZERO,
-                nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
-                signature = orderRequest.signature,
-            ),
-            verifyingChainId = orderRequest.verifyingChainId,
-        )
+        when (walletAddress) {
+            is EvmAddress ->
+                verifyEIP712Signature(
+                    walletAddress,
+                    EIP712Transaction.Order(
+                        walletAddress,
+                        baseChainId = baseSymbol.chainId.value,
+                        baseToken = baseSymbol.contractAddress ?: EvmAddress.zero,
+                        quoteChainId = quoteSymbol.chainId.value,
+                        quoteToken = quoteSymbol.contractAddress ?: EvmAddress.zero,
+                        amount = if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
+                        price = BigInteger.ZERO,
+                        nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
+                        signature = orderRequest.signature,
+                    ),
+                    verifyingChainId = orderRequest.verifyingChainId,
+                )
+            is BitcoinAddress -> {} // TODO verify signature
+        }
 
         val response = runBlocking {
             sequencerClient.backToBackOrder(
@@ -164,24 +170,28 @@ class ExchangeApiService(
 
             ensureOrderMarketIdMatchesBatchMarketId(orderRequest.marketId, batchOrdersRequest)
 
-            verifyEIP712Signature(
-                walletAddress,
-                EIP712Transaction.Order(
-                    walletAddress,
-                    baseChainId = baseSymbol.chainId.value,
-                    baseToken = baseSymbol.contractAddress ?: Address.zero,
-                    quoteChainId = quoteSymbol.chainId.value,
-                    quoteToken = quoteSymbol.contractAddress ?: Address.zero,
-                    amount = if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
-                    price = when (orderRequest) {
-                        is CreateOrderApiRequest.Limit -> orderRequest.price.toFundamentalUnits(quoteSymbol.decimals)
-                        else -> BigInteger.ZERO
-                    },
-                    nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
-                    signature = orderRequest.signature,
-                ),
-                verifyingChainId = orderRequest.verifyingChainId,
-            )
+            when (walletAddress) {
+                is EvmAddress ->
+                    verifyEIP712Signature(
+                        walletAddress,
+                        EIP712Transaction.Order(
+                            walletAddress,
+                            baseChainId = baseSymbol.chainId.value,
+                            baseToken = baseSymbol.contractAddress ?: EvmAddress.zero,
+                            quoteChainId = quoteSymbol.chainId.value,
+                            quoteToken = quoteSymbol.contractAddress ?: EvmAddress.zero,
+                            amount = if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
+                            price = when (orderRequest) {
+                                is CreateOrderApiRequest.Limit -> orderRequest.price.toFundamentalUnits(quoteSymbol.decimals)
+                                else -> BigInteger.ZERO
+                            },
+                            nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
+                            signature = orderRequest.signature,
+                        ),
+                        verifyingChainId = orderRequest.verifyingChainId,
+                    )
+                is BitcoinAddress -> {} // TODO verify signature
+            }
 
             SequencerClient.Order(
                 sequencerOrderId = orderId.toSequencerId().value,
@@ -200,17 +210,21 @@ class ExchangeApiService(
         val ordersToCancel = batchOrdersRequest.cancelOrders.map { orderRequest ->
             ensureOrderMarketIdMatchesBatchMarketId(orderRequest.marketId, batchOrdersRequest)
 
-            verifyEIP712Signature(
-                walletAddress,
-                EIP712Transaction.CancelOrder(
-                    walletAddress,
-                    batchOrdersRequest.marketId,
-                    if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
-                    BigInteger(1, orderRequest.nonce.toHexBytes()),
-                    orderRequest.signature,
-                ),
-                verifyingChainId = orderRequest.verifyingChainId,
-            )
+            when (walletAddress) {
+                is EvmAddress ->
+                    verifyEIP712Signature(
+                        walletAddress,
+                        EIP712Transaction.CancelOrder(
+                            walletAddress,
+                            batchOrdersRequest.marketId,
+                            if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
+                            BigInteger(1, orderRequest.nonce.toHexBytes()),
+                            orderRequest.signature,
+                        ),
+                        verifyingChainId = orderRequest.verifyingChainId,
+                    )
+                is BitcoinAddress -> {} // TODO verify signature
+            }
 
             orderRequest.orderId
         }
@@ -259,18 +273,21 @@ class ExchangeApiService(
     fun withdraw(walletAddress: Address, apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse {
         val symbol = getSymbolEntity(apiRequest.symbol)
 
-        verifyEIP712Signature(
-            walletAddress,
-            EIP712Transaction.WithdrawTx(
+        when (walletAddress) {
+            is EvmAddress -> verifyEIP712Signature(
                 walletAddress,
-                TokenAddressAndChain(symbol.contractAddress ?: Address.zero, symbol.chainId.value),
-                apiRequest.amount,
-                apiRequest.nonce,
-                apiRequest.amount == BigInteger.ZERO,
-                apiRequest.signature,
-            ),
-            symbol.chainId.value,
-        )
+                EIP712Transaction.WithdrawTx(
+                    walletAddress,
+                    TokenAddressAndChain(symbol.contractAddress ?: EvmAddress.zero, symbol.chainId.value),
+                    apiRequest.amount,
+                    apiRequest.nonce,
+                    apiRequest.amount == BigInteger.ZERO,
+                    apiRequest.signature,
+                ),
+                symbol.chainId.value,
+            )
+            is BitcoinAddress -> {} // TODO verify signature
+        }
 
         val withdrawal = transaction {
             WithdrawalEntity.createPending(
@@ -397,7 +414,7 @@ class ExchangeApiService(
 
     private val exchangeContractsByChain = mutableMapOf<ChainId, Address>()
 
-    private fun verifyEIP712Signature(walletAddress: Address, tx: EIP712Transaction, verifyingChainId: ChainId) {
+    private fun verifyEIP712Signature(walletAddress: EvmAddress, tx: EIP712Transaction, verifyingChainId: ChainId) {
         val verifyingContract = exchangeContractsByChain[verifyingChainId] ?: transaction {
             DeployedSmartContractEntity.latestExchangeContractAddress(verifyingChainId)?.also {
                 exchangeContractsByChain[verifyingChainId] = it
@@ -405,11 +422,12 @@ class ExchangeApiService(
         }
 
         runCatching {
+            val linkedSigner = LinkedSignerService.getLinkedSigner(walletAddress, verifyingChainId) as? EvmAddress
             ECHelper.isValidSignature(
                 EIP712Helper.computeHash(tx, verifyingChainId, verifyingContract),
                 tx.signature,
                 walletAddress,
-                LinkedSignerService.getLinkedSigner(walletAddress, verifyingChainId),
+                linkedSigner,
             )
         }.onFailure {
             logger.warn(it) { "Exception verifying EIP712 signature" }

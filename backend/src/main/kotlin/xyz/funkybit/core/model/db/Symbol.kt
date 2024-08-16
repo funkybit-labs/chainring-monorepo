@@ -10,7 +10,6 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.selectAll
-import org.web3j.crypto.Keys
 import xyz.funkybit.apps.api.FaucetMode
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.Symbol
@@ -93,12 +92,12 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
 
         fun forChainAndContractAddress(chainId: ChainId, contractAddress: Address?) =
             SymbolEntity
-                .find { SymbolTable.chainId.eq(chainId).and(contractAddress?.let { SymbolTable.contractAddress.eq(it.value) } ?: SymbolTable.contractAddress.isNull()) }
+                .find { SymbolTable.chainId.eq(chainId).and(contractAddress?.let { SymbolTable.contractAddress.eq(it.toString()) } ?: SymbolTable.contractAddress.isNull()) }
                 .single()
 
         fun symbolsToAddToWallet(address: Address): List<SymbolEntity> {
             val subquery = WalletTable.select(WalletTable.addedSymbols).adjustWhere {
-                WalletTable.address.eq(address.value)
+                WalletTable.address.eq(address.toString())
             }
             return SymbolTable.selectAll().adjustWhere {
                 SymbolTable.addToWallets.eq(true) and
@@ -113,8 +112,8 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
     var chainId by SymbolTable.chainId
     var chain by ChainEntity referencedOn SymbolTable.chainId
     var contractAddress by SymbolTable.contractAddress.transform(
-        toColumn = { it?.value },
-        toReal = { it?.let { Address(Keys.toChecksumAddress(it)) } },
+        toColumn = { it?.toString() },
+        toReal = { it?.let { Address.auto(it) } },
     )
     var decimals by SymbolTable.decimals
     var description by SymbolTable.description

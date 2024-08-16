@@ -22,7 +22,6 @@ import org.http4k.format.KotlinxSerialization
 import org.http4k.lens.RequestContextKey
 import org.http4k.security.HmacSha256.hmacSHA256
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.web3j.crypto.Keys
 import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.RequestProcessingError
@@ -31,11 +30,11 @@ import xyz.funkybit.apps.api.requestContexts
 import xyz.funkybit.core.evm.ECHelper
 import xyz.funkybit.core.evm.EIP712Helper
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.telegram.TelegramUserId
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserEntity
-import xyz.funkybit.core.model.toChecksumAddress
 import xyz.funkybit.core.model.toEvmSignature
 import xyz.funkybit.core.services.LinkedSignerService
 import java.util.Base64
@@ -51,7 +50,7 @@ val signedTokenSecurity = object : Security {
             is AuthResult.Success -> {
                 val requestWithPrincipal =
                     request.with(
-                        principalRequestContextKey of authResult.address.toChecksumAddress(),
+                        principalRequestContextKey of authResult.address.canonicalize(),
                     )
                 httpHandler(requestWithPrincipal)
             }
@@ -77,7 +76,7 @@ val adminSecurity = object : Security {
     override val filter = Filter { next -> wrapWithAdminCheck(next) }
 
     private fun wrapWithAdminCheck(httpHandler: HttpHandler): HttpHandler = { request ->
-        if (transaction { WalletEntity.findByAddress(request.principal.toChecksumAddress())?.isAdmin } == true) {
+        if (transaction { WalletEntity.findByAddress(request.principal.canonicalize())?.isAdmin } == true) {
             httpHandler(request)
         } else {
             unauthorizedResponse("Access denied")
@@ -97,7 +96,7 @@ fun validateAuthToken(token: String): AuthResult {
 
     if (validateSignature(signInMessage, signature)) {
         return AuthResult.Success(
-            Address(Keys.toChecksumAddress(signInMessage.address)),
+            EvmAddress.canonicalize(signInMessage.address),
             endOfValidityInterval(signInMessage),
         )
     }
@@ -126,13 +125,19 @@ private fun endOfValidityInterval(signInMessage: SignInMessage): Instant =
 
 private fun validateSignature(signInMessage: SignInMessage, signature: String): Boolean {
     return runCatching {
-        val walletAddress = Address(Keys.toChecksumAddress(signInMessage.address))
-        ECHelper.isValidSignature(
-            messageHash = EIP712Helper.computeHash(signInMessage),
-            signature = signature.toEvmSignature(),
-            signerAddress = walletAddress,
-            linkedSignerAddress = LinkedSignerService.getLinkedSigner(walletAddress, signInMessage.chainId),
-        )
+        if (signInMessage.chainId.value == 0UL) {
+            TODO()
+        } else {
+            val walletAddress = EvmAddress.canonicalize(signInMessage.address)
+            // TODO - support bitcoin linked signers
+            val linkedSignerAddress = LinkedSignerService.getLinkedSigner(walletAddress, signInMessage.chainId) as? EvmAddress
+            ECHelper.isValidSignature(
+                messageHash = EIP712Helper.computeHash(signInMessage),
+                signature = signature.toEvmSignature(),
+                signerAddress = walletAddress,
+                linkedSignerAddress = linkedSignerAddress,
+            )
+        }
     }.getOrElse { false }
 }
 
@@ -152,12 +157,12 @@ private const val AUTHORIZATION_SCHEME_PREFIX = "Bearer "
 private val AUTH_TOKEN_VALIDITY_INTERVAL = System.getenv("AUTH_TOKEN_VALIDITY_INTERVAL")?.let { Duration.parse(it) } ?: 30.days
 
 sealed class AuthResult {
-    data class Success(val address: Address, val expiresAt: Instant) : AuthResult()
+    data class Success(val address: EvmAddress, val expiresAt: Instant) : AuthResult()
     data class Failure(val response: Response) : AuthResult()
 }
 
 private val principalRequestContextKey =
-    RequestContextKey.optional<Address>(requestContexts)
+    RequestContextKey.optional<EvmAddress>(requestContexts)
 
 val Request.principal: Address
     get() = principalRequestContextKey(this)

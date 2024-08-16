@@ -14,7 +14,7 @@ import org.web3j.tx.Contract
 import xyz.funkybit.apps.api.model.Withdrawal
 import xyz.funkybit.contracts.generated.Exchange
 import xyz.funkybit.core.blockchain.BlockchainClient
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.BlockEntity
@@ -149,10 +149,10 @@ class BlockProcessor(
             val deposit = DepositEntity.findByTxHash(txHash)
             if (deposit == null) {
                 DepositEntity.createOrUpdate(
-                    wallet = WalletEntity.getOrCreate(Address(Keys.toChecksumAddress(depositEventResponse.from))),
+                    wallet = WalletEntity.getOrCreate(EvmAddress(Keys.toChecksumAddress(depositEventResponse.from))),
                     symbol = SymbolEntity.forChainAndContractAddress(
                         chainId,
-                        Address(Keys.toChecksumAddress(depositEventResponse.token)).takeIf { it != Address.zero },
+                        EvmAddress(Keys.toChecksumAddress(depositEventResponse.token)).takeIf { it != EvmAddress.zero },
                     ),
                     amount = depositEventResponse.amount,
                     blockNumber = blockNumber,
@@ -171,10 +171,10 @@ class BlockProcessor(
             val withdrawalEventResponse = Exchange.getWithdrawalRequestedEventFromLog(log)
             logger.debug { "Received sovereign withdrawal request event (from: ${withdrawalEventResponse.from}, amount: ${withdrawalEventResponse.amount}, token: ${withdrawalEventResponse.token}, txHash: ${withdrawalEventResponse.log.transactionHash}), chainId: $chainId" }
 
-            val fromAddress = Address(Keys.toChecksumAddress(withdrawalEventResponse.from))
+            val fromAddress = EvmAddress(Keys.toChecksumAddress(withdrawalEventResponse.from))
             val symbol = SymbolEntity.forChainAndContractAddress(
                 chainId,
-                Address(Keys.toChecksumAddress(withdrawalEventResponse.token)).takeIf { it != Address.zero },
+                EvmAddress(Keys.toChecksumAddress(withdrawalEventResponse.token)).takeIf { it != EvmAddress.zero },
             )
             val nonce = 0L
             val evmSignature = EvmSignature.emptySignature()
@@ -208,8 +208,8 @@ class BlockProcessor(
             val linkedSignerEventResponse = Exchange.getLinkedSignerEventFromLog(log)
             logger.debug { "Received linked signer (wallet: ${linkedSignerEventResponse.sender}, signer: ${linkedSignerEventResponse.linkedSigner}, txHash: ${linkedSignerEventResponse.log.transactionHash}), chainId: $chainId" }
 
-            val linkedSignerAddress = Address(Keys.toChecksumAddress(linkedSignerEventResponse.linkedSigner))
-            val walletAddress = Address(Keys.toChecksumAddress(linkedSignerEventResponse.sender))
+            val linkedSignerAddress = EvmAddress(Keys.toChecksumAddress(linkedSignerEventResponse.linkedSigner))
+            val walletAddress = EvmAddress(Keys.toChecksumAddress(linkedSignerEventResponse.sender))
             LinkedSignerService.createOrUpdateWalletLinkedSigner(walletAddress, chainId, linkedSignerAddress)
         }
     }

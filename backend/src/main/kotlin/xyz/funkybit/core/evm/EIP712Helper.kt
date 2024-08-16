@@ -40,7 +40,7 @@ object EIP712Helper {
                     /* chainId = */
                     chainId.value.toString(),
                     /* verifyingContract = */
-                    verifyingContract.value,
+                    verifyingContract.toString(),
                     /* salt = */
                     null,
                 ),

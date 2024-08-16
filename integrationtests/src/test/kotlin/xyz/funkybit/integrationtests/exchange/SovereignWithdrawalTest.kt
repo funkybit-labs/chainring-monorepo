@@ -41,7 +41,7 @@ class SovereignWithdrawalTest {
 
         (0 until chains.size).forEach { index ->
             wallet.switchChain(chains[index].id)
-            Faucet.fundAndMine(wallet.address, amount = BigDecimal("1").toFundamentalUnits(18), chainId = wallet.currentChainId)
+            Faucet.fundAndMine(wallet.evmAddress, amount = BigDecimal("1").toFundamentalUnits(18), chainId = wallet.currentChainId)
 
             val btc = chains[index].symbols.first { it.name == "BTC".toChainSymbol(chains[index].id) }
             val usdc = chains[index].symbols.first { it.name == "USDC".toChainSymbol(chains[index].id) }
@@ -151,7 +151,7 @@ class SovereignWithdrawalTest {
 
         (0 until chains.size).forEach { index ->
             wallet.switchChain(chains[index].id)
-            Faucet.fundAndMine(wallet.address, amount = BigDecimal("1").toFundamentalUnits(18), chainId = wallet.currentChainId)
+            Faucet.fundAndMine(wallet.evmAddress, amount = BigDecimal("1").toFundamentalUnits(18), chainId = wallet.currentChainId)
 
             val btc = chains[index].symbols.first { it.name == "BTC".toChainSymbol(chains[index].id) }
             val usdc = chains[index].symbols.first { it.name == "USDC".toChainSymbol(chains[index].id) }

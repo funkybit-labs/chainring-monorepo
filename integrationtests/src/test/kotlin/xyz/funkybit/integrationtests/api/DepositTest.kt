@@ -51,7 +51,7 @@ class DepositTest {
         (0 until chains.size).forEach { index ->
 
             wallet.switchChain(config.chains[index].id)
-            Faucet.fundAndMine(wallet.address, chainId = wallet.currentChainId)
+            Faucet.fundAndMine(wallet.evmAddress, chainId = wallet.currentChainId)
 
             val btc = config.chains[index].symbols.first { it.name == "BTC".toChainSymbol(config.chains[index].id) }
             val usdc = config.chains[index].symbols.first { it.name == "USDC".toChainSymbol(config.chains[index].id) }
@@ -134,8 +134,8 @@ class DepositTest {
         val apiClient2 = TestApiClient()
         val wallet2 = Wallet(apiClient2)
 
-        Faucet.fundAndMine(wallet1.address, chainId = wallet1.currentChainId)
-        Faucet.fundAndMine(wallet2.address, chainId = wallet2.currentChainId)
+        Faucet.fundAndMine(wallet1.evmAddress, chainId = wallet1.currentChainId)
+        Faucet.fundAndMine(wallet2.evmAddress, chainId = wallet2.currentChainId)
 
         val chain1 = apiClient1.getConfiguration().chains[0]
         val btc = chain1.symbols.first { it.name == "BTC:${chain1.id}" }
@@ -156,7 +156,7 @@ class DepositTest {
         val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
 
-        Faucet.fundAndMine(wallet.address, chainId = wallet.currentChainId)
+        Faucet.fundAndMine(wallet.evmAddress, chainId = wallet.currentChainId)
 
         val chain = apiClient.getConfiguration().chains[0]
         val btc = chain.symbols.first { it.name == "BTC:${chain.id}" }
@@ -185,7 +185,7 @@ class DepositTest {
         val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
 
-        Faucet.fundAndMine(wallet.address, chainId = wallet.currentChainId)
+        Faucet.fundAndMine(wallet.evmAddress, chainId = wallet.currentChainId)
 
         val chain = apiClient.getConfiguration().chains[0]
         val btc = chain.symbols.first { it.name == "BTC:${chain.id}" }
@@ -238,7 +238,7 @@ class DepositTest {
         val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
 
-        Faucet.fundAndMine(wallet.address, chainId = wallet.currentChainId)
+        Faucet.fundAndMine(wallet.evmAddress, chainId = wallet.currentChainId)
 
         val chain = apiClient.getConfiguration().chains[0]
         val btc = chain.symbols.first { it.name == "BTC:${chain.id}" }

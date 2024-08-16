@@ -6,7 +6,7 @@ import xyz.funkybit.core.blockchain.BlockchainClientConfig
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.db.DbConfig
 import xyz.funkybit.core.db.connect
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.SymbolEntity
@@ -22,6 +22,8 @@ import org.web3j.crypto.Keys
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.methods.response.VoidResponse
 import org.web3j.utils.Numeric
+import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.BitcoinAddress
 import java.time.Duration
 
 data class SymbolContractAddress(
@@ -61,37 +63,49 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
 
     val txHashes = fixtures.wallets.flatMap { wallet ->
         wallet.balances.mapNotNull { (symbolId, balance) ->
-            val symbol = fixtures.symbols.first { it.id == symbolId }
-            val blockchainClient = blockchainClient(symbol.chainId)
+            when (wallet.address) {
+                is BitcoinAddress -> null // TODO seed bitcoin wallets
+                is EvmAddress -> {
+                    val symbol = fixtures.symbols.first { it.id == symbolId }
+                    val blockchainClient = blockchainClient(symbol.chainId)
 
-            println("Setting ${symbol.name} balance for ${wallet.address.value} to $balance")
+                    println("Setting ${symbol.name} balance for ${wallet.address.value} to $balance")
 
-            if (symbol.isNative) {
-                blockchainClient.setNativeBalance(wallet.address, balance)
-                null
-            } else {
-                val symbolContractAddress = symbolContractAddresses.first { it.symbolId == symbolId }.address
-                val currentBalance = blockchainClient.getERC20Balance(symbolContractAddress, wallet.address)
-                if (currentBalance < balance) {
-                    Pair(
-                        symbol.chainId,
-                        blockchainClient.sendMintERC20Tx(
-                            symbolContractAddress,
-                            wallet.address,
-                            balance - currentBalance
-                        )
-                    )
-                } else if (currentBalance > balance) {
-                    Pair(
-                        symbol.chainId,
-                        blockchainClient.asyncBurnERC20(
-                            symbolContractAddress,
-                            wallet.address,
-                            currentBalance - balance
-                        )
-                    )
-                } else {
-                    null
+                    if (symbol.isNative) {
+                        blockchainClient.setNativeBalance(wallet.address, balance)
+                        null
+                    } else {
+                        val symbolContractAddress = symbolContractAddresses.first { it.symbolId == symbolId }.address
+                        when (symbolContractAddress) {
+                            is BitcoinAddress -> null // TODO get bitcoin token balance
+                            is EvmAddress -> {
+                                val currentBalance =
+                                    blockchainClient.getERC20Balance(symbolContractAddress, wallet.address)
+
+                                if (currentBalance < balance) {
+                                    Pair(
+                                        symbol.chainId,
+                                        blockchainClient.sendMintERC20Tx(
+                                            symbolContractAddress,
+                                            wallet.address,
+                                            balance - currentBalance
+                                        )
+                                    )
+                                } else if (currentBalance > balance) {
+                                    Pair(
+                                        symbol.chainId,
+                                        blockchainClient.asyncBurnERC20(
+                                            symbolContractAddress,
+                                            wallet.address,
+                                            currentBalance - balance
+                                        )
+                                    )
+                                } else {
+                                    null
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -113,7 +127,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
 }
 
 class FixturesBlockchainClient(config: BlockchainClientConfig) : BlockchainClient(config) {
-    fun deployMockERC20(tokenName: String, decimals: BigInteger): Address {
+    fun deployMockERC20(tokenName: String, decimals: BigInteger): EvmAddress {
         val contract = MockERC20.deploy(
             web3j,
             transactionManager,
@@ -122,12 +136,12 @@ class FixturesBlockchainClient(config: BlockchainClientConfig) : BlockchainClien
             tokenName,
             decimals
         ).send()
-        return Address(Keys.toChecksumAddress(contract.contractAddress))
+        return EvmAddress(Keys.toChecksumAddress(contract.contractAddress))
     }
 
     fun asyncBurnERC20(
-        tokenContractAddress: Address,
-        receiver: Address,
+        tokenContractAddress: EvmAddress,
+        receiver: EvmAddress,
         amount: BigInteger
     ): TxHash =
         sendTransaction(
@@ -139,7 +153,7 @@ class FixturesBlockchainClient(config: BlockchainClientConfig) : BlockchainClien
             BigInteger.ZERO,
         )
 
-    fun setNativeBalance(address: Address, amount: BigInteger) =
+    fun setNativeBalance(address: EvmAddress, amount: BigInteger) =
         Request(
             "anvil_setBalance",
             listOf<String>(address.value, Numeric.encodeQuantity(amount)),
