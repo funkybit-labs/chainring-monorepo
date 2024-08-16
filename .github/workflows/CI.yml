@@ -61,7 +61,7 @@ jobs:
     uses: ./.github/workflows/start-services.yml
     with:
       environment: test
-      services: "anvil,anvil2,ring,api,garp,sequencer,telegrambot,otterscan,otterscan2"
+      services: "anvil,anvil2,ring,api,garp,sequencer,telegrambot"
 
   deploy_web_ui:
     name: Deploy Web UI
@@ -106,5 +106,5 @@ jobs:
     uses: ./.github/workflows/stop-services.yml
     with:
       environment: test
-      services: "api,ring,telegrambot,garp,sequencer,anvil,otterscan,anvil2,otterscan2"
+      services: "api,ring,telegrambot,garp,sequencer,anvil,anvil2"
 
