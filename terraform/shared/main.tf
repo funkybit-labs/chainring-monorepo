@@ -2,7 +2,7 @@ module "github_oidc" {
   source = "../modules/github_oidc"
 }
 locals {
-  repos = toset(["otterscan", "mocker", "sequencer", "anvil", "backend", "bitcoin"])
+  repos = toset(["otterscan", "mocker", "sequencer", "anvil", "backend", "bitcoin", "fulcrum"])
 }
 resource "aws_iam_role_policy" "auth" {
   role   = module.github_oidc.role.name
@@ -104,7 +104,14 @@ moved {
   from = aws_ecr_repository_policy.bitcoin
   to   = module.ecr_repo["bitcoin"].aws_ecr_repository_policy.policy
 }
-
+moved {
+  from = aws_ecr_repository.fulcrum
+  to   = module.ecr_repo["fulcrum"].aws_ecr_repository.repo
+}
+moved {
+  from = aws_ecr_repository_policy.fulcrum
+  to   = module.ecr_repo["fulcrum"].aws_ecr_repository_policy.policy
+}
 resource "aws_route53_zone" "zone" {
   name = var.chainring_zone
 }

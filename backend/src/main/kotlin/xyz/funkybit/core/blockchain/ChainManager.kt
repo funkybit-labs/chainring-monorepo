@@ -47,6 +47,7 @@ data class BitcoinBlockchainClientConfig(
     val feeSettings: FeeEstimationSettings,
     val blockExplorerNetName: String,
     val blockExplorerUrl: String,
+    val faucetAddress: String?,
 )
 
 object ChainManager {
@@ -112,7 +113,8 @@ object ChainManager {
         password = System.getenv("BITCOIN_NETWORK_RPC_PASSWORD") ?: "password",
         feeSettings = FeeEstimationSettings(1, SmartFeeMode.CONSERVATIVE, 5, 50),
         blockExplorerNetName = System.getenv("BLOCK_EXPLORER_NET_NAME_BITCOIN") ?: "Bitcoin Network",
-        blockExplorerUrl = System.getenv("BLOCK_EXPLORER_URL_BITCOIN") ?: "",
+        blockExplorerUrl = System.getenv("BLOCK_EXPLORER_URL_BITCOIN") ?: "http://localhost:1080",
+        faucetAddress = "bcrt1q3nyukkpkg6yj0y5tj6nj80dh67m30p963mzxy7",
     )
 
     private val blockchainClientsByChainId: Map<ChainId, BlockchainClient> by lazy {

@@ -1,6 +1,7 @@
 package xyz.funkybit.core.blockchain.bitcoin
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -32,10 +33,12 @@ class BasicAuthInterceptor(user: String, password: String) : Interceptor {
 open class JsonRpcClientBase(val url: String, interceptor: Interceptor? = null) {
     open val logger = KotlinLogging.logger {}
 
+    @OptIn(ExperimentalSerializationApi::class)
     val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
         isLenient = true
+        explicitNulls = false
     }
 
     val httpClient = OkHttpClient.Builder()
@@ -95,11 +98,11 @@ open class JsonRpcClientBase(val url: String, interceptor: Interceptor? = null) 
         return json.decodeFromJsonElement(jsonElement)
     }
 
-    inline fun abbreviateString(value: String): String {
-        if (value.length < 4096) {
-            return value
+    private fun abbreviateString(value: String): String {
+        return if (value.length < 4096) {
+            value
         } else {
-            return "${value.substring(0, 2048)} ... ${value.substring(value.length - 2048, value.length)}"
+            "${value.substring(0, 2048)} ... ${value.substring(value.length - 2048, value.length)}"
         }
     }
 }

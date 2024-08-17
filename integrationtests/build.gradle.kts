@@ -65,6 +65,8 @@ dependencies {
     implementation(project(":backend"))
     implementation(project(":sequencer"))
     implementation(project(":sequencercommon"))
+    implementation("org.bitcoinj:bitcoinj-core:0.16.3")
+
     testImplementation(project(mapOf("path" to ":")))
     testImplementation(testFixtures(project(":backend")))
 }
