@@ -20,9 +20,9 @@ import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.SequencerOrderId
 import xyz.funkybit.core.model.db.OrderExecutionTable.nullable
+import xyz.funkybit.core.model.db.migrations.V60_AddResponseSequenceToTradeAndWithdrawal.V60_TradeTable.default
 import xyz.funkybit.core.utils.toByteArrayNoSign
 import xyz.funkybit.core.utils.toHex
-import xyz.funkybit.sequencer.proto.OrderDisposition
 import java.math.BigDecimal
 import java.math.BigInteger
 
@@ -73,22 +73,6 @@ enum class OrderStatus {
     fun isError(): Boolean {
         return this in listOf(Failed, Rejected)
     }
-
-    companion object {
-        fun fromOrderDisposition(disposition: OrderDisposition): OrderStatus {
-            return when (disposition) {
-                OrderDisposition.Accepted -> Open
-                OrderDisposition.Filled -> Filled
-                OrderDisposition.PartiallyFilled -> Partial
-                OrderDisposition.Failed,
-                OrderDisposition.UNRECOGNIZED,
-                -> Failed
-                OrderDisposition.Canceled -> Cancelled
-                OrderDisposition.Rejected -> Rejected
-                OrderDisposition.AutoReduced -> Open
-            }
-        }
-    }
 }
 
 data class CreateOrderAssignment(
@@ -131,6 +115,7 @@ object OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
     )
     val amount = decimal("amount", 30, 0)
     val originalAmount = decimal("original_amount", 30, 0)
+    val autoReduced = bool("auto_reduced").default(false)
     val price = decimal("price", 30, 18).nullable()
     val updatedAt = timestamp("updated_at").nullable()
     val updatedBy = varchar("updated_by", 10485760).nullable()
@@ -160,7 +145,6 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 marketId = this.marketGuid.value,
                 side = this.side,
                 amount = this.amount,
-                originalAmount = this.originalAmount,
                 executions = executions.map { execution ->
                     Order.Execution(
                         tradeId = execution.trade.guid.value,
@@ -189,7 +173,6 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 secondMarketId = this.secondMarketGuid!!.value,
                 side = this.side,
                 amount = this.amount,
-                originalAmount = this.originalAmount,
                 executions = executions.map { execution ->
                     Order.Execution(
                         tradeId = execution.trade.guid.value,
@@ -218,6 +201,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 side = this.side,
                 amount = this.amount,
                 originalAmount = this.originalAmount,
+                autoReduced = this.autoReduced,
                 price = this.price!!,
                 executions = executions.map { execution ->
                     Order.Execution(
@@ -385,12 +369,6 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         this.status = OrderStatus.Cancelled
     }
 
-    fun updateStatus(status: OrderStatus) {
-        val now = Clock.System.now()
-        this.updatedAt = now
-        this.status = status
-    }
-
     var nonce by OrderTable.nonce
     var createdAt by OrderTable.createdAt
     var createdBy by OrderTable.createdBy
@@ -409,6 +387,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         toReal = { it.toBigInteger() },
         toColumn = { it.toBigDecimal() },
     )
+    var autoReduced by OrderTable.autoReduced
     var price by OrderTable.price
     var updatedAt by OrderTable.updatedAt
     var updatedBy by OrderTable.updatedBy

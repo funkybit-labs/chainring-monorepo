@@ -90,7 +90,6 @@ object Examples {
         marketId = MarketId("BTC/ETH"),
         side = OrderSide.Buy,
         amount = BigInteger("100"),
-        originalAmount = BigInteger("100"),
         executions = listOf(
             Order.Execution(
                 tradeId = TradeId.generate(),
@@ -120,6 +119,7 @@ object Examples {
         amount = BigInteger("100"),
         price = BigDecimal("100"),
         originalAmount = BigInteger("100"),
+        autoReduced = false,
         executions = listOf(
             Order.Execution(
                 tradeId = TradeId.generate(),

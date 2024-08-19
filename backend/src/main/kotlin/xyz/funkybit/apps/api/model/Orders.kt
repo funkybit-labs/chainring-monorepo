@@ -150,7 +150,6 @@ sealed class Order {
     abstract val marketId: MarketId
     abstract val side: OrderSide
     abstract val amount: BigIntegerJson
-    abstract val originalAmount: BigIntegerJson
     abstract val executions: List<Execution>
     abstract val timing: Timing
 
@@ -163,7 +162,6 @@ sealed class Order {
         override val marketId: MarketId,
         override val side: OrderSide,
         override val amount: BigIntegerJson,
-        override val originalAmount: BigIntegerJson,
         override val executions: List<Execution>,
         override val timing: Timing,
     ) : Order()
@@ -178,7 +176,6 @@ sealed class Order {
         val secondMarketId: MarketId,
         override val side: OrderSide,
         override val amount: BigIntegerJson,
-        override val originalAmount: BigIntegerJson,
         override val executions: List<Execution>,
         override val timing: Timing,
     ) : Order()
@@ -192,7 +189,8 @@ sealed class Order {
         override val marketId: MarketId,
         override val side: OrderSide,
         override val amount: BigIntegerJson,
-        override val originalAmount: BigIntegerJson,
+        val originalAmount: BigIntegerJson,
+        val autoReduced: Boolean,
         val price: BigDecimalJson,
         override val executions: List<Execution>,
         override val timing: Timing,
