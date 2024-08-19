@@ -25,6 +25,7 @@ import xyz.funkybit.core.utils.bitcoin.BitcoinInsufficientFundsException
 import xyz.funkybit.core.utils.bitcoin.inSatsAsDecimalString
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
+import xyz.funkybit.integrationtests.testutils.isTestEnvRun
 import xyz.funkybit.integrationtests.testutils.waitFor
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -38,7 +39,7 @@ class UtxoSelectionTest {
 
     @Test
     fun testUxtoSelection() {
-        Assumptions.assumeTrue((System.getenv("INTEGRATION_RUN") ?: "0") != "1")
+        Assumptions.assumeFalse(isTestEnvRun())
 
         // create a wallet
         val ecKey = ECKey()
@@ -111,7 +112,7 @@ class UtxoSelectionTest {
 
     @Test
     fun testUxtoSelectionPagination() {
-        Assumptions.assumeTrue((System.getenv("INTEGRATION_RUN") ?: "0") != "1")
+        Assumptions.assumeFalse(isTestEnvRun())
 
         // create a wallet
         val ecKey = ECKey()
