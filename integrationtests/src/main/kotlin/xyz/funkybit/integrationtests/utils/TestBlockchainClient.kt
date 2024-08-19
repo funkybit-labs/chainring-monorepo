@@ -14,7 +14,7 @@ import xyz.funkybit.contracts.generated.MockERC20
 import xyz.funkybit.core.blockchain.BlockchainClient
 import xyz.funkybit.core.blockchain.BlockchainClientConfig
 import xyz.funkybit.core.blockchain.ContractType
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.TxHash
 import java.math.BigInteger
 import kotlin.time.Duration
@@ -96,8 +96,8 @@ class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : Blockchai
         VoidResponse::class.java,
     ).send()
 
-    fun sovereignWithdrawal(senderCredentials: Credentials, tokenContractAddress: Address, amount: BigInteger): TxHash {
-        val exchangeContractAddress = getContractAddress(ContractType.Exchange).value
+    fun sovereignWithdrawal(senderCredentials: Credentials, tokenContractAddress: EvmAddress, amount: BigInteger): TxHash {
+        val exchangeContractAddress = getContractAddress(ContractType.Exchange).toString()
         val txManager = RawTransactionManager(
             web3j,
             // custom sender credentials

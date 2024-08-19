@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.testfixtures.DbTestHelpers.createChain
 import xyz.funkybit.testfixtures.DbTestHelpers.createSymbol
 import xyz.funkybit.testutils.TestWithDb
@@ -26,13 +26,13 @@ class FaucetDripTest : TestWithDb() {
 
     @Test
     fun `test faucet drip entity`() {
-        val walletAddress = Address.generate()
+        val walletAddress = EvmAddress.generate()
         val ipAddress = Random.nextInt().toString()
         transaction {
             assertTrue(FaucetDripEntity.eligible(symbol, walletAddress, ipAddress))
             val faucetDrip = FaucetDripEntity.create(symbol, walletAddress, ipAddress)
             assertFalse(FaucetDripEntity.eligible(symbol, walletAddress, ipAddress))
-            assertFalse(FaucetDripEntity.eligible(symbol, Address.generate(), ipAddress))
+            assertFalse(FaucetDripEntity.eligible(symbol, EvmAddress.generate(), ipAddress))
             assertFalse(FaucetDripEntity.eligible(symbol, walletAddress, Random.nextInt().toString()))
             faucetDrip.createdAt = Clock.System.now().minus(1.days)
             faucetDrip.flush()

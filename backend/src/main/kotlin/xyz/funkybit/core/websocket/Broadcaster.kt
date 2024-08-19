@@ -41,7 +41,6 @@ import xyz.funkybit.core.model.db.OrderExecutionEntity
 import xyz.funkybit.core.model.db.OrderStatus
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.toOrderResponse
-import xyz.funkybit.core.model.toChecksumAddress
 import xyz.funkybit.core.utils.PgListener
 import java.math.BigDecimal
 import java.util.concurrent.ConcurrentHashMap
@@ -95,7 +94,7 @@ class Broadcaster(val db: Database) {
         }.addIfAbsent(client)
 
         client.principal?.also { principal ->
-            subscriptionsByPrincipal.getOrPut(principal.toChecksumAddress()) {
+            subscriptionsByPrincipal.getOrPut(principal.canonicalize()) {
                 TopicSubscriptions()
             }.getOrPut(topic) {
                 Subscriptions()

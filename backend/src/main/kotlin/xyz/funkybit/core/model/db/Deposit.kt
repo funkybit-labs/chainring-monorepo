@@ -108,7 +108,7 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
                     DepositTable.walletGuid,
                     WalletTable.guid,
                 ).join(SymbolTable, JoinType.INNER, DepositTable.symbolGuid, SymbolTable.guid).selectAll().where {
-                    WalletTable.address.eq(address.value)
+                    WalletTable.address.eq(address.toString())
                 }.orderBy(Pair(DepositTable.createdAt, SortOrder.DESC)),
             ).toList()
         }
@@ -134,7 +134,7 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
             ) {
                 it[DepositTable.guid] = DepositId.generate()
                 it[createdAt] = Clock.System.now()
-                it[createdBy] = wallet.address.value
+                it[createdBy] = wallet.address.toString()
                 it[status] = DepositStatus.Pending
                 it[walletGuid] = wallet.guid
                 it[symbolGuid] = symbol.guid

@@ -14,8 +14,8 @@ import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.evm.EIP712Helper
 import xyz.funkybit.core.evm.EIP712Transaction
 import xyz.funkybit.core.evm.TokenAddressAndChain
-import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EncryptedString
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.BalanceEntity
@@ -87,8 +87,8 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
     )
     var isCurrent by TelegramBotUserWalletTable.isCurrent
 
-    val address: Address
-        get() = wallet.address
+    val evmAddress: EvmAddress
+        get() = wallet.address as EvmAddress
 
     fun exchangeBalances(): List<BalanceEntity> =
         BalanceEntity.getBalancesForWallet(wallet)
@@ -106,14 +106,14 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
     fun onChainBalances(symbols: List<SymbolEntity>): List<Pair<SymbolEntity, BigDecimal>> =
         runBlocking {
             symbols.map { symbol ->
-                Pair(symbol, ChainManager.getBlockchainClient(symbol.chainId.value).asyncGetBalance(wallet.address, symbol))
+                Pair(symbol, ChainManager.getBlockchainClient(symbol.chainId.value).asyncGetBalance(evmAddress, symbol))
             }
         }
 
     fun onChainBalance(symbol: SymbolEntity): BigDecimal =
         ChainManager
             .getBlockchainClient(symbol.chainId.value)
-            .getBalance(wallet.address, symbol)
+            .getBalance(evmAddress, symbol)
 
     fun blockchainClient(chainId: ChainId): BlockchainClient =
         ChainManager
@@ -123,30 +123,32 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
         val blockchainClient = blockchainClient(symbol.chainId.value)
         val exchangeContractAddress = DeployedSmartContractEntity.latestExchangeContractAddress(
             blockchainClient.chainId,
-        )!!
+        ) as? EvmAddress
         val bigIntAmount = amount.toFundamentalUnits(symbol.decimals)
-        val tokenAddress = symbol.contractAddress
-        return if (tokenAddress != null) {
-            runBlocking {
-                val allowanceTxReceipt = blockchainClient
-                    .loadERC20(tokenAddress)
-                    .approve(exchangeContractAddress.value, bigIntAmount)
-                    .sendAsync()
-                    .await()
-                if (allowanceTxReceipt.isStatusOK) {
-                    blockchainClient.sendTransaction(
-                        exchangeContractAddress,
-                        blockchainClient
-                            .loadExchangeContract(exchangeContractAddress)
-                            .deposit(tokenAddress.value, bigIntAmount).encodeFunctionCall(),
-                        BigInteger.ZERO,
-                    )
-                } else {
-                    null
+        val tokenAddress = symbol.contractAddress as? EvmAddress
+        return exchangeContractAddress?.let {
+            if (tokenAddress != null) {
+                runBlocking {
+                    val allowanceTxReceipt = blockchainClient
+                        .loadERC20(tokenAddress)
+                        .approve(exchangeContractAddress.toString(), bigIntAmount)
+                        .sendAsync()
+                        .await()
+                    if (allowanceTxReceipt.isStatusOK) {
+                        blockchainClient.sendTransaction(
+                            exchangeContractAddress,
+                            blockchainClient
+                                .loadExchangeContract(exchangeContractAddress)
+                                .deposit(tokenAddress.value, bigIntAmount).encodeFunctionCall(),
+                            BigInteger.ZERO,
+                        )
+                    } else {
+                        null
+                    }
                 }
+            } else {
+                blockchainClient.sendNativeDepositTx(exchangeContractAddress, bigIntAmount)
             }
-        } else {
-            blockchainClient.sendNativeDepositTx(exchangeContractAddress, bigIntAmount)
         }
     }
 
@@ -158,7 +160,7 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
         val bigIntAmount = amount.toFundamentalUnits(symbol.decimals)
         val tx = EIP712Transaction.WithdrawTx(
             wallet.address,
-            TokenAddressAndChain(symbol.contractAddress ?: Address.zero, symbol.chainId.value),
+            TokenAddressAndChain(symbol.contractAddress ?: EvmAddress.zero, symbol.chainId.value),
             bigIntAmount,
             nonce,
             bigIntAmount == BigInteger.ZERO,
@@ -176,9 +178,9 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
         val tx = EIP712Transaction.Order(
             wallet.address,
             baseChainId = market.baseSymbol.chainId.value,
-            baseToken = market.baseSymbol.contractAddress ?: Address.zero,
+            baseToken = market.baseSymbol.contractAddress ?: EvmAddress.zero,
             quoteChainId = market.quoteSymbol.chainId.value,
-            quoteToken = market.quoteSymbol.contractAddress ?: Address.zero,
+            quoteToken = market.quoteSymbol.contractAddress ?: EvmAddress.zero,
             amount = if (side == OrderSide.Buy) amount else amount.negate(),
             price = BigInteger.ZERO,
             nonce = BigInteger(1, nonce.toHexBytes()),

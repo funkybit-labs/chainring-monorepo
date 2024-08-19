@@ -7,7 +7,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.web3j.crypto.Keys
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.testfixtures.DbTestHelpers.createChain
 import xyz.funkybit.testutils.TestWithDb
@@ -35,11 +35,11 @@ class LinkedSignerServiceTest : TestWithDb() {
 
     @Test
     fun `handles adding and removing linked signers`() {
-        assertNull(LinkedSignerService.getLinkedSigner(Address.zero, chainId1))
+        assertNull(LinkedSignerService.getLinkedSigner(EvmAddress.zero, chainId1))
 
         // add a linked signer and verify
-        val walletAddress = Address(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
-        val linkedSignerAddress = Address(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
+        val walletAddress = EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
+        val linkedSignerAddress = EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
 
         // update the signer on one chain and verify
         sendAndWaitForLinkedSignerUpdate(walletAddress, chainId1, linkedSignerAddress)
@@ -48,18 +48,18 @@ class LinkedSignerServiceTest : TestWithDb() {
         sendAndWaitForLinkedSignerUpdate(walletAddress, chainId2, linkedSignerAddress)
 
         // remove on one chain and verify just removed from that chain
-        sendAndWaitForLinkedSignerUpdate(walletAddress, chainId2, Address.zero)
+        sendAndWaitForLinkedSignerUpdate(walletAddress, chainId2, EvmAddress.zero)
         assertEquals(linkedSignerAddress, LinkedSignerService.getLinkedSigner(walletAddress, chainId1))
         assertNull(LinkedSignerService.getLinkedSigner(walletAddress, chainId2))
 
         // remove on other and verify
-        sendAndWaitForLinkedSignerUpdate(walletAddress, chainId2, Address.zero)
+        sendAndWaitForLinkedSignerUpdate(walletAddress, chainId2, EvmAddress.zero)
         // idempotent
-        sendAndWaitForLinkedSignerUpdate(walletAddress, chainId2, Address.zero)
+        sendAndWaitForLinkedSignerUpdate(walletAddress, chainId2, EvmAddress.zero)
 
         // add multiple
-        val walletAddress2 = Address(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
-        val linkedSignerAddress2 = Address(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
+        val walletAddress2 = EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
+        val linkedSignerAddress2 = EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
         sendAndWaitForLinkedSignerUpdate(walletAddress, chainId1, linkedSignerAddress)
         sendAndWaitForLinkedSignerUpdate(walletAddress2, chainId1, linkedSignerAddress2)
         sendAndWaitForLinkedSignerUpdate(walletAddress, chainId2, linkedSignerAddress)
@@ -71,10 +71,10 @@ class LinkedSignerServiceTest : TestWithDb() {
 
     @Test
     fun `updates state from db on a restart`() {
-        val walletAddress = Address(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
-        val linkedSignerAddress = Address(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
-        val walletAddress2 = Address(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
-        val linkedSignerAddress2 = Address(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
+        val walletAddress = EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
+        val linkedSignerAddress = EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
+        val walletAddress2 = EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
+        val linkedSignerAddress2 = EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(Keys.createEcKeyPair())))
 
         sendAndWaitForLinkedSignerUpdate(walletAddress, chainId1, linkedSignerAddress)
         sendAndWaitForLinkedSignerUpdate(walletAddress2, chainId1, linkedSignerAddress2)
@@ -96,7 +96,7 @@ class LinkedSignerServiceTest : TestWithDb() {
         assertEquals(linkedSignerAddress2, LinkedSignerService.getLinkedSigner(walletAddress2, chainId2))
     }
 
-    private fun sendAndWaitForLinkedSignerUpdate(walletAddress: Address, chainId: ChainId, linkedSignerAddress: Address) {
+    private fun sendAndWaitForLinkedSignerUpdate(walletAddress: EvmAddress, chainId: ChainId, linkedSignerAddress: EvmAddress) {
         transaction {
             LinkedSignerService.createOrUpdateWalletLinkedSigner(walletAddress, chainId, linkedSignerAddress)
         }
@@ -108,7 +108,7 @@ class LinkedSignerServiceTest : TestWithDb() {
             .atMost(Duration.ofMillis(5000L))
             .until {
                 LinkedSignerService.getLinkedSigner(walletAddress, chainId) ==
-                    if (linkedSignerAddress == Address.zero) null else linkedSignerAddress
+                    if (linkedSignerAddress == EvmAddress.zero) null else linkedSignerAddress
             }
     }
 }

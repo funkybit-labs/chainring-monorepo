@@ -25,6 +25,7 @@ import xyz.funkybit.apps.api.model.BigDecimalJson
 import xyz.funkybit.apps.api.model.BigIntegerJson
 import xyz.funkybit.apps.api.model.RequestProcessingError
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.FeeRate
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.WithdrawalFee
@@ -198,7 +199,7 @@ class AdminRoutes(
                         symbol.addToWallets = payload.addToWallets
                         symbol.iconUrl = url
                         symbol.updatedAt = Clock.System.now()
-                        symbol.updatedBy = request.principal.value
+                        symbol.updatedBy = request.principal.toString()
                         originalData
                     }
                     if (originalData.withdrawalFee != payload.withdrawalFee) {
@@ -256,7 +257,7 @@ class AdminRoutes(
                             quoteSymbol = quoteSymbol,
                             tickSize = payload.tickSize,
                             lastPrice = payload.lastPrice,
-                            createdBy = request.principal.value,
+                            createdBy = request.principal.toString(),
                             minFee = BigInteger.ZERO,
                         ),
                         baseSymbol,
@@ -358,7 +359,7 @@ class AdminRoutes(
             returning(
                 Status.OK,
                 responseBody to listOf(
-                    Address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
+                    EvmAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
                 ),
             )
         } bindContract Method.GET to { _ ->
@@ -370,7 +371,7 @@ class AdminRoutes(
         }
     }
 
-    private val adminAddressPathParam = Path.map(::Address, Address::value).of("adminAddress", "Admin Address")
+    private val adminAddressPathParam = Path.map(Address::auto, Address::toString).of("adminAddress", "Admin Address")
     private val addAdmin: ContractRoute = run {
         "admin/admin" / adminAddressPathParam meta {
             operationId = "add-admin"

@@ -2,8 +2,8 @@ package xyz.funkybit.apps.telegrambot.model
 
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import xyz.funkybit.apps.api.model.ApiError
-import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EncryptedString
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.abbreviated
 import xyz.funkybit.core.model.db.BalanceEntity
@@ -47,7 +47,7 @@ sealed class Output {
 object OutputMessage {
     fun mainMenu(
         recipient: TelegramBotUserEntity,
-        currentWallet: Address,
+        currentWallet: EvmAddress,
         walletOnChainBalances: List<Pair<SymbolEntity, BigDecimal>>,
         exchangeBalances: List<BalanceEntity>,
         airdropSupported: Boolean,
@@ -372,7 +372,7 @@ object OutputMessage {
             text = "❌ Invalid command",
         )
 
-    fun settings(recipient: TelegramBotUserEntity, currentWallet: Address): Output.SendMessage =
+    fun settings(recipient: TelegramBotUserEntity, currentWallet: EvmAddress): Output.SendMessage =
         Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "-- Current Wallet --" +
@@ -415,7 +415,7 @@ object OutputMessage {
             ),
         )
 
-    fun selectWalletToSwitchTo(recipient: TelegramBotUserEntity, wallets: List<Address>, currentWallet: Address): Output.SendMessage =
+    fun selectWalletToSwitchTo(recipient: TelegramBotUserEntity, wallets: List<EvmAddress>, currentWallet: EvmAddress): Output.SendMessage =
         Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "Please select a wallet to switch to:",
@@ -436,7 +436,7 @@ object OutputMessage {
             ),
         )
 
-    fun switchedToWallet(recipient: TelegramBotUserEntity, wallet: Address): Output.SendMessage =
+    fun switchedToWallet(recipient: TelegramBotUserEntity, wallet: EvmAddress): Output.SendMessage =
         Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "Switched to wallet ${wallet.value}",
@@ -448,7 +448,7 @@ object OutputMessage {
             text = "To import your existing wallet please send your private key in the next message or /cancel to abort",
         )
 
-    fun importWalletSuccess(recipient: TelegramBotUserEntity, newWallet: Address): Output.SendMessage =
+    fun importWalletSuccess(recipient: TelegramBotUserEntity, newWallet: EvmAddress): Output.SendMessage =
         Output.SendMessage(
             recipient = recipient.telegramUserId,
             text = "✅ Your private key has been imported. Your wallet address is ${newWallet.value}",

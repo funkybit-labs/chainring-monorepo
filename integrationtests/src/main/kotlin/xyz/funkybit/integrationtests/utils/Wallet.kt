@@ -2,6 +2,8 @@ package xyz.funkybit.integrationtests.utils
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
+import org.bitcoinj.core.NetworkParameters
+import org.bitcoinj.wallet.KeyChainGroup
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
@@ -19,7 +21,7 @@ import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.evm.EIP712Helper
 import xyz.funkybit.core.evm.EIP712Transaction
 import xyz.funkybit.core.evm.TokenAddressAndChain
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.TxHash
@@ -33,6 +35,7 @@ import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.time.Duration
+import org.bitcoinj.wallet.Wallet as BitcoinWallet
 
 class Wallet(
     val walletKeypair: ECKeyPair,
@@ -61,7 +64,9 @@ class Wallet(
 
     var currentChainId: ChainId = blockchainClients.first().chainId
 
-    val address = Address(Keys.toChecksumAddress("0x" + Keys.getAddress(walletKeypair)))
+    val evmAddress = EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(walletKeypair)))
+    private val bitcoinNetwork = NetworkParameters.fromID(NetworkParameters.ID_REGTEST)
+    val bitcoinAddress = BitcoinWallet(bitcoinNetwork, KeyChainGroup.createBasic(bitcoinNetwork))
 
     private val exchangeContractAddressByChainId = chains.associate { it.id to it.contracts.first { it.name == ContractType.Exchange.name }.address }
     private val exchangeContractByChainId = blockchainClients.associate { it.chainId to it.loadExchangeContract(exchangeContractAddressByChainId.getValue(it.chainId)) }
@@ -78,11 +83,11 @@ class Wallet(
         currentBlockchainClient().waitForTransactionReceipt(txHash)
 
     fun getWalletERC20Balance(symbol: Symbol): BigInteger {
-        return loadErc20Contract(symbol.value).balanceOf(address.value).send()
+        return loadErc20Contract(symbol.value).balanceOf(evmAddress.value).send()
     }
 
     fun getWalletERC20Balance(symbol: String): BigInteger {
-        return loadErc20Contract(symbol).balanceOf(address.value).send()
+        return loadErc20Contract(symbol).balanceOf(evmAddress.value).send()
     }
 
     fun mintERC20AndMine(symbol: String, amount: BigInteger): TransactionReceipt {
@@ -97,8 +102,8 @@ class Wallet(
 
     fun sendMintERC20Tx(symbol: String, amount: BigInteger): TxHash =
         currentBlockchainClient().sendMintERC20Tx(
-            Address(loadErc20Contract(symbol).contractAddress),
-            address,
+            EvmAddress(loadErc20Contract(symbol).contractAddress),
+            evmAddress,
             amount,
         )
 
@@ -106,7 +111,7 @@ class Wallet(
         mintERC20AndMine(assetAmount.symbol.name, assetAmount.amount.toFundamentalUnits(assetAmount.symbol.decimals))
 
     fun getWalletNativeBalance(): BigInteger {
-        return blockchainClientsByChainId.getValue(currentChainId).getNativeBalance(address)
+        return blockchainClientsByChainId.getValue(currentChainId).getNativeBalance(evmAddress)
     }
 
     fun getWalletBalance(symbol: SymbolInfo): AssetAmount =
@@ -131,16 +136,16 @@ class Wallet(
 
     fun getExchangeERC20Balance(symbol: String): BigInteger {
         val chainId = chains.first { c -> c.symbols.any { it.name == symbol } }.id
-        return exchangeContractByChainId.getValue(chainId).balances(address.value, erc20TokenAddress(symbol, chainId)).send()
+        return exchangeContractByChainId.getValue(chainId).balances(evmAddress.value, erc20TokenAddress(symbol, chainId)).send()
     }
 
     fun getExchangeNativeBalance(): BigInteger {
-        return exchangeContractByChainId.getValue(currentChainId).balances(address.value, Address.zero.value).send()
+        return exchangeContractByChainId.getValue(currentChainId).balances(evmAddress.value, EvmAddress.zero.value).send()
     }
 
     private fun getExchangeNativeBalance(symbol: String): BigInteger {
         val chainId = chains.first { c -> c.symbols.any { it.name == symbol } }.id
-        return exchangeContractByChainId.getValue(chainId).balances(address.value, Address.zero.value).send()
+        return exchangeContractByChainId.getValue(chainId).balances(evmAddress.value, EvmAddress.zero.value).send()
     }
 
     fun depositAndMine(assetAmount: AssetAmount): TransactionReceipt {
@@ -175,8 +180,8 @@ class Wallet(
         val erc20Contract = loadErc20Contract(symbol)
 
         blockchainClientsByChainId.getValue(currentChainId).sendTransaction(
-            Address(erc20Contract.contractAddress),
-            erc20Contract.approve(exchangeContractAddressByChainId.getValue(currentChainId).value, amount).encodeFunctionCall(),
+            EvmAddress(erc20Contract.contractAddress),
+            erc20Contract.approve(exchangeContractAddressByChainId.getValue(currentChainId).toString(), amount).encodeFunctionCall(),
             BigInteger.ZERO,
         )
 
@@ -186,7 +191,7 @@ class Wallet(
         while (Clock.System.now().minus(start) < Duration.parse("1m")) {
             try {
                 return blockchainClientsByChainId.getValue(currentChainId).sendTransaction(
-                    Address(exchangeContractByChainId.getValue(currentChainId).contractAddress),
+                    EvmAddress(exchangeContractByChainId.getValue(currentChainId).contractAddress),
                     exchangeContractByChainId.getValue(currentChainId).deposit(erc20TokenAddress(symbol)?.value, amount)
                         .encodeFunctionCall(),
                     BigInteger.ZERO,
@@ -201,7 +206,7 @@ class Wallet(
     fun setLinkedSigner(linkedSigner: String, digest: ByteArray, signature: EvmSignature): TransactionReceipt {
         val blockchainClient = blockchainClientsByChainId.getValue(currentChainId)
         val txHash = blockchainClient.sendTransaction(
-            Address(exchangeContractByChainId.getValue(currentChainId).contractAddress),
+            EvmAddress(exchangeContractByChainId.getValue(currentChainId).contractAddress),
             exchangeContractByChainId.getValue(currentChainId).linkSigner(linkedSigner, digest, signature.toByteArray()).encodeFunctionCall(),
             BigInteger.ZERO,
         )
@@ -212,7 +217,7 @@ class Wallet(
     fun removeLinkedSigner(): TransactionReceipt {
         val blockchainClient = blockchainClientsByChainId.getValue(currentChainId)
         val txHash = blockchainClient.sendTransaction(
-            Address(exchangeContractByChainId.getValue(currentChainId).contractAddress),
+            EvmAddress(exchangeContractByChainId.getValue(currentChainId).contractAddress),
             exchangeContractByChainId.getValue(currentChainId).removeLinkedSigner().encodeFunctionCall(),
             BigInteger.ZERO,
         )
@@ -220,15 +225,15 @@ class Wallet(
         return blockchainClient.getTransactionReceipt(txHash)!!
     }
 
-    fun getLinkedSigner(chainId: ChainId): Address {
-        return Address(Keys.toChecksumAddress(exchangeContractByChainId.getValue(chainId).linkedSigners(address.value).send()))
+    fun getLinkedSigner(chainId: ChainId): EvmAddress {
+        return EvmAddress(Keys.toChecksumAddress(exchangeContractByChainId.getValue(chainId).linkedSigners(evmAddress.value).send()))
     }
 
     fun signWithdraw(symbol: String, amount: BigInteger, nonceOverride: Long? = null, linkedSignerEcKeyPair: ECKeyPair? = null): CreateWithdrawalApiRequest {
         val nonce = nonceOverride ?: getWithdrawalNonce()
         val tx = EIP712Transaction.WithdrawTx(
-            address,
-            TokenAddressAndChain(erc20TokenAddress(symbol) ?: Address.zero, this.currentChainId),
+            evmAddress,
+            TokenAddressAndChain(erc20TokenAddress(symbol) ?: EvmAddress.zero, this.currentChainId),
             amount,
             nonce,
             amount == BigInteger.ZERO,
@@ -257,11 +262,11 @@ class Wallet(
         val (_, quoteSymbol) = marketSymbols(request.secondMarketId)
 
         val tx = EIP712Transaction.Order(
-            address,
+            evmAddress,
             baseChainId = chainId(baseSymbol),
-            baseToken = baseSymbol.contractAddress ?: Address.zero,
+            baseToken = baseSymbol.contractAddress ?: EvmAddress.zero,
             quoteChainId = chainId(quoteSymbol),
-            quoteToken = quoteSymbol.contractAddress ?: Address.zero,
+            quoteToken = quoteSymbol.contractAddress ?: EvmAddress.zero,
             amount = if (request.side == OrderSide.Buy) request.amount else request.amount.negate(),
             price = BigInteger.ZERO,
             nonce = BigInteger(1, request.nonce.toHexBytes()),
@@ -277,11 +282,11 @@ class Wallet(
         val (baseSymbol, quoteSymbol) = marketSymbols(request.marketId)
 
         val tx = EIP712Transaction.Order(
-            address,
+            evmAddress,
             baseChainId = chainId(baseSymbol),
-            baseToken = baseSymbol.contractAddress ?: Address.zero,
+            baseToken = baseSymbol.contractAddress ?: EvmAddress.zero,
             quoteChainId = chainId(quoteSymbol),
-            quoteToken = quoteSymbol.contractAddress ?: Address.zero,
+            quoteToken = quoteSymbol.contractAddress ?: EvmAddress.zero,
             amount = if (request.side == OrderSide.Buy) request.amount else request.amount.negate(),
             price = BigInteger.ZERO,
             nonce = BigInteger(1, request.nonce.toHexBytes()),
@@ -295,7 +300,7 @@ class Wallet(
 
     fun signCancelOrder(request: CancelOrderApiRequest): CancelOrderApiRequest {
         val tx = EIP712Transaction.CancelOrder(
-            address,
+            evmAddress,
             request.marketId,
             if (request.side == OrderSide.Buy) request.amount else request.amount.negate(),
             BigInteger(1, request.nonce.toHexBytes()),
@@ -314,11 +319,11 @@ class Wallet(
     private fun limitOrderEip712TxSignature(marketId: MarketId, amount: OrderAmount, price: BigDecimal, side: OrderSide, nonce: String, linkedSignerEcKeyPair: ECKeyPair? = null): EvmSignature {
         val (baseSymbol, quoteSymbol) = marketSymbols(marketId)
         val tx = EIP712Transaction.Order(
-            address,
+            evmAddress,
             baseChainId = chainId(baseSymbol),
-            baseToken = baseSymbol.contractAddress ?: Address.zero,
+            baseToken = baseSymbol.contractAddress ?: EvmAddress.zero,
             quoteChainId = chainId(quoteSymbol),
-            quoteToken = quoteSymbol.contractAddress ?: Address.zero,
+            quoteToken = quoteSymbol.contractAddress ?: EvmAddress.zero,
             amount = if (side == OrderSide.Buy) amount else amount.negate(),
             price = price.toFundamentalUnits(quoteSymbol.decimals),
             nonce = BigInteger(1, nonce.toHexBytes()),
@@ -333,11 +338,11 @@ class Wallet(
 
     private fun loadErc20Contract(symbol: String) = blockchainClientsByChainId.getValue(currentChainId).loadERC20Mock(erc20TokenAddress(symbol)!!.value)
 
-    private fun erc20TokenAddress(symbol: String): Address? =
-        chains.first { it.id == currentChainId }.symbols.firstOrNull { (it.name == symbol || it.name == "$symbol:$currentChainId") && it.contractAddress != null }?.contractAddress
+    private fun erc20TokenAddress(symbol: String): EvmAddress? =
+        chains.first { it.id == currentChainId }.symbols.firstOrNull { (it.name == symbol || it.name == "$symbol:$currentChainId") && it.contractAddress != null }?.contractAddress as? EvmAddress
 
     private fun erc20TokenAddress(symbol: String, chainId: ChainId): String? =
-        chains.first { it.id == chainId }.symbols.firstOrNull { (it.name == symbol || it.name == "$symbol:$currentChainId") && it.contractAddress != null }?.contractAddress?.value
+        chains.first { it.id == chainId }.symbols.firstOrNull { (it.name == symbol || it.name == "$symbol:$currentChainId") && it.contractAddress != null }?.contractAddress?.toString()
 
     private fun marketSymbols(marketId: MarketId): Pair<SymbolInfo, SymbolInfo> =
         marketId
@@ -354,7 +359,7 @@ class Wallet(
 
         return blockchainClient.sovereignWithdrawal(
             senderCredentials = Credentials.create(walletKeypair),
-            tokenContractAddress = erc20TokenAddress(symbol) ?: Address.zero,
+            tokenContractAddress = erc20TokenAddress(symbol) ?: EvmAddress.zero,
             amount = amount,
         ).also { blockchainClient.mine() }
     }

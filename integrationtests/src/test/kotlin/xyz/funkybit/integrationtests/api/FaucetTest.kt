@@ -32,7 +32,7 @@ class FaucetTest {
             val nativeSymbol = Symbol(chain.symbols.first { it.contractAddress == null }.name)
 
             val nativeBalanceBefore = wallet.getWalletNativeBalance()
-            apiClient.faucet(FaucetApiRequest(nativeSymbol, wallet.address)).also {
+            apiClient.faucet(FaucetApiRequest(nativeSymbol, wallet.evmAddress)).also {
                 assertEquals(nativeSymbol, it.symbol)
                 assertEquals(BigInteger("1000000000000000000"), it.amount)
                 assertEquals(chain.id, it.chainId)
@@ -68,7 +68,7 @@ class FaucetTest {
             val erc20Symbol = Symbol(chain.symbols.first { it.contractAddress != null && it.name.startsWith("ETH") }.name)
 
             val balanceBefore = wallet.getWalletERC20Balance(erc20Symbol)
-            apiClient.faucet(FaucetApiRequest(erc20Symbol, wallet.address)).also {
+            apiClient.faucet(FaucetApiRequest(erc20Symbol, wallet.evmAddress)).also {
                 assertEquals(erc20Symbol, it.symbol)
                 assertEquals(BigInteger("1000000000000000000"), it.amount)
                 assertEquals(chain.id, it.chainId)

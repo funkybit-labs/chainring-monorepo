@@ -49,7 +49,7 @@ class WithdrawalTest {
         (0 until chains.size).forEach { index ->
 
             wallet.switchChain(chains[index].id)
-            Faucet.fundAndMine(wallet.address, chainId = wallet.currentChainId)
+            Faucet.fundAndMine(wallet.evmAddress, chainId = wallet.currentChainId)
 
             val btc = chains[index].symbols.first { it.name == "BTC".toChainSymbol(chains[index].id) }
             val usdc = chains[index].symbols.first { it.name == "USDC".toChainSymbol(chains[index].id) }
@@ -271,7 +271,7 @@ class WithdrawalTest {
         wsClient.assertBalancesMessageReceived()
 
         val wallet = Wallet(apiClient)
-        Faucet.fundAndMine(wallet.address)
+        Faucet.fundAndMine(wallet.evmAddress)
 
         val amount = AssetAmount(usdc, "1000")
         wallet.mintERC20AndMine(amount * BigDecimal("2"))
@@ -303,7 +303,7 @@ class WithdrawalTest {
         wsClient.assertBalancesMessageReceived()
 
         val wallet = Wallet(apiClient)
-        Faucet.fundAndMine(wallet.address)
+        Faucet.fundAndMine(wallet.evmAddress)
 
         val initialDepositAmount = AssetAmount(usdc, "1001")
         wallet.mintERC20AndMine(initialDepositAmount * BigDecimal("2"))
@@ -359,7 +359,7 @@ class WithdrawalTest {
         wsClient.assertBalancesMessageReceived()
 
         val wallet = Wallet(apiClient)
-        Faucet.fundAndMine(wallet.address)
+        Faucet.fundAndMine(wallet.evmAddress)
 
         val initialDepositAmount = AssetAmount(usdc, "1000")
         wallet.mintERC20AndMine(initialDepositAmount * BigDecimal("2"))
@@ -473,8 +473,8 @@ class WithdrawalTest {
         wsClient2.subscribeToBalances()
         wsClient2.assertBalancesMessageReceived()
 
-        Faucet.fundAndMine(wallet1.address, chainId = wallet1.currentChainId)
-        Faucet.fundAndMine(wallet2.address, chainId = wallet2.currentChainId)
+        Faucet.fundAndMine(wallet1.evmAddress, chainId = wallet1.currentChainId)
+        Faucet.fundAndMine(wallet2.evmAddress, chainId = wallet2.currentChainId)
         val btc = apiClient1.getConfiguration().chains.flatMap { it.symbols }.first { it.name.startsWith("BTC:") }
 
         val btcDeposit1Amount = AssetAmount(btc, "0.01")
@@ -518,7 +518,7 @@ class WithdrawalTest {
         wsClient.assertBalancesMessageReceived()
 
         val wallet = Wallet(apiClient)
-        Faucet.fundAndMine(wallet.address)
+        Faucet.fundAndMine(wallet.evmAddress)
 
         // deposit some BTC
         val btcDepositAmount = AssetAmount(btc, "0.002")

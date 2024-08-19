@@ -14,7 +14,7 @@ import xyz.funkybit.apps.api.model.websocket.SubscriptionTopic
 import xyz.funkybit.apps.api.model.websocket.MyTradesCreated
 import xyz.funkybit.apps.api.model.websocket.MyTradesUpdated
 import xyz.funkybit.apps.api.model.websocket.MyTrades
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.OHLCDuration
@@ -44,7 +44,7 @@ class Taker(
     private val priceCorrectionFunction: PriceFunction,
     keyPair: ECKeyPair = Keys.createEcKeyPair()
 ) : Actor(marketIds, nativeAssets, assets, keyPair) {
-    override val id: String = "tkr_${Address(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
+    override val id: String = "tkr_${EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
     override val logger: KLogger = KotlinLogging.logger {}
     private var currentOrder: Order.Market? = null
     private var marketPrices = mutableMapOf<MarketId, BigDecimal>()

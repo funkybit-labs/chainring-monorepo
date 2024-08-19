@@ -206,7 +206,7 @@ class TestRoutes(
                         .getBySequencerIds(walletIds)
                         .associateBy(
                             keySelector = { it.sequencerId.value },
-                            valueTransform = { it.address.value },
+                            valueTransform = { it.address.toString() },
                         )
                 }
 

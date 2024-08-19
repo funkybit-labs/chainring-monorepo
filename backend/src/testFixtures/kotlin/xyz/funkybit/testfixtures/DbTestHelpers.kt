@@ -2,7 +2,7 @@ package xyz.funkybit.testfixtures
 
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.SequencerOrderId
 import xyz.funkybit.core.model.db.ChainEntity
 import xyz.funkybit.core.model.db.ChainId
@@ -55,7 +55,7 @@ object DbTestHelpers {
         SymbolEntity.create(
             name,
             chainId,
-            contractAddress = Address.generate(),
+            contractAddress = EvmAddress.generate(),
             decimals = decimals,
             description = "$name coin",
             withdrawalFee = withdrawalFee,
@@ -69,7 +69,7 @@ object DbTestHelpers {
     ): MarketEntity =
         MarketEntity.create(baseSymbol, quoteSymbol, tickSize, lastPrice, "test")
 
-    fun createWallet(address: Address = Address.generate()): WalletEntity =
+    fun createWallet(address: EvmAddress = EvmAddress.generate()): WalletEntity =
         WalletEntity.getOrCreate(address)
 
     fun createOrder(

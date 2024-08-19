@@ -420,7 +420,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
         executeAndTrace(
             TraceRecorder.Op.AddAdmin,
             Request.Builder()
-                .url("$apiServerRootUrl/v1/admin/admin/${address.value}")
+                .url("$apiServerRootUrl/v1/admin/admin/$address")
                 .put("".toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(ecKeyPair),
@@ -430,7 +430,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
         executeAndTrace(
             TraceRecorder.Op.RemoveAdmin,
             Request.Builder()
-                .url("$apiServerRootUrl/v1/admin/admin/${address.value}")
+                .url("$apiServerRootUrl/v1/admin/admin/$address")
                 .delete()
                 .build()
                 .withAuthHeaders(ecKeyPair),

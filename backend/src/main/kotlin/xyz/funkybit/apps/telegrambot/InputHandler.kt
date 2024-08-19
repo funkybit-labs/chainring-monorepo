@@ -76,7 +76,7 @@ class InputHandler(
                         user.updateSessionState(SessionState.SwapFromSymbolSelection)
                     }
                     is Input.Settings -> {
-                        sendTransient(OutputMessage.settings(user, currentWallet.address))
+                        sendTransient(OutputMessage.settings(user, currentWallet.evmAddress))
                         user.updateSessionState(SessionState.Settings)
                     }
                     else -> {
@@ -94,7 +94,7 @@ class InputHandler(
 
                         val txHash = ChainManager
                             .getBlockchainClient(symbol.chainId.value)
-                            .sendNativeDepositTx(currentWallet.address, amount.toFundamentalUnits(symbol.decimals))
+                            .sendNativeDepositTx(currentWallet.evmAddress, amount.toFundamentalUnits(symbol.decimals))
 
                         send(OutputMessage.airdropRequested(user, symbol, amount))
                         user.updateSessionState(SessionState.AirdropPending(symbol, amount, txHash))
@@ -190,7 +190,7 @@ class InputHandler(
                                 .deposit(currentState.amount, currentState.symbol)
                                 ?.let { txHash ->
                                     exchangeApiService
-                                        .deposit(currentWallet.address, CreateDepositApiRequest(currentState.symbol, currentState.amount, txHash))
+                                        .deposit(currentWallet.evmAddress, CreateDepositApiRequest(currentState.symbol, currentState.amount, txHash))
                                         .deposit.id
                                 }
 
@@ -308,7 +308,7 @@ class InputHandler(
                             val signature = currentWallet.signWithdrawal(currentState.amount, currentState.symbol, nonce)
                             exchangeApiService
                                 .withdraw(
-                                    currentWallet.address,
+                                    currentWallet.evmAddress,
                                     CreateWithdrawalApiRequest(currentState.symbol, currentState.amount, nonce, signature),
                                 )
                                 .withdrawal.id.right()
@@ -460,7 +460,7 @@ class InputHandler(
                             }
 
                             val errorOrOrderId = try {
-                                val response = exchangeApiService.addOrder(currentWallet.address, signedOrder)
+                                val response = exchangeApiService.addOrder(currentWallet.evmAddress, signedOrder)
                                 response.error?.left() ?: response.orderId.right()
                             } catch (e: RequestProcessingError) {
                                 e.error.left()
@@ -526,8 +526,8 @@ class InputHandler(
                         sendTransient(
                             OutputMessage.selectWalletToSwitchTo(
                                 user,
-                                wallets = user.wallets.map { it.address },
-                                currentWallet = currentWallet.address,
+                                wallets = user.wallets.map { it.evmAddress },
+                                currentWallet = currentWallet.evmAddress,
                             ),
                         )
                         user.updateSessionState(SessionState.WalletToSwitchToSelection)
@@ -555,7 +555,7 @@ class InputHandler(
 
             is SessionState.ShowingPrivateKey -> {
                 deleteTransientMessages(user)
-                sendTransient(OutputMessage.settings(user, currentWallet.address))
+                sendTransient(OutputMessage.settings(user, currentWallet.evmAddress))
                 user.updateSessionState(SessionState.Settings)
             }
 
@@ -563,18 +563,18 @@ class InputHandler(
                 when (input) {
                     is Input.WalletSelected -> {
                         deleteTransientMessages(user)
-                        val targetWallet = user.wallets.find { it.address.abbreviated() == input.abbreviatedAddress }!!
+                        val targetWallet = user.wallets.find { it.evmAddress.abbreviated() == input.abbreviatedAddress }!!
                         if (currentWallet != targetWallet) {
                             currentWallet.isCurrent = false
                             targetWallet.isCurrent = true
                         }
-                        send(OutputMessage.switchedToWallet(user, targetWallet.address))
-                        sendTransient(OutputMessage.settings(user, targetWallet.address))
+                        send(OutputMessage.switchedToWallet(user, targetWallet.evmAddress))
+                        sendTransient(OutputMessage.settings(user, targetWallet.evmAddress))
                         user.updateSessionState(SessionState.Settings)
                     }
                     is Input.Cancel -> {
                         deleteTransientMessages(user)
-                        sendTransient(OutputMessage.settings(user, currentWallet.address))
+                        sendTransient(OutputMessage.settings(user, currentWallet.evmAddress))
                         user.updateSessionState(SessionState.Settings)
                     }
                     else -> {
@@ -588,21 +588,21 @@ class InputHandler(
                     is Input.Text -> {
                         if (input.text.contains("cancel", ignoreCase = true)) {
                             deleteTransientMessages(user)
-                            sendTransient(OutputMessage.settings(user, currentWallet.address))
+                            sendTransient(OutputMessage.settings(user, currentWallet.evmAddress))
                             user.updateSessionState(SessionState.Settings)
                         } else {
                             try {
                                 val newCurrentWallet = user.addWallet(input.text)
                                 currentWallet.isCurrent = false
                                 newCurrentWallet.isCurrent = true
-                                send(OutputMessage.importWalletSuccess(user, newCurrentWallet.address))
+                                send(OutputMessage.importWalletSuccess(user, newCurrentWallet.evmAddress))
                             } catch (e: Exception) {
                                 logger.warn(e) { "Failed to import key" }
                                 send(OutputMessage.importWalletFailure(user))
                             }
                             user.messageIdsForDeletion += input.messageId
                             deleteTransientMessages(user)
-                            sendTransient(OutputMessage.settings(user, user.currentWallet().address))
+                            sendTransient(OutputMessage.settings(user, user.currentWallet().evmAddress))
                             user.updateSessionState(SessionState.Settings)
                         }
                     }
@@ -622,7 +622,7 @@ class InputHandler(
         send(
             OutputMessage.mainMenu(
                 wallet.user,
-                wallet.address,
+                wallet.evmAddress,
                 walletOnChainBalances = wallet.onChainBalances(symbols),
                 exchangeBalances = wallet.exchangeBalances(),
                 airdropSupported = faucetSupported,

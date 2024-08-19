@@ -61,6 +61,7 @@ dependencies {
     implementation("net.openhft:chronicle-queue:5.22.28")
 
     implementation("io.arrow-kt:arrow-core:1.2.1")
+    implementation("org.bitcoinj:bitcoinj-core:0.16.3")
 
     implementation(project(":backend"))
     implementation(project(":sequencer"))

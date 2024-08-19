@@ -14,6 +14,7 @@ import xyz.funkybit.core.evm.ECHelper.sha3
 import xyz.funkybit.core.evm.TokenAdjustmentList
 import xyz.funkybit.core.evm.WalletTradeList
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.BalanceChange
 import xyz.funkybit.core.model.db.BalanceEntity
 import xyz.funkybit.core.model.db.BalanceType
@@ -342,7 +343,7 @@ class SettlementCoordinator(
             if (wallets.isNotEmpty()) {
                 val walletAddresses = wallets.toList()
                 chainId to BatchSettlement(
-                    walletAddresses.map { it.value },
+                    walletAddresses.map { it.toString() },
                     walletAddresses.map { walletAddress ->
                         WalletTradeList(
                             tradeGuids.getValue(walletAddress).toList(),
@@ -350,7 +351,7 @@ class SettlementCoordinator(
                     },
                     (balanceAdjustments.keys).map { symbolId ->
                         TokenAdjustmentList(
-                            token = (symbolMap.getValue(symbolId).contractAddress ?: Address.zero).value,
+                            token = (symbolMap.getValue(symbolId).contractAddress ?: EvmAddress.zero).toString(),
                             increments = balanceAdjustments.getValue(symbolId).filter { it.value > BigInteger.ZERO }
                                 .map { Adjustment(walletAddresses.indexOf(it.key).toBigInteger(), it.value) },
                             decrements = balanceAdjustments.getValue(symbolId).filter { it.value < BigInteger.ZERO }
@@ -482,7 +483,7 @@ class SettlementCoordinator(
         val finalExchangeBalances = runBlocking {
             blockchainClientsByChainId.getValue(chainId).getExchangeBalances(
                 wallets.map { it.address },
-                symbolIds.map { symbolMap.getValue(it).contractAddress ?: Address.zero },
+                symbolIds.map { symbolMap.getValue(it).contractAddress ?: EvmAddress.zero },
                 blockNumber?.let { DefaultBlockParam.BlockNumber(it) } ?: DefaultBlockParam.Latest,
             )
         }
@@ -495,7 +496,7 @@ class SettlementCoordinator(
                         walletId = wallet.guid.value,
                         symbolId = symbolId,
                         amount = finalExchangeBalances.getValue(wallet.address).getValue(
-                            symbolInfo.contractAddress ?: Address.zero,
+                            symbolInfo.contractAddress ?: EvmAddress.zero,
                         ),
                     )
                 }

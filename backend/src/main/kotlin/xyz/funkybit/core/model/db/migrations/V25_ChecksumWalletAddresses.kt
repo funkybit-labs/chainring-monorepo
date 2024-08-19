@@ -5,7 +5,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import org.web3j.crypto.Keys
 import xyz.funkybit.core.db.Migration
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.GUIDTable
 import xyz.funkybit.core.model.db.WalletId
 import xyz.funkybit.core.sequencer.toSequencerId
@@ -27,7 +27,7 @@ class V25_ChecksumWalletAddresses : Migration() {
                     val address = resultRow[V25_WalletTable.address]
                     println("Updating address $address $guid ")
                     V25_WalletTable.update({ V25_WalletTable.guid.eq(guid) }) {
-                        val checksumAddress = Address(Keys.toChecksumAddress(address))
+                        val checksumAddress = EvmAddress(Keys.toChecksumAddress(address))
                         it[this.address] = Keys.toChecksumAddress(address)
                         it[this.sequencerId] = checksumAddress.toSequencerId().value
                     }

@@ -6,7 +6,7 @@ import org.web3j.crypto.Keys
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 
 object BitcoinContractsPublisher {
@@ -36,8 +36,8 @@ object BitcoinContractsPublisher {
                 DeployedSmartContractEntity.create(
                     name = contractType.name,
                     chainId = BitcoinClient.chainId,
-                    implementationAddress = Address(Keys.toChecksumAddress(it)),
-                    proxyAddress = Address(Keys.toChecksumAddress(it)),
+                    implementationAddress = EvmAddress(Keys.toChecksumAddress(it)),
+                    proxyAddress = EvmAddress(Keys.toChecksumAddress(it)),
                     version = 1,
                 )
             }

@@ -24,7 +24,7 @@ import xyz.funkybit.apps.api.model.DeployedContract
 import xyz.funkybit.apps.api.model.Market
 import xyz.funkybit.apps.api.model.Role
 import xyz.funkybit.apps.api.model.SymbolInfo
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.FeeRate
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.ChainEntity
@@ -60,7 +60,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                 contracts = listOf(
                                     DeployedContract(
                                         name = "Exchange",
-                                        address = Address("0x0000000000000000000000000000000000000000"),
+                                        address = EvmAddress("0x0000000000000000000000000000000000000000"),
                                     ),
                                 ),
                                 symbols = listOf(
@@ -76,7 +76,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                     SymbolInfo(
                                         name = "USDC",
                                         description = "USD Coin",
-                                        contractAddress = Address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
+                                        contractAddress = EvmAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
                                         decimals = 18u,
                                         faucetSupported = false,
                                         iconUrl = "https://icons/usdc.svg",
@@ -175,7 +175,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                             SymbolInfo(
                                 name = "RING",
                                 description = "funkybit Token",
-                                contractAddress = Address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
+                                contractAddress = EvmAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
                                 decimals = 18u,
                                 faucetSupported = true,
                                 iconUrl = "https://icons/ring.svg",

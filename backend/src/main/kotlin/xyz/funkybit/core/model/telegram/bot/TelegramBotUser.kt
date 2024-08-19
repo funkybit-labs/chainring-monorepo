@@ -10,7 +10,7 @@ import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.web3j.crypto.Keys
 import xyz.funkybit.core.db.executeRaw
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.EntityId
 import xyz.funkybit.core.model.db.GUIDEntity
 import xyz.funkybit.core.model.db.GUIDTable
@@ -59,7 +59,7 @@ class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<Tele
                     val privateKey = Keys.createEcKeyPair().privateKey.toString(16)
                     val wallet = TelegramBotUserWalletEntity.create(
                         WalletEntity.getOrCreate(
-                            Address.fromPrivateKey(
+                            EvmAddress.fromPrivateKey(
                                 privateKey,
                             ),
                         ),
@@ -115,7 +115,7 @@ class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<Tele
 
     fun addWallet(privateKey: String): TelegramBotUserWalletEntity {
         return TelegramBotUserWalletEntity.create(
-            WalletEntity.getOrCreate(Address.fromPrivateKey(privateKey)),
+            WalletEntity.getOrCreate(EvmAddress.fromPrivateKey(privateKey)),
             this,
             privateKey.encrypt(),
             isCurrent = false,

@@ -79,7 +79,7 @@ class OrderCRUDTest : OrderBaseTest() {
             )
             .also { wsMessage -> verifyApiReturnsSameLimits(apiClient, wsMessage) }
 
-        Faucet.fundAndMine(wallet.address)
+        Faucet.fundAndMine(wallet.evmAddress)
 
         val daiAmountToDeposit = AssetAmount(dai, "14")
         wallet.mintERC20AndMine(daiAmountToDeposit)
@@ -180,7 +180,7 @@ class OrderCRUDTest : OrderBaseTest() {
         wsClient.subscribeToLimits()
         wsClient.assertLimitsMessageReceived()
 
-        Faucet.fundAndMine(wallet.address)
+        Faucet.fundAndMine(wallet.evmAddress)
 
         val daiAmountToDeposit = AssetAmount(dai, "14")
         wallet.mintERC20AndMine(daiAmountToDeposit)
@@ -239,7 +239,7 @@ class OrderCRUDTest : OrderBaseTest() {
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()
 
-        Faucet.fundAndMine(wallet.address)
+        Faucet.fundAndMine(wallet.evmAddress)
         val daiAmountToDeposit = AssetAmount(dai, "200")
         wallet.mintERC20AndMine(daiAmountToDeposit)
         wallet.depositAndMine(daiAmountToDeposit)
@@ -427,7 +427,7 @@ class OrderCRUDTest : OrderBaseTest() {
         wsClient.subscribeToLimits()
         wsClient.assertLimitsMessageReceived()
 
-        Faucet.fundAndMine(wallet.address)
+        Faucet.fundAndMine(wallet.evmAddress)
         val daiAmountToDeposit = AssetAmount(dai, "30")
         wallet.mintERC20AndMine(daiAmountToDeposit)
         wallet.depositAndMine(daiAmountToDeposit)
@@ -473,7 +473,7 @@ class OrderCRUDTest : OrderBaseTest() {
         wsClient.subscribeToBalances()
         wsClient.assertBalancesMessageReceived()
 
-        Faucet.fundAndMine(wallet.address)
+        Faucet.fundAndMine(wallet.evmAddress)
         val daiAmountToDeposit = AssetAmount(dai, "30")
         wallet.mintERC20AndMine(daiAmountToDeposit)
         wallet.depositAndMine(daiAmountToDeposit)

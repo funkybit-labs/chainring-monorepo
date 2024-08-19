@@ -17,7 +17,7 @@ import xyz.funkybit.apps.api.model.websocket.MyTradesCreated
 import xyz.funkybit.apps.api.model.websocket.MyTradesUpdated
 import xyz.funkybit.apps.api.model.websocket.MyTrades
 import xyz.funkybit.integrationtests.utils.ApiCallFailure
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.OHLCDuration
@@ -65,7 +65,7 @@ class Maker(
     keyPair: ECKeyPair = Keys.createEcKeyPair(),
 ) : Actor(marketIds, nativeAssets, assets, keyPair) {
     private val marketPriceOverrideFunction: PriceFunction? = marketPriceOverride?.let { PriceFunction.generateDeterministicHarmonicMovement(initialValue = it.toDouble(), maxFluctuation = 0.01) }
-    override val id: String = "mm_${Address(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
+    override val id: String = "mm_${EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
     override val logger: KLogger = KotlinLogging.logger {}
     private var currentOrders = mutableMapOf<MarketId, MutableSet<Order.Limit>>()
     private var quotesCreated = false
