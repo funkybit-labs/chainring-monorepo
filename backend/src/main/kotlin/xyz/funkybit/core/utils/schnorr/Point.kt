@@ -19,14 +19,8 @@ class Point(x: BigInteger?, y: BigInteger?) {
         )
 
         fun taggedHash(tag: String, msg: ByteArray): ByteArray {
-            val tagHash: ByteArray = sha256(tag.toByteArray())
-            val len = (tagHash.size * 2) + msg.size
-            val buf = ByteArray(len)
-            System.arraycopy(tagHash, 0, buf, 0, tagHash.size)
-            System.arraycopy(tagHash, 0, buf, tagHash.size, tagHash.size)
-            System.arraycopy(msg, 0, buf, tagHash.size * 2, msg.size)
-
-            return sha256(buf)
+            val tagHash = sha256(tag.toByteArray())
+            return sha256(tagHash + tagHash + msg)
         }
 
         fun pointFromBytes(b: ByteArray?): Point? {
@@ -40,7 +34,7 @@ class Point(x: BigInteger?, y: BigInteger?) {
             return if (y.modPow(BigInteger.TWO, p).compareTo(ySq) != 0) {
                 null
             } else {
-                Point(x, y)
+                Point(x, if (y.and(BigInteger.ONE) == BigInteger.ZERO) y else p.subtract(y))
             }
         }
 
@@ -75,15 +69,14 @@ class Point(x: BigInteger?, y: BigInteger?) {
                 return infinityPoint()
             }
 
-            val lam: BigInteger?
-            if (point1.isEqual(point2)) {
+            val lam = if (point1.isEqual(point2)) {
                 val base: BigInteger = point2.getY().multiply(BigInteger.TWO)
-                lam = BigInteger.valueOf(3L).multiply(point1.getX()).multiply(point1.getX())
+                BigInteger.valueOf(3L).multiply(point1.getX()).multiply(point1.getX())
                     .multiply(base.modPow(p.subtract(BigInteger.TWO), p))
                     .mod(p)
             } else {
                 val base: BigInteger = point2.getX().subtract(point1.getX())
-                lam = point2.getY().subtract(point1.getY())
+                point2.getY().subtract(point1.getY())
                     .multiply(base.modPow(p.subtract(BigInteger.TWO), p)).mod(p)
             }
 
@@ -130,23 +123,23 @@ class Point(x: BigInteger?, y: BigInteger?) {
         return r
     }
 
-    private fun isSquare(x: BigInteger): Boolean {
-        return x.modPow(p.subtract(BigInteger.ONE).divide(BigInteger.TWO), p).compareTo(BigInteger.ONE) == 0
+    private fun isEven(x: BigInteger): Boolean {
+        return x.mod(BigInteger.TWO) == BigInteger.ZERO
     }
 
-    fun hasSquareY(): Boolean {
-        return hasSquareY(this)
+    fun hasEvenY(): Boolean {
+        return hasEvenY(this)
     }
 
-    private fun hasSquareY(point: Point): Boolean {
-        return (!point.isInfinity() && isSquare(point.getY()))
-    }
-
-    fun toBytes(): ByteArray {
-        return bytesFromPoint(this)
+    private fun hasEvenY(point: Point): Boolean {
+        return (!point.isInfinity() && isEven(point.getY()))
     }
 
     fun isEqual(point: Point): Boolean {
         return getPair() == point.getPair()
+    }
+
+    override fun toString(): String {
+        return "Point$pair"
     }
 }
