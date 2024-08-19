@@ -4,6 +4,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.decodeFromJsonElement
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.UtxoId
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.model.rpc.ArchRpcParams
 import xyz.funkybit.core.model.rpc.ArchRpcRequest
@@ -35,23 +37,9 @@ object ArchNetworkClient : JsonRpcClientBase(
         )
     }
 
-    fun startDkg(): String {
-        return getValue(
-            ArchRpcRequest(
-                "start_dkg",
-            ),
-        )
-    }
+    fun getNetworkAddress(): BitcoinAddress = getContractAddress("")
 
-    fun startKeyExchange(): Boolean {
-        return getValue(
-            ArchRpcRequest(
-                "start_key_exchange",
-            ),
-        )
-    }
-
-    fun getContractAddress(contract: String): String {
+    fun getContractAddress(contract: String): BitcoinAddress {
         return getValue(
             ArchRpcRequest(
                 "get_contract_address",
@@ -87,11 +75,11 @@ object ArchNetworkClient : JsonRpcClientBase(
         )
     }
 
-    fun readUtxo(utxoId: String): ArchNetworkRpc.ReadUtxoResult {
+    fun readUtxo(utxoId: UtxoId): ArchNetworkRpc.ReadUtxoResult {
         return getValue(
             ArchRpcRequest(
                 "read_utxo",
-                ArchRpcParams(ArchNetworkRpc.ReadUtxoParams(utxoId)),
+                ArchRpcParams(ArchNetworkRpc.ReadUtxoParams(utxoId.value)),
             ),
         )
     }

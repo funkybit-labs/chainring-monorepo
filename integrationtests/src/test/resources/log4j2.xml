@@ -17,7 +17,7 @@
         <Logger name="xyz.funkybit" level="debug" additivity="false">
             <AppenderRef ref="AsyncAppender"/>
         </Logger>
-        <Logger name="xyz.funkybit.core.repeater.tasks" level="error" additivity="false">
+        <Logger name="xyz.funkybit.core.repeater.tasks" level="warn" additivity="false">
             <AppenderRef ref="AsyncAppender"/>
             <AppenderRef ref="TestLoggingAppender"/>
         </Logger>

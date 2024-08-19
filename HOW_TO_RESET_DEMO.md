@@ -65,6 +65,9 @@ and then truncate db tables using favourite SQL editor. In this way OHLC records
 -- truncate table telegram_mini_app_game_reaction_time;
 -- truncate table telegram_mini_app_user cascade;
 -- truncate table wallet_linked_signer;
+-- truncate table bitcoin_wallet_state;
+-- truncate table arch_state_utxo_log;
+-- truncate table arch_state_utxo;
 -- delete from key_value_store where key = 'LastProcessedOutputIndex';
 ```
 

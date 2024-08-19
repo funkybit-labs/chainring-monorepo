@@ -10,12 +10,14 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import xyz.funkybit.apps.api.model.BigIntegerJson
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.db.TxHash
 
 sealed class MempoolSpaceApi {
     @Serializable
     data class Transaction(
         @SerialName("txid")
-        val txId: String,
+        val txId: TxHash,
         val version: Int,
         val size: Int,
         val weight: Int,
@@ -37,13 +39,13 @@ sealed class MempoolSpaceApi {
     data class VOut(
         val value: BigIntegerJson,
         @SerialName("scriptpubkey_address")
-        val scriptPubKeyAddress: String,
+        val scriptPubKeyAddress: BitcoinAddress,
     )
 
     @Serializable
     data class VIn(
         @SerialName("txid")
-        val txId: String,
+        val txId: TxHash,
         val vout: Int,
         @SerialName("prevout")
         val prevOut: VOut,
@@ -71,10 +73,10 @@ object MempoolSpaceClient {
     private fun execute(request: Request): Response =
         httpClient.newCall(request).execute()
 
-    fun getTransactions(walletAddress: String, afterTxId: String?): List<MempoolSpaceApi.Transaction> {
-        val url = "$apiServerRootUrl/address/$walletAddress/txs".toHttpUrl().newBuilder().apply {
+    fun getTransactions(walletAddress: BitcoinAddress, afterTxId: TxHash?): List<MempoolSpaceApi.Transaction> {
+        val url = "$apiServerRootUrl/address/${walletAddress.value}/txs".toHttpUrl().newBuilder().apply {
             afterTxId?.let {
-                addQueryParameter("after_txid", afterTxId)
+                addQueryParameter("after_txid", afterTxId.value)
             }
         }.build()
         logger.debug { "Request -> $url" }

@@ -1,7 +1,6 @@
 package xyz.funkybit.integrationtests.bitcoin
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.bitcoinj.core.Address
 import org.bitcoinj.core.Coin
 import org.bitcoinj.core.ECKey
 import org.bitcoinj.core.NetworkParameters
@@ -9,7 +8,6 @@ import org.bitcoinj.core.Sha256Hash
 import org.bitcoinj.core.Transaction
 import org.bitcoinj.core.TransactionOutPoint
 import org.bitcoinj.core.TransactionOutput
-import org.bitcoinj.script.Script
 import org.bitcoinj.script.ScriptBuilder
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -19,6 +17,9 @@ import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.UtxoId
+import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.UnspentUtxo
 import xyz.funkybit.core.services.UtxoSelectionService
 import xyz.funkybit.core.utils.bitcoin.BitcoinInsufficientFundsException
@@ -35,7 +36,15 @@ import kotlin.test.assertEquals
 class UtxoSelectionTest {
     private val logger = KotlinLogging.logger {}
 
-    private val params = NetworkParameters.fromID(NetworkParameters.ID_REGTEST)
+    companion object {
+
+        val params = NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!
+        fun waitForTx(address: BitcoinAddress, txId: TxHash) {
+            waitFor {
+                MempoolSpaceClient.getTransactions(address, null).firstOrNull { it.txId == txId } != null
+            }
+        }
+    }
 
     @Test
     fun testUxtoSelection() {
@@ -43,7 +52,7 @@ class UtxoSelectionTest {
 
         // create a wallet
         val ecKey = ECKey()
-        val address = Address.fromKey(params, ecKey, Script.ScriptType.P2WPKH).toString()
+        val address = BitcoinAddress.fromKey(params, ecKey)
         logger.debug { "address is $address" }
 
         // airdrop 3000 sats
@@ -59,7 +68,7 @@ class UtxoSelectionTest {
         }
 
         assertEquals(1, selectedUtxos.size)
-        assertEquals("$txId:$expectedVout", selectedUtxos[0].utxoId)
+        assertEquals(UtxoId.fromTxHashAndVout(txId, expectedVout), selectedUtxos[0].utxoId)
         assertEquals(BigInteger("3000"), selectedUtxos[0].amount)
         assertNotNull(selectedUtxos[0].blockHeight)
 
@@ -79,15 +88,15 @@ class UtxoSelectionTest {
             UtxoSelectionService.selectUtxos(address, BigInteger("3000"), BigInteger("1500"))
         }
         assertEquals(2, selectedUtxos.size)
-        assertEquals(setOf("$txId:$expectedVout", "$txId2:$expectedVout2"), selectedUtxos.map { it.utxoId }.toSet())
+        assertEquals(setOf(UtxoId.fromTxHashAndVout(txId, expectedVout), UtxoId.fromTxHashAndVout(txId2, expectedVout2)), selectedUtxos.map { it.utxoId }.toSet())
         assertEquals(BigInteger("6100"), selectedUtxos.sumOf { it.amount })
 
-        val transferToAddress = Address.fromKey(params, ECKey(), Script.ScriptType.P2WPKH).toString()
+        val transferToAddress = BitcoinAddress.fromKey(params, ECKey())
 
         val transaction = buildTransferTx(ecKey, transferToAddress, BigInteger("3000"), address, BigInteger("1500"), selectedUtxos)
         val txId3 = BitcoinClient.sendRawTransaction(transaction.toHexString())
         logger.debug { "txId3 = $txId3" }
-        assertEquals(transaction.txId.bytes.toHex(false), txId3)
+        assertEquals(transaction.txId.bytes.toHex(false), txId3.value)
 
         BitcoinClient.mine(1)
 
@@ -99,14 +108,14 @@ class UtxoSelectionTest {
             UtxoSelectionService.refreshUnspentUtxos(address)
         }
         assertEquals(unspentUtxos.size, 1)
-        assertEquals("$txId3:$changeVout", unspentUtxos[0].utxoId)
+        assertEquals(UtxoId.fromTxHashAndVout(txId3, changeVout), unspentUtxos[0].utxoId)
         assertEquals(BigInteger("1600"), unspentUtxos[0].amount)
 
         val transferToUnspentUtxos = transaction {
             UtxoSelectionService.refreshUnspentUtxos(transferToAddress)
         }
         assertEquals(transferToUnspentUtxos.size, 1)
-        assertEquals("$txId3:$transferVout", transferToUnspentUtxos[0].utxoId)
+        assertEquals(UtxoId.fromTxHashAndVout(txId3, transferVout), transferToUnspentUtxos[0].utxoId)
         assertEquals(BigInteger("3000"), transferToUnspentUtxos[0].amount)
     }
 
@@ -116,7 +125,7 @@ class UtxoSelectionTest {
 
         // create a wallet
         val ecKey = ECKey()
-        val address = Address.fromKey(params, ecKey, Script.ScriptType.P2WPKH).toString()
+        val address = BitcoinAddress.fromKey(params, ecKey)
         logger.debug { "address is $address" }
 
         val txIds = (1..40).map {
@@ -135,7 +144,7 @@ class UtxoSelectionTest {
         val selectedUtxos = transaction {
             UtxoSelectionService.selectUtxos(address, transferAmount, feeAmount)
         }
-        val transferToAddress = Address.fromKey(params, ECKey(), Script.ScriptType.P2WPKH).toString()
+        val transferToAddress = BitcoinAddress.fromKey(params, ECKey())
 
         val transaction = buildTransferTx(ecKey, transferToAddress, transferAmount, address, feeAmount, selectedUtxos)
         val txId3 = BitcoinClient.sendRawTransaction(transaction.toHexString())
@@ -151,34 +160,27 @@ class UtxoSelectionTest {
             UtxoSelectionService.refreshUnspentUtxos(address)
         }
         assertEquals(unspentUtxos.size, 1)
-        assertEquals("$txId3:$changeVout", unspentUtxos[0].utxoId)
+        assertEquals(UtxoId.fromTxHashAndVout(txId3, changeVout), unspentUtxos[0].utxoId)
         assertEquals(BigInteger("2000"), unspentUtxos[0].amount)
 
         val transferToUnspentUtxos = transaction {
             UtxoSelectionService.refreshUnspentUtxos(transferToAddress)
         }
         assertEquals(transferToUnspentUtxos.size, 1)
-        assertEquals("$txId3:$transferVout", transferToUnspentUtxos[0].utxoId)
+        assertEquals(UtxoId.fromTxHashAndVout(txId3, transferVout), transferToUnspentUtxos[0].utxoId)
         assertEquals(transferAmount, transferToUnspentUtxos[0].amount)
     }
 
-    private fun waitForTx(address: String, txId: String) {
-        waitFor {
-            MempoolSpaceClient.getTransactions(address, null).firstOrNull { it.txId == txId } != null
-        }
-    }
-
-    private fun buildTransferTx(ecKey: ECKey, toAddress: String, amount: BigInteger, changeAddress: String, feeAmount: BigInteger, utxos: List<UnspentUtxo>): Transaction {
+    private fun buildTransferTx(ecKey: ECKey, toAddress: BitcoinAddress, amount: BigInteger, changeAddress: BitcoinAddress, feeAmount: BigInteger, utxos: List<UnspentUtxo>): Transaction {
         val rawTx = Transaction(params)
         rawTx.setVersion(2)
-        rawTx.addOutput(TransactionOutput(params, rawTx, Coin.valueOf(amount.toLong()), Address.fromString(params, toAddress)))
+        rawTx.addOutput(TransactionOutput(params, rawTx, Coin.valueOf(amount.toLong()), toAddress.toBitcoinCoreAddress(params)))
         val changeAmount = utxos.sumOf { it.amount } - amount - feeAmount
         if (changeAmount > BigInteger.ZERO) {
-            rawTx.addOutput(TransactionOutput(params, rawTx, Coin.valueOf(changeAmount.toLong()), Address.fromString(params, changeAddress)))
+            rawTx.addOutput(TransactionOutput(params, rawTx, Coin.valueOf(changeAmount.toLong()), changeAddress.toBitcoinCoreAddress(params)))
         }
         utxos.forEach {
-            val parts = it.utxoId.split(":")
-            rawTx.addSignedInput(TransactionOutPoint(params, parts[1].toLong(), Sha256Hash.wrap(parts[0])), ScriptBuilder.createP2WPKHOutputScript(ecKey), Coin.valueOf(it.amount.toLong()), ecKey, Transaction.SigHash.SINGLE, true)
+            rawTx.addSignedInput(TransactionOutPoint(params, it.utxoId.vout(), Sha256Hash.wrap(it.utxoId.txId().value)), ScriptBuilder.createP2WPKHOutputScript(ecKey), Coin.valueOf(it.amount.toLong()), ecKey, Transaction.SigHash.SINGLE, true)
         }
         return rawTx
     }
