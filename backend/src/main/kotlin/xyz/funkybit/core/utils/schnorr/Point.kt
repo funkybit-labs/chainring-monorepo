@@ -19,7 +19,8 @@ class Point(x: BigInteger?, y: BigInteger?) {
         )
 
         fun taggedHash(tag: String, msg: ByteArray): ByteArray {
-            return sha256(sha256(tag.toByteArray()) + sha256(tag.toByteArray()) + msg)
+            val tagHash = sha256(tag.toByteArray())
+            return sha256(tagHash + tagHash + msg)
         }
 
         fun pointFromBytes(b: ByteArray?): Point? {
