@@ -13,7 +13,7 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.serializer
-import xyz.funkybit.core.model.UtxoId
+import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.utils.sha256
 import xyz.funkybit.core.utils.toHex

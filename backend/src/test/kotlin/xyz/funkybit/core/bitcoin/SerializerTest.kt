@@ -8,7 +8,8 @@ import kotlinx.serialization.json.Json
 import org.bouncycastle.util.encoders.Hex
 import org.junit.jupiter.api.Test
 import xyz.funkybit.core.model.BitcoinAddress
-import xyz.funkybit.core.model.ExchangeInstruction
+import xyz.funkybit.core.model.bitcoin.ProgramInstruction
+import xyz.funkybit.core.model.bitcoin.SerializedBitcoinTx
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.model.rpc.ArchRpcParams
@@ -43,14 +44,14 @@ class SerializerTest {
 
     @Test
     fun `test borsch`() {
-        val exchangeInstruction: ExchangeInstruction = ExchangeInstruction.InitStateParams(
+        val exchangeInstruction: ProgramInstruction = ProgramInstruction.InitStateParams(
             BitcoinAddress("fee"),
-            "hello".toByteArray(),
+            SerializedBitcoinTx("hello".toByteArray()),
         )
 
         assertEquals(
             Borsh.encodeToByteArray(exchangeInstruction).toHex(),
-            Borsh.encodeToByteArray(Borsh.decodeFromByteArray<ExchangeInstruction>(Borsh.encodeToByteArray(exchangeInstruction))).toHex(),
+            Borsh.encodeToByteArray(Borsh.decodeFromByteArray<ProgramInstruction>(Borsh.encodeToByteArray(exchangeInstruction))).toHex(),
         )
 
         assertEquals(

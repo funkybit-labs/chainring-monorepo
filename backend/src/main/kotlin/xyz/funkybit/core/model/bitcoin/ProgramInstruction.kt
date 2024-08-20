@@ -1,4 +1,4 @@
-package xyz.funkybit.core.model
+package xyz.funkybit.core.model.bitcoin
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
@@ -10,52 +10,33 @@ import kotlinx.serialization.descriptors.buildSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.serializer
+import xyz.funkybit.core.model.BitcoinAddress
 
-@Serializable(with = ExchangeInstructionSerializer::class)
-sealed class ExchangeInstruction {
-
-    @Serializable
-    enum class ExchangeInstructionEnum {
-        InitState,
-    }
+@Serializable(with = ProgramInstructionSerializer::class)
+sealed class ProgramInstruction {
 
     @Serializable
     data class InitStateParams(
         val feeAccount: BitcoinAddress,
-        val txHex: ByteArray,
-    ) : ExchangeInstruction() {
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (javaClass != other?.javaClass) return false
-
-            other as InitStateParams
-
-            if (feeAccount != other.feeAccount) return false
-            if (!txHex.contentEquals(other.txHex)) return false
-
-            return true
-        }
-
-        override fun hashCode(): Int {
-            var result = feeAccount.hashCode()
-            result = 31 * result + txHex.contentHashCode()
-            return result
-        }
-    }
+        val txHex: SerializedBitcoinTx,
+    ) : ProgramInstruction()
 }
 
-object ExchangeInstructionSerializer : KSerializer<ExchangeInstruction> {
+object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
+
+    private const val INIT_STATE: Byte = 0
+
     @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = buildSerialDescriptor("Pubkey", StructureKind.LIST)
 
     @OptIn(InternalSerializationApi::class)
-    override fun serialize(encoder: Encoder, value: ExchangeInstruction) {
+    override fun serialize(encoder: Encoder, value: ProgramInstruction) {
         when (encoder) {
             is com.funkatronics.kborsh.BorshEncoder -> {
                 when (value) {
-                    is ExchangeInstruction.InitStateParams -> {
-                        encoder.encodeByte((ExchangeInstruction.ExchangeInstructionEnum.InitState.ordinal).toByte())
-                        ExchangeInstruction.InitStateParams::class.serializer().serialize(encoder, value)
+                    is ProgramInstruction.InitStateParams -> {
+                        encoder.encodeByte(INIT_STATE)
+                        ProgramInstruction.InitStateParams::class.serializer().serialize(encoder, value)
                     }
                     // add other instructions here
                 }
@@ -65,12 +46,12 @@ object ExchangeInstructionSerializer : KSerializer<ExchangeInstruction> {
     }
 
     @OptIn(InternalSerializationApi::class)
-    override fun deserialize(decoder: Decoder): ExchangeInstruction {
+    override fun deserialize(decoder: Decoder): ProgramInstruction {
         return when (decoder) {
             is com.funkatronics.kborsh.BorshDecoder -> {
                 when (val code = decoder.decodeByte()) {
-                    (ExchangeInstruction.ExchangeInstructionEnum.InitState.ordinal).toByte() -> {
-                        ExchangeInstruction.InitStateParams::class.serializer().deserialize(decoder)
+                    INIT_STATE -> {
+                        ProgramInstruction.InitStateParams::class.serializer().deserialize(decoder)
                     }
                     else -> throw Exception("unknown enum ordinal $code")
                 }
@@ -81,7 +62,7 @@ object ExchangeInstructionSerializer : KSerializer<ExchangeInstruction> {
 }
 
 @Serializable
-data class ExchangeState(
+data class ProgramState(
     val feeAccount: BitcoinAddress,
     val lastSettlementBatchHash: String,
     val lastWithdrawalBatchHash: String,

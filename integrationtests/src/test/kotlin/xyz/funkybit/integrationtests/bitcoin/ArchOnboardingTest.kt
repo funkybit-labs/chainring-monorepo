@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
-import xyz.funkybit.core.model.ExchangeState
+import xyz.funkybit.core.model.bitcoin.ProgramState
 import xyz.funkybit.core.model.db.ArchStateUtxoEntity
 import xyz.funkybit.core.model.db.StateUtxoStatus
 import xyz.funkybit.core.model.db.SymbolEntity
@@ -39,25 +39,25 @@ class ArchOnboardingTest {
         // notify the repeater app task
         triggerRepeaterTaskAndWaitForCompletion("arch_onboarding")
 
-        val stateUtxo = transaction { ArchStateUtxoEntity.getExchangeStateUtxo() }
+        val stateUtxo = transaction { ArchStateUtxoEntity.getProgramStateUtxo() }
         validateStateUtxo(stateUtxo)
         assertTrue(listOf(StateUtxoStatus.Onboarded, StateUtxoStatus.Initializing, StateUtxoStatus.Complete).contains(stateUtxo.status))
 
         waitFor {
             triggerRepeaterTaskAndWaitForCompletion("arch_onboarding")
             transaction {
-                ArchStateUtxoEntity.getExchangeStateUtxo().status == StateUtxoStatus.Complete
+                ArchStateUtxoEntity.getProgramStateUtxo().status == StateUtxoStatus.Complete
             }
         }
 
         // verify state
         transaction {
-            val utxoId = ArchStateUtxoEntity.getExchangeStateUtxo().utxoId
+            val utxoId = ArchStateUtxoEntity.getProgramStateUtxo().utxoId
             val utxoInfo = ArchNetworkClient.readUtxo(utxoId)
-            val exchangeState = Borsh.decodeFromByteArray<ExchangeState>(utxoInfo.data.toByteArray())
-            assertEquals(BitcoinClient.bitcoinConfig.feeAccountAddress, exchangeState.feeAccount)
-            assertEquals("", exchangeState.lastSettlementBatchHash)
-            assertEquals("", exchangeState.lastWithdrawalBatchHash)
+            val programState = Borsh.decodeFromByteArray<ProgramState>(utxoInfo.data.toByteArray())
+            assertEquals(BitcoinClient.bitcoinConfig.feeAccountAddress, programState.feeAccount)
+            assertEquals("", programState.lastSettlementBatchHash)
+            assertEquals("", programState.lastWithdrawalBatchHash)
             assertEquals(BitcoinClient.bitcoinConfig.submitterXOnlyPublicKey.toHex(), utxoInfo.authority.bytes.toHex())
         }
 

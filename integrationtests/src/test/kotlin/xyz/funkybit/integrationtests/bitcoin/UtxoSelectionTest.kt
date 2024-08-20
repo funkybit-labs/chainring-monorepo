@@ -18,7 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
 import xyz.funkybit.core.model.BitcoinAddress
-import xyz.funkybit.core.model.UtxoId
+import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.UnspentUtxo
 import xyz.funkybit.core.services.UtxoSelectionService

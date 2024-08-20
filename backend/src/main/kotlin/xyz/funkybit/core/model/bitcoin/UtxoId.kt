@@ -1,4 +1,4 @@
-package xyz.funkybit.core.model
+package xyz.funkybit.core.model.bitcoin
 
 import kotlinx.serialization.Serializable
 

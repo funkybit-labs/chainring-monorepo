@@ -12,13 +12,12 @@ import org.bitcoinj.core.TransactionOutput
 import org.bitcoinj.core.TransactionWitness
 import org.bitcoinj.script.ScriptBuilder
 import org.bitcoinj.script.ScriptOpCodes
-import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
-import xyz.funkybit.core.model.ExchangeInstruction
-import xyz.funkybit.core.model.UtxoId
+import xyz.funkybit.core.model.bitcoin.ProgramInstruction
+import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.ArchStateUtxoEntity
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.UnspentUtxo
@@ -181,7 +180,7 @@ object ArchUtils {
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)
-    fun signAndSendInstruction(programId: Address, utxoIds: List<UtxoId>, exchangeInstruction: ExchangeInstruction): TxHash {
+    fun signAndSendInstruction(programId: Address, utxoIds: List<UtxoId>, exchangeInstruction: ProgramInstruction): TxHash {
         val instruction = ArchNetworkRpc.Instruction(
             programId = ArchNetworkRpc.Pubkey(programId.toString().toHexBytes().toUByteArray()),
             utxos = utxoIds.map {
@@ -210,21 +209,18 @@ object ArchUtils {
         return ArchNetworkClient.sendTransaction(runtimeTransaction)
     }
 
-    fun completeTransaction(processedTx: ArchNetworkRpc.ProcessedTransaction, onCompletion: () -> Unit) {
+    fun refreshStateUtxoIds(processedTx: ArchNetworkRpc.ProcessedTransaction) {
         val bitcoinTxId = processedTx.bitcoinTxIds.values.first()
         val inputUtxoIds = processedTx.runtimeTransaction.message.instructions.first().utxos.map { it.toUtxoId() }.toSet()
 
-        transaction {
-            // update any modified state utxos
-            val bitcoinTx = BitcoinClient.getRawTransaction(bitcoinTxId)
-            bitcoinTx.txIns.forEachIndexed { index, txIn ->
-                val utxoId = txIn.toUtxoId()
-                if (inputUtxoIds.contains(utxoId)) {
-                    ArchStateUtxoEntity.findByUtxoId(txIn.toUtxoId())
-                        ?.updateUtxoId(bitcoinTx.txOuts.first { it.index == index }.toUtxoId(bitcoinTxId))
-                }
+        // update any modified state utxos
+        val bitcoinTx = BitcoinClient.getRawTransaction(bitcoinTxId)
+        bitcoinTx.txIns.forEachIndexed { index, txIn ->
+            val utxoId = txIn.toUtxoId()
+            if (inputUtxoIds.contains(utxoId)) {
+                ArchStateUtxoEntity.findByUtxoId(txIn.toUtxoId())
+                    ?.updateUtxoId(bitcoinTx.txOuts.first { it.index == index }.toUtxoId(bitcoinTxId))
             }
-            onCompletion()
         }
     }
 
