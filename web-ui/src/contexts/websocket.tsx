@@ -1,7 +1,6 @@
 import { useEffect, createContext, useRef, useContext } from 'react'
 import { ExponentialBackoff, Websocket, WebsocketBuilder } from 'websocket-ts'
 import { apiBaseUrl } from 'apiClient'
-import { UseAccountReturnType } from 'wagmi'
 import { loadAuthToken } from 'auth'
 import {
   IncomingWSMessage,
@@ -9,6 +8,7 @@ import {
   PublishableSchema,
   SubscriptionTopic
 } from 'websocketMessages'
+import { Wallet } from 'contexts/walletProvider'
 
 const connectionUrl =
   apiBaseUrl.replace('http:', 'ws:').replace('https:', 'wss:') + '/connect'
@@ -33,7 +33,7 @@ export function WebsocketProvider({
   wallet,
   children
 }: {
-  wallet: UseAccountReturnType
+  wallet: Wallet
   children: React.ReactNode
 }) {
   const ws = useRef<Websocket | null>(null)
@@ -122,15 +122,14 @@ export function WebsocketProvider({
 
     async function connect(refreshAuth: boolean = false) {
       // don't do anything until we know for sure that wallet is connected
-      if (['connecting', 'reconnecting'].includes(wallet.status)) return
+      if (wallet.primaryCategory === 'none') return
 
       if (connecting) return
       connecting = true
 
-      const authQuery =
-        wallet.address && wallet.status == 'connected'
-          ? `?auth=${await loadAuthToken({ forceRefresh: refreshAuth })}`
-          : ''
+      const authQuery = wallet.primaryAddress
+        ? `?auth=${await loadAuthToken({ forceRefresh: refreshAuth })}`
+        : ''
 
       ws.current?.close()
       ws.current = new WebsocketBuilder(connectionUrl + authQuery)
@@ -157,7 +156,7 @@ export function WebsocketProvider({
     return () => {
       ws.current?.close()
     }
-  }, [wallet.address, wallet.status])
+  }, [wallet.primaryCategory, wallet.primaryAddress])
 
   return (
     <WebsocketContext.Provider value={{ subscribe, unsubscribe }}>

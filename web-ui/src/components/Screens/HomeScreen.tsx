@@ -1,5 +1,4 @@
 import { apiClient, Chain, OrderSide } from 'apiClient'
-import { useAccount } from 'wagmi'
 import BalancesWidget from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import { Header, Tab } from 'components/Screens/Header'
 import React, { LegacyRef, useEffect, useMemo, useState } from 'react'
@@ -16,9 +15,10 @@ import Spinner from 'components/common/Spinner'
 import { WebsocketProvider } from 'contexts/websocket'
 import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
 import Admin from 'components/Screens/Admin'
+import { useWallet } from 'contexts/walletProvider'
 
 function WebsocketWrapper({ contents }: { contents: JSX.Element }) {
-  const wallet = useAccount()
+  const wallet = useWallet()
   return <WebsocketProvider wallet={wallet}>{contents}</WebsocketProvider>
 }
 
@@ -28,7 +28,7 @@ function HomeScreenContent() {
     queryFn: apiClient.getConfiguration
   })
 
-  const wallet = useAccount()
+  const wallet = useWallet()
 
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
   const [side, setSide] = useState<OrderSide>(
@@ -47,11 +47,14 @@ function HomeScreenContent() {
     marketsWithBackToBack
   } = useMemo(() => {
     const config = configQuery.data
-    const chainConfig = config?.chains
+    const evmChainConfig = config?.chains
       .filter((chain) => chain.networkType === 'Evm')
-      .find((chain) => chain.id === (wallet.chainId || config.chains[0]?.id))
+      .find(
+        (chain) =>
+          chain.id === (wallet.evmAccount?.chainId ?? config.chains[0]?.id)
+      )
 
-    const exchangeContract = chainConfig?.contracts?.find(
+    const exchangeContract = evmChainConfig?.contracts?.find(
       (c) => c.name == 'Exchange'
     )
 
@@ -74,7 +77,7 @@ function HomeScreenContent() {
       feeRates,
       marketsWithBackToBack
     }
-  }, [configQuery.data, wallet.chainId])
+  }, [configQuery.data, wallet.evmAccount])
 
   useEffect(() => {
     if (markets !== null && selectedMarket == null) {
@@ -140,7 +143,7 @@ function HomeScreenContent() {
             {tab === 'Swap' && (
               <SwapModal
                 markets={marketsWithBackToBack}
-                walletAddress={wallet.address}
+                walletAddress={wallet.primaryAddress}
                 exchangeContractAddress={exchangeContract?.address}
                 feeRates={feeRates}
                 onMarketChange={setSelectedMarket}
@@ -150,7 +153,7 @@ function HomeScreenContent() {
             {tab === 'Limit' && (
               <LimitModal
                 markets={markets}
-                walletAddress={wallet.address}
+                walletAddress={wallet.primaryAddress}
                 exchangeContractAddress={exchangeContract?.address}
                 feeRates={feeRates}
                 onMarketChange={setSelectedMarket}
@@ -170,7 +173,7 @@ function HomeScreenContent() {
                   {symbols && width >= 1100 && (
                     <div ref={balancesRef as LegacyRef<HTMLDivElement>}>
                       <BalancesWidget
-                        walletAddress={wallet.address}
+                        walletAddress={wallet.primaryAddress}
                         exchangeContractAddress={exchangeContract?.address}
                         symbols={symbols}
                         chains={chains}
@@ -182,7 +185,7 @@ function HomeScreenContent() {
                   <div ref={swapRef as LegacyRef<HTMLDivElement>}>
                     <SwapWidget
                       markets={markets}
-                      walletAddress={wallet.address}
+                      walletAddress={wallet.primaryAddress}
                       exchangeContractAddress={exchangeContract?.address}
                       feeRates={feeRates}
                       onMarketChange={setSelectedMarket}
@@ -209,7 +212,7 @@ function HomeScreenContent() {
                       height={500}
                     />
                     <BalancesWidget
-                      walletAddress={wallet.address}
+                      walletAddress={wallet.primaryAddress}
                       exchangeContractAddress={exchangeContract?.address}
                       symbols={symbols}
                       chains={chains}
@@ -219,7 +222,7 @@ function HomeScreenContent() {
                 <div className="col-span-1 space-y-4 laptop:col-span-3">
                   <OrdersAndTradesWidget
                     markets={markets}
-                    walletAddress={wallet.address}
+                    walletAddress={wallet.primaryAddress}
                     exchangeContractAddress={exchangeContract?.address}
                   />
                 </div>

@@ -2,7 +2,6 @@ import { Button } from 'components/common/Button'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AddressSchema, AdminMarket, AdminSymbol, apiClient } from 'apiClient'
 import { Fragment, useMemo, useState } from 'react'
-import { useAccount } from 'wagmi'
 import SubmitButton from 'components/common/SubmitButton'
 import Trash from 'assets/Trash.svg'
 import SymbolModal from 'components/Screens/Admin/SymbolModal'
@@ -10,6 +9,7 @@ import Edit from 'assets/Edit.svg'
 import Input from 'components/Screens/Admin/Input'
 import Add from 'assets/Add.svg'
 import MarketModal from 'components/Screens/Admin/MarketModal'
+import { useWallet } from 'contexts/walletProvider'
 
 export default function Admin({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -61,7 +61,7 @@ export default function Admin({ onClose }: { onClose: () => void }) {
     return marketsQuery.data ?? []
   }, [marketsQuery.data])
 
-  const account = useAccount()
+  const wallet = useWallet()
 
   const [makerFeeRate, setMakerFeeRate] = useState<bigint>()
   const [takerFeeRate, setTakerFeeRate] = useState<bigint>()
@@ -138,7 +138,7 @@ export default function Admin({ onClose }: { onClose: () => void }) {
           width={'normal'}
         />
         <div className="text-lg">funkybit admin</div>
-        <div className="text-sm">{account.address}</div>
+        <div className="text-sm">{wallet.primaryAddress}</div>
       </div>
     )
   }

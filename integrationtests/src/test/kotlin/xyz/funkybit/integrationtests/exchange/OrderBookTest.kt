@@ -28,7 +28,7 @@ class OrderBookTest {
         val client = WebsocketClient.blocking(auth)
         val apiClient = TestApiClient()
         val config = apiClient.getConfiguration()
-        val chain1 = config.chains.first().id
+        val chain1 = config.evmChains.first().id
         client.subscribeToOrderBook(MarketId("BTC:$chain1/ETH:$chain1"))
 
         client.assertOrderBookMessageReceived(MarketId("BTC:$chain1/ETH:$chain1")) { msg ->

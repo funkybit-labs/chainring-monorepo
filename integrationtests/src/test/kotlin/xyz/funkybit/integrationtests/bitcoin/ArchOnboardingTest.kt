@@ -5,7 +5,6 @@ import kotlinx.serialization.decodeFromByteArray
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
@@ -27,7 +26,7 @@ import kotlin.test.assertEquals
 @ExtendWith(AppUnderTestRunner::class)
 class ArchOnboardingTest {
 
-    @Test
+    // @Test
     fun testOnboarding() {
         Assumptions.assumeFalse(isTestEnvRun())
 

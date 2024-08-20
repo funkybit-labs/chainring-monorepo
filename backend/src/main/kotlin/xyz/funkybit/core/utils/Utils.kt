@@ -124,3 +124,5 @@ fun sha256(b: ByteArray?): ByteArray {
     val digest = MessageDigest.getInstance("SHA-256")
     return digest.digest(b)
 }
+
+fun doubleSha256(b: ByteArray?) = sha256(sha256(b))

@@ -85,8 +85,8 @@ export function SwapInternals({
   Renderer
 }: {
   markets: Markets
-  exchangeContractAddress?: Address
-  walletAddress?: Address
+  exchangeContractAddress?: string
+  walletAddress?: string
   feeRates: FeeRates
   onMarketChange: (m: Market) => void
   onSideChange: (s: OrderSide) => void
@@ -257,9 +257,11 @@ export function SwapInternals({
       (message: Publishable) => {
         if (message.type === 'OrderBook') {
           if (market.isBackToBack()) {
-            message.marketId == market.marketIds[0]
-              ? setOrderBook(message)
-              : setSecondMarketOrderBook(message)
+            if (message.marketId == market.marketIds[0]) {
+              setOrderBook(message)
+            } else {
+              setSecondMarketOrderBook(message)
+            }
           } else {
             setOrderBook(message)
           }
@@ -716,7 +718,7 @@ export function SwapInternals({
               domain: getDomain(exchangeContractAddress!, config.state.chainId),
               primaryType: 'Order',
               message: {
-                sender: walletAddress!,
+                sender: walletAddress! as Address,
                 baseChainId: BigInt(baseSymbol.chainId),
                 baseToken: baseSymbol.contractAddress ?? addressZero,
                 quoteChainId: BigInt(quoteSymbol.chainId),
@@ -748,7 +750,7 @@ export function SwapInternals({
               domain: getDomain(exchangeContractAddress!, config.state.chainId),
               primaryType: 'Order',
               message: {
-                sender: walletAddress!,
+                sender: walletAddress! as Address,
                 baseChainId: BigInt(baseSymbol.chainId),
                 baseToken: baseSymbol.contractAddress ?? addressZero,
                 quoteChainId: BigInt(quoteSymbol.chainId),

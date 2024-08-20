@@ -30,6 +30,7 @@ import xyz.funkybit.apps.api.requestContexts
 import xyz.funkybit.core.evm.ECHelper
 import xyz.funkybit.core.evm.EIP712Helper
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.WalletEntity
@@ -37,6 +38,7 @@ import xyz.funkybit.core.model.telegram.TelegramUserId
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserEntity
 import xyz.funkybit.core.model.toEvmSignature
 import xyz.funkybit.core.services.LinkedSignerService
+import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureVerification
 import java.util.Base64
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -96,7 +98,7 @@ fun validateAuthToken(token: String): AuthResult {
 
     if (validateSignature(signInMessage, signature)) {
         return AuthResult.Success(
-            EvmAddress.canonicalize(signInMessage.address),
+            Address.auto(signInMessage.address),
             endOfValidityInterval(signInMessage),
         )
     }
@@ -126,7 +128,9 @@ private fun endOfValidityInterval(signInMessage: SignInMessage): Instant =
 private fun validateSignature(signInMessage: SignInMessage, signature: String): Boolean {
     return runCatching {
         if (signInMessage.chainId.value == 0UL) {
-            TODO()
+            val bitcoinAddress = BitcoinAddress.canonicalize(signInMessage.address)
+            val bitcoinSignInMessage = signInMessage.message + "\nAddress: ${bitcoinAddress.value}, Timestamp: ${signInMessage.timestamp}"
+            BitcoinSignatureVerification.verifyMessage(bitcoinAddress, signature.replace(" ", "+"), bitcoinSignInMessage)
         } else {
             val walletAddress = EvmAddress.canonicalize(signInMessage.address)
             // TODO - support bitcoin linked signers
@@ -138,6 +142,8 @@ private fun validateSignature(signInMessage: SignInMessage, signature: String): 
                 linkedSignerAddress = linkedSignerAddress,
             )
         }
+    }.onFailure { e ->
+        logger.debug(e) { "Error during signature validation" }
     }.getOrElse { false }
 }
 
@@ -157,12 +163,12 @@ private const val AUTHORIZATION_SCHEME_PREFIX = "Bearer "
 private val AUTH_TOKEN_VALIDITY_INTERVAL = System.getenv("AUTH_TOKEN_VALIDITY_INTERVAL")?.let { Duration.parse(it) } ?: 30.days
 
 sealed class AuthResult {
-    data class Success(val address: EvmAddress, val expiresAt: Instant) : AuthResult()
+    data class Success(val address: Address, val expiresAt: Instant) : AuthResult()
     data class Failure(val response: Response) : AuthResult()
 }
 
 private val principalRequestContextKey =
-    RequestContextKey.optional<EvmAddress>(requestContexts)
+    RequestContextKey.optional<Address>(requestContexts)
 
 val Request.principal: Address
     get() = principalRequestContextKey(this)

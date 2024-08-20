@@ -1,4 +1,3 @@
-import { Address } from 'viem'
 import { apiClient, Chain } from 'apiClient'
 import React, { useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
@@ -23,8 +22,8 @@ export default function BalancesWidget({
   symbols,
   chains
 }: {
-  walletAddress?: Address
-  exchangeContractAddress?: Address
+  walletAddress?: string
+  exchangeContractAddress?: string
   symbols: TradingSymbols
   chains: Chain[]
 }) {

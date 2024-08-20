@@ -22,8 +22,8 @@ export default function WithdrawalModal({
   close,
   onClosed
 }: {
-  exchangeContractAddress: Address
-  walletAddress: Address
+  exchangeContractAddress: string
+  walletAddress: string
   symbol: TradingSymbol
   isOpen: boolean
   close: () => void
@@ -37,10 +37,10 @@ export default function WithdrawalModal({
     queryFn: async function () {
       return await readContract(config, {
         abi: ExchangeAbi,
-        address: exchangeContractAddress,
+        address: exchangeContractAddress as Address,
         functionName: 'balances',
         args: [
-          walletAddress,
+          walletAddress as Address,
           symbol.contractAddress ? symbol.contractAddress : zeroAddress
         ]
       })

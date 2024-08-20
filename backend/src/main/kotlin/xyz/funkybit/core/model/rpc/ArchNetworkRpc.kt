@@ -15,7 +15,7 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.serializer
 import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.TxHash
-import xyz.funkybit.core.utils.sha256
+import xyz.funkybit.core.utils.doubleSha256
 import xyz.funkybit.core.utils.toHex
 import java.util.*
 
@@ -79,7 +79,7 @@ sealed class ArchNetworkRpc {
         val instructions: List<Instruction>,
     ) {
         fun hash(): ByteArray {
-            return sha256(sha256(Borsh.encodeToByteArray(this)).toHex(false).toByteArray())
+            return doubleSha256(Borsh.encodeToByteArray(this)).toHex(false).toByteArray()
         }
     }
 

@@ -1,4 +1,4 @@
-import { Address, formatUnits } from 'viem'
+import { formatUnits } from 'viem'
 import TradingSymbols from 'tradingSymbols'
 import React, {
   Fragment,
@@ -31,8 +31,8 @@ export function BalancesTable({
   exchangeContractAddress,
   symbols
 }: {
-  walletAddress?: Address
-  exchangeContractAddress?: Address
+  walletAddress?: string
+  exchangeContractAddress?: string
   symbols: TradingSymbols
 }) {
   const config = useConfig()
@@ -68,7 +68,7 @@ export function BalancesTable({
   useEffect(() => {
     if (switchToChainId) {
       const chain = allChains.find((c) => c.id == switchToChainId)
-      chain &&
+      if (chain) {
         switchChain({
           addEthereumChainParameter: {
             chainName: chain.name,
@@ -80,6 +80,7 @@ export function BalancesTable({
           },
           chainId: chain.id
         })
+      }
     }
     setSwitchToChainId(null)
   }, [switchToChainId, switchChain])

@@ -2,7 +2,7 @@ import Markets, { Market } from 'markets'
 import React, { useMemo, useState } from 'react'
 import TradingSymbol from 'tradingSymbol'
 import { Balance, FeeRates, OrderSide } from 'apiClient'
-import { Address, formatUnits } from 'viem'
+import { formatUnits } from 'viem'
 import { SymbolSelector } from 'components/Screens/HomeScreen/SymbolSelector'
 import AmountInput from 'components/common/AmountInput'
 import { classNames } from 'utils'
@@ -28,8 +28,8 @@ export function SwapWidget({
   onSideChange
 }: {
   markets: Markets
-  exchangeContractAddress?: Address
-  walletAddress?: Address
+  exchangeContractAddress?: string
+  walletAddress?: string
   feeRates: FeeRates
   onMarketChange: (m: Market) => void
   onSideChange: (s: OrderSide) => void
@@ -119,9 +119,11 @@ export function SwapWidget({
                       <button
                         className="ml-2 rounded bg-darkBluishGray6 px-2 py-1 text-sm text-darkBluishGray2 hover:bg-blue5"
                         onClick={() => {
-                          sr.side === 'Sell'
-                            ? sr.handleMaxBaseAmount()
-                            : sr.handleMaxQuoteAmount()
+                          if (sr.side === 'Sell') {
+                            sr.handleMaxBaseAmount()
+                          } else {
+                            sr.handleMaxQuoteAmount()
+                          }
                         }}
                       >
                         Max
@@ -130,7 +132,9 @@ export function SwapWidget({
                 </span>
                 <div className="flex flex-row items-baseline space-x-2 text-sm">
                   {depositAmount(
-                    exchangeContractAddress && sr.topBalance,
+                    exchangeContractAddress === undefined
+                      ? undefined
+                      : sr.topBalance,
                     sr.topSymbol
                   )}
                 </div>
@@ -225,7 +229,9 @@ export function SwapWidget({
                 <span className="text-base text-darkBluishGray1">Buy</span>
                 <div className="flex flex-row space-x-2 align-middle text-sm">
                   {depositAmount(
-                    exchangeContractAddress && sr.bottomBalance,
+                    exchangeContractAddress === undefined
+                      ? undefined
+                      : sr.bottomBalance,
                     sr.bottomSymbol
                   )}
                 </div>

@@ -264,7 +264,7 @@ class WithdrawalTest {
     @Test
     fun `withdrawal errors`() {
         val apiClient = TestApiClient()
-        val usdc = apiClient.getConfiguration().chains.flatMap { it.symbols }.first { it.name.startsWith("USDC:") }
+        val usdc = apiClient.getConfiguration().evmChains.flatMap { it.symbols }.first { it.name.startsWith("USDC:") }
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribeToBalances()
@@ -296,7 +296,7 @@ class WithdrawalTest {
     @Test
     fun `withdraw all while deposit in progress`() {
         val apiClient = TestApiClient()
-        val usdc = apiClient.getConfiguration().chains.flatMap { it.symbols }.first { it.name.startsWith("USDC:") }
+        val usdc = apiClient.getConfiguration().evmChains.flatMap { it.symbols }.first { it.name.startsWith("USDC:") }
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribeToBalances()
@@ -352,7 +352,7 @@ class WithdrawalTest {
     @Test
     fun `withdraw all balance in contract less that amount from sequencer`() {
         val apiClient = TestApiClient()
-        val usdc = apiClient.getConfiguration().chains.flatMap { it.symbols }.first { it.name.startsWith("USDC:") }
+        val usdc = apiClient.getConfiguration().evmChains.flatMap { it.symbols }.first { it.name.startsWith("USDC:") }
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribeToBalances()
@@ -475,7 +475,7 @@ class WithdrawalTest {
 
         Faucet.fundAndMine(wallet1.evmAddress, chainId = wallet1.currentChainId)
         Faucet.fundAndMine(wallet2.evmAddress, chainId = wallet2.currentChainId)
-        val btc = apiClient1.getConfiguration().chains.flatMap { it.symbols }.first { it.name.startsWith("BTC:") }
+        val btc = apiClient1.getConfiguration().evmChains.flatMap { it.symbols }.first { it.name.startsWith("BTC:") }
 
         val btcDeposit1Amount = AssetAmount(btc, "0.01")
         val btcDeposit2Amount = AssetAmount(btc, "0.02")
@@ -511,7 +511,7 @@ class WithdrawalTest {
     @Test
     fun `withdrawal blockchain failure`() {
         val apiClient = TestApiClient()
-        val btc = apiClient.getConfiguration().chains.flatMap { it.symbols }.first { it.name.startsWith("BTC") }
+        val btc = apiClient.getConfiguration().evmChains.flatMap { it.symbols }.first { it.name.startsWith("BTC") }
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
         wsClient.subscribeToBalances()

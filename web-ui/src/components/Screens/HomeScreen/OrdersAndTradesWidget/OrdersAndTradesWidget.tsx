@@ -1,7 +1,7 @@
 import { Order, OrderSide } from 'apiClient'
 import React, { useCallback, useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
-import { Address, formatUnits } from 'viem'
+import { formatUnits } from 'viem'
 import { format } from 'date-fns'
 import { produce } from 'immer'
 import { calculateNotional, classNames } from 'utils'
@@ -32,8 +32,8 @@ export default function OrdersAndTradesWidget({
   walletAddress
 }: {
   markets: Markets
-  exchangeContractAddress?: Address
-  walletAddress?: Address
+  exchangeContractAddress?: string
+  walletAddress?: string
 }) {
   const [orders, setOrders] = useState<Order[]>(() => [])
   const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null)
