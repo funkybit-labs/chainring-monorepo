@@ -52,12 +52,15 @@ import xyz.funkybit.core.sequencer.sequencerWalletId
 import xyz.funkybit.core.sequencer.withdrawalId
 import xyz.funkybit.sequencer.core.toBigInteger
 import xyz.funkybit.sequencer.proto.BackToBackOrder
+import xyz.funkybit.sequencer.proto.LimitsUpdate
 import xyz.funkybit.sequencer.proto.Order
 import xyz.funkybit.sequencer.proto.OrderBatch
+import xyz.funkybit.sequencer.proto.OrderChanged
 import xyz.funkybit.sequencer.proto.OrderDisposition
 import xyz.funkybit.sequencer.proto.SequencerError
 import xyz.funkybit.sequencer.proto.SequencerRequest
 import xyz.funkybit.sequencer.proto.SequencerResponse
+import xyz.funkybit.sequencer.proto.TradeCreated
 import xyz.funkybit.sequencer.proto.bidOfferStateOrNull
 import xyz.funkybit.sequencer.proto.newQuantityOrNull
 import java.math.BigDecimal
@@ -80,7 +83,7 @@ object SequencerResponseProcessorService {
                     if (balanceChange == null) {
                         withdrawalEntity.update(WithdrawalStatus.Failed, error(response, "Insufficient Balance"))
                     } else {
-                        handleSequencerResponse(response, ordersBeingUpdated = listOf())
+                        handleSequencerResponse(response)
                         withdrawalEntity.update(
                             WithdrawalStatus.Sequenced,
                             null,
@@ -96,7 +99,7 @@ object SequencerResponseProcessorService {
                     if (response.balancesChangedList.firstOrNull { it.wallet == deposit.wallet } == null) {
                         depositEntity.markAsFailed(error(response))
                     } else {
-                        handleSequencerResponse(response, ordersBeingUpdated = listOf())
+                        handleSequencerResponse(response)
                         depositEntity.markAsComplete()
                     }
                 }
@@ -104,7 +107,7 @@ object SequencerResponseProcessorService {
                 if (request.balanceBatch.failedWithdrawalsList.isNotEmpty() ||
                     request.balanceBatch.failedSettlementsList.isNotEmpty()
                 ) {
-                    handleSequencerResponse(response, ordersBeingUpdated = listOf())
+                    handleSequencerResponse(response)
                 }
             }
 
@@ -255,7 +258,7 @@ object SequencerResponseProcessorService {
         )
     }
 
-    private fun handleSequencerResponse(response: SequencerResponse, ordersBeingUpdated: List<Long> = listOf(), orderIdsInRequest: List<Long> = listOf()) {
+    private fun handleSequencerResponse(response: SequencerResponse, orderIdsInRequest: List<Long> = listOf()) {
         val timestamp = if (response.createdAt > 0) {
             Instant.fromEpochMilliseconds(response.createdAt)
         } else {
@@ -264,9 +267,19 @@ object SequencerResponseProcessorService {
 
         val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
 
-        // handle trades
+        val tradesWithTakerOrder = handleTrades(response.tradesCreatedList, response.sequence, orderIdsInRequest, timestamp, broadcasterNotifications)
+        handleChangedOrders(response.ordersChangedList, timestamp, broadcasterNotifications)
+        handleBalanceChanges(response.balancesChangedList, broadcasterNotifications)
+        updateOrderBookSnapshot(response.ordersChangedList, broadcasterNotifications)
+        updateOhlc(tradesWithTakerOrder, broadcasterNotifications)
+        handleLimitsUpdates(response.limitsUpdatedList, broadcasterNotifications)
+
+        publishBroadcasterNotifications(broadcasterNotifications)
+    }
+
+    private fun handleTrades(createdTrades: List<TradeCreated>, responseSequence: Long, orderIdsInRequest: List<Long> = listOf(), timestamp: Instant, broadcasterNotifications: MutableList<BroadcasterNotification>): List<Pair<TradeEntity, OrderEntity>> {
         val executionsCreatedByWallet = mutableMapOf<Address, MutableList<OrderExecutionEntity>>()
-        val tradesWithTakerOrder: List<Pair<TradeEntity, OrderEntity>> = response.tradesCreatedList.mapNotNull { trade ->
+        val tradesWithTakerOrders = createdTrades.mapNotNull { trade ->
             logger.debug { "Trade Created: buyOrderGuid=${trade.buyOrderGuid}, sellOrderGuid=${trade.sellOrderGuid}, amount=${trade.amount.toBigInteger()} levelIx=${trade.levelIx}, buyerFee=${trade.buyerFee.toBigInteger()}, sellerFee=${trade.sellerFee.toBigInteger()}" }
             val buyOrder = OrderEntity.findBySequencerOrderId(trade.buyOrderGuid)
             val sellOrder = OrderEntity.findBySequencerOrderId(trade.sellOrderGuid)
@@ -280,7 +293,7 @@ object SequencerResponseProcessorService {
                     amount = trade.amount.toBigInteger(),
                     price = tradeMarket.tickSize.multiply(trade.levelIx.toBigDecimal()),
                     tradeHash = ECHelper.tradeHash(trade.buyOrderGuid, trade.sellOrderGuid),
-                    responseSequence = response.sequence,
+                    responseSequence = responseSequence,
                 )
 
                 // create executions for both
@@ -344,21 +357,55 @@ object SequencerResponseProcessorService {
                 )
             }
 
+        return tradesWithTakerOrders
+    }
+
+    private fun handleChangedOrders(changedOrders: List<OrderChanged>, timestamp: Instant, broadcasterNotifications: MutableList<BroadcasterNotification>) {
         // update all orders that have changed
-        val orderChangedMap = response.ordersChangedList.mapNotNull { orderChanged ->
-            if (ordersBeingUpdated.contains(orderChanged.guid) || orderChanged.disposition != OrderDisposition.Accepted) {
+        val orderChangedMap = changedOrders.mapNotNull { orderChanged ->
+            if (orderChanged.disposition != OrderDisposition.Accepted) {
                 logger.debug { "order updated for ${orderChanged.guid}, disposition ${orderChanged.disposition}" }
                 orderChanged.guid to orderChanged
             } else {
                 null
             }
         }.toMap()
+
         OrderEntity.listWithExecutionsForSequencerOrderIds(orderChangedMap.keys.toList()).forEach { (orderToUpdate, executions) ->
             val orderChanged = orderChangedMap.getValue(orderToUpdate.sequencerOrderId!!.value)
-            orderToUpdate.updateStatus(OrderStatus.fromOrderDisposition(orderChanged.disposition))
+
+            when (orderChanged.disposition) {
+                OrderDisposition.Accepted -> {
+                    orderToUpdate.status = OrderStatus.Open
+                }
+                OrderDisposition.Filled -> {
+                    orderToUpdate.status = OrderStatus.Filled
+                }
+                OrderDisposition.PartiallyFilled -> {
+                    orderToUpdate.status = OrderStatus.Partial
+                }
+                OrderDisposition.Failed, OrderDisposition.UNRECOGNIZED -> {
+                    orderToUpdate.status = OrderStatus.Failed
+                }
+                OrderDisposition.Canceled -> {
+                    orderToUpdate.status = OrderStatus.Cancelled
+                }
+                OrderDisposition.Rejected -> {
+                    orderToUpdate.status = OrderStatus.Rejected
+                }
+                OrderDisposition.AutoReduced -> {
+                    orderToUpdate.autoReduced = true
+                }
+                null -> {}
+            }
+
             orderChanged.newQuantityOrNull?.also { newQuantity ->
+                orderToUpdate.originalAmount = orderToUpdate.amount
                 orderToUpdate.amount = newQuantity.toBigInteger()
             }
+
+            orderToUpdate.updatedAt = timestamp
+
             broadcasterNotifications.add(
                 BroadcasterNotification(
                     MyOrderUpdated(orderToUpdate.toOrderResponse(executions)),
@@ -366,19 +413,18 @@ object SequencerResponseProcessorService {
                 ),
             )
         }
+    }
 
-        val markets = MarketEntity.all().toList()
-
-        // update balance changes
+    private fun handleBalanceChanges(balanceChanges: List<xyz.funkybit.sequencer.proto.BalanceChange>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
         logger.debug { "Calculating balance changes" }
-        if (response.balancesChangedList.isNotEmpty()) {
+        if (balanceChanges.isNotEmpty()) {
             val walletMap = WalletEntity.getBySequencerIds(
-                response.balancesChangedList.map { SequencerWalletId(it.wallet) }.toSet(),
+                balanceChanges.map { SequencerWalletId(it.wallet) }.toSet(),
             ).associateBy { it.sequencerId.value }
 
             logger.debug { "updating balances" }
             BalanceEntity.updateBalances(
-                response.balancesChangedList.mapNotNull { change ->
+                balanceChanges.mapNotNull { change ->
                     walletMap[change.wallet]?.let {
                         BalanceChange.Delta(
                             walletId = it.guid.value,
@@ -395,13 +441,15 @@ object SequencerResponseProcessorService {
             }
         }
         logger.debug { "Done calculating balance changes" }
+    }
 
+    private fun updateOrderBookSnapshot(ordersChanged: List<OrderChanged>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
         val marketsWithOrderChanges = OrderEntity
-            .getOrdersMarkets(response.ordersChangedList.map { it.guid })
+            .getOrdersMarkets(ordersChanged.map { it.guid })
             .sortedBy { it.guid }
 
         logger.debug { "Got markets with order changes, calculating order book notifications" }
-        val orderBookNotifications = marketsWithOrderChanges.flatMap { market ->
+        marketsWithOrderChanges.forEach { market ->
             logger.debug { "Market $market" }
             val prevSnapshot = OrderBookSnapshot.get(market)
             logger.debug { "got old snapshot" }
@@ -413,11 +461,13 @@ object SequencerResponseProcessorService {
             logger.debug { "saved new snapshot" }
             val seqNumber = KeyValueStore.incrementLong("WebsocketMsgSeqNumber:OrderBookDiff:${market.id.value.value}")
 
-            listOf(
+            broadcasterNotifications.add(
                 BroadcasterNotification(
                     OrderBook(market, newSnapshot),
                     recipient = null,
                 ),
+            )
+            broadcasterNotifications.add(
                 BroadcasterNotification(
                     OrderBookDiff(seqNumber, market, diff),
                     recipient = null,
@@ -425,7 +475,9 @@ object SequencerResponseProcessorService {
             )
         }
         logger.debug { "Done calculating order book notifications" }
+    }
 
+    private fun updateOhlc(tradesWithTakerOrder: List<Pair<TradeEntity, OrderEntity>>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
         val lastPriceByMarket = mutableMapOf<MarketId, BigDecimal>()
         val ohlcNotifications = tradesWithTakerOrder
             .fold(mutableMapOf<OrderId, MutableList<TradeEntity>>()) { acc, pair ->
@@ -434,7 +486,7 @@ object SequencerResponseProcessorService {
                 acc[orderId] = acc.getOrDefault(orderId, mutableListOf()).also { it.add(trade) }
                 acc
             }
-            .map { (_, trades) ->
+            .forEach { (_, trades) ->
                 val market = trades.first().market
                 val marketPriceScale = market.tickSize.stripTrailingZeros().scale() + 1
                 val sumOfAmounts = trades.sumOf { it.amount }
@@ -445,19 +497,22 @@ object SequencerResponseProcessorService {
 
                 lastPriceByMarket[market.id.value] = weightedPrice
 
-                OHLCEntity.updateWith(market.guid.value, trades.first().timestamp, weightedPrice, sumOfAmounts)
-                    .map {
+                OHLCEntity.updateWith(market.guid.value, trades.first().timestamp, weightedPrice, sumOfAmounts).forEach {
+                    broadcasterNotifications.add(
                         BroadcasterNotification.pricesForMarketPeriods(
                             marketId = market.guid.value,
                             duration = it.duration,
                             ohlc = listOf(it),
                             full = false,
                             dailyChange = h24ClosePrice?.let { closePrice -> (weightedPrice - closePrice) / closePrice } ?: BigDecimal.ZERO,
-                        )
-                    }
-            }.flatten()
+                        ),
+                    )
+                }
+            }
 
         logger.debug { "Done calculating ohlc notifications" }
+
+        val markets = MarketEntity.all().toList()
 
         markets.forEach { m ->
             lastPriceByMarket[m.id.value]?.let {
@@ -465,33 +520,36 @@ object SequencerResponseProcessorService {
             }
         }
 
-        val walletsToNotifyAboutLimitsChanges = response
-            .limitsUpdatedList
+        return ohlcNotifications
+    }
+
+    private fun handleLimitsUpdates(limitsUpdates: List<LimitsUpdate>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
+        val walletsToNotifyAboutLimitsChanges = limitsUpdates
             .map { it.wallet }
             .distinct()
             .mapNotNull { WalletEntity.getBySequencerId(it.sequencerWalletId()) }
 
-        walletsToNotifyAboutLimitsChanges
-            .associateBy { it.sequencerId.value }
-            .also { walletsBySequencerId ->
-                val limitUpdates = response.limitsUpdatedList.map {
-                    Pair(
-                        walletsBySequencerId.getValue(it.wallet).guid.value,
-                        MarketLimits(
-                            MarketId(it.marketId),
-                            it.base.toBigInteger(),
-                            it.quote.toBigInteger(),
-                        ),
-                    )
-                }
-                LimitEntity.update(limitUpdates)
-            }
+        val walletsBySequencerId = walletsToNotifyAboutLimitsChanges.associateBy { it.sequencerId.value }
 
-        val limitsNotifications = walletsToNotifyAboutLimitsChanges.map { wallet ->
-            BroadcasterNotification.limits(wallet)
+        LimitEntity.update(
+            limitsUpdates.map {
+                val wallet = walletsBySequencerId.getValue(it.wallet)
+                Pair(
+                    wallet.guid.value,
+                    MarketLimits(
+                        MarketId(it.marketId),
+                        it.base.toBigInteger(),
+                        it.quote.toBigInteger(),
+                    ),
+                )
+            },
+        )
+
+        walletsToNotifyAboutLimitsChanges.forEach { wallet ->
+            broadcasterNotifications.add(
+                BroadcasterNotification.limits(wallet),
+            )
         }
-
-        publishBroadcasterNotifications(broadcasterNotifications + orderBookNotifications + ohlcNotifications + limitsNotifications)
     }
 
     private fun getSymbol(asset: String): SymbolEntity {
