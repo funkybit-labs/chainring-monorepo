@@ -5,7 +5,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.decodeFromJsonElement
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import xyz.funkybit.core.model.BitcoinAddress
-import xyz.funkybit.core.model.UtxoId
+import xyz.funkybit.core.model.bitcoin.UtxoId
+import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.model.rpc.ArchRpcParams
 import xyz.funkybit.core.model.rpc.ArchRpcRequest
@@ -48,7 +49,7 @@ object ArchNetworkClient : JsonRpcClientBase(
         )
     }
 
-    fun sendTransaction(transaction: ArchNetworkRpc.RuntimeTransaction): String {
+    fun sendTransaction(transaction: ArchNetworkRpc.RuntimeTransaction): TxHash {
         return getValue(
             ArchRpcRequest(
                 "send_transaction",
@@ -57,22 +58,20 @@ object ArchNetworkClient : JsonRpcClientBase(
         )
     }
 
-    fun getProcessedTransaction(txId: String): ArchNetworkRpc.ProcessedTransaction {
-        return getValue(
-            ArchRpcRequest(
-                "get_processed_transaction",
-                ArchRpcParams(txId),
-            ),
-        )
-    }
-
-    fun assignAuthority(request: ArchNetworkRpc.AssignAuthorityParams): ArchNetworkRpc.ProcessedTransaction {
-        return getValue(
-            ArchRpcRequest(
-                "assign_authority",
-                ArchRpcParams(request),
-            ),
-        )
+    fun getProcessedTransaction(txId: TxHash): ArchNetworkRpc.ProcessedTransaction? {
+        return try {
+            getValue(
+                ArchRpcRequest(
+                    "get_processed_transaction",
+                    ArchRpcParams(txId.value),
+                ),
+            )
+        } catch (e: JsonRpcException) {
+            if (e.error.code != 404) {
+                throw e
+            }
+            null
+        }
     }
 
     fun readUtxo(utxoId: UtxoId): ArchNetworkRpc.ReadUtxoResult {
@@ -80,23 +79,6 @@ object ArchNetworkClient : JsonRpcClientBase(
             ArchRpcRequest(
                 "read_utxo",
                 ArchRpcParams(ArchNetworkRpc.ReadUtxoParams(utxoId.value)),
-            ),
-        )
-    }
-
-    fun getBestBlockHash(): String {
-        return getValue(
-            ArchRpcRequest(
-                "get_best_block_hash",
-            ),
-        )
-    }
-
-    fun getBlock(blockHash: String): String {
-        return getValue(
-            ArchRpcRequest(
-                "get_block",
-                ArchRpcParams(blockHash),
             ),
         )
     }

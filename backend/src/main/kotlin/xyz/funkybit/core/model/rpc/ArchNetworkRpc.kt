@@ -1,5 +1,6 @@
 package xyz.funkybit.core.model.rpc
 
+import com.funkatronics.kborsh.Borsh
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -8,9 +9,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.buildSerialDescriptor
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.serializer
+import xyz.funkybit.core.model.bitcoin.UtxoId
+import xyz.funkybit.core.model.db.TxHash
+import xyz.funkybit.core.utils.sha256
+import xyz.funkybit.core.utils.toHex
 import java.util.*
 
 @Serializable
@@ -40,7 +46,6 @@ object ArchRpcParamsSerializer : KSerializer<ArchRpcParams> {
             is ArchNetworkRpc.GetContractAddress -> ArchNetworkRpc.GetContractAddress::class.serializer().serialize(encoder, param)
             is ArchNetworkRpc.RuntimeTransaction -> ArchNetworkRpc.RuntimeTransaction::class.serializer().serialize(encoder, param)
             is ArchNetworkRpc.ReadUtxoParams -> ArchNetworkRpc.ReadUtxoParams::class.serializer().serialize(encoder, param)
-            is ArchNetworkRpc.AssignAuthorityParams -> ArchNetworkRpc.AssignAuthorityParams::class.serializer().serialize(encoder, param)
         }
     }
 
@@ -72,7 +77,11 @@ sealed class ArchNetworkRpc {
     data class Message(
         val signers: List<Pubkey>,
         val instructions: List<Instruction>,
-    )
+    ) {
+        fun hash(): ByteArray {
+            return sha256(sha256(Borsh.encodeToByteArray(this)).toHex(false).toByteArray())
+        }
+    }
 
     @Serializable
     data class Instruction(
@@ -85,14 +94,50 @@ sealed class ArchNetworkRpc {
     @Serializable
     data class UtxoMeta(
         @SerialName("txid")
-        val txId: String,
+        val txId: TxHash,
         val vout: Int,
-    )
+    ) {
+        fun toUtxoId() = UtxoId.fromTxHashAndVout(txId, vout)
+    }
 
-    @Serializable
+    @Serializable(with = PubkeySerializer::class)
     @JvmInline
-    value class Pubkey(val bytes: UByteArray)
-    // TODO verify 32 bytes
+    value class Pubkey(val bytes: UByteArray) {
+        init {
+            require(bytes.size == 32) {
+                "Pubkey must be 32 bytes"
+            }
+        }
+    }
+
+    // this custom serializer is to handle the Pubkey - in rust it is defined as [u8; 32], so when serializing
+    // the length does not precede the array since it's a fixed size. This mimics this behaviour on kotlin since
+    // Pubkey is a value class around a UByteArray so default serialization writes the length out
+    @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
+    object PubkeySerializer : KSerializer<Pubkey> {
+        @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
+        override val descriptor: SerialDescriptor = buildSerialDescriptor("Pubkey", StructureKind.LIST)
+
+        @OptIn(InternalSerializationApi::class)
+        override fun serialize(encoder: Encoder, value: Pubkey) {
+            when (encoder) {
+                is com.funkatronics.kborsh.BorshEncoder -> {
+                    value.bytes.forEach { encoder.encodeByte(it.toByte()) }
+                }
+                else -> UByteArray::class.serializer().serialize(encoder, value.bytes)
+            }
+        }
+
+        @OptIn(InternalSerializationApi::class)
+        override fun deserialize(decoder: Decoder): Pubkey {
+            return when (decoder) {
+                is com.funkatronics.kborsh.BorshDecoder -> {
+                    Pubkey((0..31).map { decoder.decodeByte() }.toByteArray().toUByteArray())
+                }
+                else -> Pubkey(UByteArray::class.serializer().deserialize(decoder))
+            }
+        }
+    }
 
     @Serializable
     @JvmInline
@@ -109,13 +154,13 @@ sealed class ArchNetworkRpc {
         @SerialName("utxo_id")
         val utxoId: String,
         val data: UByteArray,
-        val authority: UByteArray,
+        val authority: Pubkey,
     )
 
     @Serializable
     enum class Status {
         Processing,
-        Sucess, // was this way in rust code
+        Success,
         Failed,
     }
 
@@ -123,10 +168,9 @@ sealed class ArchNetworkRpc {
     data class ProcessedTransaction(
         @SerialName("runtime_transaction")
         val runtimeTransaction: RuntimeTransaction,
-        // val receipts: Map<String, Receipt>,  // TODO Receipt comes from risc0-zkvm and is large
         val status: Status,
         @SerialName("bitcoin_txids")
-        val bitcoinTxIds: Map<String, String>,
+        val bitcoinTxIds: Map<String, TxHash>,
     )
 
     @Serializable
@@ -135,18 +179,5 @@ sealed class ArchNetworkRpc {
         val txId: String,
         val vout: Int,
         val value: ULong,
-    )
-
-    @Serializable
-    data class AuthorityMessage(
-        val utxo: Utxo,
-        val data: UByteArray,
-        val authority: Pubkey,
-    )
-
-    @Serializable
-    data class AssignAuthorityParams(
-        val signature: Signature,
-        val message: AuthorityMessage,
     )
 }

@@ -3,12 +3,17 @@ package xyz.funkybit.core.repeater.tasks
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction
+import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
-import xyz.funkybit.core.model.UtxoId
+import xyz.funkybit.core.model.bitcoin.ProgramInstruction
+import xyz.funkybit.core.model.bitcoin.SerializedBitcoinTx
+import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.ArchStateUtxoEntity
+import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.StateUtxoStatus
 import xyz.funkybit.core.model.db.SymbolEntity
+import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.services.UtxoSelectionService
 import xyz.funkybit.core.utils.bitcoin.ArchUtils
 import java.math.BigInteger
@@ -29,7 +34,7 @@ class ArchOnboardingTask : RepeaterBaseTask(
 
         // onboard the exchange state UTXO first
         val stateUtxoEntity = transaction {
-            ArchStateUtxoEntity.findExchangeStateUtxo() ?: initiateOnboarding(null)
+            ArchStateUtxoEntity.findProgramStateUtxo() ?: initiateOnboarding(null)
         }
 
         stateUtxoEntity?.let { stateUtxo ->
@@ -37,6 +42,31 @@ class ArchOnboardingTask : RepeaterBaseTask(
                 transaction { checkIfOnboarded(stateUtxo) }
             }
             if (stateUtxo.status == StateUtxoStatus.Onboarded) {
+                transaction { initializeStateUtxo(stateUtxo) }
+            }
+            if (stateUtxo.status == StateUtxoStatus.Initializing) {
+                stateUtxo.initializationTxId?.let { archTxId ->
+                    ArchNetworkClient.getProcessedTransaction(archTxId)?.let {
+                        when (it.status) {
+                            ArchNetworkRpc.Status.Success -> {
+                                transaction {
+                                    ArchUtils.refreshStateUtxoIds(it)
+                                    stateUtxo.markAsComplete()
+                                }
+                                logger.debug { "Completed initialization for State Utxo ${stateUtxo.utxoId}" }
+                            }
+                            ArchNetworkRpc.Status.Failed -> {
+                                logger.error { "Initializing State Utxo failed for ${stateUtxo.utxoId}" }
+                                transaction { stateUtxo.markAsFailed() }
+                            }
+                            ArchNetworkRpc.Status.Processing -> {
+                                logger.debug { "Processing initialization for State Utxo ${stateUtxo.utxoId}" }
+                            }
+                        }
+                    }
+                }
+            }
+            if (stateUtxo.status == StateUtxoStatus.Complete) {
                 // onboard symbol utxos
                 findSymbolsWithNoStateUtxo().forEach {
                     transaction { initiateOnboarding(it) }
@@ -97,6 +127,33 @@ class ArchOnboardingTask : RepeaterBaseTask(
         } catch (e: Exception) {
             logger.warn(e) { "Unable to onboard state UTXO: ${e.message}" }
             null
+        }
+    }
+
+    private fun initializeStateUtxo(stateUtxo: ArchStateUtxoEntity) {
+        // TODO CHAIN-457 - better network fee estimation
+        val feeAmount = BigInteger("3000")
+        val txRaw = ArchUtils.buildFeeTx(
+            BitcoinClient.bitcoinConfig.submitterEcKey,
+            BitcoinClient.bitcoinConfig.submitterAddress,
+            feeAmount,
+            UtxoSelectionService.selectUtxos(
+                BitcoinClient.bitcoinConfig.submitterAddress,
+                BigInteger.ZERO,
+                feeAmount,
+            ),
+        )
+
+        ArchUtils.signAndSendInstruction(
+            programId = DeployedSmartContractEntity.validContracts(BitcoinClient.chainId)
+                .first { it.name == ContractType.Exchange.name }.proxyAddress,
+            listOf(stateUtxo.utxoId),
+            ProgramInstruction.InitStateParams(
+                feeAccount = BitcoinClient.bitcoinConfig.feeAccountAddress,
+                txHex = SerializedBitcoinTx(txRaw.unsafeBitcoinSerialize()),
+            ),
+        ).also {
+            stateUtxo.markAsInitializing(it)
         }
     }
 

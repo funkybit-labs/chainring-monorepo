@@ -46,6 +46,9 @@ fun generateOrderNonce() = generateHexString(32)
 @OptIn(ExperimentalStdlibApi::class)
 fun ByteArray.toHex(add0x: Boolean = true) = (if (add0x) "0x" else "") + this.toHexString(HexFormat.Default)
 
+@OptIn(ExperimentalStdlibApi::class, ExperimentalUnsignedTypes::class)
+fun UByteArray.toHex(add0x: Boolean = true) = (if (add0x) "0x" else "") + this.toHexString(HexFormat.Default)
+
 fun String.toHexBytes() = Hex.decode(this.replace("0x", ""))
 
 fun Instant.truncateTo(unit: DateTimeUnit.TimeBased): Instant {

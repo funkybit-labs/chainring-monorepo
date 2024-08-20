@@ -4,7 +4,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceApi
 import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
 import xyz.funkybit.core.model.BitcoinAddress
-import xyz.funkybit.core.model.UtxoId
+import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.BitcoinWalletStateEntity
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.UnspentUtxo

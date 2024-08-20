@@ -13,6 +13,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.encodeCollection
 import xyz.funkybit.apps.api.model.BigDecimalJson
+import xyz.funkybit.core.model.bitcoin.UtxoId
+import xyz.funkybit.core.model.db.TxHash
 import java.util.*
 
 @Serializable
@@ -72,11 +74,13 @@ sealed class BitcoinRpc {
     @Serializable
     data class TxIn(
         @SerialName("txid")
-        val txId: String?,
+        val txId: TxHash,
         @SerialName("vout")
-        val outIndex: Int?,
+        val outIndex: Int,
         val scriptSig: ScriptSig?,
-    )
+    ) {
+        fun toUtxoId() = UtxoId.fromTxHashAndVout(txId, outIndex)
+    }
 
     @Serializable
     data class TxOut(
@@ -84,7 +88,9 @@ sealed class BitcoinRpc {
         @SerialName("n")
         val index: Int,
         val scriptPubKey: ScriptPubKey,
-    )
+    ) {
+        fun toUtxoId(txId: TxHash) = UtxoId.fromTxHashAndVout(txId, index)
+    }
 
     @Serializable
     data class Transaction(

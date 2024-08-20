@@ -10,7 +10,7 @@ import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import xyz.funkybit.apps.api.model.BigIntegerJson
 import xyz.funkybit.core.model.BitcoinAddress
-import xyz.funkybit.core.model.UtxoId
+import xyz.funkybit.core.model.bitcoin.UtxoId
 
 @Serializable
 @JvmInline
