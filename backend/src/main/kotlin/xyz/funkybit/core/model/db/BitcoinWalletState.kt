@@ -34,17 +34,17 @@ object BitcoinWalletStateTable : GUIDTable<BitcoinWalletStateId>("bitcoin_wallet
     val address = varchar("address", 10485760).uniqueIndex()
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at").nullable()
-    val lastTxId = varchar("last_tx_id", 10485760).nullable()
+    val lastSeenBlockHeight = long("last_seen_block_height").nullable()
     val unspentUtxos = jsonb<List<UnspentUtxo>>("unspent_utxos", json)
 }
 
 class BitcoinWalletStateEntity(guid: EntityID<BitcoinWalletStateId>) : GUIDEntity<BitcoinWalletStateId>(guid) {
     companion object : EntityClass<BitcoinWalletStateId, BitcoinWalletStateEntity>(BitcoinWalletStateTable) {
-        fun create(address: BitcoinAddress, lastTxId: TxHash?, unspentUtxos: List<UnspentUtxo>): BitcoinWalletStateEntity {
+        fun create(address: BitcoinAddress, lastSeenBlockHeight: Long?, unspentUtxos: List<UnspentUtxo>): BitcoinWalletStateEntity {
             return BitcoinWalletStateEntity.new(BitcoinWalletStateId.generate()) {
                 this.address = address
                 this.unspentUtxos = unspentUtxos
-                this.lastTxId = lastTxId
+                this.lastSeenBlockHeight = lastSeenBlockHeight
                 this.createdAt = Clock.System.now()
             }
         }
@@ -56,8 +56,8 @@ class BitcoinWalletStateEntity(guid: EntityID<BitcoinWalletStateId>) : GUIDEntit
         }
     }
 
-    fun update(lastTxId: TxHash?, unspentUtxos: List<UnspentUtxo>) {
-        this.lastTxId = lastTxId
+    fun update(lastSeenBlockHeight: Long?, unspentUtxos: List<UnspentUtxo>) {
+        this.lastSeenBlockHeight = lastSeenBlockHeight
         this.unspentUtxos = unspentUtxos
         this.updatedAt = Clock.System.now()
     }
@@ -68,10 +68,7 @@ class BitcoinWalletStateEntity(guid: EntityID<BitcoinWalletStateId>) : GUIDEntit
     )
 
     var unspentUtxos by BitcoinWalletStateTable.unspentUtxos
-    var lastTxId by BitcoinWalletStateTable.lastTxId.transform(
-        toReal = { it?.let(::TxHash) },
-        toColumn = { it?.value },
-    )
+    var lastSeenBlockHeight by BitcoinWalletStateTable.lastSeenBlockHeight
 
     var createdAt by BitcoinWalletStateTable.createdAt
     var updatedAt by BitcoinWalletStateTable.updatedAt

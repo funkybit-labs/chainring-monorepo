@@ -10,7 +10,6 @@ import org.bitcoinj.core.TransactionOutPoint
 import org.bitcoinj.core.TransactionOutput
 import org.bitcoinj.script.ScriptBuilder
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -57,7 +56,6 @@ class UtxoSelectionTest {
 
         // airdrop 3000 sats
         val txId = BitcoinClient.sendToAddress(address, BigInteger("3000"))
-        BitcoinClient.mine(1)
 
         waitForTx(address, txId)
         val expectedVout = BitcoinClient.getRawTransaction(txId).txOuts.first { it.value.compareTo(BigDecimal("0.00003000")) == 0 }.index
@@ -70,7 +68,6 @@ class UtxoSelectionTest {
         assertEquals(1, selectedUtxos.size)
         assertEquals(UtxoId.fromTxHashAndVout(txId, expectedVout), selectedUtxos[0].utxoId)
         assertEquals(BigInteger("3000"), selectedUtxos[0].amount)
-        assertNotNull(selectedUtxos[0].blockHeight)
 
         // check it fails if we request more that available
         assertThrows<BitcoinInsufficientFundsException> {
@@ -81,7 +78,6 @@ class UtxoSelectionTest {
 
         // airdrop some more
         val txId2 = BitcoinClient.sendToAddress(address, BigInteger("3100"))
-        BitcoinClient.mine(1)
         waitForTx(address, txId2)
         val expectedVout2 = BitcoinClient.getRawTransaction(txId2).txOuts.first { it.value.compareTo(BigDecimal("0.00003100")) == 0 }.index
         selectedUtxos = transaction {
@@ -95,10 +91,7 @@ class UtxoSelectionTest {
 
         val transaction = buildTransferTx(ecKey, transferToAddress, BigInteger("3000"), address, BigInteger("1500"), selectedUtxos)
         val txId3 = BitcoinClient.sendRawTransaction(transaction.toHexString())
-        logger.debug { "txId3 = $txId3" }
         assertEquals(transaction.txId.bytes.toHex(false), txId3.value)
-
-        BitcoinClient.mine(1)
 
         waitForTx(address, txId3)
         val tx = BitcoinClient.getRawTransaction(txId3)
@@ -117,6 +110,8 @@ class UtxoSelectionTest {
         assertEquals(transferToUnspentUtxos.size, 1)
         assertEquals(UtxoId.fromTxHashAndVout(txId3, transferVout), transferToUnspentUtxos[0].utxoId)
         assertEquals(BigInteger("3000"), transferToUnspentUtxos[0].amount)
+
+        BitcoinClient.mine(1)
     }
 
     @Test

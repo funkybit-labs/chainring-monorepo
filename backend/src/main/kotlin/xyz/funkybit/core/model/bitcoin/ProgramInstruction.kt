@@ -14,12 +14,19 @@ import xyz.funkybit.core.model.BitcoinAddress
 
 @Serializable(with = ProgramInstructionSerializer::class)
 sealed class ProgramInstruction {
+    abstract val txHex: SerializedBitcoinTx
 
     @Serializable
     data class InitStateParams(
         val feeAccount: BitcoinAddress,
-        val txHex: SerializedBitcoinTx,
+        override val txHex: SerializedBitcoinTx,
     ) : ProgramInstruction()
+
+    fun withFeeTx(txHex: SerializedBitcoinTx): ProgramInstruction {
+        return when (this) {
+            is InitStateParams -> this.copy(txHex = txHex)
+        }
+    }
 }
 
 object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {

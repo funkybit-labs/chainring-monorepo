@@ -3,19 +3,18 @@ package xyz.funkybit.core.repeater.tasks
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction
-import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.bitcoin.ProgramInstruction
 import xyz.funkybit.core.model.bitcoin.SerializedBitcoinTx
 import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.ArchStateUtxoEntity
-import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.StateUtxoStatus
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.services.UtxoSelectionService
 import xyz.funkybit.core.utils.bitcoin.ArchUtils
+import xyz.funkybit.core.utils.bitcoin.BitcoinInsufficientFundsException
 import java.math.BigInteger
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -98,12 +97,13 @@ class ArchOnboardingTask : RepeaterBaseTask(
 
         val archNetworkAddress = ArchNetworkClient.getNetworkAddress()
         val stateUtxoAmount = BigInteger("1500")
-        // we almost always just need 1 utxo, but the 263 estimate assumes 2 ins, so we overestimate the
-        // fee given to the utxo selection algorithm. We will recalculate once we get the number of utxos returned.
-        val feeAmount = ArchUtils.calculateFee(263)
 
         return try {
-            val selectedUtxos = UtxoSelectionService.selectUtxos(config.submitterAddress, stateUtxoAmount, feeAmount)
+            val selectedUtxos = UtxoSelectionService.selectUtxos(
+                config.submitterAddress,
+                stateUtxoAmount,
+                ArchUtils.calculateFee(ArchUtils.P2WPKH_2IN_2OUT_VSIZE),
+            )
             val recalculatedFee = ArchUtils.estimateOnboardingTxFee(
                 config.submitterEcKey,
                 archNetworkAddress,
@@ -131,29 +131,18 @@ class ArchOnboardingTask : RepeaterBaseTask(
     }
 
     private fun initializeStateUtxo(stateUtxo: ArchStateUtxoEntity) {
-        // TODO CHAIN-457 - better network fee estimation
-        val feeAmount = BigInteger("3000")
-        val txRaw = ArchUtils.buildFeeTx(
-            BitcoinClient.bitcoinConfig.submitterEcKey,
-            BitcoinClient.bitcoinConfig.submitterAddress,
-            feeAmount,
-            UtxoSelectionService.selectUtxos(
-                BitcoinClient.bitcoinConfig.submitterAddress,
-                BigInteger.ZERO,
-                feeAmount,
-            ),
-        )
-
-        ArchUtils.signAndSendInstruction(
-            programId = DeployedSmartContractEntity.validContracts(BitcoinClient.chainId)
-                .first { it.name == ContractType.Exchange.name }.proxyAddress,
-            listOf(stateUtxo.utxoId),
-            ProgramInstruction.InitStateParams(
-                feeAccount = BitcoinClient.bitcoinConfig.feeAccountAddress,
-                txHex = SerializedBitcoinTx(txRaw.unsafeBitcoinSerialize()),
-            ),
-        ).also {
-            stateUtxo.markAsInitializing(it)
+        try {
+            ArchUtils.signAndSendInstruction(
+                listOf(stateUtxo.utxoId),
+                ProgramInstruction.InitStateParams(
+                    feeAccount = BitcoinClient.bitcoinConfig.feeAccountAddress,
+                    txHex = SerializedBitcoinTx.empty(),
+                ),
+            ).also {
+                stateUtxo.markAsInitializing(it)
+            }
+        } catch (e: BitcoinInsufficientFundsException) {
+            logger.warn { "Insufficient utxos available for fee" }
         }
     }
 
