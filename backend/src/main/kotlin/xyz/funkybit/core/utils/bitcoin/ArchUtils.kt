@@ -12,22 +12,33 @@ import org.bitcoinj.core.TransactionOutput
 import org.bitcoinj.core.TransactionWitness
 import org.bitcoinj.script.ScriptBuilder
 import org.bitcoinj.script.ScriptOpCodes
+import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.bitcoin.ProgramInstruction
+import xyz.funkybit.core.model.bitcoin.SerializedBitcoinTx
 import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.ArchStateUtxoEntity
+import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.UnspentUtxo
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
+import xyz.funkybit.core.services.UtxoSelectionService
 import xyz.funkybit.core.utils.schnorr.Schnorr
 import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigDecimal
 import java.math.BigInteger
 
 object ArchUtils {
+
+    // 10.5 (Overhead), 68 (Vin) * 2, 31(Vout), 27 (Witness) * 2
+    const val P2WPKH_2IN_1OUT_VSIZE = 232
+    const val P2WPKH_2IN_2OUT_VSIZE = 263
+
+    // 57.5 (Vin), 43(Vout), 24 (Witness) (signature(64 bytes) + hash of data(32))
+    const val P2TR_UTXO_IN_OUT_VSIZE = 125
 
     private val zeroCoinValue = Coin.valueOf(0)
 
@@ -131,6 +142,40 @@ object ArchUtils {
         return rawTx
     }
 
+    private fun estimateNetworkFeeForContractCall(
+        ecKey: ECKey,
+        changeAddress: BitcoinAddress,
+        numStateUtxos: Int,
+        utxos: List<UnspentUtxo>,
+    ): BigInteger {
+        val params = BitcoinClient.getParams()
+        val rawTx = Transaction(params)
+        rawTx.setVersion(2)
+        rawTx.addOutput(
+            TransactionOutput(
+                params,
+                rawTx,
+                zeroCoinValue,
+                changeAddress.toBitcoinCoreAddress(params),
+            ),
+        )
+        utxos.forEach {
+            rawTx.addSignedInput(
+                TransactionOutPoint(
+                    params,
+                    it.utxoId.vout(),
+                    Sha256Hash.wrap(it.utxoId.txId().value),
+                ),
+                ScriptBuilder.createP2WPKHOutputScript(ecKey),
+                Coin.valueOf(it.amount.toLong()),
+                ecKey,
+                Transaction.SigHash.NONE,
+                true,
+            )
+        }
+        return calculateFee(rawTx.vsize + numStateUtxos * P2TR_UTXO_IN_OUT_VSIZE)
+    }
+
     fun estimateOnboardingTxFee(
         ecKey: ECKey,
         archNetworkAddress: BitcoinAddress,
@@ -177,6 +222,43 @@ object ArchUtils {
             )
         }
         return calculateFee(rawTx.vsize)
+    }
+
+    fun signAndSendInstruction(stateUtxoIds: List<UtxoId>, exchangeInstruction: ProgramInstruction): TxHash {
+        val config = BitcoinClient.bitcoinConfig
+        val selectedUtxos = UtxoSelectionService.selectUtxos(
+            BitcoinClient.bitcoinConfig.submitterAddress,
+            BigInteger.ZERO,
+            calculateFee(P2WPKH_2IN_1OUT_VSIZE + P2TR_UTXO_IN_OUT_VSIZE * stateUtxoIds.size),
+        )
+        val feeAmount = estimateNetworkFeeForContractCall(
+            config.submitterEcKey,
+            config.submitterAddress,
+            stateUtxoIds.size,
+            selectedUtxos,
+        )
+
+        val serializedFeeTx = SerializedBitcoinTx(
+            buildFeeTx(
+                config.submitterEcKey,
+                config.submitterAddress,
+                feeAmount,
+                UtxoSelectionService.selectUtxos(
+                    BitcoinClient.bitcoinConfig.submitterAddress,
+                    BigInteger.ZERO,
+                    feeAmount,
+                ),
+            ).unsafeBitcoinSerialize(),
+        )
+
+        return signAndSendInstruction(
+            programId = DeployedSmartContractEntity.validContracts(BitcoinClient.chainId)
+                .first { it.name == ContractType.Exchange.name }.proxyAddress,
+            stateUtxoIds,
+            exchangeInstruction.withFeeTx(txHex = serializedFeeTx),
+        ).also {
+            UtxoSelectionService.reserveUtxos(config.submitterAddress, selectedUtxos.map { it.utxoId }.toSet(), it.value)
+        }
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)

@@ -33,8 +33,7 @@ class ArchOnboardingTest {
 
         triggerRepeaterTaskAndWaitForCompletion("arch_onboarding")
 
-        airdropToSubmitter(wait = false) // for onboarding
-        airdropToSubmitter() // for initialization
+        airdropToSubmitter()
 
         // notify the repeater app task
         triggerRepeaterTaskAndWaitForCompletion("arch_onboarding")
@@ -61,11 +60,12 @@ class ArchOnboardingTest {
             assertEquals(BitcoinClient.bitcoinConfig.submitterXOnlyPublicKey.toHex(), utxoInfo.authority.bytes.toHex())
         }
 
-        // now verify token state utxo is onboarded
-        airdropToSubmitter()
-
-        // notify the repeater app task
-        triggerRepeaterTaskAndWaitForCompletion("arch_onboarding")
+        waitFor {
+            triggerRepeaterTaskAndWaitForCompletion("arch_onboarding")
+            transaction {
+                ArchStateUtxoEntity.findTokenStateUtxo(SymbolEntity.forChain(BitcoinClient.chainId).first()) != null
+            }
+        }
 
         validateStateUtxo(
             transaction {
@@ -77,7 +77,7 @@ class ArchOnboardingTest {
     private fun airdropToSubmitter(wait: Boolean = true) {
         val txId = BitcoinClient.sendToAddressAndMine(
             BitcoinClient.bitcoinConfig.submitterAddress,
-            BigInteger("6000"),
+            BigInteger("20000"),
         )
         if (wait) {
             waitForTx(BitcoinClient.bitcoinConfig.submitterAddress, txId)
