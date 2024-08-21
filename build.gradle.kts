@@ -113,7 +113,7 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
     exec {
         isIgnoreExitValue = true
         commandLine(
-            "bash", "-c", "forge build --root ${projectDir}/contracts --out ${buildDir}/contracts"
+            "bash", "-c", "forge build --root ${projectDir}/contracts/evm --out ${buildDir}/contracts"
         )
     }.also {
         if (it.exitValue == 127) {
