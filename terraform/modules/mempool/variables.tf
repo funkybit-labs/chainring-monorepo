@@ -8,23 +8,15 @@ variable "cpu" {
 variable "memory" {
   default = 2048
 }
-variable "tcp_ports" {
-  type    = list(number)
-  default = []
+variable "api_port" {
+  default = 8080
 }
-variable "include_command" {
-  default = false
-}
-variable "image" {}
-variable "image_is_external" {
-  default = false
-}
+variable "bitcoin_host" {}
+variable "bitcoin_rpc_port" {}
+variable "bitcoin_fulcrum_port" {}
 variable "ecs_cluster_id" {}
 variable "subnet_id_1" {}
 variable "subnet_id_2" {}
-variable "allow_inbound" {
-  default = false
-}
 variable "hostnames" {
   type    = list(string)
   default = []
@@ -34,15 +26,6 @@ variable "lb_https_listener_arn" {
 }
 variable "lb_priority" {
   default = 100
-}
-variable "lb_protocol" {
-  default = "HTTP"
-}
-variable "health_check_http_path" {
-  default = "/health"
-}
-variable "health_check_http_status" {
-  default = "200"
 }
 variable "app_ecs_task_role" {}
 variable "zone" {
@@ -55,7 +38,6 @@ variable "mount_efs_volume" {
   default = false
 }
 variable "service_discovery_private_dns_namespace" {}
-data "aws_caller_identity" "current" {}
 variable "deployment_maximum_percent" {
   type    = number
   default = 200
@@ -63,7 +45,4 @@ variable "deployment_maximum_percent" {
 variable "deployment_minimum_healthy_percent" {
   type    = number
   default = 100
-}
-variable "icons_bucket" {
-  default = {}
 }

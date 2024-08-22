@@ -108,8 +108,8 @@ module "anvil" {
   lb_dns_name                             = module.alb.dns_name
   zone                                    = data.terraform_remote_state.shared.outputs.zone
   tcp_ports                               = [8545]
-  health_check                            = "/"
-  health_check_status                     = "400"
+  health_check_http_path                  = "/"
+  health_check_http_status                = "400"
   mount_efs_volume                        = true
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
   deployment_minimum_healthy_percent      = 0
@@ -136,8 +136,8 @@ module "otterscan" {
   lb_dns_name                             = module.alb.dns_name
   zone                                    = data.terraform_remote_state.shared.outputs.zone
   tcp_ports                               = [80]
-  health_check                            = "/"
-  health_check_status                     = "200"
+  health_check_http_path                  = "/"
+  health_check_http_status                = "200"
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
 }
 
@@ -163,8 +163,8 @@ module "anvil2" {
   lb_dns_name                             = module.alb.dns_name
   zone                                    = data.terraform_remote_state.shared.outputs.zone
   tcp_ports                               = [8545]
-  health_check                            = "/"
-  health_check_status                     = "400"
+  health_check_http_path                  = "/"
+  health_check_http_status                = "400"
   mount_efs_volume                        = true
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
   deployment_minimum_healthy_percent      = 0
@@ -191,8 +191,8 @@ module "otterscan2" {
   lb_dns_name                             = module.alb.dns_name
   zone                                    = data.terraform_remote_state.shared.outputs.zone
   tcp_ports                               = [80]
-  health_check                            = "/"
-  health_check_status                     = "200"
+  health_check_http_path                  = "/"
+  health_check_http_status                = "200"
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
 }
 

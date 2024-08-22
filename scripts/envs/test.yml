@@ -10,8 +10,11 @@ environment:
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
     ENABLE_TEST_ROUTES: "true"
     FAUCET_MODE: AllSymbols
-    BITCOIN_NETWORK_ENABLED: "false"
+    BITCOIN_NETWORK_ENABLED: "true"
+    BITCOIN_NETWORK_RPC_URL: "https://test-bitcoin.funkybit.fun"
+    BLOCK_EXPLORER_URL_BITCOIN: "https://test-mempool.funkybit.fun"
     REPEATER_AUTOMATIC_TASK_SCHEDULING: "false"
+    ARCH_NETWORK_RPC_URL: "https://test-arch.funkybit.fun"
   sequencer:
     QUEUE_HOME: "/data/queues/test"
     CHECKPOINTS_ENABLED: "false"
@@ -36,27 +39,6 @@ environment:
   otterscan2:
     ERIGON_URL: https://test-anvil2.funkybit.fun
 services:
-  api:
-    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
-    count: 1
-    is_essential: "true"
-    environment: backend
-    secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-a00059f0-7cd7-4989-bd67-7af9e5899397-cWukH6
-  ring:
-    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
-    count: 1
-    environment: backend
-    secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-a00059f0-7cd7-4989-bd67-7af9e5899397-cWukH6
-  telegrambot:
-    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
-    count: 1
-    environment: telegrambot
-    no_rolling_upgrade: "true"
-    secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-a00059f0-7cd7-4989-bd67-7af9e5899397-cWukH6
-      TELEGRAM_BOT_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:test/telegrambot/TELEGRAM_BOT_TOKEN-EJTdMA
   anvil:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
     count: 1
@@ -74,6 +56,21 @@ services:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/otterscan
     count: 1
     environment: otterscan2
+  bitcoin:
+    count: 1
+    is_essential: "true"
+  mempool:
+    count: 1
+    is_essential: "true"
+  arch:
+    count: 1
+    is_essential: "true"
+  ring:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
+    count: 1
+    environment: backend
+    secrets:
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-a00059f0-7cd7-4989-bd67-7af9e5899397-cWukH6
   sequencer:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer
     count: 1
@@ -88,4 +85,19 @@ services:
     environment: garp
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-a00059f0-7cd7-4989-bd67-7af9e5899397-cWukH6
+  api:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
+    count: 1
+    is_essential: "true"
+    environment: backend
+    secrets:
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-a00059f0-7cd7-4989-bd67-7af9e5899397-cWukH6
+  telegrambot:
+    image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
+    count: 1
+    environment: telegrambot
+    no_rolling_upgrade: "true"
+    secrets:
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-a00059f0-7cd7-4989-bd67-7af9e5899397-cWukH6
+      TELEGRAM_BOT_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:test/telegrambot/TELEGRAM_BOT_TOKEN-EJTdMA
 

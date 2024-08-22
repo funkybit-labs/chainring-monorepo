@@ -10,7 +10,6 @@ import org.bitcoinj.core.TransactionOutPoint
 import org.bitcoinj.core.TransactionOutput
 import org.bitcoinj.script.ScriptBuilder
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
@@ -25,7 +24,6 @@ import xyz.funkybit.core.utils.bitcoin.BitcoinInsufficientFundsException
 import xyz.funkybit.core.utils.bitcoin.inSatsAsDecimalString
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
-import xyz.funkybit.integrationtests.testutils.isTestEnvRun
 import xyz.funkybit.integrationtests.testutils.waitFor
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -47,8 +45,6 @@ class UtxoSelectionTest {
 
     @Test
     fun testUtxoSelection() {
-        Assumptions.assumeFalse(isTestEnvRun())
-
         // create a wallet
         val ecKey = ECKey()
         val address = BitcoinAddress.fromKey(params, ecKey)
@@ -116,8 +112,6 @@ class UtxoSelectionTest {
 
     @Test
     fun testUtxoSelectionPagination() {
-        Assumptions.assumeFalse(isTestEnvRun())
-
         // create a wallet
         val ecKey = ECKey()
         val address = BitcoinAddress.fromKey(params, ecKey)

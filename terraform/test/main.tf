@@ -1,5 +1,6 @@
 locals {
   name_prefix = "test"
+  account_id    = data.aws_caller_identity.current.account_id
 }
 
 module "vpc" {
@@ -103,8 +104,8 @@ module "anvil" {
   lb_dns_name                             = module.alb.dns_name
   zone                                    = data.terraform_remote_state.shared.outputs.zone
   tcp_ports                               = [8545]
-  health_check                            = "/"
-  health_check_status                     = "400"
+  health_check_http_path                  = "/"
+  health_check_http_status                = "400"
   mount_efs_volume                        = false
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
   deployment_minimum_healthy_percent      = 0
@@ -132,8 +133,89 @@ module "anvil2" {
   lb_dns_name                             = module.alb.dns_name
   zone                                    = data.terraform_remote_state.shared.outputs.zone
   tcp_ports                               = [8545]
-  health_check                            = "/"
-  health_check_status                     = "400"
+  health_check_http_path                  = "/"
+  health_check_http_status                = "400"
+  mount_efs_volume                        = false
+  service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
+  deployment_minimum_healthy_percent      = 0
+  deployment_maximum_percent              = 100
+}
+
+module "bitcoin" {
+  source            = "../modules/bitcoin"
+  name_prefix       = local.name_prefix
+  task_name         = "bitcoin"
+  bitcoind_image    = "${local.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/bitcoin:latest"
+  bitcoind_port     = 18443
+  fulcrum_image     = "${local.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/fulcrum:latest"
+  fulcrum_port      = 50001
+  memory            = 4096
+  ecs_cluster_id    = module.ecs.cluster.id
+  app_ecs_task_role = module.ecs.app_ecs_task_role
+  aws_region        = var.aws_region
+  subnet_id_1       = module.vpc.private_subnet_id_1
+  subnet_id_2       = module.vpc.private_subnet_id_2
+  vpc               = module.vpc.vpc
+  hostnames = [
+    "${local.name_prefix}-bitcoin.${data.terraform_remote_state.shared.outputs.zone.name}"
+  ]
+  lb_https_listener_arn                   = module.alb.https_listener_arn
+  lb_priority                             = 104
+  lb_dns_name                             = module.alb.dns_name
+  zone                                    = data.terraform_remote_state.shared.outputs.zone
+  mount_efs_volume                        = false
+  service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
+  deployment_minimum_healthy_percent      = 0
+  deployment_maximum_percent              = 100
+}
+
+module "mempool" {
+  source               = "../modules/mempool"
+  name_prefix          = local.name_prefix
+  task_name            = "mempool"
+  memory               = 4096
+  bitcoin_host         = "test-bitcoin.funkybit.fun"
+  bitcoin_rpc_port     = 18443
+  bitcoin_fulcrum_port = 50001
+  ecs_cluster_id       = module.ecs.cluster.id
+  app_ecs_task_role    = module.ecs.app_ecs_task_role
+  aws_region           = var.aws_region
+  subnet_id_1          = module.vpc.private_subnet_id_1
+  subnet_id_2          = module.vpc.private_subnet_id_2
+  vpc                  = module.vpc.vpc
+  hostnames = [
+    "${local.name_prefix}-mempool.${data.terraform_remote_state.shared.outputs.zone.name}"
+  ]
+  lb_https_listener_arn                   = module.alb.https_listener_arn
+  lb_priority                             = 105
+  lb_dns_name                             = module.alb.dns_name
+  zone                                    = data.terraform_remote_state.shared.outputs.zone
+  mount_efs_volume                        = false
+  service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
+  deployment_minimum_healthy_percent      = 0
+  deployment_maximum_percent              = 100
+}
+
+module "arch" {
+  source               = "../modules/arch"
+  name_prefix          = local.name_prefix
+  task_name            = "arch"
+  memory               = 4096
+  bitcoin_host         = "test-bitcoin.funkybit.fun"
+  bitcoin_rpc_port     = 18443
+  ecs_cluster_id       = module.ecs.cluster.id
+  app_ecs_task_role    = module.ecs.app_ecs_task_role
+  aws_region           = var.aws_region
+  subnet_id_1          = module.vpc.private_subnet_id_1
+  subnet_id_2          = module.vpc.private_subnet_id_2
+  vpc                  = module.vpc.vpc
+  hostnames = [
+    "${local.name_prefix}-arch.${data.terraform_remote_state.shared.outputs.zone.name}"
+  ]
+  lb_https_listener_arn                   = module.alb.https_listener_arn
+  lb_priority                             = 106
+  lb_dns_name                             = module.alb.dns_name
+  zone                                    = data.terraform_remote_state.shared.outputs.zone
   mount_efs_volume                        = false
   service_discovery_private_dns_namespace = module.vpc.service_discovery_private_dns_namespace
   deployment_minimum_healthy_percent      = 0

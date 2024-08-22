@@ -61,7 +61,18 @@ jobs:
     uses: ./.github/workflows/start-services.yml
     with:
       environment: test
-      services: "anvil,anvil2,ring,api,garp,sequencer,telegrambot"
+      services: "anvil,anvil2,bitcoin,mempool,arch,ring,api,garp,sequencer,telegrambot"
+
+  init_arch:
+    name: Init arch
+    if: ${{ github.event_name == 'push' }}
+    needs: [ start_services ]
+    permissions:
+      id-token: write # needed for aws credentials
+      contents: read
+    uses: ./.github/workflows/init-arch.yml
+    with:
+      environment: test
 
   deploy_web_ui:
     name: Deploy Web UI
@@ -87,7 +98,7 @@ jobs:
 
   integration_tests:
     name: Run integration tests
-    needs: [ start_services ]
+    needs: [ init_arch ]
     if: ${{ github.event_name == 'push' }}
     permissions:
       id-token: write # needed for aws credentials
@@ -106,5 +117,5 @@ jobs:
     uses: ./.github/workflows/stop-services.yml
     with:
       environment: test
-      services: "api,ring,telegrambot,garp,sequencer,anvil,anvil2"
+      services: "api,ring,telegrambot,garp,sequencer,arch,mempool,bitcoin,anvil,anvil2"
 

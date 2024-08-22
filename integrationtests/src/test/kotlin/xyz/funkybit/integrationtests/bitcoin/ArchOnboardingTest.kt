@@ -4,7 +4,6 @@ import com.funkatronics.kborsh.Borsh
 import kotlinx.serialization.decodeFromByteArray
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
@@ -16,7 +15,6 @@ import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.integrationtests.bitcoin.UtxoSelectionTest.Companion.waitForTx
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
-import xyz.funkybit.integrationtests.testutils.isTestEnvRun
 import xyz.funkybit.integrationtests.testutils.triggerRepeaterTaskAndWaitForCompletion
 import xyz.funkybit.integrationtests.testutils.waitFor
 import java.math.BigDecimal
@@ -29,8 +27,6 @@ class ArchOnboardingTest {
 
     @Test
     fun testOnboarding() {
-        Assumptions.assumeFalse(isTestEnvRun())
-
         triggerRepeaterTaskAndWaitForCompletion("arch_onboarding")
 
         airdropToSubmitter()

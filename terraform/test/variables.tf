@@ -35,6 +35,8 @@ data "aws_acm_certificate" "funkybit" {
   key_types = ["EC_prime256v1"]
 }
 
+data "aws_caller_identity" "current" {}
+
 terraform {
   required_version = "1.5.7"
 

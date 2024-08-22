@@ -1,10 +1,3 @@
-locals {
-  connect_to_load_balancer = var.lb_https_listener_arn != ""
-  inbound_port = var.allow_inbound ? var.tcp_ports[0] : 0
-  account_id    = data.aws_caller_identity.current.account_id
-  port_mappings = flatten([for port in var.tcp_ports : { containerPort = port, hostPort = port, protocol = "tcp" }])
-}
-
 resource "aws_iam_role" "ecs_task_execution_role" {
   name = "${var.name_prefix}-${var.task_name}-task-execution"
 
@@ -32,7 +25,7 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
   role = aws_iam_role.ecs_task_execution_role.id
   policy = jsonencode({
     Version = "2012-10-17",
-    Statement = flatten([[
+    Statement = [
       {
         Effect = "Allow",
         Action = [
@@ -45,41 +38,8 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
           "logs:PutLogEvents"
         ],
         Resource = "*"
-      },
-      {
-        Effect = "Allow",
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ],
-        Resource = [
-          "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:${var.name_prefix}/${var.task_name}/*",
-          "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:slack-error-reporter-token-*"
-        ]
-      },
-      {
-        Effect = "Allow",
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ],
-        Resource = [
-          "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*"
-        ],
-        Condition = {
-          "StringEquals" : { "aws:ResourceTag/Name" : "${var.name_prefix}-db-cluster" }
-        }
       }
-      ], (var.icons_bucket == {} ? [] : [
-        {
-          Action = [
-            "s3:GetObject",
-            "s3:PutObject",
-            "s3:PutObjectAcl"
-          ],
-          Effect   = "Allow",
-          Resource = var.icons_bucket.arn
-        }
-      ]
-    )])
+    ]
   })
 }
 
@@ -103,22 +63,20 @@ resource "aws_security_group_rule" "ecs_task_egress" {
 }
 
 resource "aws_security_group_rule" "security_group_ingress" {
-  count             = var.allow_inbound ? 1 : 0
   security_group_id = aws_security_group.security_group.id
 
   type        = "ingress"
-  from_port   = local.inbound_port
-  to_port     = local.inbound_port
+  from_port   = var.bitcoind_port
+  to_port     = var.bitcoind_port
   protocol    = "tcp"
   cidr_blocks = [var.vpc.cidr_block]
 }
 
 
 resource "aws_lb_target_group" "target_group" {
-  count                = local.connect_to_load_balancer ? 1 : 0
   name                 = "${var.name_prefix}-${var.task_name}-tg"
-  port                 = local.inbound_port
-  protocol             = var.lb_protocol
+  port                 = var.bitcoind_port
+  protocol             = "HTTP"
   vpc_id               = var.vpc.id
   target_type          = "ip"
   deregistration_delay = 5
@@ -126,22 +84,21 @@ resource "aws_lb_target_group" "target_group" {
   health_check {
     healthy_threshold   = "2"
     interval            = "10"
-    protocol            = var.lb_protocol
-    matcher             = var.lb_protocol == "HTTP" ? var.health_check_http_status : null
+    protocol            = "HTTP"
+    matcher             = "200"
     timeout             = "3"
-    path                = var.lb_protocol == "HTTP" ? var.health_check_http_path : null
+    path                = "/rest/chaininfo.json"
     unhealthy_threshold = "3"
   }
 }
 
 resource "aws_lb_listener_rule" "target_group" {
-  count        = local.connect_to_load_balancer ? 1 : 0
   listener_arn = var.lb_https_listener_arn
   priority     = var.lb_priority
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.target_group[0].arn
+    target_group_arn = aws_lb_target_group.target_group.arn
   }
 
   condition {
@@ -162,10 +119,10 @@ resource "aws_ecs_task_definition" "task" {
   container_definitions = jsonencode([
     merge(
       {
-        name         = "${var.name_prefix}-${var.task_name}"
-        image        = var.image_is_external ? var.image : "${local.account_id}.dkr.ecr.us-east-2.amazonaws.com/${var.image}:latest"
+        name         = "${var.name_prefix}-${var.task_name}-bitcoind"
+        image        = var.bitcoind_image
         essential    = true
-        portMappings = local.port_mappings
+        portMappings = [{ containerPort = var.bitcoind_port, hostPort = var.bitcoind_port, protocol = "tcp" }]
         cpu          = 0
         volumesFrom  = []
         environment  = []
@@ -176,12 +133,44 @@ resource "aws_ecs_task_definition" "task" {
             "awslogs-group" : "firelens-container",
             "awslogs-region" : var.aws_region,
             "awslogs-create-group" : "true",
-            "awslogs-stream-prefix" : "${var.name_prefix}-${var.task_name}",
+            "awslogs-stream-prefix" : "${var.name_prefix}-${var.task_name}-bitcoind",
             "mode" : "non-blocking"
           }
         }
       },
-      var.include_command ? { command = [var.task_name] } : {},
+      var.mount_efs_volume ? {
+        mountPoints = [
+          {
+            "containerPath" : "/data",
+            "sourceVolume" : "${var.name_prefix}-${var.task_name}-efs-volume"
+          }
+        ]
+      } : { mountPoints = [] }
+    ),
+    merge(
+      {
+        name         = "${var.name_prefix}-${var.task_name}-fulcrum"
+        image        = var.fulcrum_image
+        essential    = true
+        portMappings = [{ containerPort = var.fulcrum_port, hostPort = var.fulcrum_port, protocol = "tcp" }]
+        cpu          = 0
+        volumesFrom  = []
+        environment  = [
+          { name  = "BITCOIND_HOST", value = "localhost" },
+          { name = "BITCOIND_PORT", value = tostring(var.bitcoind_port) }
+        ]
+        secrets      = []
+        logConfiguration = {
+          logDriver = "awslogs"
+          options = {
+            "awslogs-group" : "firelens-container",
+            "awslogs-region" : var.aws_region,
+            "awslogs-create-group" : "true",
+            "awslogs-stream-prefix" : "${var.name_prefix}-${var.task_name}-fulcrum",
+            "mode" : "non-blocking"
+          }
+        }
+      },
       var.mount_efs_volume ? {
         mountPoints = [
           {
@@ -240,13 +229,10 @@ resource "aws_ecs_service" "service" {
     assign_public_ip = false
   }
 
-  dynamic "load_balancer" {
-    for_each = local.connect_to_load_balancer ? [0] : []
-    content {
-      target_group_arn = aws_lb_target_group.target_group[0].arn
-      container_name   = "${var.name_prefix}-${var.task_name}"
-      container_port   = local.inbound_port
-    }
+  load_balancer {
+    target_group_arn = aws_lb_target_group.target_group.arn
+    container_name   = "${var.name_prefix}-${var.task_name}-bitcoind"
+    container_port   = var.bitcoind_port
   }
 
   service_registries {
@@ -254,8 +240,8 @@ resource "aws_ecs_service" "service" {
   }
 
   lifecycle {
-    # we are updating image in the task definition and desired count every time during the deploy
-    ignore_changes = [task_definition, desired_count]
+    # we are updating desired count via ecs-deploy script
+    ignore_changes = [desired_count]
   }
 }
 

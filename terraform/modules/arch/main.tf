@@ -1,8 +1,5 @@
 locals {
-  connect_to_load_balancer = var.lb_https_listener_arn != ""
-  inbound_port = var.allow_inbound ? var.tcp_ports[0] : 0
-  account_id    = data.aws_caller_identity.current.account_id
-  port_mappings = flatten([for port in var.tcp_ports : { containerPort = port, hostPort = port, protocol = "tcp" }])
+  bootnode_rpc_port = 9001
 }
 
 resource "aws_iam_role" "ecs_task_execution_role" {
@@ -32,7 +29,7 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
   role = aws_iam_role.ecs_task_execution_role.id
   policy = jsonencode({
     Version = "2012-10-17",
-    Statement = flatten([[
+    Statement = [
       {
         Effect = "Allow",
         Action = [
@@ -45,41 +42,8 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
           "logs:PutLogEvents"
         ],
         Resource = "*"
-      },
-      {
-        Effect = "Allow",
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ],
-        Resource = [
-          "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:${var.name_prefix}/${var.task_name}/*",
-          "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:slack-error-reporter-token-*"
-        ]
-      },
-      {
-        Effect = "Allow",
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ],
-        Resource = [
-          "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*"
-        ],
-        Condition = {
-          "StringEquals" : { "aws:ResourceTag/Name" : "${var.name_prefix}-db-cluster" }
-        }
       }
-      ], (var.icons_bucket == {} ? [] : [
-        {
-          Action = [
-            "s3:GetObject",
-            "s3:PutObject",
-            "s3:PutObjectAcl"
-          ],
-          Effect   = "Allow",
-          Resource = var.icons_bucket.arn
-        }
-      ]
-    )])
+    ]
   })
 }
 
@@ -103,22 +67,20 @@ resource "aws_security_group_rule" "ecs_task_egress" {
 }
 
 resource "aws_security_group_rule" "security_group_ingress" {
-  count             = var.allow_inbound ? 1 : 0
   security_group_id = aws_security_group.security_group.id
 
   type        = "ingress"
-  from_port   = local.inbound_port
-  to_port     = local.inbound_port
+  from_port   = local.bootnode_rpc_port
+  to_port     = local.bootnode_rpc_port
   protocol    = "tcp"
   cidr_blocks = [var.vpc.cidr_block]
 }
 
 
 resource "aws_lb_target_group" "target_group" {
-  count                = local.connect_to_load_balancer ? 1 : 0
   name                 = "${var.name_prefix}-${var.task_name}-tg"
-  port                 = local.inbound_port
-  protocol             = var.lb_protocol
+  port                 = local.bootnode_rpc_port
+  protocol             = "HTTP"
   vpc_id               = var.vpc.id
   target_type          = "ip"
   deregistration_delay = 5
@@ -126,22 +88,21 @@ resource "aws_lb_target_group" "target_group" {
   health_check {
     healthy_threshold   = "2"
     interval            = "10"
-    protocol            = var.lb_protocol
-    matcher             = var.lb_protocol == "HTTP" ? var.health_check_http_status : null
+    protocol            = "HTTP"
+    matcher             = "405" # Arch returns HTTP status 405 (method not allowed) for non-POST requests
     timeout             = "3"
-    path                = var.lb_protocol == "HTTP" ? var.health_check_http_path : null
+    path                = "/"
     unhealthy_threshold = "3"
   }
 }
 
 resource "aws_lb_listener_rule" "target_group" {
-  count        = local.connect_to_load_balancer ? 1 : 0
   listener_arn = var.lb_https_listener_arn
   priority     = var.lb_priority
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.target_group[0].arn
+    target_group_arn = aws_lb_target_group.target_group.arn
   }
 
   condition {
@@ -162,13 +123,32 @@ resource "aws_ecs_task_definition" "task" {
   container_definitions = jsonencode([
     merge(
       {
-        name         = "${var.name_prefix}-${var.task_name}"
-        image        = var.image_is_external ? var.image : "${local.account_id}.dkr.ecr.us-east-2.amazonaws.com/${var.image}:latest"
+        name         = "${var.name_prefix}-${var.task_name}-bootnode"
+        image        = "ghcr.io/arch-network/node:latest"
         essential    = true
-        portMappings = local.port_mappings
+        portMappings = [
+          { containerPort = local.bootnode_rpc_port, hostPort = local.bootnode_rpc_port, protocol = "tcp" }
+        ]
         cpu          = 0
         volumesFrom  = []
-        environment  = []
+        environment  = [
+          { name = "LOG_LEVEL", value = "debug" },
+          { name = "RUST_BACKTRACE", value = "1" },
+          { name = "NETWORK_MODE", value = "devnet" },
+          { name = "PRIVATE_KEY_PASSWORD", value = "" },
+          { name = "RPC_BIND_IP", value = "0.0.0.0" },
+          { name = "BITCOIN_RPC_ENDPOINT", value = var.bitcoin_host },
+          { name = "BITCOIN_RPC_PORT", value = tostring(var.bitcoin_rpc_port) },
+          { name = "BITCOIN_RPC_USERNAME", value = "user" },
+          { name = "BITCOIN_RPC_PASSWORD", value = "password" },
+          { name = "BITCOIN_RPC_WALLET", value = "testwallet" },
+          { name = "RISC0_DEV_MODE", value = "1" },
+          { name = "DATA_DIR", value = "/arch-data/bootnode" },
+          { name = "IS_BOOT_NODE", value = "true" },
+          { name = "RPC_BIND_PORT", value = tostring(local.bootnode_rpc_port) },
+          { name = "ARCH_NODES", value = "http://localhost:${local.bootnode_rpc_port},http://localhost:9002,http://localhost:9003" },
+          { name = "PROVER_ENDPOINT", value = "http://localhost:8001" },
+        ]
         secrets      = []
         logConfiguration = {
           logDriver = "awslogs"
@@ -176,16 +156,120 @@ resource "aws_ecs_task_definition" "task" {
             "awslogs-group" : "firelens-container",
             "awslogs-region" : var.aws_region,
             "awslogs-create-group" : "true",
-            "awslogs-stream-prefix" : "${var.name_prefix}-${var.task_name}",
+            "awslogs-stream-prefix" : "${var.name_prefix}-${var.task_name}-bootnode",
             "mode" : "non-blocking"
           }
         }
       },
-      var.include_command ? { command = [var.task_name] } : {},
       var.mount_efs_volume ? {
         mountPoints = [
           {
-            "containerPath" : "/data",
+            "containerPath" : "/arch-data",
+            "sourceVolume" : "${var.name_prefix}-${var.task_name}-efs-volume"
+          }
+        ]
+      } : { mountPoints = [] }
+    ),
+    merge(
+      {
+        name         = "${var.name_prefix}-${var.task_name}-node"
+        image        = "ghcr.io/arch-network/node:latest"
+        essential    = true
+        portMappings = [
+          { containerPort = 9002, hostPort = 9002, protocol = "tcp" }
+        ]
+        cpu          = 0
+        volumesFrom  = []
+        environment  = [
+          { name = "LOG_LEVEL", value = "debug" },
+          { name = "RUST_BACKTRACE", value = "1" },
+          { name = "NETWORK_MODE", value = "devnet" },
+          { name = "PRIVATE_KEY_PASSWORD", value = "" },
+          { name = "RPC_BIND_IP", value = "0.0.0.0" },
+          { name = "BITCOIN_RPC_ENDPOINT", value = var.bitcoin_host },
+          { name = "BITCOIN_RPC_PORT", value = tostring(var.bitcoin_rpc_port) },
+          { name = "BITCOIN_RPC_USERNAME", value = "user" },
+          { name = "BITCOIN_RPC_PASSWORD", value = "password" },
+          { name = "BITCOIN_RPC_WALLET", value = "testwallet" },
+          { name = "RISC0_DEV_MODE", value = "1" },
+          { name = "DATA_DIR", value = "/arch-data/node" },
+          { name = "RPC_BIND_PORT", value = "9002" },
+          { name = "BOOT_NODE_ENDPOINT", value = "http://localhost:${local.bootnode_rpc_port}" },
+          { name = "PROVER_ENDPOINT", value = "http://localhost:8001" },
+        ]
+        dependsOn = [
+          { containerName = "${var.name_prefix}-${var.task_name}-bootnode", condition = "START" }
+        ]
+        secrets      = []
+        logConfiguration = {
+          logDriver = "awslogs"
+          options = {
+            "awslogs-group" : "firelens-container",
+            "awslogs-region" : var.aws_region,
+            "awslogs-create-group" : "true",
+            "awslogs-stream-prefix" : "${var.name_prefix}-${var.task_name}-node",
+            "mode" : "non-blocking"
+          }
+        }
+      },
+      var.mount_efs_volume ? {
+        mountPoints = [
+          {
+            "containerPath" : "/arch-data",
+            "sourceVolume" : "${var.name_prefix}-${var.task_name}-efs-volume"
+          }
+        ]
+      } : { mountPoints = [] }
+    ),
+    merge(
+      {
+        name         = "${var.name_prefix}-${var.task_name}-prover"
+        image        = "ghcr.io/arch-network/zkvm:latest"
+        essential    = true
+        portMappings = [
+          { containerPort = 9003, hostPort = 9003, protocol = "tcp" },
+          { containerPort = 8001, hostPort = 8001, protocol = "tcp" }
+        ]
+        cpu          = 0
+        volumesFrom  = []
+        environment  = [
+          { name = "LOG_LEVEL", value = "debug" },
+          { name = "RUST_BACKTRACE", value = "1" },
+          { name = "NETWORK_MODE", value = "devnet" },
+          { name = "PRIVATE_KEY_PASSWORD", value = "" },
+          { name = "RPC_BIND_IP", value = "0.0.0.0" },
+          { name = "BITCOIN_RPC_ENDPOINT", value = var.bitcoin_host },
+          { name = "BITCOIN_RPC_PORT", value = tostring(var.bitcoin_rpc_port) },
+          { name = "BITCOIN_RPC_USERNAME", value = "user" },
+          { name = "BITCOIN_RPC_PASSWORD", value = "password" },
+          { name = "BITCOIN_RPC_WALLET", value = "testwallet" },
+          { name = "RISC0_DEV_MODE", value = "1" },
+          { name = "DATA_DIR", value = "/arch-data/prover" },
+          { name = "RPC_BIND_PORT", value = "9003" },
+          { name = "ZKVM_RPC_BIND_IP", value = "0.0.0.0" },
+          { name = "ZKVM_RPC_BIND_PORT", value = "8001" },
+          { name = "ARCH_BOOT_NODE_URL", value = "http://localhost:${local.bootnode_rpc_port}" },
+          { name = "PROVER_ENDPOINT", value = "http://localhost:8001" },
+        ]
+        dependsOn = [
+          { containerName = "${var.name_prefix}-${var.task_name}-bootnode", condition = "START" }
+        ]
+        secrets      = []
+        logConfiguration = {
+          logDriver = "awslogs"
+          options = {
+            "awslogs-group" : "firelens-container",
+            "awslogs-region" : var.aws_region,
+            "awslogs-create-group" : "true",
+            "awslogs-stream-prefix" : "${var.name_prefix}-${var.task_name}-prover",
+            "mode" : "non-blocking"
+          }
+        }
+      },
+      var.mount_efs_volume ? {
+        mountPoints = [
+          {
+            "containerPath" : "/arch-data",
             "sourceVolume" : "${var.name_prefix}-${var.task_name}-efs-volume"
           }
         ]
@@ -240,13 +324,10 @@ resource "aws_ecs_service" "service" {
     assign_public_ip = false
   }
 
-  dynamic "load_balancer" {
-    for_each = local.connect_to_load_balancer ? [0] : []
-    content {
-      target_group_arn = aws_lb_target_group.target_group[0].arn
-      container_name   = "${var.name_prefix}-${var.task_name}"
-      container_port   = local.inbound_port
-    }
+  load_balancer {
+    target_group_arn = aws_lb_target_group.target_group.arn
+    container_name   = "${var.name_prefix}-${var.task_name}-bootnode"
+    container_port   = local.bootnode_rpc_port
   }
 
   service_registries {
@@ -254,8 +335,8 @@ resource "aws_ecs_service" "service" {
   }
 
   lifecycle {
-    # we are updating image in the task definition and desired count every time during the deploy
-    ignore_changes = [task_definition, desired_count]
+    # we are updating desired count via ecs-deploy script
+    ignore_changes = [desired_count]
   }
 }
 

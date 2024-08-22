@@ -1,0 +1,35 @@
+name: Init Arch
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
+
+# only one running job
+concurrency:
+  group: init-arch
+  cancel-in-progress: false
+
+jobs:
+  init_arch:
+    name: Init Arch
+    runs-on: ubuntu-latest
+    permissions:
+      # needed for aws credentials
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup AWS
+        uses: ./.github/actions/setup-aws
+      - name: Configure SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CI_BASTION_KEY }}
+      - name: Run init_arch script
+        run: |
+          cd scripts
+          ./init_arch.sh ${{ inputs.environment }}
