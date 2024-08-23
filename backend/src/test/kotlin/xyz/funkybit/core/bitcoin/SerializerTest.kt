@@ -45,7 +45,7 @@ class SerializerTest {
     @Test
     fun `test borsch`() {
         val exchangeInstruction: ProgramInstruction = ProgramInstruction.InitStateParams(
-            BitcoinAddress("fee"),
+            BitcoinAddress.canonicalize("fee"),
             SerializedBitcoinTx("hello".toByteArray()),
         )
 

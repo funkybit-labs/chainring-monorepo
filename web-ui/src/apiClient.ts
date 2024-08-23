@@ -18,7 +18,7 @@ const decimal = () =>
       } catch (error) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: `${value} can't be parsed into Decimal`
+          message: `${value} can't be parsed into Decimal: ${error}`
         })
         return z.NEVER
       }

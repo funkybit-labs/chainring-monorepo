@@ -74,7 +74,7 @@ open class OrderBaseTest {
         @BeforeAll
         fun loadSymbols() {
             val config = TestApiClient.getConfiguration()
-            val(chain1, chain2) = config.chains.map { it.id }
+            val(chain1, chain2) = config.evmChains.map { it.id }
             usdcDaiMarket = config.markets.first { it.id.value == "USDC:$chain1/DAI:$chain1" }
             usdc2Dai2Market = config.markets.first { it.id.value == "USDC:$chain2/DAI:$chain2" }
             btcEthMarket = config.markets.first { it.id.value == "BTC:$chain1/ETH:$chain1" }

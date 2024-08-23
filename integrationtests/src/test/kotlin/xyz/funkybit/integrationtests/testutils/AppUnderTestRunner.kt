@@ -245,7 +245,6 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
 
     private fun deleteAll() {
         transaction {
-            BlockTable.deleteAll()
             TelegramBotUserWalletTable.deleteAll()
             TelegramBotUserTable.deleteAll()
             TelegramMiniAppUserRewardTable.deleteAll()

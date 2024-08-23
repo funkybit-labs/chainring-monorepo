@@ -2,7 +2,6 @@ package xyz.funkybit.integrationtests.utils
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
-import org.bitcoinj.core.NetworkParameters
 import org.bitcoinj.wallet.KeyChainGroup
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
@@ -18,6 +17,7 @@ import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.apps.ring.BlockchainDepositHandler
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.ContractType
+import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.evm.EIP712Helper
 import xyz.funkybit.core.evm.EIP712Transaction
 import xyz.funkybit.core.evm.TokenAddressAndChain
@@ -65,7 +65,7 @@ class Wallet(
     var currentChainId: ChainId = blockchainClients.first().chainId
 
     val evmAddress = EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(walletKeypair)))
-    private val bitcoinNetwork = NetworkParameters.fromID(NetworkParameters.ID_REGTEST)
+    private val bitcoinNetwork = BitcoinClient.getParams()
     val bitcoinAddress = BitcoinWallet(bitcoinNetwork, KeyChainGroup.createBasic(bitcoinNetwork))
 
     private val exchangeContractAddressByChainId = chains.associate { it.id to it.contracts.first { it.name == ContractType.Exchange.name }.address }

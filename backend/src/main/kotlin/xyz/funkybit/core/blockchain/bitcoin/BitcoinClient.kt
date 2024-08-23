@@ -4,6 +4,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.decodeFromJsonElement
 import org.bitcoinj.core.NetworkParameters
+import org.bitcoinj.core.Transaction
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.SmartFeeMode
 import xyz.funkybit.core.model.BitcoinAddress
@@ -29,7 +30,7 @@ object BitcoinClient : JsonRpcClientBase(
     override val logger = KotlinLogging.logger {}
 
     val bitcoinConfig = ChainManager.bitcoinBlockchainClientConfig
-    val chainId = ChainId(8086u)
+    val chainId = ChainId(0u)
     private val minFee = BigDecimal(bitcoinConfig.feeSettings.minValue)
     private val maxFee = BigDecimal(bitcoinConfig.feeSettings.maxValue)
 

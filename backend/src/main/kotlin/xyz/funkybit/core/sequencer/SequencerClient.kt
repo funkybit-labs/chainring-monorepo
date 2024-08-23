@@ -3,7 +3,6 @@ package xyz.funkybit.core.sequencer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
-import org.bitcoinj.core.Base58
 import xyz.funkybit.apps.api.middleware.ServerSpans
 import xyz.funkybit.apps.api.middleware.Tracer
 import xyz.funkybit.core.evm.ECHelper
@@ -82,7 +81,7 @@ fun Address.toSequencerId(): SequencerWalletId {
             ECHelper.sha3(
                 when (this) {
                     is EvmAddress -> this.value.toHexBytes()
-                    is BitcoinAddress -> Base58.decode(this.value)
+                    is BitcoinAddress -> this.script().toByteArray()
                 },
             ),
         ).toLong(),

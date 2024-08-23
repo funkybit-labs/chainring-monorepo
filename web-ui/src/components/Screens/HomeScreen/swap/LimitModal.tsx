@@ -2,7 +2,7 @@ import Markets, { Market } from 'markets'
 import React, { LegacyRef, useEffect, useMemo, useRef, useState } from 'react'
 import TradingSymbol from 'tradingSymbol'
 import { Balance, FeeRates, OrderSide } from 'apiClient'
-import { Address, formatUnits } from 'viem'
+import { formatUnits } from 'viem'
 import { SymbolSelector } from 'components/Screens/HomeScreen/SymbolSelector'
 import AmountInput from 'components/common/AmountInput'
 import { classNames } from 'utils'
@@ -33,8 +33,8 @@ export function LimitModal({
   onSideChange
 }: {
   markets: Markets
-  exchangeContractAddress?: Address
-  walletAddress?: Address
+  exchangeContractAddress?: string
+  walletAddress?: string
   feeRates: FeeRates
   onMarketChange: (m: Market) => void
   onSideChange: (s: OrderSide) => void
@@ -139,7 +139,9 @@ export function LimitModal({
                 <span className="text-base text-darkBluishGray1">Sell</span>
                 <div className="flex flex-row items-baseline space-x-2 text-sm">
                   {depositAmount(
-                    exchangeContractAddress && sr.topBalance,
+                    exchangeContractAddress === undefined
+                      ? undefined
+                      : sr.topBalance,
                     sr.topSymbol
                   )}
                   {walletAddress && exchangeContractAddress && (
@@ -263,7 +265,9 @@ export function LimitModal({
                 <span className="text-base text-darkBluishGray1">Buy</span>
                 <div className="flex flex-row space-x-2 align-middle text-sm">
                   {depositAmount(
-                    exchangeContractAddress && sr.bottomBalance,
+                    exchangeContractAddress === undefined
+                      ? undefined
+                      : sr.bottomBalance,
                     sr.bottomSymbol
                   )}
                 </div>

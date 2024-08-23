@@ -63,7 +63,7 @@ class BitcoinWalletStateEntity(guid: EntityID<BitcoinWalletStateId>) : GUIDEntit
     }
 
     var address by BitcoinWalletStateTable.address.transform(
-        toReal = { BitcoinAddress(it) },
+        toReal = { BitcoinAddress.canonicalize(it) },
         toColumn = { it.value },
     )
 

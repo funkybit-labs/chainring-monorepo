@@ -29,8 +29,8 @@ export default function DepositModal({
   close,
   onClosed
 }: {
-  exchangeContractAddress: Address
-  walletAddress: Address
+  exchangeContractAddress: string
+  walletAddress: string
   symbol: TradingSymbol
   isOpen: boolean
   close: () => void
@@ -46,10 +46,10 @@ export default function DepositModal({
             abi: ERC20Abi,
             address: symbol.contractAddress,
             functionName: 'balanceOf',
-            args: [walletAddress]
+            args: [walletAddress as Address]
           })
         : getBalance(config, {
-            address: walletAddress
+            address: walletAddress as Address
           }).then((res) => res.value)
     }
   })
@@ -86,7 +86,10 @@ export default function DepositModal({
             chainId: symbol.chainId,
             data: encodeFunctionData({
               abi: ERC20Abi,
-              args: [walletAddress, exchangeContractAddress],
+              args: [
+                walletAddress as Address,
+                exchangeContractAddress as Address
+              ],
               functionName: 'allowance'
             })
           })
@@ -110,7 +113,7 @@ export default function DepositModal({
 
           setSubmitPhase('waitingForDepositApproval')
           depositHash = await sendTransaction(config, {
-            to: exchangeContractAddress,
+            to: exchangeContractAddress as Address,
             chainId: symbol.chainId,
             data: encodeFunctionData({
               abi: ExchangeAbi,
@@ -121,7 +124,7 @@ export default function DepositModal({
         } else {
           setSubmitPhase('waitingForDepositApproval')
           depositHash = await sendTransaction(config, {
-            to: exchangeContractAddress,
+            to: exchangeContractAddress as Address,
             value: amount
           })
         }

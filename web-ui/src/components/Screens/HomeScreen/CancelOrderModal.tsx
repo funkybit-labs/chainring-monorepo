@@ -17,8 +17,8 @@ export function CancelOrderModal({
   onClosed
 }: {
   order: Order
-  exchangeContractAddress: Address
-  walletAddress: Address
+  exchangeContractAddress: string
+  walletAddress: string
   isOpen: boolean
   close: () => void
   onClosed: () => void
@@ -48,7 +48,7 @@ export function CancelOrderModal({
           domain: getDomain(exchangeContractAddress!, config.state.chainId),
           primaryType: 'CancelOrder',
           message: {
-            sender: walletAddress!,
+            sender: walletAddress! as Address,
             marketId: order.marketId,
             amount: order.side == 'Buy' ? order.amount : -order.amount,
             nonce: BigInt('0x' + nonce)

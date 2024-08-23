@@ -22,16 +22,16 @@ class ExchangeContractManager {
     init {
         val config = TestApiClient.getConfiguration()
         blockchainClients.forEach { (chainId, blockchainClient) ->
-            val chain = config.chains.first { it.id == chainId }
+            val chain = config.evmChains.first { it.id == chainId }
             blockchainClient.setContractAddress(
                 ContractType.Exchange,
                 chain.contracts.first { it.name == "Exchange" }.address,
             )
         }
-        symbols = config.chains.map { chain ->
+        symbols = config.evmChains.map { chain ->
             chain.symbols.associateBy { it.name }
         }.flatMap { map -> map.entries }.associate(Map.Entry<String, SymbolInfo>::toPair)
-        symbolByChainId = config.chains.map { chain ->
+        symbolByChainId = config.evmChains.map { chain ->
             chain.symbols.associate { it.name to chain.id }
         }.flatMap { map -> map.entries }.associate(Map.Entry<String, ChainId>::toPair)
     }

@@ -10,7 +10,9 @@ const walletConnectMetadata = {
   name: 'funkybit',
   description: 'The first cross-chain DEX built on Bitcoin',
   url: '', // origin must match your domain & subdomain
-  icons: ['https://avatars.githubusercontent.com/u/37784886'] // TODO CHAIN-423 - update for funkybit
+  icons: [
+    'https://chainring-web-icons.s3.us-east-2.amazonaws.com/symbols/funkybit-icon-64x64.png'
+  ]
 }
 
 export let allChains: [Chain, ...Chain[]]

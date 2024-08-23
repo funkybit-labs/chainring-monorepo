@@ -1,6 +1,5 @@
 import logo from 'assets/funkybit-orange-logo-name.png'
-import { useWeb3Modal } from '@web3modal/wagmi/react'
-import { useAccount } from 'wagmi'
+import { useWallet } from 'contexts/walletProvider'
 import { addressDisplay, classNames, uniqueFilter } from 'utils'
 import { Button } from 'components/common/Button'
 import React, { useEffect, useMemo, useState } from 'react'
@@ -11,6 +10,7 @@ import faucetIcon from 'assets/faucet.svg'
 import { useValidChain } from 'hooks/useValidChain'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from 'apiClient'
+import { Address } from 'viem'
 
 export type Tab = 'Swap' | 'Limit' | 'Dashboard'
 
@@ -25,8 +25,7 @@ export function Header({
   onTabChange: (newTab: Tab) => void
   onShowAdmin: () => void
 }) {
-  const { open: openWalletConnectModal } = useWeb3Modal()
-  const account = useAccount()
+  const wallet = useWallet()
   const [name, setName] = useState<string>()
   const [icon, setIcon] = useState<string>()
   const [showMenu, setShowMenu] = useState(false)
@@ -34,11 +33,11 @@ export function Header({
   const [tab, setTab] = useState<Tab>(initialTab)
 
   useEffect(() => {
-    if (account.isConnected && account.connector) {
-      setIcon(account.connector.icon)
-      setName(account.connector.name)
+    if (wallet.evmAccount?.isConnected && wallet.evmAccount.connector) {
+      setIcon(wallet.evmAccount.connector.icon)
+      setName(wallet.evmAccount.connector.name)
     }
-  }, [account.isConnected, account.connector])
+  }, [wallet.evmAccount])
 
   useEffect(() => {
     function escapeHandler(ev: KeyboardEvent) {
@@ -72,7 +71,7 @@ export function Header({
   function walletConnector() {
     return (
       <div className="ml-5 whitespace-nowrap">
-        {account.isConnected ? (
+        {wallet.primaryCategory !== 'none' ? (
           <Button
             style={validChain ? 'normal' : 'warning'}
             width={'normal'}
@@ -86,10 +85,10 @@ export function Header({
                     alt={name ?? ''}
                   />
                 )}
-                {addressDisplay(account.address ?? '0x')}
+                {addressDisplay(wallet.primaryAddress ?? '0x')}
               </span>
             )}
-            onClick={() => openWalletConnectModal({ view: 'Account' })}
+            onClick={() => wallet.changeAccount()}
             disabled={false}
             primary={false}
           />
@@ -98,7 +97,7 @@ export function Header({
             style={'normal'}
             width={'normal'}
             caption={() => <>Connect Wallet</>}
-            onClick={() => openWalletConnectModal({ view: 'Connect' })}
+            onClick={() => wallet.connect('evm')}
             primary={true}
             disabled={false}
           />
@@ -112,7 +111,7 @@ export function Header({
   function faucetButton({ onClick }: { onClick: () => void }) {
     return (
       <span className="mx-5 whitespace-nowrap">
-        {faucetSymbols.length > 0 && account.isConnected ? (
+        {faucetSymbols.length > 0 && wallet.primaryCategory !== 'none' ? (
           <Button
             style={'normal'}
             width={'normal'}
@@ -230,16 +229,18 @@ export function Header({
           </div>
         </>
       )}
-      {faucetSymbols.length > 0 && account.isConnected && showFaucetModal && (
-        <div className="fixed">
-          <FaucetModal
-            isOpen={showFaucetModal}
-            walletAddress={account.address!}
-            symbols={faucetSymbols}
-            close={() => setShowFaucetModal(false)}
-          />
-        </div>
-      )}
+      {faucetSymbols.length > 0 &&
+        wallet.primaryCategory !== 'none' &&
+        showFaucetModal && (
+          <div className="fixed">
+            <FaucetModal
+              isOpen={showFaucetModal}
+              walletAddress={wallet.primaryAddress! as Address}
+              symbols={faucetSymbols}
+              close={() => setShowFaucetModal(false)}
+            />
+          </div>
+        )}
     </>
   )
 }
