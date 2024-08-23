@@ -76,7 +76,7 @@ data class OrderBookSnapshot(
                 }
                 .singleOrNull() ?: empty(market)
 
-        fun calculate(market: MarketEntity, latestTradesWithTakerOrders: List<Pair<TradeEntity, OrderEntity>>, prevSnapshot: OrderBookSnapshot?): OrderBookSnapshot {
+        fun calculate(market: MarketEntity, latestTradesWithTakerOrders: List<Pair<TradeEntity, OrderEntity>>, prevSnapshot: OrderBookSnapshot): OrderBookSnapshot {
             val priceScale = market.priceScale()
 
             fun getOrderBookEntries(side: OrderSide): List<Entry> {
@@ -135,7 +135,7 @@ data class OrderBookSnapshot(
                             .map { it.first },
                     )
                 } else {
-                    prevSnapshot?.last?.price ?: BigDecimal.ZERO
+                    prevSnapshot.last.price
                 }.setScale(priceScale, RoundingMode.HALF_EVEN)
 
                 LastTrade(
@@ -146,10 +146,8 @@ data class OrderBookSnapshot(
                         else -> LastTradeDirection.Unchanged
                     },
                 )
-            } else if (prevSnapshot != null) {
-                LastTrade(prevSnapshot.last.price, prevSnapshot.last.direction)
             } else {
-                LastTrade(BigDecimal.ZERO.setScale(priceScale, RoundingMode.HALF_EVEN), LastTradeDirection.Unchanged)
+                LastTrade(prevSnapshot.last.price, prevSnapshot.last.direction)
             }
 
             return OrderBookSnapshot(

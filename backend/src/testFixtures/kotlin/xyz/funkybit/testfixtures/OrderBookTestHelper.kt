@@ -113,7 +113,7 @@ object OrderBookTestHelper {
             (ordersInDb.map { it.market } + tradesInDb.map { it.market }).distinct().forEach { marketId ->
                 val market = MarketEntity[marketId]
                 OrderBookSnapshot
-                    .calculate(market, tradesWithTakerOrders, prevSnapshot = null)
+                    .calculate(market, tradesWithTakerOrders, prevSnapshot = OrderBookSnapshot.get(market))
                     .save(market)
             }
 
