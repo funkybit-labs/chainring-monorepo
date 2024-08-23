@@ -250,25 +250,35 @@ export function ReactionGame({
           </div>
         )}
 
-        <div className="absolute bottom-12 w-full items-center justify-center px-6 text-center text-xl">
+        <div className="absolute bottom-7 w-full items-center justify-center px-6 text-center text-xl">
           {(gameState === 'idle' || gameState === 'finished') && (
-            <Button
-              caption={() => {
-                if (apiError || tickets <= 0) {
-                  return 'No tickets remaining'
-                } else if (gameState === 'idle') {
-                  return 'Start'
-                } else {
-                  return `Try again (${tickets} tickets left)`
-                }
-              }}
-              onClick={() => {
-                if (!apiError && tickets > 0) startGame()
-                else onClose()
-              }}
-              className={classNames('my-4 w-full p-2 !bg-brightOrange/70')}
-              disabled={tickets <= 0}
-            />
+            <>
+              <Button
+                caption={() => {
+                  if (apiError || tickets <= 0) {
+                    return 'No tickets remaining'
+                  } else if (gameState === 'idle') {
+                    return 'Start'
+                  } else {
+                    return `Try again (${tickets} tickets left)`
+                  }
+                }}
+                onClick={() => {
+                  if (!apiError && tickets > 0) startGame()
+                  else onClose()
+                }}
+                className={classNames(
+                  'mt-4 w-full p-2 !bg-brightOrange/70 disabled:opacity-75',
+                  gameState === 'idle' ? 'mb-9' : null
+                )}
+                disabled={tickets <= 0}
+              />
+              {gameState !== 'idle' && (
+                <button onClick={onClose} className="text-base">
+                  Close
+                </button>
+              )}
+            </>
           )}
           {(gameState === 'waiting' ||
             gameState === 'early' ||
