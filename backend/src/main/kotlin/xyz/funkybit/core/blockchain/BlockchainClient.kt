@@ -247,7 +247,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
 
             exchangeContractCall(DefaultBlockParam.Latest) {
                 setSovereignWithdrawalDelay(config.sovereignWithdrawalDelaySeconds)
-            }.send()
+            }
         }
 
         return DeployedContract(
@@ -257,13 +257,13 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         )
     }
 
-    private fun <A> exchangeContractCall(block: DefaultBlockParam, f: Exchange.() -> RemoteFunctionCall<A>): RemoteFunctionCall<A> {
+    private fun <A> exchangeContractCall(block: DefaultBlockParam, f: Exchange.() -> RemoteFunctionCall<A>): A {
         val contract = loadExchangeContract(exchangeContractAddress)
         contract.setDefaultBlockParameter(block.toWeb3j())
         val startTime = Clock.System.now()
         while (true) {
             try {
-                return f(contract)
+                return f(contract).send()
             } catch (e: ContractCallException) {
                 val errorMessage = e.message ?: ""
                 val badBlockNumberErrors = setOf(
@@ -282,18 +282,18 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         }
     }
 
-    suspend fun getExchangeBalance(address: Address, tokenAddress: Address, block: DefaultBlockParam): BigInteger {
+    fun getExchangeBalance(address: Address, tokenAddress: Address, block: DefaultBlockParam): BigInteger {
         return exchangeContractCall(block) {
             balances(address.toString(), tokenAddress.toString())
-        }.sendAsync().await()
+        }
     }
 
-    private suspend fun getExchangeBalances(walletAddress: Address, tokenAddresses: List<Address>, block: DefaultBlockParam): Map<Address, BigInteger> =
+    private fun getExchangeBalances(walletAddress: Address, tokenAddresses: List<Address>, block: DefaultBlockParam): Map<Address, BigInteger> =
         tokenAddresses.associateWith { tokenAddress ->
             getExchangeBalance(walletAddress, tokenAddress, block)
         }
 
-    suspend fun getExchangeBalances(walletAddresses: List<Address>, tokenAddresses: List<Address>, block: DefaultBlockParam): Map<Address, Map<Address, BigInteger>> =
+    fun getExchangeBalances(walletAddresses: List<Address>, tokenAddresses: List<Address>, block: DefaultBlockParam): Map<Address, Map<Address, BigInteger>> =
         walletAddresses.associateWith { walletAddress ->
             getExchangeBalances(walletAddress, tokenAddresses, block)
         }
@@ -419,13 +419,13 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         sendTransaction(address, "", amount)
 
     fun batchHash(block: DefaultBlockParam): String =
-        exchangeContractCall(block, Exchange::batchHash).send().toHex(false)
+        exchangeContractCall(block, Exchange::batchHash).toHex(false)
 
     fun lastSettlementBatchHash(block: DefaultBlockParam): String =
-        exchangeContractCall(block, Exchange::lastSettlementBatchHash).send().toHex(false)
+        exchangeContractCall(block, Exchange::lastSettlementBatchHash).toHex(false)
 
     fun lastWithdrawalBatchHash(block: DefaultBlockParam): String =
-        exchangeContractCall(block, Exchange::lastWithdrawalBatchHash).send().toHex(false)
+        exchangeContractCall(block, Exchange::lastWithdrawalBatchHash).toHex(false)
 
     fun sendMintERC20Tx(
         tokenContractAddress: EvmAddress,
@@ -442,10 +442,10 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         )
 
     fun getFeeAccountAddress(block: DefaultBlockParam): EvmAddress =
-        EvmAddress(Keys.toChecksumAddress(exchangeContractCall(block, Exchange::feeAccount).send()))
+        EvmAddress(Keys.toChecksumAddress(exchangeContractCall(block, Exchange::feeAccount)))
 
     fun getSovereignWithdrawalDelay(block: DefaultBlockParam): BigInteger =
-        exchangeContractCall(block, Exchange::sovereignWithdrawalDelay).send()
+        exchangeContractCall(block, Exchange::sovereignWithdrawalDelay)
 
     val exchangeContractAddress: Address
         get() = contractMap.getValue(ContractType.Exchange)
