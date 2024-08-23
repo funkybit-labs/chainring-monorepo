@@ -4,6 +4,7 @@ import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
 import org.bouncycastle.util.encoders.Hex
 import org.jetbrains.exposed.sql.transactions.TransactionManager
+import java.math.BigDecimal
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -126,3 +127,6 @@ fun sha256(b: ByteArray?): ByteArray {
 }
 
 fun doubleSha256(b: ByteArray?) = sha256(sha256(b))
+
+fun List<BigInteger>.sum() = this.reduce { a, b -> a + b }
+fun List<BigDecimal>.sum() = this.reduce { a, b -> a + b }

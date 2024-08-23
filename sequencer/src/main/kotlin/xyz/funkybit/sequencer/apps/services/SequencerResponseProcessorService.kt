@@ -270,7 +270,7 @@ object SequencerResponseProcessorService {
         val tradesWithTakerOrder = handleTrades(response.tradesCreatedList, response.sequence, orderIdsInRequest, timestamp, broadcasterNotifications)
         handleChangedOrders(response.ordersChangedList, timestamp, broadcasterNotifications)
         handleBalanceChanges(response.balancesChangedList, broadcasterNotifications)
-        updateOrderBookSnapshot(response.ordersChangedList, broadcasterNotifications)
+        updateOrderBookSnapshot(response.ordersChangedList, tradesWithTakerOrder, broadcasterNotifications)
         updateOhlc(tradesWithTakerOrder, broadcasterNotifications)
         handleLimitsUpdates(response.limitsUpdatedList, broadcasterNotifications)
 
@@ -443,7 +443,7 @@ object SequencerResponseProcessorService {
         logger.debug { "Done calculating balance changes" }
     }
 
-    private fun updateOrderBookSnapshot(ordersChanged: List<OrderChanged>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
+    private fun updateOrderBookSnapshot(ordersChanged: List<OrderChanged>, tradesWithTakerOrder: List<Pair<TradeEntity, OrderEntity>>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
         val marketsWithOrderChanges = OrderEntity
             .getOrdersMarkets(ordersChanged.map { it.guid })
             .sortedBy { it.guid }
@@ -453,7 +453,7 @@ object SequencerResponseProcessorService {
             logger.debug { "Market $market" }
             val prevSnapshot = OrderBookSnapshot.get(market)
             logger.debug { "got old snapshot" }
-            val newSnapshot = OrderBookSnapshot.calculate(market)
+            val newSnapshot = OrderBookSnapshot.calculate(market, tradesWithTakerOrder, prevSnapshot)
             logger.debug { "calculated new snapshot" }
             val diff = newSnapshot.diff(prevSnapshot)
             logger.debug { "calculated diff" }

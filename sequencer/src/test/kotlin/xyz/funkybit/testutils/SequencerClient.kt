@@ -3,6 +3,7 @@ package xyz.funkybit.testutils
 import org.junit.jupiter.api.Assertions.assertEquals
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.FeeRates
+import xyz.funkybit.core.utils.sum
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.sequencer.apps.SequencerApp
 import xyz.funkybit.sequencer.core.Asset
@@ -213,9 +214,6 @@ class SequencerClient(clock: Clock) {
         val withdrawalFeesSet = response.withdrawalFeesSetList
         assertEquals(withdrawalFeesSet.size, fees.size)
     }
-
-    private fun List<BigInteger>.sum() = this.reduce { a, b -> a + b }
-    private fun List<BigDecimal>.sum() = this.reduce { a, b -> a + b }
 
     fun depositsAndWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigDecimal>, expectedAmount: BigDecimal? = amounts.sum(), expectedWithdrawalFees: List<BigInteger> = listOf()): SequencerResponse {
         val depositsAndWithdrawalsResponse = sequencer.processRequest(
