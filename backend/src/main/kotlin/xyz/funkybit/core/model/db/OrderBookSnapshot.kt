@@ -3,7 +3,6 @@ package xyz.funkybit.core.model.db
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.http4k.format.KotlinxSerialization
-import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.div
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.times
@@ -17,6 +16,8 @@ import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.upsert
 import xyz.funkybit.apps.api.model.BigDecimalJson
 import xyz.funkybit.core.utils.fromFundamentalUnits
+import xyz.funkybit.core.utils.setScale
+import xyz.funkybit.core.utils.sum
 import java.math.BigDecimal
 import java.math.RoundingMode
 
@@ -75,7 +76,7 @@ data class OrderBookSnapshot(
                 }
                 .singleOrNull() ?: empty(market)
 
-        fun calculate(market: MarketEntity): OrderBookSnapshot {
+        fun calculate(market: MarketEntity, latestTradesWithTakerOrders: List<Pair<TradeEntity, OrderEntity>>, prevSnapshot: OrderBookSnapshot): OrderBookSnapshot {
             val priceScale = market.priceScale()
 
             fun getOrderBookEntries(side: OrderSide): List<Entry> {
@@ -101,41 +102,58 @@ data class OrderBookSnapshot(
                     }
             }
 
+            val latestTradesWithTakerOrdersForMarket = latestTradesWithTakerOrders
+                .filter { it.first.marketGuid.value == market.guid.value }
+
+            val latestOrderIds = latestTradesWithTakerOrdersForMarket
+                .map { it.second.guid.value }
+                .distinct()
+
             // We calculate last trade's price as a size-weighted average
             // of all execution prices from the last match
-            val weightedAveragePriceCol = TradeTable.price.times(TradeTable.amount).sum().div(TradeTable.amount.sum())
-
-            val (lastTradePrice, prevTradePrice) = OrderExecutionTable
-                .join(OrderTable, JoinType.LEFT, OrderExecutionTable.orderGuid, OrderTable.guid)
-                .leftJoin(TradeTable)
-                .select(weightedAveragePriceCol)
-                .where { OrderTable.marketGuid.eq(market.guid) }
-                .andWhere { OrderTable.type.eq(OrderType.Market) }
-                .groupBy(
-                    OrderExecutionTable.orderGuid,
-                    OrderExecutionTable.timestamp,
-                )
-                .orderBy(OrderExecutionTable.timestamp, SortOrder.DESC)
-                .limit(2)
-                .mapNotNull { it[weightedAveragePriceCol] }
-                .let {
-                    Pair(
-                        it.getOrElse(0) { BigDecimal.ZERO },
-                        it.getOrElse(1) { BigDecimal.ZERO },
+            fun weightedAvgPrice(trades: List<TradeEntity>): BigDecimal =
+                trades
+                    .map { it.price * it.amount.toBigDecimal() }
+                    .sum()
+                    .div(
+                        trades.map { it.amount.toBigDecimal() }.sum(),
                     )
-                }
 
-            return OrderBookSnapshot(
-                bids = getOrderBookEntries(OrderSide.Buy),
-                asks = getOrderBookEntries(OrderSide.Sell),
-                last = LastTrade(
-                    price = lastTradePrice.setScale(priceScale, RoundingMode.HALF_EVEN),
-                    direction = when {
+            val lastTrade = if (latestOrderIds.isNotEmpty()) {
+                val latestOrderId = latestOrderIds.last()
+                val lastTradePrice = weightedAvgPrice(
+                    latestTradesWithTakerOrdersForMarket
+                        .filter { it.second.guid.value == latestOrderId }
+                        .map { it.first },
+                ).setScale(priceScale, RoundingMode.HALF_EVEN)
+
+                val prevTradePrice = if (latestOrderIds.size > 1) {
+                    val orderId = latestOrderIds[latestOrderIds.size - 2]
+                    weightedAvgPrice(
+                        latestTradesWithTakerOrdersForMarket
+                            .filter { it.second.guid.value == orderId }
+                            .map { it.first },
+                    )
+                } else {
+                    prevSnapshot.last.price
+                }.setScale(priceScale, RoundingMode.HALF_EVEN)
+
+                LastTrade(
+                    lastTradePrice,
+                    when {
                         lastTradePrice > prevTradePrice -> LastTradeDirection.Up
                         lastTradePrice < prevTradePrice -> LastTradeDirection.Down
                         else -> LastTradeDirection.Unchanged
                     },
-                ),
+                )
+            } else {
+                LastTrade(prevSnapshot.last.price, prevSnapshot.last.direction)
+            }
+
+            return OrderBookSnapshot(
+                bids = getOrderBookEntries(OrderSide.Buy),
+                asks = getOrderBookEntries(OrderSide.Sell),
+                last = lastTrade,
             )
         }
     }

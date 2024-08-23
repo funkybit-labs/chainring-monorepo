@@ -24,7 +24,6 @@ import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.testfixtures.DbTestHelpers.createOrder
 import java.math.BigDecimal
 import java.math.BigInteger
-import kotlin.time.Duration
 
 object OrderBookTestHelper {
     data class Order(
@@ -40,7 +39,7 @@ object OrderBookTestHelper {
 
     data class Trade(
         val market: MarketId,
-        val timeSinceHappened: Duration,
+        val responseSequence: Long,
         val buyOrder: OrderId,
         val sellOrder: OrderId,
         val amount: BigDecimal,
@@ -68,35 +67,45 @@ object OrderBookTestHelper {
             TransactionManager.current().commit()
 
             val now = Clock.System.now()
-            tradesInDb.forEach { trade ->
-                val tradeMarket = MarketEntity[trade.market]
+            val tradesWithTakerOrders = if (tradesInDb.isNotEmpty()) {
+                val lastRespSeq = tradesInDb.maxBy { it.responseSequence }.responseSequence
+                tradesInDb.sortedBy { it.responseSequence }.map { trade ->
+                    val tradeMarket = MarketEntity[trade.market]
 
-                val tradeEntity = TradeEntity.create(
-                    now.minus(trade.timeSinceHappened),
-                    tradeMarket,
-                    amount = trade.amount.toFundamentalUnits(tradeMarket.baseSymbol.decimals),
-                    price = trade.price,
-                    tradeHash = generateHexString(32),
-                    0L,
-                )
+                    val tradeEntity = TradeEntity.create(
+                        now,
+                        tradeMarket,
+                        amount = trade.amount.toFundamentalUnits(tradeMarket.baseSymbol.decimals),
+                        price = trade.price,
+                        tradeHash = generateHexString(32),
+                        trade.responseSequence,
+                    )
 
-                listOf(Pair(trade.buyOrder, trade.sellOrder), Pair(trade.sellOrder, trade.buyOrder)).forEach { (orderId, counterOrderId) ->
-                    val order = OrderEntity[orderId]
-                    val counterOrder = OrderEntity[counterOrderId]
-                    assertTrue(
-                        order.status == OrderStatus.Filled || order.status == OrderStatus.Partial,
-                        "Order must be filled or partially filled",
-                    )
-                    OrderExecutionEntity.create(
-                        timestamp = tradeEntity.timestamp,
-                        orderEntity = order,
-                        counterOrderEntity = counterOrder,
-                        tradeEntity = tradeEntity,
-                        role = if (order.type == OrderType.Market) ExecutionRole.Taker else ExecutionRole.Maker,
-                        feeAmount = BigInteger.ZERO,
-                        feeSymbol = Symbol(order.market.quoteSymbol.name),
-                    )
-                }
+                    listOf(Pair(trade.buyOrder, trade.sellOrder), Pair(trade.sellOrder, trade.buyOrder)).forEach { (orderId, counterOrderId) ->
+                        val order = OrderEntity[orderId]
+                        val counterOrder = OrderEntity[counterOrderId]
+                        assertTrue(
+                            order.status == OrderStatus.Filled || order.status == OrderStatus.Partial,
+                            "Order must be filled or partially filled",
+                        )
+                        OrderExecutionEntity.create(
+                            timestamp = tradeEntity.timestamp,
+                            orderEntity = order,
+                            counterOrderEntity = counterOrder,
+                            tradeEntity = tradeEntity,
+                            role = if (order.type == OrderType.Market) ExecutionRole.Taker else ExecutionRole.Maker,
+                            feeAmount = BigInteger.ZERO,
+                            feeSymbol = Symbol(order.market.quoteSymbol.name),
+                        )
+                    }
+
+                    val buyOrder = OrderEntity[trade.buyOrder]
+                    val sellOrder = OrderEntity[trade.sellOrder]
+
+                    tradeEntity to if (buyOrder.type == OrderType.Market) buyOrder else sellOrder
+                }.filter { it.first.responseSequence == lastRespSeq }
+            } else {
+                emptyList()
             }
 
             TransactionManager.current().commit()
@@ -104,7 +113,7 @@ object OrderBookTestHelper {
             (ordersInDb.map { it.market } + tradesInDb.map { it.market }).distinct().forEach { marketId ->
                 val market = MarketEntity[marketId]
                 OrderBookSnapshot
-                    .calculate(market)
+                    .calculate(market, tradesWithTakerOrders, prevSnapshot = OrderBookSnapshot.get(market))
                     .save(market)
             }
 

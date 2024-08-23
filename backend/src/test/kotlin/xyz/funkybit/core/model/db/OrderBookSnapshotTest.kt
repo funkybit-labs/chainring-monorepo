@@ -13,7 +13,6 @@ import xyz.funkybit.testfixtures.OrderBookTestHelper.Trade
 import xyz.funkybit.testfixtures.OrderBookTestHelper.verifyOrderBook
 import xyz.funkybit.testutils.TestWithDb
 import java.math.BigDecimal
-import kotlin.time.Duration.Companion.seconds
 
 class OrderBookSnapshotTest : TestWithDb() {
     private val btcEthMarket = MarketId("BTC:123/ETH:123")
@@ -532,7 +531,7 @@ class OrderBookSnapshotTest : TestWithDb() {
             tradesInDb = listOf(
                 Trade(
                     btcEthMarket,
-                    timeSinceHappened = 1.seconds,
+                    responseSequence = 1,
                     buyOrder = OrderId("order_3"),
                     sellOrder = OrderId("order_4"),
                     amount = "2".toBigDecimal(),
@@ -623,7 +622,7 @@ class OrderBookSnapshotTest : TestWithDb() {
             tradesInDb = listOf(
                 Trade(
                     btcEthMarket,
-                    timeSinceHappened = 2.seconds,
+                    responseSequence = 1,
                     buyOrder = OrderId("order_3"),
                     sellOrder = OrderId("order_4"),
                     amount = "2".toBigDecimal(),
@@ -631,7 +630,7 @@ class OrderBookSnapshotTest : TestWithDb() {
                 ),
                 Trade(
                     btcEthMarket,
-                    timeSinceHappened = 1.seconds,
+                    responseSequence = 1,
                     buyOrder = OrderId("order_5"),
                     sellOrder = OrderId("order_6"),
                     amount = "2".toBigDecimal(),
@@ -722,7 +721,7 @@ class OrderBookSnapshotTest : TestWithDb() {
             tradesInDb = listOf(
                 Trade(
                     btcEthMarket,
-                    timeSinceHappened = 2.seconds,
+                    responseSequence = 1,
                     buyOrder = OrderId("order_5"),
                     sellOrder = OrderId("order_6"),
                     amount = "2".toBigDecimal(),
@@ -730,7 +729,7 @@ class OrderBookSnapshotTest : TestWithDb() {
                 ),
                 Trade(
                     btcEthMarket,
-                    timeSinceHappened = 1.seconds,
+                    responseSequence = 2,
                     buyOrder = OrderId("order_3"),
                     sellOrder = OrderId("order_4"),
                     amount = "2".toBigDecimal(),
@@ -821,7 +820,7 @@ class OrderBookSnapshotTest : TestWithDb() {
             tradesInDb = listOf(
                 Trade(
                     btcEthMarket,
-                    timeSinceHappened = 2.seconds,
+                    responseSequence = 1,
                     buyOrder = OrderId("order_5"),
                     sellOrder = OrderId("order_6"),
                     amount = "2".toBigDecimal(),
@@ -829,7 +828,7 @@ class OrderBookSnapshotTest : TestWithDb() {
                 ),
                 Trade(
                     btcEthMarket,
-                    timeSinceHappened = 1.seconds,
+                    responseSequence = 1,
                     buyOrder = OrderId("order_3"),
                     sellOrder = OrderId("order_4"),
                     amount = "2".toBigDecimal(),
@@ -930,7 +929,15 @@ class OrderBookSnapshotTest : TestWithDb() {
             tradesInDb = listOf(
                 Trade(
                     btcEthMarket,
-                    timeSinceHappened = 1.seconds,
+                    responseSequence = 1,
+                    buyOrder = OrderId("order_6"),
+                    sellOrder = OrderId("order_7"),
+                    amount = "2".toBigDecimal(),
+                    price = "17.35".toBigDecimal(),
+                ),
+                Trade(
+                    btcEthMarket,
+                    responseSequence = 2,
                     buyOrder = OrderId("order_3"),
                     sellOrder = OrderId("order_5"),
                     amount = "2".toBigDecimal(),
@@ -938,19 +945,11 @@ class OrderBookSnapshotTest : TestWithDb() {
                 ),
                 Trade(
                     btcEthMarket,
-                    timeSinceHappened = 1.seconds,
+                    responseSequence = 2,
                     buyOrder = OrderId("order_4"),
                     sellOrder = OrderId("order_5"),
                     amount = "3".toBigDecimal(),
                     price = "17.40".toBigDecimal(),
-                ),
-                Trade(
-                    btcEthMarket,
-                    timeSinceHappened = 2.seconds,
-                    buyOrder = OrderId("order_6"),
-                    sellOrder = OrderId("order_7"),
-                    amount = "2".toBigDecimal(),
-                    price = "17.35".toBigDecimal(),
                 ),
             ),
             expected = OrderBookSnapshot(
@@ -1077,7 +1076,7 @@ class OrderBookSnapshotTest : TestWithDb() {
             tradesInDb = listOf(
                 Trade(
                     btcEthMarket,
-                    timeSinceHappened = 3.seconds,
+                    responseSequence = 1,
                     buyOrder = OrderId("order_5"),
                     sellOrder = OrderId("order_6"),
                     amount = "2".toBigDecimal(),
@@ -1085,7 +1084,7 @@ class OrderBookSnapshotTest : TestWithDb() {
                 ),
                 Trade(
                     btcEthMarket,
-                    timeSinceHappened = 2.seconds,
+                    responseSequence = 1,
                     buyOrder = OrderId("order_3"),
                     sellOrder = OrderId("order_4"),
                     amount = "2".toBigDecimal(),
@@ -1093,7 +1092,7 @@ class OrderBookSnapshotTest : TestWithDb() {
                 ),
                 Trade(
                     ethUsdcMarket,
-                    timeSinceHappened = 1.seconds,
+                    responseSequence = 1,
                     buyOrder = OrderId("order_9"),
                     sellOrder = OrderId("order_10"),
                     amount = "1".toBigDecimal(),
