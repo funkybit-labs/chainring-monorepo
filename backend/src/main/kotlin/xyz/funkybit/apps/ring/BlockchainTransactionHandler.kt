@@ -8,7 +8,6 @@ import org.web3j.crypto.Hash.sha3
 import org.web3j.crypto.RawTransaction
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import org.web3j.tx.Contract
-import org.web3j.tx.exceptions.ContractCallException
 import org.web3j.utils.Numeric
 import xyz.funkybit.contracts.generated.Exchange
 import xyz.funkybit.core.blockchain.BlockchainClient
@@ -35,6 +34,7 @@ import xyz.funkybit.core.model.db.WithdrawalStatus
 import xyz.funkybit.core.model.db.publishBroadcasterNotifications
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.sequencer.toSequencerId
+import xyz.funkybit.core.utils.BlockchainUtils.getAsOfBlockOrLater
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.core.utils.toHexBytes
 import xyz.funkybit.core.utils.tryAcquireAdvisoryLock
@@ -709,27 +709,6 @@ class BlockchainTransactionHandler(
             }
 
             publishBroadcasterNotifications(broadcasterNotifications)
-        }
-    }
-
-    private fun getAsOfBlockOrLater(blockNumber: DefaultBlockParam.BlockNumber, query: (blockParam: DefaultBlockParam) -> String): String {
-        try {
-            return query(blockNumber)
-        } catch (e: ContractCallException) {
-            e.message?.let {
-                Regex(
-                    ".*Contract Call has been reverted by the EVM with the reason: 'BlockOutOfRangeError: block height is (\\d+) but requested was (\\d+)'.*",
-                ).matchEntire(it)?.let { matchResult ->
-                    if (matchResult.groups.size == 3) {
-                        val blockHeight = matchResult.groups[1]!!.value.toBigInteger()
-                        val requestedHeight = matchResult.groups[2]!!.value.toBigInteger()
-                        if (blockHeight > requestedHeight) {
-                            return getAsOfBlockOrLater(DefaultBlockParam.BlockNumber(blockHeight), query)
-                        }
-                    }
-                }
-            }
-            throw(e)
         }
     }
 

@@ -37,6 +37,7 @@ import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.publishBroadcasterNotifications
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.sequencer.toSequencerId
+import xyz.funkybit.core.utils.BlockchainUtils.getAsOfBlockOrLater
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.core.utils.toHexBytes
 import xyz.funkybit.core.utils.tryAcquireAdvisoryLock
@@ -480,13 +481,17 @@ class SettlementCoordinator(
     }
 
     private fun updateBalances(wallets: List<WalletEntity>, symbolIds: List<SymbolId>, chainId: ChainId, blockNumber: BigInteger?) {
-        val finalExchangeBalances = runBlocking {
+        val getBalances: (DefaultBlockParam) -> Map<Address, Map<Address, BigInteger>> = { blockParam ->
             blockchainClientsByChainId.getValue(chainId).getExchangeBalances(
                 wallets.map { it.address },
                 symbolIds.map { symbolMap.getValue(it).contractAddress ?: EvmAddress.zero },
-                blockNumber?.let { DefaultBlockParam.BlockNumber(it) } ?: DefaultBlockParam.Latest,
+                blockParam,
             )
         }
+        val finalExchangeBalances = blockNumber?.let { number ->
+            getAsOfBlockOrLater(DefaultBlockParam.BlockNumber(number), getBalances)
+        } ?: getBalances(DefaultBlockParam.Latest)
+
         logger.debug { "finalExchangeBalances = $finalExchangeBalances" }
         BalanceEntity.updateBalances(
             wallets.map { wallet ->
