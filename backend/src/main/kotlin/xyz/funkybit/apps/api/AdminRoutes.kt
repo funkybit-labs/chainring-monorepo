@@ -65,6 +65,12 @@ class AdminRoutes(
             val lastPrice: BigDecimalJson,
             val minFee: BigIntegerJson,
         )
+
+        @Serializable
+        data class SetFeeRates(
+            val maker: FeeRate,
+            val taker: FeeRate,
+        )
     }
 
     private val createSymbol: ContractRoute = run {
@@ -407,13 +413,13 @@ class AdminRoutes(
     }
 
     private val setFeeRates: ContractRoute = run {
-        val requestBody = Body.auto<FeeRates>().toLens()
+        val requestBody = Body.auto<SetFeeRates>().toLens()
         "admin/fee-rates" meta {
             operationId = "set-fee-rates"
             summary = "Set Fee Rates"
             security = signedTokenSecurity.and(adminSecurity)
             tags += listOf(Tag("admin"))
-            receiving(requestBody to FeeRates(FeeRate(100), FeeRate(200)))
+            receiving(requestBody to SetFeeRates(FeeRate(100), FeeRate(200)))
             returning(Status.CREATED)
         } bindContract Method.POST to { request ->
             val payload = requestBody(request)

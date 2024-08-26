@@ -21,24 +21,25 @@ import xyz.funkybit.apps.api.model.AccountConfigurationApiResponse
 import xyz.funkybit.apps.api.model.Chain
 import xyz.funkybit.apps.api.model.ConfigurationApiResponse
 import xyz.funkybit.apps.api.model.DeployedContract
+import xyz.funkybit.apps.api.model.FeeRates
 import xyz.funkybit.apps.api.model.Market
 import xyz.funkybit.apps.api.model.Role
 import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.apps.api.model.toSymbolInfo
 import xyz.funkybit.core.model.EvmAddress
-import xyz.funkybit.core.model.FeeRate
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.ChainEntity
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ChainTable
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
-import xyz.funkybit.core.model.db.FeeRates
 import xyz.funkybit.core.model.db.MarketEntity
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.utils.TestnetChallengeUtils
+import xyz.funkybit.core.model.db.WalletEntity
+import java.math.BigDecimal
 import java.math.BigInteger
 
 class ConfigRoutes(private val faucetMode: FaucetMode) {
@@ -104,8 +105,8 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                             ),
                         ),
                         feeRates = FeeRates(
-                            maker = FeeRate.fromPercents(1.0),
-                            taker = FeeRate.fromPercents(2.0),
+                            maker = BigDecimal("1.0"),
+                            taker = BigDecimal("2.0"),
                         ),
                     ),
             )
@@ -153,7 +154,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                     minFee = market.minFee,
                                 )
                             }.sortedWith(compareBy({ it.baseSymbol.value }, { it.quoteSymbol.value })),
-                            feeRates = FeeRates.fetch(),
+                            feeRates = FeeRates(xyz.funkybit.core.model.db.FeeRates.fetch()),
                         ),
                 )
             }

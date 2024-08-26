@@ -118,8 +118,8 @@ export EVM_NETWORK_URL_Botanix="https://demo-anvil2.funkybit.fun"
 
 export SEQUENCER_HOST_NAME="localhost"
 export SEQUENCER_PORT="5338"
-export MAKER_FEE_RATE=0.01
-export TAKER_FEE_RATE=0.02
+export MAKER_FEE_RATE=0.0001
+export TAKER_FEE_RATE=0.0002
 
 make db_seed
 ```
