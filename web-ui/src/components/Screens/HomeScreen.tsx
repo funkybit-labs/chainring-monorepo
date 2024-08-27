@@ -54,9 +54,17 @@ function HomeScreenContent() {
           chain.id === (wallet.evmAccount?.chainId ?? config.chains[0]?.id)
       )
 
-    const exchangeContract = evmChainConfig?.contracts?.find(
-      (c) => c.name == 'Exchange'
-    )
+    const bitcoinChainConfig = config?.chains.filter(
+      (chain) => chain.networkType === 'Bitcoin'
+    )[0]
+
+    const exchangeContract = (
+      wallet.primaryCategory === 'evm'
+        ? evmChainConfig
+        : wallet.primaryCategory === 'bitcoin'
+          ? bitcoinChainConfig
+          : null
+    )?.contracts?.find((c) => c.name == 'Exchange')
 
     const symbols = config ? TradingSymbols.fromConfig(config) : null
     const markets =
@@ -77,7 +85,7 @@ function HomeScreenContent() {
       feeRates,
       marketsWithBackToBack
     }
-  }, [configQuery.data, wallet.evmAccount])
+  }, [configQuery.data, wallet.evmAccount, wallet.primaryCategory])
 
   useEffect(() => {
     if (markets !== null && selectedMarket == null) {

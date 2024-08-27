@@ -1,10 +1,10 @@
 import { signTypedData } from '@wagmi/core'
 import { wagmiConfig } from 'wagmiConfig'
 import {
-  getBitcoinAccount,
-  getEvmAccount,
-  getPrimaryAddress,
-  getPrimaryCategory
+  getGlobalBitcoinAccount,
+  getGlobalEvmAccount,
+  getGlobalPrimaryAddress,
+  getGlobalPrimaryCategory
 } from 'contexts/walletProvider'
 
 export type LoadAuthTokenOptions = {
@@ -16,7 +16,7 @@ let signingPromise: Promise<string> | null = null
 export async function loadAuthToken(
   options: LoadAuthTokenOptions = { forceRefresh: false }
 ): Promise<string> {
-  const primaryAddress = getPrimaryAddress()
+  const primaryAddress = getGlobalPrimaryAddress()
   if (primaryAddress) {
     const existingToken = localStorage.getItem(`did-${primaryAddress}`)
     if (existingToken && !options.forceRefresh) return existingToken
@@ -24,7 +24,9 @@ export async function loadAuthToken(
     if (!signingPromise) {
       signingPromise = signAuthToken(
         primaryAddress,
-        getPrimaryCategory() === 'evm' ? getEvmAccount()?.chainId ?? 0 : 0
+        getGlobalPrimaryCategory() === 'evm'
+          ? getGlobalEvmAccount()!.chainId!
+          : 0
       )
     }
 
@@ -69,14 +71,13 @@ async function signAuthToken(
             primaryType: 'Sign In'
           })
         : await (async () => {
-            const address = getBitcoinAccount()!.address
+            const bitcoinAccount = getGlobalBitcoinAccount()
+            console.log('global bitcoin account', bitcoinAccount)
+            const address = bitcoinAccount!.address
             const messageToSign =
               evmMessage.message +
               `\nAddress: ${address}, Timestamp: ${evmMessage.timestamp}`
-            return await getBitcoinAccount()!.signMessage(
-              address,
-              messageToSign
-            )
+            return await bitcoinAccount!.signMessage(address, messageToSign)
           })()
 
     const signInMessageBody = base64urlEncode(

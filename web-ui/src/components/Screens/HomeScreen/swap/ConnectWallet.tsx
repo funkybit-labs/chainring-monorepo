@@ -1,5 +1,5 @@
 import { Button } from 'components/common/Button'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useConfig } from 'wagmi'
 import { useValidChain } from 'hooks/useValidChain'
 import { Modal } from 'components/common/Modal'
@@ -20,6 +20,12 @@ export function ConnectWallet({ onSwitchToChain }: Props) {
 
   const [showWalletCategorySelection, setShowWalletCategorySelection] =
     useState(false)
+
+  useEffect(() => {
+    if (showWalletCategorySelection && wallet.primaryCategory !== 'none') {
+      setShowWalletCategorySelection(false)
+    }
+  }, [showWalletCategorySelection, wallet.primaryCategory])
 
   return (
     <>

@@ -12,11 +12,15 @@ export function uniqueFilter<T>(value: T, index: number, self: T[]): boolean {
   return self.indexOf(value) === index
 }
 
-export function addressDisplay(address: string): string {
+export function evmAddressDisplay(address: string): string {
   const without0x = address.startsWith('0x') ? address.slice(2) : address
   return (
     '0x' + without0x.slice(0, 4) + '...' + without0x.slice(without0x.length - 4)
   )
+}
+
+export function bitcoinAddressDisplay(address?: string): string {
+  return address?.slice(0, 5) + '...' + address?.slice(address.length - 5)
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
