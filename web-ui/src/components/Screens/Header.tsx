@@ -1,6 +1,11 @@
 import logo from 'assets/funkybit-orange-logo-name.png'
 import { useWallet } from 'contexts/walletProvider'
-import { addressDisplay, classNames, uniqueFilter } from 'utils'
+import {
+  evmAddressDisplay,
+  classNames,
+  uniqueFilter,
+  bitcoinAddressDisplay
+} from 'utils'
 import { Button } from 'components/common/Button'
 import React, { useEffect, useMemo, useState } from 'react'
 import Markets from 'markets'
@@ -11,6 +16,8 @@ import { useValidChain } from 'hooks/useValidChain'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from 'apiClient'
 import { Address } from 'viem'
+import BtcSvg from 'assets/btc.svg'
+import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 
 export type Tab = 'Swap' | 'Limit' | 'Dashboard'
 
@@ -31,13 +38,28 @@ export function Header({
   const [showMenu, setShowMenu] = useState(false)
   const [showFaucetModal, setShowFaucetModal] = useState<boolean>(false)
   const [tab, setTab] = useState<Tab>(initialTab)
+  const [showDisconnect, setShowDisconnect] = useState(false)
 
   useEffect(() => {
-    if (wallet.evmAccount?.isConnected && wallet.evmAccount.connector) {
-      setIcon(wallet.evmAccount.connector.icon)
-      setName(wallet.evmAccount.connector.name)
+    switch (wallet.primaryCategory) {
+      case 'evm':
+        if (wallet.evmAccount?.isConnected && wallet.evmAccount.connector) {
+          setIcon(wallet.evmAccount.connector.icon)
+          setName(wallet.evmAccount.connector.name)
+        }
+        break
+      case 'bitcoin':
+        if (wallet.bitcoinAccount?.address !== undefined) {
+          setIcon(BtcSvg)
+          setName('Bitcoin')
+        }
+        break
+      case 'none':
+        setIcon(undefined)
+        setName(undefined)
+        break
     }
-  }, [wallet.evmAccount])
+  }, [wallet])
 
   useEffect(() => {
     function escapeHandler(ev: KeyboardEvent) {
@@ -72,35 +94,54 @@ export function Header({
     return (
       <div className="ml-5 whitespace-nowrap">
         {wallet.primaryCategory !== 'none' ? (
-          <Button
-            style={validChain ? 'normal' : 'warning'}
-            width={'normal'}
-            tooltip={validChain ? undefined : 'INVALID CHAIN'}
-            caption={() => (
-              <span>
-                {icon && (
-                  <img
-                    className="mr-2 inline-block size-5"
-                    src={icon}
-                    alt={name ?? ''}
-                  />
-                )}
-                {addressDisplay(wallet.primaryAddress ?? '0x')}
-              </span>
+          <div className={'relative'}>
+            <Button
+              style={validChain ? 'normal' : 'warning'}
+              width={'normal'}
+              tooltip={validChain ? undefined : 'INVALID CHAIN'}
+              caption={() => (
+                <span>
+                  {icon && (
+                    <img
+                      className="mr-2 inline-block size-5"
+                      src={icon}
+                      alt={name ?? ''}
+                    />
+                  )}
+                  {wallet.primaryCategory === 'evm'
+                    ? evmAddressDisplay(wallet.primaryAddress ?? '0x')
+                    : bitcoinAddressDisplay(wallet.primaryAddress)}
+                </span>
+              )}
+              onClick={() => {
+                if (wallet.primaryCategory === 'evm') {
+                  wallet.changeAccount()
+                } else if (wallet.primaryCategory === 'bitcoin') {
+                  setShowDisconnect(true)
+                }
+              }}
+              disabled={false}
+              primary={false}
+            />
+            {showDisconnect && (
+              <div className={'absolute'}>
+                <Button
+                  caption={() => {
+                    return <>Disconnect</>
+                  }}
+                  onClick={() => {
+                    setShowDisconnect(false)
+                    wallet.disconnect()
+                  }}
+                  disabled={false}
+                  style={'normal'}
+                  width={'normal'}
+                />
+              </div>
             )}
-            onClick={() => wallet.changeAccount()}
-            disabled={false}
-            primary={false}
-          />
+          </div>
         ) : tab === 'Dashboard' ? (
-          <Button
-            style={'normal'}
-            width={'normal'}
-            caption={() => <>Connect Wallet</>}
-            onClick={() => wallet.connect('evm')}
-            primary={true}
-            disabled={false}
-          />
+          <ConnectWallet onSwitchToChain={() => {}} />
         ) : (
           <div className="w-[152px]" />
         )}
