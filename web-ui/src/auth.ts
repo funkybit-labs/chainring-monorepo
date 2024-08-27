@@ -72,7 +72,6 @@ async function signAuthToken(
           })
         : await (async () => {
             const bitcoinAccount = getGlobalBitcoinAccount()
-            console.log('global bitcoin account', bitcoinAccount)
             const address = bitcoinAccount!.address
             const messageToSign =
               evmMessage.message +
