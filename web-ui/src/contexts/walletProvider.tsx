@@ -166,16 +166,18 @@ export function useWallet(): Wallet {
 
   const { connect, disconnect, changeAccount, bitcoinAccount, evmAccount } =
     context
+
   return {
     connect,
     disconnect,
     changeAccount,
     primaryAccount: evmAccount ?? bitcoinAccount,
-    primaryCategory: evmAccount?.isConnected
-      ? 'evm'
-      : bitcoinAccount?.address
-        ? 'bitcoin'
-        : 'none',
+    primaryCategory:
+      evmAccount?.status == 'connected'
+        ? 'evm'
+        : bitcoinAccount?.address
+          ? 'bitcoin'
+          : 'none',
     primaryAddress: evmAccount?.address ?? bitcoinAccount?.address,
     bitcoinAccount,
     evmAccount
