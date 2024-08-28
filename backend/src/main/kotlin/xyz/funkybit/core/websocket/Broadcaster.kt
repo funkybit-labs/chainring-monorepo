@@ -202,8 +202,8 @@ class Broadcaster(val db: Database) {
                         SubscriptionTopic.MyTrades,
                         MyTrades(
                             OrderExecutionEntity
-                                .listLatestForWallet(
-                                    client.principal,
+                                .listLatestForUser(
+                                    client.principal.userGuid,
                                     maxSequencerResponses = 100,
                                 ).map(OrderExecutionEntity::toTradeResponse),
                         ),
@@ -250,12 +250,12 @@ class Broadcaster(val db: Database) {
     private fun sendOrders(client: ConnectedClient) {
         if (client.principal != null) {
             val combinedOrderResponses = transaction {
-                val openOrders = OrderEntity.listWithExecutionsForWallet(
-                    client.principal,
+                val openOrders = OrderEntity.listWithExecutionsForUser(
+                    client.principal.userGuid,
                     statuses = listOf(OrderStatus.Open, OrderStatus.Partial),
                 )
-                val recentOrders = OrderEntity.listWithExecutionsForWallet(
-                    client.principal,
+                val recentOrders = OrderEntity.listWithExecutionsForUser(
+                    client.principal.userGuid,
                     limit = 100,
                 )
 
@@ -281,7 +281,7 @@ class Broadcaster(val db: Database) {
                     OutgoingWSMessage.Publish(
                         SubscriptionTopic.Balances,
                         Balances(
-                            BalanceEntity.balancesAsApiResponse(client.principal).balances,
+                            BalanceEntity.balancesAsApiResponse(client.principal.userGuid).balances,
                         ),
                     ),
                 )
@@ -295,7 +295,7 @@ class Broadcaster(val db: Database) {
                 client.send(
                     OutgoingWSMessage.Publish(
                         SubscriptionTopic.Limits,
-                        Limits(LimitEntity.forWallet(client.principal)),
+                        Limits(LimitEntity.forUserId(client.principal.userGuid)),
                     ),
                 )
             }

@@ -2,6 +2,7 @@ package xyz.funkybit.testfixtures
 
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.SequencerOrderId
 import xyz.funkybit.core.model.db.ChainEntity
@@ -14,6 +15,7 @@ import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.OrderStatus
 import xyz.funkybit.core.model.db.OrderType
 import xyz.funkybit.core.model.db.SymbolEntity
+import xyz.funkybit.core.model.db.UserEntity
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.utils.toFundamentalUnits
 import java.math.BigDecimal
@@ -69,8 +71,12 @@ object DbTestHelpers {
     ): MarketEntity =
         MarketEntity.create(baseSymbol, quoteSymbol, tickSize, lastPrice, "test")
 
-    fun createWallet(address: EvmAddress = EvmAddress.generate()): WalletEntity =
-        WalletEntity.getOrCreateWithUser(address)
+    fun createWallet(address: Address = EvmAddress.generate(), user: UserEntity? = null): WalletEntity =
+        if (user == null) {
+            WalletEntity.getOrCreateWithUser(address)
+        } else {
+            WalletEntity.createForUser(user, address)
+        }
 
     fun createOrder(
         market: MarketEntity,

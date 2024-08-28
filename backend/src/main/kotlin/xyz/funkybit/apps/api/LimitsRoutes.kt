@@ -45,9 +45,8 @@ object LimitsRoutes {
             )
         } bindContract Method.GET to { request ->
             transaction {
-                val wallet = request.principal
                 Response(Status.OK).with(
-                    responseBody of GetLimitsApiResponse(LimitEntity.forWallet(wallet)),
+                    responseBody of GetLimitsApiResponse(LimitEntity.forUserId(request.principal.userGuid)),
                 )
             }
         }

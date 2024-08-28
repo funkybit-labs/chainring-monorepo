@@ -78,6 +78,11 @@ sealed class BitcoinAddress(val value: String) : Address() {
             val hash = Utils.HEX.encode(convertBits(decoded.data.copyOfRange(1, decoded.data.size), 5, 8, false))
             return padZeroHexN(ScriptOpCodes.OP_0.toString(16), 2) + opPushData(hash)
         }
+
+        companion object {
+            fun generate(networkParameters: NetworkParameters): SegWit =
+                fromKey(networkParameters, ECKey())
+        }
     }
 
     data class Taproot(val raw: String, val testnet: Boolean) : BitcoinAddress(raw) {

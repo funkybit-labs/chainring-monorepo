@@ -52,26 +52,25 @@ object WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
 }
 
 class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
-
     companion object : EntityClass<WalletId, WalletEntity>(WalletTable) {
-
         fun getOrCreateWithUser(address: Address): WalletEntity {
             val canonicalAddress = address.canonicalize()
-            return findByAddress(canonicalAddress) ?: run {
-                val user = UserEntity.create(canonicalAddress)
+            return createForUser(UserEntity.create(canonicalAddress), address)
+        }
 
-                WalletEntity.new(WalletId.generate(canonicalAddress)) {
-                    this.address = canonicalAddress
-                    sequencerId = canonicalAddress.toSequencerId()
-                    createdAt = Clock.System.now()
-                    createdBy = "system"
+        fun createForUser(user: UserEntity, address: Address): WalletEntity {
+            val canonicalAddress = address.canonicalize()
+            return WalletEntity.new(WalletId.generate(canonicalAddress)) {
+                this.address = canonicalAddress
+                sequencerId = canonicalAddress.toSequencerId()
+                createdAt = Clock.System.now()
+                createdBy = "system"
 
-                    type = when (canonicalAddress) {
-                        is EvmAddress -> WalletType.Evm
-                        is BitcoinAddress -> WalletType.Bitcoin
-                    }
-                    this.user = user
+                type = when (canonicalAddress) {
+                    is EvmAddress -> WalletType.Evm
+                    is BitcoinAddress -> WalletType.Bitcoin
                 }
+                this.user = user
             }
         }
 

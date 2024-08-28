@@ -36,7 +36,7 @@ class BalanceRoutes {
         } bindContract Method.GET to { request ->
             transaction {
                 Response(Status.OK).with(
-                    responseBody of balancesAsApiResponse(request.principal),
+                    responseBody of balancesAsApiResponse(request.principal.userGuid),
                 )
             }
         }

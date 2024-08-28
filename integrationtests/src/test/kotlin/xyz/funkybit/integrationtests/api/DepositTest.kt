@@ -127,7 +127,7 @@ class DepositTest {
     }
 
     @Test
-    fun `test deposits are scoped to wallet`() {
+    fun `test deposits are scoped to user`() {
         val apiClient1 = TestApiClient()
         val wallet1 = Wallet(apiClient1)
 

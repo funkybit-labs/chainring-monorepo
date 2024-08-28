@@ -7,7 +7,6 @@ import org.http4k.contract.div
 import org.http4k.contract.meta
 import org.http4k.core.Body
 import org.http4k.core.Method
-import org.http4k.core.Request
 import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.core.with
@@ -79,9 +78,9 @@ class WithdrawalRoutes(private val exchangeApiService: ExchangeApiService) {
                 ),
             )
         } bindContract Method.GET to { withdrawalId ->
-            { _: Request ->
+            { request ->
                 transaction {
-                    WithdrawalEntity.findById(withdrawalId)?.let {
+                    WithdrawalEntity.findByIdForUser(withdrawalId, request.principal.userGuid)?.let {
                         Response(Status.OK).with(
                             responseBody of WithdrawalApiResponse(Withdrawal.fromEntity(it)),
                         )
@@ -111,7 +110,7 @@ class WithdrawalRoutes(private val exchangeApiService: ExchangeApiService) {
             transaction {
                 Response(Status.OK).with(
                     responseBody of ListWithdrawalsApiResponse(
-                        WithdrawalEntity.history(request.principal.address).map(Withdrawal::fromEntity),
+                        WithdrawalEntity.history(request.principal.userGuid).map(Withdrawal::fromEntity),
                     ),
                 )
             }

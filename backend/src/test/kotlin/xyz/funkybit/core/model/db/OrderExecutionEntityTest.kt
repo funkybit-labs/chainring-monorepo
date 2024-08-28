@@ -1,11 +1,13 @@
 package xyz.funkybit.core.model.db
 
 import kotlinx.datetime.Clock
+import org.bitcoinj.core.NetworkParameters
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.utils.generateHexString
 import xyz.funkybit.testfixtures.DbTestHelpers.createChain
@@ -31,8 +33,14 @@ class OrderExecutionEntityTest : TestWithDb() {
     }
 
     @Test
-    fun `list latest order executions for wallet`() {
+    fun `list latest order executions for user`() {
         val (makerWalletId, takerWalletId) = transaction { Pair(createWallet().id.value, createWallet().id.value) }
+        val makerWallet2Id = transaction {
+            createWallet(
+                address = BitcoinAddress.SegWit.generate(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!),
+                user = WalletEntity[makerWalletId].user,
+            ).id.value
+        }
 
         createOrders(
             listOf(
@@ -41,7 +49,7 @@ class OrderExecutionEntityTest : TestWithDb() {
                 Order(OrderId("maker_order_3"), makerWalletId, btcEthMarket, OrderType.Limit, OrderSide.Sell),
                 Order(OrderId("maker_order_4"), makerWalletId, btcEthMarket, OrderType.Limit, OrderSide.Sell),
                 Order(OrderId("maker_order_5"), makerWalletId, btcEthMarket, OrderType.Limit, OrderSide.Sell),
-                Order(OrderId("maker_order_6"), makerWalletId, btcEthMarket, OrderType.Limit, OrderSide.Sell),
+                Order(OrderId("maker_order_6"), makerWallet2Id, btcEthMarket, OrderType.Limit, OrderSide.Sell),
                 Order(OrderId("taker_order_1"), takerWalletId, btcEthMarket, OrderType.Market, OrderSide.Buy),
                 Order(OrderId("taker_order_2"), takerWalletId, btcEthMarket, OrderType.Market, OrderSide.Buy),
                 Order(OrderId("taker_order_3"), takerWalletId, btcEthMarket, OrderType.Market, OrderSide.Buy),
@@ -51,8 +59,8 @@ class OrderExecutionEntityTest : TestWithDb() {
         transaction {
             assertEquals(
                 emptyList<Pair<TradeId, ExecutionRole>>(),
-                OrderExecutionEntity.listLatestForWallet(
-                    WalletEntity[takerWalletId],
+                OrderExecutionEntity.listLatestForUser(
+                    WalletEntity[takerWalletId].userGuid,
                     maxSequencerResponses = 10,
                 ).map { Pair(it.tradeGuid.value, it.role) },
             )
@@ -87,8 +95,8 @@ class OrderExecutionEntityTest : TestWithDb() {
                     Pair(TradeId("trade_taker_order_3_maker_order_5"), ExecutionRole.Taker),
                     Pair(TradeId("trade_taker_order_3_maker_order_6"), ExecutionRole.Taker),
                 ),
-                OrderExecutionEntity.listLatestForWallet(
-                    WalletEntity[takerWalletId],
+                OrderExecutionEntity.listLatestForUser(
+                    WalletEntity[takerWalletId].userGuid,
                     maxSequencerResponses = 1,
                 ).map { Pair(it.tradeGuid.value, it.role) },
             )
@@ -102,8 +110,8 @@ class OrderExecutionEntityTest : TestWithDb() {
                     Pair(TradeId("trade_taker_order_1_maker_order_1"), ExecutionRole.Taker),
                     Pair(TradeId("trade_taker_order_1_maker_order_2"), ExecutionRole.Taker),
                 ),
-                OrderExecutionEntity.listLatestForWallet(
-                    WalletEntity[takerWalletId],
+                OrderExecutionEntity.listLatestForUser(
+                    WalletEntity[takerWalletId].userGuid,
                     maxSequencerResponses = 2,
                 ).map { Pair(it.tradeGuid.value, it.role) },
             )
@@ -115,8 +123,8 @@ class OrderExecutionEntityTest : TestWithDb() {
                     Pair(TradeId("trade_taker_order_3_maker_order_5"), ExecutionRole.Maker),
                     Pair(TradeId("trade_taker_order_3_maker_order_6"), ExecutionRole.Maker),
                 ),
-                OrderExecutionEntity.listLatestForWallet(
-                    WalletEntity[makerWalletId],
+                OrderExecutionEntity.listLatestForUser(
+                    WalletEntity[makerWalletId].userGuid,
                     maxSequencerResponses = 1,
                 ).map { Pair(it.tradeGuid.value, it.role) },
             )
@@ -130,8 +138,8 @@ class OrderExecutionEntityTest : TestWithDb() {
                     Pair(TradeId("trade_taker_order_1_maker_order_1"), ExecutionRole.Maker),
                     Pair(TradeId("trade_taker_order_1_maker_order_2"), ExecutionRole.Maker),
                 ),
-                OrderExecutionEntity.listLatestForWallet(
-                    WalletEntity[makerWalletId],
+                OrderExecutionEntity.listLatestForUser(
+                    WalletEntity[makerWalletId].userGuid,
                     maxSequencerResponses = 2,
                 ).map { Pair(it.tradeGuid.value, it.role) },
             )

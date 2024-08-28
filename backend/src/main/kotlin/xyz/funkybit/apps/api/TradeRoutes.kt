@@ -65,8 +65,8 @@ object TradeRoutes {
             val limit = request.query("limit")?.toInt() ?: 100
 
             val trades = transaction {
-                OrderExecutionEntity.listForWallet(
-                    wallet = request.principal,
+                OrderExecutionEntity.listForUser(
+                    userId = request.principal.userGuid,
                     beforeTimestamp = timestamp,
                     limit = limit,
                 ).map { it.toTradeResponse() }

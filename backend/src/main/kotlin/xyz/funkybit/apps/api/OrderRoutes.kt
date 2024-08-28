@@ -131,13 +131,13 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
                 responseBody to Examples.limitOrderResponse,
             )
         } bindContract Method.GET to { orderIdOrClientOrderId ->
-            { _: Request ->
+            { request ->
                 transaction {
                     val order = if (orderIdOrClientOrderId.startsWith("external:")) {
                         val clientOrderId = ClientOrderId(orderIdOrClientOrderId.removePrefix("external:"))
-                        OrderEntity.findByClientOrderId(clientOrderId)
+                        OrderEntity.findByClientOrderIdForUser(clientOrderId, request.principal.userGuid)
                     } else {
-                        OrderEntity.findById(OrderId(orderIdOrClientOrderId))
+                        OrderEntity.findByIdForUser(OrderId(orderIdOrClientOrderId), request.principal.userGuid)
                     }
 
                     when (order) {
@@ -169,8 +169,8 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.GET to { request: Request ->
             val orders = transaction {
-                OrderEntity.listWithExecutionsForWallet(
-                    request.principal,
+                OrderEntity.listWithExecutionsForUser(
+                    request.principal.userGuid,
                     request.query("statuses")?.let { statuses ->
                         statuses.split(",").mapNotNull {
                             try {
@@ -201,7 +201,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             tags += listOf(Tag("order"))
             returning(Status.NO_CONTENT)
         } bindContract Method.DELETE to { request ->
-            exchangeApiService.cancelOpenOrders(request.principal)
+            exchangeApiService.cancelOpenOrders(request.principal.userGuid)
 
             Response(Status.NO_CONTENT)
         }
