@@ -58,7 +58,7 @@ class DepositRoutes(val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.POST to { request ->
             Response(Status.CREATED).with(
-                responseBody of exchangeApiService.deposit(request.principal, requestBody(request)),
+                responseBody of exchangeApiService.deposit(request.principal.address, requestBody(request)),
             )
         }
     }
@@ -110,7 +110,7 @@ class DepositRoutes(val exchangeApiService: ExchangeApiService) {
             transaction {
                 Response(Status.OK).with(
                     responseBody of ListDepositsApiResponse(
-                        DepositEntity.history(request.principal).map(Deposit::fromEntity),
+                        DepositEntity.history(request.principal.address).map(Deposit::fromEntity),
                     ),
                 )
             }

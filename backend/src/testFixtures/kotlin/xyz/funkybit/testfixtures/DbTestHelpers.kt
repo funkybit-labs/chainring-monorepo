@@ -70,7 +70,7 @@ object DbTestHelpers {
         MarketEntity.create(baseSymbol, quoteSymbol, tickSize, lastPrice, "test")
 
     fun createWallet(address: EvmAddress = EvmAddress.generate()): WalletEntity =
-        WalletEntity.getOrCreate(address)
+        WalletEntity.getOrCreateWithUser(address)
 
     fun createOrder(
         market: MarketEntity,

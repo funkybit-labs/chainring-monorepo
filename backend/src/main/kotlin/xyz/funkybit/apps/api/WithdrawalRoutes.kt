@@ -59,7 +59,7 @@ class WithdrawalRoutes(private val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.POST to { request ->
             Response(Status.CREATED).with(
-                responseBody of exchangeApiService.withdraw(request.principal, requestBody(request)),
+                responseBody of exchangeApiService.withdraw(request.principal.address, requestBody(request)),
             )
         }
     }
@@ -111,7 +111,7 @@ class WithdrawalRoutes(private val exchangeApiService: ExchangeApiService) {
             transaction {
                 Response(Status.OK).with(
                     responseBody of ListWithdrawalsApiResponse(
-                        WithdrawalEntity.history(request.principal).map(Withdrawal::fromEntity),
+                        WithdrawalEntity.history(request.principal.address).map(Withdrawal::fromEntity),
                     ),
                 )
             }

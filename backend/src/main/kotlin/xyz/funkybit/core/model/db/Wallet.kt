@@ -23,6 +23,11 @@ value class WalletId(override val value: String) : EntityId {
     override fun toString(): String = value
 }
 
+enum class WalletType {
+    Bitcoin,
+    Evm,
+}
+
 object WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
@@ -30,18 +35,42 @@ object WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
     val sequencerId = long("sequencer_id").uniqueIndex()
     val addedSymbols = array<String>("added_symbols", VarCharColumnType(10485760)).default(emptyList())
     val isAdmin = bool("is_admin").default(false)
+    val type = customEnumeration(
+        "type",
+        "WalletType",
+        { value -> WalletType.valueOf(value as String) },
+        { PGEnum("WalletType", it) },
+    ).index()
+    val userGuid = reference("user_guid", UserTable).index()
+
+    init {
+        uniqueIndex(
+            customIndexName = "wallet_type_user",
+            columns = arrayOf(userGuid, type),
+        )
+    }
 }
 
 class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
 
     companion object : EntityClass<WalletId, WalletEntity>(WalletTable) {
-        fun getOrCreate(address: Address): WalletEntity {
-            return findByAddress(address) ?: run {
-                WalletEntity.new(WalletId.generate(address)) {
-                    this.address = address
-                    this.sequencerId = address.toSequencerId()
-                    this.createdAt = Clock.System.now()
-                    this.createdBy = "system"
+
+        fun getOrCreateWithUser(address: Address): WalletEntity {
+            val canonicalAddress = address.canonicalize()
+            return findByAddress(canonicalAddress) ?: run {
+                val user = UserEntity.create(canonicalAddress)
+
+                WalletEntity.new(WalletId.generate(canonicalAddress)) {
+                    this.address = canonicalAddress
+                    sequencerId = canonicalAddress.toSequencerId()
+                    createdAt = Clock.System.now()
+                    createdBy = "system"
+
+                    type = when (canonicalAddress) {
+                        is EvmAddress -> WalletType.Evm
+                        is BitcoinAddress -> WalletType.Bitcoin
+                    }
+                    this.user = user
                 }
             }
         }
@@ -98,4 +127,8 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
     )
     var addedSymbols by WalletTable.addedSymbols
     var isAdmin by WalletTable.isAdmin
+
+    var type by WalletTable.type
+    var userGuid by WalletTable.userGuid
+    var user by UserEntity referencedOn WalletTable.userGuid
 }

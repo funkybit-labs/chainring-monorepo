@@ -382,7 +382,7 @@ class AdminRoutes(
         } bindContract Method.PUT to { address ->
             { _ ->
                 transaction {
-                    WalletEntity.getOrCreate(address).isAdmin = true
+                    WalletEntity.getOrCreateWithUser(address).isAdmin = true
                 }
                 Response(Status.CREATED)
             }

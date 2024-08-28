@@ -27,7 +27,6 @@ import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.SettlementStatus
 import xyz.funkybit.core.model.db.TradeId
-import xyz.funkybit.core.model.db.WalletEntity
 
 object TradeRoutes {
     val listTrades: ContractRoute = run {
@@ -67,7 +66,7 @@ object TradeRoutes {
 
             val trades = transaction {
                 OrderExecutionEntity.listForWallet(
-                    wallet = WalletEntity.getOrCreate(request.principal),
+                    wallet = request.principal,
                     beforeTimestamp = timestamp,
                     limit = limit,
                 ).map { it.toTradeResponse() }

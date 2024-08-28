@@ -40,7 +40,6 @@ import xyz.funkybit.core.model.db.OrderEntity
 import xyz.funkybit.core.model.db.OrderExecutionEntity
 import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.OrderStatus
-import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.toOrderResponse
 
 class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
@@ -74,7 +73,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.POST to { request ->
             val apiRequest: CreateOrderApiRequest = requestBody(request)
-            val response = exchangeApiService.addOrder(request.principal, apiRequest)
+            val response = exchangeApiService.addOrder(request.principal.address, apiRequest)
             if (response.requestStatus == RequestStatus.Accepted) {
                 Response(Status.CREATED).with(
                     responseBody of response,
@@ -104,7 +103,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
                 if (orderId != apiRequest.orderId) {
                     processingError("Invalid order id")
                 } else {
-                    val response = exchangeApiService.cancelOrder(request.principal, apiRequest)
+                    val response = exchangeApiService.cancelOrder(request.principal.address, apiRequest)
                     if (response.requestStatus == RequestStatus.Accepted) {
                         Response(Status.NO_CONTENT)
                     } else {
@@ -171,7 +170,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
         } bindContract Method.GET to { request: Request ->
             val orders = transaction {
                 OrderEntity.listWithExecutionsForWallet(
-                    WalletEntity.getOrCreate(request.principal),
+                    request.principal,
                     request.query("statuses")?.let { statuses ->
                         statuses.split(",").mapNotNull {
                             try {
@@ -202,9 +201,8 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             tags += listOf(Tag("order"))
             returning(Status.NO_CONTENT)
         } bindContract Method.DELETE to { request ->
-            exchangeApiService.cancelOpenOrders(
-                transaction { WalletEntity.getOrCreate(request.principal) },
-            )
+            exchangeApiService.cancelOpenOrders(request.principal)
+
             Response(Status.NO_CONTENT)
         }
     }
@@ -238,7 +236,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.POST to { request ->
             Response(Status.OK).with(
-                responseBody of exchangeApiService.orderBatch(request.principal, requestBody(request)),
+                responseBody of exchangeApiService.orderBatch(request.principal.address, requestBody(request)),
             )
         }
     }

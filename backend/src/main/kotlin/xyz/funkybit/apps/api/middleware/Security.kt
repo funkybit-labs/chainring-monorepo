@@ -50,10 +50,13 @@ val signedTokenSecurity = object : Security {
     private fun wrapWithAuthentication(httpHandler: HttpHandler): HttpHandler = { request ->
         when (val authResult = authenticate(request)) {
             is AuthResult.Success -> {
-                val requestWithPrincipal =
-                    request.with(
-                        principalRequestContextKey of authResult.address.canonicalize(),
-                    )
+                val wallet = transaction {
+                    WalletEntity.getOrCreateWithUser(authResult.address)
+                }
+
+                val requestWithPrincipal = request.with(
+                    principalRequestContextKey of wallet,
+                )
                 httpHandler(requestWithPrincipal)
             }
             is AuthResult.Failure -> {
@@ -78,7 +81,7 @@ val adminSecurity = object : Security {
     override val filter = Filter { next -> wrapWithAdminCheck(next) }
 
     private fun wrapWithAdminCheck(httpHandler: HttpHandler): HttpHandler = { request ->
-        if (transaction { WalletEntity.findByAddress(request.principal.canonicalize())?.isAdmin } == true) {
+        if (request.principal.isAdmin) {
             httpHandler(request)
         } else {
             unauthorizedResponse("Access denied")
@@ -168,9 +171,9 @@ sealed class AuthResult {
 }
 
 private val principalRequestContextKey =
-    RequestContextKey.optional<Address>(requestContexts)
+    RequestContextKey.optional<WalletEntity>(requestContexts)
 
-val Request.principal: Address
+val Request.principal: WalletEntity
     get() = principalRequestContextKey(this)
         ?: throw RequestProcessingError(Status.UNAUTHORIZED, ApiError(ReasonCode.AuthenticationError, "Unauthorized"))
 

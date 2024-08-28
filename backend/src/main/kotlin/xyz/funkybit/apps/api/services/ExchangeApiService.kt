@@ -319,7 +319,7 @@ class ExchangeApiService(
     fun deposit(walletAddress: Address, apiRequest: CreateDepositApiRequest): DepositApiResponse =
         transaction {
             val deposit = DepositEntity.createOrUpdate(
-                wallet = WalletEntity.getOrCreate(walletAddress),
+                wallet = WalletEntity.getOrCreateWithUser(walletAddress),
                 symbol = getSymbolEntity(apiRequest.symbol),
                 amount = apiRequest.amount,
                 blockNumber = null,

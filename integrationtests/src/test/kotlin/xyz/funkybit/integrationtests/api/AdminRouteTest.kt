@@ -35,7 +35,7 @@ class AdminRouteTest {
         apiClient.tryListAdmins().assertError(ApiError(ReasonCode.AuthenticationError, "Access denied"))
         assertEquals(Role.User, apiClient.getAccountConfiguration().role)
         transaction {
-            WalletEntity.getOrCreate(apiClient.address).isAdmin = true
+            WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = true
         }
         assertEquals(listOf(apiClient.address), apiClient.listAdmins())
         assertEquals(Role.Admin, apiClient.getAccountConfiguration().role)
@@ -53,7 +53,7 @@ class AdminRouteTest {
 
         val feeRates = apiClient.getConfiguration().feeRates
         transaction {
-            WalletEntity.getOrCreate(apiClient.address).isAdmin = true
+            WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = true
         }
 
         val newFeeRates = FeeRates(FeeRate(feeRates.maker.value + 1L), FeeRate(feeRates.taker.value + 2L))
@@ -85,7 +85,7 @@ class AdminRouteTest {
         )
         apiClient.tryCreateSymbol(adminRequest).assertError(ApiError(ReasonCode.AuthenticationError, "Access denied"))
         transaction {
-            WalletEntity.getOrCreate(apiClient.address).isAdmin = true
+            WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = true
         }
         try {
             apiClient.createSymbol(adminRequest)
@@ -135,7 +135,7 @@ class AdminRouteTest {
         } finally {
             transaction {
                 SymbolEntity.findById(SymbolId(chainId, "NAME"))?.delete()
-                WalletEntity.getOrCreate(apiClient.address).isAdmin = false
+                WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = false
             }
         }
     }
@@ -144,7 +144,7 @@ class AdminRouteTest {
     fun `test market management`() {
         val apiClient = TestApiClient()
         transaction {
-            WalletEntity.getOrCreate(apiClient.address).isAdmin = true
+            WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = true
         }
 
         val config = apiClient.getConfiguration()
@@ -225,7 +225,7 @@ class AdminRouteTest {
                 MarketEntity.findById(marketId)?.delete()
                 SymbolEntity.findById(SymbolId(chainId1, "NAME"))?.delete()
                 SymbolEntity.findById(SymbolId(chainId2, "NAME"))?.delete()
-                WalletEntity.getOrCreate(apiClient.address).isAdmin = false
+                WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = false
             }
         }
     }
