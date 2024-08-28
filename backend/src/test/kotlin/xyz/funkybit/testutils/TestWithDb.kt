@@ -33,6 +33,7 @@ import xyz.funkybit.core.model.db.OrderTable
 import xyz.funkybit.core.model.db.SettlementBatchTable
 import xyz.funkybit.core.model.db.SymbolTable
 import xyz.funkybit.core.model.db.TradeTable
+import xyz.funkybit.core.model.db.UserTable
 import xyz.funkybit.core.model.db.WalletLinkedSignerTable
 import xyz.funkybit.core.model.db.WalletTable
 import xyz.funkybit.core.model.db.WithdrawalTable
@@ -81,6 +82,7 @@ open class TestWithDb {
             WalletLinkedSignerTable.deleteAll()
             LimitTable.deleteAll()
             WalletTable.deleteAll()
+            UserTable.deleteAll()
             OHLCTable.deleteAll()
             FaucetDripTable.deleteAll()
             MarketTable.deleteAll()

@@ -55,7 +55,8 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
     companion object : EntityClass<WalletId, WalletEntity>(WalletTable) {
         fun getOrCreateWithUser(address: Address): WalletEntity {
             val canonicalAddress = address.canonicalize()
-            return createForUser(UserEntity.create(canonicalAddress), address)
+            return findByAddress(canonicalAddress)
+                ?: run { createForUser(UserEntity.create(canonicalAddress), address) }
         }
 
         fun createForUser(user: UserEntity, address: Address): WalletEntity {
