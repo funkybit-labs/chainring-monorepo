@@ -181,7 +181,9 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                 withdrawalFee = BigInteger.ZERO,
                             ),
                         ),
-                        linkedAddresses = listOf(),
+                        linkedAddresses = listOf(
+                            EvmAddress.zero,
+                        ),
                     ),
             )
         } bindContract Method.GET to { request ->
