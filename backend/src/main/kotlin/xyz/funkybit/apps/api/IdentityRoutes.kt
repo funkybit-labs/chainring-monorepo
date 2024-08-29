@@ -34,7 +34,7 @@ import java.math.BigInteger
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-const val baseLinkMessage = "[funkybit] Please sign this message to link your wallets. This action will not cost any gas fees."
+const val BASE_LINK_MESSAGE = "[funkybit] Please sign this message to link your wallets. This action will not cost any gas fees."
 data class LinkMessage(
     val message: String,
     val address: String,
@@ -157,7 +157,7 @@ object IdentityRoutes {
         val bitcoinAddress = BitcoinAddress.canonicalize(bitcoinLinkAddressProof.address.toString())
         val linkAddress = EvmAddress.canonicalize(bitcoinLinkAddressProof.linkAddress.toString())
 
-        val bitcoinLinkAddressMessage = baseLinkMessage +
+        val bitcoinLinkAddressMessage = BASE_LINK_MESSAGE +
             "\nAddress: ${bitcoinAddress.value}, LinkAddress: ${linkAddress.value}, Timestamp: ${bitcoinLinkAddressProof.timestamp}"
 
         return BitcoinSignatureVerification.verifyMessage(bitcoinAddress, bitcoinLinkAddressProof.signature.value.replace(" ", "+"), bitcoinLinkAddressMessage)
@@ -169,7 +169,7 @@ object IdentityRoutes {
         return ECHelper.isValidSignature(
             messageHash = EIP712Helper.computeHash(
                 LinkMessage(
-                    message = baseLinkMessage,
+                    message = BASE_LINK_MESSAGE,
                     address = evmLinkAddressProof.address.toString(),
                     linkAddress = evmLinkAddressProof.linkAddress.toString(),
                     chainId = evmLinkAddressProof.chainId,

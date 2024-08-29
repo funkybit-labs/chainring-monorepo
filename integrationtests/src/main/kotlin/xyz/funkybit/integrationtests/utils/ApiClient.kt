@@ -201,7 +201,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/account-config")
                 .get()
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryMarkSymbolAsAdded(symbolName: String): Either<ApiCallFailure, Unit> =
@@ -211,7 +211,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/account-config/$symbolName")
                 .post("".toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
     fun tryLinkIdentity(apiRequest: LinkIdentityApiRequest): Either<ApiCallFailure, Unit> =
@@ -221,7 +221,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/identities/link")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
     fun tryCreateOrder(apiRequest: CreateOrderApiRequest): Either<ApiCallFailure, CreateOrderApiResponse> =
@@ -231,7 +231,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/orders")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryBatchOrders(apiRequest: BatchOrdersApiRequest): Either<ApiCallFailure, BatchOrdersApiResponse> =
@@ -241,7 +241,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/batch/orders")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryCancelOrder(apiRequest: CancelOrderApiRequest): Either<ApiCallFailure, Unit> =
@@ -251,7 +251,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/orders/${apiRequest.orderId}")
                 .delete(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
     fun tryGetOrder(id: OrderId): Either<ApiCallFailure, Order> =
@@ -261,7 +261,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/orders/$id")
                 .get()
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
     fun tryGetOrder(id: ClientOrderId): Either<ApiCallFailure, Order> =
@@ -271,7 +271,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/orders/external:$id")
                 .get()
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
     fun tryListOrders(statuses: List<OrderStatus> = emptyList(), marketId: MarketId? = null): Either<ApiCallFailure, OrdersApiResponse> {
@@ -292,7 +292,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/orders")
                 .delete()
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
     fun tryGetOrderBook(marketId: MarketId): Either<ApiCallFailure, GetOrderBookApiResponse> =
@@ -304,7 +304,7 @@ open class ApiClient(
                 )
                 .get()
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
     fun tryGetLimits(): Either<ApiCallFailure, GetLimitsApiResponse> =
@@ -314,7 +314,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/limits")
                 .get()
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
     fun tryCreateDeposit(apiRequest: CreateDepositApiRequest): Either<ApiCallFailure, DepositApiResponse> =
@@ -324,7 +324,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/deposits")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryGetDeposit(id: DepositId): Either<ApiCallFailure, DepositApiResponse> =
@@ -334,7 +334,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/deposits/$id")
                 .get()
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryListDeposits(): Either<ApiCallFailure, ListDepositsApiResponse> =
@@ -394,7 +394,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/faucet")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryCreateSymbol(adminRequest: AdminRoutes.Companion.AdminSymbol): Either<ApiCallFailure, Unit> =
@@ -404,7 +404,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/admin/symbol")
                 .post(Json.encodeToString(adminRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryListSymbols(): Either<ApiCallFailure, List<AdminRoutes.Companion.AdminSymbol>> =
@@ -414,7 +414,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/admin/symbol")
                 .get()
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryPatchSymbol(adminRequest: AdminRoutes.Companion.AdminSymbol): Either<ApiCallFailure, Unit> =
@@ -424,7 +424,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/admin/symbol/${adminRequest.name}")
                 .patch(Json.encodeToString(adminRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryCreateMarket(adminRequest: AdminRoutes.Companion.AdminMarket): Either<ApiCallFailure, Unit> =
@@ -434,7 +434,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/admin/market")
                 .post(Json.encodeToString(adminRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryListMarkets(): Either<ApiCallFailure, List<AdminRoutes.Companion.AdminMarket>> =
@@ -444,7 +444,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/admin/market")
                 .get()
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryPatchMarket(adminRequest: AdminRoutes.Companion.AdminMarket): Either<ApiCallFailure, Unit> =
@@ -454,7 +454,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/admin/market/${adminRequest.id}")
                 .patch(Json.encodeToString(adminRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryListAdmins(): Either<ApiCallFailure, List<Address>> =
@@ -464,7 +464,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/admin/admin")
                 .get()
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryAddAdmin(address: Address): Either<ApiCallFailure, Unit> =
@@ -474,7 +474,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/admin/admin/$address")
                 .put("".toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryRemoveAdmin(address: Address): Either<ApiCallFailure, Unit> =
@@ -484,7 +484,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/admin/admin/$address")
                 .delete()
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
     fun trySetFeeRates(feeRates: FeeRates): Either<ApiCallFailure, Unit> =
@@ -494,7 +494,7 @@ open class ApiClient(
                 .url("$apiServerRootUrl/v1/admin/fee-rates")
                 .post(Json.encodeToString(feeRates).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(keyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryGetLastPrice(marketId: MarketId): Either<ApiCallFailure, GetLastPriceResponse> =

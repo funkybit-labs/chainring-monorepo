@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.apps.api.model.LinkIdentityApiRequest
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.utils.TestApiClient
 import xyz.funkybit.integrationtests.utils.WalletKeyPair
@@ -26,6 +27,7 @@ class IdentityApiTest {
         assertTrue { evmKeyApiClient.getAccountConfiguration().linkedAddresses.isEmpty() }
 
         val bitcoinKey = ECKey()
+        val bitcoinKeyApiClient = TestApiClient(WalletKeyPair.Bitcoin(bitcoinKey), chainId = ChainId(0u))
         val bitcoinAddress = BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, bitcoinKey)
 
         evmKeyApiClient.linkIdentity(
@@ -43,6 +45,37 @@ class IdentityApiTest {
             ),
         )
 
+        assertEquals(listOf(evmAddress), bitcoinKeyApiClient.getAccountConfiguration().linkedAddresses)
+        assertEquals(listOf(bitcoinAddress), evmKeyApiClient.getAccountConfiguration().linkedAddresses)
+    }
+
+    @Test
+    fun `bitcoin wallet link evm wallet`() {
+        val bitcoinKey = ECKey()
+        val bitcoinKeyApiClient = TestApiClient(WalletKeyPair.Bitcoin(bitcoinKey), chainId = ChainId(0u))
+        val bitcoinAddress = BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, bitcoinKey)
+        assertTrue { bitcoinKeyApiClient.getAccountConfiguration().linkedAddresses.isEmpty() }
+
+        val evmWalletKeyPair = WalletKeyPair.EVM.generate()
+        val evmKeyApiClient = TestApiClient(evmWalletKeyPair)
+        val evmAddress = evmKeyApiClient.address as EvmAddress
+
+        bitcoinKeyApiClient.linkIdentity(
+            LinkIdentityApiRequest(
+                bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
+                    ecKey = bitcoinKey,
+                    address = bitcoinAddress,
+                    linkAddress = evmAddress,
+                ),
+                evmLinkAddressProof = signEvmWalletLinkProof(
+                    ecKeyPair = evmWalletKeyPair.ecKeyPair,
+                    address = evmAddress,
+                    linkAddress = bitcoinAddress,
+                ),
+            ),
+        )
+
+        assertEquals(listOf(evmAddress), bitcoinKeyApiClient.getAccountConfiguration().linkedAddresses)
         assertEquals(listOf(bitcoinAddress), evmKeyApiClient.getAccountConfiguration().linkedAddresses)
     }
 
