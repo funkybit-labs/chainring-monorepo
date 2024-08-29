@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import org.bitcoinj.core.NetworkParameters
 import org.junit.jupiter.api.Assertions
 import xyz.funkybit.apps.api.TestRoutes
 import xyz.funkybit.apps.api.model.AccountConfigurationApiResponse
@@ -13,6 +14,7 @@ import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.BalancesApiResponse
 import xyz.funkybit.apps.api.model.BatchOrdersApiRequest
 import xyz.funkybit.apps.api.model.BatchOrdersApiResponse
+import xyz.funkybit.apps.api.model.BitcoinLinkAddressProof
 import xyz.funkybit.apps.api.model.CancelOrderApiRequest
 import xyz.funkybit.apps.api.model.ConfigurationApiResponse
 import xyz.funkybit.apps.api.model.CreateDepositApiRequest
@@ -20,6 +22,7 @@ import xyz.funkybit.apps.api.model.CreateOrderApiRequest
 import xyz.funkybit.apps.api.model.CreateOrderApiResponse
 import xyz.funkybit.apps.api.model.CreateWithdrawalApiRequest
 import xyz.funkybit.apps.api.model.DepositApiResponse
+import xyz.funkybit.apps.api.model.EvmLinkAddressProof
 import xyz.funkybit.apps.api.model.FaucetApiRequest
 import xyz.funkybit.apps.api.model.FaucetApiResponse
 import xyz.funkybit.apps.api.model.GetLastPriceResponse
@@ -33,6 +36,8 @@ import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.apps.api.model.OrderAmount
 import xyz.funkybit.apps.api.model.OrdersApiResponse
 import xyz.funkybit.apps.api.model.WithdrawalApiResponse
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.MarketMinFee
 import xyz.funkybit.core.model.Percentage
@@ -190,6 +195,26 @@ class TestApiClient(keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(), trace
 
     override fun linkIdentity(apiRequest: LinkIdentityApiRequest) =
         tryLinkIdentity(apiRequest).assertSuccess()
+
+    fun linkIdentity(bitcoinLinkAddressProof: BitcoinLinkAddressProof, evmLinkAddressProof: EvmLinkAddressProof) =
+        tryLinkIdentity(LinkIdentityApiRequest(bitcoinLinkAddressProof, evmLinkAddressProof)).assertSuccess()
+
+    fun linkBitcoinWallet(bitcoinKeyPair: WalletKeyPair.Bitcoin) {
+        val bitcoinAddress = BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, bitcoinKeyPair.ecKey)
+
+        linkIdentity(
+            signBitcoinWalletLinkProof(
+                ecKey = bitcoinKeyPair.ecKey,
+                address = bitcoinAddress,
+                linkAddress = this.address as EvmAddress,
+            ),
+            signEvmWalletLinkProof(
+                ecKeyPair = (this.keyPair as WalletKeyPair.EVM).ecKeyPair,
+                address = this.address,
+                linkAddress = bitcoinAddress,
+            ),
+        )
+    }
 
     override fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
         tryCreateOrder(apiRequest).assertSuccess()

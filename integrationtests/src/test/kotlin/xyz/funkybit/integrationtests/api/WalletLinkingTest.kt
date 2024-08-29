@@ -1,17 +1,13 @@
 package xyz.funkybit.integrationtests.api
 
 import org.bitcoinj.core.ECKey
-import org.bitcoinj.core.NetworkParameters
 import org.http4k.client.WebsocketClient
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.apps.api.model.Market
-import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.OrderStatus
-import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WithdrawalStatus
 import xyz.funkybit.core.utils.setScale
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
@@ -33,7 +29,6 @@ import xyz.funkybit.integrationtests.utils.blocking
 import xyz.funkybit.integrationtests.utils.subscribeToBalances
 import xyz.funkybit.integrationtests.utils.subscribeToMyOrders
 import xyz.funkybit.integrationtests.utils.subscribeToMyTrades
-import xyz.funkybit.testfixtures.DbTestHelpers.createWallet
 import java.math.BigDecimal
 import kotlin.test.Test
 
@@ -91,17 +86,12 @@ class WalletLinkingTest : OrderBaseTest() {
             it.orders
         }
 
-        // TODO: linking should be done via API
-        val takerApiClientBitcoin = transaction {
-            val takerEvmWallet = WalletEntity.getByAddress(takerApiClientEvm.address)
-            val takerBitcoinKeyPair = ECKey()
-            createWallet(
-                address = BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, takerBitcoinKeyPair),
-                user = takerEvmWallet.user,
-            )
-            TestApiClient(WalletKeyPair.Bitcoin(takerBitcoinKeyPair), chainId = ChainId(0u))
-        }
+        // link bitcoin wallet
+        val takerBitcoinKeyPair = WalletKeyPair.Bitcoin(ECKey())
+        takerApiClientEvm.linkBitcoinWallet(takerBitcoinKeyPair)
+        val takerApiClientBitcoin = TestApiClient(takerBitcoinKeyPair, chainId = ChainId(0u))
 
+        // check that user sees same balances, deposits, withdrawals, orders and trades
         assertEquals(takerBalances, takerApiClientBitcoin.getBalances().balances)
         assertEquals(takerDeposits, takerApiClientBitcoin.listDeposits().deposits)
         assertEquals(takerWithdrawals, takerApiClientBitcoin.listWithdrawals().withdrawals)
