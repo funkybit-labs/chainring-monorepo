@@ -5,6 +5,7 @@ import kotlinx.datetime.Instant
 import org.bitcoinj.core.ECKey
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
+import xyz.funkybit.apps.api.LinkMessage
 import xyz.funkybit.apps.api.model.Balance
 import xyz.funkybit.apps.api.model.BitcoinLinkAddressProof
 import xyz.funkybit.apps.api.model.EvmLinkAddressProof
@@ -114,7 +115,6 @@ fun signBitcoinWalletLinkProof(
     val signature = BitcoinSignature(ecKey.signMessage(bitcoinLinkAddressMessage))
 
     return BitcoinLinkAddressProof(
-        message = message,
         address = address,
         linkAddress = linkAddress,
         timestamp = timestamp.toString(),
@@ -129,16 +129,20 @@ fun signEvmWalletLinkProof(
     chainId: ChainId = ChainId(1337U),
     timestamp: Instant = Clock.System.now(),
 ): EvmLinkAddressProof {
-    val evmLinkAddressProof = EvmLinkAddressProof(
+    val linkMessage = LinkMessage(
         message = "[funkybit] Please sign this message to link your wallets. This action will not cost any gas fees.",
+        address = address.toString(),
+        linkAddress = linkAddress.toString(),
+        chainId = chainId,
+        timestamp = timestamp.toString(),
+    )
+    val signature: EvmSignature = ECHelper.signData(Credentials.create(ecKeyPair), EIP712Helper.computeHash(linkMessage))
+
+    return EvmLinkAddressProof(
         address = address,
         linkAddress = linkAddress,
         chainId = chainId,
         timestamp = timestamp.toString(),
-        signature = EvmSignature.emptySignature(),
+        signature = signature,
     )
-
-    val signature: EvmSignature = ECHelper.signData(Credentials.create(ecKeyPair), EIP712Helper.computeHash(evmLinkAddressProof))
-
-    return evmLinkAddressProof.copy(signature = signature)
 }

@@ -9,7 +9,6 @@ import xyz.funkybit.core.model.db.ChainId
 
 @Serializable
 data class BitcoinLinkAddressProof(
-    val message: String,
     val address: BitcoinAddress,
     val linkAddress: EvmAddress,
     val timestamp: String,
@@ -18,7 +17,6 @@ data class BitcoinLinkAddressProof(
 
 @Serializable
 data class EvmLinkAddressProof(
-    val message: String,
     val chainId: ChainId,
     val address: EvmAddress,
     val linkAddress: BitcoinAddress,

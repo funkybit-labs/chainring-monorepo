@@ -26,7 +26,7 @@ class IdentityApiTest {
         assertTrue { evmKeyApiClient.getAccountConfiguration().linkedAddresses.isEmpty() }
 
         val bitcoinKey = ECKey()
-        val bitcoinAddress = BitcoinAddress.fromKey(NetworkParameters.fromID("org.bitcoinj.unittest")!!, bitcoinKey)
+        val bitcoinAddress = BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, bitcoinKey)
 
         evmKeyApiClient.linkIdentity(
             LinkIdentityApiRequest(

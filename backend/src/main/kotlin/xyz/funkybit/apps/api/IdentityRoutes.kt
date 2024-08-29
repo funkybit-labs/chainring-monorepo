@@ -34,6 +34,15 @@ import java.math.BigInteger
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
+const val baseLinkMessage = "[funkybit] Please sign this message to link your wallets. This action will not cost any gas fees."
+data class LinkMessage(
+    val message: String,
+    val address: String,
+    val linkAddress: String,
+    val chainId: ChainId,
+    val timestamp: String,
+)
+
 object IdentityRoutes {
     private val logger = KotlinLogging.logger {}
 
@@ -48,14 +57,12 @@ object IdentityRoutes {
             receiving(
                 requestBody to LinkIdentityApiRequest(
                     bitcoinLinkAddressProof = BitcoinLinkAddressProof(
-                        message = "[funkybit] Please sign this message to link your wallets. This action will not cost any gas fees.",
                         address = BitcoinAddress.canonicalize("bcrt1qdca3sam9mldju3ssryrrcmjvd8pgnw30ccaggx"),
                         linkAddress = EvmAddress.zero,
                         timestamp = "2024-08-21T14:14:13.095Z",
                         signature = BitcoinSignature.emptySignature(),
                     ),
                     evmLinkAddressProof = EvmLinkAddressProof(
-                        message = "[funkybit] Please sign this message to link your wallets. This action will not cost any gas fees.",
                         address = EvmAddress.zero,
                         linkAddress = BitcoinAddress.canonicalize("bcrt1qdca3sam9mldju3ssryrrcmjvd8pgnw30ccaggx"),
                         chainId = ChainId(BigInteger.ZERO),
@@ -150,7 +157,7 @@ object IdentityRoutes {
         val bitcoinAddress = BitcoinAddress.canonicalize(bitcoinLinkAddressProof.address.toString())
         val linkAddress = EvmAddress.canonicalize(bitcoinLinkAddressProof.linkAddress.toString())
 
-        val bitcoinLinkAddressMessage = bitcoinLinkAddressProof.message +
+        val bitcoinLinkAddressMessage = baseLinkMessage +
             "\nAddress: ${bitcoinAddress.value}, LinkAddress: ${linkAddress.value}, Timestamp: ${bitcoinLinkAddressProof.timestamp}"
 
         return BitcoinSignatureVerification.verifyMessage(bitcoinAddress, bitcoinLinkAddressProof.signature.value.replace(" ", "+"), bitcoinLinkAddressMessage)
@@ -160,7 +167,15 @@ object IdentityRoutes {
         val walletAddress = EvmAddress.canonicalize(evmLinkAddressProof.address.toString())
 
         return ECHelper.isValidSignature(
-            messageHash = EIP712Helper.computeHash(evmLinkAddressProof),
+            messageHash = EIP712Helper.computeHash(
+                LinkMessage(
+                    message = baseLinkMessage,
+                    address = evmLinkAddressProof.address.toString(),
+                    linkAddress = evmLinkAddressProof.linkAddress.toString(),
+                    chainId = evmLinkAddressProof.chainId,
+                    timestamp = evmLinkAddressProof.timestamp,
+                ),
+            ),
             signature = evmLinkAddressProof.signature,
             signerAddress = walletAddress,
         )
