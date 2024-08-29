@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.dao.with
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
@@ -198,8 +199,10 @@ class BalanceEntity(guid: EntityID<BalanceId>) : GUIDEntity<BalanceId>(guid) {
         fun getBalancesForUserId(userId: UserId): List<BalanceEntity> =
             BalanceTable
                 .innerJoin(WalletTable)
+                .innerJoin(SymbolTable)
                 .selectAll()
                 .where { WalletTable.userGuid.eq(userId) }
+                .orderBy(Pair(SymbolTable.name, SortOrder.ASC))
                 .map(Companion::wrapRow)
                 .with(BalanceEntity::symbol)
                 .toList()

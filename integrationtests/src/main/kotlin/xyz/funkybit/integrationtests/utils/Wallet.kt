@@ -2,9 +2,6 @@ package xyz.funkybit.integrationtests.utils
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
-import org.bitcoinj.wallet.KeyChainGroup
-import org.web3j.crypto.Credentials
-import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import xyz.funkybit.apps.api.model.CancelOrderApiRequest
@@ -17,7 +14,6 @@ import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.apps.ring.BlockchainDepositHandler
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.ContractType
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.evm.EIP712Helper
 import xyz.funkybit.core.evm.EIP712Transaction
 import xyz.funkybit.core.evm.TokenAddressAndChain
@@ -35,10 +31,9 @@ import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.time.Duration
-import org.bitcoinj.wallet.Wallet as BitcoinWallet
 
 class Wallet(
-    val walletKeypair: ECKeyPair,
+    val keyPair: WalletKeyPair.EVM,
     val chains: List<Chain>,
     val apiClient: ApiClient,
 ) {
@@ -46,11 +41,12 @@ class Wallet(
     companion object {
         operator fun invoke(apiClient: ApiClient): Wallet {
             val config = apiClient.getConfiguration().chains
-            return Wallet(apiClient.ecKeyPair, config, apiClient)
+            // TODO: add bitcoin support
+            return Wallet(apiClient.keyPair as WalletKeyPair.EVM, config, apiClient)
         }
     }
     private val blockchainClients = ChainManager.blockchainConfigs.map {
-        TestBlockchainClient(ChainManager.getBlockchainClient(it, walletKeypair.privateKey.toByteArray().toHex()).config)
+        TestBlockchainClient(ChainManager.getBlockchainClient(it, keyPair.privateKey.toByteArray().toHex()).config)
             .also { blockchainClient ->
                 val chain = chains.first { it.id == blockchainClient.chainId }
                 blockchainClient.setContractAddress(
@@ -64,9 +60,7 @@ class Wallet(
 
     var currentChainId: ChainId = blockchainClients.first().chainId
 
-    val evmAddress = EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(walletKeypair)))
-    private val bitcoinNetwork = BitcoinClient.getParams()
-    val bitcoinAddress = BitcoinWallet(bitcoinNetwork, KeyChainGroup.createBasic(bitcoinNetwork))
+    val evmAddress = keyPair.address() as EvmAddress
 
     private val exchangeContractAddressByChainId = chains.associate { it.id to it.contracts.first { it.name == ContractType.Exchange.name }.address }
     private val exchangeContractByChainId = blockchainClients.associate { it.chainId to it.loadExchangeContract(exchangeContractAddressByChainId.getValue(it.chainId)) }
@@ -229,7 +223,7 @@ class Wallet(
         return EvmAddress(Keys.toChecksumAddress(exchangeContractByChainId.getValue(chainId).linkedSigners(evmAddress.value).send()))
     }
 
-    fun signWithdraw(symbol: String, amount: BigInteger, nonceOverride: Long? = null, linkedSignerEcKeyPair: ECKeyPair? = null): CreateWithdrawalApiRequest {
+    fun signWithdraw(symbol: String, amount: BigInteger, nonceOverride: Long? = null, linkedSignerKeyPair: WalletKeyPair? = null): CreateWithdrawalApiRequest {
         val nonce = nonceOverride ?: getWithdrawalNonce()
         val tx = EIP712Transaction.WithdrawTx(
             evmAddress,
@@ -243,13 +237,13 @@ class Wallet(
             Symbol(symbol),
             amount,
             nonce,
-            blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId)), linkedSignerEcKeyPair),
+            blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId)), linkedSignerKeyPair?.let { it as WalletKeyPair.EVM }?.ecKeyPair),
         )
     }
 
-    fun signOrder(request: CreateOrderApiRequest.Limit, linkedSignerEcKeyPair: ECKeyPair? = null): CreateOrderApiRequest.Limit =
+    fun signOrder(request: CreateOrderApiRequest.Limit, linkedSignerKeyPair: WalletKeyPair? = null): CreateOrderApiRequest.Limit =
         request.copy(
-            signature = limitOrderEip712TxSignature(request.marketId, request.amount, request.price, request.side, request.nonce, linkedSignerEcKeyPair),
+            signature = limitOrderEip712TxSignature(request.marketId, request.amount, request.price, request.side, request.nonce, linkedSignerKeyPair),
             verifyingChainId = this.currentChainId,
         )
 
@@ -316,7 +310,7 @@ class Wallet(
         exchangeContractByChainId.getValue(currentChainId).rollbackBatch().sendAsync()
     }
 
-    private fun limitOrderEip712TxSignature(marketId: MarketId, amount: OrderAmount, price: BigDecimal, side: OrderSide, nonce: String, linkedSignerEcKeyPair: ECKeyPair? = null): EvmSignature {
+    private fun limitOrderEip712TxSignature(marketId: MarketId, amount: OrderAmount, price: BigDecimal, side: OrderSide, nonce: String, linkedSignerKeyPair: WalletKeyPair? = null): EvmSignature {
         val (baseSymbol, quoteSymbol) = marketSymbols(marketId)
         val tx = EIP712Transaction.Order(
             evmAddress,
@@ -329,7 +323,7 @@ class Wallet(
             nonce = BigInteger(1, nonce.toHexBytes()),
             signature = EvmSignature.emptySignature(),
         )
-        return blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId)), linkedSignerEcKeyPair)
+        return blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId)), linkedSignerKeyPair?.let { it as WalletKeyPair.EVM }?.ecKeyPair)
     }
 
     private fun getWithdrawalNonce(): Long {
@@ -358,7 +352,7 @@ class Wallet(
         val blockchainClient = blockchainClientsByChainId.getValue(currentChainId)
 
         return blockchainClient.sovereignWithdrawal(
-            senderCredentials = Credentials.create(walletKeypair),
+            senderCredentials = keyPair.credentials,
             tokenContractAddress = erc20TokenAddress(symbol) ?: EvmAddress.zero,
             amount = amount,
         ).also { blockchainClient.mine() }

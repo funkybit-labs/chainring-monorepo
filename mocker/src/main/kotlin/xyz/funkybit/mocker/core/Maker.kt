@@ -44,6 +44,7 @@ import org.knowm.xchart.SwingWrapper
 import org.knowm.xchart.XYChartBuilder
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
+import xyz.funkybit.integrationtests.utils.WalletKeyPair
 
 sealed class LiquidityPlacement {
     data class Absolute(val amount: BigInteger) : LiquidityPlacement()
@@ -62,10 +63,10 @@ class Maker(
     private val liquidityPlacement: LiquidityPlacement,
     nativeAssets: Map<String, BigInteger>,
     assets: Map<String, BigInteger>,
-    keyPair: ECKeyPair = Keys.createEcKeyPair(),
+    keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(),
 ) : Actor(marketIds, nativeAssets, assets, keyPair) {
     private val marketPriceOverrideFunction: PriceFunction? = marketPriceOverride?.let { PriceFunction.generateDeterministicHarmonicMovement(initialValue = it.toDouble(), maxFluctuation = 0.01) }
-    override val id: String = "mm_${EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
+    override val id: String = "mm_${keyPair.address().canonicalize()}"
     override val logger: KLogger = KotlinLogging.logger {}
     private var currentOrders = mutableMapOf<MarketId, MutableSet<Order.Limit>>()
     private var quotesCreated = false

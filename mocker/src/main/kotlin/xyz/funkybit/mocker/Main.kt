@@ -22,6 +22,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
+import xyz.funkybit.integrationtests.utils.WalletKeyPair
 import java.math.BigInteger
 
 
@@ -123,7 +124,7 @@ fun main() {
     timer.cancel()
 }
 
-fun startMaker(market: Market, marketPriceOverride: BigDecimal?, liquidityPlacement: LiquidityPlacement, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, keyPair: ECKeyPair = Keys.createEcKeyPair()): Maker {
+fun startMaker(market: Market, marketPriceOverride: BigDecimal?, liquidityPlacement: LiquidityPlacement, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, keyPair: WalletKeyPair = WalletKeyPair.EVM.generate()): Maker {
     val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
     val quoteAssetBtc = market.quoteSymbol.value.startsWith("BTC")
     val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)

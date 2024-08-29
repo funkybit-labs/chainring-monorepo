@@ -16,9 +16,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import org.bitcoinj.core.ECKey
+import org.bitcoinj.core.NetworkParameters
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
+import org.web3j.utils.Numeric
 import xyz.funkybit.apps.api.AdminRoutes
 import xyz.funkybit.apps.api.middleware.SignInMessage
 import xyz.funkybit.apps.api.model.AccountConfigurationApiResponse
@@ -44,11 +47,10 @@ import xyz.funkybit.apps.api.model.ListWithdrawalsApiResponse
 import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.apps.api.model.OrdersApiResponse
 import xyz.funkybit.apps.api.model.WithdrawalApiResponse
-import xyz.funkybit.core.blockchain.checksumAddress
 import xyz.funkybit.core.evm.ECHelper
 import xyz.funkybit.core.evm.EIP712Helper
 import xyz.funkybit.core.model.Address
-import xyz.funkybit.core.model.EvmSignature
+import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ClientOrderId
 import xyz.funkybit.core.model.db.DepositId
@@ -72,12 +74,49 @@ data class ApiCallFailure(
     val error: ApiError?,
 )
 
-open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val traceRecorder: TraceRecorder = TraceRecorder.noOp) {
-    val authToken: String = issueAuthToken(ecKeyPair = ecKeyPair)
-    val address = Credentials.create(ecKeyPair).checksumAddress()
+sealed class WalletKeyPair {
+    data class EVM(val ecKeyPair: ECKeyPair) : WalletKeyPair() {
+        companion object {
+            fun generate(): EVM =
+                EVM(Keys.createEcKeyPair())
 
-    var linkedSignerEcKeyPair: ECKeyPair? = null
-    private var currentChainId: ChainId = ChainId(1337u)
+            fun fromPrivateKeyHex(privKeyHex: String): EVM =
+                EVM(ECKeyPair.create(Numeric.toBigInt(privKeyHex)))
+        }
+
+        val privateKey = ecKeyPair.privateKey
+        val credentials = Credentials.create(ecKeyPair)
+    }
+
+    data class Bitcoin(val ecKey: ECKey) : WalletKeyPair()
+
+    fun sign(signInMessage: SignInMessage): String =
+        when (this) {
+            is EVM -> {
+                ECHelper.signData(Credentials.create(ecKeyPair), EIP712Helper.computeHash(signInMessage)).value
+            }
+            is Bitcoin -> {
+                ecKey.signMessage(signInMessage.message + "\nAddress: ${signInMessage.address}, Timestamp: ${signInMessage.timestamp}")
+            }
+        }
+
+    fun address(): Address =
+        when (this) {
+            is EVM -> Address.auto(Credentials.create(ecKeyPair).address)
+            is Bitcoin -> BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, ecKey)
+        }
+}
+
+open class ApiClient(
+    val keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(),
+    val traceRecorder: TraceRecorder = TraceRecorder.noOp,
+    chainId: ChainId = ChainId(1337u),
+) {
+    private var currentChainId: ChainId = chainId
+    var authToken: String = issueAuthToken(keyPair = keyPair, chainId = currentChainId)
+    val address = keyPair.address()
+
+    var linkedSignerKeyPair: WalletKeyPair? = null
 
     companion object {
         private fun listOrdersUrl(statuses: List<OrderStatus>, marketId: MarketId?) = "$apiServerRootUrl/v1/orders".toHttpUrl().newBuilder().apply {
@@ -97,8 +136,8 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                     },
             ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
-        internal fun authHeaders(ecKeyPair: ECKeyPair, linkedSignerEcKeyPair: ECKeyPair?, chainId: ChainId): Headers {
-            val didToken = issueAuthToken(ecKeyPair, linkedSignerEcKeyPair = linkedSignerEcKeyPair, chainId = chainId)
+        internal fun authHeaders(keyPair: WalletKeyPair, linkedSignerKeyPair: WalletKeyPair?, chainId: ChainId): Headers {
+            val didToken = issueAuthToken(keyPair, linkedSignerKeyPair = linkedSignerKeyPair, chainId = chainId)
 
             return Headers.Builder()
                 .add(
@@ -108,11 +147,11 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
         }
 
         fun issueAuthToken(
-            ecKeyPair: ECKeyPair = Keys.createEcKeyPair(),
-            address: String = "0x${Keys.getAddress(ecKeyPair)}",
+            keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(),
+            address: String = keyPair.address().canonicalize().toString(),
             chainId: ChainId = ChainId(1337U),
             timestamp: Instant = Clock.System.now(),
-            linkedSignerEcKeyPair: ECKeyPair? = null,
+            linkedSignerKeyPair: WalletKeyPair? = null,
         ): String {
             val message = SignInMessage(
                 message = "[funkybit] Please sign this message to verify your ownership of this wallet address. This action will not cost any gas fees.",
@@ -122,9 +161,9 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
             )
 
             val body: String = Json.encodeToString(message)
-            val signature: EvmSignature = ECHelper.signData(Credentials.create(linkedSignerEcKeyPair ?: ecKeyPair), EIP712Helper.computeHash(message))
+            val signature = (linkedSignerKeyPair ?: keyPair).sign(message)
 
-            return "${Base64.getUrlEncoder().encodeToString(body.toByteArray())}.${signature.value}"
+            return "${Base64.getUrlEncoder().encodeToString(body.toByteArray())}.$signature"
         }
 
         private fun execute(request: Request): Response =
@@ -133,6 +172,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
 
     fun switchChain(chainId: ChainId) {
         currentChainId = chainId
+        issueAuthToken(keyPair = keyPair, chainId = currentChainId)
     }
 
     fun newWebSocket(listener: WebSocketListener): WebSocket =
@@ -160,7 +200,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/account-config")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryMarkSymbolAsAdded(symbolName: String): Either<ApiCallFailure, Unit> =
@@ -170,7 +210,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/account-config/$symbolName")
                 .post("".toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
     fun tryCreateOrder(apiRequest: CreateOrderApiRequest): Either<ApiCallFailure, CreateOrderApiResponse> =
@@ -180,7 +220,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/orders")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryBatchOrders(apiRequest: BatchOrdersApiRequest): Either<ApiCallFailure, BatchOrdersApiResponse> =
@@ -190,7 +230,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/batch/orders")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryCancelOrder(apiRequest: CancelOrderApiRequest): Either<ApiCallFailure, Unit> =
@@ -200,7 +240,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/orders/${apiRequest.orderId}")
                 .delete(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
     fun tryGetOrder(id: OrderId): Either<ApiCallFailure, Order> =
@@ -210,7 +250,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/orders/$id")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
     fun tryGetOrder(id: ClientOrderId): Either<ApiCallFailure, Order> =
@@ -220,7 +260,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/orders/external:$id")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
     fun tryListOrders(statuses: List<OrderStatus> = emptyList(), marketId: MarketId? = null): Either<ApiCallFailure, OrdersApiResponse> {
@@ -230,7 +270,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url(listOrdersUrl(statuses, marketId))
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
     }
 
@@ -241,7 +281,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/orders")
                 .delete()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
     fun tryGetOrderBook(marketId: MarketId): Either<ApiCallFailure, GetOrderBookApiResponse> =
@@ -253,7 +293,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 )
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
     fun tryGetLimits(): Either<ApiCallFailure, GetLimitsApiResponse> =
@@ -263,7 +303,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/limits")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrPayload(HttpURLConnection.HTTP_OK)
 
     fun tryCreateDeposit(apiRequest: CreateDepositApiRequest): Either<ApiCallFailure, DepositApiResponse> =
@@ -273,7 +313,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/deposits")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryGetDeposit(id: DepositId): Either<ApiCallFailure, DepositApiResponse> =
@@ -283,7 +323,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/deposits/$id")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryListDeposits(): Either<ApiCallFailure, ListDepositsApiResponse> =
@@ -293,7 +333,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/deposits")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryCreateWithdrawal(apiRequest: CreateWithdrawalApiRequest): Either<ApiCallFailure, WithdrawalApiResponse> =
@@ -303,7 +343,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/withdrawals")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair, linkedSignerEcKeyPair, currentChainId),
+                .withAuthHeaders(keyPair, linkedSignerKeyPair, currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryGetWithdrawal(id: WithdrawalId): Either<ApiCallFailure, WithdrawalApiResponse> =
@@ -313,7 +353,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/withdrawals/$id")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair, linkedSignerEcKeyPair, currentChainId),
+                .withAuthHeaders(keyPair, linkedSignerKeyPair, currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryListWithdrawals(): Either<ApiCallFailure, ListWithdrawalsApiResponse> =
@@ -323,7 +363,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/withdrawals")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair, linkedSignerEcKeyPair, currentChainId),
+                .withAuthHeaders(keyPair, linkedSignerKeyPair, currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryGetBalances(): Either<ApiCallFailure, BalancesApiResponse> =
@@ -333,7 +373,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/balances")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryFaucet(apiRequest: FaucetApiRequest): Either<ApiCallFailure, FaucetApiResponse> =
@@ -343,7 +383,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/faucet")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryCreateSymbol(adminRequest: AdminRoutes.Companion.AdminSymbol): Either<ApiCallFailure, Unit> =
@@ -353,7 +393,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/admin/symbol")
                 .post(Json.encodeToString(adminRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryListSymbols(): Either<ApiCallFailure, List<AdminRoutes.Companion.AdminSymbol>> =
@@ -363,7 +403,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/admin/symbol")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryPatchSymbol(adminRequest: AdminRoutes.Companion.AdminSymbol): Either<ApiCallFailure, Unit> =
@@ -373,7 +413,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/admin/symbol/${adminRequest.name}")
                 .patch(Json.encodeToString(adminRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryCreateMarket(adminRequest: AdminRoutes.Companion.AdminMarket): Either<ApiCallFailure, Unit> =
@@ -383,7 +423,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/admin/market")
                 .post(Json.encodeToString(adminRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryListMarkets(): Either<ApiCallFailure, List<AdminRoutes.Companion.AdminMarket>> =
@@ -393,7 +433,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/admin/market")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryPatchMarket(adminRequest: AdminRoutes.Companion.AdminMarket): Either<ApiCallFailure, Unit> =
@@ -403,7 +443,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/admin/market/${adminRequest.id}")
                 .patch(Json.encodeToString(adminRequest).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryListAdmins(): Either<ApiCallFailure, List<Address>> =
@@ -413,7 +453,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/admin/admin")
                 .get()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
     fun tryAddAdmin(address: Address): Either<ApiCallFailure, Unit> =
@@ -423,7 +463,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/admin/admin/$address")
                 .put("".toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryRemoveAdmin(address: Address): Either<ApiCallFailure, Unit> =
@@ -433,7 +473,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/admin/admin/$address")
                 .delete()
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
     fun trySetFeeRates(feeRates: FeeRates): Either<ApiCallFailure, Unit> =
@@ -443,7 +483,7 @@ open class ApiClient(val ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), val trac
                 .url("$apiServerRootUrl/v1/admin/fee-rates")
                 .post(Json.encodeToString(feeRates).toRequestBody(applicationJson))
                 .build()
-                .withAuthHeaders(ecKeyPair),
+                .withAuthHeaders(keyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_CREATED)
 
     fun tryGetLastPrice(marketId: MarketId): Either<ApiCallFailure, GetLastPriceResponse> =
@@ -564,11 +604,11 @@ val json = Json {
     this.ignoreUnknownKeys = true
 }
 
-fun Request.withAuthHeaders(ecKeyPair: ECKeyPair?, linkedSignerEcKeyPair: ECKeyPair? = null, chainId: ChainId? = null): Request =
-    if (ecKeyPair == null) {
+fun Request.withAuthHeaders(keyPair: WalletKeyPair?, linkedSignerKeyPair: WalletKeyPair? = null, chainId: ChainId? = null): Request =
+    if (keyPair == null) {
         this
     } else {
-        addHeaders(ApiClient.authHeaders(ecKeyPair, linkedSignerEcKeyPair, chainId = chainId ?: ChainId(1337u)))
+        addHeaders(ApiClient.authHeaders(keyPair, linkedSignerKeyPair, chainId = chainId ?: ChainId(1337u)))
     }
 
 inline fun <reified T> Response.toErrorOrPayload(expectedStatusCode: Int): Either<ApiCallFailure, T> {

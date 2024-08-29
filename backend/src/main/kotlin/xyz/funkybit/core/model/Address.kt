@@ -83,6 +83,8 @@ sealed class BitcoinAddress(val value: String) : Address() {
             fun generate(networkParameters: NetworkParameters): SegWit =
                 fromKey(networkParameters, ECKey())
         }
+
+        override fun toString(): String = this.raw
     }
 
     data class Taproot(val raw: String, val testnet: Boolean) : BitcoinAddress(raw) {
@@ -91,6 +93,8 @@ sealed class BitcoinAddress(val value: String) : Address() {
             val tapTweakedPubkey = Utils.HEX.encode(convertBits(decoded.data.copyOfRange(1, decoded.data.size), 5, 8, false))
             return padZeroHexN(ScriptOpCodes.OP_1.toString(16), 2) + opPushData(tapTweakedPubkey)
         }
+
+        override fun toString(): String = this.raw
     }
 
     data class P2SH(val raw: String, val testnet: Boolean) : BitcoinAddress(raw) {
@@ -99,6 +103,8 @@ sealed class BitcoinAddress(val value: String) : Address() {
             val hash = Utils.HEX.encode(decoded)
             return padZeroHexN(ScriptOpCodes.OP_HASH160.toString(16), 2) + opPushData(hash) + padZeroHexN(ScriptOpCodes.OP_EQUAL.toString(16), 2)
         }
+
+        override fun toString(): String = this.raw
     }
 
     data class P2PKH(val raw: String, val testnet: Boolean) : BitcoinAddress(raw) {
@@ -111,10 +117,13 @@ sealed class BitcoinAddress(val value: String) : Address() {
                 padZeroHexN(ScriptOpCodes.OP_EQUALVERIFY.toString(16), 2) +
                 padZeroHexN(ScriptOpCodes.OP_CHECKSIG.toString(16), 2)
         }
+
+        override fun toString(): String = this.raw
     }
 
     data class Unrecognized(val raw: String) : BitcoinAddress(raw) {
         override fun script() = ""
+        override fun toString(): String = this.raw
     }
 
     protected fun convertBits(data: ByteArray, fromBits: Int, toBits: Int, pad: Boolean): ByteArray {

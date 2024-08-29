@@ -29,6 +29,7 @@ import org.http4k.server.asServer
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
 import org.web3j.utils.Numeric
+import xyz.funkybit.integrationtests.utils.WalletKeyPair
 
 fun main() {
     val logger = KotlinLogging.logger {}
@@ -145,7 +146,7 @@ class MockerApp(
                         liquidityPlacement = params.liquidityPlacement,
                         baseAssetAmount = params.initialBaseBalance * BigDecimal(100),
                         quoteAssetAmount = params.initialBaseBalance * params.priceBaseline * BigDecimal(100),
-                        keyPair = ECKeyPair.create(Numeric.toBigInt(params.makerPrivateKeyHex))
+                        keyPair = WalletKeyPair.EVM.fromPrivateKeyHex(params.makerPrivateKeyHex)
                     )
                 )
             }

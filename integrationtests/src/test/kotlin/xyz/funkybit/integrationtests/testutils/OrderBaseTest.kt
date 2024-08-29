@@ -32,6 +32,7 @@ import xyz.funkybit.integrationtests.utils.ExpectedBalance
 import xyz.funkybit.integrationtests.utils.Faucet
 import xyz.funkybit.integrationtests.utils.TestApiClient
 import xyz.funkybit.integrationtests.utils.Wallet
+import xyz.funkybit.integrationtests.utils.WalletKeyPair
 import xyz.funkybit.integrationtests.utils.assertBalances
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
 import xyz.funkybit.integrationtests.utils.assertLimitsMessageReceived
@@ -199,7 +200,7 @@ open class OrderBaseTest {
         // the preparation tx will need to be resubmitted again
         // Not rolling back on chain but changing the tx hash simulates anvil restarting
         if (rollbackSettlement) {
-            val submitterWallet = Wallet(TestApiClient(ecKeyPair = Credentials.create("0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba").ecKeyPair))
+            val submitterWallet = Wallet(TestApiClient(keyPair = WalletKeyPair.EVM(Credentials.create("0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba").ecKeyPair)))
             submitterWallet.switchChain(transaction { ChainSettlementBatchEntity[chainBatchGuid].chainId.value })
             submitterWallet.rollbackSettlement()
         }
