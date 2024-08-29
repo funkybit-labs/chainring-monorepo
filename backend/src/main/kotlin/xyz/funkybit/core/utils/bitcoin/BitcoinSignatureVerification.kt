@@ -51,7 +51,7 @@ object BitcoinSignatureVerification {
             val pubkey =
                 ECKey.recoverFromSignature(recId, ECKey.ECDSASignature(r, s), Sha256Hash.of(msgHash), compressed)
             logger.debug { "Recovered pubkey $pubkey from ECDSA signature" }
-            return pubkey != null
+            return pubkey != null // TODO verify that recovered address matches the address provided in the message
         } else {
             // Segwit P2WPKH and Taproot P2TR use BIP322 signing process
             val script = address.script()
@@ -63,7 +63,7 @@ object BitcoinSignatureVerification {
                 ScriptOpCodes.OP_0 -> {
                     val sigLen = signatureHex.substring(2, 4).toInt(16) * 2
                     val sig = signatureHex.substring(4, 4 + sigLen - 2)
-                    val pubkey = signatureHex.substring(6 + sigLen)
+                    val pubkey = signatureHex.substring(6 + sigLen) // TODO check that pubkey matches the address provided in the message
                     val scriptCode = generateSingleSigScript(pubkey, address)
                     // witness msg prefix for txSign:
                     // ...versionByte -- 4 byte - 0

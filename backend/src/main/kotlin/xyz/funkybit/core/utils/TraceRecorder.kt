@@ -12,6 +12,7 @@ interface TraceRecorder {
         GetConfiguration,
         GetAccountConfiguration,
         MarkSymbolAsAdded,
+        LinkIdentity,
         CreateOrder,
         CancelOrder,
         GetOrder,

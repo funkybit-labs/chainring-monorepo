@@ -42,6 +42,7 @@ import xyz.funkybit.apps.api.model.FaucetApiResponse
 import xyz.funkybit.apps.api.model.GetLastPriceResponse
 import xyz.funkybit.apps.api.model.GetLimitsApiResponse
 import xyz.funkybit.apps.api.model.GetOrderBookApiResponse
+import xyz.funkybit.apps.api.model.LinkIdentityApiRequest
 import xyz.funkybit.apps.api.model.ListDepositsApiResponse
 import xyz.funkybit.apps.api.model.ListWithdrawalsApiResponse
 import xyz.funkybit.apps.api.model.Order
@@ -209,6 +210,16 @@ open class ApiClient(
             Request.Builder()
                 .url("$apiServerRootUrl/v1/account-config/$symbolName")
                 .post("".toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(keyPair),
+        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
+
+    fun tryLinkIdentity(apiRequest: LinkIdentityApiRequest): Either<ApiCallFailure, Unit> =
+        executeAndTrace(
+            TraceRecorder.Op.LinkIdentity,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/identities/link")
+                .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(keyPair),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
@@ -511,6 +522,9 @@ open class ApiClient(
 
     open fun markSymbolAsAdded(symbolName: String) =
         tryMarkSymbolAsAdded(symbolName).throwOrReturn()
+
+    open fun linkIdentity(apiRequest: LinkIdentityApiRequest) =
+        tryLinkIdentity(apiRequest).throwOrReturn()
 
     open fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
         tryCreateOrder(apiRequest).throwOrReturn()

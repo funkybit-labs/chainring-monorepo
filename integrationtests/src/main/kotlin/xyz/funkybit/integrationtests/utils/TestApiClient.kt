@@ -25,6 +25,7 @@ import xyz.funkybit.apps.api.model.FaucetApiResponse
 import xyz.funkybit.apps.api.model.GetLastPriceResponse
 import xyz.funkybit.apps.api.model.GetLimitsApiResponse
 import xyz.funkybit.apps.api.model.GetOrderBookApiResponse
+import xyz.funkybit.apps.api.model.LinkIdentityApiRequest
 import xyz.funkybit.apps.api.model.ListDepositsApiResponse
 import xyz.funkybit.apps.api.model.ListWithdrawalsApiResponse
 import xyz.funkybit.apps.api.model.Market
@@ -186,6 +187,9 @@ class TestApiClient(keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(), trace
 
     override fun markSymbolAsAdded(symbolName: String) =
         tryMarkSymbolAsAdded(symbolName).assertSuccess()
+
+    override fun linkIdentity(apiRequest: LinkIdentityApiRequest) =
+        tryLinkIdentity(apiRequest).assertSuccess()
 
     override fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
         tryCreateOrder(apiRequest).assertSuccess()

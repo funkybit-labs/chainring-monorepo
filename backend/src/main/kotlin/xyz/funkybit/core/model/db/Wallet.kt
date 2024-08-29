@@ -5,7 +5,9 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.VarCharColumnType
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.selectAll
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
@@ -56,7 +58,10 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
         fun getOrCreateWithUser(address: Address): WalletEntity {
             val canonicalAddress = address.canonicalize()
             return findByAddress(canonicalAddress)
-                ?: run { createForUser(UserEntity.create(canonicalAddress), address) }
+                ?: run {
+                    val user = UserEntity.create(canonicalAddress)
+                    createForUser(user, address)
+                }
         }
 
         fun createForUser(user: UserEntity, address: Address): WalletEntity {
@@ -108,6 +113,16 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
                 EvmAddress(it[WalletTable.address])
             }
         }
+    }
+
+    fun linkedAddresses(): List<Address> {
+        return WalletTable
+            .selectAll()
+            .where {
+                WalletTable.userGuid.eq(userGuid) and WalletTable.guid.neq(guid)
+            }.map {
+                Address.auto(it[WalletTable.address])
+            }
     }
 
     var createdAt by WalletTable.createdAt
