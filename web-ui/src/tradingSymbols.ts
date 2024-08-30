@@ -1,5 +1,6 @@
 import TradingSymbol from 'tradingSymbol'
 import { ConfigurationApiResponse } from 'apiClient'
+import { bitcoinEnabled } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 
 export default class TradingSymbols {
   native: TradingSymbol[]
@@ -9,7 +10,7 @@ export default class TradingSymbols {
   static fromConfig(config: ConfigurationApiResponse): TradingSymbols {
     return new TradingSymbols(
       config.chains
-        .filter((chain) => chain.networkType === 'Evm')
+        .filter((chain) => bitcoinEnabled || chain.networkType === 'Evm')
         .map((chain) =>
           chain.symbols.map(
             (symbol) =>
@@ -20,6 +21,7 @@ export default class TradingSymbols {
                 symbol.contractAddress,
                 symbol.decimals,
                 chain.id,
+                chain.networkType,
                 symbol.faucetSupported,
                 symbol.withdrawalFee,
                 symbol.iconUrl

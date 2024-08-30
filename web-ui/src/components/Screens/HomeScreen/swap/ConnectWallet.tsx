@@ -1,5 +1,5 @@
 import { Button } from 'components/common/Button'
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useConfig } from 'wagmi'
 import { useValidChain } from 'hooks/useValidChain'
 import { Modal } from 'components/common/Modal'
@@ -8,12 +8,12 @@ import { useWallet } from 'contexts/walletProvider'
 type Props = {
   onSwitchToChain: (chainId: number) => Promise<void> | void
 }
-const bitcoinEnabled = import.meta.env.ENV_ENABLE_BITCOIN
+export const bitcoinEnabled = import.meta.env.ENV_ENABLE_BITCOIN
 
 export function ConnectWallet({ onSwitchToChain }: Props) {
   const validChain = useValidChain()
   const wallet = useWallet()
-  const config = useConfig()
+  const evmConfig = useConfig()
 
   const connectedWithInvalidChain =
     wallet.evmAccount?.isConnected && !validChain
@@ -21,26 +21,24 @@ export function ConnectWallet({ onSwitchToChain }: Props) {
   const [showWalletCategorySelection, setShowWalletCategorySelection] =
     useState(false)
 
-  useEffect(() => {
-    if (showWalletCategorySelection && wallet.primaryCategory !== 'none') {
-      setShowWalletCategorySelection(false)
-    }
-  }, [showWalletCategorySelection, wallet.primaryCategory])
-
   return (
     <>
-      <div className="mt-4">
+      <div>
         <Button
           caption={() =>
             connectedWithInvalidChain ? 'Invalid Chain' : 'Connect Wallet'
           }
-          onClick={() =>
-            connectedWithInvalidChain
-              ? onSwitchToChain(config.chains[0].id)
-              : bitcoinEnabled
-                ? setShowWalletCategorySelection(true)
-                : wallet.connect('evm')
-          }
+          onClick={() => {
+            if (connectedWithInvalidChain) {
+              onSwitchToChain(evmConfig.chains[0].id)
+            } else {
+              if (bitcoinEnabled && wallet.primaryCategory === 'none') {
+                setShowWalletCategorySelection(true)
+              } else {
+                wallet.connect('evm')
+              }
+            }
+          }}
           disabled={false}
           primary={true}
           width={'full'}

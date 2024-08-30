@@ -2,9 +2,8 @@ import { signTypedData } from '@wagmi/core'
 import { wagmiConfig } from 'wagmiConfig'
 import {
   getGlobalBitcoinAccount,
-  getGlobalEvmAccount,
-  getGlobalPrimaryAddress,
-  getGlobalPrimaryCategory
+  getGlobalPrimaryChainId,
+  getGlobalPrimaryAddress
 } from 'contexts/walletProvider'
 
 export type LoadAuthTokenOptions = {
@@ -22,12 +21,7 @@ export async function loadAuthToken(
     if (existingToken && !options.forceRefresh) return existingToken
 
     if (!signingPromise) {
-      signingPromise = signAuthToken(
-        primaryAddress,
-        getGlobalPrimaryCategory() === 'evm'
-          ? getGlobalEvmAccount()!.chainId!
-          : 0
-      )
+      signingPromise = signAuthToken(primaryAddress, getGlobalPrimaryChainId()!)
     }
 
     return signingPromise

@@ -111,7 +111,7 @@ fun signBitcoinWalletLinkProof(
     timestamp: Instant = Clock.System.now(),
 ): BitcoinLinkAddressProof {
     val message = "[funkybit] Please sign this message to link your wallets. This action will not cost any gas fees."
-    val bitcoinLinkAddressMessage = "$message\nAddress: ${address.value}, LinkAddress: ${linkAddress.value}, Timestamp: $timestamp"
+    val bitcoinLinkAddressMessage = "$message\nAddress: ${address.value}, LinkAddress: ${linkAddress.value.lowercase()}, Timestamp: $timestamp"
     val signature = BitcoinSignature(ecKey.signMessage(bitcoinLinkAddressMessage))
 
     return BitcoinLinkAddressProof(
@@ -131,7 +131,7 @@ fun signEvmWalletLinkProof(
 ): EvmLinkAddressProof {
     val linkMessage = LinkMessage(
         message = "[funkybit] Please sign this message to link your wallets. This action will not cost any gas fees.",
-        address = address.toString(),
+        address = address.toString().lowercase(),
         linkAddress = linkAddress.toString(),
         chainId = chainId,
         timestamp = timestamp.toString(),

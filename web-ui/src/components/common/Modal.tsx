@@ -19,7 +19,7 @@ export function Modal({
     <>
       <div className="fixed left-0 top-0 z-20 h-screen w-screen bg-black opacity-75"></div>
       <Transition appear show={isOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-30" onClose={close}>
+        <Dialog as="div" className="relative z-50" onClose={close}>
           <Transition.Child
             as={Fragment}
             enter="ease-out duration-300"

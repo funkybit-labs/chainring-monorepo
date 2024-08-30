@@ -156,7 +156,7 @@ sealed class BitcoinAddress(val value: String) : Address() {
         org.bitcoinj.core.Address.fromString(params, value)
 }
 
-@Serializable
+@Serializable(with = EvmAddressSerializer::class)
 data class EvmAddress(val value: String) : Address() {
     override fun canonicalize() = Companion.canonicalize(this.value)
     override fun toString() = this.value
@@ -175,6 +175,12 @@ data class EvmAddress(val value: String) : Address() {
         fun fromPrivateKey(privateKey: String): EvmAddress =
             canonicalize(Credentials.create(privateKey).address)
     }
+}
+
+object EvmAddressSerializer : KSerializer<EvmAddress> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("EvmAddress", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: EvmAddress) = encoder.encodeString(value.value)
+    override fun deserialize(decoder: Decoder) = EvmAddress.canonicalize(decoder.decodeString())
 }
 
 fun EvmAddress.toChecksumAddress(): EvmAddress {

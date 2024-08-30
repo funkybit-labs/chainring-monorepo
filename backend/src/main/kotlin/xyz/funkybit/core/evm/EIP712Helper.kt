@@ -117,7 +117,7 @@ object EIP712Helper {
                 mapOf(
                     "message" to linkMessage.message,
                     "address" to linkMessage.address,
-                    "linkedAddress" to linkMessage.linkAddress,
+                    "linkAddress" to linkMessage.linkAddress,
                     "chainId" to linkMessage.chainId.value,
                     "timestamp" to linkMessage.timestamp,
                 ),

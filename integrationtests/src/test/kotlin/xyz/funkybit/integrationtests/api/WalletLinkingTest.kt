@@ -160,7 +160,7 @@ class WalletLinkingTest : OrderBaseTest() {
 //                    linkAddress = bitcoinAddress,
 //                ),
 //            ),
-//        ).assertError(ApiError(ReasonCode.LinkIdentityError, "Signature can't be verified"))
+//        ).assertError(ApiError(ReasonCode.LinkIdentityError, "Invalid signature"))
         evmKeyApiClient.tryLinkWallets(
             LinkWalletsApiRequest(
                 bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
@@ -174,7 +174,7 @@ class WalletLinkingTest : OrderBaseTest() {
                     linkAddress = bitcoinAddress,
                 ).copy(signature = EvmSignature("0x1cd66f580ec8f6fd37b2101849955c5a50d787092fe8a97e5c55bea6a24c1d47409e17450adaa617cc07907f56a4eb1f468467fcefe7808cbd63fbba935ee0201b")),
             ),
-        ).assertError(ApiError(ReasonCode.LinkWalletsError, "Signature can't be verified"))
+        ).assertError(ApiError(ReasonCode.LinkWalletsError, "Invalid signature"))
 
         // link proof timestamp should be recent
         bitcoinKeyApiClient.tryLinkWallets(

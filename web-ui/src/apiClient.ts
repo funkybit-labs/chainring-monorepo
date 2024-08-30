@@ -112,7 +112,8 @@ export type ConfigurationApiResponse = z.infer<
 
 export const AccountConfigurationApiResponseSchema = z.object({
   newSymbols: z.array(SymbolSchema),
-  role: z.enum(['User', 'Admin'])
+  role: z.enum(['User', 'Admin']),
+  linkedAddresses: z.array(AddressSchema)
 })
 export type AccountConfigurationApiResponse = z.infer<
   typeof AccountConfigurationApiResponseSchema
@@ -392,6 +393,26 @@ const FaucetRequestSchema = z.object({
   address: AddressSchema
 })
 export type FaucetRequest = z.infer<typeof FaucetRequestSchema>
+
+const BitcoinLinkAddressProofSchema = z.object({
+  address: z.string(),
+  linkAddress: z.string(),
+  timestamp: z.string(),
+  signature: z.string()
+})
+
+const EvmLinkAddressProofSchema = z.object({
+  chainId: z.number(),
+  address: z.string(),
+  linkAddress: z.string(),
+  timestamp: z.string(),
+  signature: z.string()
+})
+
+const LinkWalletRequestSchema = z.object({
+  bitcoinLinkAddressProof: BitcoinLinkAddressProofSchema,
+  evmLinkAddressProof: EvmLinkAddressProofSchema
+})
 
 const ApiErrorSchema = z.object({
   displayMessage: z.string()
@@ -719,6 +740,25 @@ export const apiClient = new Zodios(apiBaseUrl, [
         name: 'quote',
         type: 'Path',
         schema: z.string()
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'post',
+    path: '/v1/wallets/link',
+    alias: 'linkWallet',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: LinkWalletRequestSchema
       }
     ],
     response: z.undefined(),

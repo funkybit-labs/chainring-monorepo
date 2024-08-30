@@ -1,4 +1,4 @@
-import { AddressType } from 'apiClient'
+import { AddressType, NetworkType } from 'apiClient'
 
 export default class TradingSymbol {
   name: string
@@ -7,6 +7,7 @@ export default class TradingSymbol {
   contractAddress: AddressType | null
   decimals: number
   chainId: number
+  networkType: NetworkType
   faucetSupported: boolean
   withdrawalFee: bigint
   iconUrl: string
@@ -18,6 +19,7 @@ export default class TradingSymbol {
     contactAddress: AddressType | null,
     decimals: number,
     chainId: number,
+    networkType: NetworkType,
     faucetSupported: boolean,
     withdrawalFee: bigint,
     iconUrl: string
@@ -28,6 +30,7 @@ export default class TradingSymbol {
     this.contractAddress = contactAddress
     this.decimals = decimals
     this.chainId = chainId
+    this.networkType = networkType
     this.faucetSupported = faucetSupported
     this.withdrawalFee = withdrawalFee
     this.iconUrl = iconUrl

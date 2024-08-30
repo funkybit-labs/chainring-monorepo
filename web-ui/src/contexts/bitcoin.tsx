@@ -67,7 +67,6 @@ export function BitcoinProvider({ children }: { children: React.ReactNode }) {
   function disconnect() {
     setDisconnected(true)
     setAccounts([])
-    console.log('a')
     SatsConnect.request('wallet_renouncePermissions', undefined).finally(() => {
       SatsConnect.disconnect()
     })

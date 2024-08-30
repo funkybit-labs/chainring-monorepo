@@ -157,7 +157,7 @@ object WalletRoutes {
         // check both signatures are valid
         if (!evmSignatureValid(apiRequest.evmLinkAddressProof) || !bitcoinSignatureValid(apiRequest.bitcoinLinkAddressProof)) {
             return Either.Left(
-                ApiError(ReasonCode.LinkWalletsError, "Signature can't be verified"),
+                ApiError(ReasonCode.LinkWalletsError, "Invalid signature"),
             )
         }
 
