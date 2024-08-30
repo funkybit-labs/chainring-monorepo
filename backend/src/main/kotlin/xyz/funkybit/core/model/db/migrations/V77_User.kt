@@ -34,7 +34,6 @@ class V77_User : Migration() {
     }
 
     object V77_WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
-        val address = varchar("address", 10485760).uniqueIndex()
         val type = customEnumeration(
             "type",
             "WalletType",
