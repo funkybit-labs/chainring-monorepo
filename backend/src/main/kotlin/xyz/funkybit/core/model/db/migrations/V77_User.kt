@@ -1,15 +1,19 @@
 package xyz.funkybit.core.model.db.migrations
 
+import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.id.IntIdTable
 import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.db.Migration
 import xyz.funkybit.core.model.db.GUIDTable
 import xyz.funkybit.core.model.db.PGEnum
 import xyz.funkybit.core.model.db.UserId
 import xyz.funkybit.core.model.db.WalletId
+import xyz.funkybit.core.model.db.WalletTable
 import xyz.funkybit.core.model.db.enumDeclaration
 
 @Suppress("ClassName")
@@ -29,13 +33,14 @@ class V77_User : Migration() {
     }
 
     object V77_WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
+        val address = WalletTable.varchar("address", 10485760).uniqueIndex()
         val type = customEnumeration(
             "type",
             "WalletType",
             { value -> V77_WalletType.valueOf(value as String) },
             { PGEnum("WalletType", it) },
-        ).index()
-        val userGuid = reference("user_guid", V77_UserTable).index()
+        ).nullable()
+        val userGuid = reference("user_guid", V77_UserTable).index().nullable()
 
         init {
             uniqueIndex(
@@ -51,12 +56,25 @@ class V77_User : Migration() {
 
     override fun run() {
         transaction {
-            // TODO add backward compatibility
-
+            // add user table
             SchemaUtils.createMissingTablesAndColumns(V77_UserTable)
 
+            // add type and user to wallet
             exec("CREATE TYPE WalletType AS ENUM (${enumDeclaration<V77_WalletType>()})")
             SchemaUtils.createMissingTablesAndColumns(V77_WalletTable)
+            // backfill data
+            V77_WalletTable.selectAll().forEach { walletRecord ->
+                val userId = UserId.generate()
+                V77_UserTable.insert { userRecord ->
+                    userRecord[V77_UserTable.guid] = userId
+                    userRecord[V77_UserTable.createdAt] = Clock.System.now()
+                    userRecord[V77_UserTable.createdBy] = "V77_WalletTable"
+                }
+                walletRecord[V77_WalletTable.userGuid] = userId
+                walletRecord[V77_WalletTable.type] = V77_WalletType.Evm
+            }
+            exec("ALTER TABLE wallet ALTER COLUMN user_guid SET NOT NULL")
+            exec("ALTER TABLE wallet ALTER COLUMN type SET NOT NULL")
 
             // change wallet_guid in limit table to user_guid
             exec("ALTER TABLE \"limit\" DROP CONSTRAINT unique_limit")
