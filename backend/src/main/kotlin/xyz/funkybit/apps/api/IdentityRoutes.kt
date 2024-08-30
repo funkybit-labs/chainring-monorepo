@@ -4,6 +4,9 @@ import arrow.core.Either
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.Tag
 import org.http4k.contract.meta
@@ -29,12 +32,15 @@ import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.WalletEntity
+import xyz.funkybit.core.model.db.WalletLinkProofEntity
 import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureVerification
 import java.math.BigInteger
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 const val BASE_LINK_MESSAGE = "[funkybit] Please sign this message to link your wallets. This action will not cost any gas fees."
+
+@Serializable
 data class LinkMessage(
     val message: String,
     val address: String,
@@ -90,14 +96,28 @@ object IdentityRoutes {
                             is EvmAddress -> apiRequest.evmLinkAddressProof.linkAddress
                         }
 
-                        when (val linkWallet = WalletEntity.findByAddress(linkAddress)) {
+                        when (val existingLinkedWallet = WalletEntity.findByAddress(linkAddress)) {
                             null -> {
-                                WalletEntity.createForUser(wallet.user, linkAddress)
+                                // create a new wallet and link it to the user
+                                val linkedWallet = WalletEntity.createForUser(wallet.user, linkAddress)
+
+                                // also store link proof for the future reference
+                                val evmWallet = wallet.takeIf { it.address is EvmAddress } ?: linkedWallet
+                                val evmWalletLinkProofMessage = Json.encodeToString(evmWalletLinkProofMessage(apiRequest.evmLinkAddressProof))
+                                val evmWalletLinkProofSignature = apiRequest.evmLinkAddressProof.signature.value
+
+                                val bitcoinWallet = wallet.takeIf { it.address is BitcoinAddress } ?: linkedWallet
+                                val bitcoinWalletLinkProofMessage = bitcoinWalletLinkProofMessage(apiRequest.bitcoinLinkAddressProof)
+                                val bitcoinWalletLinkProofSignature = apiRequest.bitcoinLinkAddressProof.signature.value
+
+                                WalletLinkProofEntity.create(wallet = evmWallet, message = evmWalletLinkProofMessage, signature = evmWalletLinkProofSignature, createdBy = request.principal)
+                                WalletLinkProofEntity.create(wallet = bitcoinWallet, message = bitcoinWalletLinkProofMessage, signature = bitcoinWalletLinkProofSignature, createdBy = request.principal)
+
                                 Response(Status.NO_CONTENT)
                             }
 
                             else -> {
-                                if (linkWallet.userGuid == wallet.userGuid) {
+                                if (existingLinkedWallet.userGuid == wallet.userGuid) {
                                     Response(Status.NO_CONTENT) // no-op, already linked
                                 } else {
                                     errorResponse(
@@ -155,29 +175,32 @@ object IdentityRoutes {
 
     private fun bitcoinSignatureValid(bitcoinLinkAddressProof: BitcoinLinkAddressProof): Boolean {
         val bitcoinAddress = BitcoinAddress.canonicalize(bitcoinLinkAddressProof.address.toString())
-        val linkAddress = EvmAddress.canonicalize(bitcoinLinkAddressProof.linkAddress.toString())
-
-        val bitcoinLinkAddressMessage = BASE_LINK_MESSAGE +
-            "\nAddress: ${bitcoinAddress.value}, LinkAddress: ${linkAddress.value}, Timestamp: ${bitcoinLinkAddressProof.timestamp}"
+        val bitcoinLinkAddressMessage = bitcoinWalletLinkProofMessage(bitcoinLinkAddressProof)
 
         return BitcoinSignatureVerification.verifyMessage(bitcoinAddress, bitcoinLinkAddressProof.signature.value.replace(" ", "+"), bitcoinLinkAddressMessage)
     }
 
     private fun evmSignatureValid(evmLinkAddressProof: EvmLinkAddressProof): Boolean {
-        val walletAddress = EvmAddress.canonicalize(evmLinkAddressProof.address.toString())
-
         return ECHelper.isValidSignature(
-            messageHash = EIP712Helper.computeHash(
-                LinkMessage(
-                    message = BASE_LINK_MESSAGE,
-                    address = evmLinkAddressProof.address.toString(),
-                    linkAddress = evmLinkAddressProof.linkAddress.toString(),
-                    chainId = evmLinkAddressProof.chainId,
-                    timestamp = evmLinkAddressProof.timestamp,
-                ),
-            ),
+            messageHash = EIP712Helper.computeHash(evmWalletLinkProofMessage(evmLinkAddressProof)),
             signature = evmLinkAddressProof.signature,
-            signerAddress = walletAddress,
+            signerAddress = EvmAddress.canonicalize(evmLinkAddressProof.address.toString()),
         )
     }
+
+    private fun bitcoinWalletLinkProofMessage(bitcoinLinkAddressProof: BitcoinLinkAddressProof): String {
+        val bitcoinAddress = BitcoinAddress.canonicalize(bitcoinLinkAddressProof.address.toString())
+        val linkAddress = EvmAddress.canonicalize(bitcoinLinkAddressProof.linkAddress.toString())
+
+        return BASE_LINK_MESSAGE + "\nAddress: ${bitcoinAddress.value}, LinkAddress: ${linkAddress.value}, Timestamp: ${bitcoinLinkAddressProof.timestamp}"
+    }
+
+    private fun evmWalletLinkProofMessage(evmLinkAddressProof: EvmLinkAddressProof) =
+        LinkMessage(
+            message = BASE_LINK_MESSAGE,
+            address = evmLinkAddressProof.address.toString(),
+            linkAddress = evmLinkAddressProof.linkAddress.toString(),
+            chainId = evmLinkAddressProof.chainId,
+            timestamp = evmLinkAddressProof.timestamp,
+        )
 }

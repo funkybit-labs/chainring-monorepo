@@ -3,6 +3,7 @@ package xyz.funkybit.core.model.db.migrations
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.id.IntIdTable
+import org.jetbrains.exposed.sql.ReferenceOption
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
@@ -13,7 +14,7 @@ import xyz.funkybit.core.model.db.GUIDTable
 import xyz.funkybit.core.model.db.PGEnum
 import xyz.funkybit.core.model.db.UserId
 import xyz.funkybit.core.model.db.WalletId
-import xyz.funkybit.core.model.db.WalletTable
+import xyz.funkybit.core.model.db.WalletLinkedProofId
 import xyz.funkybit.core.model.db.enumDeclaration
 
 @Suppress("ClassName")
@@ -33,7 +34,7 @@ class V77_User : Migration() {
     }
 
     object V77_WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
-        val address = WalletTable.varchar("address", 10485760).uniqueIndex()
+        val address = varchar("address", 10485760).uniqueIndex()
         val type = customEnumeration(
             "type",
             "WalletType",
@@ -50,6 +51,14 @@ class V77_User : Migration() {
         }
     }
 
+    object V77_WalletLinkProofTable : GUIDTable<WalletLinkedProofId>("wallet_link_proof", ::WalletLinkedProofId) {
+        val walletGuid = reference("wallet_guid", V77_WalletTable, onDelete = ReferenceOption.CASCADE).index()
+        val createdAt = timestamp("created_at")
+        val createdBy = varchar("created_by", 10485760)
+        val message = varchar("message", 10485760)
+        val signature = varchar("signature", 10485760)
+    }
+
     object V77_LimitTable : IntIdTable("limit") {
         val userGuid = reference("user_guid", V77_UserTable).index().nullable()
     }
@@ -62,7 +71,6 @@ class V77_User : Migration() {
             // add type and user to wallet
             exec("CREATE TYPE WalletType AS ENUM (${enumDeclaration<V77_WalletType>()})")
             SchemaUtils.createMissingTablesAndColumns(V77_WalletTable)
-            // backfill data
             V77_WalletTable.selectAll().forEach { walletRecord ->
                 val userId = UserId.generate()
                 V77_UserTable.insert { userRecord ->
@@ -75,6 +83,9 @@ class V77_User : Migration() {
             }
             exec("ALTER TABLE wallet ALTER COLUMN user_guid SET NOT NULL")
             exec("ALTER TABLE wallet ALTER COLUMN type SET NOT NULL")
+
+            // link proof table
+            SchemaUtils.createMissingTablesAndColumns(V77_WalletLinkProofTable)
 
             // change wallet_guid in limit table to user_guid
             exec("ALTER TABLE \"limit\" DROP CONSTRAINT unique_limit")
