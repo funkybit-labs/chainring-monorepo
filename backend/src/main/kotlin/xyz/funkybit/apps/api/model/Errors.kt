@@ -39,7 +39,7 @@ enum class ReasonCode {
 
     SignupRequired,
 
-    LinkIdentityError,
+    LinkWalletsError,
 }
 
 val jsonWithDefaults = Json { encodeDefaults = true }

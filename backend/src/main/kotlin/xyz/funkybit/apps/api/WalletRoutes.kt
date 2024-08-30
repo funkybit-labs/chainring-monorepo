@@ -21,7 +21,7 @@ import xyz.funkybit.apps.api.middleware.signedTokenSecurity
 import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.BitcoinLinkAddressProof
 import xyz.funkybit.apps.api.model.EvmLinkAddressProof
-import xyz.funkybit.apps.api.model.LinkIdentityApiRequest
+import xyz.funkybit.apps.api.model.LinkWalletsApiRequest
 import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.errorResponse
 import xyz.funkybit.core.evm.ECHelper
@@ -49,19 +49,19 @@ data class LinkMessage(
     val timestamp: String,
 )
 
-object IdentityRoutes {
+object WalletRoutes {
     private val logger = KotlinLogging.logger {}
 
-    val linkIdentities: ContractRoute = run {
-        val requestBody = Body.auto<LinkIdentityApiRequest>().toLens()
+    val linkWallets: ContractRoute = run {
+        val requestBody = Body.auto<LinkWalletsApiRequest>().toLens()
 
-        "identities/link" meta {
-            operationId = "link-identities"
-            summary = "Link identities"
+        "wallets/link" meta {
+            operationId = "link-wallets"
+            summary = "Link wallets"
             security = signedTokenSecurity
             tags += listOf(Tag("link"))
             receiving(
-                requestBody to LinkIdentityApiRequest(
+                requestBody to LinkWalletsApiRequest(
                     bitcoinLinkAddressProof = BitcoinLinkAddressProof(
                         address = BitcoinAddress.canonicalize("bcrt1qdca3sam9mldju3ssryrrcmjvd8pgnw30ccaggx"),
                         linkAddress = EvmAddress.zero,
@@ -122,7 +122,7 @@ object IdentityRoutes {
                                 } else {
                                     errorResponse(
                                         status = Status.UNPROCESSABLE_ENTITY,
-                                        ApiError(ReasonCode.LinkIdentityError, "Link address is already in use"),
+                                        ApiError(ReasonCode.LinkWalletsError, "Link address is already in use"),
                                     )
                                 }
                             }
@@ -133,21 +133,31 @@ object IdentityRoutes {
         }
     }
 
-    private fun validateLinkRequest(wallet: WalletEntity, apiRequest: LinkIdentityApiRequest): Either<ApiError, Unit> {
+    private fun validateLinkRequest(principal: WalletEntity, apiRequest: LinkWalletsApiRequest): Either<ApiError, Unit> {
         // check that wallets link each other
         if (
             apiRequest.evmLinkAddressProof.address != apiRequest.bitcoinLinkAddressProof.linkAddress ||
             apiRequest.bitcoinLinkAddressProof.address != apiRequest.evmLinkAddressProof.linkAddress
         ) {
             return Either.Left(
-                ApiError(ReasonCode.LinkIdentityError, "Invalid identity links"),
+                ApiError(ReasonCode.LinkWalletsError, "Invalid wallet links"),
+            )
+        }
+
+        // check principal is one of the linked wallets
+        if (
+            principal.address is BitcoinAddress && principal.address != apiRequest.bitcoinLinkAddressProof.address ||
+            principal.address is EvmAddress && principal.address != apiRequest.evmLinkAddressProof.address
+        ) {
+            return Either.Left(
+                ApiError(ReasonCode.LinkWalletsError, "Invalid wallet links"),
             )
         }
 
         // check both signatures are valid
         if (!evmSignatureValid(apiRequest.evmLinkAddressProof) || !bitcoinSignatureValid(apiRequest.bitcoinLinkAddressProof)) {
             return Either.Left(
-                ApiError(ReasonCode.LinkIdentityError, "Signature can't be verified"),
+                ApiError(ReasonCode.LinkWalletsError, "Signature can't be verified"),
             )
         }
 
@@ -166,7 +176,7 @@ object IdentityRoutes {
 
         if (bitcoinSignatureNotValidYet || bitcoinSignatureExpired || evmSignatureNotValidYet || evmSignatureExpired) {
             return Either.Left(
-                ApiError(ReasonCode.LinkIdentityError, "Link proof has expired or not valid yet"),
+                ApiError(ReasonCode.LinkWalletsError, "Link proof has expired or not valid yet"),
             )
         }
 

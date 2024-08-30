@@ -25,7 +25,7 @@ data class EvmLinkAddressProof(
 )
 
 @Serializable
-data class LinkIdentityApiRequest(
+data class LinkWalletsApiRequest(
     val bitcoinLinkAddressProof: BitcoinLinkAddressProof,
     val evmLinkAddressProof: EvmLinkAddressProof,
 )

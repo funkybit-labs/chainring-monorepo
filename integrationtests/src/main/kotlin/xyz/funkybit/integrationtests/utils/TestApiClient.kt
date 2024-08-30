@@ -28,7 +28,7 @@ import xyz.funkybit.apps.api.model.FaucetApiResponse
 import xyz.funkybit.apps.api.model.GetLastPriceResponse
 import xyz.funkybit.apps.api.model.GetLimitsApiResponse
 import xyz.funkybit.apps.api.model.GetOrderBookApiResponse
-import xyz.funkybit.apps.api.model.LinkIdentityApiRequest
+import xyz.funkybit.apps.api.model.LinkWalletsApiRequest
 import xyz.funkybit.apps.api.model.ListDepositsApiResponse
 import xyz.funkybit.apps.api.model.ListWithdrawalsApiResponse
 import xyz.funkybit.apps.api.model.Market
@@ -193,24 +193,21 @@ class TestApiClient(keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(), trace
     override fun markSymbolAsAdded(symbolName: String) =
         tryMarkSymbolAsAdded(symbolName).assertSuccess()
 
-    override fun linkIdentity(apiRequest: LinkIdentityApiRequest) =
-        tryLinkIdentity(apiRequest).assertSuccess()
-
-    fun linkIdentity(bitcoinLinkAddressProof: BitcoinLinkAddressProof, evmLinkAddressProof: EvmLinkAddressProof) =
-        tryLinkIdentity(LinkIdentityApiRequest(bitcoinLinkAddressProof, evmLinkAddressProof)).assertSuccess()
+    override fun linkWallets(bitcoinLinkAddressProof: BitcoinLinkAddressProof, evmLinkAddressProof: EvmLinkAddressProof) =
+        tryLinkWallets(LinkWalletsApiRequest(bitcoinLinkAddressProof, evmLinkAddressProof)).assertSuccess()
 
     fun linkBitcoinWallet(bitcoinKeyPair: WalletKeyPair.Bitcoin) {
         val bitcoinAddress = BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, bitcoinKeyPair.ecKey)
 
-        linkIdentity(
+        linkWallets(
             signBitcoinWalletLinkProof(
                 ecKey = bitcoinKeyPair.ecKey,
                 address = bitcoinAddress,
-                linkAddress = this.address as EvmAddress,
+                linkAddress = address as EvmAddress,
             ),
             signEvmWalletLinkProof(
-                ecKeyPair = (this.keyPair as WalletKeyPair.EVM).ecKeyPair,
-                address = this.address,
+                ecKeyPair = (keyPair as WalletKeyPair.EVM).ecKeyPair,
+                address = address,
                 linkAddress = bitcoinAddress,
             ),
         )
