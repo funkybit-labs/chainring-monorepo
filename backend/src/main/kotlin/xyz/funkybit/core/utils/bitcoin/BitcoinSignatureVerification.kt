@@ -1,7 +1,6 @@
 package xyz.funkybit.core.utils.bitcoin
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.bitcoinj.core.Base58
 import org.bitcoinj.core.Coin
 import org.bitcoinj.core.ECKey
 import org.bitcoinj.core.LegacyAddress
@@ -165,12 +164,6 @@ object BitcoinSignatureVerification {
                 else -> throw IllegalArgumentException("Only P2WPKH and P2TR addresses are supported")
             }
         }
-    }
-
-    fun base58Check(addrType: Int, payload: ByteArray): String {
-        val addressBytes = byteArrayOf(addrType.toByte()) + payload
-        val checksum = doubleSha256(addressBytes).copyOfRange(0, 4)
-        return Base58.encode(addressBytes + checksum)
     }
 
     @OptIn(ExperimentalStdlibApi::class)
