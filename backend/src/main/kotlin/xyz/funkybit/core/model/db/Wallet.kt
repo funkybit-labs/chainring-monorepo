@@ -25,7 +25,7 @@ value class WalletId(override val value: String) : EntityId {
     override fun toString(): String = value
 }
 
-enum class WalletType {
+enum class WalletFamily {
     Bitcoin,
     Evm,
 }
@@ -37,18 +37,18 @@ object WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
     val sequencerId = long("sequencer_id").uniqueIndex()
     val addedSymbols = array<String>("added_symbols", VarCharColumnType(10485760)).default(emptyList())
     val isAdmin = bool("is_admin").default(false)
-    val type = customEnumeration(
-        "type",
-        "WalletType",
-        { value -> WalletType.valueOf(value as String) },
-        { PGEnum("WalletType", it) },
+    val walletFamily = customEnumeration(
+        "wallet_family",
+        "WalletFamily",
+        { value -> WalletFamily.valueOf(value as String) },
+        { PGEnum("WalletFamily", it) },
     ).index()
     val userGuid = reference("user_guid", UserTable).index()
 
     init {
         uniqueIndex(
-            customIndexName = "wallet_type_user",
-            columns = arrayOf(userGuid, type),
+            customIndexName = "wallet_family_user",
+            columns = arrayOf(userGuid, walletFamily),
         )
     }
 }
@@ -72,9 +72,9 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
                 createdAt = Clock.System.now()
                 createdBy = "system"
 
-                type = when (canonicalAddress) {
-                    is EvmAddress -> WalletType.Evm
-                    is BitcoinAddress -> WalletType.Bitcoin
+                walletFamily = when (canonicalAddress) {
+                    is EvmAddress -> WalletFamily.Evm
+                    is BitcoinAddress -> WalletFamily.Bitcoin
                 }
                 this.user = user
             }
@@ -143,7 +143,7 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
     var addedSymbols by WalletTable.addedSymbols
     var isAdmin by WalletTable.isAdmin
 
-    var type by WalletTable.type
+    var walletFamily by WalletTable.walletFamily
     var userGuid by WalletTable.userGuid
     var user by UserEntity referencedOn WalletTable.userGuid
 }

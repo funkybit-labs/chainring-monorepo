@@ -28,24 +28,24 @@ class V77_User : Migration() {
     }
 
     @Serializable
-    enum class V77_WalletType {
+    enum class V77_WalletFamily {
         Bitcoin,
         Evm,
     }
 
     object V77_WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
-        val type = customEnumeration(
-            "type",
-            "WalletType",
-            { value -> V77_WalletType.valueOf(value as String) },
-            { PGEnum("WalletType", it) },
+        val walletFamily = customEnumeration(
+            "wallet_family",
+            "WalletFamily",
+            { value -> V77_WalletFamily.valueOf(value as String) },
+            { PGEnum("WalletFamily", it) },
         ).nullable()
         val userGuid = reference("user_guid", V77_UserTable).index().nullable()
 
         init {
             uniqueIndex(
-                customIndexName = "wallet_type_user",
-                columns = arrayOf(userGuid, type),
+                customIndexName = "wallet_family_user",
+                columns = arrayOf(userGuid, walletFamily),
             )
         }
     }
@@ -67,8 +67,8 @@ class V77_User : Migration() {
             // add user table
             SchemaUtils.createMissingTablesAndColumns(V77_UserTable)
 
-            // add type and user to wallet
-            exec("CREATE TYPE WalletType AS ENUM (${enumDeclaration<V77_WalletType>()})")
+            // add wallet_family and user to wallet
+            exec("CREATE TYPE WalletFamily AS ENUM (${enumDeclaration<V77_WalletFamily>()})")
             SchemaUtils.createMissingTablesAndColumns(V77_WalletTable)
             V77_WalletTable.selectAll().forEach { walletRecord ->
                 val userId = UserId.generate()
@@ -78,10 +78,10 @@ class V77_User : Migration() {
                     userRecord[V77_UserTable.createdBy] = "V77_WalletTable"
                 }
                 walletRecord[V77_WalletTable.userGuid] = userId
-                walletRecord[V77_WalletTable.type] = V77_WalletType.Evm
+                walletRecord[V77_WalletTable.walletFamily] = V77_WalletFamily.Evm
             }
             exec("ALTER TABLE wallet ALTER COLUMN user_guid SET NOT NULL")
-            exec("ALTER TABLE wallet ALTER COLUMN type SET NOT NULL")
+            exec("ALTER TABLE wallet ALTER COLUMN wallet_family SET NOT NULL")
 
             // link proof table
             SchemaUtils.createMissingTablesAndColumns(V77_WalletLinkProofTable)

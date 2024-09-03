@@ -17,7 +17,6 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.bitcoinj.core.ECKey
-import org.bitcoinj.core.NetworkParameters
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
@@ -50,10 +49,12 @@ import xyz.funkybit.apps.api.model.ListWithdrawalsApiResponse
 import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.apps.api.model.OrdersApiResponse
 import xyz.funkybit.apps.api.model.WithdrawalApiResponse
+import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.evm.ECHelper
 import xyz.funkybit.core.evm.EIP712Helper
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ClientOrderId
 import xyz.funkybit.core.model.db.DepositId
@@ -89,9 +90,17 @@ sealed class WalletKeyPair {
 
         val privateKey = ecKeyPair.privateKey
         val credentials = Credentials.create(ecKeyPair)
+
+        override fun address(): EvmAddress = EvmAddress.canonicalize(Credentials.create(ecKeyPair).address)
     }
 
-    data class Bitcoin(val ecKey: ECKey) : WalletKeyPair()
+    data class Bitcoin(val ecKey: ECKey) : WalletKeyPair() {
+        companion object {
+            fun generate(): Bitcoin = Bitcoin(ECKey())
+        }
+
+        override fun address(): BitcoinAddress = BitcoinAddress.fromKey(BitcoinClient.getParams(), ecKey)
+    }
 
     fun sign(signInMessage: SignInMessage): String =
         when (this) {
@@ -103,11 +112,7 @@ sealed class WalletKeyPair {
             }
         }
 
-    fun address(): Address =
-        when (this) {
-            is EVM -> Address.auto(Credentials.create(ecKeyPair).address)
-            is Bitcoin -> BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, ecKey)
-        }
+    abstract fun address(): Address
 }
 
 open class ApiClient(

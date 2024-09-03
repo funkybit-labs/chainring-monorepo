@@ -1,12 +1,12 @@
 package xyz.funkybit.core.model.db
 
 import kotlinx.datetime.Clock
-import org.bitcoinj.core.NetworkParameters
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.utils.generateHexString
@@ -37,7 +37,7 @@ class OrderExecutionEntityTest : TestWithDb() {
         val (makerWalletId, takerWalletId) = transaction { Pair(createWallet().id.value, createWallet().id.value) }
         val makerWallet2Id = transaction {
             createWallet(
-                address = BitcoinAddress.SegWit.generate(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!),
+                address = BitcoinAddress.SegWit.generate(BitcoinClient.getParams()),
                 user = WalletEntity[makerWalletId].user,
             ).id.value
         }

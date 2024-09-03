@@ -237,7 +237,7 @@ class Wallet(
             Symbol(symbol),
             amount,
             nonce,
-            blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId)), linkedSignerKeyPair?.let { it as WalletKeyPair.EVM }?.ecKeyPair),
+            blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId)), (linkedSignerKeyPair as? WalletKeyPair.EVM)?.ecKeyPair),
         )
     }
 
@@ -323,7 +323,7 @@ class Wallet(
             nonce = BigInteger(1, nonce.toHexBytes()),
             signature = EvmSignature.emptySignature(),
         )
-        return blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId)), linkedSignerKeyPair?.let { it as WalletKeyPair.EVM }?.ecKeyPair)
+        return blockchainClientsByChainId.getValue(currentChainId).signData(EIP712Helper.computeHash(tx, this.currentChainId, exchangeContractAddressByChainId.getValue(currentChainId)), (linkedSignerKeyPair as? WalletKeyPair.EVM)?.ecKeyPair)
     }
 
     private fun getWithdrawalNonce(): Long {
