@@ -1,7 +1,10 @@
 package xyz.funkybit.core.utils.bitcoin
 
+import io.github.oshai.kotlinlogging.KotlinLogging
+import org.bitcoinj.core.Base58
 import org.bitcoinj.core.Coin
 import org.bitcoinj.core.ECKey
+import org.bitcoinj.core.LegacyAddress
 import org.bitcoinj.core.Sha256Hash
 import org.bitcoinj.core.Transaction
 import org.bitcoinj.core.TransactionInput
@@ -12,7 +15,6 @@ import org.bitcoinj.script.Script
 import org.bitcoinj.script.ScriptBuilder
 import org.bitcoinj.script.ScriptOpCodes
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient.getParams
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient.logger
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.utils.doubleSha256
 import xyz.funkybit.core.utils.schnorr.Schnorr
@@ -22,11 +24,16 @@ import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigInteger
 
 object BitcoinSignatureVerification {
+    private val logger = KotlinLogging.logger {}
+
     @OptIn(ExperimentalStdlibApi::class)
     fun verifyMessage(address: BitcoinAddress, signature: String, message: String): Boolean {
         logger.debug { "verifyMessage($address, $signature, $message)" }
         val signatureHex = java.util.Base64.getDecoder().decode(signature).toHex(false)
         if (signatureHex.length == 130) {
+            // note: ECKey.signedMessageToKey(message, signature) follows the same public key recovery process,
+            // but has stricter signature's header byte verification (header < 27 || header > 34) and therefore fails P2SH
+
             val prefix = "\u0018Bitcoin Signed Message:\n".toByteArray(Charsets.UTF_8)
             val msgHex = message.toByteArray(Charsets.UTF_8)
             val len = getVarInt(msgHex.size.toLong())
@@ -48,10 +55,34 @@ object BitcoinSignatureVerification {
                 BigInteger(1, signatureHex.substring(66, 130).hexToByteArray()),
             )
 
-            val pubkey =
-                ECKey.recoverFromSignature(recId, ECKey.ECDSASignature(r, s), Sha256Hash.of(msgHash), compressed)
-            logger.debug { "Recovered pubkey $pubkey from ECDSA signature" }
-            return pubkey != null // TODO verify that recovered address matches the address provided in the message
+            val recoveredPubkey = ECKey.recoverFromSignature(recId, ECKey.ECDSASignature(r, s), Sha256Hash.wrap(msgHash), compressed)
+            val recoveredAddress = BitcoinAddress.fromKey(getParams(), recoveredPubkey!!)
+            logger.debug { "Recovered pubkey $recoveredPubkey from ECDSA signature, corresponding address $recoveredAddress" }
+
+            when (address) {
+                is BitcoinAddress.P2PKH -> {
+                    // transaction is pay-2-public-key-hash, therefore comparing a hash of the recovered from the signature public key
+                    val p2PKHAddress = LegacyAddress.fromPubKeyHash(getParams(), recoveredPubkey.pubKeyHash)
+
+                    return p2PKHAddress.toBase58() == address.value
+                }
+
+                is BitcoinAddress.P2SH -> {
+                    // create the 1 of 1 scriptSig: OP_HASH160 <20-byte hash160(pubkey)> OP_EQUAL
+                    val recoveredPubKeyHash160 = Utils.sha256hash160(recoveredPubkey.pubKey)
+                    val scriptSig = ScriptBuilder.createP2WPKHOutputScript(recoveredPubKeyHash160)
+
+                    // create the P2SH address
+                    val scriptHash = Utils.sha256hash160(scriptSig.program)
+                    val p2shAddress = LegacyAddress.fromScriptHash(getParams(), scriptHash)
+
+                    return p2shAddress.toBase58() == address.value
+                }
+
+                else -> {
+                    return recoveredAddress == address
+                }
+            }
         } else {
             // Segwit P2WPKH and Taproot P2TR use BIP322 signing process
             val script = address.script()
@@ -63,7 +94,7 @@ object BitcoinSignatureVerification {
                 ScriptOpCodes.OP_0 -> {
                     val sigLen = signatureHex.substring(2, 4).toInt(16) * 2
                     val sig = signatureHex.substring(4, 4 + sigLen - 2)
-                    val pubkey = signatureHex.substring(6 + sigLen) // TODO check that pubkey matches the address provided in the message
+                    val pubkey = signatureHex.substring(6 + sigLen)
                     val scriptCode = generateSingleSigScript(pubkey, address)
                     // witness msg prefix for txSign:
                     // ...versionByte -- 4 byte - 0
@@ -134,6 +165,12 @@ object BitcoinSignatureVerification {
                 else -> throw IllegalArgumentException("Only P2WPKH and P2TR addresses are supported")
             }
         }
+    }
+
+    fun base58Check(addrType: Int, payload: ByteArray): String {
+        val addressBytes = byteArrayOf(addrType.toByte()) + payload
+        val checksum = doubleSha256(addressBytes).copyOfRange(0, 4)
+        return Base58.encode(addressBytes + checksum)
     }
 
     @OptIn(ExperimentalStdlibApi::class)
