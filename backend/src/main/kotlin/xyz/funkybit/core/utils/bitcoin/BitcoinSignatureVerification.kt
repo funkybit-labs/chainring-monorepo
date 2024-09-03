@@ -60,7 +60,7 @@ object BitcoinSignatureVerification {
 
             when (address) {
                 is BitcoinAddress.P2PKH -> {
-                    // transaction is pay-2-public-key-hash, therefore comparing a hash of the recovered from the signature public key
+                    // comparing a hash of the recovered from the signature public key
                     val p2PKHAddress = LegacyAddress.fromPubKeyHash(getParams(), recoveredPubkey.pubKeyHash)
 
                     return p2PKHAddress.toBase58() == address.value
