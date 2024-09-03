@@ -67,15 +67,19 @@ object BitcoinSignatureVerification {
                 }
 
                 is BitcoinAddress.P2SH -> {
-                    // create the 1 of 1 scriptSig: OP_HASH160 <20-byte hash160(pubkey)> OP_EQUAL
-                    val recoveredPubKeyHash160 = Utils.sha256hash160(recoveredPubkey.pubKey)
-                    val scriptSig = ScriptBuilder.createP2WPKHOutputScript(recoveredPubKeyHash160)
+                    // check P2SH (e.g., multisig)
+                    val p2shRedeemScript = ScriptBuilder.createMultiSigOutputScript(1, listOf(recoveredPubkey))
+                    var p2shScriptHash = Utils.sha256hash160(p2shRedeemScript.program)
+                    var p2shpAddress = LegacyAddress.fromScriptHash(getParams(), p2shScriptHash)
 
-                    // create the P2SH address
-                    val scriptHash = Utils.sha256hash160(scriptSig.program)
-                    val p2shAddress = LegacyAddress.fromScriptHash(getParams(), scriptHash)
+                    if (p2shpAddress.toBase58() == address.value) return true
 
-                    return p2shAddress.toBase58() == address.value
+                    // check P2SH-P2WPKH
+                    val p2shp2wpkhScriptPubKey = ScriptBuilder.createP2WPKHOutputScript(Utils.sha256hash160(recoveredPubkey.pubKey))
+                    val p2shp2wpkhScriptHash = Utils.sha256hash160(p2shp2wpkhScriptPubKey.program)
+                    val p2shp2wpkhAddress = LegacyAddress.fromScriptHash(getParams(), p2shp2wpkhScriptHash)
+
+                    return p2shp2wpkhAddress.toBase58() == address.value
                 }
 
                 else -> {
