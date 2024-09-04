@@ -56,6 +56,7 @@ val signedTokenSecurity = object : Security {
 
                 val requestWithPrincipal = request.with(
                     principalRequestContextKey of wallet,
+                    addressRequestContextKey of authResult.address.canonicalize(),
                 )
                 httpHandler(requestWithPrincipal)
             }
@@ -65,15 +66,25 @@ val signedTokenSecurity = object : Security {
             }
         }
     }
+}
 
-    private fun authenticate(request: Request): AuthResult {
-        val authHeader = request.header("Authorization")?.trim() ?: return missingAuthorizationHeader()
+// only validate auth token, do not create wallet and user
+val addressOnlySignedTokenSecurity = object : Security {
+    override val filter = Filter { next -> wrapWithAuthentication(next) }
 
-        if (!authHeader.startsWith(AUTHORIZATION_SCHEME_PREFIX, ignoreCase = true)) {
-            return authFailure("Invalid authentication scheme")
+    private fun wrapWithAuthentication(httpHandler: HttpHandler): HttpHandler = { request ->
+        when (val authResult = authenticate(request)) {
+            is AuthResult.Success -> {
+                val requestWithPrincipal = request.with(
+                    addressRequestContextKey of authResult.address.canonicalize(),
+                )
+                httpHandler(requestWithPrincipal)
+            }
+            is AuthResult.Failure -> {
+                logger.info { "Authentication failed with status ${authResult.response.status.code} and error '${authResult.response.bodyString()}'" }
+                authResult.response
+            }
         }
-
-        return validateAuthToken(authHeader.removePrefix(AUTHORIZATION_SCHEME_PREFIX))
     }
 }
 
@@ -87,6 +98,16 @@ val adminSecurity = object : Security {
             unauthorizedResponse("Access denied")
         }
     }
+}
+
+private fun authenticate(request: Request): AuthResult {
+    val authHeader = request.header("Authorization")?.trim() ?: return missingAuthorizationHeader()
+
+    if (!authHeader.startsWith(AUTHORIZATION_SCHEME_PREFIX, ignoreCase = true)) {
+        return authFailure("Invalid authentication scheme")
+    }
+
+    return validateAuthToken(authHeader.removePrefix(AUTHORIZATION_SCHEME_PREFIX))
 }
 
 fun validateAuthToken(token: String): AuthResult {
@@ -172,9 +193,14 @@ sealed class AuthResult {
 
 private val principalRequestContextKey =
     RequestContextKey.optional<WalletEntity>(requestContexts)
-
 val Request.principal: WalletEntity
     get() = principalRequestContextKey(this)
+        ?: throw RequestProcessingError(Status.UNAUTHORIZED, ApiError(ReasonCode.AuthenticationError, "Unauthorized"))
+
+private val addressRequestContextKey =
+    RequestContextKey.optional<Address>(requestContexts)
+val Request.address: Address
+    get() = addressRequestContextKey(this)
         ?: throw RequestProcessingError(Status.UNAUTHORIZED, ApiError(ReasonCode.AuthenticationError, "Unauthorized"))
 
 private fun unauthorizedResponse(message: String) = errorResponse(

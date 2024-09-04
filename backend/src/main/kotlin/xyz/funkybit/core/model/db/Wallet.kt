@@ -115,7 +115,7 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
         }
     }
 
-    fun linkedAddresses(): List<Address> {
+    fun authorizedAddresses(): List<Address> {
         return WalletTable
             .selectAll()
             .where {

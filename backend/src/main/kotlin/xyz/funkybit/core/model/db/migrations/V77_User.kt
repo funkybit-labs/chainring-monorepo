@@ -13,8 +13,8 @@ import xyz.funkybit.core.db.Migration
 import xyz.funkybit.core.model.db.GUIDTable
 import xyz.funkybit.core.model.db.PGEnum
 import xyz.funkybit.core.model.db.UserId
+import xyz.funkybit.core.model.db.WalletAuthorizationId
 import xyz.funkybit.core.model.db.WalletId
-import xyz.funkybit.core.model.db.WalletLinkedProofId
 import xyz.funkybit.core.model.db.enumDeclaration
 
 @Suppress("ClassName")
@@ -50,7 +50,7 @@ class V77_User : Migration() {
         }
     }
 
-    object V77_WalletLinkProofTable : GUIDTable<WalletLinkedProofId>("wallet_link_proof", ::WalletLinkedProofId) {
+    object V77_WalletAuthorizationTable : GUIDTable<WalletAuthorizationId>("wallet_authorization", ::WalletAuthorizationId) {
         val walletGuid = reference("wallet_guid", V77_WalletTable, onDelete = ReferenceOption.CASCADE).index()
         val createdAt = timestamp("created_at")
         val createdBy = varchar("created_by", 10485760)
@@ -84,7 +84,7 @@ class V77_User : Migration() {
             exec("ALTER TABLE wallet ALTER COLUMN wallet_family SET NOT NULL")
 
             // link proof table
-            SchemaUtils.createMissingTablesAndColumns(V77_WalletLinkProofTable)
+            SchemaUtils.createMissingTablesAndColumns(V77_WalletAuthorizationTable)
 
             // change wallet_guid in limit table to user_guid
             exec("ALTER TABLE \"limit\" DROP CONSTRAINT unique_limit")

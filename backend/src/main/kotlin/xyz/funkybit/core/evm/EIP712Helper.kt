@@ -3,7 +3,7 @@ package xyz.funkybit.core.evm
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.web3j.crypto.StructuredData
 import org.web3j.crypto.StructuredDataEncoder
-import xyz.funkybit.apps.api.LinkMessage
+import xyz.funkybit.apps.api.AuthorizeWalletAddressMessage
 import xyz.funkybit.apps.api.middleware.SignInMessage
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.db.ChainId
@@ -94,7 +94,7 @@ object EIP712Helper {
         return encoder.hashStructuredData()
     }
 
-    fun computeHash(linkMessage: LinkMessage): ByteArray {
+    fun computeHash(linkMessage: AuthorizeWalletAddressMessage): ByteArray {
         val encoder = StructuredDataEncoder(
             StructuredData.EIP712Message(
                 /* types = */
@@ -117,7 +117,7 @@ object EIP712Helper {
                 mapOf(
                     "message" to linkMessage.message,
                     "address" to linkMessage.address,
-                    "linkedAddress" to linkMessage.linkAddress,
+                    "authorizedAddress" to linkMessage.authorizedAddress,
                     "chainId" to linkMessage.chainId.value,
                     "timestamp" to linkMessage.timestamp,
                 ),

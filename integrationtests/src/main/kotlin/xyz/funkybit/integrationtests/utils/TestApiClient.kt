@@ -10,10 +10,10 @@ import org.junit.jupiter.api.Assertions
 import xyz.funkybit.apps.api.TestRoutes
 import xyz.funkybit.apps.api.model.AccountConfigurationApiResponse
 import xyz.funkybit.apps.api.model.ApiError
+import xyz.funkybit.apps.api.model.AuthorizeWalletApiRequest
 import xyz.funkybit.apps.api.model.BalancesApiResponse
 import xyz.funkybit.apps.api.model.BatchOrdersApiRequest
 import xyz.funkybit.apps.api.model.BatchOrdersApiResponse
-import xyz.funkybit.apps.api.model.BitcoinLinkAddressProof
 import xyz.funkybit.apps.api.model.CancelOrderApiRequest
 import xyz.funkybit.apps.api.model.ConfigurationApiResponse
 import xyz.funkybit.apps.api.model.CreateDepositApiRequest
@@ -21,13 +21,11 @@ import xyz.funkybit.apps.api.model.CreateOrderApiRequest
 import xyz.funkybit.apps.api.model.CreateOrderApiResponse
 import xyz.funkybit.apps.api.model.CreateWithdrawalApiRequest
 import xyz.funkybit.apps.api.model.DepositApiResponse
-import xyz.funkybit.apps.api.model.EvmLinkAddressProof
 import xyz.funkybit.apps.api.model.FaucetApiRequest
 import xyz.funkybit.apps.api.model.FaucetApiResponse
 import xyz.funkybit.apps.api.model.GetLastPriceResponse
 import xyz.funkybit.apps.api.model.GetLimitsApiResponse
 import xyz.funkybit.apps.api.model.GetOrderBookApiResponse
-import xyz.funkybit.apps.api.model.LinkWalletsApiRequest
 import xyz.funkybit.apps.api.model.ListDepositsApiResponse
 import xyz.funkybit.apps.api.model.ListWithdrawalsApiResponse
 import xyz.funkybit.apps.api.model.Market
@@ -35,9 +33,6 @@ import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.apps.api.model.OrderAmount
 import xyz.funkybit.apps.api.model.OrdersApiResponse
 import xyz.funkybit.apps.api.model.WithdrawalApiResponse
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
-import xyz.funkybit.core.model.BitcoinAddress
-import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.MarketMinFee
 import xyz.funkybit.core.model.Percentage
@@ -201,22 +196,17 @@ class TestApiClient(keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(), trace
     override fun markSymbolAsAdded(symbolName: String) =
         tryMarkSymbolAsAdded(symbolName).assertSuccess()
 
-    override fun linkWallets(bitcoinLinkAddressProof: BitcoinLinkAddressProof, evmLinkAddressProof: EvmLinkAddressProof) =
-        tryLinkWallets(LinkWalletsApiRequest(bitcoinLinkAddressProof, evmLinkAddressProof)).assertSuccess()
+    override fun authorizeWallet(apiRequest: AuthorizeWalletApiRequest) =
+        tryAuthorizeWallet(apiRequest).assertSuccess()
 
-    fun linkBitcoinWallet(bitcoinKeyPair: WalletKeyPair.Bitcoin) {
-        val bitcoinAddress = BitcoinAddress.fromKey(BitcoinClient.getParams(), bitcoinKeyPair.ecKey)
+    fun authorizeBitcoinWallet(evmKeyPair: WalletKeyPair.EVM) {
+        val bitcoinKeyPair = keyPair as WalletKeyPair.Bitcoin
 
-        linkWallets(
-            signBitcoinWalletLinkProof(
-                ecKey = bitcoinKeyPair.ecKey,
-                address = bitcoinAddress,
-                linkAddress = address as EvmAddress,
-            ),
-            signEvmWalletLinkProof(
-                ecKeyPair = (keyPair as WalletKeyPair.EVM).ecKeyPair,
-                address = address,
-                linkAddress = bitcoinAddress,
+        authorizeWallet(
+            signAuthorizeBitcoinWalletRequest(
+                ecKeyPair = evmKeyPair.ecKeyPair,
+                address = evmKeyPair.address(),
+                authorizedAddress = bitcoinKeyPair.address(),
             ),
         )
     }
