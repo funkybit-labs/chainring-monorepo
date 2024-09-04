@@ -113,7 +113,7 @@ export type ConfigurationApiResponse = z.infer<
 export const AccountConfigurationApiResponseSchema = z.object({
   newSymbols: z.array(SymbolSchema),
   role: z.enum(['User', 'Admin']),
-  linkedAddresses: z.array(AddressSchema)
+  authorizedAddress: z.array(AddressSchema)
 })
 export type AccountConfigurationApiResponse = z.infer<
   typeof AccountConfigurationApiResponseSchema

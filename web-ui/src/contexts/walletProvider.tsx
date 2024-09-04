@@ -47,7 +47,7 @@ function setGlobal(
 ) {
   window.localStorage.setItem(
     `funkybit-wallet-${name}`,
-    value ? JSON.stringify(value) : 'null'
+    JSON.stringify(value ?? 'null')
   )
 }
 
