@@ -6,10 +6,12 @@ import org.bitcoinj.core.NetworkParameters
 import org.http4k.client.WebsocketClient
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.extension.ExtendWith
+import org.web3j.crypto.ECKeyPair
 import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.LinkWalletsApiRequest
 import xyz.funkybit.apps.api.model.Market
 import xyz.funkybit.apps.api.model.ReasonCode
+import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.BitcoinSignature
 import xyz.funkybit.core.model.EvmAddress
@@ -52,84 +54,72 @@ class WalletLinkingTest : OrderBaseTest() {
 
     @Test
     fun `evm wallet link bitcoin wallet`() {
-        val evmWalletKeyPair = WalletKeyPair.EVM.generate()
-        val evmKeyApiClient = TestApiClient(evmWalletKeyPair)
-        val evmAddress = evmKeyApiClient.address as EvmAddress
+        val evmKeyApiClient = TestApiClient.withEvmWallet()
         assertTrue { evmKeyApiClient.getAccountConfiguration().linkedAddresses.isEmpty() }
 
-        val bitcoinKey = ECKey()
-        val bitcoinKeyApiClient = TestApiClient(WalletKeyPair.Bitcoin(bitcoinKey), chainId = ChainId(0u))
-        val bitcoinAddress = BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, bitcoinKey)
+        val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
 
         evmKeyApiClient.linkWallets(
             bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
-                ecKey = bitcoinKey,
-                address = bitcoinAddress,
-                linkAddress = evmAddress,
+                ecKey = bitcoinKeyApiClient.keyPair.asECKey(),
+                address = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                linkAddress = evmKeyApiClient.address.asEvmAddress(),
             ),
             evmLinkAddressProof = signEvmWalletLinkProof(
-                ecKeyPair = evmWalletKeyPair.ecKeyPair,
-                address = evmAddress,
-                linkAddress = bitcoinAddress,
+                ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
+                address = evmKeyApiClient.address.asEvmAddress(),
+                linkAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
             ),
         )
 
-        kotlin.test.assertEquals(listOf(evmAddress), bitcoinKeyApiClient.getAccountConfiguration().linkedAddresses)
-        kotlin.test.assertEquals(listOf(bitcoinAddress), evmKeyApiClient.getAccountConfiguration().linkedAddresses)
+        kotlin.test.assertEquals(listOf(evmKeyApiClient.address), bitcoinKeyApiClient.getAccountConfiguration().linkedAddresses)
+        kotlin.test.assertEquals(listOf(bitcoinKeyApiClient.address), evmKeyApiClient.getAccountConfiguration().linkedAddresses)
     }
 
     @Test
     fun `bitcoin wallet link evm wallet`() {
-        val bitcoinKey = ECKey()
-        val bitcoinKeyApiClient = TestApiClient(WalletKeyPair.Bitcoin(bitcoinKey), chainId = ChainId(0u))
-        val bitcoinAddress = BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, bitcoinKey)
+        val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
         assertTrue { bitcoinKeyApiClient.getAccountConfiguration().linkedAddresses.isEmpty() }
 
-        val evmWalletKeyPair = WalletKeyPair.EVM.generate()
-        val evmKeyApiClient = TestApiClient(evmWalletKeyPair)
-        val evmAddress = evmKeyApiClient.address as EvmAddress
+        val evmKeyApiClient = TestApiClient.withEvmWallet()
 
         bitcoinKeyApiClient.linkWallets(
             bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
-                ecKey = bitcoinKey,
-                address = bitcoinAddress,
-                linkAddress = evmAddress,
+                ecKey = bitcoinKeyApiClient.keyPair.asECKey(),
+                address = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                linkAddress = evmKeyApiClient.address.asEvmAddress(),
             ),
             evmLinkAddressProof = signEvmWalletLinkProof(
-                ecKeyPair = evmWalletKeyPair.ecKeyPair,
-                address = evmAddress,
-                linkAddress = bitcoinAddress,
+                ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
+                address = evmKeyApiClient.address.asEvmAddress(),
+                linkAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
             ),
         )
 
-        kotlin.test.assertEquals(listOf(evmAddress), bitcoinKeyApiClient.getAccountConfiguration().linkedAddresses)
-        kotlin.test.assertEquals(listOf(bitcoinAddress), evmKeyApiClient.getAccountConfiguration().linkedAddresses)
+        kotlin.test.assertEquals(listOf(evmKeyApiClient.address.asEvmAddress()), bitcoinKeyApiClient.getAccountConfiguration().linkedAddresses)
+        kotlin.test.assertEquals(listOf(bitcoinKeyApiClient.address.asBitcoinAddress()), evmKeyApiClient.getAccountConfiguration().linkedAddresses)
     }
 
     @Test
     fun `already linked address can't be re-linked`() {
-        val evmWalletKeyPair = WalletKeyPair.EVM.generate()
-        val evmKeyApiClient = TestApiClient(evmWalletKeyPair)
-        val evmAddress = evmKeyApiClient.address as EvmAddress
+        val evmKeyApiClient = TestApiClient.withEvmWallet()
         assertTrue { evmKeyApiClient.getAccountConfiguration().linkedAddresses.isEmpty() }
 
-        val bitcoinKey = ECKey()
-        val bitcoinKeyApiClient = TestApiClient(WalletKeyPair.Bitcoin(bitcoinKey), chainId = ChainId(0u))
-        val bitcoinAddress = BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, bitcoinKey)
+        val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
         assertTrue { bitcoinKeyApiClient.getAccountConfiguration().linkedAddresses.isEmpty() }
 
         // note: each wallet has been linked to a new user by sending an api request
         bitcoinKeyApiClient.tryLinkWallets(
             LinkWalletsApiRequest(
                 bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
-                    ecKey = bitcoinKey,
-                    address = bitcoinAddress,
-                    linkAddress = evmAddress,
+                    ecKey = bitcoinKeyApiClient.keyPair.asECKey(),
+                    address = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                    linkAddress = evmKeyApiClient.address.asEvmAddress(),
                 ),
                 evmLinkAddressProof = signEvmWalletLinkProof(
-                    ecKeyPair = evmWalletKeyPair.ecKeyPair,
-                    address = evmAddress,
-                    linkAddress = bitcoinAddress,
+                    ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
+                    address = evmKeyApiClient.address.asEvmAddress(),
+                    linkAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
                 ),
             ),
         ).assertError(ApiError(ReasonCode.LinkWalletsError, "Link address is already in use"))
@@ -137,14 +127,10 @@ class WalletLinkingTest : OrderBaseTest() {
 
     @Test
     fun `link proof validation error cases`() {
-        val evmWalletKeyPair = WalletKeyPair.EVM.generate()
-        val evmKeyApiClient = TestApiClient(evmWalletKeyPair)
-        val evmAddress = evmKeyApiClient.address as EvmAddress
+        val evmKeyApiClient = TestApiClient.withEvmWallet()
         assertTrue { evmKeyApiClient.getAccountConfiguration().linkedAddresses.isEmpty() }
 
-        val bitcoinKey = ECKey()
-        val bitcoinKeyApiClient = TestApiClient(WalletKeyPair.Bitcoin(bitcoinKey), chainId = ChainId(0u))
-        val bitcoinAddress = BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, bitcoinKey)
+        val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
 
         // signature should be valid
         evmKeyApiClient.tryLinkWallets(
@@ -164,14 +150,14 @@ class WalletLinkingTest : OrderBaseTest() {
         evmKeyApiClient.tryLinkWallets(
             LinkWalletsApiRequest(
                 bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
-                    ecKey = bitcoinKey,
-                    address = bitcoinAddress,
-                    linkAddress = evmAddress,
+                    ecKey = bitcoinKeyApiClient.keyPair.asECKey(),
+                    address = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                    linkAddress = evmKeyApiClient.address.asEvmAddress(),
                 ),
                 evmLinkAddressProof = signEvmWalletLinkProof(
-                    ecKeyPair = evmWalletKeyPair.ecKeyPair,
-                    address = evmAddress,
-                    linkAddress = bitcoinAddress,
+                    ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
+                    address = evmKeyApiClient.address.asEvmAddress(),
+                    linkAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
                 ).copy(signature = EvmSignature("0x1cd66f580ec8f6fd37b2101849955c5a50d787092fe8a97e5c55bea6a24c1d47409e17450adaa617cc07907f56a4eb1f468467fcefe7808cbd63fbba935ee0201b")),
             ),
         ).assertError(ApiError(ReasonCode.LinkWalletsError, "Signature can't be verified"))
@@ -180,44 +166,44 @@ class WalletLinkingTest : OrderBaseTest() {
         bitcoinKeyApiClient.tryLinkWallets(
             LinkWalletsApiRequest(
                 bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
-                    ecKey = bitcoinKey,
-                    address = bitcoinAddress,
-                    linkAddress = evmAddress,
+                    ecKey = bitcoinKeyApiClient.keyPair.asECKey(),
+                    address = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                    linkAddress = evmKeyApiClient.address.asEvmAddress(),
                     timestamp = Clock.System.now() + 11.seconds,
                 ),
                 evmLinkAddressProof = signEvmWalletLinkProof(
-                    ecKeyPair = evmWalletKeyPair.ecKeyPair,
-                    address = evmAddress,
-                    linkAddress = bitcoinAddress,
+                    ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
+                    address = evmKeyApiClient.address.asEvmAddress(),
+                    linkAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
                 ),
             ),
         ).assertError(ApiError(ReasonCode.LinkWalletsError, "Link proof has expired or not valid yet"))
         bitcoinKeyApiClient.tryLinkWallets(
             LinkWalletsApiRequest(
                 bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
-                    ecKey = bitcoinKey,
-                    address = bitcoinAddress,
-                    linkAddress = evmAddress,
+                    ecKey = bitcoinKeyApiClient.keyPair.asECKey(),
+                    address = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                    linkAddress = evmKeyApiClient.address.asEvmAddress(),
                     timestamp = Clock.System.now() - 5.minutes - 1.seconds,
                 ),
                 evmLinkAddressProof = signEvmWalletLinkProof(
-                    ecKeyPair = evmWalletKeyPair.ecKeyPair,
-                    address = evmAddress,
-                    linkAddress = bitcoinAddress,
+                    ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
+                    address = evmKeyApiClient.address.asEvmAddress(),
+                    linkAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
                 ),
             ),
         ).assertError(ApiError(ReasonCode.LinkWalletsError, "Link proof has expired or not valid yet"))
         bitcoinKeyApiClient.tryLinkWallets(
             LinkWalletsApiRequest(
                 bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
-                    ecKey = bitcoinKey,
-                    address = bitcoinAddress,
-                    linkAddress = evmAddress,
+                    ecKey = bitcoinKeyApiClient.keyPair.asECKey(),
+                    address = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                    linkAddress = evmKeyApiClient.address.asEvmAddress(),
                 ),
                 evmLinkAddressProof = signEvmWalletLinkProof(
-                    ecKeyPair = evmWalletKeyPair.ecKeyPair,
-                    address = evmAddress,
-                    linkAddress = bitcoinAddress,
+                    ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
+                    address = evmKeyApiClient.address.asEvmAddress(),
+                    linkAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
                     timestamp = Clock.System.now() + 11.seconds,
                 ),
             ),
@@ -225,14 +211,14 @@ class WalletLinkingTest : OrderBaseTest() {
         bitcoinKeyApiClient.tryLinkWallets(
             LinkWalletsApiRequest(
                 bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
-                    ecKey = bitcoinKey,
-                    address = bitcoinAddress,
-                    linkAddress = evmAddress,
+                    ecKey = bitcoinKeyApiClient.keyPair.asECKey(),
+                    address = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                    linkAddress = evmKeyApiClient.address.asEvmAddress(),
                 ),
                 evmLinkAddressProof = signEvmWalletLinkProof(
-                    ecKeyPair = evmWalletKeyPair.ecKeyPair,
-                    address = evmAddress,
-                    linkAddress = bitcoinAddress,
+                    ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
+                    address = evmKeyApiClient.address.asEvmAddress(),
+                    linkAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
                     timestamp = Clock.System.now() - 5.minutes - 1.seconds,
                 ),
             ),
@@ -242,29 +228,29 @@ class WalletLinkingTest : OrderBaseTest() {
         bitcoinKeyApiClient.tryLinkWallets(
             LinkWalletsApiRequest(
                 bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
-                    ecKey = bitcoinKey,
-                    address = bitcoinAddress,
+                    ecKey = bitcoinKeyApiClient.keyPair.asECKey(),
+                    address = bitcoinKeyApiClient.address.asBitcoinAddress(),
                     linkAddress = EvmAddress.generate(),
                     timestamp = Clock.System.now() + 11.seconds,
                 ),
                 evmLinkAddressProof = signEvmWalletLinkProof(
-                    ecKeyPair = evmWalletKeyPair.ecKeyPair,
-                    address = evmAddress,
-                    linkAddress = bitcoinAddress,
+                    ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
+                    address = evmKeyApiClient.address.asEvmAddress(),
+                    linkAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
                 ),
             ),
         ).assertError(ApiError(ReasonCode.LinkWalletsError, "Invalid wallet links"))
         bitcoinKeyApiClient.tryLinkWallets(
             LinkWalletsApiRequest(
                 bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
-                    ecKey = bitcoinKey,
-                    address = bitcoinAddress,
-                    linkAddress = evmAddress,
+                    ecKey = bitcoinKeyApiClient.keyPair.asECKey(),
+                    address = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                    linkAddress = evmKeyApiClient.address.asEvmAddress(),
                     timestamp = Clock.System.now() + 11.seconds,
                 ),
                 evmLinkAddressProof = signEvmWalletLinkProof(
-                    ecKeyPair = evmWalletKeyPair.ecKeyPair,
-                    address = evmAddress,
+                    ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
+                    address = evmKeyApiClient.address.asEvmAddress(),
                     linkAddress = BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, ECKey()),
                 ),
             ),
@@ -421,4 +407,20 @@ class WalletLinkingTest : OrderBaseTest() {
 
         return apiClient
     }
+}
+
+fun WalletKeyPair.asEcKeyPair(): ECKeyPair {
+    return (this as WalletKeyPair.EVM).ecKeyPair
+}
+
+fun WalletKeyPair.asECKey(): ECKey {
+    return (this as WalletKeyPair.Bitcoin).ecKey
+}
+
+fun Address.asEvmAddress(): EvmAddress {
+    return this as EvmAddress
+}
+
+fun Address.asBitcoinAddress(): BitcoinAddress {
+    return this as BitcoinAddress
 }

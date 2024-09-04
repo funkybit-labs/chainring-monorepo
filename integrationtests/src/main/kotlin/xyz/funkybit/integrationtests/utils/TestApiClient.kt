@@ -6,7 +6,6 @@ import kotlinx.serialization.json.Json
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
-import org.bitcoinj.core.NetworkParameters
 import org.junit.jupiter.api.Assertions
 import xyz.funkybit.apps.api.TestRoutes
 import xyz.funkybit.apps.api.model.AccountConfigurationApiResponse
@@ -36,6 +35,7 @@ import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.apps.api.model.OrderAmount
 import xyz.funkybit.apps.api.model.OrdersApiResponse
 import xyz.funkybit.apps.api.model.WithdrawalApiResponse
+import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
@@ -63,6 +63,14 @@ import kotlin.test.assertIs
 class TestApiClient(keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(), traceRecorder: TraceRecorder = TraceRecorder.noOp, chainId: ChainId = ChainId(1337u)) : ApiClient(keyPair, traceRecorder, chainId) {
 
     companion object {
+
+        fun withEvmWallet(keyPair: WalletKeyPair.EVM = WalletKeyPair.EVM.generate(), chainId: ChainId = ChainId(1337u)): TestApiClient {
+            return TestApiClient(keyPair = keyPair, chainId = chainId)
+        }
+
+        fun withBitcoinWallet(keyPair: WalletKeyPair.Bitcoin = WalletKeyPair.Bitcoin.generate(), chainId: ChainId = ChainId(0u)): TestApiClient {
+            return TestApiClient(keyPair = keyPair, chainId = chainId)
+        }
 
         fun getOpenApiDocumentation(): String {
             val httpResponse = execute(
@@ -197,7 +205,7 @@ class TestApiClient(keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(), trace
         tryLinkWallets(LinkWalletsApiRequest(bitcoinLinkAddressProof, evmLinkAddressProof)).assertSuccess()
 
     fun linkBitcoinWallet(bitcoinKeyPair: WalletKeyPair.Bitcoin) {
-        val bitcoinAddress = BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, bitcoinKeyPair.ecKey)
+        val bitcoinAddress = BitcoinAddress.fromKey(BitcoinClient.getParams(), bitcoinKeyPair.ecKey)
 
         linkWallets(
             signBitcoinWalletLinkProof(
