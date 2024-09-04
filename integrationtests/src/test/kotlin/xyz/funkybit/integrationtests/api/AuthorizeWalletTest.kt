@@ -125,14 +125,14 @@ class AuthorizeWalletTest : OrderBaseTest() {
                 address = bitcoinKeyApiClient.address.asBitcoinAddress(),
                 authorizedAddress = evmKeyApiClient.address.asEvmAddress(),
             ).copy(signature = "H7P1/r+gULX05tXwaJGfglZSL4sRhykAsgwQtpm92xRIPaGUnxQAhm1CZsTuQ8wh3w51f1uUVpxU2RUfJ3hq81I="),
-        ).assertError(ApiError(ReasonCode.AuthorizeWallerError, "Authorization signature can't be verified"))
+        ).assertError(ApiError(ReasonCode.AuthorizeWallerError, "Invalid signature"))
         bitcoinKeyApiClient.tryAuthorizeWallet(
             apiRequest = signAuthorizeBitcoinWalletRequest(
                 ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
                 address = evmKeyApiClient.address.asEvmAddress(),
                 authorizedAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
             ).copy(signature = "0x1cd66f580ec8f6fd37b2101849955c5a50d787092fe8a97e5c55bea6a24c1d47409e17450adaa617cc07907f56a4eb1f468467fcefe7808cbd63fbba935ee0201b"),
-        ).assertError(ApiError(ReasonCode.AuthorizeWallerError, "Authorization signature can't be verified"))
+        ).assertError(ApiError(ReasonCode.AuthorizeWallerError, "Invalid signature"))
 
         // authorization signature timestamp should be recent
         evmKeyApiClient.tryAuthorizeWallet(

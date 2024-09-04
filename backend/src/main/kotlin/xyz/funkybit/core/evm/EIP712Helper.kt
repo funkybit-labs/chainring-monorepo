@@ -106,7 +106,7 @@ object EIP712Helper {
                     "Link" to listOf(
                         StructuredData.Entry("message", "string"),
                         StructuredData.Entry("address", "string"),
-                        StructuredData.Entry("linkAddress", "string"),
+                        StructuredData.Entry("authorizedAddress", "string"),
                         StructuredData.Entry("chainId", "uint32"),
                         StructuredData.Entry("timestamp", "string"),
                     ),
