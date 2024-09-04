@@ -145,7 +145,8 @@ class MockerApp(
                         liquidityPlacement = params.liquidityPlacement,
                         baseAssetAmount = params.initialBaseBalance * BigDecimal(100),
                         quoteAssetAmount = params.initialBaseBalance * params.priceBaseline * BigDecimal(100),
-                        keyPair = ECKeyPair.create(Numeric.toBigInt(params.makerPrivateKeyHex))
+                        keyPair = ECKeyPair.create(Numeric.toBigInt(params.makerPrivateKeyHex)),
+                        usePriceFeed = System.getenv("MAKER_USE_PRICE_FEED")?.toBoolean() ?: false
                     )
                 )
             }

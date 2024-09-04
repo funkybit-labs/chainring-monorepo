@@ -42,6 +42,7 @@ dependencies {
     implementation("de.fxlae:typeid-java:0.2.0")
     implementation(project(":backend"))
     implementation(project(":integrationtests"))
+    testImplementation("org.awaitility:awaitility-kotlin:4.2.0")
 }
 
 tasks.test {
