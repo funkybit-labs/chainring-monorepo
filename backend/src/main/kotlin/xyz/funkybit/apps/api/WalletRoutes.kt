@@ -193,6 +193,6 @@ object WalletRoutes {
             is BitcoinAddress -> "Bitcoin"
         }
 
-        return String.format(BASE_AUTHORIZE_MESSAGE, walletFamily, authorizedAddress.toString())
+        return String.format(BASE_AUTHORIZE_MESSAGE, walletFamily, authorizedAddress.toString().lowercase())
     }
 }

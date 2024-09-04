@@ -135,7 +135,7 @@ fun signAuthorizeBitcoinWalletRequest(
         EIP712Helper.computeHash(
             AuthorizeWalletAddressMessage(
                 message = message,
-                address = address.toString().lowercase(),
+                address = address.toString(),
                 authorizedAddress = authorizedAddress.toString(),
                 chainId = chainId,
                 timestamp = timestamp.toString(),
