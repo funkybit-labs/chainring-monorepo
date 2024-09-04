@@ -13,6 +13,7 @@ import xyz.funkybit.apps.api.model.Market
 import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.BitcoinSignature
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.db.ChainId
@@ -51,7 +52,7 @@ import kotlin.time.Duration.Companion.seconds
 @ExtendWith(AppUnderTestRunner::class)
 class WalletLinkingTest : OrderBaseTest() {
 
-    @org.junit.jupiter.api.Test
+    @Test
     fun `evm wallet link bitcoin wallet`() {
         val evmKeyApiClient = TestApiClient.withEvmWallet()
         assertTrue { evmKeyApiClient.getAccountConfiguration().linkedAddresses.isEmpty() }
@@ -75,7 +76,7 @@ class WalletLinkingTest : OrderBaseTest() {
         kotlin.test.assertEquals(listOf(bitcoinKeyApiClient.address), evmKeyApiClient.getAccountConfiguration().linkedAddresses)
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     fun `bitcoin wallet link evm wallet`() {
         val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
         assertTrue { bitcoinKeyApiClient.getAccountConfiguration().linkedAddresses.isEmpty() }
@@ -99,7 +100,7 @@ class WalletLinkingTest : OrderBaseTest() {
         kotlin.test.assertEquals(listOf(bitcoinKeyApiClient.address.asBitcoinAddress()), evmKeyApiClient.getAccountConfiguration().linkedAddresses)
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     fun `already linked address can't be re-linked`() {
         val evmKeyApiClient = TestApiClient.withEvmWallet()
         assertTrue { evmKeyApiClient.getAccountConfiguration().linkedAddresses.isEmpty() }
@@ -124,29 +125,28 @@ class WalletLinkingTest : OrderBaseTest() {
         ).assertError(ApiError(ReasonCode.LinkWalletsError, "Link address is already in use"))
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     fun `link proof validation error cases`() {
         val evmKeyApiClient = TestApiClient.withEvmWallet()
         assertTrue { evmKeyApiClient.getAccountConfiguration().linkedAddresses.isEmpty() }
 
         val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
 
-        // TODO uncomment once bitcoin recovered address check is fixed
-//        // signature should be valid
-//        evmKeyApiClient.tryLinkIdentity(
-//            LinkIdentityApiRequest(
-//                bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
-//                    ecKey = bitcoinKey,
-//                    address = bitcoinAddress,
-//                    linkAddress = evmAddress,
-//                ).copy(signature = BitcoinSignature("H7P1/r+gULX05tXwaJGfglZSL4sRhykAsgwQtpm92xRIPaGUnxQAhm1CZsTuQ8wh3w51f1uUVpxU2RUfJ3hq81I=")),
-//                evmLinkAddressProof = signEvmWalletLinkProof(
-//                    ecKeyPair = evmWalletKeyPair.ecKeyPair,
-//                    address = evmAddress,
-//                    linkAddress = bitcoinAddress,
-//                ),
-//            ),
-//        ).assertError(ApiError(ReasonCode.LinkIdentityError, "Signature can't be verified"))
+        // signature should be valid
+        evmKeyApiClient.tryLinkWallets(
+            LinkWalletsApiRequest(
+                bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
+                    ecKey = bitcoinKeyApiClient.keyPair.asECKey(),
+                    address = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                    linkAddress = evmKeyApiClient.address.asEvmAddress(),
+                ).copy(signature = BitcoinSignature("H7P1/r+gULX05tXwaJGfglZSL4sRhykAsgwQtpm92xRIPaGUnxQAhm1CZsTuQ8wh3w51f1uUVpxU2RUfJ3hq81I=")),
+                evmLinkAddressProof = signEvmWalletLinkProof(
+                    ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
+                    address = evmKeyApiClient.address.asEvmAddress(),
+                    linkAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                ),
+            ),
+        ).assertError(ApiError(ReasonCode.LinkWalletsError, "Signature can't be verified"))
         evmKeyApiClient.tryLinkWallets(
             LinkWalletsApiRequest(
                 bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
