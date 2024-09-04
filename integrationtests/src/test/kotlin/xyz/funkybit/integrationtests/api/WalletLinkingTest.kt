@@ -136,14 +136,14 @@ class WalletLinkingTest : OrderBaseTest() {
         evmKeyApiClient.tryLinkWallets(
             LinkWalletsApiRequest(
                 bitcoinLinkAddressProof = signBitcoinWalletLinkProof(
-                    ecKey = bitcoinKey,
-                    address = bitcoinAddress,
-                    linkAddress = evmAddress,
+                    ecKey = bitcoinKeyApiClient.keyPair.asECKey(),
+                    address = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                    linkAddress = evmKeyApiClient.address.asEvmAddress(),
                 ).copy(signature = BitcoinSignature("H7P1/r+gULX05tXwaJGfglZSL4sRhykAsgwQtpm92xRIPaGUnxQAhm1CZsTuQ8wh3w51f1uUVpxU2RUfJ3hq81I=")),
                 evmLinkAddressProof = signEvmWalletLinkProof(
-                    ecKeyPair = evmWalletKeyPair.ecKeyPair,
-                    address = evmAddress,
-                    linkAddress = bitcoinAddress,
+                    ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
+                    address = evmKeyApiClient.address.asEvmAddress(),
+                    linkAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
                 ),
             ),
         ).assertError(ApiError(ReasonCode.LinkWalletsError, "Signature can't be verified"))
