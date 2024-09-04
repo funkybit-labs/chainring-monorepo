@@ -123,7 +123,7 @@ fun main() {
     timer.cancel()
 }
 
-fun startMaker(market: Market, marketPriceOverride: BigDecimal?, liquidityPlacement: LiquidityPlacement, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, keyPair: ECKeyPair = Keys.createEcKeyPair()): Maker {
+fun startMaker(market: Market, marketPriceOverride: BigDecimal?, liquidityPlacement: LiquidityPlacement, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, keyPair: ECKeyPair = Keys.createEcKeyPair(), usePriceFeed: Boolean = false): Maker {
     val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
     val quoteAssetBtc = market.quoteSymbol.value.startsWith("BTC")
     val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)
@@ -147,6 +147,7 @@ fun startMaker(market: Market, marketPriceOverride: BigDecimal?, liquidityPlacem
             else -> mapOf(baseAsset, quoteAsset)
         },
         keyPair = keyPair,
+        usePriceFeed = usePriceFeed
     )
     maker.start()
     return maker
