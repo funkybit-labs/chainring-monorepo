@@ -3,7 +3,6 @@ package xyz.funkybit.integrationtests.bitcoin
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.bitcoinj.core.Coin
 import org.bitcoinj.core.ECKey
-import org.bitcoinj.core.NetworkParameters
 import org.bitcoinj.core.Sha256Hash
 import org.bitcoinj.core.Transaction
 import org.bitcoinj.core.TransactionOutPoint
@@ -37,7 +36,7 @@ class UtxoSelectionTest {
 
     companion object {
 
-        val params = NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!
+        val params = BitcoinClient.getParams()
         fun waitForTx(address: BitcoinAddress, txId: TxHash) {
             waitFor {
                 MempoolSpaceClient.getTransactions(address, null).firstOrNull { it.txId == txId } != null

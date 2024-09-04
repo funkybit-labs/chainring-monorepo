@@ -67,7 +67,7 @@ sealed class BitcoinAddress(val value: String) : Address() {
         this.value.startsWith("3") -> P2SH(this.value, false)
         this.value.startsWith("2") -> P2SH(this.value, true)
         this.value.startsWith("1") -> P2PKH(this.value, false)
-        this.value.startsWith("m") -> P2PKH(this.value, true)
+        this.value.startsWith("m") || this.value.startsWith("n") -> P2PKH(this.value, true)
         else -> Unrecognized(this.value)
     }
     override fun toString() = this.value

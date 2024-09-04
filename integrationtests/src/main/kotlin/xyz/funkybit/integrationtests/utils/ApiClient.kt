@@ -17,7 +17,6 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.bitcoinj.core.ECKey
-import org.bitcoinj.core.NetworkParameters
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
@@ -27,10 +26,10 @@ import xyz.funkybit.apps.api.middleware.SignInMessage
 import xyz.funkybit.apps.api.model.AccountConfigurationApiResponse
 import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.ApiErrors
+import xyz.funkybit.apps.api.model.AuthorizeWalletApiRequest
 import xyz.funkybit.apps.api.model.BalancesApiResponse
 import xyz.funkybit.apps.api.model.BatchOrdersApiRequest
 import xyz.funkybit.apps.api.model.BatchOrdersApiResponse
-import xyz.funkybit.apps.api.model.BitcoinLinkAddressProof
 import xyz.funkybit.apps.api.model.CancelOrderApiRequest
 import xyz.funkybit.apps.api.model.ConfigurationApiResponse
 import xyz.funkybit.apps.api.model.CreateDepositApiRequest
@@ -38,22 +37,22 @@ import xyz.funkybit.apps.api.model.CreateOrderApiRequest
 import xyz.funkybit.apps.api.model.CreateOrderApiResponse
 import xyz.funkybit.apps.api.model.CreateWithdrawalApiRequest
 import xyz.funkybit.apps.api.model.DepositApiResponse
-import xyz.funkybit.apps.api.model.EvmLinkAddressProof
 import xyz.funkybit.apps.api.model.FaucetApiRequest
 import xyz.funkybit.apps.api.model.FaucetApiResponse
 import xyz.funkybit.apps.api.model.GetLastPriceResponse
 import xyz.funkybit.apps.api.model.GetLimitsApiResponse
 import xyz.funkybit.apps.api.model.GetOrderBookApiResponse
-import xyz.funkybit.apps.api.model.LinkWalletsApiRequest
 import xyz.funkybit.apps.api.model.ListDepositsApiResponse
 import xyz.funkybit.apps.api.model.ListWithdrawalsApiResponse
 import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.apps.api.model.OrdersApiResponse
 import xyz.funkybit.apps.api.model.WithdrawalApiResponse
+import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.evm.ECHelper
 import xyz.funkybit.core.evm.EIP712Helper
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ClientOrderId
 import xyz.funkybit.core.model.db.DepositId
@@ -89,9 +88,17 @@ sealed class WalletKeyPair {
 
         val privateKey = ecKeyPair.privateKey
         val credentials = Credentials.create(ecKeyPair)
+
+        override fun address(): EvmAddress = EvmAddress.canonicalize(Credentials.create(ecKeyPair).address)
     }
 
-    data class Bitcoin(val ecKey: ECKey) : WalletKeyPair()
+    data class Bitcoin(val ecKey: ECKey) : WalletKeyPair() {
+        companion object {
+            fun generate(): Bitcoin = Bitcoin(ECKey())
+        }
+
+        override fun address(): BitcoinAddress = BitcoinAddress.fromKey(BitcoinClient.getParams(), ecKey)
+    }
 
     fun sign(signInMessage: SignInMessage): String =
         when (this) {
@@ -103,11 +110,7 @@ sealed class WalletKeyPair {
             }
         }
 
-    fun address(): Address =
-        when (this) {
-            is EVM -> Address.auto(Credentials.create(ecKeyPair).address)
-            is Bitcoin -> BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, ecKey)
-        }
+    abstract fun address(): Address
 }
 
 open class ApiClient(
@@ -216,11 +219,11 @@ open class ApiClient(
                 .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
-    fun tryLinkWallets(apiRequest: LinkWalletsApiRequest): Either<ApiCallFailure, Unit> =
+    fun tryAuthorizeWallet(apiRequest: AuthorizeWalletApiRequest): Either<ApiCallFailure, Unit> =
         executeAndTrace(
-            TraceRecorder.Op.LinkIdentity,
+            TraceRecorder.Op.AuthorizeWallet,
             Request.Builder()
-                .url("$apiServerRootUrl/v1/wallets/link")
+                .url("$apiServerRootUrl/v1/wallets/authorization")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(keyPair, chainId = currentChainId),
@@ -525,8 +528,8 @@ open class ApiClient(
     open fun markSymbolAsAdded(symbolName: String) =
         tryMarkSymbolAsAdded(symbolName).throwOrReturn()
 
-    open fun linkWallets(bitcoinLinkAddressProof: BitcoinLinkAddressProof, evmLinkAddressProof: EvmLinkAddressProof) =
-        tryLinkWallets(LinkWalletsApiRequest(bitcoinLinkAddressProof, evmLinkAddressProof)).throwOrReturn()
+    open fun authorizeWallet(apiRequest: AuthorizeWalletApiRequest) =
+        tryAuthorizeWallet(apiRequest).throwOrReturn()
 
     open fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
         tryCreateOrder(apiRequest).throwOrReturn()

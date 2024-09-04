@@ -5,16 +5,14 @@ import kotlinx.datetime.Instant
 import org.bitcoinj.core.ECKey
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
-import xyz.funkybit.apps.api.LinkMessage
+import xyz.funkybit.apps.api.AuthorizeWalletAddressMessage
+import xyz.funkybit.apps.api.model.AuthorizeWalletApiRequest
 import xyz.funkybit.apps.api.model.Balance
-import xyz.funkybit.apps.api.model.BitcoinLinkAddressProof
-import xyz.funkybit.apps.api.model.EvmLinkAddressProof
 import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.apps.api.model.websocket.Limits
 import xyz.funkybit.core.evm.ECHelper
 import xyz.funkybit.core.evm.EIP712Helper
 import xyz.funkybit.core.model.BitcoinAddress
-import xyz.funkybit.core.model.BitcoinSignature
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.Symbol
@@ -104,45 +102,52 @@ fun verifyApiReturnsSameLimits(apiClient: TestApiClient, wsMessage: Limits) {
     assertEquals(wsMessage.limits, apiClient.getLimits().limits)
 }
 
-fun signBitcoinWalletLinkProof(
+fun signAuthorizeEvmWalletRequest(
     ecKey: ECKey,
     address: BitcoinAddress,
-    linkAddress: EvmAddress,
+    authorizedAddress: EvmAddress,
+    chainId: ChainId = ChainId(0U),
     timestamp: Instant = Clock.System.now(),
-): BitcoinLinkAddressProof {
-    val message = "[funkybit] Please sign this message to link your wallets. This action will not cost any gas fees."
-    val bitcoinLinkAddressMessage = "$message\nAddress: ${address.value}, LinkAddress: ${linkAddress.value.lowercase()}, Timestamp: $timestamp"
-    val signature = BitcoinSignature(ecKey.signMessage(bitcoinLinkAddressMessage))
+): AuthorizeWalletApiRequest {
+    val message = "[funkybit] Please sign this message to authorize EVM wallet ${authorizedAddress.value.lowercase()}. This action will not cost any gas fees."
+    val bitcoinLinkAddressMessage = "$message\nAddress: ${address.value}, Timestamp: $timestamp"
+    val signature = ecKey.signMessage(bitcoinLinkAddressMessage)
 
-    return BitcoinLinkAddressProof(
+    return AuthorizeWalletApiRequest(
+        authorizedAddress = authorizedAddress,
+        chainId = chainId,
         address = address,
-        linkAddress = linkAddress,
         timestamp = timestamp.toString(),
         signature = signature,
     )
 }
 
-fun signEvmWalletLinkProof(
+fun signAuthorizeBitcoinWalletRequest(
     ecKeyPair: ECKeyPair,
     address: EvmAddress,
-    linkAddress: BitcoinAddress,
+    authorizedAddress: BitcoinAddress,
     chainId: ChainId = ChainId(1337U),
     timestamp: Instant = Clock.System.now(),
-): EvmLinkAddressProof {
-    val linkMessage = LinkMessage(
-        message = "[funkybit] Please sign this message to link your wallets. This action will not cost any gas fees.",
-        address = address.toString().lowercase(),
-        linkAddress = linkAddress.toString(),
-        chainId = chainId,
-        timestamp = timestamp.toString(),
+): AuthorizeWalletApiRequest {
+    val message = "[funkybit] Please sign this message to authorize Bitcoin wallet ${authorizedAddress.value.lowercase()}. This action will not cost any gas fees."
+    val signature: EvmSignature = ECHelper.signData(
+        Credentials.create(ecKeyPair),
+        EIP712Helper.computeHash(
+            AuthorizeWalletAddressMessage(
+                message = message,
+                address = address.toString().lowercase(),
+                authorizedAddress = authorizedAddress.toString(),
+                chainId = chainId,
+                timestamp = timestamp.toString(),
+            ),
+        ),
     )
-    val signature: EvmSignature = ECHelper.signData(Credentials.create(ecKeyPair), EIP712Helper.computeHash(linkMessage))
 
-    return EvmLinkAddressProof(
+    return AuthorizeWalletApiRequest(
+        authorizedAddress = authorizedAddress,
         address = address,
-        linkAddress = linkAddress,
         chainId = chainId,
         timestamp = timestamp.toString(),
-        signature = signature,
+        signature = signature.value,
     )
 }
