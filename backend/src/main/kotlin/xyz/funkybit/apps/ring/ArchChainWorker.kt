@@ -3,13 +3,13 @@ package xyz.funkybit.apps.ring
 import io.github.oshai.kotlinlogging.KotlinLogging
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 
-class BitcoinChainWorker {
+class ArchChainWorker {
     val logger = KotlinLogging.logger {}
 
     fun start() {
         if (BitcoinClient.bitcoinConfig.enabled) {
             try {
-                BitcoinContractsPublisher.updateContracts()
+                ArchContractsPublisher.updateContracts()
             } catch (e: Exception) {
                 logger.error(e) { "Failed to load bitcoin contract" }
             }

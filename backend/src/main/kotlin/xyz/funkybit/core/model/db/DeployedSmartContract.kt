@@ -6,7 +6,9 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.model.Address
@@ -72,6 +74,17 @@ class DeployedSmartContractEntity(guid: EntityID<ContractId>) : GUIDEntity<Contr
                 .orderBy(DeployedSmartContractTable.createdAt to SortOrder.DESC)
                 .firstOrNull()
 
+        fun deleteDeployedContractByNameAndChain(
+            name: String,
+            chainId: ChainId,
+        ) {
+            DeployedSmartContractTable.deleteWhere {
+                DeployedSmartContractTable.name.eq(name) and DeployedSmartContractTable.chainId.eq(
+                    chainId,
+                )
+            }
+        }
+
         fun latestExchangeContractAddress(chainId: ChainId): Address? =
             findLastDeployedContractByNameAndChain(ContractType.Exchange.name, chainId)?.proxyAddress
 
@@ -88,7 +101,7 @@ class DeployedSmartContractEntity(guid: EntityID<ContractId>) : GUIDEntity<Contr
     var name by DeployedSmartContractTable.name
     var chainId by DeployedSmartContractTable.chainId
     var proxyAddress by DeployedSmartContractTable.proxyAddress.transform(
-        toColumn = { it.canonicalize().toString() },
+        toColumn = { it.toString() },
         toReal = { Address.auto(it) },
     )
     var implementationAddress by DeployedSmartContractTable.implementationAddress.transform(
