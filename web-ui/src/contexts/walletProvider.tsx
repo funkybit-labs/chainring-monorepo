@@ -222,7 +222,10 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
   }, [primaryCategory, bitcoinWallet])
 
   const authorizeBitcoinWallet = useCallback(
-    async (bitcoinAccount, evmAccount) => {
+    async (
+      bitcoinAccount: BitcoinAccount,
+      evmAccount: UseAccountReturnType
+    ) => {
       const accountConfig = await apiClient.getAccountConfiguration()
       if (accountConfig.authorizedAddresses.length == 0) {
         const bitcoinAddress = bitcoinAccount.address
@@ -279,37 +282,43 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     []
   )
 
-  const authorizeEvmWallet = useCallback(async (bitcoinAccount, evmAccount) => {
-    const accountConfig = await apiClient.getAccountConfiguration()
-    if (accountConfig.authorizedAddresses.length == 0) {
-      const bitcoinAddress = bitcoinAccount.address
-      const evmAddress = evmAccount.address!
-      const chainId = evmAccount.chainId!
-      const timestamp = new Date().toISOString()
+  const authorizeEvmWallet = useCallback(
+    async (
+      bitcoinAccount: BitcoinAccount,
+      evmAccount: UseAccountReturnType
+    ) => {
+      const accountConfig = await apiClient.getAccountConfiguration()
+      if (accountConfig.authorizedAddresses.length == 0) {
+        const bitcoinAddress = bitcoinAccount.address
+        const evmAddress = evmAccount.address!
+        const chainId = evmAccount.chainId!
+        const timestamp = new Date().toISOString()
 
-      const evmWalletAuthToken = await signAuthToken(evmAddress, chainId)
+        const evmWalletAuthToken = await signAuthToken(evmAddress, chainId)
 
-      const commonMessage = `[funkybit] Please sign this message to authorize EVM wallet ${evmAddress.toLowerCase()}. This action will not cost any gas fees.`
-      const bitcoinMessage = `${commonMessage}\nAddress: ${bitcoinAddress}, Timestamp: ${timestamp}`
-      const bitcoinSignature = await bitcoinAccount!.signMessage(
-        bitcoinAddress,
-        bitcoinMessage
-      )
+        const commonMessage = `[funkybit] Please sign this message to authorize EVM wallet ${evmAddress.toLowerCase()}. This action will not cost any gas fees.`
+        const bitcoinMessage = `${commonMessage}\nAddress: ${bitcoinAddress}, Timestamp: ${timestamp}`
+        const bitcoinSignature = await bitcoinAccount!.signMessage(
+          bitcoinAddress,
+          bitcoinMessage
+        )
 
-      await authorizeWallet(
-        {
-          address: evmAddress,
-          authToken: evmWalletAuthToken
-        },
-        {
-          address: bitcoinAddress,
-          chainId: 0,
-          signature: bitcoinSignature,
-          timestamp: timestamp
-        }
-      )
-    }
-  }, [])
+        await authorizeWallet(
+          {
+            address: evmAddress,
+            authToken: evmWalletAuthToken
+          },
+          {
+            address: bitcoinAddress,
+            chainId: 0,
+            signature: bitcoinSignature,
+            timestamp: timestamp
+          }
+        )
+      }
+    },
+    []
+  )
 
   async function authorizeWallet(
     authorizedWallet: { address: string; authToken: string },
