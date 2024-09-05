@@ -25,10 +25,23 @@ export function ConnectWallet({ onSwitchToChain }: Props) {
     <>
       <div>
         <Button
-          caption={() =>
-            connectedWithInvalidChain ? 'Invalid Chain' : 'Connect Wallet'
-          }
+          caption={() => {
+            let missingConnection = ''
+            switch (wallet.primaryCategory) {
+              case 'bitcoin':
+                missingConnection = 'EVM '
+                break
+              case 'evm':
+                missingConnection = bitcoinEnabled ? 'Bitcoin ' : 'EVM '
+                break
+            }
+
+            return connectedWithInvalidChain
+              ? 'Invalid Chain'
+              : `Connect ${missingConnection}Wallet`
+          }}
           onClick={() => {
+            console.log('ConnectWallet', 'onClick')
             if (connectedWithInvalidChain) {
               onSwitchToChain(evmConfig.chains[0].id)
             } else {
@@ -67,6 +80,7 @@ export function ConnectWallet({ onSwitchToChain }: Props) {
               caption={() => 'EVM Wallets'}
               onClick={() => {
                 wallet.connect('evm')
+                setShowWalletCategorySelection(false)
               }}
               disabled={false}
               primary={true}
@@ -77,6 +91,7 @@ export function ConnectWallet({ onSwitchToChain }: Props) {
               caption={() => 'Bitcoin Wallets'}
               onClick={() => {
                 wallet.connect('bitcoin')
+                setShowWalletCategorySelection(false)
               }}
               disabled={false}
               primary={true}
