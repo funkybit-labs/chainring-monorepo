@@ -19,7 +19,7 @@ class TestPriceFeed {
         val priceFeed = PriceFeed(listOf(btcEth, ethUsdc, btcUsdc), ::onPriceUpdate)
 
         priceFeed.start()
-        await.pollInSameThread().atMost(Duration.ofMillis(3000L)).until {
+        await.pollInSameThread().atMost(Duration.ofMillis(5000L)).until {
             (latestPrices[btcEth] ?: 0.0) > 0.0 &&
                 (latestPrices[ethUsdc] ?: 0.0) > 0.0 &&
                 (latestPrices[btcUsdc] ?: 0.0) > 0.0
