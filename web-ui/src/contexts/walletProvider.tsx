@@ -17,7 +17,7 @@ import Spinner from 'components/common/Spinner'
 import { useWeb3Modal, useWeb3ModalEvents } from '@web3modal/wagmi/react'
 import SatsConnect from 'sats-connect'
 import { useEffectOnce } from 'react-use'
-import { apiClient, noAuthApiClient } from 'apiClient'
+import { apiClient, authorizeWalletApiClient } from 'apiClient'
 import { signTypedData } from '@wagmi/core'
 import { signAuthToken } from 'auth'
 
@@ -321,7 +321,7 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     }
   ) {
     try {
-      await noAuthApiClient.authorizeWallet(
+      await authorizeWalletApiClient.authorizeWallet(
         {
           authorizedAddress: authorizedWallet.address,
           chainId: authorizingWallet.chainId,

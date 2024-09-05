@@ -412,7 +412,7 @@ const ApiErrorsSchema = z.object({
 })
 export type ApiErrors = z.infer<typeof ApiErrorsSchema>
 
-const apiDefinitions = [
+export const apiClient = new Zodios(apiBaseUrl, [
   {
     method: 'get',
     path: '/v1/config',
@@ -737,7 +737,20 @@ const apiDefinitions = [
         schema: ApiErrorsSchema
       }
     ]
-  },
+  }
+])
+apiClient.use(
+  pluginToken({
+    getToken: async () => {
+      return loadAuthToken()
+    },
+    renewToken: async () => {
+      return loadAuthToken({ forceRefresh: true })
+    }
+  })
+)
+
+export const authorizeWalletApiClient = new Zodios(apiBaseUrl, [
   {
     method: 'post',
     path: '/v1/wallets/authorize',
@@ -757,21 +770,7 @@ const apiDefinitions = [
       }
     ]
   }
-]
-
-export const apiClient = new Zodios(apiBaseUrl, apiDefinitions)
-apiClient.use(
-  pluginToken({
-    getToken: async () => {
-      return loadAuthToken()
-    },
-    renewToken: async () => {
-      return loadAuthToken({ forceRefresh: true })
-    }
-  })
-)
-
-export const noAuthApiClient = new Zodios(apiBaseUrl, apiDefinitions)
+])
 
 export function useMaintenance() {
   const [maintenance, setMaintenance] = useState(false)
