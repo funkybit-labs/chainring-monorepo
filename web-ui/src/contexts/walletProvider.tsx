@@ -1,5 +1,6 @@
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -220,68 +221,65 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     }
   }, [primaryCategory, bitcoinWallet])
 
-  async function authorizeBitcoinWallet(
-    bitcoinAccount: BitcoinAccount,
-    evmAccount: UseAccountReturnType
-  ) {
-    const accountConfig = await apiClient.getAccountConfiguration()
-    if (accountConfig.authorizedAddresses.length == 0) {
-      const bitcoinAddress = bitcoinAccount.address
-      const evmAddress = evmAccount.address!
-      const chainId = evmAccount.chainId!
-      const timestamp = new Date().toISOString()
+  const authorizeBitcoinWallet = useCallback(
+    async (bitcoinAccount, evmAccount) => {
+      const accountConfig = await apiClient.getAccountConfiguration()
+      if (accountConfig.authorizedAddresses.length == 0) {
+        const bitcoinAddress = bitcoinAccount.address
+        const evmAddress = evmAccount.address!
+        const chainId = evmAccount.chainId!
+        const timestamp = new Date().toISOString()
 
-      const bitcoinWalletAuthToken = await signAuthToken(bitcoinAddress, 0)
+        const bitcoinWalletAuthToken = await signAuthToken(bitcoinAddress, 0)
 
-      const commonMessage = `[funkybit] Please sign this message to authorize Bitcoin wallet ${bitcoinAddress}. This action will not cost any gas fees.`
-      const evmMessage = {
-        message: commonMessage,
-        address: evmAddress,
-        authorizedAddress: bitcoinAddress,
-        chainId: chainId,
-        timestamp: timestamp
-      }
-      const evmSignature = await signTypedData(wagmiConfig, {
-        domain: {
-          name: 'funkybit',
-          chainId: chainId
-        },
-        types: {
-          EIP712Domain: [
-            { name: 'name', type: 'string' },
-            { name: 'chainId', type: 'uint32' }
-          ],
-          Authorize: [
-            { name: 'message', type: 'string' },
-            { name: 'address', type: 'string' },
-            { name: 'authorizedAddress', type: 'string' },
-            { name: 'chainId', type: 'uint32' },
-            { name: 'timestamp', type: 'string' }
-          ]
-        },
-        message: evmMessage,
-        primaryType: 'Authorize'
-      })
-
-      await authorizeWallet(
-        {
-          address: bitcoinAddress,
-          authToken: bitcoinWalletAuthToken
-        },
-        {
-          address: evmAddress.toLowerCase(),
+        const commonMessage = `[funkybit] Please sign this message to authorize Bitcoin wallet ${bitcoinAddress}. This action will not cost any gas fees.`
+        const evmMessage = {
+          message: commonMessage,
+          address: evmAddress,
+          authorizedAddress: bitcoinAddress,
           chainId: chainId,
-          signature: evmSignature,
           timestamp: timestamp
         }
-      )
-    }
-  }
+        const evmSignature = await signTypedData(wagmiConfig, {
+          domain: {
+            name: 'funkybit',
+            chainId: chainId
+          },
+          types: {
+            EIP712Domain: [
+              { name: 'name', type: 'string' },
+              { name: 'chainId', type: 'uint32' }
+            ],
+            Authorize: [
+              { name: 'message', type: 'string' },
+              { name: 'address', type: 'string' },
+              { name: 'authorizedAddress', type: 'string' },
+              { name: 'chainId', type: 'uint32' },
+              { name: 'timestamp', type: 'string' }
+            ]
+          },
+          message: evmMessage,
+          primaryType: 'Authorize'
+        })
 
-  async function authorizeEvmWallet(
-    bitcoinAccount: BitcoinAccount,
-    evmAccount: UseAccountReturnType
-  ) {
+        await authorizeWallet(
+          {
+            address: bitcoinAddress,
+            authToken: bitcoinWalletAuthToken
+          },
+          {
+            address: evmAddress.toLowerCase(),
+            chainId: chainId,
+            signature: evmSignature,
+            timestamp: timestamp
+          }
+        )
+      }
+    },
+    []
+  )
+
+  const authorizeEvmWallet = useCallback(async (bitcoinAccount, evmAccount) => {
     const accountConfig = await apiClient.getAccountConfiguration()
     if (accountConfig.authorizedAddresses.length == 0) {
       const bitcoinAddress = bitcoinAccount.address
@@ -311,7 +309,7 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
         }
       )
     }
-  }
+  }, [])
 
   async function authorizeWallet(
     authorizedWallet: { address: string; authToken: string },
@@ -349,7 +347,14 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
         authorizeEvmWallet(bitcoinAccount, evmAccount)
       }
     }
-  }, [primaryCategory, bitcoinAccount, evmAccount, web3ModalEvent])
+  }, [
+    authorizeBitcoinWallet,
+    authorizeEvmWallet,
+    primaryCategory,
+    bitcoinAccount,
+    evmAccount,
+    web3ModalEvent
+  ])
 
   function clearGlobalPrimary() {
     setGlobalPrimaryAddress(null)

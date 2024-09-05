@@ -78,7 +78,7 @@ class V77_User : Migration() {
                     userRecord[V77_UserTable.createdAt] = Clock.System.now()
                     userRecord[V77_UserTable.createdBy] = "V77_WalletTable"
                 }
-                V77_WalletTable.update({V77_WalletTable.guid eq walletRecord[V77_WalletTable.guid]}) {
+                V77_WalletTable.update({ V77_WalletTable.guid eq walletRecord[V77_WalletTable.guid] }) {
                     it[userGuid] = userId
                     it[walletFamily] = V77_WalletFamily.Evm
                 }
