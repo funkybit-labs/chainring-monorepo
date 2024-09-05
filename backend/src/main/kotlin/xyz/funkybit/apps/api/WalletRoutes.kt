@@ -53,9 +53,9 @@ object WalletRoutes {
     val authorizeWallet: ContractRoute = run {
         val requestBody = Body.auto<AuthorizeWalletApiRequest>().toLens()
 
-        "wallets/authorization" meta {
-            operationId = "wallet-authorization"
-            summary = "Register wallet authorization"
+        "wallets/authorize" meta {
+            operationId = "authorize-wallet"
+            summary = "Authorize wallet"
             security = addressOnlySignedTokenSecurity
             tags += listOf(Tag("authorize"))
             receiving(

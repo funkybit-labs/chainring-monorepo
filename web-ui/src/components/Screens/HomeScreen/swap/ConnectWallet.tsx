@@ -32,10 +32,20 @@ export function ConnectWallet({ onSwitchToChain }: Props) {
             if (connectedWithInvalidChain) {
               onSwitchToChain(evmConfig.chains[0].id)
             } else {
-              if (bitcoinEnabled && wallet.primaryCategory === 'none') {
-                setShowWalletCategorySelection(true)
-              } else {
-                wallet.connect('evm')
+              switch (wallet.primaryCategory) {
+                case 'bitcoin':
+                  wallet.connect('evm')
+                  break
+                case 'evm':
+                  wallet.connect(bitcoinEnabled ? 'bitcoin' : 'evm')
+                  break
+                case 'none':
+                  if (bitcoinEnabled) {
+                    setShowWalletCategorySelection(true)
+                  } else {
+                    wallet.connect('evm')
+                  }
+                  break
               }
             }
           }}

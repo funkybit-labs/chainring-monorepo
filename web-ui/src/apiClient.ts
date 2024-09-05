@@ -113,7 +113,7 @@ export type ConfigurationApiResponse = z.infer<
 export const AccountConfigurationApiResponseSchema = z.object({
   newSymbols: z.array(SymbolSchema),
   role: z.enum(['User', 'Admin']),
-  authorizedAddress: z.array(AddressSchema)
+  authorizedAddresses: z.array(z.string())
 })
 export type AccountConfigurationApiResponse = z.infer<
   typeof AccountConfigurationApiResponseSchema
@@ -394,24 +394,12 @@ const FaucetRequestSchema = z.object({
 })
 export type FaucetRequest = z.infer<typeof FaucetRequestSchema>
 
-const BitcoinLinkAddressProofSchema = z.object({
-  address: z.string(),
-  linkAddress: z.string(),
-  timestamp: z.string(),
-  signature: z.string()
-})
-
-const EvmLinkAddressProofSchema = z.object({
+const AuthorizeWalletRequestSchema = z.object({
+  authorizedAddress: z.string(),
   chainId: z.number(),
   address: z.string(),
-  linkAddress: z.string(),
   timestamp: z.string(),
   signature: z.string()
-})
-
-const LinkWalletRequestSchema = z.object({
-  bitcoinLinkAddressProof: BitcoinLinkAddressProofSchema,
-  evmLinkAddressProof: EvmLinkAddressProofSchema
 })
 
 const ApiErrorSchema = z.object({
@@ -424,7 +412,7 @@ const ApiErrorsSchema = z.object({
 })
 export type ApiErrors = z.infer<typeof ApiErrorsSchema>
 
-export const apiClient = new Zodios(apiBaseUrl, [
+const apiDefinitions = [
   {
     method: 'get',
     path: '/v1/config',
@@ -752,13 +740,13 @@ export const apiClient = new Zodios(apiBaseUrl, [
   },
   {
     method: 'post',
-    path: '/v1/wallets/link',
-    alias: 'linkWallet',
+    path: '/v1/wallets/authorize',
+    alias: 'authorizeWallet',
     parameters: [
       {
         name: 'payload',
         type: 'Body',
-        schema: LinkWalletRequestSchema
+        schema: AuthorizeWalletRequestSchema
       }
     ],
     response: z.undefined(),
@@ -769,8 +757,9 @@ export const apiClient = new Zodios(apiBaseUrl, [
       }
     ]
   }
-])
+]
 
+export const apiClient = new Zodios(apiBaseUrl, apiDefinitions)
 apiClient.use(
   pluginToken({
     getToken: async () => {
@@ -781,6 +770,8 @@ apiClient.use(
     }
   })
 )
+
+export const noAuthApiClient = new Zodios(apiBaseUrl, apiDefinitions)
 
 export function useMaintenance() {
   const [maintenance, setMaintenance] = useState(false)

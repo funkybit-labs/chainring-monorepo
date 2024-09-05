@@ -51,7 +51,7 @@ class AuthorizeWalletTest : OrderBaseTest() {
     @Test
     fun `evm wallet authorize bitcoin wallet`() {
         val evmKeyApiClient = TestApiClient.withEvmWallet()
-        assertTrue { evmKeyApiClient.getAccountConfiguration().authorizedAddress.isEmpty() }
+        assertTrue { evmKeyApiClient.getAccountConfiguration().authorizedAddresses.isEmpty() }
 
         val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
         bitcoinKeyApiClient.authorizeWallet(
@@ -62,14 +62,14 @@ class AuthorizeWalletTest : OrderBaseTest() {
             ),
         )
 
-        assertEquals(listOf(evmKeyApiClient.address), bitcoinKeyApiClient.getAccountConfiguration().authorizedAddress)
-        assertEquals(listOf(bitcoinKeyApiClient.address), evmKeyApiClient.getAccountConfiguration().authorizedAddress)
+        assertEquals(listOf(evmKeyApiClient.address), bitcoinKeyApiClient.getAccountConfiguration().authorizedAddresses)
+        assertEquals(listOf(bitcoinKeyApiClient.address), evmKeyApiClient.getAccountConfiguration().authorizedAddresses)
     }
 
     @Test
     fun `bitcoin wallet authorize evm wallet`() {
         val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
-        assertTrue { bitcoinKeyApiClient.getAccountConfiguration().authorizedAddress.isEmpty() }
+        assertTrue { bitcoinKeyApiClient.getAccountConfiguration().authorizedAddresses.isEmpty() }
 
         val evmKeyApiClient = TestApiClient.withEvmWallet()
         evmKeyApiClient.authorizeWallet(
@@ -80,17 +80,17 @@ class AuthorizeWalletTest : OrderBaseTest() {
             ),
         )
 
-        assertEquals(listOf(evmKeyApiClient.address.asEvmAddress()), bitcoinKeyApiClient.getAccountConfiguration().authorizedAddress)
-        assertEquals(listOf(bitcoinKeyApiClient.address.asBitcoinAddress()), evmKeyApiClient.getAccountConfiguration().authorizedAddress)
+        assertEquals(listOf(evmKeyApiClient.address.asEvmAddress()), bitcoinKeyApiClient.getAccountConfiguration().authorizedAddresses)
+        assertEquals(listOf(bitcoinKeyApiClient.address.asBitcoinAddress()), evmKeyApiClient.getAccountConfiguration().authorizedAddresses)
     }
 
     @Test
     fun `already used address can't be authorized`() {
         val evmKeyApiClient = TestApiClient.withEvmWallet()
-        assertTrue { evmKeyApiClient.getAccountConfiguration().authorizedAddress.isEmpty() }
+        assertTrue { evmKeyApiClient.getAccountConfiguration().authorizedAddresses.isEmpty() }
 
         val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
-        assertTrue { bitcoinKeyApiClient.getAccountConfiguration().authorizedAddress.isEmpty() }
+        assertTrue { bitcoinKeyApiClient.getAccountConfiguration().authorizedAddresses.isEmpty() }
 
         // note: each wallet has been linked to a new user by sending an api request
 
@@ -114,7 +114,7 @@ class AuthorizeWalletTest : OrderBaseTest() {
     @Test
     fun `authorization error cases`() {
         val evmKeyApiClient = TestApiClient.withEvmWallet()
-        assertTrue { evmKeyApiClient.getAccountConfiguration().authorizedAddress.isEmpty() }
+        assertTrue { evmKeyApiClient.getAccountConfiguration().authorizedAddresses.isEmpty() }
 
         val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
 

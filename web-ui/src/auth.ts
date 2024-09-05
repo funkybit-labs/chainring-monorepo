@@ -22,6 +22,14 @@ export async function loadAuthToken(
 
     if (!signingPromise) {
       signingPromise = signAuthToken(primaryAddress, getGlobalPrimaryChainId()!)
+        .then((authToken) => {
+          signingPromise = null
+          return authToken
+        })
+        .catch((error) => {
+          signingPromise = null
+          throw error
+        })
     }
 
     return signingPromise
@@ -30,60 +38,54 @@ export async function loadAuthToken(
   return ''
 }
 
-async function signAuthToken(
+export async function signAuthToken(
   address: string,
   chainId: number
 ): Promise<string> {
-  try {
-    const evmMessage = {
-      message: `[funkybit] Please sign this message to verify your ownership of this wallet address. This action will not cost any gas fees.`,
-      address: chainId > 0 ? address.toLowerCase() : address,
-      chainId: chainId,
-      timestamp: new Date().toISOString()
-    }
-
-    const signature =
-      chainId > 0
-        ? await signTypedData(wagmiConfig, {
-            domain: {
-              name: 'funkybit',
-              chainId: chainId
-            },
-            types: {
-              EIP712Domain: [
-                { name: 'name', type: 'string' },
-                { name: 'chainId', type: 'uint32' }
-              ],
-              'Sign In': [
-                { name: 'message', type: 'string' },
-                { name: 'address', type: 'string' },
-                { name: 'chainId', type: 'uint32' },
-                { name: 'timestamp', type: 'string' }
-              ]
-            },
-            message: evmMessage,
-            primaryType: 'Sign In'
-          })
-        : await (async () => {
-            const bitcoinAccount = getGlobalBitcoinAccount()
-            const address = bitcoinAccount!.address
-            const messageToSign =
-              evmMessage.message +
-              `\nAddress: ${address}, Timestamp: ${evmMessage.timestamp}`
-            return await bitcoinAccount!.signMessage(address, messageToSign)
-          })()
-
-    const signInMessageBody = base64urlEncode(
-      new TextEncoder().encode(JSON.stringify(evmMessage))
-    )
-    const authToken = `${signInMessageBody}.${signature}`
-    localStorage.setItem(`did-${address}`, authToken)
-    signingPromise = null
-    return authToken
-  } catch (error) {
-    signingPromise = null
-    throw error
+  const evmMessage = {
+    message: `[funkybit] Please sign this message to verify your ownership of this wallet address. This action will not cost any gas fees.`,
+    address: chainId > 0 ? address.toLowerCase() : address,
+    chainId: chainId,
+    timestamp: new Date().toISOString()
   }
+
+  const signature =
+    chainId > 0
+      ? await signTypedData(wagmiConfig, {
+          domain: {
+            name: 'funkybit',
+            chainId: chainId
+          },
+          types: {
+            EIP712Domain: [
+              { name: 'name', type: 'string' },
+              { name: 'chainId', type: 'uint32' }
+            ],
+            'Sign In': [
+              { name: 'message', type: 'string' },
+              { name: 'address', type: 'string' },
+              { name: 'chainId', type: 'uint32' },
+              { name: 'timestamp', type: 'string' }
+            ]
+          },
+          message: evmMessage,
+          primaryType: 'Sign In'
+        })
+      : await (async () => {
+          const bitcoinAccount = getGlobalBitcoinAccount()
+          const address = bitcoinAccount!.address
+          const messageToSign =
+            evmMessage.message +
+            `\nAddress: ${address}, Timestamp: ${evmMessage.timestamp}`
+          return await bitcoinAccount!.signMessage(address, messageToSign)
+        })()
+
+  const signInMessageBody = base64urlEncode(
+    new TextEncoder().encode(JSON.stringify(evmMessage))
+  )
+  const authToken = `${signInMessageBody}.${signature}`
+  localStorage.setItem(`did-${address}`, authToken)
+  return authToken
 }
 
 function base64urlEncode(input: Uint8Array): string {
