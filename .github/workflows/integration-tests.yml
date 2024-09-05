@@ -47,6 +47,7 @@ jobs:
           CI_RUN: 1
           SEQUENCER_HOST_NAME: test-sequencer.funkybit.fun
           SEQUENCER_PORT: 5337
+          CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
       - name: Test Report
         uses: dorny/test-reporter@v1.8.0
         if: success() || failure()

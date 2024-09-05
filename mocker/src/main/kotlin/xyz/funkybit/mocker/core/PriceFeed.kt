@@ -1,5 +1,6 @@
 package xyz.funkybit.mocker.core
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import xyz.funkybit.core.model.db.MarketId
@@ -22,6 +23,10 @@ class PriceFeed(marketIds: List<MarketId>, val onPriceUpdate: (Map<MarketId, Dou
 
     private lateinit var priceThread: Thread
 
+    private val apiKey = System.getenv("CRYPTOCOMPARE_API_KEY")
+
+    private val logger = KotlinLogging.logger {}
+
     fun start() {
         priceThread = thread(start = true, isDaemon = false, name = "mock-price-feed") {
             while (!stopping) {
@@ -29,7 +34,7 @@ class PriceFeed(marketIds: List<MarketId>, val onPriceUpdate: (Map<MarketId, Dou
                     val request = httpClient.newCall(
                         Request.Builder()
                             .url(
-                                "https://min-api.cryptocompare.com/data/pricemulti?fsyms=${baseSymbols.joinToString(",")}&tsyms=${quoteSymbols.joinToString(",")}"
+                                "https://min-api.cryptocompare.com/data/pricemulti?${if (apiKey != null) "api_key=$apiKey&" else ""}fsyms=${baseSymbols.joinToString(",")}&tsyms=${quoteSymbols.joinToString(",")}"
                             )
                             .get()
                             .build()
@@ -45,6 +50,8 @@ class PriceFeed(marketIds: List<MarketId>, val onPriceUpdate: (Map<MarketId, Dou
                             }
                         }
                         onPriceUpdate(prices.toMap())
+                    } else {
+                        logger.debug { "Unable to get prices from ${request.request().url}: ${response.code}: ${response.body}" }
                     }
                     Thread.sleep(2000L)
                 } catch (e: InterruptedException) {
