@@ -230,6 +230,9 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
       const evmAddress = evmAccount.address!
       const chainId = evmAccount.chainId!
       const timestamp = new Date().toISOString()
+
+      const bitcoinWalletAuthToken = await signAuthToken(bitcoinAddress, 0)
+
       const commonMessage = `[funkybit] Please sign this message to authorize Bitcoin wallet ${bitcoinAddress}. This action will not cost any gas fees.`
       const evmMessage = {
         message: commonMessage,
@@ -238,7 +241,6 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
         chainId: chainId,
         timestamp: timestamp
       }
-
       const evmSignature = await signTypedData(wagmiConfig, {
         domain: {
           name: 'funkybit',
@@ -260,8 +262,6 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
         message: evmMessage,
         primaryType: 'Authorize'
       })
-
-      const bitcoinWalletAuthToken = await signAuthToken(bitcoinAddress, 0)
 
       await authorizeWallet(
         {
@@ -288,14 +288,15 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
       const evmAddress = evmAccount.address!
       const chainId = evmAccount.chainId!
       const timestamp = new Date().toISOString()
+
+      const evmWalletAuthToken = await signAuthToken(evmAddress, chainId)
+
       const commonMessage = `[funkybit] Please sign this message to authorize EVM wallet ${evmAddress.toLowerCase()}. This action will not cost any gas fees.`
       const bitcoinMessage = `${commonMessage}\nAddress: ${bitcoinAddress}, Timestamp: ${timestamp}`
       const bitcoinSignature = await bitcoinAccount!.signMessage(
         bitcoinAddress,
         bitcoinMessage
       )
-
-      const evmWalletAuthToken = await signAuthToken(evmAddress, chainId)
 
       await authorizeWallet(
         {
