@@ -30,11 +30,11 @@ data class BroadcasterNotification(
             BroadcasterNotification(Prices(marketId, duration, ohlc.map { it.toWSResponse() }, full, dailyChange.stripTrailingZeros()), null)
 
         fun limits(wallet: WalletEntity): BroadcasterNotification =
-            BroadcasterNotification(Limits(LimitEntity.forWallet(wallet)), recipient = wallet.address)
+            BroadcasterNotification(Limits(LimitEntity.forUserId(wallet.userGuid)), recipient = wallet.address)
 
         fun walletBalances(wallet: WalletEntity): BroadcasterNotification =
             BroadcasterNotification(
-                Balances(BalanceEntity.balancesAsApiResponse(wallet).balances),
+                Balances(BalanceEntity.balancesAsApiResponse(wallet.userGuid).balances),
                 recipient = wallet.address,
             )
     }

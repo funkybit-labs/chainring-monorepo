@@ -23,6 +23,7 @@ import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import Deposit from 'assets/Deposit.svg'
 import MarketPrice from 'components/Screens/HomeScreen/swap/MarketPrice'
+import { useWallet } from 'contexts/walletProvider'
 
 export function SwapModal({
   markets,
@@ -39,6 +40,8 @@ export function SwapModal({
   onMarketChange: (m: Market) => void
   onSideChange: (s: OrderSide) => void
 }) {
+  const wallet = useWallet()
+
   const [animateSide, setAnimateSide] = useState(false)
   function onChangedSide(s: OrderSide) {
     onSideChange(s)
@@ -58,6 +61,14 @@ export function SwapModal({
     if (symbol.chainId != config.state.chainId) {
       switchToEthChain(symbol.chainId)
     }
+  }
+
+  function walletConnectedForSymbol(symbol: TradingSymbol) {
+    return (
+      (symbol.networkType == 'Evm' &&
+        wallet.evmAccount?.status === 'connected') ||
+      (symbol.networkType == 'Bitcoin' && wallet.bitcoinAccount)
+    )
   }
 
   return SwapInternals({
@@ -267,7 +278,10 @@ export function SwapModal({
               />
             </div>
             <div className="flex w-full flex-col">
-              {walletAddress && exchangeContractAddress ? (
+              {walletAddress &&
+              exchangeContractAddress &&
+              walletConnectedForSymbol(sr.topSymbol) &&
+              walletConnectedForSymbol(sr.bottomSymbol) ? (
                 <>
                   {sr.noPriceFound && (
                     <span className="w-full text-center text-brightRed">

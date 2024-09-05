@@ -40,7 +40,6 @@ import xyz.funkybit.core.model.db.OrderEntity
 import xyz.funkybit.core.model.db.OrderExecutionEntity
 import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.OrderStatus
-import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.toOrderResponse
 
 class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
@@ -74,7 +73,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.POST to { request ->
             val apiRequest: CreateOrderApiRequest = requestBody(request)
-            val response = exchangeApiService.addOrder(request.principal, apiRequest)
+            val response = exchangeApiService.addOrder(request.principal.address, apiRequest)
             if (response.requestStatus == RequestStatus.Accepted) {
                 Response(Status.CREATED).with(
                     responseBody of response,
@@ -104,7 +103,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
                 if (orderId != apiRequest.orderId) {
                     processingError("Invalid order id")
                 } else {
-                    val response = exchangeApiService.cancelOrder(request.principal, apiRequest)
+                    val response = exchangeApiService.cancelOrder(request.principal.address, apiRequest)
                     if (response.requestStatus == RequestStatus.Accepted) {
                         Response(Status.NO_CONTENT)
                     } else {
@@ -132,13 +131,13 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
                 responseBody to Examples.limitOrderResponse,
             )
         } bindContract Method.GET to { orderIdOrClientOrderId ->
-            { _: Request ->
+            { request ->
                 transaction {
                     val order = if (orderIdOrClientOrderId.startsWith("external:")) {
                         val clientOrderId = ClientOrderId(orderIdOrClientOrderId.removePrefix("external:"))
-                        OrderEntity.findByClientOrderId(clientOrderId)
+                        OrderEntity.findByClientOrderIdForUser(clientOrderId, request.principal.userGuid)
                     } else {
-                        OrderEntity.findById(OrderId(orderIdOrClientOrderId))
+                        OrderEntity.findByIdForUser(OrderId(orderIdOrClientOrderId), request.principal.userGuid)
                     }
 
                     when (order) {
@@ -170,8 +169,8 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.GET to { request: Request ->
             val orders = transaction {
-                OrderEntity.listWithExecutionsForWallet(
-                    WalletEntity.getOrCreate(request.principal),
+                OrderEntity.listWithExecutionsForUser(
+                    request.principal.userGuid,
                     request.query("statuses")?.let { statuses ->
                         statuses.split(",").mapNotNull {
                             try {
@@ -202,9 +201,8 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             tags += listOf(Tag("order"))
             returning(Status.NO_CONTENT)
         } bindContract Method.DELETE to { request ->
-            exchangeApiService.cancelOpenOrders(
-                transaction { WalletEntity.getOrCreate(request.principal) },
-            )
+            exchangeApiService.cancelOpenOrders(request.principal.userGuid)
+
             Response(Status.NO_CONTENT)
         }
     }
@@ -238,7 +236,7 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.POST to { request ->
             Response(Status.OK).with(
-                responseBody of exchangeApiService.orderBatch(request.principal, requestBody(request)),
+                responseBody of exchangeApiService.orderBatch(request.principal.address, requestBody(request)),
             )
         }
     }

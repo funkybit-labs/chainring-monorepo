@@ -1,5 +1,6 @@
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -13,9 +14,12 @@ import {
 } from 'contexts/bitcoin'
 import { wagmiConfig } from 'wagmiConfig'
 import Spinner from 'components/common/Spinner'
-import { useWeb3Modal } from '@web3modal/wagmi/react'
+import { useWeb3Modal, useWeb3ModalEvents } from '@web3modal/wagmi/react'
 import SatsConnect from 'sats-connect'
 import { useEffectOnce } from 'react-use'
+import { apiClient, authorizeWalletApiClient } from 'apiClient'
+import { signTypedData } from '@wagmi/core'
+import { signAuthToken } from 'auth'
 
 export type WalletCategory = 'evm' | 'bitcoin' | 'none'
 
@@ -41,24 +45,23 @@ function getGlobal(name: string) {
 
 function setGlobal(
   name: string,
-  value: string | UseAccountReturnType | BitcoinAccount | null
+  value: string | number | BitcoinAccount | null
 ) {
   window.localStorage.setItem(
     `funkybit-wallet-${name}`,
-    value ? JSON.stringify(value) : 'null'
+    value !== null ? JSON.stringify(value) : 'null'
   )
 }
 
-export function getGlobalEvmAccount(): UseAccountReturnType | null {
-  return getGlobal('evmAccount')
-}
-function setGlobalEvmAccount(account: UseAccountReturnType | null) {
-  setGlobal('evmAccount', account)
-}
-
 export function getGlobalBitcoinAccount(): BitcoinAccount | null {
+  const bitcoinAccount = getGlobal('bitcoinAccount')
+
+  if (!bitcoinAccount) {
+    return null
+  }
+
   return {
-    ...getGlobal('bitcoinAccount'),
+    ...bitcoinAccount,
     signMessage: async (address, message) => {
       const result = await SatsConnect.request('signMessage', {
         address,
@@ -76,18 +79,6 @@ function setGlobalBitcoinAccount(account: BitcoinAccount | null) {
   setGlobal('bitcoinAccount', account)
 }
 
-export function getGlobalPrimaryAccount():
-  | UseAccountReturnType
-  | BitcoinAccount
-  | null {
-  return getGlobal('primaryAccount')
-}
-function setGlobalPrimaryAccount(
-  account: UseAccountReturnType | BitcoinAccount | null
-) {
-  setGlobal('primaryAccount', account)
-}
-
 export function getGlobalPrimaryAddress(): string | null {
   return getGlobal('primaryAddress')
 }
@@ -102,8 +93,16 @@ function setGlobalPrimaryCategory(category: WalletCategory) {
   setGlobal('primaryCategory', category)
 }
 
+export function getGlobalPrimaryChainId(): number | null {
+  return getGlobal('primaryChainId')
+}
+function setGlobalPrimaryChainId(chainId: number | null) {
+  setGlobal('primaryChainId', chainId)
+}
+
 function WalletProviderInternal({ children }: { children: React.ReactNode }) {
   const { open: openWalletConnectModal } = useWeb3Modal()
+  const { data: web3ModalEvent } = useWeb3ModalEvents()
 
   const [bitcoinAccount, setBitcoinAccount] = useState<BitcoinAccount | null>(
     getGlobalBitcoinAccount()
@@ -111,13 +110,20 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
 
   const bitcoinWallet = useBitcoinWallet()
   const evmAccount = useAccount()
+
+  const globalPrimaryCategory = getGlobalPrimaryCategory()
   const primaryCategory = useMemo(() => {
+    if (globalPrimaryCategory && globalPrimaryCategory !== 'none') {
+      return globalPrimaryCategory
+    }
+
     return evmAccount?.status === 'connected'
       ? 'evm'
       : bitcoinAccount?.address
         ? 'bitcoin'
         : 'none'
-  }, [evmAccount, bitcoinAccount])
+  }, [globalPrimaryCategory, evmAccount, bitcoinAccount])
+
   const primaryAccount = useMemo(() => {
     switch (primaryCategory) {
       case 'evm':
@@ -127,6 +133,7 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     }
     return null
   }, [primaryCategory, evmAccount, bitcoinAccount])
+
   const primaryAddress = useMemo(() => {
     switch (primaryCategory) {
       case 'evm':
@@ -137,23 +144,26 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
   }, [primaryCategory, evmAccount, bitcoinAccount])
 
   useEffectOnce(() => {
-    setGlobalPrimaryCategory(primaryCategory)
-    setGlobalPrimaryAddress(primaryAddress ?? null)
-    setGlobalPrimaryAccount(primaryAccount)
+    if (globalPrimaryCategory != primaryCategory) {
+      setGlobalPrimaryCategory(primaryCategory)
+      setGlobalPrimaryAddress(primaryAddress ?? null)
+    }
   })
 
   useEffect(() => {
+    const category = getGlobalPrimaryCategory()
     if (evmAccount.status === 'connected') {
-      const category = getGlobalPrimaryCategory()
       switch (category) {
         case null:
+        case 'none':
         case 'evm':
-          setGlobalPrimaryAccount(evmAccount)
           setGlobalPrimaryAddress(evmAccount.address ?? null)
-          setGlobalEvmAccount(evmAccount)
+          setGlobalPrimaryChainId(evmAccount.chainId)
           setGlobalPrimaryCategory('evm')
           break
       }
+    } else if (evmAccount.status === 'disconnected' && category === 'evm') {
+      clearGlobalPrimary()
     }
   }, [evmAccount])
 
@@ -178,10 +188,17 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
       case 'none':
         // no primary wallet yet, so set bitcoin to it
         if (bitcoinWallet.accounts.length > 0) {
-          setGlobalPrimaryAccount(bitcoinWallet.accounts[0])
           setGlobalPrimaryAddress(bitcoinWallet.accounts[0].address)
           setGlobalBitcoinAccount(bitcoinWallet.accounts[0])
           setGlobalPrimaryCategory('bitcoin')
+          setGlobalPrimaryChainId(0)
+          setBitcoinAccount(bitcoinWallet.accounts[0])
+        }
+        break
+      case 'evm':
+        // primary wallet is evm, now also bitcoin wallet was connected, so store it
+        if (bitcoinWallet.accounts.length > 0) {
+          setGlobalBitcoinAccount(bitcoinWallet.accounts[0])
           setBitcoinAccount(bitcoinWallet.accounts[0])
         }
         break
@@ -204,9 +221,153 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     }
   }, [primaryCategory, bitcoinWallet])
 
+  const authorizeBitcoinWallet = useCallback(
+    async (
+      bitcoinAccount: BitcoinAccount,
+      evmAccount: UseAccountReturnType
+    ) => {
+      const accountConfig = await apiClient.getAccountConfiguration()
+      if (accountConfig.authorizedAddresses.length == 0) {
+        const bitcoinAddress = bitcoinAccount.address
+        const evmAddress = evmAccount.address!
+        const chainId = evmAccount.chainId!
+        const timestamp = new Date().toISOString()
+
+        const bitcoinWalletAuthToken = await signAuthToken(bitcoinAddress, 0)
+
+        const commonMessage = `[funkybit] Please sign this message to authorize Bitcoin wallet ${bitcoinAddress}. This action will not cost any gas fees.`
+        const evmMessage = {
+          message: commonMessage,
+          address: evmAddress,
+          authorizedAddress: bitcoinAddress,
+          chainId: chainId,
+          timestamp: timestamp
+        }
+        const evmSignature = await signTypedData(wagmiConfig, {
+          domain: {
+            name: 'funkybit',
+            chainId: chainId
+          },
+          types: {
+            EIP712Domain: [
+              { name: 'name', type: 'string' },
+              { name: 'chainId', type: 'uint32' }
+            ],
+            Authorize: [
+              { name: 'message', type: 'string' },
+              { name: 'address', type: 'string' },
+              { name: 'authorizedAddress', type: 'string' },
+              { name: 'chainId', type: 'uint32' },
+              { name: 'timestamp', type: 'string' }
+            ]
+          },
+          message: evmMessage,
+          primaryType: 'Authorize'
+        })
+
+        await authorizeWallet(
+          {
+            address: bitcoinAddress,
+            authToken: bitcoinWalletAuthToken
+          },
+          {
+            address: evmAddress.toLowerCase(),
+            chainId: chainId,
+            signature: evmSignature,
+            timestamp: timestamp
+          }
+        )
+      }
+    },
+    []
+  )
+
+  const authorizeEvmWallet = useCallback(
+    async (
+      bitcoinAccount: BitcoinAccount,
+      evmAccount: UseAccountReturnType
+    ) => {
+      const accountConfig = await apiClient.getAccountConfiguration()
+      if (accountConfig.authorizedAddresses.length == 0) {
+        const bitcoinAddress = bitcoinAccount.address
+        const evmAddress = evmAccount.address!
+        const chainId = evmAccount.chainId!
+        const timestamp = new Date().toISOString()
+
+        const evmWalletAuthToken = await signAuthToken(evmAddress, chainId)
+
+        const commonMessage = `[funkybit] Please sign this message to authorize EVM wallet ${evmAddress.toLowerCase()}. This action will not cost any gas fees.`
+        const bitcoinMessage = `${commonMessage}\nAddress: ${bitcoinAddress}, Timestamp: ${timestamp}`
+        const bitcoinSignature = await bitcoinAccount!.signMessage(
+          bitcoinAddress,
+          bitcoinMessage
+        )
+
+        await authorizeWallet(
+          {
+            address: evmAddress,
+            authToken: evmWalletAuthToken
+          },
+          {
+            address: bitcoinAddress,
+            chainId: 0,
+            signature: bitcoinSignature,
+            timestamp: timestamp
+          }
+        )
+      }
+    },
+    []
+  )
+
+  async function authorizeWallet(
+    authorizedWallet: { address: string; authToken: string },
+    authorizingWallet: {
+      address: string
+      chainId: number
+      signature: string
+      timestamp: string
+    }
+  ) {
+    try {
+      await authorizeWalletApiClient.authorizeWallet(
+        {
+          authorizedAddress: authorizedWallet.address,
+          chainId: authorizingWallet.chainId,
+          address: authorizingWallet.address,
+          timestamp: authorizingWallet.timestamp,
+          signature: authorizingWallet.signature
+        },
+        {
+          headers: { Authorization: `Bearer ${authorizedWallet.authToken}` }
+        }
+      )
+    } catch (e) {
+      console.log(e)
+      alert('Failed to authorize wallet')
+    }
+  }
+
+  useEffect(() => {
+    if (bitcoinAccount && web3ModalEvent.event === 'CONNECT_SUCCESS') {
+      if (primaryCategory == 'evm') {
+        authorizeBitcoinWallet(bitcoinAccount, evmAccount)
+      } else if (primaryCategory == 'bitcoin') {
+        authorizeEvmWallet(bitcoinAccount, evmAccount)
+      }
+    }
+  }, [
+    authorizeBitcoinWallet,
+    authorizeEvmWallet,
+    primaryCategory,
+    bitcoinAccount,
+    evmAccount,
+    web3ModalEvent
+  ])
+
   function clearGlobalPrimary() {
-    setGlobalPrimaryAccount(null)
     setGlobalPrimaryAddress(null)
+    setGlobalPrimaryChainId(null)
     setGlobalPrimaryCategory('none')
   }
 

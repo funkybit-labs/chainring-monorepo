@@ -107,14 +107,15 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             }.toList()
         }
 
-        fun listLatestForWallet(wallet: WalletEntity, maxSequencerResponses: Int): List<OrderExecutionEntity> {
+        fun listLatestForUser(userId: EntityID<UserId>, maxSequencerResponses: Int): List<OrderExecutionEntity> {
             val sequencerResponseNumbers = TradeTable
                 .join(OrderExecutionTable, JoinType.INNER, TradeTable.guid, OrderExecutionTable.tradeGuid)
                 .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
+                .innerJoin(WalletTable)
                 .select(TradeTable.responseSequence)
                 .withDistinct(true)
                 .where {
-                    OrderTable.walletGuid.eq(wallet.guid)
+                    WalletTable.userGuid.eq(userId)
                 }
                 .orderBy(TradeTable.responseSequence, SortOrder.DESC)
                 .limit(maxSequencerResponses)
@@ -122,10 +123,11 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
 
             return OrderExecutionTable
                 .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
+                .innerJoin(WalletTable)
                 .join(TradeTable, JoinType.INNER, TradeTable.guid, OrderExecutionTable.tradeGuid)
                 .select(OrderExecutionTable.columns)
                 .where {
-                    OrderTable.walletGuid.eq(wallet.guid)
+                    WalletTable.userGuid.eq(userId)
                         .and(TradeTable.responseSequence.inList(sequencerResponseNumbers))
                 }
                 .orderBy(Pair(TradeTable.responseSequence, SortOrder.DESC), Pair(TradeTable.sequenceId, SortOrder.ASC))
@@ -134,13 +136,14 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
                 }.toList()
         }
 
-        fun listForWallet(wallet: WalletEntity, beforeTimestamp: Instant, limit: Int): List<OrderExecutionEntity> {
+        fun listForUser(userId: EntityID<UserId>, beforeTimestamp: Instant, limit: Int): List<OrderExecutionEntity> {
             return OrderExecutionTable
                 .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
+                .innerJoin(WalletTable)
                 .join(TradeTable, JoinType.INNER, TradeTable.guid, OrderExecutionTable.tradeGuid)
                 .select(OrderExecutionTable.columns)
                 .where {
-                    OrderTable.walletGuid.eq(wallet.guid) and OrderExecutionTable.timestamp.less(beforeTimestamp)
+                    WalletTable.userGuid.eq(userId) and OrderExecutionTable.timestamp.less(beforeTimestamp)
                 }
                 .orderBy(Pair(OrderExecutionTable.timestamp, SortOrder.DESC))
                 .limit(limit)

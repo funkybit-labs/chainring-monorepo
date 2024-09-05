@@ -24,6 +24,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import xyz.funkybit.integrationtests.utils.WalletKeyPair
 import java.math.BigDecimal
 import kotlin.time.Duration.Companion.seconds
 
@@ -31,7 +32,7 @@ abstract class Actor(
     private val marketIds: List<MarketId>,
     private val nativeAssets: Map<String, BigInteger>,
     private val assets: Map<String, BigInteger>,
-    keyPair: ECKeyPair
+    keyPair: WalletKeyPair
 ) {
     abstract val id: String
     protected abstract val logger: KLogger

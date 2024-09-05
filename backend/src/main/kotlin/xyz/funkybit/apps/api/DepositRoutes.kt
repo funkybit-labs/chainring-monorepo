@@ -7,7 +7,6 @@ import org.http4k.contract.div
 import org.http4k.contract.meta
 import org.http4k.core.Body
 import org.http4k.core.Method
-import org.http4k.core.Request
 import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.core.with
@@ -58,7 +57,7 @@ class DepositRoutes(val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.POST to { request ->
             Response(Status.CREATED).with(
-                responseBody of exchangeApiService.deposit(request.principal, requestBody(request)),
+                responseBody of exchangeApiService.deposit(request.principal.address, requestBody(request)),
             )
         }
     }
@@ -78,9 +77,9 @@ class DepositRoutes(val exchangeApiService: ExchangeApiService) {
                 ),
             )
         } bindContract Method.GET to { id ->
-            { _: Request ->
+            { request ->
                 transaction {
-                    DepositEntity.findById(id)?.let {
+                    DepositEntity.findByIdForUser(id, request.principal.userGuid)?.let {
                         Response(Status.OK).with(
                             responseBody of DepositApiResponse(Deposit.fromEntity(it)),
                         )
@@ -110,7 +109,7 @@ class DepositRoutes(val exchangeApiService: ExchangeApiService) {
             transaction {
                 Response(Status.OK).with(
                     responseBody of ListDepositsApiResponse(
-                        DepositEntity.history(request.principal).map(Deposit::fromEntity),
+                        DepositEntity.history(request.principal.userGuid).map(Deposit::fromEntity),
                     ),
                 )
             }

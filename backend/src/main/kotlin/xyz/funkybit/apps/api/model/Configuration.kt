@@ -27,6 +27,7 @@ enum class Role {
 data class AccountConfigurationApiResponse(
     val newSymbols: List<SymbolInfo>,
     val role: Role,
+    val authorizedAddresses: List<Address>,
 )
 
 @Serializable

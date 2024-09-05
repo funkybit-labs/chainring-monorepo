@@ -17,7 +17,6 @@ import xyz.funkybit.apps.api.model.GetLimitsApiResponse
 import xyz.funkybit.apps.api.model.MarketLimits
 import xyz.funkybit.core.model.db.LimitEntity
 import xyz.funkybit.core.model.db.MarketId
-import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.utils.toFundamentalUnits
 import java.math.BigDecimal
 
@@ -46,9 +45,8 @@ object LimitsRoutes {
             )
         } bindContract Method.GET to { request ->
             transaction {
-                val wallet = WalletEntity.getOrCreate(request.principal)
                 Response(Status.OK).with(
-                    responseBody of GetLimitsApiResponse(LimitEntity.forWallet(wallet)),
+                    responseBody of GetLimitsApiResponse(LimitEntity.forUserId(request.principal.userGuid)),
                 )
             }
         }

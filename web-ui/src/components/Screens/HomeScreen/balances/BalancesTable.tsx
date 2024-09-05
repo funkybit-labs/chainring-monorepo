@@ -21,10 +21,12 @@ import {
 import Deposit from 'assets/Deposit.svg'
 import Withdrawal from 'assets/Withdrawal.svg'
 import { useConfig, useSwitchChain } from 'wagmi'
-import { allChains } from 'wagmiConfig'
 import TradingSymbol from 'tradingSymbol'
 import { SymbolAndChain } from 'components/common/SymbolAndChain'
 import { ExpandableValue } from 'components/common/ExpandableValue'
+import { useWallet } from 'contexts/walletProvider'
+import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
+import { useSwitchToEthChain } from 'utils/switchToEthChain'
 
 export function BalancesTable({
   walletAddress,
@@ -35,7 +37,8 @@ export function BalancesTable({
   exchangeContractAddress?: string
   symbols: TradingSymbols
 }) {
-  const config = useConfig()
+  const wallet = useWallet()
+  const evmConfig = useConfig()
   const { switchChain } = useSwitchChain()
 
   const [depositSymbol, setDepositSymbol] = useState<TradingSymbol | null>(null)
@@ -45,7 +48,10 @@ export function BalancesTable({
     null
   )
 
-  const [switchToChainId, setSwitchToChainId] = useState<number | null>(null)
+  const switchToEthChain = useSwitchToEthChain()
+  const [switchToEthChainId, setSwitchToEthChainId] = useState<number | null>(
+    null
+  )
   const [showWithdrawalModal, setShowWithdrawalModal] = useState<boolean>(false)
 
   const queryClient = useQueryClient()
@@ -66,31 +72,22 @@ export function BalancesTable({
   })
 
   useEffect(() => {
-    if (switchToChainId) {
-      const chain = allChains.find((c) => c.id == switchToChainId)
-      if (chain) {
-        switchChain({
-          addEthereumChainParameter: {
-            chainName: chain.name,
-            nativeCurrency: chain.nativeCurrency,
-            rpcUrls: chain.rpcUrls.default.http,
-            blockExplorerUrls: chain.blockExplorers
-              ? [chain.blockExplorers.default.url]
-              : undefined
-          },
-          chainId: chain.id
-        })
-      }
+    if (switchToEthChainId) {
+      switchToEthChain(switchToEthChainId)
     }
-    setSwitchToChainId(null)
-  }, [switchToChainId, switchChain])
+    setSwitchToEthChainId(null)
+  }, [switchToEthChainId, switchChain, switchToEthChain])
 
   function openDepositModal(symbol: TradingSymbol) {
-    setWithdrawSymbol(null)
-    setDepositSymbol(symbol)
-    setShowDepositModal(true)
-    if (symbol.chainId != config.state.chainId) {
-      setSwitchToChainId(symbol.chainId)
+    if (symbol.networkType === 'Bitcoin') {
+      alert('Not implemented')
+    } else if (symbol.networkType === 'Evm') {
+      setWithdrawSymbol(null)
+      setDepositSymbol(symbol)
+      setShowDepositModal(true)
+      if (symbol.chainId != evmConfig.state.chainId) {
+        setSwitchToEthChainId(symbol.chainId)
+      }
     }
   }
 
@@ -98,9 +95,17 @@ export function BalancesTable({
     setDepositSymbol(null)
     setWithdrawSymbol(symbol)
     setShowWithdrawalModal(true)
-    if (symbol.chainId != config.state.chainId) {
-      setSwitchToChainId(symbol.chainId)
+    if (symbol.chainId != evmConfig.state.chainId) {
+      setSwitchToEthChainId(symbol.chainId)
     }
+  }
+
+  function walletConnectedForSymbol(symbol: TradingSymbol) {
+    return (
+      (symbol.networkType == 'Evm' &&
+        wallet.evmAccount?.status === 'connected') ||
+      (symbol.networkType == 'Bitcoin' && wallet.bitcoinAccount)
+    )
   }
 
   return (
@@ -120,44 +125,58 @@ export function BalancesTable({
                   value={formatUnits(balance.available, symbol.decimals)}
                 />
               </div>
-              <div className="mb-4 inline-block space-x-4 justify-self-end text-xs">
-                <Button
-                  style={'normal'}
-                  width={'normal'}
-                  caption={() => (
-                    <span className="whitespace-nowrap">
-                      <span className="mr-4 hidden narrow:inline">Deposit</span>
-                      <img className="inline" src={Deposit} alt={'Deposit'} />
-                    </span>
-                  )}
-                  onClick={() => openDepositModal(symbol)}
-                  disabled={false}
-                />
-                <Button
-                  style={'normal'}
-                  width={'normal'}
-                  caption={() => (
-                    <span className="whitespace-nowrap">
-                      <span className="mr-4 hidden narrow:inline">
-                        Withdraw
-                      </span>
-                      <img
-                        className="inline"
-                        src={Withdrawal}
-                        alt={'Withdrawal'}
-                      />
-                    </span>
-                  )}
-                  onClick={() => openWithdrawModal(symbol)}
-                  disabled={balance.available === 0n}
-                />
+              <div className="mb-4 inline-block space-x-4 text-xs">
+                {walletConnectedForSymbol(symbol) ? (
+                  <>
+                    <Button
+                      style={'normal'}
+                      width={'normal'}
+                      caption={() => (
+                        <span className="whitespace-nowrap">
+                          <span className="mr-4 hidden narrow:inline">
+                            Deposit
+                          </span>
+                          <img
+                            className="inline"
+                            src={Deposit}
+                            alt={'Deposit'}
+                          />
+                        </span>
+                      )}
+                      onClick={() => openDepositModal(symbol)}
+                      disabled={false}
+                    />
+                    <Button
+                      style={'normal'}
+                      width={'normal'}
+                      caption={() => (
+                        <span className="whitespace-nowrap">
+                          <span className="mr-4 hidden narrow:inline">
+                            Withdraw
+                          </span>
+                          <img
+                            className="inline"
+                            src={Withdrawal}
+                            alt={'Withdrawal'}
+                          />
+                        </span>
+                      )}
+                      onClick={() => openWithdrawModal(symbol)}
+                      disabled={balance.available === 0n}
+                    />
+                  </>
+                ) : (
+                  <ConnectWallet
+                    onSwitchToChain={(chainId) => switchToEthChain(chainId)}
+                  />
+                )}
               </div>
             </Fragment>
           )
         })}
       </div>
 
-      {depositSymbol && depositSymbol.chainId == config.state.chainId && (
+      {depositSymbol && depositSymbol.chainId == evmConfig.state.chainId && (
         <DepositModal
           isOpen={showDepositModal}
           exchangeContractAddress={exchangeContractAddress!}
@@ -168,7 +187,7 @@ export function BalancesTable({
         />
       )}
 
-      {withdrawSymbol && withdrawSymbol.chainId == config.state.chainId && (
+      {withdrawSymbol && withdrawSymbol.chainId == evmConfig.state.chainId && (
         <WithdrawalModal
           isOpen={showWithdrawalModal}
           exchangeContractAddress={exchangeContractAddress!}

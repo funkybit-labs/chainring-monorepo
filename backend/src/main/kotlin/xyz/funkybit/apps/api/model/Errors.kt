@@ -38,6 +38,8 @@ enum class ReasonCode {
     ChainNotSupported,
 
     SignupRequired,
+
+    AuthorizeWallerError,
 }
 
 val jsonWithDefaults = Json { encodeDefaults = true }

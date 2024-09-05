@@ -12,6 +12,7 @@ interface TraceRecorder {
         GetConfiguration,
         GetAccountConfiguration,
         MarkSymbolAsAdded,
+        AuthorizeWallet,
         CreateOrder,
         CancelOrder,
         GetOrder,

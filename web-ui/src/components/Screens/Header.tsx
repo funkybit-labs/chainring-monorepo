@@ -141,7 +141,9 @@ export function Header({
             )}
           </div>
         ) : tab === 'Dashboard' ? (
-          <ConnectWallet onSwitchToChain={() => {}} />
+          <div className="mt-4">
+            <ConnectWallet onSwitchToChain={() => {}} />
+          </div>
         ) : (
           <div className="w-[152px]" />
         )}

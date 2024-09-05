@@ -15,7 +15,7 @@ import java.math.BigInteger
 
 object LimitTable : IntIdTable("limit") {
     val marketGuid = reference("market_guid", MarketTable).index()
-    val walletGuid = reference("wallet_guid", WalletTable).index()
+    val userGuid = reference("user_guid", UserTable).index()
     val base = decimal("base", 30, 0)
     val quote = decimal("quote", 30, 0)
     val updatedAt = timestamp("updated_at")
@@ -23,16 +23,19 @@ object LimitTable : IntIdTable("limit") {
     init {
         uniqueIndex(
             customIndexName = "unique_limit",
-            columns = arrayOf(marketGuid, walletGuid),
+            columns = arrayOf(marketGuid, userGuid),
         )
     }
 }
 
 class LimitEntity(id: EntityID<Int>) : Entity<Int>(id) {
     companion object : EntityClass<Int, LimitEntity>(LimitTable) {
-        fun forWallet(wallet: WalletEntity): List<MarketLimits> {
+        fun forUserId(userId: EntityID<UserId>): List<MarketLimits> =
+            forUserId(userId.value)
+
+        fun forUserId(userId: UserId): List<MarketLimits> {
             val availableBalances = BalanceEntity
-                .getBalancesForWallet(wallet)
+                .getBalancesForUserId(userId)
                 .filter { it.type == BalanceType.Available }
                 .associateBy { it.symbolGuid }
 
@@ -45,7 +48,7 @@ class LimitEntity(id: EntityID<Int>) : Entity<Int>(id) {
                     LimitTable.base,
                     LimitTable.quote,
                 )
-                .where { LimitTable.walletGuid.isNull().or(LimitTable.walletGuid.eq(wallet.guid)) }
+                .where { LimitTable.userGuid.isNull().or(LimitTable.userGuid.eq(userId)) }
                 .orderBy(Pair(MarketTable.guid, SortOrder.ASC))
                 .map {
                     MarketLimits(
@@ -56,15 +59,15 @@ class LimitEntity(id: EntityID<Int>) : Entity<Int>(id) {
                 }
         }
 
-        fun update(limitUpdates: List<Pair<WalletId, MarketLimits>>) {
+        fun update(limitUpdates: List<Pair<UserId, MarketLimits>>) {
             val now = Clock.System.now()
             LimitTable
                 .batchUpsert(
                     limitUpdates,
-                    keys = arrayOf(LimitTable.walletGuid, LimitTable.marketGuid),
-                    body = { (walletId, marketLimits) ->
+                    keys = arrayOf(LimitTable.userGuid, LimitTable.marketGuid),
+                    body = { (userId, marketLimits) ->
                         this[LimitTable.marketGuid] = EntityID(marketLimits.marketId, MarketTable)
-                        this[LimitTable.walletGuid] = EntityID(walletId, WalletTable)
+                        this[LimitTable.userGuid] = EntityID(userId, UserTable)
                         this[LimitTable.base] = marketLimits.base.toBigDecimal()
                         this[LimitTable.quote] = marketLimits.quote.toBigDecimal()
                         this[LimitTable.updatedAt] = now

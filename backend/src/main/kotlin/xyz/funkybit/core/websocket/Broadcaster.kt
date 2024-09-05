@@ -49,11 +49,9 @@ import kotlin.time.Duration.Companion.hours
 
 private val logger = KotlinLogging.logger {}
 
-typealias Principal = Address
-
 data class ConnectedClient(
     val websocket: Websocket,
-    val principal: Principal?,
+    val principal: WalletEntity?,
     val authorizedUntil: Instant,
 ) : Websocket by websocket {
     fun send(message: OutgoingWSMessage) {
@@ -70,7 +68,7 @@ typealias TopicSubscriptions = ConcurrentHashMap<SubscriptionTopic, Subscription
 
 class Broadcaster(val db: Database) {
     private val subscriptions = TopicSubscriptions()
-    private val subscriptionsByPrincipal = ConcurrentHashMap<Principal, TopicSubscriptions>()
+    private val subscriptionsByWallet = ConcurrentHashMap<Address, TopicSubscriptions>()
     private val lastPricePublish = mutableMapOf<Pair<MarketId, ConnectedClient>, Instant>()
     private val orderBooksByMarket = ConcurrentHashMap<MarketId, OrderBook>()
     private val pricesByMarketAndPeriod = ConcurrentHashMap<SubscriptionTopic.Prices, MutableList<OHLC>>()
@@ -93,8 +91,8 @@ class Broadcaster(val db: Database) {
             Subscriptions()
         }.addIfAbsent(client)
 
-        client.principal?.also { principal ->
-            subscriptionsByPrincipal.getOrPut(principal.canonicalize()) {
+        client.principal?.also { wallet ->
+            subscriptionsByWallet.getOrPut(wallet.address) {
                 TopicSubscriptions()
             }.getOrPut(topic) {
                 Subscriptions()
@@ -118,9 +116,9 @@ class Broadcaster(val db: Database) {
         if (topic is SubscriptionTopic.Prices) {
             lastPricePublish.remove(Pair(topic.marketId, client))
         }
-        return client.principal?.let { principal ->
-            subscriptionsByPrincipal[principal]?.get(topic)?.remove(client)
-            subscriptionsByPrincipal[principal]?.get(topic)?.isNotEmpty() ?: false
+        return client.principal?.let { wallet ->
+            subscriptionsByWallet[wallet.address]?.get(topic)?.remove(client)
+            subscriptionsByWallet[wallet.address]?.get(topic)?.isNotEmpty() ?: false
         } ?: false
     }
 
@@ -129,9 +127,9 @@ class Broadcaster(val db: Database) {
             unsubscribe(topic, client)
         }.toSet().contains(true)
 
-        client.principal?.also { principal ->
+        client.principal?.also { wallet ->
             if (!hasSubscriptions) {
-                subscriptionsByPrincipal.remove(principal)
+                subscriptionsByWallet.remove(wallet.address)
             }
         }
     }
@@ -204,8 +202,8 @@ class Broadcaster(val db: Database) {
                         SubscriptionTopic.MyTrades,
                         MyTrades(
                             OrderExecutionEntity
-                                .listLatestForWallet(
-                                    WalletEntity.getOrCreate(client.principal),
+                                .listLatestForUser(
+                                    client.principal.userGuid,
                                     maxSequencerResponses = 100,
                                 ).map(OrderExecutionEntity::toTradeResponse),
                         ),
@@ -252,12 +250,12 @@ class Broadcaster(val db: Database) {
     private fun sendOrders(client: ConnectedClient) {
         if (client.principal != null) {
             val combinedOrderResponses = transaction {
-                val openOrders = OrderEntity.listWithExecutionsForWallet(
-                    WalletEntity.getOrCreate(client.principal),
+                val openOrders = OrderEntity.listWithExecutionsForUser(
+                    client.principal.userGuid,
                     statuses = listOf(OrderStatus.Open, OrderStatus.Partial),
                 )
-                val recentOrders = OrderEntity.listWithExecutionsForWallet(
-                    WalletEntity.getOrCreate(client.principal),
+                val recentOrders = OrderEntity.listWithExecutionsForUser(
+                    client.principal.userGuid,
                     limit = 100,
                 )
 
@@ -283,7 +281,7 @@ class Broadcaster(val db: Database) {
                     OutgoingWSMessage.Publish(
                         SubscriptionTopic.Balances,
                         Balances(
-                            BalanceEntity.balancesAsApiResponse(WalletEntity.getOrCreate(client.principal)).balances,
+                            BalanceEntity.balancesAsApiResponse(client.principal.userGuid).balances,
                         ),
                     ),
                 )
@@ -297,11 +295,7 @@ class Broadcaster(val db: Database) {
                 client.send(
                     OutgoingWSMessage.Publish(
                         SubscriptionTopic.Limits,
-                        Limits(
-                            LimitEntity.forWallet(
-                                WalletEntity.getOrCreate(client.principal),
-                            ),
-                        ),
+                        Limits(LimitEntity.forUserId(client.principal.userGuid)),
                     ),
                 )
             }
@@ -363,6 +357,6 @@ class Broadcaster(val db: Database) {
         }
     }
 
-    private fun findClients(principal: Principal, topic: SubscriptionTopic): List<ConnectedClient> =
-        subscriptionsByPrincipal[principal]?.get(topic) ?: emptyList()
+    private fun findClients(address: Address, topic: SubscriptionTopic): List<ConnectedClient> =
+        subscriptionsByWallet[address]?.get(topic) ?: emptyList()
 }

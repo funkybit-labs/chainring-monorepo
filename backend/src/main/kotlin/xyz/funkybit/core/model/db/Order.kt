@@ -13,6 +13,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andIfNotNull
 import org.jetbrains.exposed.sql.batchInsert
+import org.jetbrains.exposed.sql.innerJoin
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
@@ -20,7 +21,6 @@ import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.SequencerOrderId
 import xyz.funkybit.core.model.db.OrderExecutionTable.nullable
-import xyz.funkybit.core.model.db.migrations.V60_AddResponseSequenceToTradeAndWithdrawal.V60_TradeTable.default
 import xyz.funkybit.core.utils.toByteArrayNoSign
 import xyz.funkybit.core.utils.toHex
 import java.math.BigDecimal
@@ -258,11 +258,21 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             }.firstOrNull()
         }
 
-        fun findByClientOrderId(clientOrderId: ClientOrderId): OrderEntity? {
-            return OrderEntity.find {
-                OrderTable.clientOrderId.eq(clientOrderId.value)
-            }.firstOrNull()
-        }
+        fun findByIdForUser(id: OrderId, userId: EntityID<UserId>): OrderEntity? =
+            OrderTable
+                .innerJoin(WalletTable)
+                .selectAll()
+                .where { OrderTable.id.eq(id).and(WalletTable.userGuid.eq(userId)) }
+                .let(OrderEntity::wrapRows)
+                .singleOrNull()
+
+        fun findByClientOrderIdForUser(clientOrderId: ClientOrderId, userId: EntityID<UserId>): OrderEntity? =
+            OrderTable
+                .innerJoin(WalletTable)
+                .selectAll()
+                .where { OrderTable.clientOrderId.eq(clientOrderId.value).and(WalletTable.userGuid.eq(userId)) }
+                .let(OrderEntity::wrapRows)
+                .singleOrNull()
 
         fun listWithExecutionsForSequencerOrderIds(sequencerOrderIds: List<Long>): List<Pair<OrderEntity, List<OrderExecutionEntity>>> {
             return listWithExecutions(
@@ -285,9 +295,9 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             }
         }
 
-        fun listWithExecutionsForWallet(wallet: WalletEntity, statuses: List<OrderStatus> = emptyList(), marketId: MarketId? = null, limit: Int? = null): List<Pair<OrderEntity, List<OrderExecutionEntity>>> {
+        fun listWithExecutionsForUser(userId: EntityID<UserId>, statuses: List<OrderStatus> = emptyList(), marketId: MarketId? = null, limit: Int? = null): List<Pair<OrderEntity, List<OrderExecutionEntity>>> {
             return listWithExecutions(
-                queryFilter = OrderTable.walletGuid.eq(wallet.guid)
+                queryFilter = WalletTable.userGuid.eq(userId)
                     .andIfNotNull(marketId?.let { OrderTable.marketGuid.eq(it) })
                     .andIfNotNull(statuses.ifEmpty { null }?.let { OrderTable.status.inList(statuses) }),
                 sort = true,
@@ -298,6 +308,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         private fun listWithExecutions(queryFilter: Op<Boolean>, sort: Boolean = false, limit: Int? = null): List<Pair<OrderEntity, List<OrderExecutionEntity>>> {
             val executions = mutableMapOf<OrderId, MutableList<OrderExecutionEntity>>()
             val orders = OrderTable
+                .innerJoin(WalletTable)
                 .join(OrderExecutionTable, JoinType.LEFT, OrderExecutionTable.orderGuid, OrderTable.guid)
                 .selectAll().where {
                     queryFilter
@@ -342,18 +353,20 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
             )
         }
 
-        fun listOpenForWallet(wallet: WalletEntity): List<OrderEntity> {
-            return OrderEntity
-                .find {
-                    OrderTable.walletGuid.eq(wallet.guid).and(
+        fun listOpenForUser(userId: EntityID<UserId>): List<OrderEntity> =
+            OrderTable
+                .innerJoin(WalletTable)
+                .selectAll()
+                .where {
+                    WalletTable.userGuid.eq(userId).and(
                         OrderTable.status.eq(OrderStatus.Open).or(
                             OrderTable.status.eq(OrderStatus.Partial).and(OrderTable.type.eq(OrderType.Limit)),
                         ),
                     )
                 }
                 .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
+                .map(OrderEntity::wrapRow)
                 .toList()
-        }
     }
 
     fun update(amount: BigInteger, price: BigDecimal?) {

@@ -2,6 +2,8 @@ package xyz.funkybit.apps.api.services
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
+import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.dao.with
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.BatchOrdersApiRequest
@@ -38,6 +40,7 @@ import xyz.funkybit.core.model.db.OrderEntity
 import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.SymbolEntity
+import xyz.funkybit.core.model.db.UserId
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.sequencer.SequencerClient
@@ -319,7 +322,7 @@ class ExchangeApiService(
     fun deposit(walletAddress: Address, apiRequest: CreateDepositApiRequest): DepositApiResponse =
         transaction {
             val deposit = DepositEntity.createOrUpdate(
-                wallet = WalletEntity.getOrCreate(walletAddress),
+                wallet = WalletEntity.getOrCreateWithUser(walletAddress),
                 symbol = getSymbolEntity(apiRequest.symbol),
                 amount = apiRequest.amount,
                 blockNumber = null,
@@ -340,21 +343,31 @@ class ExchangeApiService(
         ).canceledOrders.first()
     }
 
-    fun cancelOpenOrders(walletEntity: WalletEntity) {
+    fun cancelOpenOrders(userId: EntityID<UserId>) {
         val openOrders = transaction {
-            OrderEntity.listOpenForWallet(walletEntity)
+            OrderEntity
+                .listOpenForUser(userId)
+                .with(OrderEntity::wallet)
+                .map { Pair(it, it.wallet) }
         }
         if (openOrders.isNotEmpty()) {
             runBlocking {
-                openOrders.groupBy { it.marketGuid }.forEach { entry ->
-                    val orderIds = entry.value.map { it.guid.value }
-                    sequencerClient.cancelOrders(
-                        entry.key.value,
-                        walletEntity.address.toSequencerId().value,
-                        orderIds,
-                        cancelAll = true,
+                openOrders
+                    .groupBy(
+                        keySelector = { (order, wallet) -> Pair(order.marketGuid, wallet.address) },
+                        valueTransform = { (order, _) -> order },
                     )
-                }
+                    .forEach { entry ->
+                        val orderIds = entry.value.map { it.guid.value }
+                        val (marketGuid, walletAddress) = entry.key
+
+                        sequencerClient.cancelOrders(
+                            marketGuid.value,
+                            walletAddress.toSequencerId().value,
+                            orderIds,
+                            cancelAll = true,
+                        )
+                    }
             }
         }
     }

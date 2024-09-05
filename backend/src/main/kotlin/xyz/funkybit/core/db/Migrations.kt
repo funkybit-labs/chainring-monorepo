@@ -73,6 +73,7 @@ import xyz.funkybit.core.model.db.migrations.V73_AddBitcoinWalletStateTable
 import xyz.funkybit.core.model.db.migrations.V74_ArchStateUtxoTables
 import xyz.funkybit.core.model.db.migrations.V75_AddAutoReducedToOrder
 import xyz.funkybit.core.model.db.migrations.V76_AddBlockHeightToBitcoinWalletState
+import xyz.funkybit.core.model.db.migrations.V77_User
 import xyz.funkybit.core.model.db.migrations.V7_OrderTable
 import xyz.funkybit.core.model.db.migrations.V8_ExecutionsAndTrades
 import xyz.funkybit.core.model.db.migrations.V9_SymbolTable
@@ -154,4 +155,5 @@ val migrations = listOf(
     V74_ArchStateUtxoTables(),
     V75_AddAutoReducedToOrder(),
     V76_AddBlockHeightToBitcoinWalletState(),
+    V77_User(),
 )

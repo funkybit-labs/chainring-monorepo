@@ -17,7 +17,6 @@ import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import xyz.funkybit.core.evm.EIP712Transaction
 import xyz.funkybit.core.evm.TokenAddressAndChain
-import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
@@ -126,18 +125,25 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 .toList()
         }
 
-        fun history(address: Address): List<WithdrawalEntity> {
-            return WithdrawalEntity.wrapRows(
-                WithdrawalTable.join(
-                    WalletTable,
-                    JoinType.INNER,
-                    WithdrawalTable.walletGuid,
-                    WalletTable.guid,
-                ).join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid).selectAll().where {
-                    WalletTable.address.eq(address.toString())
-                }.orderBy(Pair(WithdrawalTable.createdAt, SortOrder.DESC)),
-            ).toList()
-        }
+        fun findByIdForUser(withdrawalId: WithdrawalId, userId: EntityID<UserId>): WithdrawalEntity? =
+            WithdrawalTable
+                .join(WalletTable, JoinType.INNER, WithdrawalTable.walletGuid, WalletTable.guid)
+                .join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid)
+                .selectAll()
+                .where { WithdrawalTable.id.eq(withdrawalId).and(WalletTable.userGuid.eq(userId)) }
+                .orderBy(Pair(WithdrawalTable.createdAt, SortOrder.DESC))
+                .let(WithdrawalEntity::wrapRows)
+                .singleOrNull()
+
+        fun history(userId: EntityID<UserId>): List<WithdrawalEntity> =
+            WithdrawalTable
+                .join(WalletTable, JoinType.INNER, WithdrawalTable.walletGuid, WalletTable.guid)
+                .join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid)
+                .selectAll()
+                .where { WalletTable.userGuid.eq(userId) }
+                .orderBy(Pair(WithdrawalTable.createdAt, SortOrder.DESC))
+                .let(WithdrawalEntity::wrapRows)
+                .toList()
 
         fun findSequenced(chainId: ChainId, limit: Int, maxResponseSequence: Long?): List<WithdrawalEntity> {
             return WithdrawalTable

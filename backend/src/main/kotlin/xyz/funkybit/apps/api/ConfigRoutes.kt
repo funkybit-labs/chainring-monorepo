@@ -36,7 +36,6 @@ import xyz.funkybit.core.model.db.MarketEntity
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.SymbolEntity
-import xyz.funkybit.core.model.db.WalletEntity
 import java.math.BigInteger
 
 class ConfigRoutes(private val faucetMode: FaucetMode) {
@@ -182,6 +181,9 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                 withdrawalFee = BigInteger.ZERO,
                             ),
                         ),
+                        authorizedAddresses = listOf(
+                            EvmAddress.zero,
+                        ),
                     ),
             )
         } bindContract Method.GET to { request ->
@@ -189,8 +191,8 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                 Response(Status.OK).with(
                     responseBody of
                         AccountConfigurationApiResponse(
-                            role = if (WalletEntity.findByAddress(request.principal)?.isAdmin == true) Role.Admin else Role.User,
-                            newSymbols = SymbolEntity.symbolsToAddToWallet(request.principal).map {
+                            role = if (request.principal.isAdmin) Role.Admin else Role.User,
+                            newSymbols = SymbolEntity.symbolsToAddToWallet(request.principal.address).map {
                                 SymbolInfo(
                                     it.name,
                                     it.description,
@@ -201,6 +203,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                     it.withdrawalFee,
                                 )
                             },
+                            authorizedAddresses = request.principal.authorizedAddresses(),
                         ),
                 )
             }
@@ -221,11 +224,11 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
         } bindContract Method.POST to { symbolName ->
             { request ->
                 transaction {
-                    WalletEntity.getOrCreate(request.principal).let {
-                        if (!it.addedSymbols.contains(symbolName)) {
-                            it.addedSymbols += symbolName
-                        }
+                    val wallet = request.principal
+                    if (!wallet.addedSymbols.contains(symbolName)) {
+                        wallet.addedSymbols += symbolName
                     }
+
                     Response(Status.NO_CONTENT)
                 }
             }

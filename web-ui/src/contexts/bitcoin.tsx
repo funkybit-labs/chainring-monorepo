@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import SatsConnect, { RpcErrorCode } from 'sats-connect'
 
+export const bitcoinEnabled = import.meta.env.ENV_ENABLE_BITCOIN
+
 export const BitcoinContext = createContext<{
   connect: () => void
   disconnect: () => void
@@ -67,7 +69,6 @@ export function BitcoinProvider({ children }: { children: React.ReactNode }) {
   function disconnect() {
     setDisconnected(true)
     setAccounts([])
-    console.log('a')
     SatsConnect.request('wallet_renouncePermissions', undefined).finally(() => {
       SatsConnect.disconnect()
     })

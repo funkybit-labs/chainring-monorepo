@@ -149,7 +149,7 @@ class BlockProcessor(
             val deposit = DepositEntity.findByTxHash(txHash)
             if (deposit == null) {
                 DepositEntity.createOrUpdate(
-                    wallet = WalletEntity.getOrCreate(EvmAddress(Keys.toChecksumAddress(depositEventResponse.from))),
+                    wallet = WalletEntity.getOrCreateWithUser(EvmAddress(Keys.toChecksumAddress(depositEventResponse.from))),
                     symbol = SymbolEntity.forChainAndContractAddress(
                         chainId,
                         EvmAddress(Keys.toChecksumAddress(depositEventResponse.token)).takeIf { it != EvmAddress.zero },

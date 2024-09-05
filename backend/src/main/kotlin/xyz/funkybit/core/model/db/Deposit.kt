@@ -18,7 +18,6 @@ import org.jetbrains.exposed.sql.update
 import org.jetbrains.exposed.sql.upsert
 import org.jetbrains.exposed.sql.vendors.ForUpdateOption
 import xyz.funkybit.apps.api.model.BigIntegerJson
-import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.TxHash
 import java.math.BigInteger
 
@@ -100,18 +99,23 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
                 .let { DepositEntity.wrapRows(it) }
                 .toList()
 
-        fun history(address: Address): List<DepositEntity> {
-            return DepositEntity.wrapRows(
-                DepositTable.join(
-                    WalletTable,
-                    JoinType.INNER,
-                    DepositTable.walletGuid,
-                    WalletTable.guid,
-                ).join(SymbolTable, JoinType.INNER, DepositTable.symbolGuid, SymbolTable.guid).selectAll().where {
-                    WalletTable.address.eq(address.toString())
-                }.orderBy(Pair(DepositTable.createdAt, SortOrder.DESC)),
-            ).toList()
-        }
+        fun findByIdForUser(depositId: DepositId, userId: EntityID<UserId>): DepositEntity? =
+            DepositTable
+                .join(WalletTable, JoinType.INNER, DepositTable.walletGuid, WalletTable.guid)
+                .selectAll()
+                .where { DepositTable.id.eq(depositId).and(WalletTable.userGuid.eq(userId)) }
+                .let(DepositEntity::wrapRows)
+                .singleOrNull()
+
+        fun history(userId: EntityID<UserId>): List<DepositEntity> =
+            DepositTable
+                .join(WalletTable, JoinType.INNER, DepositTable.walletGuid, WalletTable.guid)
+                .join(SymbolTable, JoinType.INNER, DepositTable.symbolGuid, SymbolTable.guid)
+                .selectAll()
+                .where { WalletTable.userGuid.eq(userId) }
+                .orderBy(Pair(DepositTable.createdAt, SortOrder.DESC))
+                .let(DepositEntity::wrapRows)
+                .toList()
 
         fun createOrUpdate(
             wallet: WalletEntity,

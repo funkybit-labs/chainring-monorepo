@@ -535,7 +535,7 @@ object SequencerResponseProcessorService {
             limitsUpdates.map {
                 val wallet = walletsBySequencerId.getValue(it.wallet)
                 Pair(
-                    wallet.guid.value,
+                    wallet.userGuid.value,
                     MarketLimits(
                         MarketId(it.marketId),
                         it.base.toBigInteger(),

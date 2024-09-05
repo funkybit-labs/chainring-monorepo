@@ -113,6 +113,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                             configRoutes.getConfiguration,
                             configRoutes.getAccountConfiguration,
                             configRoutes.markSymbolAsAdded,
+                            WalletRoutes.authorizeWallet,
                             orderRoutes.createOrder(),
                             orderRoutes.cancelOrder(),
                             orderRoutes.getOrder(),

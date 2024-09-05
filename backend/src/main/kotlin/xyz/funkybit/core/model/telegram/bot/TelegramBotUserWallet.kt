@@ -91,17 +91,14 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
         get() = wallet.address as EvmAddress
 
     fun exchangeBalances(): List<BalanceEntity> =
-        BalanceEntity.getBalancesForWallet(wallet)
+        BalanceEntity.getBalancesForUserId(wallet.userGuid)
 
     fun exchangeAvailableBalance(symbol: SymbolEntity): BigDecimal =
-        (
-            BalanceEntity.findForWalletAndSymbol(
-                wallet,
-                symbol,
-                BalanceType.Available,
-            )?.balance ?: BigInteger.ZERO
-            )
-            .fromFundamentalUnits(symbol.decimals)
+        BalanceEntity
+            .findForUserAndSymbol(wallet.userGuid, symbol, BalanceType.Available)
+            ?.balance
+            ?.fromFundamentalUnits(symbol.decimals)
+            ?: BigInteger.ZERO.fromFundamentalUnits(symbol.decimals)
 
     fun onChainBalances(symbols: List<SymbolEntity>): List<Pair<SymbolEntity, BigDecimal>> =
         runBlocking {
