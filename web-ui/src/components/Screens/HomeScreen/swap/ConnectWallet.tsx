@@ -4,11 +4,11 @@ import { useConfig } from 'wagmi'
 import { useValidChain } from 'hooks/useValidChain'
 import { Modal } from 'components/common/Modal'
 import { useWallet } from 'contexts/walletProvider'
+import { bitcoinEnabled } from 'contexts/bitcoin'
 
 type Props = {
   onSwitchToChain: (chainId: number) => Promise<void> | void
 }
-export const bitcoinEnabled = import.meta.env.ENV_ENABLE_BITCOIN
 
 export function ConnectWallet({ onSwitchToChain }: Props) {
   const validChain = useValidChain()

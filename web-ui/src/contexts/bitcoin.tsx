@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import SatsConnect, { RpcErrorCode } from 'sats-connect'
 
+export const bitcoinEnabled = import.meta.env.ENV_ENABLE_BITCOIN
+
 export const BitcoinContext = createContext<{
   connect: () => void
   disconnect: () => void

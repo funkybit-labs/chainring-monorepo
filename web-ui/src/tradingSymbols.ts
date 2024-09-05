@@ -1,6 +1,6 @@
 import TradingSymbol from 'tradingSymbol'
 import { ConfigurationApiResponse } from 'apiClient'
-import { bitcoinEnabled } from 'components/Screens/HomeScreen/swap/ConnectWallet'
+import { bitcoinEnabled } from 'contexts/bitcoin'
 
 export default class TradingSymbols {
   native: TradingSymbol[]
