@@ -41,7 +41,6 @@ export function ConnectWallet({ onSwitchToChain }: Props) {
               : `Connect ${missingConnection}Wallet`
           }}
           onClick={() => {
-            console.log('ConnectWallet', 'onClick')
             if (connectedWithInvalidChain) {
               onSwitchToChain(evmConfig.chains[0].id)
             } else {
@@ -53,11 +52,12 @@ export function ConnectWallet({ onSwitchToChain }: Props) {
                   wallet.connect(bitcoinEnabled ? 'bitcoin' : 'evm')
                   break
                 case 'none':
-                  if (bitcoinEnabled) {
-                    setShowWalletCategorySelection(true)
-                  } else {
-                    wallet.connect('evm')
-                  }
+                  // For now we always have them connect EVM first
+                  //if (bitcoinEnabled) {
+                  //  setShowWalletCategorySelection(true)
+                  //} else {
+                  wallet.connect('evm')
+                  //}
                   break
               }
             }

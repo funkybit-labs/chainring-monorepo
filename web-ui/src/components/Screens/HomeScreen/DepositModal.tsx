@@ -27,7 +27,10 @@ export default function DepositModal({
   symbol,
   isOpen,
   close,
-  onClosed
+  onClosed,
+  initialAmount,
+  title,
+  message
 }: {
   exchangeContractAddress: string
   walletAddress: string
@@ -35,6 +38,9 @@ export default function DepositModal({
   isOpen: boolean
   close: () => void
   onClosed: () => void
+  initialAmount?: string
+  title?: string
+  message?: string
 }) {
   const config = useConfig()
 
@@ -59,7 +65,7 @@ export default function DepositModal({
     setInputValue: setAmountInputValue,
     valueInFundamentalUnits: amount
   } = useAmountInputState({
-    initialInputValue: '',
+    initialInputValue: initialAmount ?? '',
     decimals: symbol.decimals
   })
 
@@ -78,7 +84,6 @@ export default function DepositModal({
     mutationFn: async () => {
       try {
         let depositHash: string
-
         if (symbol.contractAddress) {
           setSubmitPhase('checkingAllowanceAmount')
           const allowance = await call(config, {
@@ -172,14 +177,19 @@ export default function DepositModal({
       isOpen={isOpen}
       close={close}
       onClosed={onClosed}
-      title={`Deposit ${symbol.displayName()}`}
+      title={title ?? `Deposit ${symbol.displayName()}`}
     >
-      <div className="max-h-52 overflow-y-auto">
+      <div className="max-h-56 overflow-y-auto">
         <ModalAsyncContent
           asyncData={walletBalanceQuery}
           success={(walletBalance) => {
             return (
               <div>
+                {message && (
+                  <p className="my-2 text-center text-sm text-white">
+                    {message}
+                  </p>
+                )}
                 <AmountInput
                   value={amountInputValue}
                   disabled={submitPhase !== null}

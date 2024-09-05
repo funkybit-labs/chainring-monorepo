@@ -110,14 +110,26 @@ export type ConfigurationApiResponse = z.infer<
   typeof ConfigurationApiResponseSchema
 >
 
+const TestnetChallengeStatus = z.enum([
+  'Unenrolled',
+  'PendingAirdrop',
+  'PendingDeposit',
+  'PendingDepositConfirmation',
+  'Enrolled',
+  'Disqualified'
+])
+export type TestnetChallengeStatusType = z.infer<typeof TestnetChallengeStatus>
+
 export const AccountConfigurationApiResponseSchema = z.object({
   newSymbols: z.array(SymbolSchema),
   role: z.enum(['User', 'Admin']),
-  authorizedAddresses: z.array(z.string())
+  authorizedAddresses: z.array(z.string()),
+  testnetChallengeStatus: TestnetChallengeStatus,
+  testnetChallengeDepositSymbol: z.string().nullable(),
+  testnetChallengeDepositContract: AddressSchema.nullable(),
+  nickName: z.string().nullable(),
+  avatarUrl: z.string().nullable()
 })
-export type AccountConfigurationApiResponse = z.infer<
-  typeof AccountConfigurationApiResponseSchema
->
 
 const OrderSideSchema = z.enum(['Buy', 'Sell'])
 export type OrderSide = z.infer<typeof OrderSideSchema>
@@ -730,6 +742,19 @@ export const apiClient = new Zodios(apiBaseUrl, [
         schema: z.string()
       }
     ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'post',
+    path: '/v1/testnet-challenge',
+    alias: 'testnetChallengeEnroll',
+    parameters: [],
     response: z.undefined(),
     errors: [
       {

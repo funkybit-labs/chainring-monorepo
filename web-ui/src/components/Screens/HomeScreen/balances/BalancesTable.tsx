@@ -20,7 +20,7 @@ import {
 } from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import Deposit from 'assets/Deposit.svg'
 import Withdrawal from 'assets/Withdrawal.svg'
-import { useConfig, useSwitchChain } from 'wagmi'
+import { useConfig } from 'wagmi'
 import TradingSymbol from 'tradingSymbol'
 import { SymbolAndChain } from 'components/common/SymbolAndChain'
 import { ExpandableValue } from 'components/common/ExpandableValue'
@@ -39,7 +39,6 @@ export function BalancesTable({
 }) {
   const wallet = useWallet()
   const evmConfig = useConfig()
-  const { switchChain } = useSwitchChain()
 
   const [depositSymbol, setDepositSymbol] = useState<TradingSymbol | null>(null)
   const [showDepositModal, setShowDepositModal] = useState<boolean>(false)
@@ -76,7 +75,7 @@ export function BalancesTable({
       switchToEthChain(switchToEthChainId)
     }
     setSwitchToEthChainId(null)
-  }, [switchToEthChainId, switchChain, switchToEthChain])
+  }, [switchToEthChainId, switchToEthChain])
 
   function openDepositModal(symbol: TradingSymbol) {
     if (symbol.networkType === 'Bitcoin') {

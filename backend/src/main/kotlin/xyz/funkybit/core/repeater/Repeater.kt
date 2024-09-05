@@ -5,6 +5,7 @@ import org.jetbrains.exposed.sql.Database
 import xyz.funkybit.core.repeater.tasks.ArchTokenStateSetupTask
 import xyz.funkybit.core.repeater.tasks.GasMonitorTask
 import xyz.funkybit.core.repeater.tasks.ReferralPointsTask
+import xyz.funkybit.core.repeater.tasks.TestnetChallengeMonitorTask
 import xyz.funkybit.core.utils.PgListener
 import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -18,6 +19,7 @@ class Repeater(db: Database, private val automaticTaskScheduling: Boolean = true
         GasMonitorTask(),
         ReferralPointsTask(),
         ArchTokenStateSetupTask(),
+        TestnetChallengeMonitorTask(),
     ).associateBy { it.name }
 
     private val timer = ScheduledThreadPoolExecutor(8)
