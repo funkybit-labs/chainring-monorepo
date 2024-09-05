@@ -150,8 +150,8 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
   })
 
   useEffect(() => {
+    const category = getGlobalPrimaryCategory()
     if (evmAccount.status === 'connected') {
-      const category = getGlobalPrimaryCategory()
       switch (category) {
         case null:
         case 'none':
@@ -161,6 +161,8 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
           setGlobalPrimaryCategory('evm')
           break
       }
+    } else if (evmAccount.status === 'disconnected' && category === 'evm') {
+      clearGlobalPrimary()
     }
   }, [evmAccount])
 
