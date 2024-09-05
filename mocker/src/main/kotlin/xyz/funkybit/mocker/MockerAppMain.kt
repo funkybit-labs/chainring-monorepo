@@ -146,7 +146,8 @@ class MockerApp(
                         liquidityPlacement = params.liquidityPlacement,
                         baseAssetAmount = params.initialBaseBalance * BigDecimal(100),
                         quoteAssetAmount = params.initialBaseBalance * params.priceBaseline * BigDecimal(100),
-                        keyPair = WalletKeyPair.EVM.fromPrivateKeyHex(params.makerPrivateKeyHex)
+                        keyPair = WalletKeyPair.EVM.fromPrivateKeyHex(params.makerPrivateKeyHex),
+                        usePriceFeed = System.getenv("MAKER_USE_PRICE_FEED")?.toBoolean() ?: false
                     )
                 )
             }

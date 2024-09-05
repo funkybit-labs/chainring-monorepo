@@ -56,7 +56,7 @@ sealed class LiquidityPlacement {
 }
 
 class Maker(
-    marketIds: List<MarketId>,
+    private val marketIds: List<MarketId>,
     private val levels: Int,
     private val levelsSpread: Int,
     private val marketPriceOverride: BigDecimal? = null,
@@ -64,12 +64,51 @@ class Maker(
     nativeAssets: Map<String, BigInteger>,
     assets: Map<String, BigInteger>,
     keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(),
+    private val usePriceFeed: Boolean = false
 ) : Actor(marketIds, nativeAssets, assets, keyPair) {
     private val marketPriceOverrideFunction: PriceFunction? = marketPriceOverride?.let { PriceFunction.generateDeterministicHarmonicMovement(initialValue = it.toDouble(), maxFluctuation = 0.01) }
     override val id: String = "mm_${keyPair.address().canonicalize()}"
     override val logger: KLogger = KotlinLogging.logger {}
     private var currentOrders = mutableMapOf<MarketId, MutableSet<Order.Limit>>()
     private var quotesCreated = false
+
+    private var priceFeed: PriceFeed? = null
+
+    override fun start() {
+        super.start()
+        if (usePriceFeed) {
+            priceFeed = PriceFeed(marketIds) { prices ->
+                if (!quotesCreated) {
+                    logger.info { "$id: creating quotes from initial prices" }
+                    prices.forEach { (marketId, price) ->
+                        if (price > 0.0) {
+                            createQuotes(
+                                marketId,
+                                levels,
+                                levelsSpread,
+                                price.toBigDecimal()
+                            )
+                        } else {
+                            logger.error { "$id: no price found for $marketId" }
+                        }
+                    }
+                    quotesCreated = true
+                } else {
+                    logger.info { "$id: adjusting quotes from updated prices" }
+                    prices.forEach { (marketId, price) ->
+                        if (price > 0.0) {
+                            markets.find { it.id == marketId }?.let {
+                                adjustQuotes(it, price.toBigDecimal())
+                            }
+                        } else {
+                            logger.error { "$id: no price found for $marketId" }
+                        }
+                    }
+                }
+            }
+            priceFeed!!.start()
+        }
+    }
 
     override val websocketSubscriptionTopics: List<SubscriptionTopic> =
         marketIds
@@ -81,6 +120,7 @@ class Maker(
             )
 
     override fun onStopping() {
+        priceFeed?.stop()
         quotesCreated = false
         apiClient.cancelOpenOrders()
     }
@@ -174,19 +214,26 @@ class Maker(
             }
 
             is Prices -> {
-                if (message.full) {
-                    logger.info { "$id: full price update for ${message.market}" }
-                    if (!quotesCreated) {
-                        markets.find { it.id == message.market }?.let {
-                            createQuotes(message.market, levels, levelsSpread, message.ohlc.lastOrNull()?.close ?: BigDecimal.ONE)
-                            quotesCreated = true
+                if (!usePriceFeed) {
+                    if (message.full) {
+                        logger.info { "$id: full price update for ${message.market}" }
+                        if (!quotesCreated) {
+                            markets.find { it.id == message.market }?.let {
+                                createQuotes(
+                                    message.market,
+                                    levels,
+                                    levelsSpread,
+                                    message.ohlc.lastOrNull()?.close ?: BigDecimal.ONE
+                                )
+                                quotesCreated = true
+                            }
                         }
-                    }
-                } else {
-                    if (message.ohlc.isNotEmpty()) {
-                        logger.info { "$id: incremental price update $message" }
-                        markets.find { it.id == message.market }?.let {
-                            adjustQuotes(it, message.ohlc.last().close)
+                    } else {
+                        if (message.ohlc.isNotEmpty()) {
+                            logger.info { "$id: incremental price update $message" }
+                            markets.find { it.id == message.market }?.let {
+                                adjustQuotes(it, message.ohlc.last().close)
+                            }
                         }
                     }
                 }
