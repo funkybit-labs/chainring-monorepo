@@ -9,6 +9,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import xyz.funkybit.core.db.Migration
 import xyz.funkybit.core.model.db.GUIDTable
 import xyz.funkybit.core.model.db.PGEnum
@@ -77,8 +78,10 @@ class V77_User : Migration() {
                     userRecord[V77_UserTable.createdAt] = Clock.System.now()
                     userRecord[V77_UserTable.createdBy] = "V77_WalletTable"
                 }
-                walletRecord[V77_WalletTable.userGuid] = userId
-                walletRecord[V77_WalletTable.walletFamily] = V77_WalletFamily.Evm
+                V77_WalletTable.update({V77_WalletTable.guid eq walletRecord[V77_WalletTable.guid]}) {
+                    it[userGuid] = userId
+                    it[walletFamily] = V77_WalletFamily.Evm
+                }
             }
             exec("ALTER TABLE wallet ALTER COLUMN user_guid SET NOT NULL")
             exec("ALTER TABLE wallet ALTER COLUMN wallet_family SET NOT NULL")
@@ -89,7 +92,7 @@ class V77_User : Migration() {
             // change wallet_guid in limit table to user_guid
             exec("ALTER TABLE \"limit\" DROP CONSTRAINT unique_limit")
             SchemaUtils.createMissingTablesAndColumns(V77_LimitTable)
-            exec("UPDATE \"limit\" SET user_guid = (SELECT user_guid FROM wallet WHERE wallet.user_guid = \"limit\".user_guid)")
+            exec("UPDATE \"limit\" SET user_guid = (SELECT user_guid FROM wallet WHERE wallet.guid = \"limit\".wallet_guid)")
             exec("ALTER TABLE \"limit\" DROP COLUMN wallet_guid")
             exec("ALTER TABLE \"limit\" ALTER COLUMN user_guid SET NOT NULL")
             exec("ALTER TABLE \"limit\" ADD CONSTRAINT unique_limit UNIQUE(market_guid, user_guid)")
