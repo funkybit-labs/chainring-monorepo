@@ -223,7 +223,7 @@ open class ApiClient(
         executeAndTrace(
             TraceRecorder.Op.AuthorizeWallet,
             Request.Builder()
-                .url("$apiServerRootUrl/v1/wallets/authorization")
+                .url("$apiServerRootUrl/v1/wallets/authorize")
                 .post(Json.encodeToString(apiRequest).toRequestBody(applicationJson))
                 .build()
                 .withAuthHeaders(keyPair, chainId = currentChainId),
