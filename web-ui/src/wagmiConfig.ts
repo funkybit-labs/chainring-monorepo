@@ -15,7 +15,7 @@ const walletConnectMetadata = {
   ]
 }
 
-export let allChains: [Chain, ...Chain[]]
+export let evmChains: [Chain, ...Chain[]]
 export let wagmiConfig: Config
 
 export const initializeWagmiConfig = async () => {
@@ -51,13 +51,13 @@ export const initializeWagmiConfig = async () => {
     })
 
   if (isNonEmptyArray(chains)) {
-    allChains = chains
+    evmChains = chains
   } else {
     throw new Error('No chains available in the configuration')
   }
 
   wagmiConfig = createConfig({
-    chains: allChains,
+    chains: evmChains,
     transports: chains.reduce(
       (acc: Record<number, ReturnType<typeof http>>, chain: Chain) => {
         acc[chain.id] = http()

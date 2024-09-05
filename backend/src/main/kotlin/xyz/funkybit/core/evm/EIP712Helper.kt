@@ -103,16 +103,16 @@ object EIP712Helper {
                         StructuredData.Entry("name", "string"),
                         StructuredData.Entry("chainId", "uint32"),
                     ),
-                    "Link" to listOf(
+                    "Authorize" to listOf(
                         StructuredData.Entry("message", "string"),
                         StructuredData.Entry("address", "string"),
-                        StructuredData.Entry("linkAddress", "string"),
+                        StructuredData.Entry("authorizedAddress", "string"),
                         StructuredData.Entry("chainId", "uint32"),
                         StructuredData.Entry("timestamp", "string"),
                     ),
                 ),
                 /* primaryType = */
-                "Link",
+                "Authorize",
                 /* message = */
                 mapOf(
                     "message" to linkMessage.message,

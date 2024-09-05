@@ -18,6 +18,7 @@ import Decimal from 'decimal.js'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import MarketPrice from 'components/Screens/HomeScreen/swap/MarketPrice'
+import { useWallet } from 'contexts/walletProvider'
 
 export function SwapWidget({
   markets,
@@ -80,6 +81,15 @@ export function SwapWidget({
       }, [sr, marketPriceInverted])
 
       const switchToEthChain = useSwitchToEthChain()
+      const wallet = useWallet()
+
+      function walletConnectedForSymbol(symbol: TradingSymbol) {
+        return (
+          (symbol.networkType == 'Evm' &&
+            wallet.evmAccount?.status === 'connected') ||
+          (symbol.networkType == 'Bitcoin' && wallet.bitcoinAccount)
+        )
+      }
 
       function depositAmount(
         deposit: Balance | undefined,
@@ -312,7 +322,10 @@ export function SwapWidget({
               onClick={() => setMarketPriceInverted(!marketPriceInverted)}
             />
             <div className="flex w-full flex-col">
-              {walletAddress && exchangeContractAddress ? (
+              {walletAddress &&
+              exchangeContractAddress &&
+              walletConnectedForSymbol(sr.topSymbol) &&
+              walletConnectedForSymbol(sr.bottomSymbol) ? (
                 <>
                   {sr.noPriceFound && (
                     <span className="w-full text-center text-brightRed">

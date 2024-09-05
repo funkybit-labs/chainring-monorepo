@@ -51,7 +51,7 @@ class AuthorizeWalletTest : OrderBaseTest() {
     @Test
     fun `evm wallet authorize bitcoin wallet`() {
         val evmKeyApiClient = TestApiClient.withEvmWallet()
-        assertTrue { evmKeyApiClient.getAccountConfiguration().authorizedAddress.isEmpty() }
+        assertTrue { evmKeyApiClient.getAccountConfiguration().authorizedAddresses.isEmpty() }
 
         val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
         bitcoinKeyApiClient.authorizeWallet(
@@ -62,14 +62,14 @@ class AuthorizeWalletTest : OrderBaseTest() {
             ),
         )
 
-        assertEquals(listOf(evmKeyApiClient.address), bitcoinKeyApiClient.getAccountConfiguration().authorizedAddress)
-        assertEquals(listOf(bitcoinKeyApiClient.address), evmKeyApiClient.getAccountConfiguration().authorizedAddress)
+        assertEquals(listOf(evmKeyApiClient.address), bitcoinKeyApiClient.getAccountConfiguration().authorizedAddresses)
+        assertEquals(listOf(bitcoinKeyApiClient.address), evmKeyApiClient.getAccountConfiguration().authorizedAddresses)
     }
 
     @Test
     fun `bitcoin wallet authorize evm wallet`() {
         val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
-        assertTrue { bitcoinKeyApiClient.getAccountConfiguration().authorizedAddress.isEmpty() }
+        assertTrue { bitcoinKeyApiClient.getAccountConfiguration().authorizedAddresses.isEmpty() }
 
         val evmKeyApiClient = TestApiClient.withEvmWallet()
         evmKeyApiClient.authorizeWallet(
@@ -80,17 +80,17 @@ class AuthorizeWalletTest : OrderBaseTest() {
             ),
         )
 
-        assertEquals(listOf(evmKeyApiClient.address.asEvmAddress()), bitcoinKeyApiClient.getAccountConfiguration().authorizedAddress)
-        assertEquals(listOf(bitcoinKeyApiClient.address.asBitcoinAddress()), evmKeyApiClient.getAccountConfiguration().authorizedAddress)
+        assertEquals(listOf(evmKeyApiClient.address.asEvmAddress()), bitcoinKeyApiClient.getAccountConfiguration().authorizedAddresses)
+        assertEquals(listOf(bitcoinKeyApiClient.address.asBitcoinAddress()), evmKeyApiClient.getAccountConfiguration().authorizedAddresses)
     }
 
     @Test
     fun `already used address can't be authorized`() {
         val evmKeyApiClient = TestApiClient.withEvmWallet()
-        assertTrue { evmKeyApiClient.getAccountConfiguration().authorizedAddress.isEmpty() }
+        assertTrue { evmKeyApiClient.getAccountConfiguration().authorizedAddresses.isEmpty() }
 
         val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
-        assertTrue { bitcoinKeyApiClient.getAccountConfiguration().authorizedAddress.isEmpty() }
+        assertTrue { bitcoinKeyApiClient.getAccountConfiguration().authorizedAddresses.isEmpty() }
 
         // note: each wallet has been linked to a new user by sending an api request
 
@@ -114,7 +114,7 @@ class AuthorizeWalletTest : OrderBaseTest() {
     @Test
     fun `authorization error cases`() {
         val evmKeyApiClient = TestApiClient.withEvmWallet()
-        assertTrue { evmKeyApiClient.getAccountConfiguration().authorizedAddress.isEmpty() }
+        assertTrue { evmKeyApiClient.getAccountConfiguration().authorizedAddresses.isEmpty() }
 
         val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
 
@@ -125,14 +125,14 @@ class AuthorizeWalletTest : OrderBaseTest() {
                 address = bitcoinKeyApiClient.address.asBitcoinAddress(),
                 authorizedAddress = evmKeyApiClient.address.asEvmAddress(),
             ).copy(signature = "H7P1/r+gULX05tXwaJGfglZSL4sRhykAsgwQtpm92xRIPaGUnxQAhm1CZsTuQ8wh3w51f1uUVpxU2RUfJ3hq81I="),
-        ).assertError(ApiError(ReasonCode.AuthorizeWallerError, "Authorization signature can't be verified"))
+        ).assertError(ApiError(ReasonCode.AuthorizeWallerError, "Invalid signature"))
         bitcoinKeyApiClient.tryAuthorizeWallet(
             apiRequest = signAuthorizeBitcoinWalletRequest(
                 ecKeyPair = evmKeyApiClient.keyPair.asEcKeyPair(),
                 address = evmKeyApiClient.address.asEvmAddress(),
                 authorizedAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
             ).copy(signature = "0x1cd66f580ec8f6fd37b2101849955c5a50d787092fe8a97e5c55bea6a24c1d47409e17450adaa617cc07907f56a4eb1f468467fcefe7808cbd63fbba935ee0201b"),
-        ).assertError(ApiError(ReasonCode.AuthorizeWallerError, "Authorization signature can't be verified"))
+        ).assertError(ApiError(ReasonCode.AuthorizeWallerError, "Invalid signature"))
 
         // authorization signature timestamp should be recent
         evmKeyApiClient.tryAuthorizeWallet(

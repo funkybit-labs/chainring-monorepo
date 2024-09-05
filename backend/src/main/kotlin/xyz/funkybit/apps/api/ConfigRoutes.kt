@@ -181,7 +181,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                 withdrawalFee = BigInteger.ZERO,
                             ),
                         ),
-                        authorizedAddress = listOf(
+                        authorizedAddresses = listOf(
                             EvmAddress.zero,
                         ),
                     ),
@@ -203,7 +203,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                     it.withdrawalFee,
                                 )
                             },
-                            authorizedAddress = request.principal.authorizedAddresses(),
+                            authorizedAddresses = request.principal.authorizedAddresses(),
                         ),
                 )
             }

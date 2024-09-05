@@ -23,6 +23,7 @@ import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import Deposit from 'assets/Deposit.svg'
 import MarketPrice from 'components/Screens/HomeScreen/swap/MarketPrice'
+import { useWallet } from 'contexts/walletProvider'
 
 export function LimitModal({
   markets,
@@ -73,6 +74,7 @@ export function LimitModal({
     Renderer: function (sr: SwapRender) {
       const sellAmountInputRef = useRef<HTMLInputElement>(null)
       const config = useConfig()
+      const wallet = useWallet()
       const [marketPriceInverted, setMarketPriceInverted] = useState(false)
 
       const marketPrice = useMemo(() => {
@@ -98,6 +100,14 @@ export function LimitModal({
           return 'N/A'
         }
       }, [sr, marketPriceInverted])
+
+      function walletConnectedForSymbol(symbol: TradingSymbol) {
+        return (
+          (symbol.networkType == 'Evm' &&
+            wallet.evmAccount?.status === 'connected') ||
+          (symbol.networkType == 'Bitcoin' && wallet.bitcoinAccount)
+        )
+      }
 
       function depositAmount(
         deposit: Balance | undefined,
@@ -350,7 +360,10 @@ export function LimitModal({
               onClick={() => setMarketPriceInverted(!marketPriceInverted)}
             />
             <div className="flex w-full flex-col">
-              {walletAddress && exchangeContractAddress ? (
+              {walletAddress &&
+              exchangeContractAddress &&
+              walletConnectedForSymbol(sr.topSymbol) &&
+              walletConnectedForSymbol(sr.bottomSymbol) ? (
                 <>
                   {sr.noPriceFound && (
                     <span className="w-full text-center text-brightRed">

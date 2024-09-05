@@ -112,7 +112,8 @@ export type ConfigurationApiResponse = z.infer<
 
 export const AccountConfigurationApiResponseSchema = z.object({
   newSymbols: z.array(SymbolSchema),
-  role: z.enum(['User', 'Admin'])
+  role: z.enum(['User', 'Admin']),
+  authorizedAddresses: z.array(z.string())
 })
 export type AccountConfigurationApiResponse = z.infer<
   typeof AccountConfigurationApiResponseSchema
@@ -393,6 +394,14 @@ const FaucetRequestSchema = z.object({
 })
 export type FaucetRequest = z.infer<typeof FaucetRequestSchema>
 
+const AuthorizeWalletRequestSchema = z.object({
+  authorizedAddress: z.string(),
+  chainId: z.number(),
+  address: z.string(),
+  timestamp: z.string(),
+  signature: z.string()
+})
+
 const ApiErrorSchema = z.object({
   displayMessage: z.string()
 })
@@ -403,7 +412,7 @@ const ApiErrorsSchema = z.object({
 })
 export type ApiErrors = z.infer<typeof ApiErrorsSchema>
 
-export const apiClient = new Zodios(apiBaseUrl, [
+const apiDefinitions = [
   {
     method: 'get',
     path: '/v1/config',
@@ -728,9 +737,29 @@ export const apiClient = new Zodios(apiBaseUrl, [
         schema: ApiErrorsSchema
       }
     ]
+  },
+  {
+    method: 'post',
+    path: '/v1/wallets/authorize',
+    alias: 'authorizeWallet',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: AuthorizeWalletRequestSchema
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
   }
-])
+]
 
+export const apiClient = new Zodios(apiBaseUrl, apiDefinitions)
 apiClient.use(
   pluginToken({
     getToken: async () => {
@@ -741,6 +770,8 @@ apiClient.use(
     }
   })
 )
+
+export const noAuthApiClient = new Zodios(apiBaseUrl, apiDefinitions)
 
 export function useMaintenance() {
   const [maintenance, setMaintenance] = useState(false)
