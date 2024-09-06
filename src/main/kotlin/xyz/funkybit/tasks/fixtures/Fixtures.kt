@@ -4,6 +4,7 @@ import xyz.funkybit.core.blockchain.BitcoinBlockchainClientConfig
 import xyz.funkybit.core.blockchain.BlockchainClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.FeeRates
@@ -67,7 +68,7 @@ fun getFixtures(chainringChainClients: List<BlockchainClient>, bitcoinBlockchain
             Fixtures.Chain(
                 BitcoinClient.chainId,
                 "Bitcoin",
-                EvmAddress("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"),
+                BitcoinAddress.canonicalize("bcrt1qj2w49gms5vm0ea7vhj028p355eyped59vjgufd"),
                 bitcoinBlockchainClientConfig.url,
                 bitcoinBlockchainClientConfig.blockExplorerNetName,
                 bitcoinBlockchainClientConfig.blockExplorerUrl,

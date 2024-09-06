@@ -54,11 +54,26 @@ sealed class MempoolSpaceApi {
     data class MempoolApiFailure(
         val error: String,
     )
+
+    @Serializable
+    data class Stats(
+        @SerialName("funded_txo_sum")
+        val fundedTxoSum: Long,
+    )
+
+    @Serializable
+    data class AddressStats(
+        val address: String,
+        @SerialName("chain_stats")
+        val chainStats: Stats,
+        @SerialName("mempool_stats")
+        val mempoolStats: Stats,
+    )
 }
 
 object MempoolSpaceClient {
 
-    val apiServerRootUrl = System.getenv("MEMPOOL_SPACE_API_URL") ?: "http://localhost:1080/api"
+    val apiServerRootUrl = System.getenv("MEMPOOL_SPACE_API_URL") ?: "https://mempool.dev.aws.archnetwork.xyz/api"
     val httpClient = OkHttpClient.Builder().build()
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -70,8 +85,10 @@ object MempoolSpaceClient {
     }
     val logger = KotlinLogging.logger {}
 
-    private fun execute(request: Request): Response =
-        httpClient.newCall(request).execute()
+    private fun execute(request: Request): Response {
+        logger.debug { "Request -> ${request.url}" }
+        return httpClient.newCall(request).execute()
+    }
 
     fun getTransactions(walletAddress: BitcoinAddress, afterTxId: TxHash?): List<MempoolSpaceApi.Transaction> {
         val url = "$apiServerRootUrl/address/${walletAddress.value}/txs".toHttpUrl().newBuilder().apply {
@@ -79,13 +96,23 @@ object MempoolSpaceClient {
                 addQueryParameter("after_txid", afterTxId.value)
             }
         }.build()
-        logger.debug { "Request -> $url" }
         return execute(
             Request.Builder()
                 .url(url)
                 .get()
                 .build(),
         ).toPayload()
+    }
+
+    fun getBalance(walletAddress: BitcoinAddress): Long {
+        val url = "$apiServerRootUrl/address/${walletAddress.value}".toHttpUrl().newBuilder().build()
+        val stats: MempoolSpaceApi.AddressStats = execute(
+            Request.Builder()
+                .url(url)
+                .get()
+                .build(),
+        ).toPayload()
+        return stats.chainStats.fundedTxoSum + stats.mempoolStats.fundedTxoSum
     }
 
     private inline fun <reified T> Response.toPayload(): T {

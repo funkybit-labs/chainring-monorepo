@@ -1,6 +1,5 @@
 package xyz.funkybit.core.model.rpc
 
-import com.funkatronics.kborsh.Borsh
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -9,14 +8,19 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.buildSerialDescriptor
-import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.encoding.encodeCollection
 import kotlinx.serialization.serializer
+import org.bitcoinj.core.ECKey
+import xyz.funkybit.core.model.bitcoin.SystemInstruction
 import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.TxHash
-import xyz.funkybit.core.utils.doubleSha256
-import xyz.funkybit.core.utils.toHex
+import xyz.funkybit.core.utils.doubleSha256FromHex
+import xyz.funkybit.core.utils.schnorr.Point
+import xyz.funkybit.core.utils.toHexBytes
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.*
 
 @Serializable
@@ -42,10 +46,20 @@ object ArchRpcParamsSerializer : KSerializer<ArchRpcParams> {
             is Int -> encoder.encodeInt(param)
             is Long -> encoder.encodeLong(param)
             is Boolean -> encoder.encodeBoolean(param)
-            is ArchNetworkRpc.DeployProgramParams -> ArchNetworkRpc.DeployProgramParams::class.serializer().serialize(encoder, param)
-            is ArchNetworkRpc.GetContractAddress -> ArchNetworkRpc.GetContractAddress::class.serializer().serialize(encoder, param)
+            is ArchNetworkRpc.Pubkey -> ArchNetworkRpc.Pubkey::class.serializer().serialize(encoder, param)
             is ArchNetworkRpc.RuntimeTransaction -> ArchNetworkRpc.RuntimeTransaction::class.serializer().serialize(encoder, param)
-            is ArchNetworkRpc.ReadUtxoParams -> ArchNetworkRpc.ReadUtxoParams::class.serializer().serialize(encoder, param)
+            is List<*> -> encoder.encodeCollection(descriptor, param.size) {
+                param.forEachIndexed { index, it ->
+                    when (it) {
+                        is ArchNetworkRpc.RuntimeTransaction -> encodeSerializableElement(
+                            ArchNetworkRpc.RuntimeTransaction::class.serializer().descriptor,
+                            index,
+                            ArchNetworkRpc.RuntimeTransaction::class.serializer(),
+                            it,
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -56,15 +70,6 @@ object ArchRpcParamsSerializer : KSerializer<ArchRpcParams> {
 
 @OptIn(ExperimentalUnsignedTypes::class)
 sealed class ArchNetworkRpc {
-    @Serializable
-    data class DeployProgramParams(
-        val elf: UByteArray,
-    )
-
-    @Serializable
-    data class GetContractAddress(
-        val data: UByteArray,
-    )
 
     @Serializable
     data class RuntimeTransaction(
@@ -79,7 +84,40 @@ sealed class ArchNetworkRpc {
         val instructions: List<Instruction>,
     ) {
         fun hash(): ByteArray {
-            return doubleSha256(Borsh.encodeToByteArray(this)).toHex(false).toByteArray()
+            return doubleSha256FromHex(serialize())
+        }
+
+        fun serialize(): ByteArray {
+            val instructionsArrays = instructions.map {
+                it.serialize()
+            }
+            val buffer = ByteBuffer.allocate(2 + 32 * signers.size + instructionsArrays.sumOf { it.size })
+            buffer.put(signers.size.toByte())
+            signers.forEach {
+                buffer.put(it.bytes.toByteArray())
+            }
+            buffer.put(instructions.size.toByte())
+            instructionsArrays.forEach {
+                buffer.put(it)
+            }
+            return buffer.array()
+        }
+    }
+
+    @Serializable
+    data class AccountMeta(
+        val pubkey: Pubkey,
+        @SerialName("is_signer")
+        val isSigner: Boolean,
+        @SerialName("is_writable")
+        val isWritable: Boolean,
+    ) {
+        fun serialize(): ByteArray {
+            val buffer = ByteBuffer.allocate(34)
+            buffer.put(pubkey.bytes.toByteArray())
+            buffer.put(if (isSigner) 1 else 0)
+            buffer.put(if (isWritable) 1 else 0)
+            return buffer.array()
         }
     }
 
@@ -87,9 +125,22 @@ sealed class ArchNetworkRpc {
     data class Instruction(
         @SerialName("program_id")
         val programId: Pubkey,
-        val utxos: List<UtxoMeta>,
+        val accounts: List<AccountMeta>,
         val data: UByteArray,
-    )
+    ) {
+        fun serialize(): ByteArray {
+            val buffer = ByteBuffer.allocate(32 + 1 + 34 * accounts.size + 8 + data.size)
+            buffer.order(ByteOrder.LITTLE_ENDIAN)
+            buffer.put(programId.bytes.toByteArray())
+            buffer.put(accounts.size.toByte())
+            accounts.forEach {
+                buffer.put(it.serialize())
+            }
+            buffer.putLong(data.size.toLong())
+            buffer.put(data.toByteArray())
+            return buffer.array()
+        }
+    }
 
     @Serializable
     data class UtxoMeta(
@@ -98,9 +149,17 @@ sealed class ArchNetworkRpc {
         val vout: Int,
     ) {
         fun toUtxoId() = UtxoId.fromTxHashAndVout(txId, vout)
+
+        fun serialize(): ByteArray {
+            val buffer = ByteBuffer.allocate(36)
+            buffer.order(ByteOrder.LITTLE_ENDIAN)
+            buffer.put(txId.value.toHexBytes())
+            buffer.putInt(vout)
+            return buffer.array()
+        }
     }
 
-    @Serializable(with = PubkeySerializer::class)
+    @Serializable()
     @JvmInline
     value class Pubkey(val bytes: UByteArray) {
         init {
@@ -108,35 +167,25 @@ sealed class ArchNetworkRpc {
                 "Pubkey must be 32 bytes"
             }
         }
-    }
 
-    // this custom serializer is to handle the Pubkey - in rust it is defined as [u8; 32], so when serializing
-    // the length does not precede the array since it's a fixed size. This mimics this behaviour on kotlin since
-    // Pubkey is a value class around a UByteArray so default serialization writes the length out
-    @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
-    object PubkeySerializer : KSerializer<Pubkey> {
-        @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
-        override val descriptor: SerialDescriptor = buildSerialDescriptor("Pubkey", StructureKind.LIST)
+        companion object {
 
-        @OptIn(InternalSerializationApi::class)
-        override fun serialize(encoder: Encoder, value: Pubkey) {
-            when (encoder) {
-                is com.funkatronics.kborsh.BorshEncoder -> {
-                    value.bytes.forEach { encoder.encodeByte(it.toByte()) }
-                }
-                else -> UByteArray::class.serializer().serialize(encoder, value.bytes)
+            val systemProgram = Pubkey(
+                UByteArray(32).also {
+                    it[31] = 1u
+                },
+            )
+
+            fun fromECKey(ecKey: ECKey): Pubkey {
+                return Pubkey(Point.genPubKey(ecKey.privKeyBytes).toUByteArray())
+            }
+
+            fun fromHexString(hex: String): Pubkey {
+                return Pubkey(hex.toHexBytes().toUByteArray())
             }
         }
 
-        @OptIn(InternalSerializationApi::class)
-        override fun deserialize(decoder: Decoder): Pubkey {
-            return when (decoder) {
-                is com.funkatronics.kborsh.BorshDecoder -> {
-                    Pubkey((0..31).map { decoder.decodeByte() }.toByteArray().toUByteArray())
-                }
-                else -> Pubkey(UByteArray::class.serializer().deserialize(decoder))
-            }
-        }
+        fun serialize(): ByteArray = bytes.toByteArray()
     }
 
     @Serializable
@@ -144,23 +193,18 @@ sealed class ArchNetworkRpc {
     value class Signature(val bytes: UByteArray)
 
     @Serializable
-    data class ReadUtxoParams(
-        @SerialName("utxo_id")
-        val utxoId: String,
-    )
-
-    @Serializable
-    data class ReadUtxoResult(
-        @SerialName("utxo_id")
-        val utxoId: String,
+    data class AccountInfoResult(
+        val owner: Pubkey,
         val data: UByteArray,
-        val authority: Pubkey,
+        val utxo: String,
+        @SerialName("is_executable")
+        val isExecutable: Boolean,
     )
 
     @Serializable
     enum class Status {
         Processing,
-        Success,
+        Processed,
         Failed,
     }
 
@@ -170,14 +214,50 @@ sealed class ArchNetworkRpc {
         val runtimeTransaction: RuntimeTransaction,
         val status: Status,
         @SerialName("bitcoin_txids")
-        val bitcoinTxIds: Map<String, TxHash>,
+        val bitcoinTxIds: List<TxHash>,
     )
 
-    @Serializable
-    data class Utxo(
-        @SerialName("txid")
-        val txId: String,
-        val vout: Int,
-        val value: ULong,
-    )
+    companion object {
+        fun createNewAccountInstruction(pubkey: Pubkey, utxoMeta: UtxoMeta): Instruction {
+            return createSystemInstructionInstruction(
+                pubkey,
+                SystemInstruction.CreateNewAccount(utxoMeta),
+            )
+        }
+
+        fun extendBytesInstruction(pubkey: Pubkey, bytes: ByteArray): Instruction {
+            return createSystemInstructionInstruction(
+                pubkey,
+                SystemInstruction.ExtendBytes(bytes),
+            )
+        }
+
+        fun makeAccountExecutableInstruction(pubkey: Pubkey): Instruction {
+            return createSystemInstructionInstruction(
+                pubkey,
+                SystemInstruction.MakeAccountExecutable,
+            )
+        }
+
+        fun changeOwnershipInstruction(pubkey: Pubkey, ownerPubkey: Pubkey): Instruction {
+            return createSystemInstructionInstruction(
+                pubkey,
+                SystemInstruction.ChangeAccountOwnership(ownerPubkey),
+            )
+        }
+
+        private fun createSystemInstructionInstruction(pubkey: Pubkey, systemInstruction: SystemInstruction): Instruction {
+            return Instruction(
+                programId = Pubkey.systemProgram,
+                accounts = listOf(
+                    AccountMeta(
+                        pubkey = pubkey,
+                        isSigner = true,
+                        isWritable = true,
+                    ),
+                ),
+                data = systemInstruction.serialize().toUByteArray(),
+            )
+        }
+    }
 }

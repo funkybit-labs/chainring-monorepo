@@ -40,7 +40,7 @@ class Wallet(
     val logger = KotlinLogging.logger {}
     companion object {
         operator fun invoke(apiClient: ApiClient): Wallet {
-            val config = apiClient.getConfiguration().chains
+            val config = apiClient.getConfiguration().evmChains
             // TODO: add bitcoin support
             return Wallet(apiClient.keyPair as WalletKeyPair.EVM, config, apiClient)
         }
