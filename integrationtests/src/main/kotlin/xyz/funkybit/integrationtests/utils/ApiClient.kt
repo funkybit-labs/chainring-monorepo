@@ -513,6 +513,16 @@ open class ApiClient(
                 .build(),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
+    fun tryTestnetChallengeEnroll(): Either<ApiCallFailure, Unit> =
+        executeAndTrace(
+            TraceRecorder.Op.TestnetChallengeEnroll,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/testnet-challenge")
+                .post("".toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(keyPair, chainId = currentChainId),
+        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
     private fun executeAndTrace(op: TraceRecorder.Op, request: Request): Response {
         return traceRecorder.record(op) {
             httpClient.newCall(request).execute()
@@ -610,6 +620,8 @@ open class ApiClient(
 
     open fun getLastPrice(marketId: MarketId): GetLastPriceResponse =
         tryGetLastPrice(marketId).throwOrReturn()
+
+    open fun testnetChallengeEnroll() = tryTestnetChallengeEnroll().throwOrReturn()
 }
 
 fun <T> Either<ApiCallFailure, T>.throwOrReturn(): T {

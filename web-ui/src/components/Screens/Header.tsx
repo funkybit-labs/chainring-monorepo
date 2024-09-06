@@ -13,13 +13,14 @@ import Menu from 'assets/Menu.svg'
 import { FaucetModal } from 'components/Screens/HomeScreen/faucet/FaucetModal'
 import faucetIcon from 'assets/faucet.svg'
 import { useValidChain } from 'hooks/useValidChain'
-import { useQuery } from '@tanstack/react-query'
-import { apiClient } from 'apiClient'
 import { Address } from 'viem'
 import BtcSvg from 'assets/btc.svg'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
+import { TestnetChallengeEnabled } from 'testnetChallenge'
+import { useQuery } from '@tanstack/react-query'
+import { apiClient } from 'apiClient'
 
-export type Tab = 'Swap' | 'Limit' | 'Dashboard'
+export type Tab = 'Swap' | 'Limit' | 'Dashboard' | 'Testnet Challenge'
 
 export function Header({
   initialTab,
@@ -212,7 +213,16 @@ export function Header({
           </div>
         </span>
         <div className="cursor-pointer space-x-4 text-[16px]">
-          {(['Swap', 'Limit', 'Dashboard'] as Tab[]).map((t) => (
+          {(
+            [
+              'Swap',
+              'Limit',
+              'Dashboard',
+              ...(TestnetChallengeEnabled && wallet.primaryCategory !== 'none'
+                ? ['Testnet Challenge']
+                : [])
+            ] as Tab[]
+          ).map((t) => (
             <span
               key={t}
               className={classNames(
