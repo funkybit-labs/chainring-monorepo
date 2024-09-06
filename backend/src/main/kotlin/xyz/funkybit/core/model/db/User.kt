@@ -42,7 +42,7 @@ object UserTable : GUIDTable<UserId>("user", ::UserId) {
     val sequencerId = long("sequencer_id").uniqueIndex()
 
     // is admin
-    val nickName = varchar("nick_name", 10485760).nullable()
+    val nickName = varchar("nick_name", 10485760).uniqueIndex().nullable()
     val avatarUrl = varchar("avatar_url", 10485760).nullable()
     val testnetChallengeStatus = customEnumeration(
         "testnet_challenge_status",
@@ -104,6 +104,12 @@ class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
                 .toList()
 
             return users.map { Pair(it, wallets[it.guid.value] ?: emptyList()) }
+        }
+
+        fun findByNickname(name: String): UserEntity? {
+            return UserEntity.find {
+                UserTable.nickName eq name
+            }.singleOrNull()
         }
     }
 

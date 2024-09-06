@@ -17,6 +17,12 @@ make anvil_image
 make otterscan_image
 ```
 
+Install rust and solana
+```
+curl https://sh.rustup.rs -sSf | sh
+curl -sSfL https://release.solana.com/v1.18.18/install | sh
+```
+
 Start the containers
 
 ```

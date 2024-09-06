@@ -43,6 +43,7 @@ interface TraceRecorder {
         SetFeeRates,
         GetLastPrice,
         TestnetChallengeEnroll,
+        SetNickName,
     }
 
     data class Trace(

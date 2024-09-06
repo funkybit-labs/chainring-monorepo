@@ -188,7 +188,7 @@ export function Header({
 
   return (
     <>
-      <div className="fixed z-50 grid h-20 w-full grid-cols-[max-content_1fr_max-content] place-items-center bg-darkBluishGray10 p-0 text-sm text-darkBluishGray1">
+      <div className="fixed z-50 grid h-20 w-full grid-cols-[max-content_1fr_max-content] place-items-center overflow-x-scroll bg-darkBluishGray10 p-0 text-sm text-darkBluishGray1">
         <span className="justify-self-start">
           <img
             className={classNames(

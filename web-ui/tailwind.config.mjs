@@ -17,10 +17,15 @@ export default {
         swivel: {
           'from': {transform: 'rotateY(0deg)'},
           'to': {transform: 'rotateY(180deg)'}
+        },
+        fall: {
+          'from': {transform: 'translateY(-1000px)'},
+          'to': {top: 'translateY(0px)'}
         }
       },
       animation: {
-        swivel: 'swivel 0.5s linear'
+        swivel: 'swivel 0.5s linear',
+        fall: 'fall 1s ease-out'
       }
     },
     colors: {

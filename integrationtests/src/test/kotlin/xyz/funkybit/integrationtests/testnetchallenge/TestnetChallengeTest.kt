@@ -4,6 +4,7 @@ import org.awaitility.kotlin.await
 import org.http4k.client.WebsocketClient
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -28,8 +29,7 @@ import java.time.Duration
 
 @ExtendWith(AppUnderTestRunner::class)
 class TestnetChallengeTest {
-    @Test
-    fun `testnet challenge flow`() {
+    private fun enrollInTestnetChallenge(): TestApiClient {
         val apiClient = TestApiClient()
         val wallet = Wallet(apiClient)
         val wsClient = WebsocketClient.blocking(apiClient.authToken)
@@ -80,6 +80,28 @@ class TestnetChallengeTest {
         )
         apiClient.getAccountConfiguration().let {
             assertEquals(TestnetChallengeStatus.Enrolled, it.testnetChallengeStatus)
+            assertNull(it.nickName)
+            assertNull(it.avatarUrl)
         }
+
+        return apiClient
+    }
+
+    @Test
+    fun `testnet challenge flow`() {
+        val apiClient = enrollInTestnetChallenge()
+        apiClient.setNickname("My Nickname")
+        apiClient.getAccountConfiguration().let {
+            assertEquals("My Nickname", it.nickName)
+            assertNull(it.avatarUrl)
+        }
+        // idempotent
+        apiClient.setNickname("My Nickname")
+
+        val apiClient2 = enrollInTestnetChallenge()
+        val left = apiClient2.trySetNickname("My Nickname").leftOrNull()
+        assertNotNull(left)
+        assertEquals(422, left!!.httpCode)
+        assertEquals("Nickname is already taken", left.error!!.message)
     }
 }

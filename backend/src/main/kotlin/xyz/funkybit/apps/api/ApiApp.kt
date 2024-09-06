@@ -145,7 +145,11 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                             routes += faucetRoutes.faucet
                         }
                         if (TestnetChallengeUtils.enabled) {
-                            routes += testnetChallengeRoutes.enroll
+                            routes += listOf(
+                                testnetChallengeRoutes.enroll,
+                                testnetChallengeRoutes.setNickname,
+                                testnetChallengeRoutes.setAvatarUrl,
+                            )
                         }
                     },
                 "/tma/v1" bind
