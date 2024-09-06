@@ -15,12 +15,16 @@ import xyz.funkybit.apps.ring.RingApp
 import xyz.funkybit.apps.ring.RingAppConfig
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.ContractType
+import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.db.DbConfig
 import xyz.funkybit.core.db.notifyDbListener
 import xyz.funkybit.core.model.MarketMinFee
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.WithdrawalFee
+import xyz.funkybit.core.model.db.ArchAccountBalanceIndexTable
+import xyz.funkybit.core.model.db.ArchAccountEntity
+import xyz.funkybit.core.model.db.ArchAccountStatus
 import xyz.funkybit.core.model.db.ArchAccountTable
 import xyz.funkybit.core.model.db.BalanceLogTable
 import xyz.funkybit.core.model.db.BalanceTable
@@ -71,6 +75,7 @@ import kotlin.time.Duration.Companion.seconds
 
 // This extension allows us to start the app under test only once
 class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
+    @OptIn(ExperimentalUnsignedTypes::class)
     override fun beforeAll(context: ExtensionContext) {
         val blockchainClients = ChainManager.blockchainConfigs.map {
             TestBlockchainClient(it)
@@ -122,11 +127,25 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                                         blockchainClient.chainId,
                                     )?.deprecated = true
                                 }
-                                DeployedSmartContractEntity.deleteDeployedContractByNameAndChain(
-                                    ContractType.Exchange.name,
-                                    BitcoinClient.chainId,
-                                )
-                                ArchAccountTable.deleteAll()
+                                val programAccount = ArchAccountEntity.findProgramAccount()
+                                val onChainAccount = try {
+                                    programAccount?.let { ArchNetworkClient.readAccountInfo(it.rpcPubkey()) }
+                                } catch (e: Exception) {
+                                    null
+                                }
+                                ArchAccountBalanceIndexTable.deleteAll()
+                                if (
+                                    programAccount?.status != ArchAccountStatus.Complete ||
+                                    ArchAccountEntity.findProgramStateAccount()?.status != ArchAccountStatus.Complete ||
+                                    onChainAccount == null ||
+                                    !onChainAccount.data.toByteArray().contentEquals(javaClass.getResource("/exchangeprogram.so")!!.readBytes())
+                                ) {
+                                    DeployedSmartContractEntity.deleteDeployedContractByNameAndChain(
+                                        ContractType.Exchange.name,
+                                        BitcoinClient.chainId,
+                                    )
+                                    ArchAccountTable.deleteAll()
+                                }
                                 WithdrawalEntity.findPending().forEach { it.update(WithdrawalStatus.Failed, "restarting test") }
                                 BlockTable.deleteAll()
                             }
@@ -247,6 +266,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             SettlementBatchTable.deleteAll()
             DepositTable.deleteAll()
             WithdrawalTable.deleteAll()
+            ArchAccountBalanceIndexTable.deleteAll()
             BlockchainTransactionTable.deleteAll()
             BalanceLogTable.deleteAll()
             BalanceTable.deleteAll()

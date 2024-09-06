@@ -12,6 +12,7 @@ import xyz.funkybit.core.db.DbConfig
 import xyz.funkybit.core.db.connect
 import xyz.funkybit.core.db.migrations
 import xyz.funkybit.core.db.upgrade
+import xyz.funkybit.core.model.db.ArchAccountBalanceIndexTable
 import xyz.funkybit.core.model.db.ArchAccountTable
 import xyz.funkybit.core.model.db.BalanceLogTable
 import xyz.funkybit.core.model.db.BalanceTable
@@ -75,6 +76,7 @@ open class TestWithDb {
             SettlementBatchTable.deleteAll()
             DepositTable.deleteAll()
             WithdrawalTable.deleteAll()
+            ArchAccountBalanceIndexTable.deleteAll()
             BlockchainTransactionTable.deleteAll()
             BalanceLogTable.deleteAll()
             BalanceTable.deleteAll()

@@ -13,11 +13,15 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.encodeCollection
 import kotlinx.serialization.serializer
 import org.bitcoinj.core.ECKey
+import org.web3j.crypto.Keys
+import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.bitcoin.SystemInstruction
 import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.utils.doubleSha256FromHex
 import xyz.funkybit.core.utils.schnorr.Point
+import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.core.utils.toHexBytes
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -76,7 +80,20 @@ sealed class ArchNetworkRpc {
         val version: Int,
         val signatures: List<Signature>,
         val message: Message,
-    )
+    ) {
+        fun serialize(): ByteArray {
+            val serializedMessage = message.serialize()
+            val buffer = ByteBuffer.allocate(4 + 1 + 64 * signatures.size + serializedMessage.size)
+            buffer.order(ByteOrder.LITTLE_ENDIAN)
+            buffer.putInt(version)
+            buffer.put(signatures.size.toByte())
+            signatures.forEach {
+                buffer.put(it.bytes.toByteArray())
+            }
+            buffer.put(message.serialize())
+            return buffer.array()
+        }
+    }
 
     @Serializable
     data class Message(
@@ -186,6 +203,10 @@ sealed class ArchNetworkRpc {
         }
 
         fun serialize(): ByteArray = bytes.toByteArray()
+
+        fun toContractAddress(): Address {
+            return EvmAddress(Keys.toChecksumAddress(bytes.toHex()))
+        }
     }
 
     @Serializable

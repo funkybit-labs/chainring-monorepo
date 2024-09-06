@@ -95,7 +95,7 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
         this.updatedBy = "system"
     }
 
-    fun markAsSubmitted(txHash: TxHash, blockNumber: BigInteger?, lastSeenBlock: BigInteger?) {
+    fun markAsSubmitted(txHash: TxHash, blockNumber: BigInteger? = null, lastSeenBlock: BigInteger? = null) {
         this.txHash = txHash
         this.blockNumber = blockNumber
         this.lastSeenBlock = lastSeenBlock

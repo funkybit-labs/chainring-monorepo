@@ -59,6 +59,8 @@ sealed class MempoolSpaceApi {
     data class Stats(
         @SerialName("funded_txo_sum")
         val fundedTxoSum: Long,
+        @SerialName("spent_txo_sum")
+        val spentTxoSum: Long,
     )
 
     @Serializable
@@ -112,7 +114,7 @@ object MempoolSpaceClient {
                 .get()
                 .build(),
         ).toPayload()
-        return stats.chainStats.fundedTxoSum + stats.mempoolStats.fundedTxoSum
+        return stats.chainStats.fundedTxoSum + stats.mempoolStats.fundedTxoSum - stats.chainStats.spentTxoSum - stats.mempoolStats.spentTxoSum
     }
 
     private inline fun <reified T> Response.toPayload(): T {

@@ -28,6 +28,45 @@ import kotlin.test.assertEquals
 @ExtendWith(AppUnderTestRunner::class)
 class ArchOnboardingTest {
 
+    companion object {
+        fun waitForProgramAccount(): ArchAccountEntity {
+            waitFor(120000) {
+                transaction {
+                    ArchAccountEntity.findProgramAccount()?.status == ArchAccountStatus.Complete
+                }
+            }
+            Thread.sleep(2000)
+            return transaction { ArchAccountEntity.findProgramAccount()!! }
+        }
+
+        fun waitForProgramStateAccount(): ArchAccountEntity {
+            waitFor {
+                transaction {
+                    ArchAccountEntity.findProgramStateAccount()?.status == ArchAccountStatus.Complete
+                }
+            }
+            Thread.sleep(2000)
+            return transaction { ArchAccountEntity.findProgramStateAccount()!! }
+        }
+
+        fun waitForTokenStateAccount(): ArchAccountEntity {
+            waitFor(30000) {
+                triggerRepeaterTaskAndWaitForCompletion("arch_token_state_setup")
+                transaction {
+                    ArchAccountEntity.findTokenAccountForSymbol(
+                        SymbolEntity.forChain(BitcoinClient.chainId).first(),
+                    )?.status == ArchAccountStatus.Complete
+                }
+            }
+            Thread.sleep(2000)
+            return transaction {
+                ArchAccountEntity.findTokenAccountForSymbol(
+                    SymbolEntity.forChain(BitcoinClient.chainId).first(),
+                )!!
+            }
+        }
+    }
+
     @Test
     fun testOnboarding() {
         Assumptions.assumeFalse(true)
@@ -71,42 +110,5 @@ class ArchOnboardingTest {
         assertEquals(0u, tokenState.feeAccountIndex)
         assertEquals(1, tokenState.balances.size)
         assertEquals(ArchAccountState.Balance(BitcoinClient.bitcoinConfig.feeCollectionAddress.value, 0u), tokenState.balances.first())
-    }
-
-    private fun waitForProgramAccount(): ArchAccountEntity {
-        waitFor(120000) {
-            transaction {
-                ArchAccountEntity.findProgramAccount()?.status == ArchAccountStatus.Complete
-            }
-        }
-        Thread.sleep(2000)
-        return transaction { ArchAccountEntity.findProgramAccount()!! }
-    }
-
-    private fun waitForProgramStateAccount(): ArchAccountEntity {
-        waitFor {
-            transaction {
-                ArchAccountEntity.findProgramStateAccount()?.status == ArchAccountStatus.Complete
-            }
-        }
-        Thread.sleep(2000)
-        return transaction { ArchAccountEntity.findProgramStateAccount()!! }
-    }
-
-    private fun waitForTokenStateAccount(): ArchAccountEntity {
-        waitFor(30000) {
-            triggerRepeaterTaskAndWaitForCompletion("arch_token_state_setup")
-            transaction {
-                ArchAccountEntity.findTokenAccount(
-                    SymbolEntity.forChain(BitcoinClient.chainId).first(),
-                )?.status == ArchAccountStatus.Complete
-            }
-        }
-        Thread.sleep(2000)
-        return transaction {
-            ArchAccountEntity.findTokenAccount(
-                SymbolEntity.forChain(BitcoinClient.chainId).first(),
-            )!!
-        }
     }
 }

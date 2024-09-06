@@ -125,7 +125,7 @@ class ArchAccountEntity(guid: EntityID<ArchAccountId>) : GUIDEntity<ArchAccountI
             }.singleOrNull()
         }
 
-        fun findTokenAccount(symbolEntity: SymbolEntity): ArchAccountEntity? {
+        fun findTokenAccountForSymbol(symbolEntity: SymbolEntity): ArchAccountEntity? {
             return ArchAccountEntity.find {
                 ArchAccountTable.type.eq(ArchAccountType.TokenState) and
                     ArchAccountTable.symbolGuid.eq(symbolEntity.id)
