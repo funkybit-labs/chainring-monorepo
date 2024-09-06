@@ -426,8 +426,8 @@ class SettlementCoordinator(
 
                 val sequencerResponse = runBlocking {
                     sequencerClient.failSettlement(
-                        buyWallet = buyOrder.wallet.address.toSequencerId().value,
-                        sellWallet = sellOrder.wallet.address.toSequencerId().value,
+                        buyUser = buyOrder.wallet.userGuid.value.toSequencerId(),
+                        sellUser = sellOrder.wallet.userGuid.value.toSequencerId(),
                         marketId = tradeEntity.marketGuid.value,
                         buyOrderId = buyOrder.guid.value,
                         sellOrderId = sellOrder.guid.value,

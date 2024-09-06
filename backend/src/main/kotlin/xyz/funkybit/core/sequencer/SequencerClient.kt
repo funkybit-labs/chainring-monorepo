@@ -11,6 +11,7 @@ import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.SequencerOrderId
+import xyz.funkybit.core.model.SequencerUserId
 import xyz.funkybit.core.model.SequencerWalletId
 import xyz.funkybit.core.model.WithdrawalFee
 import xyz.funkybit.core.model.db.ChainId
@@ -19,6 +20,8 @@ import xyz.funkybit.core.model.db.DepositId
 import xyz.funkybit.core.model.db.FeeRates
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.OrderId
+import xyz.funkybit.core.model.db.UserId
+import xyz.funkybit.core.model.db.WalletFamily
 import xyz.funkybit.core.model.db.WithdrawalId
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.core.utils.toHexBytes
@@ -88,6 +91,19 @@ fun Address.toSequencerId(): SequencerWalletId {
     )
 }
 
+fun Long.sequencerUserId(): SequencerUserId {
+    return SequencerUserId(this)
+}
+
+fun UserId.toSequencerId(): SequencerUserId {
+    return SequencerUserId(
+        BigInteger(
+            1,
+            ECHelper.sha3(value.toByteArray()),
+        ).toLong(),
+    )
+}
+
 fun EvmAddress.toSequencerId(): SequencerWalletId {
     return SequencerWalletId(BigInteger(1, ECHelper.sha3(this.value.toHexBytes())).toLong())
 }
@@ -121,7 +137,8 @@ open class SequencerClient {
 
     suspend fun orderBatch(
         marketId: MarketId,
-        wallet: Long,
+        user: SequencerUserId,
+        walletFamily: WalletFamily,
         ordersToAdd: List<Order>,
         ordersToCancel: List<OrderId>,
         cancelAll: Boolean = false,
@@ -131,7 +148,8 @@ open class SequencerClient {
                 orderBatch {
                     this.guid = UUID.randomUUID().toString()
                     this.marketId = marketId.value
-                    this.wallet = wallet
+                    this.user = user.value
+                    this.walletFamily = walletFamily.toString()
                     this.ordersToAdd.addAll(
                         ordersToAdd.map { toOrderDSL(it) },
                     )
@@ -149,7 +167,8 @@ open class SequencerClient {
 
     suspend fun backToBackOrder(
         marketIds: List<MarketId>,
-        wallet: Long,
+        userId: SequencerUserId,
+        walletFamily: WalletFamily,
         order: Order,
     ): SequencerResponse {
         return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
@@ -157,7 +176,8 @@ open class SequencerClient {
                 backToBackOrderRequest {
                     this.guid = UUID.randomUUID().toString()
                     this.order = backToBackOrder {
-                        this.wallet = wallet
+                        this.user = userId.value
+                        this.walletFamily = walletFamily.toString()
                         this.marketIds.addAll(marketIds.map { it.value })
                         this.order = toOrderDSL(order)
                     }
@@ -247,7 +267,7 @@ open class SequencerClient {
     }
 
     suspend fun deposit(
-        wallet: Long,
+        user: SequencerUserId,
         asset: Asset,
         amount: BigInteger,
         depositId: DepositId,
@@ -259,7 +279,7 @@ open class SequencerClient {
                     this.deposits.add(
                         deposit {
                             this.asset = asset.value
-                            this.wallet = wallet
+                            this.user = user.value
                             this.amount = amount.toIntegerValue()
                             this.externalGuid = depositId.value
                         },
@@ -273,7 +293,7 @@ open class SequencerClient {
     }
 
     suspend fun withdraw(
-        wallet: Long,
+        user: SequencerUserId,
         asset: Asset,
         amount: BigInteger,
         nonce: BigInteger,
@@ -287,7 +307,7 @@ open class SequencerClient {
                     this.withdrawals.add(
                         withdrawal {
                             this.asset = asset.value
-                            this.wallet = wallet
+                            this.user = user.value
                             this.amount = amount.toIntegerValue()
                             this.nonce = nonce.toIntegerValue()
                             this.signature = evmSignature.value
@@ -303,7 +323,7 @@ open class SequencerClient {
     }
 
     suspend fun failWithdraw(
-        wallet: Long,
+        user: SequencerUserId,
         asset: Asset,
         amount: BigInteger,
     ): SequencerResponse {
@@ -314,7 +334,7 @@ open class SequencerClient {
                     this.failedWithdrawals.add(
                         failedWithdrawal {
                             this.asset = asset.value
-                            this.wallet = wallet
+                            this.user = user.value
                             this.amount = amount.toIntegerValue()
                         },
                     )
@@ -327,8 +347,8 @@ open class SequencerClient {
     }
 
     suspend fun failSettlement(
-        buyWallet: Long,
-        sellWallet: Long,
+        buyUser: SequencerUserId,
+        sellUser: SequencerUserId,
         marketId: MarketId,
         buyOrderId: OrderId,
         sellOrderId: OrderId,
@@ -343,8 +363,8 @@ open class SequencerClient {
                     this.guid = UUID.randomUUID().toString()
                     this.failedSettlements.add(
                         xyz.funkybit.sequencer.proto.failedSettlement {
-                            this.buyWallet = buyWallet
-                            this.sellWallet = sellWallet
+                            this.buyUser = buyUser.value
+                            this.sellUser = sellUser.value
                             this.marketId = marketId.value
                             this.trade = xyz.funkybit.sequencer.proto.tradeCreated {
                                 this.buyOrderGuid = buyOrderId.toSequencerId().value
@@ -366,19 +386,21 @@ open class SequencerClient {
 
     suspend fun cancelOrder(
         marketId: MarketId,
-        wallet: Long,
+        userId: SequencerUserId,
+        walletFamily: WalletFamily,
         orderId: OrderId,
     ): SequencerResponse {
-        return orderBatch(marketId, wallet, emptyList(), listOf(orderId))
+        return orderBatch(marketId, userId, walletFamily, emptyList(), listOf(orderId))
     }
 
     suspend fun cancelOrders(
         marketId: MarketId,
-        wallet: Long,
+        userId: SequencerUserId,
+        walletFamily: WalletFamily,
         orderIds: List<OrderId>,
         cancelAll: Boolean = false,
     ): SequencerResponse {
-        return orderBatch(marketId, wallet, emptyList(), orderIds, cancelAll = cancelAll)
+        return orderBatch(marketId, userId, walletFamily, emptyList(), orderIds, cancelAll = cancelAll)
     }
 
     suspend fun reset(): SequencerResponse {

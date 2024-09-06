@@ -5,20 +5,20 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
+import xyz.funkybit.core.model.SequencerUserId
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.FeeRates
+import xyz.funkybit.core.model.db.UserId
+import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.sequencer.core.MarketId
-import xyz.funkybit.sequencer.core.WalletAddress
 import xyz.funkybit.sequencer.core.notional
 import xyz.funkybit.sequencer.core.notionalFee
 import xyz.funkybit.sequencer.core.toBigInteger
-import xyz.funkybit.sequencer.core.toWalletAddress
 import xyz.funkybit.sequencer.proto.Order
 import xyz.funkybit.sequencer.proto.OrderChangeRejected
 import xyz.funkybit.sequencer.proto.OrderDisposition
 import xyz.funkybit.sequencer.proto.SequencerError
-import xyz.funkybit.sequencer.proto.market
 import xyz.funkybit.sequencer.proto.newQuantityOrNull
 import xyz.funkybit.testutils.ExpectedLimitsUpdate
 import xyz.funkybit.testutils.ExpectedTrade
@@ -32,7 +32,6 @@ import xyz.funkybit.testutils.inSats
 import xyz.funkybit.testutils.inWei
 import java.math.BigDecimal
 import java.math.BigInteger
-import kotlin.random.Random
 
 class TestSequencer {
     private val mockClock = MockClock()
@@ -60,7 +59,7 @@ class TestSequencer {
         val btc1 = market.baseAsset
         val eth1 = market.quoteAsset
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         sequencer.deposit(maker, btc1, BigDecimal("10")).also { response ->
             response.assertBalanceChanges(
                 market,
@@ -109,7 +108,7 @@ class TestSequencer {
             response.ordersChangedList.first().guid
         }
 
-        val taker = generateWalletAddress()
+        val taker = generateUser()
         sequencer.deposit(taker, eth1, BigDecimal("10")).also { response ->
             response.assertLimits(
                 listOf(
@@ -255,9 +254,9 @@ class TestSequencer {
         val market = sequencer.createMarket(MarketId("BTC:1338/ETH:1338"))
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
-        val lp1 = generateWalletAddress()
-        val lp2 = generateWalletAddress()
-        val tkr = generateWalletAddress()
+        val lp1 = generateUser()
+        val lp2 = generateUser()
+        val tkr = generateUser()
 
         sequencer.deposit(lp1, market.baseAsset, BigDecimal("0.31"))
         sequencer.deposit(lp2, market.baseAsset, BigDecimal("0.31"))
@@ -399,9 +398,9 @@ class TestSequencer {
         val market = sequencer.createMarket(MarketId("BTC20/ETH20"))
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
-        val lp1 = generateWalletAddress()
-        val lp2 = generateWalletAddress()
-        val tkr = generateWalletAddress()
+        val lp1 = generateUser()
+        val lp2 = generateUser()
+        val tkr = generateUser()
 
         sequencer.deposit(lp1, market.baseAsset, BigDecimal("1")).also { response ->
             response.assertLimits(
@@ -466,7 +465,7 @@ class TestSequencer {
     @Test
     fun `test balances`() {
         val sequencer = SequencerClient(mockClock)
-        val walletAddress = generateWalletAddress()
+        val walletAddress = generateUser()
 
         val ethWithdrawalFee = BigDecimal("0.001").inWei()
         val pepeWithdrawalFee = BigDecimal("0.002").inWei()
@@ -510,7 +509,7 @@ class TestSequencer {
         sequencer.withdrawal(walletAddress, asset1, BigDecimal("0.1"), expectedAmount = null)
 
         // attempt to withdraw from an unknown wallet or asset does not return a balance change
-        sequencer.withdrawal(generateWalletAddress(), asset1, BigDecimal("1"), expectedAmount = null)
+        sequencer.withdrawal(generateUser(), asset1, BigDecimal("1"), expectedAmount = null)
         sequencer.withdrawal(walletAddress, asset2, BigDecimal("1"), expectedAmount = null)
 
         // can combine deposits and withdrawals in a batch - amount should be net
@@ -527,7 +526,7 @@ class TestSequencer {
         val market1 = sequencer.createMarket(MarketId("BTC3/ETH3"))
         val market2 = sequencer.createMarket(MarketId("ETH3/USDC3"), baseDecimals = 18, quoteDecimals = 6, tickSize = BigDecimal("1"))
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         // cannot place a buy or sell limit order without any deposits
         assertEquals(SequencerError.ExceedsLimit, sequencer.addOrder(market1, BigDecimal("0.1"), BigDecimal("12.00"), maker, Order.Type.LimitSell).error)
         assertEquals(SequencerError.ExceedsLimit, sequencer.addOrder(market1, BigDecimal("0.1"), BigDecimal("11.00"), maker, Order.Type.LimitBuy).error)
@@ -609,7 +608,7 @@ class TestSequencer {
         assertEquals(SequencerError.ExceedsLimit, sequencer.addOrder(market1, BigDecimal("0.1"), BigDecimal("12.00"), maker, Order.Type.LimitSell).error)
 
         // unless a trade increases the balance
-        val taker = generateWalletAddress()
+        val taker = generateUser()
         sequencer.deposit(taker, market1.baseAsset, BigDecimal("0.1")).also { response ->
             response.assertLimits(
                 listOf(
@@ -648,13 +647,13 @@ class TestSequencer {
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC8/ETH8"))
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         // deposit and prepare liquidity
         sequencer.deposit(maker, market.baseAsset, BigDecimal("0.2"))
         sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.2"), BigDecimal("17.55"), maker, Order.Type.LimitSell)
 
         // prepare second maker
-        val crossingTheMarketMaker = generateWalletAddress()
+        val crossingTheMarketMaker = generateUser()
         sequencer.deposit(crossingTheMarketMaker, market.quoteAsset, BigDecimal("18.00") * BigDecimal("0.3"))
         // deposit extra for the fees
         sequencer.deposit(crossingTheMarketMaker, market.quoteAsset, BigDecimal("0.03510") * BigDecimal(2))
@@ -734,7 +733,7 @@ class TestSequencer {
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC9/ETH9"))
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         // deposit and prepare liquidity
         sequencer.deposit(maker, market.baseAsset, BigDecimal("0.2"))
         val sellOrder1 = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.01"), BigDecimal("17.55"), maker, Order.Type.LimitSell)
@@ -744,7 +743,7 @@ class TestSequencer {
         sequencer.addOrder(market, BigDecimal("0.01"), BigDecimal("19.50"), maker, Order.Type.LimitSell)
 
         // prepare second maker
-        val crossingTheMarketMaker = generateWalletAddress()
+        val crossingTheMarketMaker = generateUser()
         sequencer.deposit(crossingTheMarketMaker, market.quoteAsset, BigDecimal("18.2101") * BigDecimal("0.05"))
         assertEquals(SequencerError.ExceedsLimit, sequencer.addOrder(market, BigDecimal("0.05"), BigDecimal("18.50"), crossingTheMarketMaker, Order.Type.LimitBuy).error)
 
@@ -817,7 +816,7 @@ class TestSequencer {
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC10/ETH10"))
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         // deposit and prepare liquidity
         sequencer.deposit(maker, market.quoteAsset, BigDecimal("17.50") * BigDecimal("0.2"))
         // deposit extra for the fees
@@ -825,7 +824,7 @@ class TestSequencer {
         sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.2"), BigDecimal("17.50"), maker, Order.Type.LimitBuy)
 
         // prepare second maker
-        val crossingTheMarketMaker = generateWalletAddress()
+        val crossingTheMarketMaker = generateUser()
         sequencer.deposit(crossingTheMarketMaker, market.baseAsset, BigDecimal("0.3"))
 
         // limit order can cross the market and be filled immediately
@@ -905,7 +904,7 @@ class TestSequencer {
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC11/ETH11"))
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         // deposit and prepare liquidity
         sequencer.deposit(maker, market.quoteAsset, BigDecimal("17.50") * BigDecimal("0.2"))
         val buyOrder1 = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.01"), BigDecimal("17.50"), maker, Order.Type.LimitBuy)
@@ -915,7 +914,7 @@ class TestSequencer {
         sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.01"), BigDecimal("15.50"), maker, Order.Type.LimitBuy)
 
         // prepare second maker
-        val crossingTheMarketMaker = generateWalletAddress()
+        val crossingTheMarketMaker = generateUser()
         sequencer.deposit(crossingTheMarketMaker, market.baseAsset, BigDecimal("0.3"))
 
         // limit order is partially filled until price is reached
@@ -977,7 +976,7 @@ class TestSequencer {
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC4/ETH4"))
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         sequencer.deposit(maker, market.baseAsset, BigDecimal("0.1")).also { response ->
             response.assertLimits(
                 listOf(
@@ -1008,7 +1007,7 @@ class TestSequencer {
 
         val order2 = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("0.1"), BigDecimal("17.55"), maker, Order.Type.LimitSell)
 
-        val taker = generateWalletAddress()
+        val taker = generateUser()
         sequencer.deposit(taker, market.quoteAsset, BigDecimal("1.1")).also { response ->
             response.assertLimits(
                 listOf(
@@ -1022,7 +1021,7 @@ class TestSequencer {
             assertEquals(mockClock.currentTimeMillis(), response.createdAt)
             assertEquals(0, response.ordersChangedList.size)
             assertEquals(1, response.ordersChangeRejectedList.size)
-            assertEquals(OrderChangeRejected.Reason.NotForWallet, response.ordersChangeRejectedList.first().reason)
+            assertEquals(OrderChangeRejected.Reason.NotForUser, response.ordersChangeRejectedList.first().reason)
         }
 
         // try canceling an order which has been partially filled
@@ -1068,7 +1067,7 @@ class TestSequencer {
         val market2 = sequencer.createMarket(MarketId("ETH6/USDC6"), tickSize = BigDecimal(1), baseDecimals = 18, quoteDecimals = 6)
         val market3 = sequencer.createMarket(MarketId("XXX6/ETH6"), tickSize = BigDecimal(1), baseDecimals = 6, quoteDecimals = 18)
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
 
         // maker deposits 10.1 ETH
         sequencer.deposit(maker, market1.quoteAsset, BigDecimal("10.1")).also { response ->
@@ -1114,7 +1113,7 @@ class TestSequencer {
         }
 
         // now add a taker who will hit the market1 bid selling 0.6 BTC, this would consume 6 ETH + 0,06 ETH fee from maker
-        val taker = generateWalletAddress()
+        val taker = generateUser()
         sequencer.deposit(taker, market1.baseAsset, BigDecimal("0.6")).also { response ->
             response.assertLimits(
                 listOf(
@@ -1165,7 +1164,7 @@ class TestSequencer {
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC7/ETH7"))
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         // maker deposits 10 BTC
         sequencer.deposit(maker, market.baseAsset, BigDecimal("10")).also { response ->
             response.assertLimits(
@@ -1220,8 +1219,8 @@ class TestSequencer {
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
         val market = sequencer.createMarket(MarketId("BTC8/ETH8"))
 
-        val maker = generateWalletAddress()
-        val taker = generateWalletAddress()
+        val maker = generateUser()
+        val taker = generateUser()
 
         sequencer.deposit(maker, market.baseAsset, BigDecimal("10"))
         sequencer.deposit(taker, market.quoteAsset, BigDecimal("200"))
@@ -1274,7 +1273,7 @@ class TestSequencer {
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 0.0, taker = 0.0))
         val market = sequencer.createMarket(MarketId("BTC200/ETH200"))
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         sequencer.deposit(maker, market.quoteAsset, BigDecimal("50")).also { response ->
             response.assertLimits(
                 listOf(
@@ -1371,24 +1370,24 @@ class TestSequencer {
         val sequencer = SequencerClient(mockClock)
         sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
 
-        val walletAddress = generateWalletAddress()
+        val user = generateUser()
         val asset = SequencerClient.Asset("ETH", decimals = 18)
         val amount = BigDecimal("0.2")
 
         // do a deposit
-        sequencer.deposit(walletAddress, asset, amount)
+        sequencer.deposit(user, asset, amount)
 
         // withdraw half
-        sequencer.withdrawal(walletAddress, asset, BigDecimal("0.1"))
+        sequencer.withdrawal(user, asset, BigDecimal("0.1"))
 
         // withdraw other half
-        sequencer.withdrawal(walletAddress, asset, BigDecimal("0.1"))
+        sequencer.withdrawal(user, asset, BigDecimal("0.1"))
 
         // fail the 2 withdrawals
-        sequencer.failedWithdrawals(walletAddress, asset, listOf(BigDecimal("0.1"), BigDecimal("0.1")))
+        sequencer.failedWithdrawals(user, asset, listOf(BigDecimal("0.1"), BigDecimal("0.1")))
 
         // should still be able to withdraw full amount since we rolled back the 2 halves
-        sequencer.withdrawal(walletAddress, asset, amount)
+        sequencer.withdrawal(user, asset, amount)
     }
 
     @Test
@@ -1398,8 +1397,8 @@ class TestSequencer {
 
         val market = sequencer.createMarket(MarketId("BTC8/ETH8"))
 
-        val maker = generateWalletAddress()
-        val taker = generateWalletAddress()
+        val maker = generateUser()
+        val taker = generateUser()
 
         // maker deposits some of both assets -- 10 BTC, 10 ETH
         val makerBaseBalance = BigDecimal("10")
@@ -1484,8 +1483,8 @@ class TestSequencer {
 
         val market = sequencer.createMarket(MarketId("BTC9/ETH9"))
 
-        val maker = generateWalletAddress()
-        val taker = generateWalletAddress()
+        val maker = generateUser()
+        val taker = generateUser()
 
         // maker deposits some of both assets -- 2 BTC, 10 ETH
         val makerBaseBalance = BigDecimal("2")
@@ -1576,8 +1575,8 @@ class TestSequencer {
 
         val market = sequencer.createMarket(MarketId("BTC10/ETH10"))
 
-        val maker = generateWalletAddress()
-        val taker = generateWalletAddress()
+        val maker = generateUser()
+        val taker = generateUser()
 
         // maker deposits some of both assets -- 2 BTC, 2 ETH
         val makerBaseBalance = BigDecimal("10")
@@ -1681,9 +1680,9 @@ class TestSequencer {
         val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
         sequencer.setFeeRates(feeRates)
 
-        val lp1 = generateWalletAddress()
-        val lp2 = generateWalletAddress()
-        val tkr = generateWalletAddress()
+        val lp1 = generateUser()
+        val lp2 = generateUser()
+        val tkr = generateUser()
 
         sequencer.deposit(lp1, market.baseAsset, BigDecimal("1"))
         sequencer.deposit(lp2, market.baseAsset, BigDecimal("1"))
@@ -1704,7 +1703,7 @@ class TestSequencer {
             assertEquals(OrderDisposition.PartiallyFilled, response.ordersChangedList[2].disposition)
             // make sure entire balance used
             assertEquals(
-                response.balancesChangedList.first { it.wallet == tkr.value && it.asset == market.quoteAsset.name }.delta.toBigInteger().negate(),
+                response.balancesChangedList.first { it.user == tkr.value && it.asset == market.quoteAsset.name }.delta.toBigInteger().negate(),
                 BigDecimal("3").toFundamentalUnits(market.quoteAsset.decimals),
             )
 
@@ -1745,9 +1744,9 @@ class TestSequencer {
         val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
         sequencer.setFeeRates(feeRates)
 
-        val lp1 = generateWalletAddress()
-        val lp2 = generateWalletAddress()
-        val tkr = generateWalletAddress()
+        val lp1 = generateUser()
+        val lp2 = generateUser()
+        val tkr = generateUser()
 
         sequencer.deposit(lp1, market.baseAsset, BigDecimal("1"))
         sequencer.deposit(lp2, market.baseAsset, BigDecimal("1"))
@@ -1806,9 +1805,9 @@ class TestSequencer {
         val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
         sequencer.setFeeRates(feeRates)
 
-        val lp1 = generateWalletAddress()
-        val lp2 = generateWalletAddress()
-        val tkr = generateWalletAddress()
+        val lp1 = generateUser()
+        val lp2 = generateUser()
+        val tkr = generateUser()
 
         sequencer.deposit(lp1, market.baseAsset, BigDecimal("1"))
         sequencer.deposit(lp2, market.baseAsset, BigDecimal("1"))
@@ -1858,8 +1857,6 @@ class TestSequencer {
         }
     }
 
-    private val rnd = Random(0)
-
-    private fun generateWalletAddress(): WalletAddress =
-        rnd.nextLong().toWalletAddress()
+    private fun generateUser(): SequencerUserId =
+        UserId.generate().toSequencerId()
 }

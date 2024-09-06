@@ -73,6 +73,17 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
             }.singleOrNull()
     }
 
+    fun walletFamilies(): List<WalletFamily> {
+        val baseFamily = baseSymbol.walletFamily
+        val quoteFamily = quoteSymbol.walletFamily
+
+        return if (baseFamily != quoteFamily) {
+            listOf(baseFamily, quoteFamily)
+        } else {
+            listOf(baseFamily)
+        }
+    }
+
     var createdAt by MarketTable.createdAt
     var createdBy by MarketTable.createdBy
     var updatedAt by MarketTable.updatedAt

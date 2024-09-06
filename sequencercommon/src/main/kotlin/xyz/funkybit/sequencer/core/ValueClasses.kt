@@ -3,14 +3,13 @@ package xyz.funkybit.sequencer.core
 import java.math.BigDecimal
 
 @JvmInline
-value class WalletAddress(val value: Long) {
+value class UserGuid(val value: Long) {
     override fun toString(): String = value.toString()
     companion object {
-        val none = WalletAddress(0L)
+        val none = UserGuid(0L)
     }
 }
-
-fun Long.toWalletAddress() = WalletAddress(this)
+fun Long.toUserGuid() = UserGuid(this)
 
 @JvmInline
 value class OrderGuid(val value: Long) {

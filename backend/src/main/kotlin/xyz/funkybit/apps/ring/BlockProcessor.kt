@@ -179,22 +179,21 @@ class BlockProcessor(
             val nonce = 0L
             val evmSignature = EvmSignature.emptySignature()
 
-            val withdrawal = transaction {
-                WithdrawalEntity.createPending(
-                    WalletEntity.getByAddress(fromAddress),
-                    symbol = symbol,
-                    amount = withdrawalEventResponse.amount,
-                    nonce = nonce,
-                    signature = evmSignature,
-                ).let {
-                    it.refresh(flush = true)
-                    Withdrawal.fromEntity(it)
-                }
+            val wallet = WalletEntity.getByAddress(fromAddress)
+            val withdrawal = WithdrawalEntity.createPending(
+                wallet = wallet,
+                symbol = symbol,
+                amount = withdrawalEventResponse.amount,
+                nonce = nonce,
+                signature = evmSignature,
+            ).let {
+                it.refresh(flush = true)
+                Withdrawal.fromEntity(it)
             }
 
             runBlocking {
                 sequencerClient.withdraw(
-                    fromAddress.toSequencerId().value,
+                    wallet.userGuid.value.toSequencerId(),
                     Asset(symbol.name),
                     withdrawalEventResponse.amount,
                     nonce = nonce.toBigInteger(),

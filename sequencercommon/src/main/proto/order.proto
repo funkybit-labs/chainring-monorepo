@@ -37,10 +37,11 @@ message OrderBatch {
   reserved 5;
   string guid = 1;
   string marketId = 2;
-  uint64 wallet = 3;
-  repeated Order ordersToAdd = 4;
-  repeated CancelOrder ordersToCancel = 6; // order guids
-  bool cancelAll = 7;
+  uint64 user = 3;
+  string walletFamily = 4;
+  repeated Order ordersToAdd = 6;
+  repeated CancelOrder ordersToCancel = 7; // order guids
+  bool cancelAll = 8;
 }
 
 enum OrderDisposition {
@@ -55,7 +56,8 @@ enum OrderDisposition {
 
 message BackToBackOrder {
   string guid = 1;
-  uint64 wallet = 2;
-  repeated string marketIds = 3;
-  Order order = 4;
+  uint64 user = 2;
+  string walletFamily = 3;
+  repeated string marketIds = 4;
+  Order order = 5;
 }

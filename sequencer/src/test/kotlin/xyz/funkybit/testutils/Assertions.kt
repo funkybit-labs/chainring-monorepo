@@ -1,10 +1,10 @@
 package xyz.funkybit.testutils
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import xyz.funkybit.core.model.SequencerUserId
+import xyz.funkybit.core.sequencer.sequencerUserId
 import xyz.funkybit.sequencer.core.MarketId
-import xyz.funkybit.sequencer.core.WalletAddress
 import xyz.funkybit.sequencer.core.toBigInteger
-import xyz.funkybit.sequencer.core.toWalletAddress
 import xyz.funkybit.sequencer.proto.SequencerResponse
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -72,12 +72,12 @@ fun SequencerResponse.assertTrade(
 
 fun SequencerResponse.assertBalanceChanges(
     market: SequencerClient.Market,
-    expectedChanges: List<Triple<WalletAddress, SequencerClient.Asset, BigDecimal>>,
+    expectedChanges: List<Triple<SequencerUserId, SequencerClient.Asset, BigDecimal>>,
 ) {
     val changes = balancesChangedList.map {
         val asset = market.getAsset(it.asset)
         Triple(
-            it.wallet.toWalletAddress(),
+            it.user.sequencerUserId(),
             asset,
             it.delta.fromFundamentalUnits(asset.decimals),
         )
@@ -90,7 +90,7 @@ fun SequencerResponse.assertBalanceChanges(
 }
 
 data class ExpectedLimitsUpdate(
-    val wallet: WalletAddress,
+    val userId: SequencerUserId,
     val marketId: MarketId,
     val base: BigInteger,
     val quote: BigInteger,
@@ -101,12 +101,12 @@ fun SequencerResponse.assertLimits(
 ) {
     val actual = limitsUpdatedList.map {
         ExpectedLimitsUpdate(
-            it.wallet.toWalletAddress(),
+            it.user.sequencerUserId(),
             MarketId(it.marketId),
             it.base.toBigInteger(),
             it.quote.toBigInteger(),
         )
     }
 
-    assertEquals(expected.sortedWith(compareBy({ it.wallet.value }, { it.marketId.value })), actual)
+    assertEquals(expected.sortedWith(compareBy({ it.userId.value }, { it.marketId.value })), actual)
 }

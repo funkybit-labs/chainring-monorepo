@@ -9,14 +9,14 @@ option java_outer_classname = "BalanceSchema";
 
 message Deposit {
   string asset = 1;
-  uint64 wallet = 2;
+  uint64 user = 2;
   IntegerValue amount = 3;
   string externalGuid = 4;
 }
 
 message Withdrawal {
   string asset = 1;
-  uint64 wallet = 2;
+  uint64 user = 2;
   IntegerValue amount = 3;
   IntegerValue nonce = 4;
   string signature = 5;
@@ -30,13 +30,13 @@ message WithdrawalCreated {
 
 message FailedWithdrawal {
   string asset = 1;
-  uint64 wallet = 2;
+  uint64 user = 2;
   IntegerValue amount = 3;
 }
 
 message FailedSettlement {
-  uint64 buyWallet = 1;
-  uint64 sellWallet = 2;
+  uint64 buyUser = 1;
+  uint64 sellUser = 2;
   string marketId = 3;
   TradeCreated trade = 4;
 }

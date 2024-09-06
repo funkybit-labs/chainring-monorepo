@@ -37,6 +37,12 @@ object SymbolTable : GUIDTable<SymbolId>("symbol", ::SymbolId) {
     val iconUrl = varchar("icon_url", 10485760)
     val addToWallets = bool("add_to_wallets").default(false)
     val withdrawalFee = decimal("withdrawal_fee", 30, 0).default(BigDecimal.ZERO)
+    val walletFamily = customEnumeration(
+        "wallet_family",
+        "WalletFamily",
+        { value -> WalletFamily.valueOf(value as String) },
+        { PGEnum("WalletFamily", it) },
+    ).index()
 
     init {
         uniqueIndex(
@@ -72,6 +78,7 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
             this.createdBy = "system"
             this.addToWallets = addToWallets
             this.iconUrl = iconUrl
+            this.walletFamily = WalletFamily.Evm // TODO supply proper value
         }
 
         fun forChain(chainId: ChainId): List<SymbolEntity> =
@@ -123,6 +130,7 @@ class SymbolEntity(guid: EntityID<SymbolId>) : GUIDEntity<SymbolId>(guid) {
     var updatedBy by SymbolTable.updatedBy
     var iconUrl by SymbolTable.iconUrl
     var addToWallets by SymbolTable.addToWallets
+    var walletFamily by SymbolTable.walletFamily
 
     fun displayName() = this.name.replace(Regex(":.*"), "")
 

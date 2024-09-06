@@ -23,15 +23,15 @@ data class OrderBookLevelFill(
 
 data class LevelOrder(
     var guid: OrderGuid,
-    var wallet: WalletAddress,
+    var user: UserGuid,
     var quantity: BigInteger,
     var feeRate: FeeRate,
     var level: OrderBookLevel,
     var originalQuantity: BigInteger = quantity,
 ) {
-    fun update(wallet: Long, order: Order, feeRate: FeeRate) {
+    fun update(user: Long, order: Order, feeRate: FeeRate) {
         this.guid = order.guid.toOrderGuid()
-        this.wallet = wallet.toWalletAddress()
+        this.user = user.toUserGuid()
         this.quantity = order.amount.toBigInteger()
         this.originalQuantity = this.quantity
         this.feeRate = feeRate
@@ -39,7 +39,7 @@ data class LevelOrder(
 
     fun reset() {
         this.guid = OrderGuid.none
-        this.wallet = WalletAddress.none
+        this.user = UserGuid.none
         this.quantity = BigInteger.ZERO
         this.feeRate = FeeRate.zero
         this.originalQuantity = this.quantity
@@ -48,7 +48,7 @@ data class LevelOrder(
     fun toCheckpoint(): MarketCheckpoint.LevelOrder {
         return levelOrder {
             this.guid = this@LevelOrder.guid.value
-            this.wallet = this@LevelOrder.wallet.value
+            this.user = this@LevelOrder.user.value
             this.quantity = this@LevelOrder.quantity.toIntegerValue()
             this.originalQuantity = this@LevelOrder.originalQuantity.toIntegerValue()
             this.feeRate = this@LevelOrder.feeRate.value
@@ -57,7 +57,7 @@ data class LevelOrder(
 
     fun fromCheckpoint(checkpoint: MarketCheckpoint.LevelOrder, level: OrderBookLevel) {
         this.guid = OrderGuid(checkpoint.guid)
-        this.wallet = WalletAddress(checkpoint.wallet)
+        this.user = UserGuid(checkpoint.user)
         this.quantity = checkpoint.quantity.toBigInteger()
         this.level = level
         this.originalQuantity = checkpoint.originalQuantity.toBigInteger()
@@ -71,7 +71,7 @@ data class LevelOrder(
         other as LevelOrder
 
         if (guid != other.guid) return false
-        if (wallet != other.wallet) return false
+        if (user != other.user) return false
         if (quantity != other.quantity) return false
         if (feeRate != other.feeRate) return false
         if (level.ix != other.level.ix) return false
@@ -82,7 +82,7 @@ data class LevelOrder(
 
     override fun hashCode(): Int {
         var result = guid.hashCode()
-        result = 31 * result + wallet.hashCode()
+        result = 31 * result + user.hashCode()
         result = 31 * result + quantity.hashCode()
         result = 31 * result + feeRate.hashCode()
         result = 31 * result + level.ix.hashCode()
@@ -95,7 +95,7 @@ data class LevelOrder(
 class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val maxOrderCount: Int) : AVLTree.Node<OrderBookLevel>(ix) {
 
     val orders = Array(maxOrderCount) { _ ->
-        LevelOrder(guid = 0L.toOrderGuid(), wallet = 0L.toWalletAddress(), quantity = BigInteger.ZERO, feeRate = FeeRate.zero, level = this)
+        LevelOrder(guid = 0L.toOrderGuid(), user = 0L.toUserGuid(), quantity = BigInteger.ZERO, feeRate = FeeRate.zero, level = this)
     }
     var totalQuantity = BigInteger.ZERO
     var orderHead = 0
@@ -164,13 +164,13 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
         totalQuantity = checkpoint.totalQuantity.toBigInteger()
     }
 
-    fun addOrder(wallet: Long, order: Order, feeRate: FeeRate): Pair<OrderDisposition, LevelOrder?> {
+    fun addOrder(user: Long, order: Order, feeRate: FeeRate): Pair<OrderDisposition, LevelOrder?> {
         val nextTail = (orderTail + 1) % maxOrderCount
         return if (nextTail == orderHead) {
             OrderDisposition.Rejected to null
         } else {
             val levelOrder = orders[orderTail]
-            levelOrder.update(wallet, order, feeRate)
+            levelOrder.update(user, order, feeRate)
             totalQuantity += levelOrder.quantity
             orderTail = nextTail
             OrderDisposition.Accepted to levelOrder
@@ -306,15 +306,7 @@ data class AddOrderResult(
 )
 
 data class RemoveOrderResult(
-    val wallet: WalletAddress,
+    val user: UserGuid,
     val baseAssetAmount: BigInteger,
     val quoteAssetAmount: BigInteger,
-)
-
-data class ChangeOrderResult(
-    val wallet: WalletAddress,
-    val disposition: OrderDisposition,
-    val executions: List<Execution>,
-    val baseAssetDelta: BigInteger,
-    val quoteAssetDelta: BigInteger,
 )

@@ -17,13 +17,13 @@ import xyz.funkybit.apps.api.model.BigDecimalJson
 import xyz.funkybit.apps.api.model.BigIntegerJson
 import xyz.funkybit.core.model.FeeRate
 import xyz.funkybit.core.model.MarketMinFee
-import xyz.funkybit.core.model.SequencerWalletId
+import xyz.funkybit.core.model.SequencerUserId
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.WithdrawalFee
 import xyz.funkybit.core.model.db.FeeRates
 import xyz.funkybit.core.model.db.MarketEntity
 import xyz.funkybit.core.model.db.MarketId
-import xyz.funkybit.core.model.db.WalletEntity
+import xyz.funkybit.core.model.db.UserEntity
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.sequencer.core.toBigDecimal
@@ -72,7 +72,7 @@ class TestRoutes(
         ) {
             @Serializable
             data class Balance(
-                val wallet: String,
+                val user: String,
                 val asset: String,
                 val amount: BigIntegerJson,
                 val consumed: List<Consumption>,
@@ -111,7 +111,7 @@ class TestRoutes(
             @Serializable
             data class LevelOrder(
                 val guid: Long,
-                val wallet: String,
+                val user: String,
                 val quantity: BigIntegerJson,
                 val originalQuantity: BigIntegerJson,
             )
@@ -150,7 +150,7 @@ class TestRoutes(
                     makerFeeRate = FeeRate.fromPercents(2.0),
                     balances = listOf(
                         StateDump.Balance(
-                            wallet = "wallet",
+                            user = "user",
                             asset = "asset",
                             amount = "123".toBigInteger(),
                             consumed = listOf(
@@ -182,7 +182,7 @@ class TestRoutes(
                                     orders = listOf(
                                         StateDump.LevelOrder(
                                             guid = 123L,
-                                            wallet = "Wallet",
+                                            user = "user",
                                             quantity = "123".toBigInteger(),
                                             originalQuantity = "123".toBigInteger(),
                                         ),
@@ -200,13 +200,13 @@ class TestRoutes(
                     throw RuntimeException("Failed to get sequencer state, error: ${sequencerResponse.error}")
                 }
 
-                val walletAddresses = transaction {
-                    val walletIds = sequencerResponse.stateDump.balancesList.map { SequencerWalletId(it.wallet) }.toSet()
-                    WalletEntity
-                        .getBySequencerIds(walletIds)
+                val userGuids = transaction {
+                    val userIds = sequencerResponse.stateDump.balancesList.map { SequencerUserId(it.user) }.toSet()
+                    UserEntity
+                        .getBySequencerIds(userIds)
                         .associateBy(
                             keySelector = { it.sequencerId.value },
-                            valueTransform = { it.address.toString() },
+                            valueTransform = { it.guid.value.toString() },
                         )
                 }
 
@@ -216,7 +216,7 @@ class TestRoutes(
                         takerFeeRate = FeeRate(sequencerResponse.stateDump.feeRates.taker),
                         balances = sequencerResponse.stateDump.balancesList.map { b ->
                             StateDump.Balance(
-                                wallet = walletAddresses[b.wallet] ?: b.wallet.toString(),
+                                user = userGuids[b.user] ?: b.user.toString(),
                                 asset = b.asset,
                                 amount = b.amount.toBigInteger(),
                                 consumed = b.consumedList.map { c ->
@@ -248,7 +248,7 @@ class TestRoutes(
                                         orders = l.ordersList.map { lo ->
                                             StateDump.LevelOrder(
                                                 guid = lo.guid,
-                                                wallet = walletAddresses[lo.wallet] ?: lo.wallet.toString(),
+                                                user = userGuids[lo.user] ?: lo.user.toString(),
                                                 quantity = lo.quantity.toBigInteger(),
                                                 originalQuantity = lo.originalQuantity.toBigInteger(),
                                             )

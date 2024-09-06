@@ -4,6 +4,7 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.VarCharColumnType
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
@@ -11,6 +12,7 @@ import org.jetbrains.exposed.sql.selectAll
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.model.SequencerUserId
 import xyz.funkybit.core.model.SequencerWalletId
 import xyz.funkybit.core.sequencer.toSequencerId
 import java.lang.RuntimeException
@@ -37,8 +39,8 @@ object WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
     val sequencerId = long("sequencer_id").uniqueIndex()
     val addedSymbols = array<String>("added_symbols", VarCharColumnType(10485760)).default(emptyList())
     val isAdmin = bool("is_admin").default(false)
-    val walletFamily = customEnumeration(
-        "wallet_family",
+    val family = customEnumeration(
+        "family",
         "WalletFamily",
         { value -> WalletFamily.valueOf(value as String) },
         { PGEnum("WalletFamily", it) },
@@ -48,7 +50,7 @@ object WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
     init {
         uniqueIndex(
             customIndexName = "wallet_family_user",
-            columns = arrayOf(userGuid, walletFamily),
+            columns = arrayOf(userGuid, family),
         )
     }
 }
@@ -72,7 +74,7 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
                 createdAt = Clock.System.now()
                 createdBy = "system"
 
-                walletFamily = when (canonicalAddress) {
+                family = when (canonicalAddress) {
                     is EvmAddress -> WalletFamily.Evm
                     is BitcoinAddress -> WalletFamily.Bitcoin
                 }
@@ -94,10 +96,15 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
             }.firstOrNull()
         }
 
-        fun getBySequencerIds(sequencerIds: Set<SequencerWalletId>): List<WalletEntity> {
-            return WalletEntity.find {
-                WalletTable.sequencerId.inList(sequencerIds.map { it.value })
-            }.toList()
+        fun getBySequencerUserIdsAndFamily(sequencerUserId: SequencerUserId, family: WalletFamily): WalletEntity? {
+            return WalletTable
+                .join(UserTable, JoinType.INNER, WalletTable.userGuid, UserTable.guid)
+                .selectAll()
+                .where {
+                    UserTable.sequencerId.eq(sequencerUserId.value) and WalletTable.family.eq(family)
+                }.map {
+                    WalletEntity.wrapRow(it)
+                }.singleOrNull()
         }
 
         fun getBySequencerId(sequencerId: SequencerWalletId): WalletEntity? {
@@ -143,7 +150,7 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
     var addedSymbols by WalletTable.addedSymbols
     var isAdmin by WalletTable.isAdmin
 
-    var walletFamily by WalletTable.walletFamily
+    var family by WalletTable.family
     var userGuid by WalletTable.userGuid
     var user by UserEntity referencedOn WalletTable.userGuid
 }
