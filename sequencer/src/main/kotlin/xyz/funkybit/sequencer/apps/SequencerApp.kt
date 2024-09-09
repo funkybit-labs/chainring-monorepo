@@ -913,7 +913,7 @@ class SequencerApp(
                                 sequencerRequest {
                                     type = SequencerRequest.Type.Unparseable
                                     guid = ""
-                                }
+                                },
                             )
                             val response = processRequest(request, dc.index(), startTime)
 
