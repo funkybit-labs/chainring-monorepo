@@ -146,8 +146,8 @@ class TestRoutes(
             returning(
                 Status.OK,
                 responseBody to StateDump(
-                    takerFeeRate = FeeRate.fromPercents(1.0),
-                    makerFeeRate = FeeRate.fromPercents(2.0),
+                    takerFeeRate = FeeRate.fromPercents(BigDecimal("0.01")),
+                    makerFeeRate = FeeRate.fromPercents(BigDecimal("0.02")),
                     balances = listOf(
                         StateDump.Balance(
                             wallet = "wallet",
@@ -309,8 +309,8 @@ class TestRoutes(
             tags += listOf(Tag("test"))
             receiving(
                 requestBody to SetFeeRatesInSequencer(
-                    maker = FeeRate.fromPercents(1.0),
-                    taker = FeeRate.fromPercents(2.0),
+                    maker = FeeRate.fromPercents(BigDecimal("0.01")),
+                    taker = FeeRate.fromPercents(BigDecimal("0.02")),
                 ),
             )
             returning(

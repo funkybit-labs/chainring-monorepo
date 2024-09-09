@@ -5,7 +5,6 @@ import xyz.funkybit.apps.api.FaucetMode
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.ChainId
-import xyz.funkybit.core.model.db.FeeRates
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.SymbolEntity
@@ -19,6 +18,15 @@ data class ConfigurationApiResponse(
 ) {
     val evmChains: List<Chain>
         get() = chains.filter { it.networkType == NetworkType.Evm }
+}
+
+@Serializable
+data class FeeRates(
+    val maker: BigDecimalJson,
+    val taker: BigDecimalJson,
+) {
+    constructor(feeRates: xyz.funkybit.core.model.db.FeeRates) :
+        this(maker = feeRates.maker.toPercents(), taker = feeRates.taker.toPercents())
 }
 
 enum class Role {

@@ -56,7 +56,6 @@ import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ClientOrderId
 import xyz.funkybit.core.model.db.DepositId
-import xyz.funkybit.core.model.db.FeeRates
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.OrderStatus
@@ -492,7 +491,7 @@ open class ApiClient(
                 .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_NO_CONTENT)
 
-    fun trySetFeeRates(feeRates: FeeRates): Either<ApiCallFailure, Unit> =
+    fun trySetFeeRates(feeRates: AdminRoutes.Companion.SetFeeRates): Either<ApiCallFailure, Unit> =
         executeAndTrace(
             TraceRecorder.Op.SetFeeRates,
             Request.Builder()
@@ -616,7 +615,7 @@ open class ApiClient(
 
     open fun removeAdmin(address: Address) = tryRemoveAdmin(address).throwOrReturn()
 
-    open fun setFeeRates(feeRates: FeeRates) = trySetFeeRates(feeRates).throwOrReturn()
+    open fun setFeeRates(feeRates: AdminRoutes.Companion.SetFeeRates) = trySetFeeRates(feeRates).throwOrReturn()
 
     open fun getLastPrice(marketId: MarketId): GetLastPriceResponse =
         tryGetLastPrice(marketId).throwOrReturn()

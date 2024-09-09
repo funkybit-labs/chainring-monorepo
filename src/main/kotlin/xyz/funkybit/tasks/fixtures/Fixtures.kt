@@ -60,7 +60,7 @@ data class Fixtures(
 fun String.toChainSymbol(chainId: ChainId) = "$this:$chainId"
 
 fun getFixtures(chainringChainClients: List<BlockchainClient>, bitcoinBlockchainClientConfig: BitcoinBlockchainClientConfig) = Fixtures(
-    feeRates = FeeRates.fromPercents(maker = System.getenv("MAKER_FEE_RATE")?.toDoubleOrNull() ?: 1.0, taker = System.getenv("TAKER_FEE_RATE")?.toDoubleOrNull() ?: 2.0),
+    feeRates = FeeRates.fromPercents(maker = System.getenv("MAKER_FEE_RATE")?.toBigDecimalOrNull() ?: BigDecimal("0.01"), taker = System.getenv("TAKER_FEE_RATE")?.toBigDecimalOrNull() ?: BigDecimal("0.02")),
     chains = chainringChainClients.map {
         Fixtures.Chain(it.chainId, it.config.name, EvmAddress("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"), it.config.url, it.config.blockExplorerNetName, it.config.blockExplorerUrl, NetworkType.Evm)
     } + if (bitcoinBlockchainClientConfig.enabled) {
