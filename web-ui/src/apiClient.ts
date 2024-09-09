@@ -24,9 +24,15 @@ const decimal = () =>
       }
     })
 
-export const AddressSchema = z.custom<`0x${string}`>((val: unknown) =>
+export const EvmAddressSchema = z.custom<`0x${string}`>((val: unknown) =>
   /^0x/.test(val as string)
 )
+export type EvmAddressType = z.infer<typeof EvmAddressSchema>
+export const evmAddress = (address: string): EvmAddressType => {
+  // will throw if the address is invalid
+  return EvmAddressSchema.parse(address)
+}
+export const AddressSchema = z.string().min(1)
 export type AddressType = z.infer<typeof AddressSchema>
 
 const DeployedContractSchema = z.object({
@@ -250,7 +256,6 @@ const MarketOrderSchema = z.object({
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
-  originalAmount: z.coerce.bigint(),
   executions: z.array(OrderExecutionSchema),
   timing: OrderTimingSchema
 })
@@ -265,6 +270,7 @@ const LimitOrderSchema = z.object({
   amount: z.coerce.bigint(),
   price: decimal(),
   originalAmount: z.coerce.bigint(),
+  autoReduced: z.boolean(),
   executions: z.array(OrderExecutionSchema),
   timing: OrderTimingSchema
 })
@@ -278,7 +284,6 @@ const BackToBackMarketOrderSchema = z.object({
   secondMarketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
-  originalAmount: z.coerce.bigint(),
   executions: z.array(OrderExecutionSchema),
   timing: OrderTimingSchema
 })

@@ -14,7 +14,7 @@ export function TestnetChallengeTab({
   exchangeContract
 }: {
   symbols: TradingSymbols
-  exchangeContract?: { name: string; address: `0x${string}` }
+  exchangeContract?: { name: string; address: string }
 }) {
   const evmConfig = useConfig()
   const queryClient = useQueryClient()

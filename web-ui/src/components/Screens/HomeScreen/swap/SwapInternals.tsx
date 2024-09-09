@@ -1,7 +1,14 @@
 import Markets, { Market } from 'markets'
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import TradingSymbol from 'tradingSymbol'
-import { apiClient, Balance, FeeRates, Order, OrderSide } from 'apiClient'
+import {
+  apiClient,
+  Balance,
+  evmAddress,
+  FeeRates,
+  Order,
+  OrderSide
+} from 'apiClient'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import {
   balancesTopic,
@@ -720,9 +727,13 @@ export function SwapInternals({
               message: {
                 sender: walletAddress! as Address,
                 baseChainId: BigInt(baseSymbol.chainId),
-                baseToken: baseSymbol.contractAddress ?? addressZero,
+                baseToken: evmAddress(
+                  baseSymbol.contractAddress ?? addressZero
+                ),
                 quoteChainId: BigInt(quoteSymbol.chainId),
-                quoteToken: quoteSymbol.contractAddress ?? addressZero,
+                quoteToken: evmAddress(
+                  quoteSymbol.contractAddress ?? addressZero
+                ),
                 percentage: BigInt(percentage),
                 price: isLimitOrder ? limitPriceAsBigInt : 0n,
                 nonce: BigInt('0x' + nonce)
@@ -752,9 +763,13 @@ export function SwapInternals({
               message: {
                 sender: walletAddress! as Address,
                 baseChainId: BigInt(baseSymbol.chainId),
-                baseToken: baseSymbol.contractAddress ?? addressZero,
+                baseToken: evmAddress(
+                  baseSymbol.contractAddress ?? addressZero
+                ),
                 quoteChainId: BigInt(quoteSymbol.chainId),
-                quoteToken: quoteSymbol.contractAddress ?? addressZero,
+                quoteToken: evmAddress(
+                  quoteSymbol.contractAddress ?? addressZero
+                ),
                 amount: side == 'Buy' ? baseAmount : -baseAmount,
                 price: isLimitOrder ? limitPriceAsBigInt : 0n,
                 nonce: BigInt('0x' + nonce)

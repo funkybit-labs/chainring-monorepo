@@ -6,7 +6,7 @@ import { readContract } from 'wagmi/actions'
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import { apiClient } from 'apiClient'
+import { apiClient, evmAddress } from 'apiClient'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { addressZero, getDomain, getWithdrawMessage } from 'utils/eip712'
 import useAmountInputState from 'hooks/useAmountInputState'
@@ -41,7 +41,9 @@ export default function WithdrawalModal({
         functionName: 'balances',
         args: [
           walletAddress as Address,
-          symbol.contractAddress ? symbol.contractAddress : zeroAddress
+          evmAddress(
+            symbol.contractAddress ? symbol.contractAddress : zeroAddress
+          )
         ]
       })
     }

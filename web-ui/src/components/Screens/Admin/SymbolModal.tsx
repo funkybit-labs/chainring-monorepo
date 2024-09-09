@@ -2,7 +2,7 @@ import { useConfig } from 'wagmi'
 import { ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { getToken } from 'wagmi/actions'
 import { Modal } from 'components/common/Modal'
-import { AddressSchema, AdminSymbol, apiClient } from 'apiClient'
+import { AdminSymbol, apiClient, evmAddress, EvmAddressSchema } from 'apiClient'
 import { useMutation } from '@tanstack/react-query'
 import Input from 'components/Screens/Admin/Input'
 import SubmitButton from 'components/common/SubmitButton'
@@ -68,7 +68,7 @@ export default function SymbolModal({
   function setContractAddress() {
     if (contractAddressValue != '') {
       try {
-        const parsedAddress = AddressSchema.parse(contractAddressValue)
+        const parsedAddress = EvmAddressSchema.parse(contractAddressValue)
         getToken(config, { address: parsedAddress, chainId: symbol.chainId })
           .then((token) => {
             setSymbol({
@@ -94,7 +94,7 @@ export default function SymbolModal({
 
   function checkContractAddress() {
     getToken(config, {
-      address: symbol.contractAddress!,
+      address: evmAddress(symbol.contractAddress!),
       chainId: symbol.chainId
     })
       .then((token) => {
