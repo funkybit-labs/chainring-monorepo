@@ -48,6 +48,7 @@ jobs:
           SEQUENCER_HOST_NAME: test-sequencer.funkybit.fun
           SEQUENCER_PORT: 5337
           CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
+          TESTNET_CHALLENGE_DEPOSIT_SYMBOL: ${{ vars.TESTNET_CHALLENGE_DEPOSIT_SYMBOL }}
       - name: Test Report
         uses: dorny/test-reporter@v1.8.0
         if: success() || failure()
