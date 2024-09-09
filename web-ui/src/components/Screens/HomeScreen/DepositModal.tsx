@@ -12,7 +12,7 @@ import {
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import { apiClient } from 'apiClient'
+import { apiClient, evmAddress } from 'apiClient'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import useAmountInputState from 'hooks/useAmountInputState'
 import { depositsQueryKey } from 'components/Screens/HomeScreen/balances/BalancesWidget'
@@ -50,7 +50,7 @@ export default function DepositModal({
       return symbol.contractAddress
         ? await readContract(config, {
             abi: ERC20Abi,
-            address: symbol.contractAddress,
+            address: evmAddress(symbol.contractAddress),
             functionName: 'balanceOf',
             args: [walletAddress as Address]
           })
@@ -87,7 +87,7 @@ export default function DepositModal({
         if (symbol.contractAddress) {
           setSubmitPhase('checkingAllowanceAmount')
           const allowance = await call(config, {
-            to: symbol.contractAddress,
+            to: evmAddress(symbol.contractAddress),
             chainId: symbol.chainId,
             data: encodeFunctionData({
               abi: ERC20Abi,
@@ -104,7 +104,7 @@ export default function DepositModal({
           if (allowanceAmount < amount) {
             setSubmitPhase('waitingForAllowanceApproval')
             const hash = await sendTransaction(config, {
-              to: symbol.contractAddress,
+              to: evmAddress(symbol.contractAddress),
               chainId: symbol.chainId,
               data: encodeFunctionData({
                 abi: ERC20Abi,
@@ -123,7 +123,7 @@ export default function DepositModal({
             data: encodeFunctionData({
               abi: ExchangeAbi,
               functionName: 'deposit',
-              args: [symbol.contractAddress!, amount]
+              args: [evmAddress(symbol.contractAddress!), amount]
             })
           })
         } else {
