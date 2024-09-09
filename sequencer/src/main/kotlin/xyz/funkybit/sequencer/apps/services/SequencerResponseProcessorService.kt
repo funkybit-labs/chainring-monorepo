@@ -13,6 +13,7 @@ import xyz.funkybit.apps.api.model.websocket.OrderBookDiff
 import xyz.funkybit.core.evm.ECHelper
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.FeeRate
+import xyz.funkybit.core.model.SequencerUserId
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.BalanceChange
 import xyz.funkybit.core.model.db.BalanceEntity
@@ -48,7 +49,6 @@ import xyz.funkybit.core.sequencer.clientOrderId
 import xyz.funkybit.core.sequencer.depositId
 import xyz.funkybit.core.sequencer.orderId
 import xyz.funkybit.core.sequencer.sequencerOrderId
-import xyz.funkybit.core.sequencer.sequencerUserId
 import xyz.funkybit.core.sequencer.sequencerWalletId
 import xyz.funkybit.core.sequencer.withdrawalId
 import xyz.funkybit.sequencer.core.toBigInteger
@@ -417,25 +417,31 @@ object SequencerResponseProcessorService {
     private fun handleBalanceChanges(balanceChanges: List<xyz.funkybit.sequencer.proto.BalanceChange>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
         logger.debug { "Calculating balance changes" }
         if (balanceChanges.isNotEmpty()) {
-            val walletsWithUpdatedBalances = mutableSetOf<WalletEntity>()
+            val userWalletsMap = UserEntity.getWithWalletsBySequencerUserIds(
+                balanceChanges.map { SequencerUserId(it.user) }.toSet(),
+            ).toMap().mapKeys { (user, _) -> user.sequencerId.value }
+
             logger.debug { "updating balances" }
-            // TODO load user with wallets in one call to optimize db round trips
+            val walletsWithUpdatedBalances = mutableSetOf<WalletEntity>()
             BalanceEntity.updateBalances(
                 balanceChanges.mapNotNull { change ->
                     val symbol = getSymbol(change.asset)
-                    val wallet = WalletEntity.getBySequencerUserIdsAndFamily(change.user.sequencerUserId(), symbol.walletFamily)
-                    wallet?.let {
-                        walletsWithUpdatedBalances.add(wallet)
-                        BalanceChange.Delta(
-                            walletId = wallet.guid.value,
-                            symbolId = symbol.guid.value,
-                            amount = change.delta.toBigInteger(),
-                        )
+
+                    userWalletsMap[change.user]?.let { userWallets ->
+                        userWallets.find { it.family == symbol.walletFamily }?.let { wallet ->
+                            walletsWithUpdatedBalances.add(wallet)
+                            BalanceChange.Delta(
+                                walletId = wallet.guid.value,
+                                symbolId = symbol.guid.value,
+                                amount = change.delta.toBigInteger(),
+                            )
+                        }
                     }
                 },
                 BalanceType.Available,
             )
             logger.debug { "done updating balances" }
+
             walletsWithUpdatedBalances.forEach {
                 broadcasterNotifications.add(BroadcasterNotification.walletBalances(it))
             }
@@ -524,25 +530,19 @@ object SequencerResponseProcessorService {
     }
 
     private fun handleLimitsUpdates(limitsUpdates: List<LimitsUpdate>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
-        val walletsToNotify = mutableSetOf<WalletEntity>()
+        val userWalletsMap = UserEntity.getWithWalletsBySequencerUserIds(
+            limitsUpdates.map { SequencerUserId(it.user) }.toSet(),
+        ).associateBy { it.first.sequencerId.value }
 
-        // TODO load user with wallets in one call
-        val usersBySequencerId = limitsUpdates
-            .map { it.user }
-            .distinct()
-            .mapNotNull { UserEntity.getBySequencerId(it.sequencerUserId()) }
-            .associateBy { it.sequencerId.value }
-
+        val walletsToNotifyAboutLimitsChanges = mutableSetOf<WalletEntity>()
         LimitEntity.update(
             limitsUpdates.map {
-                val user = usersBySequencerId.getValue(it.user)
                 val marketId = MarketId(it.marketId)
-                MarketEntity.findById(marketId)
-                    ?.walletFamilies()
-                    ?.mapNotNull { walletFamily ->
-                        WalletEntity.getBySequencerUserIdsAndFamily(user.sequencerId, walletFamily)
-                    }
-                    ?.forEach { wallet -> walletsToNotify.add(wallet) }
+                val (user, userWallets) = userWalletsMap[it.user]!!
+
+                MarketEntity[marketId].walletFamilies()
+                    .mapNotNull { walletFamily -> userWallets.find { it.family == walletFamily } }
+                    .forEach { wallet -> walletsToNotifyAboutLimitsChanges.add(wallet) }
 
                 Pair(
                     user.guid.value,
@@ -555,7 +555,7 @@ object SequencerResponseProcessorService {
             },
         )
 
-        walletsToNotify.forEach { wallet ->
+        walletsToNotifyAboutLimitsChanges.forEach { wallet ->
             broadcasterNotifications.add(
                 BroadcasterNotification.limits(wallet),
             )

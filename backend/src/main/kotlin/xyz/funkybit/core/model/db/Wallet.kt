@@ -4,7 +4,6 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.VarCharColumnType
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
@@ -12,7 +11,6 @@ import org.jetbrains.exposed.sql.selectAll
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
-import xyz.funkybit.core.model.SequencerUserId
 import xyz.funkybit.core.model.SequencerWalletId
 import xyz.funkybit.core.sequencer.toSequencerId
 import java.lang.RuntimeException
@@ -94,17 +92,6 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
                     },
                 )
             }.firstOrNull()
-        }
-
-        fun getBySequencerUserIdsAndFamily(sequencerUserId: SequencerUserId, family: WalletFamily): WalletEntity? {
-            return WalletTable
-                .join(UserTable, JoinType.INNER, WalletTable.userGuid, UserTable.guid)
-                .selectAll()
-                .where {
-                    UserTable.sequencerId.eq(sequencerUserId.value) and WalletTable.family.eq(family)
-                }.map {
-                    WalletEntity.wrapRow(it)
-                }.singleOrNull()
         }
 
         fun getBySequencerId(sequencerId: SequencerWalletId): WalletEntity? {

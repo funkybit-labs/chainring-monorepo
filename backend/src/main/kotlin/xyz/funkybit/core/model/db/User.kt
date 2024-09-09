@@ -5,11 +5,12 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.selectAll
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.SequencerUserId
-import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserTable.index
-import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserTable.nullable
+import xyz.funkybit.core.model.db.WalletTable.nullable
 import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 
@@ -74,16 +75,35 @@ class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
             }.toList()
         }
 
-        fun getBySequencerId(sequencerId: SequencerUserId): UserEntity? {
-            return UserEntity.find {
-                UserTable.sequencerId.eq(sequencerId.value)
-            }.firstOrNull()
-        }
-
         fun findWithTestnetChallengeStatus(status: TestnetChallengeStatus): List<UserEntity> {
             return UserEntity.find {
                 UserTable.testnetChallengeStatus eq status
             }.toList()
+        }
+
+        fun getWithWalletsBySequencerUserIds(sequencerUserIds: Set<SequencerUserId>): List<Pair<UserEntity, List<WalletEntity>>> {
+            val wallets = mutableMapOf<UserId, MutableList<WalletEntity>>()
+            val users = UserTable
+                .join(WalletTable, JoinType.LEFT, WalletTable.userGuid, UserTable.guid)
+                .selectAll().where { UserTable.sequencerId.inList(sequencerUserIds.map { it.value }) }
+                .mapNotNull { resultRow ->
+                    val walletsForUser = wallets[resultRow[UserTable.guid].value]
+                    if (walletsForUser != null) {
+                        walletsForUser.add(WalletEntity.wrapRow(resultRow))
+                        null
+                    } else {
+                        UserEntity.wrapRow(resultRow).also {
+                            wallets[it.guid.value] = listOfNotNull(
+                                resultRow[WalletTable.guid.nullable()]?.let {
+                                    WalletEntity.wrapRow(resultRow)
+                                },
+                            ).toMutableList()
+                        }
+                    }
+                }
+                .toList()
+
+            return users.map { Pair(it, wallets[it.guid.value] ?: emptyList()) }
         }
     }
 
