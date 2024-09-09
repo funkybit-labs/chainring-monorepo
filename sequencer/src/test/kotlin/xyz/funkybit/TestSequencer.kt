@@ -18,7 +18,6 @@ import xyz.funkybit.sequencer.proto.Order
 import xyz.funkybit.sequencer.proto.OrderChangeRejected
 import xyz.funkybit.sequencer.proto.OrderDisposition
 import xyz.funkybit.sequencer.proto.SequencerError
-import xyz.funkybit.sequencer.proto.market
 import xyz.funkybit.sequencer.proto.newQuantityOrNull
 import xyz.funkybit.testutils.ExpectedLimitsUpdate
 import xyz.funkybit.testutils.ExpectedTrade

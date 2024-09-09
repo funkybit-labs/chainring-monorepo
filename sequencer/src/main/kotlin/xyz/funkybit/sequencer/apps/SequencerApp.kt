@@ -42,6 +42,7 @@ import xyz.funkybit.sequencer.proto.marketCreated
 import xyz.funkybit.sequencer.proto.order
 import xyz.funkybit.sequencer.proto.orderBatch
 import xyz.funkybit.sequencer.proto.orderChanged
+import xyz.funkybit.sequencer.proto.sequencerRequest
 import xyz.funkybit.sequencer.proto.sequencerResponse
 import xyz.funkybit.sequencer.proto.withdrawalCreated
 import java.lang.Thread.UncaughtExceptionHandler
@@ -429,7 +430,7 @@ class SequencerApp(
                 }
             }
 
-            null, SequencerRequest.Type.UNRECOGNIZED -> {
+            null, SequencerRequest.Type.Unparseable, SequencerRequest.Type.UNRECOGNIZED -> {
                 sequencerResponse {
                     this.sequence = sequence
                     this.guid = request.guid
@@ -906,7 +907,14 @@ class SequencerApp(
                     if (dc.isPresent) {
                         val startTime = clock.nanoTime()
                         dc.wire()?.read()?.bytes { bytes ->
-                            val request = SequencerRequest.parseFrom(bytes.toByteArray())
+                            val request = runCatching {
+                                SequencerRequest.parseFrom(bytes.toByteArray())
+                            }.getOrDefault(
+                                sequencerRequest {
+                                    type = SequencerRequest.Type.Unparseable
+                                    guid = ""
+                                },
+                            )
                             val response = processRequest(request, dc.index(), startTime)
 
                             if (strictReplayValidation && response.sequence <= lastSequenceNumberProcessedBeforeRestart) {
