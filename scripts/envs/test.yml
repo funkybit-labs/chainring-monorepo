@@ -13,6 +13,7 @@ environment:
     BITCOIN_NETWORK_ENABLED: "false"
     REPEATER_AUTOMATIC_TASK_SCHEDULING: "false"
     TESTNET_CHALLENGE_ENABLED: "true"
+    TESTNET_CHALLENGE_DEPOSIT_SYMBOL: "USDC:31338"
   sequencer:
     QUEUE_HOME: "/data/queues/test"
     CHECKPOINTS_ENABLED: "false"
