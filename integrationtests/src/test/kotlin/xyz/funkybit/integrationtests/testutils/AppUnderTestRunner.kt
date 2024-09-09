@@ -21,8 +21,7 @@ import xyz.funkybit.core.db.notifyDbListener
 import xyz.funkybit.core.model.MarketMinFee
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.WithdrawalFee
-import xyz.funkybit.core.model.db.ArchStateUtxoLogTable
-import xyz.funkybit.core.model.db.ArchStateUtxoTable
+import xyz.funkybit.core.model.db.ArchAccountTable
 import xyz.funkybit.core.model.db.BalanceLogTable
 import xyz.funkybit.core.model.db.BalanceTable
 import xyz.funkybit.core.model.db.BitcoinWalletStateTable
@@ -123,10 +122,11 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                                         blockchainClient.chainId,
                                     )?.deprecated = true
                                 }
-                                DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(
+                                DeployedSmartContractEntity.deleteDeployedContractByNameAndChain(
                                     ContractType.Exchange.name,
                                     BitcoinClient.chainId,
-                                )?.deprecated = true
+                                )
+                                ArchAccountTable.deleteAll()
                                 WithdrawalEntity.findPending().forEach { it.update(WithdrawalStatus.Failed, "restarting test") }
                                 BlockTable.deleteAll()
                             }
@@ -143,19 +143,6 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                                 .until {
                                     transaction {
                                         DeployedSmartContractEntity.validContracts(blockchainClient.chainId)
-                                            .map { it.name } == listOf(ContractType.Exchange.name)
-                                    }
-                                }
-                        }
-                        if (BitcoinClient.bitcoinConfig.enabled) {
-                            await
-                                .pollInSameThread()
-                                .pollDelay(Duration.ofMillis(100))
-                                .pollInterval(Duration.ofMillis(100))
-                                .atMost(Duration.ofMillis(30000L))
-                                .until {
-                                    transaction {
-                                        DeployedSmartContractEntity.validContracts(BitcoinClient.chainId)
                                             .map { it.name } == listOf(ContractType.Exchange.name)
                                     }
                                 }
@@ -270,8 +257,6 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             OHLCTable.deleteAll()
             FaucetDripTable.deleteAll()
             BitcoinWalletStateTable.deleteAll()
-            ArchStateUtxoLogTable.deleteAll()
-            ArchStateUtxoTable.deleteAll()
             notifyDbListener("broadcaster_ctl", "clear-cache")
         }
     }

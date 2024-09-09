@@ -8,7 +8,10 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.SequencerUserId
+import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserTable.index
+import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserTable.nullable
 import xyz.funkybit.core.sequencer.toSequencerId
+import xyz.funkybit.core.utils.TestnetChallengeUtils
 
 @Serializable
 @JvmInline
@@ -20,6 +23,16 @@ value class UserId(override val value: String) : EntityId {
     override fun toString(): String = value
 }
 
+@Serializable
+enum class TestnetChallengeStatus {
+    Unenrolled,
+    PendingAirdrop,
+    PendingDeposit,
+    PendingDepositConfirmation,
+    Enrolled,
+    Disqualified,
+}
+
 object UserTable : GUIDTable<UserId>("user", ::UserId) {
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
@@ -28,8 +41,17 @@ object UserTable : GUIDTable<UserId>("user", ::UserId) {
     val sequencerId = long("sequencer_id").uniqueIndex()
 
     // is admin
-    // nickname
-    // avatar
+    val nickName = varchar("nick_name", 10485760).nullable()
+    val avatarUrl = varchar("avatar_url", 10485760).nullable()
+    val testnetChallengeStatus = customEnumeration(
+        "testnet_challenge_status",
+        "TestnetChallengeStatus",
+        { value -> TestnetChallengeStatus.valueOf(value as String) },
+        { PGEnum("TestnetChallengeStatus", it) },
+    ).index()
+    val inviteCode = varchar("invite_code", 10485760).uniqueIndex()
+    val invitedBy = reference("invited_by", UserTable).index().nullable()
+    val testnetAirdropTxHash = varchar("testnet_airdrop_tx_hash", 10485760).nullable()
 }
 
 class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
@@ -41,6 +63,8 @@ class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
                 this.createdAt = Clock.System.now()
                 this.createdBy = createdBy.canonicalize().toString()
                 this.sequencerId = userId.toSequencerId()
+                this.inviteCode = TestnetChallengeUtils.inviteCode()
+                this.testnetChallengeStatus = TestnetChallengeStatus.Unenrolled
             }
         }
 
@@ -55,6 +79,12 @@ class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
                 UserTable.sequencerId.eq(sequencerId.value)
             }.firstOrNull()
         }
+
+        fun findWithTestnetChallengeStatus(status: TestnetChallengeStatus): List<UserEntity> {
+            return UserEntity.find {
+                UserTable.testnetChallengeStatus eq status
+            }.toList()
+        }
     }
 
     var sequencerId by UserTable.sequencerId.transform(
@@ -67,4 +97,11 @@ class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
 
     var updatedAt by UserTable.updatedAt
     var updatedBy by UserTable.updatedBy
+
+    var nickname by UserTable.nickName
+    var avatarUrl by UserTable.avatarUrl
+    var testnetChallengeStatus by UserTable.testnetChallengeStatus
+    var inviteCode by UserTable.inviteCode
+    var invitedBy by UserTable.invitedBy
+    var testnetAirdropTxHash by UserTable.testnetAirdropTxHash
 }

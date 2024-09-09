@@ -5,7 +5,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.decodeFromJsonElement
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import xyz.funkybit.core.model.BitcoinAddress
-import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.model.rpc.ArchRpcParams
@@ -13,21 +12,14 @@ import xyz.funkybit.core.model.rpc.ArchRpcRequest
 
 @OptIn(ExperimentalUnsignedTypes::class)
 object ArchNetworkClient : JsonRpcClientBase(
-    System.getenv("ARCH_NETWORK_RPC_URL") ?: "http://localhost:9001",
+    System.getenv("ARCH_NETWORK_RPC_URL") ?: "http://localhost:9002",
     null,
 ) {
 
+    const val MAX_TX_SIZE = 1024
+
     override val logger = KotlinLogging.logger {}
     override val mediaType = "application/json".toMediaTypeOrNull()
-
-    fun deployProgram(elf: UByteArray): String {
-        return getValue(
-            ArchRpcRequest(
-                "deploy_program",
-                ArchRpcParams(ArchNetworkRpc.DeployProgramParams(elf)),
-            ),
-        )
-    }
 
     fun getProgram(programId: String): UByteArray {
         return getValue(
@@ -38,13 +30,11 @@ object ArchNetworkClient : JsonRpcClientBase(
         )
     }
 
-    fun getNetworkAddress(): BitcoinAddress = getContractAddress("")
-
-    fun getContractAddress(contract: String): BitcoinAddress {
+    fun getAccountAddress(pubKey: ArchNetworkRpc.Pubkey): BitcoinAddress {
         return getValue(
             ArchRpcRequest(
-                "get_contract_address",
-                ArchRpcParams(ArchNetworkRpc.GetContractAddress(contract.toByteArray().toUByteArray())),
+                "get_account_address",
+                ArchRpcParams(pubKey),
             ),
         )
     }
@@ -54,6 +44,15 @@ object ArchNetworkClient : JsonRpcClientBase(
             ArchRpcRequest(
                 "send_transaction",
                 ArchRpcParams(transaction),
+            ),
+        )
+    }
+
+    fun sendTransactions(transactions: List<ArchNetworkRpc.RuntimeTransaction>): List<TxHash> {
+        return getValue(
+            ArchRpcRequest(
+                "send_transactions",
+                ArchRpcParams(transactions),
             ),
         )
     }
@@ -74,11 +73,11 @@ object ArchNetworkClient : JsonRpcClientBase(
         }
     }
 
-    fun readUtxo(utxoId: UtxoId): ArchNetworkRpc.ReadUtxoResult {
+    fun readAccountInfo(pubKey: ArchNetworkRpc.Pubkey): ArchNetworkRpc.AccountInfoResult {
         return getValue(
             ArchRpcRequest(
-                "read_utxo",
-                ArchRpcParams(ArchNetworkRpc.ReadUtxoParams(utxoId.value)),
+                "read_account_info",
+                ArchRpcParams(pubKey),
             ),
         )
     }

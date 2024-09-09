@@ -16,6 +16,7 @@ import { WebsocketProvider } from 'contexts/websocket'
 import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
 import Admin from 'components/Screens/Admin'
 import { useWallet } from 'contexts/walletProvider'
+import { TestnetChallengeTab } from 'components/Screens/HomeScreen/TestnetChallengeTab'
 
 function WebsocketWrapper({ contents }: { contents: JSX.Element }) {
   const wallet = useWallet()
@@ -135,51 +136,91 @@ function HomeScreenContent() {
     showAdmin ? (
       <Admin onClose={() => setShowAdmin(false)} />
     ) : (
-      <div className="min-h-screen bg-darkBluishGray10">
-        <Header
-          initialTab={tab}
-          markets={markets}
-          onTabChange={saveTab}
-          onShowAdmin={() => setShowAdmin(true)}
-        />
+      <>
+        <div className="min-h-screen bg-darkBluishGray10">
+          <Header
+            initialTab={tab}
+            markets={markets}
+            onTabChange={saveTab}
+            onShowAdmin={() => setShowAdmin(true)}
+          />
 
-        <div className="mx-4 flex min-h-screen justify-center py-24">
-          <div
-            className="my-auto laptop:max-w-[1800px]"
-            ref={homeScreenRef as LegacyRef<HTMLDivElement>}
-          >
-            {tab === 'Swap' && (
-              <SwapModal
-                markets={marketsWithBackToBack}
-                walletAddress={wallet.primaryAddress}
-                exchangeContractAddress={exchangeContract?.address}
-                feeRates={feeRates}
-                onMarketChange={setSelectedMarket}
-                onSideChange={setSide}
-              />
-            )}
-            {tab === 'Limit' && (
-              <LimitModal
-                markets={markets}
-                walletAddress={wallet.primaryAddress}
-                exchangeContractAddress={exchangeContract?.address}
-                feeRates={feeRates}
-                onMarketChange={setSelectedMarket}
-                onSideChange={setSide}
-              />
-            )}
-            {tab === 'Dashboard' && (
-              <div className="grid grid-cols-1 gap-4 laptop:grid-cols-3">
-                <div className="col-span-1 space-y-4 laptop:col-span-2">
-                  <div ref={pricesRef as LegacyRef<HTMLDivElement>}>
-                    <PricesWidget
-                      side={defaultSide}
-                      market={selectedMarket}
-                      onSideChanged={setOverriddenSide}
-                    />
+          <div className="mx-4 flex min-h-screen justify-center py-24">
+            <div
+              className="my-auto laptop:max-w-[1800px]"
+              ref={homeScreenRef as LegacyRef<HTMLDivElement>}
+            >
+              {tab === 'Swap' && (
+                <SwapModal
+                  markets={marketsWithBackToBack}
+                  walletAddress={wallet.primaryAddress}
+                  exchangeContractAddress={exchangeContract?.address}
+                  feeRates={feeRates}
+                  onMarketChange={setSelectedMarket}
+                  onSideChange={setSide}
+                />
+              )}
+              {tab === 'Limit' && (
+                <LimitModal
+                  markets={markets}
+                  walletAddress={wallet.primaryAddress}
+                  exchangeContractAddress={exchangeContract?.address}
+                  feeRates={feeRates}
+                  onMarketChange={setSelectedMarket}
+                  onSideChange={setSide}
+                />
+              )}
+              {tab === 'Dashboard' && (
+                <div className="grid grid-cols-1 gap-4 laptop:grid-cols-3">
+                  <div className="col-span-1 space-y-4 laptop:col-span-2">
+                    <div ref={pricesRef as LegacyRef<HTMLDivElement>}>
+                      <PricesWidget
+                        side={defaultSide}
+                        market={selectedMarket}
+                        onSideChanged={setOverriddenSide}
+                      />
+                    </div>
+                    {symbols && width >= 1100 && (
+                      <div ref={balancesRef as LegacyRef<HTMLDivElement>}>
+                        <BalancesWidget
+                          walletAddress={wallet.primaryAddress}
+                          exchangeContractAddress={exchangeContract?.address}
+                          symbols={symbols}
+                          chains={chains}
+                        />
+                      </div>
+                    )}
                   </div>
-                  {symbols && width >= 1100 && (
-                    <div ref={balancesRef as LegacyRef<HTMLDivElement>}>
+                  <div className="col-span-1 space-y-4">
+                    <div ref={swapRef as LegacyRef<HTMLDivElement>}>
+                      <SwapWidget
+                        markets={markets}
+                        walletAddress={wallet.primaryAddress}
+                        exchangeContractAddress={exchangeContract?.address}
+                        feeRates={feeRates}
+                        onMarketChange={setSelectedMarket}
+                        onSideChange={setSide}
+                      />
+                    </div>
+                    {width >= 1100 && (
+                      <OrderBookWidget
+                        market={selectedMarket}
+                        side={overriddenSide ?? defaultSide}
+                        height={
+                          pricesMeasuredHeight +
+                          balancesMeasuredHeight -
+                          swapMeasuredHeight
+                        }
+                      />
+                    )}
+                  </div>
+                  {symbols && width < 1100 && (
+                    <div className="col-span-1 space-y-4">
+                      <OrderBookWidget
+                        market={selectedMarket}
+                        side={overriddenSide ?? defaultSide}
+                        height={500}
+                      />
                       <BalancesWidget
                         walletAddress={wallet.primaryAddress}
                         exchangeContractAddress={exchangeContract?.address}
@@ -188,57 +229,25 @@ function HomeScreenContent() {
                       />
                     </div>
                   )}
-                </div>
-                <div className="col-span-1 space-y-4">
-                  <div ref={swapRef as LegacyRef<HTMLDivElement>}>
-                    <SwapWidget
+                  <div className="col-span-1 space-y-4 laptop:col-span-3">
+                    <OrdersAndTradesWidget
                       markets={markets}
                       walletAddress={wallet.primaryAddress}
                       exchangeContractAddress={exchangeContract?.address}
-                      feeRates={feeRates}
-                      onMarketChange={setSelectedMarket}
-                      onSideChange={setSide}
                     />
                   </div>
-                  {width >= 1100 && (
-                    <OrderBookWidget
-                      market={selectedMarket}
-                      side={overriddenSide ?? defaultSide}
-                      height={
-                        pricesMeasuredHeight +
-                        balancesMeasuredHeight -
-                        swapMeasuredHeight
-                      }
-                    />
-                  )}
                 </div>
-                {symbols && width < 1100 && (
-                  <div className="col-span-1 space-y-4">
-                    <OrderBookWidget
-                      market={selectedMarket}
-                      side={overriddenSide ?? defaultSide}
-                      height={500}
-                    />
-                    <BalancesWidget
-                      walletAddress={wallet.primaryAddress}
-                      exchangeContractAddress={exchangeContract?.address}
-                      symbols={symbols}
-                      chains={chains}
-                    />
-                  </div>
-                )}
-                <div className="col-span-1 space-y-4 laptop:col-span-3">
-                  <OrdersAndTradesWidget
-                    markets={markets}
-                    walletAddress={wallet.primaryAddress}
-                    exchangeContractAddress={exchangeContract?.address}
-                  />
-                </div>
-              </div>
-            )}
+              )}
+              {tab === 'Testnet Challenge' && symbols && (
+                <TestnetChallengeTab
+                  symbols={symbols}
+                  exchangeContract={exchangeContract}
+                />
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </>
     )
   ) : (
     <div className="flex h-screen items-center justify-center bg-darkBluishGray10">

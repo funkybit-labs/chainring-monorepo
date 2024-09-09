@@ -40,6 +40,7 @@ import xyz.funkybit.core.model.db.OrderEntity
 import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.SymbolEntity
+import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.model.db.UserId
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WalletFamily
@@ -47,6 +48,7 @@ import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.services.LinkedSignerService
+import xyz.funkybit.core.utils.TestnetChallengeUtils
 import xyz.funkybit.core.utils.safeToInt
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.core.utils.toHexBytes
@@ -340,6 +342,15 @@ class ExchangeApiService(
                 blockNumber = null,
                 transactionHash = apiRequest.txHash,
             ) ?: throw DepositException("Unable to create deposit")
+
+            if (TestnetChallengeUtils.enabled) {
+                if (deposit.wallet.user.testnetChallengeStatus == TestnetChallengeStatus.PendingDeposit &&
+                    deposit.symbol.name == TestnetChallengeUtils.depositSymbolName &&
+                    deposit.amount == TestnetChallengeUtils.depositAmount.toFundamentalUnits(TestnetChallengeUtils.depositSymbol().decimals)
+                ) {
+                    deposit.wallet.user.testnetChallengeStatus = TestnetChallengeStatus.PendingDepositConfirmation
+                }
+            }
 
             DepositApiResponse(Deposit.fromEntity(deposit))
         }

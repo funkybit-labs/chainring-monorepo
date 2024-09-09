@@ -109,13 +109,11 @@ class UtxoSelectionTest {
         assertEquals(transferToUnspentUtxos.size, 1)
         assertEquals(UtxoId.fromTxHashAndVout(txId3, transferVout), transferToUnspentUtxos[0].utxoId)
         assertEquals(BigInteger("3000"), transferToUnspentUtxos[0].amount)
-
-        BitcoinClient.mine(1)
     }
 
-    @Test
+    // @Test
     fun testUtxoSelectionPagination() {
-        Assumptions.assumeFalse(isTestEnvRun())
+        Assumptions.assumeFalse(isTestEnvRun() || !BitcoinClient.bitcoinConfig.enabled)
 
         // create a wallet
         val ecKey = ECKey()

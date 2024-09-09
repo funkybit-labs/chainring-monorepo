@@ -12,7 +12,7 @@ import {
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import { apiClient } from 'apiClient'
+import { apiClient, evmAddress } from 'apiClient'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import useAmountInputState from 'hooks/useAmountInputState'
 import { depositsQueryKey } from 'components/Screens/HomeScreen/balances/BalancesWidget'
@@ -27,7 +27,10 @@ export default function DepositModal({
   symbol,
   isOpen,
   close,
-  onClosed
+  onClosed,
+  initialAmount,
+  title,
+  message
 }: {
   exchangeContractAddress: string
   walletAddress: string
@@ -35,6 +38,9 @@ export default function DepositModal({
   isOpen: boolean
   close: () => void
   onClosed: () => void
+  initialAmount?: string
+  title?: string
+  message?: string
 }) {
   const config = useConfig()
 
@@ -44,7 +50,7 @@ export default function DepositModal({
       return symbol.contractAddress
         ? await readContract(config, {
             abi: ERC20Abi,
-            address: symbol.contractAddress,
+            address: evmAddress(symbol.contractAddress),
             functionName: 'balanceOf',
             args: [walletAddress as Address]
           })
@@ -59,7 +65,7 @@ export default function DepositModal({
     setInputValue: setAmountInputValue,
     valueInFundamentalUnits: amount
   } = useAmountInputState({
-    initialInputValue: '',
+    initialInputValue: initialAmount ?? '',
     decimals: symbol.decimals
   })
 
@@ -78,11 +84,10 @@ export default function DepositModal({
     mutationFn: async () => {
       try {
         let depositHash: string
-
         if (symbol.contractAddress) {
           setSubmitPhase('checkingAllowanceAmount')
           const allowance = await call(config, {
-            to: symbol.contractAddress,
+            to: evmAddress(symbol.contractAddress),
             chainId: symbol.chainId,
             data: encodeFunctionData({
               abi: ERC20Abi,
@@ -99,7 +104,7 @@ export default function DepositModal({
           if (allowanceAmount < amount) {
             setSubmitPhase('waitingForAllowanceApproval')
             const hash = await sendTransaction(config, {
-              to: symbol.contractAddress,
+              to: evmAddress(symbol.contractAddress),
               chainId: symbol.chainId,
               data: encodeFunctionData({
                 abi: ERC20Abi,
@@ -118,7 +123,7 @@ export default function DepositModal({
             data: encodeFunctionData({
               abi: ExchangeAbi,
               functionName: 'deposit',
-              args: [symbol.contractAddress!, amount]
+              args: [evmAddress(symbol.contractAddress!), amount]
             })
           })
         } else {
@@ -172,14 +177,19 @@ export default function DepositModal({
       isOpen={isOpen}
       close={close}
       onClosed={onClosed}
-      title={`Deposit ${symbol.displayName()}`}
+      title={title ?? `Deposit ${symbol.displayName()}`}
     >
-      <div className="max-h-52 overflow-y-auto">
+      <div className="max-h-56 overflow-y-auto">
         <ModalAsyncContent
           asyncData={walletBalanceQuery}
           success={(walletBalance) => {
             return (
               <div>
+                {message && (
+                  <p className="my-2 text-center text-sm text-white">
+                    {message}
+                  </p>
+                )}
                 <AmountInput
                   value={amountInputValue}
                   disabled={submitPhase !== null}

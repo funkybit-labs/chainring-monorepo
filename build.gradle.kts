@@ -218,12 +218,12 @@ val compileContractsAndGenerateWrappers by tasks.register("compileContractsAndGe
     println("Web3j contract wrappers and Typescript ABIs generated successfully for all EVM contracts.")
 
     println("Building Arch contracts")
-    val elfFile = File("${projectDir}/contracts/arch/contracts/exchange/target/program.elf")
+    val archContractFile = File("${projectDir}/contracts/arch/contracts/exchange/program/target/sbf-solana-solana/release/exchangeprogram.so")
 
     exec {
         isIgnoreExitValue = true
         commandLine(
-            "bash", "-c", "cd ${projectDir}/contracts/arch/contracts/exchange && cargo build && cp $elfFile ${projectDir}/backend/src/main/resources"
+            "bash", "-c", "cd ${projectDir}/contracts/arch/contracts/exchange/program && cargo-build-sbf && cp $archContractFile ${projectDir}/backend/src/main/resources"
         )
     }.also {
         if (it.exitValue == 127) {

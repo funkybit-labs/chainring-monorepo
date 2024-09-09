@@ -63,6 +63,7 @@ sealed class BitcoinAddress(val value: String) : Address() {
         this.value.startsWith("tb1q") -> SegWit(this.value, true)
         this.value.startsWith("bcrt1q") -> SegWit(this.value, true)
         this.value.startsWith("bc1p") -> Taproot(this.value, false)
+        this.value.startsWith("bcrt1p") -> Taproot(this.value, true)
         this.value.startsWith("tb1p") -> Taproot(this.value, true)
         this.value.startsWith("3") -> P2SH(this.value, false)
         this.value.startsWith("2") -> P2SH(this.value, true)

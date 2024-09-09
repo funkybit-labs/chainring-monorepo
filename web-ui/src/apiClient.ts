@@ -24,9 +24,15 @@ const decimal = () =>
       }
     })
 
-export const AddressSchema = z.custom<`0x${string}`>((val: unknown) =>
+export const EvmAddressSchema = z.custom<`0x${string}`>((val: unknown) =>
   /^0x/.test(val as string)
 )
+export type EvmAddressType = z.infer<typeof EvmAddressSchema>
+export const evmAddress = (address: string): EvmAddressType => {
+  // will throw if the address is invalid
+  return EvmAddressSchema.parse(address)
+}
+export const AddressSchema = z.string().min(1)
 export type AddressType = z.infer<typeof AddressSchema>
 
 const DeployedContractSchema = z.object({
@@ -110,14 +116,26 @@ export type ConfigurationApiResponse = z.infer<
   typeof ConfigurationApiResponseSchema
 >
 
+const TestnetChallengeStatus = z.enum([
+  'Unenrolled',
+  'PendingAirdrop',
+  'PendingDeposit',
+  'PendingDepositConfirmation',
+  'Enrolled',
+  'Disqualified'
+])
+export type TestnetChallengeStatusType = z.infer<typeof TestnetChallengeStatus>
+
 export const AccountConfigurationApiResponseSchema = z.object({
   newSymbols: z.array(SymbolSchema),
   role: z.enum(['User', 'Admin']),
-  authorizedAddresses: z.array(z.string())
+  authorizedAddresses: z.array(z.string()),
+  testnetChallengeStatus: TestnetChallengeStatus,
+  testnetChallengeDepositSymbol: z.string().nullable(),
+  testnetChallengeDepositContract: AddressSchema.nullable(),
+  nickName: z.string().nullable(),
+  avatarUrl: z.string().nullable()
 })
-export type AccountConfigurationApiResponse = z.infer<
-  typeof AccountConfigurationApiResponseSchema
->
 
 const OrderSideSchema = z.enum(['Buy', 'Sell'])
 export type OrderSide = z.infer<typeof OrderSideSchema>
@@ -238,7 +256,6 @@ const MarketOrderSchema = z.object({
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
-  originalAmount: z.coerce.bigint(),
   executions: z.array(OrderExecutionSchema),
   timing: OrderTimingSchema
 })
@@ -253,6 +270,7 @@ const LimitOrderSchema = z.object({
   amount: z.coerce.bigint(),
   price: decimal(),
   originalAmount: z.coerce.bigint(),
+  autoReduced: z.boolean(),
   executions: z.array(OrderExecutionSchema),
   timing: OrderTimingSchema
 })
@@ -266,7 +284,6 @@ const BackToBackMarketOrderSchema = z.object({
   secondMarketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
-  originalAmount: z.coerce.bigint(),
   executions: z.array(OrderExecutionSchema),
   timing: OrderTimingSchema
 })
@@ -730,6 +747,19 @@ export const apiClient = new Zodios(apiBaseUrl, [
         schema: z.string()
       }
     ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'post',
+    path: '/v1/testnet-challenge',
+    alias: 'testnetChallengeEnroll',
+    parameters: [],
     response: z.undefined(),
     errors: [
       {

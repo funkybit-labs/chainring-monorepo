@@ -21,6 +21,10 @@ environment:
     ENABLE_TEST_ROUTES: "false"
     FAUCET_MODE: OnlyERC20
     BITCOIN_NETWORK_ENABLED: "false"
+    BITCOIN_FEE_ACCOUNT_ADDRESS: "tb1qz7spnnw5njkqv96kv58emw49pl784qwgn3tflm"
+    TESTNET_CHALLENGE_ENABLED: "true"
+    TESTNET_CHALLENGE_DEPOSIT_SYMBOL: "USDC:84532"
+    TESTNET_CHALLENGE_GAS_AMOUNT: "0.0002"
   sequencer:
     QUEUE_HOME: "/data/queues/testnet"
     CHECKPOINTS_ENABLED: "true"
@@ -62,6 +66,7 @@ services:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-63c94ec4-89c5-4724-bcf6-ae8df7f3be12-uVtkH8
       EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/ring/EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY-2liWFE
       EVM_SUBMITTER_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/ring/EVM_SUBMITTER_PRIVATE_KEY-UkdEuD
+      BITCOIN_FEE_PAYER_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/ring/BITCOIN_FEE_PAYER_PRIVATE_KEY-Uu248y
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   sequencer:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer

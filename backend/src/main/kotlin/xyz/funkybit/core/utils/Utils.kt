@@ -128,5 +128,8 @@ fun sha256(b: ByteArray?): ByteArray {
 
 fun doubleSha256(b: ByteArray?) = sha256(sha256(b))
 
+// this is to match arch - they sha256 but then second sha256 is of the hex string of the first sha256
+fun doubleSha256FromHex(b: ByteArray?) = sha256(sha256(b).toHex(false).toByteArray())
+
 fun List<BigInteger>.sum() = this.reduce { a, b -> a + b }
 fun List<BigDecimal>.sum() = this.reduce { a, b -> a + b }

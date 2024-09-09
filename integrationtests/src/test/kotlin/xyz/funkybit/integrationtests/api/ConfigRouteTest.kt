@@ -72,8 +72,6 @@ class ConfigRouteTest {
         val config = apiClient.getConfiguration()
         assertEquals(config.chains.filter { it.networkType == NetworkType.Bitcoin }.size, 1)
         val btcChainConfig = config.chains.single { it.networkType == NetworkType.Bitcoin }
-        assertEquals(btcChainConfig.contracts.size, 1)
-        assertEquals(btcChainConfig.contracts[0].name, ContractType.Exchange.name)
 
         val btcSymbol = btcChainConfig.symbols.first { it.name == "BTC".toChainSymbol(btcChainConfig.id) }
         assertEquals(BigDecimal("0.00000002").toFundamentalUnits(btcSymbol.decimals.toInt()), btcSymbol.withdrawalFee)

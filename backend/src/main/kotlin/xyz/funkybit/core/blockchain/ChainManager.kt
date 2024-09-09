@@ -5,7 +5,6 @@ import org.bitcoinj.core.NetworkParameters
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.db.ChainId
-import xyz.funkybit.core.utils.schnorr.Point
 import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigInteger
 import kotlin.time.Duration
@@ -52,15 +51,16 @@ data class BitcoinBlockchainClientConfig(
     val feeSettings: FeeEstimationSettings,
     val blockExplorerNetName: String,
     val blockExplorerUrl: String,
-    val faucetAddress: String?,
-    val privateKey: ByteArray,
+    val faucetAddress: BitcoinAddress?,
+    val submitterPrivateKey: ByteArray,
+    val feePayerPrivateKey: ByteArray,
     val changeDustThreshold: BigInteger,
-    val feeAccountAddress: BitcoinAddress,
+    val feeCollectionAddress: BitcoinAddress,
 ) {
     val params: NetworkParameters = NetworkParameters.fromID(net)!!
-    val submitterEcKey: ECKey = ECKey.fromPrivate(privateKey)
-    val submitterAddress = BitcoinAddress.fromKey(params, submitterEcKey)
-    val submitterXOnlyPublicKey = Point.genPubKey(privateKey)
+    val submitterEcKey: ECKey = ECKey.fromPrivate(submitterPrivateKey)
+    val feePayerEcKey: ECKey = ECKey.fromPrivate(feePayerPrivateKey)
+    val feePayerAddress = BitcoinAddress.fromKey(params, feePayerEcKey)
 }
 
 object ChainManager {
@@ -119,19 +119,24 @@ object ChainManager {
     }
     val bitcoinBlockchainClientConfig = BitcoinBlockchainClientConfig(
         enabled = (System.getenv("BITCOIN_NETWORK_ENABLED") ?: "true").toBoolean(),
-        url = System.getenv("BITCOIN_NETWORK_RPC_URL") ?: "http://localhost:18443",
+        url = System.getenv("BITCOIN_NETWORK_RPC_URL") ?: "http://bitcoin-node.dev.aws.archnetwork.xyz:18443/wallet/testwallet",
+        user = System.getenv("BITCOIN_NETWORK_RPC_USER") ?: "bitcoin",
+        password = System.getenv("BITCOIN_NETWORK_RPC_PASSWORD") ?: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618",
+//        url = System.getenv("BITCOIN_NETWORK_RPC_URL") ?: "http://localhost:18443",
+//        user = System.getenv("BITCOIN_NETWORK_RPC_USER") ?: "user",
+//        password = System.getenv("BITCOIN_NETWORK_RPC_PASSWORD") ?: "password",
         net = System.getenv("BITCOIN_NETWORK_NAME") ?: "org.bitcoin.regtest",
         enableBasicAuth = (System.getenv("BITCOIN_NETWORK_ENABLE_BASIC_AUTH") ?: "true").toBoolean(),
-        user = System.getenv("BITCOIN_NETWORK_RPC_USER") ?: "user",
-        password = System.getenv("BITCOIN_NETWORK_RPC_PASSWORD") ?: "password",
-        feeSettings = FeeEstimationSettings(1, SmartFeeMode.CONSERVATIVE, 5, 50),
+        feeSettings = FeeEstimationSettings(1, SmartFeeMode.CONSERVATIVE, 5, 5),
         blockExplorerNetName = System.getenv("BLOCK_EXPLORER_NET_NAME_BITCOIN") ?: "Bitcoin Network",
         blockExplorerUrl = System.getenv("BLOCK_EXPLORER_URL_BITCOIN") ?: "http://localhost:1080",
-        faucetAddress = "bcrt1q3nyukkpkg6yj0y5tj6nj80dh67m30p963mzxy7",
-        privateKey = (System.getenv("BITCOIN_SUBMITTER_PRIVATE_KEY") ?: "0x7ebc626d01c2d916c61dffee4ed2501f579009ad362360d82fcc30e3d8746cec").toHexBytes(),
+        faucetAddress = BitcoinAddress.canonicalize("bcrt1q3nyukkpkg6yj0y5tj6nj80dh67m30p963mzxy7"),
+        submitterPrivateKey = (System.getenv("BITCOIN_SUBMITTER_PRIVATE_KEY") ?: ECKey().privateKeyAsHex).toHexBytes(),
+        feePayerPrivateKey = (System.getenv("BITCOIN_FEE_PAYER_PRIVATE_KEY") ?: "0x614293096668ec4c26ede066b1570edc6bd6d663701dffb8247b63e7a3b0f566").toHexBytes(),
+        // address for fee Payer is bcrt1qdca3sam9mldju3ssryrrcmjvd8pgnw30ccaggx
         changeDustThreshold = BigInteger(System.getenv("BITCOIN_CHANGE_DUST_THRESHOLD") ?: "300"),
-        feeAccountAddress = BitcoinAddress.canonicalize(System.getenv("BITCOIN_FEE_ACCOUNT_ADDRESS") ?: "bcrt1qdca3sam9mldju3ssryrrcmjvd8pgnw30ccaggx"),
-        /* privKey for bcrt1qdca3sam9mldju3ssryrrcmjvd8pgnw30ccaggx = 0x614293096668ec4c26ede066b1570edc6bd6d663701dffb8247b63e7a3b0f566 */
+        feeCollectionAddress = BitcoinAddress.canonicalize(System.getenv("BITCOIN_FEE_ACCOUNT_ADDRESS") ?: "bcrt1q5jdpyt2x5utsqgaazdf6jr4cc7yeaec0me0e4u"),
+        /* privKey for bcrt1q5jdpyt2x5utsqgaazdf6jr4cc7yeaec0me0e4u = 0x63fe5172a2b186b8015fb60d9c314eb9017a8465ed169d5e5ff41ed8fa8d9a4a */
     )
 
     private val blockchainClientsByChainId: Map<ChainId, BlockchainClient> by lazy {

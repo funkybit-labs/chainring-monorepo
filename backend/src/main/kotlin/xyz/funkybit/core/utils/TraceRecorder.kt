@@ -42,6 +42,7 @@ interface TraceRecorder {
         RemoveAdmin,
         SetFeeRates,
         GetLastPrice,
+        TestnetChallengeEnroll,
     }
 
     data class Trace(

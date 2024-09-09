@@ -1,12 +1,15 @@
 package xyz.funkybit.apps.api.model
 
 import kotlinx.serialization.Serializable
+import xyz.funkybit.apps.api.FaucetMode
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.FeeRates
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
+import xyz.funkybit.core.model.db.SymbolEntity
+import xyz.funkybit.core.model.db.TestnetChallengeStatus
 
 @Serializable
 data class ConfigurationApiResponse(
@@ -28,6 +31,11 @@ data class AccountConfigurationApiResponse(
     val newSymbols: List<SymbolInfo>,
     val role: Role,
     val authorizedAddresses: List<Address>,
+    val testnetChallengeStatus: TestnetChallengeStatus,
+    val testnetChallengeDepositSymbol: String?,
+    val testnetChallengeDepositContract: Address?,
+    val nickName: String?,
+    val avatarUrl: String?,
 )
 
 @Serializable
@@ -57,6 +65,16 @@ data class SymbolInfo(
     val faucetSupported: Boolean,
     val iconUrl: String,
     val withdrawalFee: BigIntegerJson,
+)
+
+fun SymbolEntity.toSymbolInfo(faucetMode: FaucetMode) = SymbolInfo(
+    this.name,
+    this.description,
+    this.contractAddress,
+    this.decimals,
+    this.faucetSupported(faucetMode),
+    this.iconUrl,
+    this.withdrawalFee,
 )
 
 @Serializable

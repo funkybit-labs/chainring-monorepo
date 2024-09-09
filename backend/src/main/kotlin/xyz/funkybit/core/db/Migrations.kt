@@ -74,8 +74,10 @@ import xyz.funkybit.core.model.db.migrations.V74_ArchStateUtxoTables
 import xyz.funkybit.core.model.db.migrations.V75_AddAutoReducedToOrder
 import xyz.funkybit.core.model.db.migrations.V76_AddBlockHeightToBitcoinWalletState
 import xyz.funkybit.core.model.db.migrations.V77_User
-import xyz.funkybit.core.model.db.migrations.V78_CrossChainSequencerOrders
+import xyz.funkybit.core.model.db.migrations.V78_ArchAccountTable
+import xyz.funkybit.core.model.db.migrations.V79_UserTestnetChallenge
 import xyz.funkybit.core.model.db.migrations.V7_OrderTable
+import xyz.funkybit.core.model.db.migrations.V80_CrossChainSequencerOrders
 import xyz.funkybit.core.model.db.migrations.V8_ExecutionsAndTrades
 import xyz.funkybit.core.model.db.migrations.V9_SymbolTable
 
@@ -157,5 +159,7 @@ val migrations = listOf(
     V75_AddAutoReducedToOrder(),
     V76_AddBlockHeightToBitcoinWalletState(),
     V77_User(),
-    V78_CrossChainSequencerOrders(),
+    V78_ArchAccountTable(),
+    V79_UserTestnetChallenge(),
+    V80_CrossChainSequencerOrders(),
 )

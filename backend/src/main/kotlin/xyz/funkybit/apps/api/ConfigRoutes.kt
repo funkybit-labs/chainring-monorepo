@@ -24,6 +24,7 @@ import xyz.funkybit.apps.api.model.DeployedContract
 import xyz.funkybit.apps.api.model.Market
 import xyz.funkybit.apps.api.model.Role
 import xyz.funkybit.apps.api.model.SymbolInfo
+import xyz.funkybit.apps.api.model.toSymbolInfo
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.FeeRate
 import xyz.funkybit.core.model.Symbol
@@ -36,6 +37,8 @@ import xyz.funkybit.core.model.db.MarketEntity
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.SymbolEntity
+import xyz.funkybit.core.model.db.TestnetChallengeStatus
+import xyz.funkybit.core.utils.TestnetChallengeUtils
 import java.math.BigInteger
 
 class ConfigRoutes(private val faucetMode: FaucetMode) {
@@ -172,18 +175,23 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                         role = Role.User,
                         newSymbols = listOf(
                             SymbolInfo(
-                                name = "RING",
+                                name = "FUNK",
                                 description = "funkybit Token",
                                 contractAddress = EvmAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
                                 decimals = 18u,
                                 faucetSupported = true,
-                                iconUrl = "https://icons/ring.svg",
+                                iconUrl = "https://icons/funk.svg",
                                 withdrawalFee = BigInteger.ZERO,
                             ),
                         ),
                         authorizedAddresses = listOf(
                             EvmAddress.zero,
                         ),
+                        testnetChallengeStatus = TestnetChallengeStatus.Unenrolled,
+                        testnetChallengeDepositSymbol = "USDC:31337",
+                        testnetChallengeDepositContract = null,
+                        nickName = "Nick Name",
+                        avatarUrl = "https://icons/avatar.svg",
                     ),
             )
         } bindContract Method.GET to { request ->
@@ -193,17 +201,14 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                         AccountConfigurationApiResponse(
                             role = if (request.principal.isAdmin) Role.Admin else Role.User,
                             newSymbols = SymbolEntity.symbolsToAddToWallet(request.principal.address).map {
-                                SymbolInfo(
-                                    it.name,
-                                    it.description,
-                                    it.contractAddress,
-                                    it.decimals,
-                                    it.faucetSupported(faucetMode),
-                                    it.iconUrl,
-                                    it.withdrawalFee,
-                                )
+                                it.toSymbolInfo(faucetMode)
                             },
                             authorizedAddresses = request.principal.authorizedAddresses(),
+                            testnetChallengeStatus = request.principal.user.testnetChallengeStatus,
+                            testnetChallengeDepositSymbol = if (TestnetChallengeUtils.enabled) TestnetChallengeUtils.depositSymbolName else null,
+                            testnetChallengeDepositContract = if (TestnetChallengeUtils.enabled) TestnetChallengeUtils.depositSymbol().contractAddress else null,
+                            nickName = request.principal.user.nickname,
+                            avatarUrl = request.principal.user.avatarUrl,
                         ),
                 )
             }
