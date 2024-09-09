@@ -38,7 +38,6 @@ import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.utils.TestnetChallengeUtils
-import xyz.funkybit.core.model.db.WalletEntity
 import java.math.BigDecimal
 import java.math.BigInteger
 
