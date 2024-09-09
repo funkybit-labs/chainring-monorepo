@@ -534,7 +534,7 @@ class SequencerApp(
         val firstOrderBatch = orderBatch {
             this.guid = request.guid
             this.user = userGuid.value
-            this.walletFamily = request.walletFamily
+            this.wallet = request.wallet
             this.marketId = firstMarket.id.value
             this.ordersToAdd.add(
                 order {
@@ -588,7 +588,7 @@ class SequencerApp(
                 orderBatch {
                     this.guid = request.guid
                     this.user = userGuid.value
-                    this.walletFamily = request.walletFamily
+                    this.wallet = request.wallet
                     this.marketId = secondMarket.id.value
                     this.ordersToAdd.add(secondOrder)
                 },
@@ -661,7 +661,7 @@ class SequencerApp(
         val firstOrderBatch = orderBatch {
             this.guid = request.guid
             this.user = userGuid.value
-            this.walletFamily = request.walletFamily
+            this.wallet = request.wallet
             this.marketId = secondMarket.id.value
             this.ordersToAdd.add(
                 order {
@@ -698,7 +698,7 @@ class SequencerApp(
                 orderBatch {
                     this.guid = request.guid
                     this.user = userGuid.value
-                    this.walletFamily = request.walletFamily
+                    this.wallet = request.wallet
                     this.marketId = firstMarket.id.value
                     this.ordersToAdd.add(
                         order {

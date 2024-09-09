@@ -43,7 +43,6 @@ import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.model.db.UserId
 import xyz.funkybit.core.model.db.WalletEntity
-import xyz.funkybit.core.model.db.WalletFamily
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.sequencer.toSequencerId
@@ -68,21 +67,18 @@ class ExchangeApiService(
     fun addOrder(
         userId: UserId,
         walletAddress: Address,
-        walletFamily: WalletFamily,
         apiRequest: CreateOrderApiRequest,
     ): CreateOrderApiResponse {
         return when (apiRequest) {
             is CreateOrderApiRequest.BackToBackMarket -> addBackToBackMarketOrder(
                 userId,
                 walletAddress,
-                walletFamily,
                 apiRequest,
             )
 
             else -> orderBatch(
                 userId,
                 walletAddress,
-                walletFamily,
                 BatchOrdersApiRequest(
                     marketId = apiRequest.marketId,
                     createOrders = listOf(apiRequest),
@@ -95,7 +91,6 @@ class ExchangeApiService(
     private fun addBackToBackMarketOrder(
         userId: UserId,
         walletAddress: Address,
-        walletFamily: WalletFamily,
         orderRequest: CreateOrderApiRequest.BackToBackMarket,
     ): CreateOrderApiResponse {
         val orderId = OrderId.generate()
@@ -129,7 +124,7 @@ class ExchangeApiService(
             sequencerClient.backToBackOrder(
                 listOf(market1.id, market2.id),
                 userId.toSequencerId(),
-                walletFamily,
+                walletAddress.toSequencerId(),
                 SequencerClient.Order(
                     sequencerOrderId = orderId.toSequencerId().value,
                     amount = orderRequest.amount.fixedAmount(),
@@ -157,7 +152,6 @@ class ExchangeApiService(
     fun orderBatch(
         userId: UserId,
         walletAddress: Address,
-        walletFamily: WalletFamily,
         batchOrdersRequest: BatchOrdersApiRequest,
     ): BatchOrdersApiResponse {
         if (batchOrdersRequest.cancelOrders.isEmpty() && batchOrdersRequest.createOrders.isEmpty()) {
@@ -247,7 +241,7 @@ class ExchangeApiService(
         }
 
         val response = runBlocking {
-            sequencerClient.orderBatch(market.id, userId.toSequencerId(), walletFamily, ordersToAdd, ordersToCancel)
+            sequencerClient.orderBatch(market.id, userId.toSequencerId(), walletAddress.toSequencerId(), ordersToAdd, ordersToCancel)
         }
 
         when (response.error) {
@@ -355,11 +349,10 @@ class ExchangeApiService(
             DepositApiResponse(Deposit.fromEntity(deposit))
         }
 
-    fun cancelOrder(userId: UserId, walletAddress: Address, walletFamily: WalletFamily, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {
+    fun cancelOrder(userId: UserId, walletAddress: Address, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {
         return orderBatch(
             userId,
             walletAddress,
-            walletFamily,
             BatchOrdersApiRequest(
                 marketId = cancelOrderApiRequest.marketId,
                 createOrders = emptyList(),
@@ -379,17 +372,17 @@ class ExchangeApiService(
             runBlocking {
                 openOrders
                     .groupBy(
-                        keySelector = { (order, wallet) -> Pair(order.marketGuid, wallet.family) },
+                        keySelector = { (order, wallet) -> Pair(order.marketGuid, wallet.address) },
                         valueTransform = { (order, _) -> order },
                     )
                     .forEach { entry ->
                         val orderIds = entry.value.map { it.guid.value }
-                        val (marketGuid, walletFamily) = entry.key
+                        val (marketGuid, walletAddress) = entry.key
 
                         sequencerClient.cancelOrders(
                             marketGuid.value,
                             userId.value.toSequencerId(),
-                            walletFamily,
+                            walletAddress.toSequencerId(),
                             orderIds,
                             cancelAll = true,
                         )

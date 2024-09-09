@@ -21,7 +21,6 @@ import xyz.funkybit.core.model.db.FeeRates
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.UserId
-import xyz.funkybit.core.model.db.WalletFamily
 import xyz.funkybit.core.model.db.WithdrawalId
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.core.utils.toHexBytes
@@ -138,7 +137,7 @@ open class SequencerClient {
     suspend fun orderBatch(
         marketId: MarketId,
         user: SequencerUserId,
-        walletFamily: WalletFamily,
+        walletId: SequencerWalletId,
         ordersToAdd: List<Order>,
         ordersToCancel: List<OrderId>,
         cancelAll: Boolean = false,
@@ -149,7 +148,7 @@ open class SequencerClient {
                     this.guid = UUID.randomUUID().toString()
                     this.marketId = marketId.value
                     this.user = user.value
-                    this.walletFamily = walletFamily.toString()
+                    this.wallet = walletId.value
                     this.ordersToAdd.addAll(
                         ordersToAdd.map { toOrderDSL(it) },
                     )
@@ -168,7 +167,7 @@ open class SequencerClient {
     suspend fun backToBackOrder(
         marketIds: List<MarketId>,
         userId: SequencerUserId,
-        walletFamily: WalletFamily,
+        walletId: SequencerWalletId,
         order: Order,
     ): SequencerResponse {
         return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
@@ -177,7 +176,7 @@ open class SequencerClient {
                     this.guid = UUID.randomUUID().toString()
                     this.order = backToBackOrder {
                         this.user = userId.value
-                        this.walletFamily = walletFamily.toString()
+                        this.wallet = walletId.value
                         this.marketIds.addAll(marketIds.map { it.value })
                         this.order = toOrderDSL(order)
                     }
@@ -387,20 +386,20 @@ open class SequencerClient {
     suspend fun cancelOrder(
         marketId: MarketId,
         userId: SequencerUserId,
-        walletFamily: WalletFamily,
+        walletId: SequencerWalletId,
         orderId: OrderId,
     ): SequencerResponse {
-        return orderBatch(marketId, userId, walletFamily, emptyList(), listOf(orderId))
+        return orderBatch(marketId, userId, walletId, emptyList(), listOf(orderId))
     }
 
     suspend fun cancelOrders(
         marketId: MarketId,
         userId: SequencerUserId,
-        walletFamily: WalletFamily,
+        walletId: SequencerWalletId,
         orderIds: List<OrderId>,
         cancelAll: Boolean = false,
     ): SequencerResponse {
-        return orderBatch(marketId, userId, walletFamily, emptyList(), orderIds, cancelAll = cancelAll)
+        return orderBatch(marketId, userId, walletId, emptyList(), orderIds, cancelAll = cancelAll)
     }
 
     suspend fun reset(): SequencerResponse {

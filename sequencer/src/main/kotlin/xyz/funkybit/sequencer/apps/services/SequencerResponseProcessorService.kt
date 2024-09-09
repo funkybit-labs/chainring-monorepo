@@ -39,7 +39,6 @@ import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TradeEntity
 import xyz.funkybit.core.model.db.UserEntity
 import xyz.funkybit.core.model.db.WalletEntity
-import xyz.funkybit.core.model.db.WalletFamily
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalStatus
 import xyz.funkybit.core.model.db.publishBroadcasterNotifications
@@ -50,6 +49,7 @@ import xyz.funkybit.core.sequencer.depositId
 import xyz.funkybit.core.sequencer.orderId
 import xyz.funkybit.core.sequencer.sequencerOrderId
 import xyz.funkybit.core.sequencer.sequencerUserId
+import xyz.funkybit.core.sequencer.sequencerWalletId
 import xyz.funkybit.core.sequencer.withdrawalId
 import xyz.funkybit.sequencer.core.toBigInteger
 import xyz.funkybit.sequencer.proto.BackToBackOrder
@@ -129,10 +129,7 @@ object SequencerResponseProcessorService {
 
                 if (response.error == SequencerError.None) {
                     val market = getMarket(MarketId(request.orderBatch.marketId))
-                    val walletFamily = WalletFamily.valueOf(request.orderBatch.walletFamily)
-                    val sequencerUserId = request.orderBatch.user.sequencerUserId()
-
-                    WalletEntity.getBySequencerUserIdsAndFamily(sequencerUserId, walletFamily)?.let { wallet ->
+                    WalletEntity.getBySequencerId(request.orderBatch.wallet.sequencerWalletId())?.let { wallet ->
                         handleOrderBatchUpdates(request.orderBatch.ordersToAddList, market, wallet, response)
                         handleSequencerResponse(
                             response,
@@ -144,10 +141,7 @@ object SequencerResponseProcessorService {
 
             SequencerRequest.Type.ApplyBackToBackOrder -> {
                 if (response.error == SequencerError.None) {
-                    val walletFamily = WalletFamily.valueOf(request.backToBackOrder.walletFamily)
-                    val sequencerUserId = request.backToBackOrder.user.sequencerUserId()
-
-                    WalletEntity.getBySequencerUserIdsAndFamily(sequencerUserId, walletFamily)?.let { wallet ->
+                    WalletEntity.getBySequencerId(request.backToBackOrder.wallet.sequencerWalletId())?.let { wallet ->
                         handleBackToBackMarketOrder(request.backToBackOrder, wallet, response)
                         handleSequencerResponse(
                             response,

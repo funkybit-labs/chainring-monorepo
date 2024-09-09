@@ -18,7 +18,6 @@ import xyz.funkybit.core.model.db.DepositStatus
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderStatus
 import xyz.funkybit.core.model.db.SymbolEntity
-import xyz.funkybit.core.model.db.WalletFamily
 import xyz.funkybit.core.model.db.WithdrawalStatus
 import xyz.funkybit.core.model.telegram.bot.SessionState
 import xyz.funkybit.core.model.telegram.bot.TelegramBotUserEntity
@@ -462,7 +461,7 @@ class InputHandler(
                             }
 
                             val errorOrOrderId = try {
-                                val response = exchangeApiService.addOrder(currentWallet.wallet.userGuid.value, currentWallet.evmAddress, WalletFamily.Evm, signedOrder)
+                                val response = exchangeApiService.addOrder(currentWallet.wallet.userGuid.value, currentWallet.evmAddress, signedOrder)
                                 response.error?.left() ?: response.orderId.right()
                             } catch (e: RequestProcessingError) {
                                 e.error.left()
