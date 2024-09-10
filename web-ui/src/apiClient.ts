@@ -432,12 +432,20 @@ const AuthorizeWalletRequestSchema = z.object({
   signature: z.string()
 })
 
+const SetNicknameSchema = z.object({
+  name: z.string()
+})
+
+const SetAvatarUrlSchema = z.object({
+  url: z.string()
+})
+
 const ApiErrorSchema = z.object({
   displayMessage: z.string()
 })
 export type ApiError = z.infer<typeof ApiErrorSchema>
 
-const ApiErrorsSchema = z.object({
+export const ApiErrorsSchema = z.object({
   errors: z.array(ApiErrorSchema)
 })
 export type ApiErrors = z.infer<typeof ApiErrorsSchema>
@@ -773,6 +781,44 @@ export const apiClient = new Zodios(apiBaseUrl, [
     path: '/v1/testnet-challenge',
     alias: 'testnetChallengeEnroll',
     parameters: [],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'post',
+    path: '/v1/testnet-challenge/nickname',
+    alias: 'testnetChallengeSetNickname',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: SetNicknameSchema
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'post',
+    path: '/v1/testnet-challenge/avatar',
+    alias: 'testnetChallengeSetAvatarUrl',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: SetAvatarUrlSchema
+      }
+    ],
     response: z.undefined(),
     errors: [
       {

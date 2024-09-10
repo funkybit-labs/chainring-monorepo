@@ -78,6 +78,7 @@ import xyz.funkybit.core.model.db.migrations.V78_ArchAccountTable
 import xyz.funkybit.core.model.db.migrations.V79_UserTestnetChallenge
 import xyz.funkybit.core.model.db.migrations.V7_OrderTable
 import xyz.funkybit.core.model.db.migrations.V80_CrossChainSequencerOrders
+import xyz.funkybit.core.model.db.migrations.V81_UserNicknameIndex
 import xyz.funkybit.core.model.db.migrations.V8_ExecutionsAndTrades
 import xyz.funkybit.core.model.db.migrations.V9_SymbolTable
 
@@ -162,4 +163,5 @@ val migrations = listOf(
     V78_ArchAccountTable(),
     V79_UserTestnetChallenge(),
     V80_CrossChainSequencerOrders(),
+    V81_UserNicknameIndex(),
 )

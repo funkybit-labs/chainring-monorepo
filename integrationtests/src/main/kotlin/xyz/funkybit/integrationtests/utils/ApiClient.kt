@@ -46,6 +46,7 @@ import xyz.funkybit.apps.api.model.ListDepositsApiResponse
 import xyz.funkybit.apps.api.model.ListWithdrawalsApiResponse
 import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.apps.api.model.OrdersApiResponse
+import xyz.funkybit.apps.api.model.SetNickname
 import xyz.funkybit.apps.api.model.WithdrawalApiResponse
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.evm.ECHelper
@@ -522,6 +523,16 @@ open class ApiClient(
                 .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
+    fun trySetNickname(nickName: String): Either<ApiCallFailure, Unit> =
+        executeAndTrace(
+            TraceRecorder.Op.SetNickName,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/testnet-challenge/nickname")
+                .post(Json.encodeToString(SetNickname(nickName)).toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(keyPair, chainId = currentChainId),
+        ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
     private fun executeAndTrace(op: TraceRecorder.Op, request: Request): Response {
         return traceRecorder.record(op) {
             httpClient.newCall(request).execute()
@@ -621,6 +632,8 @@ open class ApiClient(
         tryGetLastPrice(marketId).throwOrReturn()
 
     open fun testnetChallengeEnroll() = tryTestnetChallengeEnroll().throwOrReturn()
+
+    open fun setNickname(nickName: String) = trySetNickname(nickName).throwOrReturn()
 }
 
 fun <T> Either<ApiCallFailure, T>.throwOrReturn(): T {

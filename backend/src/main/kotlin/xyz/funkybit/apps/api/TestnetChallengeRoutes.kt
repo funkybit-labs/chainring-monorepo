@@ -1,19 +1,29 @@
 package xyz.funkybit.apps.api
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.runBlocking
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.Tag
 import org.http4k.contract.meta
+import org.http4k.core.Body
 import org.http4k.core.Method
 import org.http4k.core.Response
 import org.http4k.core.Status
+import org.http4k.format.KotlinxSerialization.auto
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.middleware.principal
 import xyz.funkybit.apps.api.middleware.signedTokenSecurity
+import xyz.funkybit.apps.api.model.RequestProcessingError
+import xyz.funkybit.apps.api.model.SetAvatarUrl
+import xyz.funkybit.apps.api.model.SetNickname
+import xyz.funkybit.apps.api.model.processingError
 import xyz.funkybit.core.blockchain.BlockchainClient
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
+import xyz.funkybit.core.model.db.UserEntity
+import xyz.funkybit.core.utils.IconUtils.resolveSymbolUrl
+import xyz.funkybit.core.utils.IconUtils.sanitizeImageUrl
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 
 class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
@@ -62,6 +72,63 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
                 }
             }
             Response(Status.OK)
+        }
+    }
+
+    val setNickname: ContractRoute = run {
+        val requestBody = Body.auto<SetNickname>().toLens()
+
+        "testnet-challenge/nickname" meta {
+            operationId = "testnet-challenge-set-nickname"
+            summary = "Set Nickname"
+            tags += listOf(Tag("testnet-challenge"))
+            security = signedTokenSecurity
+            receiving(requestBody to SetNickname("Name"))
+            returning(
+                Status.OK,
+            )
+        } bindContract Method.POST to { request ->
+            val body = requestBody(request)
+            transaction {
+                val user = request.principal.user
+                if (TestnetChallengeUtils.enabled && user.testnetChallengeStatus == TestnetChallengeStatus.Enrolled) {
+                    if (user.nickname != body.name) {
+                        if (UserEntity.findByNickname(body.name) != null) {
+                            throw RequestProcessingError("Nickname is already taken")
+                        } else {
+                            user.nickname = body.name
+                        }
+                    }
+                }
+            }
+            Response(Status.OK)
+        }
+    }
+
+    val setAvatarUrl: ContractRoute = run {
+        val requestBody = Body.auto<SetAvatarUrl>().toLens()
+
+        "testnet-challenge/avatar" meta {
+            operationId = "testnet-challenge-set-avatar"
+            summary = "Set Avatar URL"
+            tags += listOf(Tag("testnet-challenge"))
+            security = signedTokenSecurity
+            receiving(requestBody to SetAvatarUrl("URL"))
+            returning(
+                Status.OK,
+            )
+        } bindContract Method.POST to { request ->
+            val body = requestBody(request)
+            val result = sanitizeImageUrl(body.url).map { sanitized ->
+                val url = runBlocking { resolveSymbolUrl(sanitized) }
+                transaction {
+                    val user = request.principal.user
+                    if (TestnetChallengeUtils.enabled && user.testnetChallengeStatus == TestnetChallengeStatus.Enrolled) {
+                        user.avatarUrl = url
+                    }
+                }
+            }
+            result.fold(ifLeft = { error -> processingError("Unable to process avatar URL: $error") }, ifRight = { Response(Status.OK) })
         }
     }
 }

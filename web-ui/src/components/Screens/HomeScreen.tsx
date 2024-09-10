@@ -16,7 +16,7 @@ import { WebsocketProvider } from 'contexts/websocket'
 import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
 import Admin from 'components/Screens/Admin'
 import { useWallet } from 'contexts/walletProvider'
-import { TestnetChallengeTab } from 'components/Screens/HomeScreen/TestnetChallengeTab'
+import { TestnetChallengeTab } from 'components/Screens/HomeScreen/testnetchallenge/TestnetChallengeTab'
 
 function WebsocketWrapper({ contents }: { contents: JSX.Element }) {
   const wallet = useWallet()
@@ -145,7 +145,7 @@ function HomeScreenContent() {
             onShowAdmin={() => setShowAdmin(true)}
           />
 
-          <div className="mx-4 flex min-h-screen justify-center py-24">
+          <div className="mx-4 flex min-h-screen justify-center overflow-auto py-24">
             <div
               className="my-auto laptop:max-w-[1800px]"
               ref={homeScreenRef as LegacyRef<HTMLDivElement>}
@@ -242,6 +242,7 @@ function HomeScreenContent() {
                 <TestnetChallengeTab
                   symbols={symbols}
                   exchangeContract={exchangeContract}
+                  onChangeTab={saveTab}
                 />
               )}
             </div>
