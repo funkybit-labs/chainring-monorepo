@@ -71,6 +71,7 @@ message SequencerRequest {
     SetWithdrawalFees = 6;
     SetMarketMinFees = 7;
     ApplyBackToBackOrder = 8;
+    Unparseable = 9;
   }
   string guid = 1;
   Type type = 2;

@@ -10,6 +10,7 @@ import Input from 'components/Screens/Admin/Input'
 import Add from 'assets/Add.svg'
 import MarketModal from 'components/Screens/Admin/MarketModal'
 import { useWallet } from 'contexts/walletProvider'
+import { FEE_RATE_PIPS_MAX_VALUE } from 'utils'
 
 export default function Admin({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -180,6 +181,9 @@ export default function Admin({ onClose }: { onClose: () => void }) {
               }
             }}
           />
+          <div className="mt-2 text-sm">
+            1 pip = {(1 / FEE_RATE_PIPS_MAX_VALUE) * 100}%
+          </div>
         </fieldset>
         <fieldset className="rounded-lg border-2 border-white bg-darkBluishGray6 p-4">
           <legend>Taker</legend>
@@ -195,6 +199,9 @@ export default function Admin({ onClose }: { onClose: () => void }) {
               }
             }}
           />
+          <div className="mt-2 text-sm">
+            1 pip = {(1 / FEE_RATE_PIPS_MAX_VALUE) * 100}%
+          </div>
         </fieldset>
         <div className="w-20">
           <SubmitButton

@@ -13,7 +13,10 @@ value class FeeRate(val value: Long) {
     companion object {
         const val MAX_VALUE = 1_000_000L
 
-        fun fromPercents(percents: Double): FeeRate =
-            FeeRate((BigDecimal(percents) * BigDecimal(MAX_VALUE) / BigDecimal(100)).toLong())
+        fun fromPercents(percents: BigDecimal): FeeRate =
+            FeeRate((percents * BigDecimal(MAX_VALUE)).toLong())
     }
+
+    fun toPercents(): BigDecimal =
+        BigDecimal(value).setScale(6) / BigDecimal(MAX_VALUE)
 }

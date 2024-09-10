@@ -42,7 +42,7 @@ class TestBackToBackOrders {
     @Test
     fun `Test market buy`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"))
@@ -198,7 +198,7 @@ class TestBackToBackOrders {
     @Test
     fun `Test market buy - max swap (100 percent)`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"))
@@ -303,7 +303,7 @@ class TestBackToBackOrders {
     @MethodSource("orderAmounts")
     fun `Test market buy - partial fill`(order1Amount: String, order2Amount: String, order1Disposition: OrderDisposition, order2Disposition: OrderDisposition) {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"))
@@ -380,7 +380,7 @@ class TestBackToBackOrders {
     @Test
     fun `Test market buy - errors`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"), minFee = BigDecimal("0.0001"))
@@ -437,7 +437,7 @@ class TestBackToBackOrders {
     @Test
     fun `Test market sell`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("btcChain2/btcChain1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("btcChain1/ethChain1"))
@@ -588,7 +588,7 @@ class TestBackToBackOrders {
     @Test
     fun `Test market sell - max swap (100 percent)`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"))
@@ -695,7 +695,7 @@ class TestBackToBackOrders {
     @MethodSource("orderAmounts")
     fun `Test market sell - partial fill`(order1Amount: String, order2Amount: String, order1Disposition: OrderDisposition, order2Disposition: OrderDisposition) {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"))
@@ -772,7 +772,7 @@ class TestBackToBackOrders {
     @Test
     fun `Test market sell - errors`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"), minFee = BigDecimal("0.01"))

@@ -1,9 +1,8 @@
 package xyz.funkybit.core.model.db
 
-import kotlinx.serialization.Serializable
 import xyz.funkybit.core.model.FeeRate
+import java.math.BigDecimal
 
-@Serializable
 data class FeeRates(
     val maker: FeeRate,
     val taker: FeeRate,
@@ -15,7 +14,7 @@ data class FeeRates(
                 taker = FeeRate(KeyValueStore.getLong("TakerFeeRate") ?: 0),
             )
 
-        fun fromPercents(maker: Double, taker: Double): FeeRates =
+        fun fromPercents(maker: BigDecimal, taker: BigDecimal): FeeRates =
             FeeRates(
                 maker = FeeRate.fromPercents(maker),
                 taker = FeeRate.fromPercents(taker),

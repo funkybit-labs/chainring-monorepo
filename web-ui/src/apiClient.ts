@@ -4,6 +4,7 @@ import { pluginToken } from '@zodios/plugins'
 import { loadAuthToken } from 'auth'
 import Decimal from 'decimal.js'
 import { useEffect, useState } from 'react'
+import { FEE_RATE_PIPS_MAX_VALUE } from 'utils'
 
 export const apiBaseUrl = import.meta.env.ENV_API_URL
 
@@ -23,6 +24,11 @@ const decimal = () =>
         return z.NEVER
       }
     })
+
+const feeRatePips = () =>
+  decimal().transform((decimalFee) => {
+    return BigInt(decimalFee.mul(FEE_RATE_PIPS_MAX_VALUE).toNumber())
+  })
 
 export const EvmAddressSchema = z.custom<`0x${string}`>((val: unknown) =>
   /^0x/.test(val as string)
@@ -102,10 +108,17 @@ const MarketSchema = z.object({
 export type Market = z.infer<typeof MarketSchema>
 
 const FeeRatesSchema = z.object({
+  maker: feeRatePips(),
+  taker: feeRatePips()
+})
+export type FeeRates = z.infer<typeof FeeRatesSchema>
+
+const SetFeeRatesSchema = z.object({
   maker: z.coerce.bigint(),
   taker: z.coerce.bigint()
 })
-export type FeeRates = z.infer<typeof FeeRatesSchema>
+
+export type SetFeeRates = z.infer<typeof SetFeeRatesSchema>
 
 export const ConfigurationApiResponseSchema = z.object({
   chains: z.array(ChainSchema),
@@ -576,7 +589,7 @@ export const apiClient = new Zodios(apiBaseUrl, [
       {
         name: 'payload',
         type: 'Body',
-        schema: FeeRatesSchema
+        schema: SetFeeRatesSchema
       }
     ],
     response: z.undefined(),

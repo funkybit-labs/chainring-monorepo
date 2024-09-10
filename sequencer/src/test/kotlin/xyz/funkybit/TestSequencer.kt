@@ -47,7 +47,7 @@ class TestSequencer {
     @Test
     fun `Test basic order matching`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
         val btcWithdrawalFee = BigDecimal("0.0001").inSats()
         sequencer.setWithdrawalFees(
             listOf(
@@ -252,7 +252,7 @@ class TestSequencer {
     fun `Test a market order that executes against multiple orders at multiple levels`(percentage: Int) {
         val sequencer = SequencerClient(mockClock)
         val market = sequencer.createMarket(MarketId("BTC:1338/ETH:1338"))
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val lp1 = generateUser()
         val lp2 = generateUser()
@@ -396,7 +396,7 @@ class TestSequencer {
     fun `Test market order that executes against multiple orders at multiple levels`() {
         val sequencer = SequencerClient(mockClock)
         val market = sequencer.createMarket(MarketId("BTC20/ETH20"))
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val lp1 = generateUser()
         val lp2 = generateUser()
@@ -522,7 +522,7 @@ class TestSequencer {
     @Test
     fun `test limit checking on orders`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
         val market1 = sequencer.createMarket(MarketId("BTC3/ETH3"))
         val market2 = sequencer.createMarket(MarketId("ETH3/USDC3"), baseDecimals = 18, quoteDecimals = 6, tickSize = BigDecimal("1"))
 
@@ -644,7 +644,7 @@ class TestSequencer {
     @Test
     fun `test LimitBuy order can cross the market`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
         val market = sequencer.createMarket(MarketId("BTC8/ETH8"))
 
         val maker = generateUser()
@@ -730,7 +730,7 @@ class TestSequencer {
     @Test
     fun `test LimitBuy order can cross the market filling LimitSell orders at multiple levels until limit price`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
         val market = sequencer.createMarket(MarketId("BTC9/ETH9"))
 
         val maker = generateUser()
@@ -813,7 +813,7 @@ class TestSequencer {
     @Test
     fun `test LimitSell order can cross the market`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
         val market = sequencer.createMarket(MarketId("BTC10/ETH10"))
 
         val maker = generateUser()
@@ -901,7 +901,7 @@ class TestSequencer {
     @Test
     fun `test LimitSell order can cross the market filling LimitBuy orders at multiple levels until limit price`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
         val market = sequencer.createMarket(MarketId("BTC11/ETH11"))
 
         val maker = generateUser()
@@ -973,7 +973,7 @@ class TestSequencer {
     @Test
     fun `test order cancel`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
         val market = sequencer.createMarket(MarketId("BTC4/ETH4"))
 
         val maker = generateUser()
@@ -1061,7 +1061,7 @@ class TestSequencer {
     @Test
     fun `test auto-reduce from trades`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC6/ETH6"), tickSize = BigDecimal(1), baseDecimals = 8, quoteDecimals = 18)
         val market2 = sequencer.createMarket(MarketId("ETH6/USDC6"), tickSize = BigDecimal(1), baseDecimals = 18, quoteDecimals = 6)
@@ -1161,7 +1161,7 @@ class TestSequencer {
     @Test
     fun `test auto-reduce from withdrawals`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
         val market = sequencer.createMarket(MarketId("BTC7/ETH7"))
 
         val maker = generateUser()
@@ -1216,7 +1216,7 @@ class TestSequencer {
     fun `fee rate change does not affect existing orders in the book`() {
         val sequencer = SequencerClient(mockClock)
         // set maker fee rate to 1% and taker fee rate to 2%
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
         val market = sequencer.createMarket(MarketId("BTC8/ETH8"))
 
         val maker = generateUser()
@@ -1228,7 +1228,7 @@ class TestSequencer {
         val sellOrder1 = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("5"), BigDecimal("10.00"), maker, Order.Type.LimitSell)
 
         // increase fee rates
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 2.0, taker = 4.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.02"), taker = BigDecimal("0.04")))
 
         val sellOrder2 = sequencer.addOrderAndVerifyAccepted(market, BigDecimal("5"), BigDecimal("10.00"), maker, Order.Type.LimitSell)
 
@@ -1270,7 +1270,7 @@ class TestSequencer {
     @Test
     fun `fee rate increase - consumption released correctly`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 0.0, taker = 0.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0"), taker = BigDecimal("0")))
         val market = sequencer.createMarket(MarketId("BTC200/ETH200"))
 
         val maker = generateUser()
@@ -1338,7 +1338,7 @@ class TestSequencer {
         )
 
         // decrease fee rate to zero
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 100.0, taker = 100.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("1.0"), taker = BigDecimal("1.0")))
 
         // quote consumption should be released using the original order's fee rate releasing 10 (10 order + 0 fee)
         sequencer.cancelOrder(market, order1.guid, maker).also { response ->
@@ -1368,7 +1368,7 @@ class TestSequencer {
     @Test
     fun `test failed withdrawals`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val user = generateUser()
         val asset = SequencerClient.Asset("ETH", decimals = 18)
@@ -1393,7 +1393,7 @@ class TestSequencer {
     @Test
     fun `Test failed settlements`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market = sequencer.createMarket(MarketId("BTC8/ETH8"))
 
@@ -1479,7 +1479,7 @@ class TestSequencer {
     @Test
     fun `Test autoreduce on failed settlements`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market = sequencer.createMarket(MarketId("BTC9/ETH9"))
 
@@ -1571,7 +1571,7 @@ class TestSequencer {
     @Test
     fun `Test failed settlements - balances can go negative`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market = sequencer.createMarket(MarketId("BTC10/ETH10"))
 
@@ -1677,7 +1677,7 @@ class TestSequencer {
     fun `Test dust gets rolled into last trade fee on market order`() {
         val sequencer = SequencerClient(mockClock)
         val market = sequencer.createMarket(MarketId("BTC21/ETH21"))
-        val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
+        val feeRates = FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02"))
         sequencer.setFeeRates(feeRates)
 
         val lp1 = generateUser()
@@ -1741,7 +1741,7 @@ class TestSequencer {
     fun `Test dust not taken if taker has quote assets reserved`() {
         val sequencer = SequencerClient(mockClock)
         val market = sequencer.createMarket(MarketId("BTC22/ETH22"))
-        val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
+        val feeRates = FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02"))
         sequencer.setFeeRates(feeRates)
 
         val lp1 = generateUser()
@@ -1802,7 +1802,7 @@ class TestSequencer {
     fun `Test dust not taken if market is exhausted`() {
         val sequencer = SequencerClient(mockClock)
         val market = sequencer.createMarket(MarketId("BTC23/ETH23"))
-        val feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0)
+        val feeRates = FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02"))
         sequencer.setFeeRates(feeRates)
 
         val lp1 = generateUser()

@@ -57,13 +57,18 @@ export function calculateNotional(
   return (price * baseAmount) / BigInt(Math.pow(10, baseSymbol.decimals))
 }
 
+export const FEE_RATE_PIPS_MAX_VALUE = 1000000
+
 export function calculateFee(notional: bigint, feeRate: bigint): bigint {
-  return (notional * feeRate) / 1000000n
+  return (notional * feeRate) / BigInt(FEE_RATE_PIPS_MAX_VALUE)
 }
 
 export function calculateNotionalMinusFee(
   notional: bigint,
   feeRate: bigint
 ): bigint {
-  return (notional * 1000000n) / (1000000n + feeRate)
+  return (
+    (notional * BigInt(FEE_RATE_PIPS_MAX_VALUE)) /
+    (BigInt(FEE_RATE_PIPS_MAX_VALUE) + feeRate)
+  )
 }
