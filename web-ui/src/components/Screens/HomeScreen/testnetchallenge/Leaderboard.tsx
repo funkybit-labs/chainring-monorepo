@@ -27,11 +27,12 @@ export function Leaderboard({
 
   const displayName = useMemo(
     () =>
+      newName ??
       nickName ??
       (wallet.primaryCategory === 'evm'
         ? evmAddressDisplay(wallet.primaryAddress ?? '')
         : bitcoinAddressDisplay(wallet.primaryAddress)),
-    [nickName, wallet]
+    [nickName, wallet, newName]
   )
 
   const [selectedAvatarFile, setSelectedAvatarFile] = useState<File>()
@@ -91,7 +92,6 @@ export function Leaderboard({
     mutationFn: ({ dataUrl }: { dataUrl: string }) =>
       apiClient.testnetChallengeSetAvatarUrl({ url: dataUrl ?? '' }),
     onSuccess: () => {
-      setAvatarPreview(undefined)
       setAvatarDataUrl(undefined)
       setSelectedAvatarFile(undefined)
       queryClient.invalidateQueries({ queryKey: ['accountConfiguration'] })

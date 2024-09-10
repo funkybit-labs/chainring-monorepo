@@ -17,6 +17,7 @@ import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
 import Admin from 'components/Screens/Admin'
 import { useWallet } from 'contexts/walletProvider'
 import { TestnetChallengeTab } from 'components/Screens/HomeScreen/testnetchallenge/TestnetChallengeTab'
+import { TestnetChallengeEnabled } from 'testnetChallenge'
 
 function WebsocketWrapper({ contents }: { contents: JSX.Element }) {
   const wallet = useWallet()
@@ -36,7 +37,8 @@ function HomeScreenContent() {
     (window.sessionStorage.getItem('side') as OrderSide | null) ?? 'Buy'
   )
   const [tab, setTab] = useState<Tab>(
-    (window.sessionStorage.getItem('tab') as Tab | null) ?? 'Swap'
+    (window.sessionStorage.getItem('tab') as Tab | null) ??
+      (TestnetChallengeEnabled ? 'Testnet Challenge' : 'Swap')
   )
 
   const {
