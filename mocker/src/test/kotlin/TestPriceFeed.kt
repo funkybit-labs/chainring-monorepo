@@ -1,7 +1,7 @@
 import org.awaitility.kotlin.await
 import org.junit.jupiter.api.Test
 import xyz.funkybit.core.model.db.MarketId
-import xyz.funkybit.mocker.core.PriceFeed
+import xyz.funkybit.core.utils.PriceFeed
 import java.time.Duration
 
 class TestPriceFeed {
@@ -16,7 +16,7 @@ class TestPriceFeed {
             latestPrices = prices
         }
 
-        val priceFeed = PriceFeed(listOf(btcEth, ethUsdc, btcUsdc), ::onPriceUpdate)
+        val priceFeed = PriceFeed(listOf(btcEth, ethUsdc, btcUsdc), sleepTimeMs = 2000L, ::onPriceUpdate)
 
         priceFeed.start()
         await.pollInSameThread().atMost(Duration.ofMillis(5000L)).until {

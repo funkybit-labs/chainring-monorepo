@@ -9,7 +9,6 @@ import xyz.funkybit.mocker.core.PriceFunction
 import xyz.funkybit.mocker.core.LiquidityPlacement
 import xyz.funkybit.mocker.core.Maker
 import xyz.funkybit.mocker.core.Taker
-import xyz.funkybit.mocker.core.toFundamentalUnits
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.File
 import java.math.BigDecimal
@@ -20,8 +19,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import org.web3j.crypto.ECKeyPair
-import org.web3j.crypto.Keys
+import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.integrationtests.utils.WalletKeyPair
 import java.math.BigInteger
 

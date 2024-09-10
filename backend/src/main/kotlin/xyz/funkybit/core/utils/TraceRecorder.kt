@@ -44,6 +44,7 @@ interface TraceRecorder {
         GetLastPrice,
         TestnetChallengeEnroll,
         SetNickName,
+        GetLeaderboard,
     }
 
     data class Trace(

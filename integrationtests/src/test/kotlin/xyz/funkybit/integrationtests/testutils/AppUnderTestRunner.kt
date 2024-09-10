@@ -44,6 +44,8 @@ import xyz.funkybit.core.model.db.OrderBookSnapshotTable
 import xyz.funkybit.core.model.db.OrderExecutionTable
 import xyz.funkybit.core.model.db.OrderTable
 import xyz.funkybit.core.model.db.SettlementBatchTable
+import xyz.funkybit.core.model.db.TestnetChallengePNLTable
+import xyz.funkybit.core.model.db.TestnetChallengeUserRewardTable
 import xyz.funkybit.core.model.db.TradeTable
 import xyz.funkybit.core.model.db.UserTable
 import xyz.funkybit.core.model.db.WalletLinkedSignerTable
@@ -268,6 +270,8 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             WithdrawalTable.deleteAll()
             ArchAccountBalanceIndexTable.deleteAll()
             BlockchainTransactionTable.deleteAll()
+            TestnetChallengePNLTable.deleteAll()
+            TestnetChallengeUserRewardTable.deleteAll()
             BalanceLogTable.deleteAll()
             BalanceTable.deleteAll()
             WalletLinkedSignerTable.deleteAll()
