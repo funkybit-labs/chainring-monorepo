@@ -9,7 +9,7 @@ import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.selectAll
 import xyz.funkybit.core.model.Address
-import xyz.funkybit.core.model.SequencerUserId
+import xyz.funkybit.core.model.SequencerAccountId
 import xyz.funkybit.core.model.db.WalletTable.nullable
 import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.utils.TestnetChallengeUtils
@@ -69,7 +69,7 @@ class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
             }
         }
 
-        fun getBySequencerIds(sequencerIds: Set<SequencerUserId>): List<UserEntity> {
+        fun getBySequencerIds(sequencerIds: Set<SequencerAccountId>): List<UserEntity> {
             return UserEntity.find {
                 UserTable.sequencerId.inList(sequencerIds.map { it.value })
             }.toList()
@@ -81,11 +81,11 @@ class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
             }.toList()
         }
 
-        fun getWithWalletsBySequencerUserIds(sequencerUserIds: Set<SequencerUserId>): List<Pair<UserEntity, List<WalletEntity>>> {
+        fun getWithWalletsBySequencerAccountIds(sequencerAccountIds: Set<SequencerAccountId>): List<Pair<UserEntity, List<WalletEntity>>> {
             val wallets = mutableMapOf<UserId, MutableList<WalletEntity>>()
             val users = UserTable
                 .join(WalletTable, JoinType.LEFT, WalletTable.userGuid, UserTable.guid)
-                .selectAll().where { UserTable.sequencerId.inList(sequencerUserIds.map { it.value }) }
+                .selectAll().where { UserTable.sequencerId.inList(sequencerAccountIds.map { it.value }) }
                 .mapNotNull { resultRow ->
                     val walletsForUser = wallets[resultRow[UserTable.guid].value]
                     if (walletsForUser != null) {
@@ -108,7 +108,7 @@ class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
     }
 
     var sequencerId by UserTable.sequencerId.transform(
-        toReal = { SequencerUserId(it) },
+        toReal = { SequencerAccountId(it) },
         toColumn = { it.value },
     )
 

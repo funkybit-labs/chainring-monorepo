@@ -17,7 +17,7 @@ import xyz.funkybit.apps.api.model.BigDecimalJson
 import xyz.funkybit.apps.api.model.BigIntegerJson
 import xyz.funkybit.core.model.FeeRate
 import xyz.funkybit.core.model.MarketMinFee
-import xyz.funkybit.core.model.SequencerUserId
+import xyz.funkybit.core.model.SequencerAccountId
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.WithdrawalFee
 import xyz.funkybit.core.model.db.FeeRates
@@ -201,7 +201,7 @@ class TestRoutes(
                 }
 
                 val userGuids = transaction {
-                    val userIds = sequencerResponse.stateDump.balancesList.map { SequencerUserId(it.account) }.toSet()
+                    val userIds = sequencerResponse.stateDump.balancesList.map { SequencerAccountId(it.account) }.toSet()
                     UserEntity
                         .getBySequencerIds(userIds)
                         .associateBy(

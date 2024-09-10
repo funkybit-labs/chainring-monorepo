@@ -51,14 +51,14 @@ class TestBackToBackOrders {
         val ethChain1 = market2.quoteAsset
 
         val maker = generateUser()
-        sequencer.deposit(maker.account, btcChain2, BigDecimal("1")).also { response ->
+        sequencer.deposit(maker, btcChain2, BigDecimal("1")).also { response ->
             response.assertLimits(
                 listOf(
                     ExpectedLimitsUpdate(maker.account, market1.id, base = BigDecimal("1").inSats(), quote = BigInteger.ZERO),
                 ),
             )
         }
-        sequencer.deposit(maker.account, btcChain1, BigDecimal("1")).also { response ->
+        sequencer.deposit(maker, btcChain1, BigDecimal("1")).also { response ->
             response.assertLimits(
                 listOf(
                     ExpectedLimitsUpdate(maker.account, market1.id, base = BigDecimal("1").inSats(), quote = BigDecimal("1").inSats()),
@@ -68,7 +68,7 @@ class TestBackToBackOrders {
         }
 
         // place a limit sell
-        val makerSellOrder1Guid = sequencer.addOrder(market1, BigDecimal("1"), BigDecimal("1.050"), maker.account, maker.wallet, Order.Type.LimitSell).let { response ->
+        val makerSellOrder1Guid = sequencer.addOrder(market1, BigDecimal("1"), BigDecimal("1.050"), maker, Order.Type.LimitSell).let { response ->
             assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
             response.assertLimits(
                 listOf(
@@ -79,7 +79,7 @@ class TestBackToBackOrders {
         }.guid
 
         // place a limit sell
-        val makerSellOrder2Guid = sequencer.addOrder(market2, BigDecimal("1"), BigDecimal("18.000"), maker.account, maker.wallet, Order.Type.LimitSell).let { response ->
+        val makerSellOrder2Guid = sequencer.addOrder(market2, BigDecimal("1"), BigDecimal("18.000"), maker, Order.Type.LimitSell).let { response ->
             assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
             response.assertLimits(
                 listOf(
@@ -90,7 +90,7 @@ class TestBackToBackOrders {
         }.guid
 
         val taker = generateUser()
-        sequencer.deposit(taker.account, ethChain1, BigDecimal("10")).also { response ->
+        sequencer.deposit(taker, ethChain1, BigDecimal("10")).also { response ->
             response.assertLimits(
                 listOf(
                     ExpectedLimitsUpdate(taker.account, market2.id, base = BigInteger.ZERO, quote = BigDecimal("10").inWei()),
@@ -100,7 +100,7 @@ class TestBackToBackOrders {
 
         // swap ETH:CHAIN1 for BTC:CHAIN2
         val backToBackOrderGuid = Random.nextLong()
-        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.5"), taker.account, taker.wallet, Order.Type.MarketBuy).also { response ->
+        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.5"), taker, Order.Type.MarketBuy).also { response ->
             assertEquals(3, response.ordersChangedCount)
 
             val takerOrder = response.ordersChangedList.first { it.guid == backToBackOrderGuid }
@@ -186,13 +186,13 @@ class TestBackToBackOrders {
             )
         }
 
-        sequencer.withdrawal(taker.account, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.5"))
-        sequencer.withdrawal(taker.account, btcChain1, BigDecimal.ZERO, expectedAmount = null)
-        sequencer.withdrawal(taker.account, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.361")) // 10 - 0.5 * 1.05 * 18 - 0.189 (fee)
+        sequencer.withdrawal(taker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.5"))
+        sequencer.withdrawal(taker, btcChain1, BigDecimal.ZERO, expectedAmount = null)
+        sequencer.withdrawal(taker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.361")) // 10 - 0.5 * 1.05 * 18 - 0.189 (fee)
 
-        sequencer.withdrawal(maker.account, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.5"))
-        sequencer.withdrawal(maker.account, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.99475")) // 1 - 0.00525
-        sequencer.withdrawal(maker.account, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("9.3555")) // 18 * 0.525 - 0.0945 (fee)
+        sequencer.withdrawal(maker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.5"))
+        sequencer.withdrawal(maker, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.99475")) // 1 - 0.00525
+        sequencer.withdrawal(maker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("9.3555")) // 18 * 0.525 - 0.0945 (fee)
     }
 
     @Test
@@ -207,21 +207,21 @@ class TestBackToBackOrders {
         val ethChain1 = market2.quoteAsset
 
         val maker = generateUser()
-        sequencer.deposit(maker.account, btcChain2, BigDecimal("1"))
-        sequencer.deposit(maker.account, btcChain1, BigDecimal("1"))
+        sequencer.deposit(maker, btcChain2, BigDecimal("1"))
+        sequencer.deposit(maker, btcChain1, BigDecimal("1"))
 
         // place a limit sell
-        val makerSellOrder1Guid = sequencer.addOrderAndVerifyAccepted(market1, BigDecimal("1"), BigDecimal("1.050"), maker.account, maker.wallet, Order.Type.LimitSell).guid
+        val makerSellOrder1Guid = sequencer.addOrderAndVerifyAccepted(market1, BigDecimal("1"), BigDecimal("1.050"), maker, Order.Type.LimitSell).guid
 
         // place a limit sell
-        val makerSellOrder2Guid = sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1"), BigDecimal("18.000"), maker.account, maker.wallet, Order.Type.LimitSell).guid
+        val makerSellOrder2Guid = sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1"), BigDecimal("18.000"), maker, Order.Type.LimitSell).guid
 
         val taker = generateUser()
-        sequencer.deposit(taker.account, ethChain1, BigDecimal("10"))
+        sequencer.deposit(taker, ethChain1, BigDecimal("10"))
 
         // swap max ETH:CHAIN1 for BTC:CHAIN2
         val backToBackOrderGuid = Random.nextLong()
-        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal.ZERO, taker.account, taker.wallet, Order.Type.MarketBuy, Percentage.MAX_VALUE).also { response ->
+        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal.ZERO, taker, Order.Type.MarketBuy, Percentage.MAX_VALUE).also { response ->
             assertEquals(3, response.ordersChangedCount)
 
             val takerOrder = response.ordersChangedList.first { it.guid == backToBackOrderGuid }
@@ -290,13 +290,13 @@ class TestBackToBackOrders {
             )
         }
 
-        sequencer.withdrawal(taker.account, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.518726")) // 0.5446623 / 1.05
-        sequencer.withdrawal(taker.account, btcChain1, BigDecimal.ZERO, expectedAmount = null)
-        sequencer.withdrawal(taker.account, ethChain1, BigDecimal.ZERO, expectedAmount = null)
+        sequencer.withdrawal(taker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.518726")) // 0.5446623 / 1.05
+        sequencer.withdrawal(taker, btcChain1, BigDecimal.ZERO, expectedAmount = null)
+        sequencer.withdrawal(taker, ethChain1, BigDecimal.ZERO, expectedAmount = null)
 
-        sequencer.withdrawal(maker.account, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.481274"))
-        sequencer.withdrawal(maker.account, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.99455338")) // 1 - 0.00544662
-        sequencer.withdrawal(maker.account, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("9.705882186")) // 18 * 0.5446623 - 0.098039214 (fee)
+        sequencer.withdrawal(maker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.481274"))
+        sequencer.withdrawal(maker, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.99455338")) // 1 - 0.00544662
+        sequencer.withdrawal(maker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("9.705882186")) // 18 * 0.5446623 - 0.098039214 (fee)
     }
 
     @ParameterizedTest
@@ -312,21 +312,21 @@ class TestBackToBackOrders {
         val ethChain1 = market2.quoteAsset
 
         val maker = generateUser()
-        sequencer.deposit(maker.account, btcChain2, BigDecimal("1"))
-        sequencer.deposit(maker.account, btcChain1, BigDecimal("1"))
+        sequencer.deposit(maker, btcChain2, BigDecimal("1"))
+        sequencer.deposit(maker, btcChain1, BigDecimal("1"))
 
         // place a limit sell
-        val makerSellOrder1Guid = sequencer.addOrderAndVerifyAccepted(market1, BigDecimal(order1Amount), BigDecimal("1.000"), maker.account, maker.wallet, Order.Type.LimitSell).guid
+        val makerSellOrder1Guid = sequencer.addOrderAndVerifyAccepted(market1, BigDecimal(order1Amount), BigDecimal("1.000"), maker, Order.Type.LimitSell).guid
 
         // place a limit sell
-        val makerSellOrder2Guid = sequencer.addOrderAndVerifyAccepted(market2, BigDecimal(order2Amount), BigDecimal("18.000"), maker.account, maker.wallet, Order.Type.LimitSell).guid
+        val makerSellOrder2Guid = sequencer.addOrderAndVerifyAccepted(market2, BigDecimal(order2Amount), BigDecimal("18.000"), maker, Order.Type.LimitSell).guid
 
         val taker = generateUser()
-        sequencer.deposit(taker.account, ethChain1, BigDecimal("10"))
+        sequencer.deposit(taker, ethChain1, BigDecimal("10"))
 
         // swap ETH:CHAIN1 for BTC:CHAIN2
         val backToBackOrderGuid = Random.nextLong()
-        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.5"), taker.account, taker.wallet, Order.Type.MarketBuy).also { response ->
+        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.5"), taker, Order.Type.MarketBuy).also { response ->
             assertEquals(3, response.ordersChangedCount)
 
             val takerOrder = response.ordersChangedList.first { it.guid == backToBackOrderGuid }
@@ -368,13 +368,13 @@ class TestBackToBackOrders {
             )
         }
 
-        sequencer.withdrawal(taker.account, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.4"))
-        sequencer.withdrawal(taker.account, btcChain1, BigDecimal.ZERO, expectedAmount = null)
-        sequencer.withdrawal(taker.account, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("2.656")) // 10 - 0.4 * 18 - 0.144 (fee)
+        sequencer.withdrawal(taker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.4"))
+        sequencer.withdrawal(taker, btcChain1, BigDecimal.ZERO, expectedAmount = null)
+        sequencer.withdrawal(taker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("2.656")) // 10 - 0.4 * 18 - 0.144 (fee)
 
-        sequencer.withdrawal(maker.account, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.6"))
-        sequencer.withdrawal(maker.account, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.996")) // 1 - 0.004
-        sequencer.withdrawal(maker.account, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("7.128")) // 18 * 0.4 - 0.072 (fee)
+        sequencer.withdrawal(maker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.6"))
+        sequencer.withdrawal(maker, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.996")) // 1 - 0.004
+        sequencer.withdrawal(maker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("7.128")) // 18 * 0.4 - 0.072 (fee)
     }
 
     @Test
@@ -391,47 +391,47 @@ class TestBackToBackOrders {
         val ethChain1 = market2.quoteAsset
 
         val maker = generateUser()
-        sequencer.deposit(maker.account, btcChain2, BigDecimal("1"))
-        sequencer.deposit(maker.account, btcChain1, BigDecimal("1"))
+        sequencer.deposit(maker, btcChain2, BigDecimal("1"))
+        sequencer.deposit(maker, btcChain1, BigDecimal("1"))
 
         // place a limit sell
-        sequencer.addOrderAndVerifyAccepted(market1, BigDecimal("0.4"), BigDecimal("1.000"), maker.account, maker.wallet, Order.Type.LimitSell).guid
+        sequencer.addOrderAndVerifyAccepted(market1, BigDecimal("0.4"), BigDecimal("1.000"), maker, Order.Type.LimitSell).guid
 
         // place a limit sell
-        sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1"), BigDecimal("18.000"), maker.account, maker.wallet, Order.Type.LimitSell).guid
+        sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1"), BigDecimal("18.000"), maker, Order.Type.LimitSell).guid
 
         val taker = generateUser()
-        sequencer.deposit(taker.account, ethChain1, BigDecimal("5"))
+        sequencer.deposit(taker, ethChain1, BigDecimal("5"))
 
         // place a market buy that exceeds the limit
         val backToBackOrderGuid = Random.nextLong()
-        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.5"), taker.account, taker.wallet, Order.Type.MarketBuy).also { response ->
+        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.5"), taker, Order.Type.MarketBuy).also { response ->
             assertEquals(SequencerError.ExceedsLimit, response.error)
         }
 
         // different bridge assets
-        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market3, BigDecimal("0.5"), taker.account, taker.wallet, Order.Type.MarketBuy).also { response ->
+        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market3, BigDecimal("0.5"), taker, Order.Type.MarketBuy).also { response ->
             assertEquals(SequencerError.InvalidBackToBackOrder, response.error)
         }
 
         // base/quote the same
-        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market4, BigDecimal("0.5"), taker.account, taker.wallet, Order.Type.MarketBuy).also { response ->
+        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market4, BigDecimal("0.5"), taker, Order.Type.MarketBuy).also { response ->
             assertEquals(SequencerError.InvalidBackToBackOrder, response.error)
         }
 
         // place one where order is below min fee
-        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.00001"), taker.account, taker.wallet, Order.Type.MarketBuy).also { response ->
+        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.00001"), taker, Order.Type.MarketBuy).also { response ->
             assertEquals(SequencerError.None, response.error)
             assertEquals(response.ordersChangedList[0].disposition, OrderDisposition.Rejected)
         }
 
-        sequencer.withdrawal(taker.account, btcChain2, BigDecimal.ZERO, null)
-        sequencer.withdrawal(taker.account, btcChain1, BigDecimal.ZERO, expectedAmount = null)
-        sequencer.withdrawal(taker.account, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("5"))
+        sequencer.withdrawal(taker, btcChain2, BigDecimal.ZERO, null)
+        sequencer.withdrawal(taker, btcChain1, BigDecimal.ZERO, expectedAmount = null)
+        sequencer.withdrawal(taker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("5"))
 
-        sequencer.withdrawal(maker.account, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("1"))
-        sequencer.withdrawal(maker.account, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("1"))
-        sequencer.withdrawal(maker.account, ethChain1, BigDecimal.ZERO, expectedAmount = null)
+        sequencer.withdrawal(maker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("1"))
+        sequencer.withdrawal(maker, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("1"))
+        sequencer.withdrawal(maker, ethChain1, BigDecimal.ZERO, expectedAmount = null)
     }
 
     @Test
@@ -446,7 +446,7 @@ class TestBackToBackOrders {
         val ethChain1 = market2.quoteAsset
 
         val maker = generateUser()
-        sequencer.deposit(maker.account, btcChain1, BigDecimal("2")).also { response ->
+        sequencer.deposit(maker, btcChain1, BigDecimal("2")).also { response ->
             response.assertLimits(
                 listOf(
                     ExpectedLimitsUpdate(maker.account, market1.id, base = BigInteger.ZERO, quote = BigDecimal("2").inSats()),
@@ -454,7 +454,7 @@ class TestBackToBackOrders {
                 ),
             )
         }
-        sequencer.deposit(maker.account, ethChain1, BigDecimal("20")).also { response ->
+        sequencer.deposit(maker, ethChain1, BigDecimal("20")).also { response ->
             response.assertLimits(
                 listOf(
                     ExpectedLimitsUpdate(maker.account, market2.id, base = BigDecimal("2").inSats(), quote = BigDecimal("20").inWei()),
@@ -463,7 +463,7 @@ class TestBackToBackOrders {
         }
 
         // place a limit buy
-        val makerBuyOrder1Guid = sequencer.addOrder(market1, BigDecimal("1"), BigDecimal("0.950"), maker.account, maker.wallet, Order.Type.LimitBuy).let { response ->
+        val makerBuyOrder1Guid = sequencer.addOrder(market1, BigDecimal("1"), BigDecimal("0.950"), maker, Order.Type.LimitBuy).let { response ->
             assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
             response.assertLimits(
                 listOf(
@@ -474,7 +474,7 @@ class TestBackToBackOrders {
         }.guid
 
         // place a limit buy
-        val makerBuyOrder2Guid = sequencer.addOrder(market2, BigDecimal("1"), BigDecimal("18.000"), maker.account, maker.wallet, Order.Type.LimitBuy).let { response ->
+        val makerBuyOrder2Guid = sequencer.addOrder(market2, BigDecimal("1"), BigDecimal("18.000"), maker, Order.Type.LimitBuy).let { response ->
             assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
             response.assertLimits(
                 listOf(
@@ -485,7 +485,7 @@ class TestBackToBackOrders {
         }.guid
 
         val taker = generateUser()
-        sequencer.deposit(taker.account, btcChain2, BigDecimal("0.6")).also { response ->
+        sequencer.deposit(taker, btcChain2, BigDecimal("0.6")).also { response ->
             response.assertLimits(
                 listOf(
                     ExpectedLimitsUpdate(taker.account, market1.id, base = BigDecimal("0.6").inSats(), quote = BigInteger.ZERO),
@@ -495,7 +495,7 @@ class TestBackToBackOrders {
 
         // swap BTC:CHAIN2 for ETH:CHAIN1
         val backToBackOrderGuid = Random.nextLong()
-        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.5"), taker.account, taker.wallet, Order.Type.MarketSell).also { response ->
+        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.5"), taker, Order.Type.MarketSell).also { response ->
             assertEquals(3, response.ordersChangedCount)
 
             val takerOrder = response.ordersChangedList.first { it.guid == backToBackOrderGuid }
@@ -576,13 +576,13 @@ class TestBackToBackOrders {
             )
         }
 
-        sequencer.withdrawal(taker.account, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.1")) // 0.6 - 0.5
-        sequencer.withdrawal(taker.account, btcChain1, BigDecimal.ZERO, expectedAmount = null)
-        sequencer.withdrawal(taker.account, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("8.379")) // 0.5 * 0.95 * 18 - 0.171 (fee)
+        sequencer.withdrawal(taker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.1")) // 0.6 - 0.5
+        sequencer.withdrawal(taker, btcChain1, BigDecimal.ZERO, expectedAmount = null)
+        sequencer.withdrawal(taker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("8.379")) // 0.5 * 0.95 * 18 - 0.171 (fee)
 
-        sequencer.withdrawal(maker.account, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.5"))
-        sequencer.withdrawal(maker.account, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("1.99525")) // 2 - 0.00475
-        sequencer.withdrawal(maker.account, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("11.3645")) // 20 - 0.5 * 18 * 0.95 - 0.0855 (fee)
+        sequencer.withdrawal(maker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.5"))
+        sequencer.withdrawal(maker, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("1.99525")) // 2 - 0.00475
+        sequencer.withdrawal(maker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("11.3645")) // 20 - 0.5 * 18 * 0.95 - 0.0855 (fee)
     }
 
     @Test
@@ -597,21 +597,21 @@ class TestBackToBackOrders {
         val ethChain1 = market2.quoteAsset
 
         val maker = generateUser()
-        sequencer.deposit(maker.account, btcChain1, BigDecimal("2"))
-        sequencer.deposit(maker.account, ethChain1, BigDecimal("20"))
+        sequencer.deposit(maker, btcChain1, BigDecimal("2"))
+        sequencer.deposit(maker, ethChain1, BigDecimal("20"))
 
         // place a limit buy
-        val makerBuyOrder1Guid = sequencer.addOrderAndVerifyAccepted(market1, BigDecimal("1"), BigDecimal("0.950"), maker.account, maker.wallet, Order.Type.LimitBuy).guid
+        val makerBuyOrder1Guid = sequencer.addOrderAndVerifyAccepted(market1, BigDecimal("1"), BigDecimal("0.950"), maker, Order.Type.LimitBuy).guid
 
         // place a limit buy
-        val makerBuyOrder2Guid = sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1"), BigDecimal("18.000"), maker.account, maker.wallet, Order.Type.LimitBuy).guid
+        val makerBuyOrder2Guid = sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1"), BigDecimal("18.000"), maker, Order.Type.LimitBuy).guid
 
         val taker = generateUser()
-        sequencer.deposit(taker.account, btcChain2, BigDecimal("0.6"))
+        sequencer.deposit(taker, btcChain2, BigDecimal("0.6"))
 
         // swap BTC:CHAIN2 for ETH:CHAIN1
         val backToBackOrderGuid = Random.nextLong()
-        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal.ZERO, taker.account, taker.wallet, Order.Type.MarketSell, Percentage.MAX_VALUE).also { response ->
+        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal.ZERO, taker, Order.Type.MarketSell, Percentage.MAX_VALUE).also { response ->
             assertEquals(3, response.ordersChangedCount)
 
             val takerOrder = response.ordersChangedList.first { it.guid == backToBackOrderGuid }
@@ -682,13 +682,13 @@ class TestBackToBackOrders {
             )
         }
 
-        sequencer.withdrawal(taker.account, btcChain2, BigDecimal.ZERO, expectedAmount = null) // 0.6 - 0.5
-        sequencer.withdrawal(taker.account, btcChain1, BigDecimal.ZERO, expectedAmount = null)
-        sequencer.withdrawal(taker.account, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("10.0548")) // 0.6 * 0.95 * 18 - 0.2052 (fee)
+        sequencer.withdrawal(taker, btcChain2, BigDecimal.ZERO, expectedAmount = null) // 0.6 - 0.5
+        sequencer.withdrawal(taker, btcChain1, BigDecimal.ZERO, expectedAmount = null)
+        sequencer.withdrawal(taker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("10.0548")) // 0.6 * 0.95 * 18 - 0.2052 (fee)
 
-        sequencer.withdrawal(maker.account, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.6"))
-        sequencer.withdrawal(maker.account, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("1.9943")) // 2 - 0.0057
-        sequencer.withdrawal(maker.account, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("9.6374")) // 20 - 0.6 * 18 * 0.95 - 0.1026 (fee)
+        sequencer.withdrawal(maker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.6"))
+        sequencer.withdrawal(maker, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("1.9943")) // 2 - 0.0057
+        sequencer.withdrawal(maker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("9.6374")) // 20 - 0.6 * 18 * 0.95 - 0.1026 (fee)
     }
 
     @ParameterizedTest
@@ -704,21 +704,21 @@ class TestBackToBackOrders {
         val ethChain1 = market2.quoteAsset
 
         val maker = generateUser()
-        sequencer.deposit(maker.account, btcChain1, BigDecimal("2"))
-        sequencer.deposit(maker.account, ethChain1, BigDecimal("20"))
+        sequencer.deposit(maker, btcChain1, BigDecimal("2"))
+        sequencer.deposit(maker, ethChain1, BigDecimal("20"))
 
         // place a limit buy
-        val makerBuyOrder1Guid = sequencer.addOrderAndVerifyAccepted(market1, BigDecimal(order1Amount), BigDecimal("1.000"), maker.account, maker.wallet, Order.Type.LimitBuy).guid
+        val makerBuyOrder1Guid = sequencer.addOrderAndVerifyAccepted(market1, BigDecimal(order1Amount), BigDecimal("1.000"), maker, Order.Type.LimitBuy).guid
 
         // place a limit buy
-        val makerBuyOrder2Guid = sequencer.addOrderAndVerifyAccepted(market2, BigDecimal(order2Amount), BigDecimal("18.000"), maker.account, maker.wallet, Order.Type.LimitBuy).guid
+        val makerBuyOrder2Guid = sequencer.addOrderAndVerifyAccepted(market2, BigDecimal(order2Amount), BigDecimal("18.000"), maker, Order.Type.LimitBuy).guid
 
         val taker = generateUser()
-        sequencer.deposit(taker.account, btcChain2, BigDecimal("0.6"))
+        sequencer.deposit(taker, btcChain2, BigDecimal("0.6"))
 
         // swap BTC:CHAIN2 for ETH:CHAIN1
         val backToBackOrderGuid = Random.nextLong()
-        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.5"), taker.account, taker.wallet, Order.Type.MarketSell).also { response ->
+        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.5"), taker, Order.Type.MarketSell).also { response ->
             assertEquals(3, response.ordersChangedCount)
 
             val takerOrder = response.ordersChangedList.first { it.guid == backToBackOrderGuid }
@@ -760,13 +760,13 @@ class TestBackToBackOrders {
             )
         }
 
-        sequencer.withdrawal(taker.account, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.2")) // 0.6 - 0.4
-        sequencer.withdrawal(taker.account, btcChain1, BigDecimal.ZERO, expectedAmount = null)
-        sequencer.withdrawal(taker.account, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("7.056")) // 0.4 * 18 - 0.144 (fee)
+        sequencer.withdrawal(taker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.2")) // 0.6 - 0.4
+        sequencer.withdrawal(taker, btcChain1, BigDecimal.ZERO, expectedAmount = null)
+        sequencer.withdrawal(taker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("7.056")) // 0.4 * 18 - 0.144 (fee)
 
-        sequencer.withdrawal(maker.account, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.4"))
-        sequencer.withdrawal(maker.account, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("1.996")) // 2 - 0.004
-        sequencer.withdrawal(maker.account, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("12.728")) // 20 - 0.4 * 18 * 1.0 - 0.072 (fee)
+        sequencer.withdrawal(maker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.4"))
+        sequencer.withdrawal(maker, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("1.996")) // 2 - 0.004
+        sequencer.withdrawal(maker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("12.728")) // 20 - 0.4 * 18 * 1.0 - 0.072 (fee)
     }
 
     @Test
@@ -781,42 +781,42 @@ class TestBackToBackOrders {
         val ethChain1 = market2.quoteAsset
 
         val maker = generateUser()
-        sequencer.deposit(maker.account, btcChain1, BigDecimal("2"))
-        sequencer.deposit(maker.account, ethChain1, BigDecimal("20"))
+        sequencer.deposit(maker, btcChain1, BigDecimal("2"))
+        sequencer.deposit(maker, ethChain1, BigDecimal("20"))
 
         // place a limit buy on first market
-        sequencer.addOrderAndVerifyAccepted(market1, BigDecimal("1"), BigDecimal("1.000"), maker.account, maker.wallet, Order.Type.LimitBuy).guid
+        sequencer.addOrderAndVerifyAccepted(market1, BigDecimal("1"), BigDecimal("1.000"), maker, Order.Type.LimitBuy).guid
 
         // place a limit buy on 2nd market
-        sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1"), BigDecimal("18.000"), maker.account, maker.wallet, Order.Type.LimitBuy).guid
+        sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1"), BigDecimal("18.000"), maker, Order.Type.LimitBuy).guid
 
         val taker = generateUser()
-        sequencer.deposit(taker.account, btcChain2, BigDecimal("0.4"))
+        sequencer.deposit(taker, btcChain2, BigDecimal("0.4"))
 
         // swap BTC:CHAIN2 for ETH:CHAIN1
         val backToBackOrderGuid = Random.nextLong()
-        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.5"), taker.account, taker.wallet, Order.Type.MarketSell).also { response ->
+        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.5"), taker, Order.Type.MarketSell).also { response ->
             assertEquals(SequencerError.ExceedsLimit, response.error)
         }
         // place one where order is below min fee
-        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.00001"), taker.account, taker.wallet, Order.Type.MarketSell).also { response ->
+        sequencer.addBackToBackOrder(backToBackOrderGuid, market1, market2, BigDecimal("0.00001"), taker, Order.Type.MarketSell).also { response ->
             assertEquals(SequencerError.None, response.error)
             assertEquals(response.ordersChangedList[0].disposition, OrderDisposition.Rejected)
         }
 
         // verify the remaining balances for taker
-        sequencer.withdrawal(taker.account, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.4"))
-        sequencer.withdrawal(taker.account, btcChain1, BigDecimal.ZERO, expectedAmount = null)
-        sequencer.withdrawal(taker.account, ethChain1, BigDecimal.ZERO, expectedAmount = null)
+        sequencer.withdrawal(taker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.4"))
+        sequencer.withdrawal(taker, btcChain1, BigDecimal.ZERO, expectedAmount = null)
+        sequencer.withdrawal(taker, ethChain1, BigDecimal.ZERO, expectedAmount = null)
 
-        sequencer.withdrawal(maker.account, btcChain2, BigDecimal.ZERO, expectedAmount = null)
-        sequencer.withdrawal(maker.account, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("2"))
-        sequencer.withdrawal(maker.account, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("20"))
+        sequencer.withdrawal(maker, btcChain2, BigDecimal.ZERO, expectedAmount = null)
+        sequencer.withdrawal(maker, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("2"))
+        sequencer.withdrawal(maker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("20"))
     }
 
     private val rnd = Random(0)
-    private fun generateUser(): SequencerClient.User {
-        return SequencerClient.User(
+    private fun generateUser(): SequencerClient.SequencerUser {
+        return SequencerClient.SequencerUser(
             account = UserId.generate().toSequencerId(),
             wallet = rnd.nextLong().toWalletAddress(),
         )

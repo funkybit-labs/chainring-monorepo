@@ -1,7 +1,7 @@
 package xyz.funkybit.testutils
 
 import org.junit.jupiter.api.Assertions.assertEquals
-import xyz.funkybit.core.model.SequencerUserId
+import xyz.funkybit.core.model.SequencerAccountId
 import xyz.funkybit.core.sequencer.toSequencerAccountId
 import xyz.funkybit.sequencer.core.MarketId
 import xyz.funkybit.sequencer.core.toBigInteger
@@ -72,7 +72,7 @@ fun SequencerResponse.assertTrade(
 
 fun SequencerResponse.assertBalanceChanges(
     market: SequencerClient.Market,
-    expectedChanges: List<Triple<SequencerUserId, SequencerClient.Asset, BigDecimal>>,
+    expectedChanges: List<Triple<SequencerAccountId, SequencerClient.Asset, BigDecimal>>,
 ) {
     val changes = balancesChangedList.map {
         val asset = market.getAsset(it.asset)
@@ -90,7 +90,7 @@ fun SequencerResponse.assertBalanceChanges(
 }
 
 data class ExpectedLimitsUpdate(
-    val userId: SequencerUserId,
+    val userId: SequencerAccountId,
     val marketId: MarketId,
     val base: BigInteger,
     val quote: BigInteger,

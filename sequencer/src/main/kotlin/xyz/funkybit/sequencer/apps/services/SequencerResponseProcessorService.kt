@@ -13,7 +13,7 @@ import xyz.funkybit.apps.api.model.websocket.OrderBookDiff
 import xyz.funkybit.core.evm.ECHelper
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.FeeRate
-import xyz.funkybit.core.model.SequencerUserId
+import xyz.funkybit.core.model.SequencerAccountId
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.BalanceChange
 import xyz.funkybit.core.model.db.BalanceEntity
@@ -417,8 +417,8 @@ object SequencerResponseProcessorService {
     private fun handleBalanceChanges(balanceChanges: List<xyz.funkybit.sequencer.proto.BalanceChange>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
         logger.debug { "Calculating balance changes" }
         if (balanceChanges.isNotEmpty()) {
-            val userWalletsMap = UserEntity.getWithWalletsBySequencerUserIds(
-                balanceChanges.map { SequencerUserId(it.account) }.toSet(),
+            val userWalletsMap = UserEntity.getWithWalletsBySequencerAccountIds(
+                balanceChanges.map { SequencerAccountId(it.account) }.toSet(),
             ).toMap().mapKeys { (user, _) -> user.sequencerId.value }
 
             logger.debug { "updating balances" }
@@ -530,8 +530,8 @@ object SequencerResponseProcessorService {
     }
 
     private fun handleLimitsUpdates(limitsUpdates: List<LimitsUpdate>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
-        val userWalletsMap = UserEntity.getWithWalletsBySequencerUserIds(
-            limitsUpdates.map { SequencerUserId(it.account) }.toSet(),
+        val userWalletsMap = UserEntity.getWithWalletsBySequencerAccountIds(
+            limitsUpdates.map { SequencerAccountId(it.account) }.toSet(),
         ).associateBy { it.first.sequencerId.value }
 
         val walletsToNotifyAboutLimitsChanges = mutableSetOf<WalletEntity>()
