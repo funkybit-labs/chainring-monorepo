@@ -13,6 +13,7 @@ import org.http4k.format.KotlinxSerialization.auto
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.middleware.principal
 import xyz.funkybit.apps.api.middleware.signedTokenSecurity
+import xyz.funkybit.apps.api.model.RequestProcessingError
 import xyz.funkybit.apps.api.model.SetAvatarUrl
 import xyz.funkybit.apps.api.model.SetNickname
 import xyz.funkybit.apps.api.model.processingError
@@ -93,18 +94,14 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
                 if (TestnetChallengeUtils.enabled && user.testnetChallengeStatus == TestnetChallengeStatus.Enrolled) {
                     if (user.nickname != body.name) {
                         if (UserEntity.findByNickname(body.name) != null) {
-                            processingError("Nickname is already taken")
+                            throw RequestProcessingError("Nickname is already taken")
                         } else {
                             user.nickname = body.name
-                            null
                         }
-                    } else {
-                        null
                     }
-                } else {
-                    null
                 }
-            } ?: Response(Status.OK)
+            }
+            Response(Status.OK)
         }
     }
 
@@ -116,7 +113,7 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
             summary = "Set Avatar URL"
             tags += listOf(Tag("testnet-challenge"))
             security = signedTokenSecurity
-            receiving(requestBody to SetAvatarUrl("Name"))
+            receiving(requestBody to SetAvatarUrl("URL"))
             returning(
                 Status.OK,
             )
@@ -131,11 +128,7 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
                     }
                 }
             }
-            if (result.isLeft()) {
-                processingError("Unable to processes avatar URL: ${result.leftOrNull()?.name}")
-            } else {
-                Response(Status.OK)
-            }
+            result.fold(ifLeft = { error -> processingError("Unable to process avatar URL: $error") }, ifRight = { Response(Status.OK) })
         }
     }
 }
