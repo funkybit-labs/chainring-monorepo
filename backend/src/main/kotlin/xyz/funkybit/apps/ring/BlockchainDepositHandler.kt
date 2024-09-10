@@ -15,6 +15,7 @@ import xyz.funkybit.core.model.db.DepositStatus
 import xyz.funkybit.core.model.db.DepositTable
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.sequencer.SequencerClient
+import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.sequencer.core.Asset
@@ -133,7 +134,7 @@ class BlockchainDepositHandler(
     private fun sendToSequencer(deposit: DepositEntity) {
         try {
             runBlocking {
-                sequencerClient.deposit(deposit.wallet.sequencerId.value, Asset(deposit.symbol.name), deposit.amount, deposit.guid.value)
+                sequencerClient.deposit(deposit.wallet.userGuid.value.toSequencerId(), Asset(deposit.symbol.name), deposit.amount, deposit.guid.value)
             }
             // Updating like this in case SequencerResponseProcessor sets status to Complete before we commit this transaction
             DepositTable.update(

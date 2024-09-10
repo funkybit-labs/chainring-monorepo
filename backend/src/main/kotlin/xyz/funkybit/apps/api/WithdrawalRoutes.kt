@@ -57,8 +57,9 @@ class WithdrawalRoutes(private val exchangeApiService: ExchangeApiService) {
                 ),
             )
         } bindContract Method.POST to { request ->
+            val wallet = request.principal
             Response(Status.CREATED).with(
-                responseBody of exchangeApiService.withdraw(request.principal.address, requestBody(request)),
+                responseBody of exchangeApiService.withdraw(wallet, requestBody(request)),
             )
         }
     }

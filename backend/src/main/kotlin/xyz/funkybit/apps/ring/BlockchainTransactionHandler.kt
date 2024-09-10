@@ -696,7 +696,7 @@ class BlockchainTransactionHandler(
             } else {
                 val sequencerResponse = runBlocking {
                     sequencerClient.failWithdraw(
-                        tx.sender.toSequencerId().value,
+                        withdrawalEntity.wallet.userGuid.value.toSequencerId(),
                         Asset(withdrawalEntity.symbol.name),
                         tx.amount,
                     )

@@ -6,7 +6,7 @@ import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.db.Migration
 import xyz.funkybit.core.model.db.GUIDTable
-import xyz.funkybit.core.model.db.MarketTable
+import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.PGEnum
 import xyz.funkybit.core.model.db.enumDeclaration
@@ -35,11 +35,13 @@ class V7_OrderTable : Migration() {
         Expired,
     }
 
+    object V7_MarketTable : GUIDTable<MarketId>("market", ::MarketId)
+
     object V7_OrderTable : GUIDTable<OrderId>("order", ::OrderId) {
         val nonce = varchar("nonce", 10485760).index()
         val createdAt = timestamp("created_at")
         val createdBy = varchar("created_by", 10485760)
-        val marketGuid = reference("market_guid", MarketTable).index()
+        val marketGuid = reference("market_guid", V7_MarketTable).index()
         val status = customEnumeration(
             "status",
             "OrderStatus",

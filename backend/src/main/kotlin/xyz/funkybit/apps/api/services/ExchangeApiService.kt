@@ -65,17 +65,17 @@ class ExchangeApiService(
     private val logger = KotlinLogging.logger {}
 
     fun addOrder(
-        walletAddress: Address,
+        wallet: WalletEntity,
         apiRequest: CreateOrderApiRequest,
     ): CreateOrderApiResponse {
         return when (apiRequest) {
             is CreateOrderApiRequest.BackToBackMarket -> addBackToBackMarketOrder(
-                walletAddress,
+                wallet,
                 apiRequest,
             )
 
             else -> orderBatch(
-                walletAddress,
+                wallet,
                 BatchOrdersApiRequest(
                     marketId = apiRequest.marketId,
                     createOrders = listOf(apiRequest),
@@ -86,11 +86,13 @@ class ExchangeApiService(
     }
 
     private fun addBackToBackMarketOrder(
-        walletAddress: Address,
+        wallet: WalletEntity,
         orderRequest: CreateOrderApiRequest.BackToBackMarket,
     ): CreateOrderApiResponse {
         val orderId = OrderId.generate()
 
+        val userId = wallet.userGuid.value
+        val walletAddress = wallet.address
         val market1 = getMarket(orderRequest.marketId)
         val baseSymbol = getSymbolEntity(market1.baseSymbol)
         val market2 = getMarket(orderRequest.secondMarketId)
@@ -119,7 +121,8 @@ class ExchangeApiService(
         val response = runBlocking {
             sequencerClient.backToBackOrder(
                 listOf(market1.id, market2.id),
-                walletAddress.toSequencerId().value,
+                userId.toSequencerId(),
+                walletAddress.toSequencerId(),
                 SequencerClient.Order(
                     sequencerOrderId = orderId.toSequencerId().value,
                     amount = orderRequest.amount.fixedAmount(),
@@ -145,7 +148,7 @@ class ExchangeApiService(
     }
 
     fun orderBatch(
-        walletAddress: Address,
+        wallet: WalletEntity,
         batchOrdersRequest: BatchOrdersApiRequest,
     ): BatchOrdersApiResponse {
         if (batchOrdersRequest.cancelOrders.isEmpty() && batchOrdersRequest.createOrders.isEmpty()) {
@@ -154,6 +157,8 @@ class ExchangeApiService(
 
         val createOrderRequestsByOrderId = batchOrdersRequest.createOrders.associateBy { OrderId.generate() }
 
+        val userId = wallet.userGuid.value
+        val walletAddress = wallet.address
         val market = getMarket(batchOrdersRequest.marketId)
         val baseSymbol = getSymbolEntity(market.baseSymbol)
         val quoteSymbol = getSymbolEntity(market.quoteSymbol)
@@ -235,7 +240,7 @@ class ExchangeApiService(
         }
 
         val response = runBlocking {
-            sequencerClient.orderBatch(market.id, walletAddress.toSequencerId().value, ordersToAdd, ordersToCancel)
+            sequencerClient.orderBatch(market.id, userId.toSequencerId(), walletAddress.toSequencerId(), ordersToAdd, ordersToCancel)
         }
 
         when (response.error) {
@@ -270,12 +275,14 @@ class ExchangeApiService(
     private fun reasonToMessage(reason: Reason): String {
         return when (reason) {
             Reason.DoesNotExist -> "Order does not exist or is already finalized"
-            Reason.NotForWallet -> "Order not created by this wallet"
+            Reason.NotForAccount -> "Order not created by this account"
             else -> ""
         }
     }
 
-    fun withdraw(walletAddress: Address, apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse {
+    fun withdraw(wallet: WalletEntity, apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse {
+        val userId = wallet.userGuid.value
+        val walletAddress = wallet.address
         val symbol = getSymbolEntity(apiRequest.symbol)
 
         when (walletAddress) {
@@ -309,7 +316,7 @@ class ExchangeApiService(
 
         runBlocking {
             sequencerClient.withdraw(
-                walletAddress.toSequencerId().value,
+                userId.toSequencerId(),
                 Asset(symbol.name),
                 apiRequest.amount,
                 apiRequest.nonce.toBigInteger(),
@@ -343,9 +350,9 @@ class ExchangeApiService(
             DepositApiResponse(Deposit.fromEntity(deposit))
         }
 
-    fun cancelOrder(walletAddress: Address, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {
+    fun cancelOrder(wallet: WalletEntity, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {
         return orderBatch(
-            walletAddress,
+            wallet,
             BatchOrdersApiRequest(
                 marketId = cancelOrderApiRequest.marketId,
                 createOrders = emptyList(),
@@ -374,7 +381,8 @@ class ExchangeApiService(
 
                         sequencerClient.cancelOrders(
                             marketGuid.value,
-                            walletAddress.toSequencerId().value,
+                            userId.value.toSequencerId(),
+                            walletAddress.toSequencerId(),
                             orderIds,
                             cancelAll = true,
                         )

@@ -73,7 +73,8 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.POST to { request ->
             val apiRequest: CreateOrderApiRequest = requestBody(request)
-            val response = exchangeApiService.addOrder(request.principal.address, apiRequest)
+            val wallet = request.principal
+            val response = exchangeApiService.addOrder(wallet, apiRequest)
             if (response.requestStatus == RequestStatus.Accepted) {
                 Response(Status.CREATED).with(
                     responseBody of response,
@@ -103,7 +104,8 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
                 if (orderId != apiRequest.orderId) {
                     processingError("Invalid order id")
                 } else {
-                    val response = exchangeApiService.cancelOrder(request.principal.address, apiRequest)
+                    val wallet = request.principal
+                    val response = exchangeApiService.cancelOrder(wallet, apiRequest)
                     if (response.requestStatus == RequestStatus.Accepted) {
                         Response(Status.NO_CONTENT)
                     } else {
@@ -235,9 +237,13 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
                 ),
             )
         } bindContract Method.POST to { request ->
-            Response(Status.OK).with(
-                responseBody of exchangeApiService.orderBatch(request.principal.address, requestBody(request)),
-            )
+            transaction {
+                val wallet = request.principal
+
+                Response(Status.OK).with(
+                    responseBody of exchangeApiService.orderBatch(wallet, requestBody(request)),
+                )
+            }
         }
     }
 }

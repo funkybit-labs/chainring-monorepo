@@ -308,7 +308,7 @@ class InputHandler(
                             val signature = currentWallet.signWithdrawal(currentState.amount, currentState.symbol, nonce)
                             exchangeApiService
                                 .withdraw(
-                                    currentWallet.evmAddress,
+                                    currentWallet.wallet,
                                     CreateWithdrawalApiRequest(currentState.symbol, currentState.amount, nonce, signature),
                                 )
                                 .withdrawal.id.right()
@@ -460,7 +460,7 @@ class InputHandler(
                             }
 
                             val errorOrOrderId = try {
-                                val response = exchangeApiService.addOrder(currentWallet.evmAddress, signedOrder)
+                                val response = exchangeApiService.addOrder(currentWallet.wallet, signedOrder)
                                 response.error?.left() ?: response.orderId.right()
                             } catch (e: RequestProcessingError) {
                                 e.error.left()

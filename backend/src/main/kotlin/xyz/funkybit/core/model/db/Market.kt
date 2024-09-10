@@ -73,6 +73,18 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
             }.singleOrNull()
     }
 
+    fun networkTypes(): List<NetworkType> {
+        val baseSymbolGuid = this.baseSymbolGuid
+        val quoteSymbolGuid = this.quoteSymbolGuid
+
+        return SymbolTable.innerJoin(ChainTable)
+            .selectAll()
+            .where { SymbolTable.guid.inList(listOf(baseSymbolGuid, quoteSymbolGuid)) }
+            .map { ChainEntity.wrapRow(it) }
+            .map { it.networkType }
+            .distinct()
+    }
+
     var createdAt by MarketTable.createdAt
     var createdBy by MarketTable.createdBy
     var updatedAt by MarketTable.updatedAt

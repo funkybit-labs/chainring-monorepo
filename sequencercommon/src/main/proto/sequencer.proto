@@ -21,20 +21,20 @@ message OrderChangeRejected {
   enum Reason {
     None = 0;
     DoesNotExist = 1;
-    NotForWallet = 2;
+    NotForAccount = 2;
   }
   uint64 guid = 1;
   Reason reason = 2;
 }
 
 message BalanceChange {
-  uint64 wallet = 1;
+  uint64 account = 1;
   string asset = 2;
   IntegerValue delta = 3;
 }
 
 message LimitsUpdate {
-  uint64 wallet = 1;
+  uint64 account = 1;
   string marketId = 2;
   IntegerValue base = 3;
   IntegerValue quote = 4;

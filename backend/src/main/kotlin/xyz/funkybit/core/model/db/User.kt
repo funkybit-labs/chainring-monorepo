@@ -5,10 +5,13 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.selectAll
 import xyz.funkybit.core.model.Address
-import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserTable.index
-import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserTable.nullable
+import xyz.funkybit.core.model.SequencerAccountId
+import xyz.funkybit.core.model.db.WalletTable.nullable
+import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 
 @Serializable
@@ -36,6 +39,7 @@ object UserTable : GUIDTable<UserId>("user", ::UserId) {
     val createdBy = varchar("created_by", 10485760)
     val updatedAt = timestamp("updated_at").nullable()
     val updatedBy = varchar("updated_by", 10485760).nullable()
+    val sequencerId = long("sequencer_id").uniqueIndex()
 
     // is admin
     val nickName = varchar("nick_name", 10485760).nullable()
@@ -55,12 +59,20 @@ class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
 
     companion object : EntityClass<UserId, UserEntity>(UserTable) {
         fun create(createdBy: Address): UserEntity {
-            return UserEntity.new(UserId.generate()) {
+            val userId = UserId.generate()
+            return UserEntity.new(userId) {
                 this.createdAt = Clock.System.now()
                 this.createdBy = createdBy.canonicalize().toString()
+                this.sequencerId = userId.toSequencerId()
                 this.inviteCode = TestnetChallengeUtils.inviteCode()
                 this.testnetChallengeStatus = TestnetChallengeStatus.Unenrolled
             }
+        }
+
+        fun getBySequencerIds(sequencerIds: Set<SequencerAccountId>): List<UserEntity> {
+            return UserEntity.find {
+                UserTable.sequencerId.inList(sequencerIds.map { it.value })
+            }.toList()
         }
 
         fun findWithTestnetChallengeStatus(status: TestnetChallengeStatus): List<UserEntity> {
@@ -68,7 +80,37 @@ class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
                 UserTable.testnetChallengeStatus eq status
             }.toList()
         }
+
+        fun getWithWalletsBySequencerAccountIds(sequencerAccountIds: Set<SequencerAccountId>): List<Pair<UserEntity, List<WalletEntity>>> {
+            val wallets = mutableMapOf<UserId, MutableList<WalletEntity>>()
+            val users = UserTable
+                .join(WalletTable, JoinType.LEFT, WalletTable.userGuid, UserTable.guid)
+                .selectAll().where { UserTable.sequencerId.inList(sequencerAccountIds.map { it.value }) }
+                .mapNotNull { resultRow ->
+                    val walletsForUser = wallets[resultRow[UserTable.guid].value]
+                    if (walletsForUser != null) {
+                        walletsForUser.add(WalletEntity.wrapRow(resultRow))
+                        null
+                    } else {
+                        UserEntity.wrapRow(resultRow).also {
+                            wallets[it.guid.value] = listOfNotNull(
+                                resultRow[WalletTable.guid.nullable()]?.let {
+                                    WalletEntity.wrapRow(resultRow)
+                                },
+                            ).toMutableList()
+                        }
+                    }
+                }
+                .toList()
+
+            return users.map { Pair(it, wallets[it.guid.value] ?: emptyList()) }
+        }
     }
+
+    var sequencerId by UserTable.sequencerId.transform(
+        toReal = { SequencerAccountId(it) },
+        toColumn = { it.value },
+    )
 
     var createdAt by UserTable.createdAt
     var createdBy by UserTable.createdBy

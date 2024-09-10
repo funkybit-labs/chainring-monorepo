@@ -188,11 +188,11 @@ object WalletRoutes {
         )
 
     private fun baseMessage(authorizedAddress: Address): String {
-        val walletFamily = when (authorizedAddress) {
+        val networkType = when (authorizedAddress) {
             is EvmAddress -> "EVM"
             is BitcoinAddress -> "Bitcoin"
         }
 
-        return String.format(BASE_AUTHORIZE_MESSAGE, walletFamily, authorizedAddress.toString().lowercase())
+        return String.format(BASE_AUTHORIZE_MESSAGE, networkType, authorizedAddress.toString().lowercase())
     }
 }
