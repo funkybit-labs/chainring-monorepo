@@ -8,8 +8,8 @@ import org.jetbrains.exposed.sql.update
 import xyz.funkybit.core.db.Migration
 import xyz.funkybit.core.model.db.GUIDTable
 import xyz.funkybit.core.model.db.PGEnum
-import xyz.funkybit.core.model.db.SymbolId
 import xyz.funkybit.core.model.db.UserId
+import xyz.funkybit.core.model.db.WalletId
 import xyz.funkybit.core.sequencer.toSequencerId
 
 @Suppress("ClassName")
@@ -20,24 +20,29 @@ class V80_CrossChainSequencerOrders : Migration() {
     }
 
     @Serializable
-    enum class V80_WalletFamily {
-        Bitcoin,
+    enum class V80_NetworkType {
         Evm,
+        Bitcoin,
     }
 
-    object V80_SymbolTable : GUIDTable<SymbolId>("symbol", ::SymbolId) {
-        val walletFamily = customEnumeration(
-            "wallet_family",
-            "WalletFamily",
-            { value -> V80_WalletFamily.valueOf(value as String) },
-            { PGEnum("WalletFamily", it) },
+    object V80_WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
+        val networkType = customEnumeration(
+            "network_type",
+            "NetworkType",
+            { value -> V80_NetworkType.valueOf(value as String) },
+            { PGEnum("NetworkType", it) },
         ).nullable()
     }
-
     override fun run() {
         transaction {
-            // better naming
-            exec("ALTER TABLE wallet RENAME COLUMN wallet_family TO family")
+            // migrate to network type
+            SchemaUtils.createMissingTablesAndColumns(V80_WalletTable)
+            exec("UPDATE wallet SET network_type = wallet_family::TEXT::NetworkType")
+            exec("ALTER TABLE wallet ALTER COLUMN network_type SET NOT NULL")
+            exec("CREATE UNIQUE INDEX wallet_user_network_type ON wallet (user_guid, network_type)")
+
+            exec("ALTER TABLE wallet DROP COLUMN wallet_family")
+            exec("DROP TYPE walletfamily")
 
             // add sequencerId to User
             SchemaUtils.createMissingTablesAndColumns(V80_UserTable)
@@ -48,16 +53,6 @@ class V80_CrossChainSequencerOrders : Migration() {
                 }
             }
             exec("ALTER TABLE \"user\" ALTER COLUMN sequencer_id SET NOT NULL")
-
-            // add wallet family to Symbol
-            SchemaUtils.createMissingTablesAndColumns(V80_SymbolTable)
-            V80_SymbolTable.selectAll().forEach { resultRow ->
-                val guid = resultRow[V80_SymbolTable.guid]
-                V80_SymbolTable.update({ V80_SymbolTable.guid.eq(guid) }) {
-                    it[this.walletFamily] = if (guid.value.value.endsWith("_0")) V80_WalletFamily.Bitcoin else V80_WalletFamily.Evm
-                }
-            }
-            exec("ALTER TABLE symbol ALTER COLUMN wallet_family SET NOT NULL")
         }
     }
 }

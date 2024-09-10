@@ -428,7 +428,7 @@ object SequencerResponseProcessorService {
                     val symbol = getSymbol(change.asset)
 
                     userWalletsMap[change.account]?.let { userWallets ->
-                        userWallets.find { it.family == symbol.walletFamily }?.let { wallet ->
+                        userWallets.find { it.networkType == symbol.chain.networkType }?.let { wallet ->
                             walletsWithUpdatedBalances.add(wallet)
                             BalanceChange.Delta(
                                 walletId = wallet.guid.value,
@@ -540,8 +540,8 @@ object SequencerResponseProcessorService {
                 val marketId = MarketId(it.marketId)
                 val (user, userWallets) = userWalletsMap[it.account]!!
 
-                MarketEntity[marketId].walletFamilies()
-                    .mapNotNull { walletFamily -> userWallets.find { it.family == walletFamily } }
+                MarketEntity[marketId].networkTypes()
+                    .mapNotNull { networkType -> userWallets.find { it.networkType == networkType } }
                     .forEach { wallet -> walletsToNotifyAboutLimitsChanges.add(wallet) }
 
                 Pair(

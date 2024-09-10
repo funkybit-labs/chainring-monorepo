@@ -73,15 +73,16 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
             }.singleOrNull()
     }
 
-    fun walletFamilies(): List<WalletFamily> {
-        val baseFamily = baseSymbol.walletFamily
-        val quoteFamily = quoteSymbol.walletFamily
+    fun networkTypes(): List<NetworkType> {
+        val baseSymbolGuid = this.baseSymbolGuid
+        val quoteSymbolGuid = this.quoteSymbolGuid
 
-        return if (baseFamily != quoteFamily) {
-            listOf(baseFamily, quoteFamily)
-        } else {
-            listOf(baseFamily)
-        }
+        return SymbolTable.innerJoin(ChainTable)
+            .selectAll()
+            .where { SymbolTable.guid.inList(listOf(baseSymbolGuid, quoteSymbolGuid)) }
+            .map { ChainEntity.wrapRow(it) }
+            .map { it.networkType }
+            .distinct()
     }
 
     var createdAt by MarketTable.createdAt

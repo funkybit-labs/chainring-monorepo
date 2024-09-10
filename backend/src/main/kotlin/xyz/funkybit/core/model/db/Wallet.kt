@@ -25,11 +25,6 @@ value class WalletId(override val value: String) : EntityId {
     override fun toString(): String = value
 }
 
-enum class WalletFamily {
-    Bitcoin,
-    Evm,
-}
-
 object WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
     val createdAt = timestamp("created_at")
     val createdBy = varchar("created_by", 10485760)
@@ -37,18 +32,18 @@ object WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
     val sequencerId = long("sequencer_id").uniqueIndex()
     val addedSymbols = array<String>("added_symbols", VarCharColumnType(10485760)).default(emptyList())
     val isAdmin = bool("is_admin").default(false)
-    val family = customEnumeration(
-        "family",
-        "WalletFamily",
-        { value -> WalletFamily.valueOf(value as String) },
-        { PGEnum("WalletFamily", it) },
-    ).index()
+    val networkType = customEnumeration(
+        "network_type",
+        "NetworkType",
+        { value -> NetworkType.valueOf(value as String) },
+        { PGEnum("NetworkType", it) },
+    )
     val userGuid = reference("user_guid", UserTable).index()
 
     init {
         uniqueIndex(
-            customIndexName = "wallet_family_user",
-            columns = arrayOf(userGuid, family),
+            customIndexName = "wallet_user_network_type",
+            columns = arrayOf(userGuid, networkType),
         )
     }
 }
@@ -72,9 +67,9 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
                 createdAt = Clock.System.now()
                 createdBy = "system"
 
-                family = when (canonicalAddress) {
-                    is EvmAddress -> WalletFamily.Evm
-                    is BitcoinAddress -> WalletFamily.Bitcoin
+                networkType = when (canonicalAddress) {
+                    is EvmAddress -> NetworkType.Evm
+                    is BitcoinAddress -> NetworkType.Bitcoin
                 }
                 this.user = user
             }
@@ -137,7 +132,7 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
     var addedSymbols by WalletTable.addedSymbols
     var isAdmin by WalletTable.isAdmin
 
-    var family by WalletTable.family
+    var networkType by WalletTable.networkType
     var userGuid by WalletTable.userGuid
     var user by UserEntity referencedOn WalletTable.userGuid
 }
