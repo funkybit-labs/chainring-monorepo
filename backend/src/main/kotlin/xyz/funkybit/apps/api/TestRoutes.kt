@@ -72,7 +72,7 @@ class TestRoutes(
         ) {
             @Serializable
             data class Balance(
-                val user: String,
+                val account: String,
                 val asset: String,
                 val amount: BigIntegerJson,
                 val consumed: List<Consumption>,
@@ -111,7 +111,7 @@ class TestRoutes(
             @Serializable
             data class LevelOrder(
                 val guid: Long,
-                val user: String,
+                val account: String,
                 val quantity: BigIntegerJson,
                 val originalQuantity: BigIntegerJson,
             )
@@ -150,7 +150,7 @@ class TestRoutes(
                     makerFeeRate = FeeRate.fromPercents(BigDecimal("0.02")),
                     balances = listOf(
                         StateDump.Balance(
-                            user = "user",
+                            account = "account",
                             asset = "asset",
                             amount = "123".toBigInteger(),
                             consumed = listOf(
@@ -182,7 +182,7 @@ class TestRoutes(
                                     orders = listOf(
                                         StateDump.LevelOrder(
                                             guid = 123L,
-                                            user = "user",
+                                            account = "account",
                                             quantity = "123".toBigInteger(),
                                             originalQuantity = "123".toBigInteger(),
                                         ),
@@ -216,7 +216,7 @@ class TestRoutes(
                         takerFeeRate = FeeRate(sequencerResponse.stateDump.feeRates.taker),
                         balances = sequencerResponse.stateDump.balancesList.map { b ->
                             StateDump.Balance(
-                                user = userGuids[b.account] ?: b.account.toString(),
+                                account = userGuids[b.account] ?: b.account.toString(),
                                 asset = b.asset,
                                 amount = b.amount.toBigInteger(),
                                 consumed = b.consumedList.map { c ->
@@ -248,7 +248,7 @@ class TestRoutes(
                                         orders = l.ordersList.map { lo ->
                                             StateDump.LevelOrder(
                                                 guid = lo.guid,
-                                                user = userGuids[lo.account] ?: lo.account.toString(),
+                                                account = userGuids[lo.account] ?: lo.account.toString(),
                                                 quantity = lo.quantity.toBigInteger(),
                                                 originalQuantity = lo.originalQuantity.toBigInteger(),
                                             )

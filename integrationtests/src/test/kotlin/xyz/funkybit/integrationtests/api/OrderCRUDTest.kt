@@ -344,7 +344,7 @@ class OrderCRUDTest : OrderBaseTest() {
         val apiClient2 = TestApiClient()
         val wallet2 = Wallet(apiClient2)
         apiClient2.tryCancelOrder(createLimitOrderResponse2, wallet2).assertError(
-            ApiError(ReasonCode.RejectedBySequencer, "Order not created by this user"),
+            ApiError(ReasonCode.RejectedBySequencer, "Order not created by this account"),
         )
 
         // invalid signature

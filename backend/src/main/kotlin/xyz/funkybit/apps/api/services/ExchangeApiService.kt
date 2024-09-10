@@ -275,7 +275,7 @@ class ExchangeApiService(
     private fun reasonToMessage(reason: Reason): String {
         return when (reason) {
             Reason.DoesNotExist -> "Order does not exist or is already finalized"
-            Reason.NotForAccount -> "Order not created by this user"
+            Reason.NotForAccount -> "Order not created by this account"
             else -> ""
         }
     }
