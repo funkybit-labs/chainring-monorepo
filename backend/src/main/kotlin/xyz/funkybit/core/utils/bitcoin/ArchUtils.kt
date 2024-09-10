@@ -2,24 +2,19 @@ package xyz.funkybit.core.utils.bitcoin
 
 import com.funkatronics.kborsh.Borsh
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
-import org.bitcoinj.core.Coin
 import org.bitcoinj.core.ECKey
-import org.bitcoinj.core.Sha256Hash
-import org.bitcoinj.core.Transaction
-import org.bitcoinj.core.TransactionOutPoint
-import org.bitcoinj.core.TransactionOutput
-import org.bitcoinj.script.ScriptBuilder
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
-import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.bitcoin.ProgramInstruction
 import xyz.funkybit.core.model.bitcoin.UtxoId
+import xyz.funkybit.core.model.db.ArchAccountBalanceInfo
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.ArchAccountType
+import xyz.funkybit.core.model.db.ConfirmedBitcoinDeposit
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TxHash
-import xyz.funkybit.core.model.db.UnspentUtxo
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.services.UtxoSelectionService
 import xyz.funkybit.core.utils.schnorr.Schnorr
@@ -37,52 +32,7 @@ object ArchUtils {
     // 57.5 (Vin), 43(Vout), 24 (Witness) (signature(64 bytes) + hash of data(32))
     const val P2TR_UTXO_IN_OUT_VSIZE = 125
 
-    private val zeroCoinValue = Coin.valueOf(0)
-
-    private fun buildFundAccountTx(
-        accountAddress: BitcoinAddress,
-        amount: BigInteger,
-        feeAmount: BigInteger,
-        utxos: List<UnspentUtxo>,
-    ): Transaction {
-        val params = BitcoinClient.getParams()
-        val rawTx = Transaction(params)
-        rawTx.setVersion(2)
-        rawTx.addOutput(
-            TransactionOutput(
-                params,
-                rawTx,
-                Coin.valueOf(amount.toLong()),
-                accountAddress.toBitcoinCoreAddress(params),
-            ),
-        )
-        val changeAmount = BigInteger.ZERO.max(utxos.sumOf { it.amount } - amount - feeAmount)
-        if (changeAmount > BitcoinClient.bitcoinConfig.changeDustThreshold) {
-            rawTx.addOutput(
-                TransactionOutput(
-                    params,
-                    rawTx,
-                    Coin.valueOf(changeAmount.toLong()),
-                    BitcoinClient.bitcoinConfig.feePayerAddress.toBitcoinCoreAddress(params),
-                ),
-            )
-        }
-        utxos.forEach {
-            rawTx.addSignedInput(
-                TransactionOutPoint(
-                    params,
-                    it.utxoId.vout(),
-                    Sha256Hash.wrap(it.utxoId.txId().value),
-                ),
-                ScriptBuilder.createP2WPKHOutputScript(BitcoinClient.bitcoinConfig.feePayerEcKey),
-                Coin.valueOf(it.amount.toLong()),
-                BitcoinClient.bitcoinConfig.feePayerEcKey,
-                Transaction.SigHash.NONE,
-                true,
-            )
-        }
-        return rawTx
-    }
+    private val submitterPubkey = BitcoinClient.bitcoinConfig.submitterPubkey
 
     fun fundArchAccountCreation(
         ecKey: ECKey,
@@ -99,20 +49,14 @@ object ArchUtils {
             val selectedUtxos = UtxoSelectionService.selectUtxos(
                 config.feePayerAddress,
                 rentAmount,
-                calculateFee(P2WPKH_2IN_2OUT_VSIZE),
-            )
-            val recalculatedFee = estimateFundAccountTxFee(
-                config.feePayerEcKey,
-                accountAddress,
-                config.feePayerAddress,
-                selectedUtxos,
+                BitcoinClient.calculateFee(P2WPKH_2IN_2OUT_VSIZE),
             )
 
-            val onboardingTx = buildFundAccountTx(
+            val onboardingTx = BitcoinClient.buildAndSignDepositTx(
                 accountAddress,
                 rentAmount,
-                recalculatedFee,
                 selectedUtxos,
+                config.feePayerEcKey,
             )
 
             val txId = BitcoinClient.sendRawTransaction(onboardingTx.toHexString())
@@ -182,47 +126,69 @@ object ArchUtils {
         } ?: false
     }
 
-    private fun estimateFundAccountTxFee(
-        ecKey: ECKey,
-        accountAddress: BitcoinAddress,
-        changeAddress: BitcoinAddress,
-        utxos: List<UnspentUtxo>,
-    ): BigInteger {
-        val params = BitcoinClient.getParams()
-        val rawTx = Transaction(params)
-        rawTx.setVersion(2)
-        rawTx.addOutput(
-            TransactionOutput(
-                params,
-                rawTx,
-                zeroCoinValue,
-                accountAddress.toBitcoinCoreAddress(params),
+    @OptIn(ExperimentalUnsignedTypes::class)
+    fun buildDepositBatchInstruction(programPubkey: ArchNetworkRpc.Pubkey, deposits: List<ConfirmedBitcoinDeposit>): ArchNetworkRpc.Instruction {
+        val accountMetas = mutableListOf(
+            ArchNetworkRpc.AccountMeta(
+                pubkey = submitterPubkey,
+                isSigner = true,
+                isWritable = false,
             ),
         )
-        rawTx.addOutput(
-            TransactionOutput(
-                params,
-                rawTx,
-                zeroCoinValue,
-                changeAddress.toBitcoinCoreAddress(params),
-            ),
-        )
-        utxos.forEach {
-            rawTx.addSignedInput(
-                TransactionOutPoint(
-                    params,
-                    it.utxoId.vout(),
-                    Sha256Hash.wrap(it.utxoId.txId().value),
-                ),
-                ScriptBuilder.createP2WPKHOutputScript(ecKey),
-                Coin.valueOf(it.amount.toLong()),
-                ecKey,
-                Transaction.SigHash.NONE,
-                true,
-            )
+        val tokenDepositsList = deposits.groupBy { it.archAccountEntity.rpcPubkey() }.map { (pubKey, tokenDeposits) ->
+            ProgramInstruction.TokenDeposits(
+                accountIndex = accountMetas.size.toUByte(),
+                deposits = tokenDeposits.map { ProgramInstruction.Adjustment(it.balanceIndex!!.toUInt(), it.depositEntity.amount.toLong().toULong()) },
+            ).also {
+                accountMetas.add(
+                    ArchNetworkRpc.AccountMeta(
+                        pubkey = pubKey,
+                        isWritable = true,
+                        isSigner = false,
+                    ),
+                )
+            }
         }
-        return calculateFee(rawTx.vsize)
+        return ArchNetworkRpc.Instruction(
+            programPubkey,
+            accountMetas,
+            ProgramInstruction.DepositBatchParams(tokenDepositsList).serialize(),
+        )
     }
+
+    @OptIn(ExperimentalUnsignedTypes::class)
+    fun buildInitTokenBalanceIndexBatchInstruction(programPubkey: ArchNetworkRpc.Pubkey, infos: List<ArchAccountBalanceInfo>): ArchNetworkRpc.Instruction {
+        val accountMetas = mutableListOf(
+            ArchNetworkRpc.AccountMeta(
+                pubkey = submitterPubkey,
+                isSigner = true,
+                isWritable = false,
+            ),
+        )
+        val setups = infos.groupBy { it.archAccountAddress }.map { (pubKey, infos) ->
+            ProgramInstruction.TokenBalanceSetup(
+                accountIndex = accountMetas.size.toUByte(),
+                walletAddresses = infos.map { it.walletAddress.value },
+            ).also {
+                accountMetas.add(
+                    ArchNetworkRpc.AccountMeta(
+                        pubkey = pubKey,
+                        isWritable = true,
+                        isSigner = false,
+                    ),
+                )
+            }
+        }
+        return ArchNetworkRpc.Instruction(
+            programPubkey,
+            accountMetas,
+            ProgramInstruction.InitTokenBalancesParams(setups).serialize(),
+        )
+    }
+
+    @OptIn(ExperimentalUnsignedTypes::class)
+    inline fun <reified T> getAccountState(pubkey: ArchNetworkRpc.Pubkey): T =
+        Borsh.decodeFromByteArray(ArchNetworkClient.readAccountInfo(pubkey).data.toByteArray())
 
     @OptIn(ExperimentalUnsignedTypes::class)
     fun signAndSendProgramInstruction(programPubkey: ArchNetworkRpc.Pubkey, accountMetas: List<ArchNetworkRpc.AccountMeta>, programInstruction: ProgramInstruction): TxHash {
@@ -260,12 +226,9 @@ object ArchUtils {
         return ArchNetworkClient.sendTransaction(runtimeTransaction)
     }
 
-    fun signAndSendInstruction(instruction: ArchNetworkRpc.Instruction, privateKey: ByteArray): TxHash {
-        return signAndSendInstructions(listOf(instruction), privateKey)
+    fun signAndSendInstruction(instruction: ArchNetworkRpc.Instruction, privateKey: ByteArray? = null): TxHash {
+        return signAndSendInstructions(listOf(instruction), privateKey ?: BitcoinClient.bitcoinConfig.submitterPrivateKey)
     }
-
-    fun calculateFee(vsize: Int) =
-        BitcoinClient.estimateSmartFeeInSatPerVByte().toBigInteger() * vsize.toBigInteger()
 }
 
 fun BigInteger.fromSatoshi(): BigDecimal {

@@ -1,5 +1,6 @@
 package xyz.funkybit.core.model.bitcoin
 
+import com.funkatronics.kborsh.Borsh
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -7,6 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.buildSerialDescriptor
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.serializer
@@ -24,12 +26,45 @@ sealed class ProgramInstruction {
     data class InitTokenStateParams(
         val tokenId: String,
     ) : ProgramInstruction()
+
+    @Serializable
+    data class TokenBalanceSetup(
+        val accountIndex: UByte,
+        val walletAddresses: List<String>,
+    )
+
+    @Serializable
+    data class InitTokenBalancesParams(
+        val tokenBalanceSetups: List<TokenBalanceSetup>,
+    ) : ProgramInstruction()
+
+    @Serializable
+    data class Adjustment(
+        val addressIndex: UInt,
+        val amount: ULong,
+    )
+
+    @Serializable
+    data class TokenDeposits(
+        val accountIndex: UByte,
+        val deposits: List<Adjustment>,
+    )
+
+    @Serializable
+    data class DepositBatchParams(
+        val tokenDepositsList: List<TokenDeposits>,
+    ) : ProgramInstruction()
+
+    @OptIn(ExperimentalUnsignedTypes::class)
+    fun serialize() = Borsh.encodeToByteArray(this).toUByteArray()
 }
 
 object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
 
     private const val INIT_PROGRAM_STATE: Byte = 0
     private const val INIT_TOKEN_STATE: Byte = 1
+    private const val INIT_TOKEN_BALANCES: Byte = 2
+    private const val DEPOSIT_BATCH: Byte = 3
 
     @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = buildSerialDescriptor("Pubkey", StructureKind.LIST)
@@ -46,6 +81,14 @@ object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
                     is ProgramInstruction.InitTokenStateParams -> {
                         encoder.encodeByte(INIT_TOKEN_STATE)
                         ProgramInstruction.InitTokenStateParams::class.serializer().serialize(encoder, value)
+                    }
+                    is ProgramInstruction.InitTokenBalancesParams -> {
+                        encoder.encodeByte(INIT_TOKEN_BALANCES)
+                        ProgramInstruction.InitTokenBalancesParams::class.serializer().serialize(encoder, value)
+                    }
+                    is ProgramInstruction.DepositBatchParams -> {
+                        encoder.encodeByte(DEPOSIT_BATCH)
+                        ProgramInstruction.DepositBatchParams::class.serializer().serialize(encoder, value)
                     }
                     // add other instructions here
                 }

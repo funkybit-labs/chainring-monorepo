@@ -8,7 +8,7 @@ import xyz.funkybit.core.utils.toHex
 value class TxHash(val value: String) {
     init {
         require(
-            value.startsWith("0x") && value.length == 66 &&
+            ((value.startsWith("0x") && value.length == 66) || value.length == 64) &&
                 value.drop(2).all { it.isDigit() || it.lowercaseChar() in 'a'..'f' },
         ) {
             "Invalid transaction hash or not a hex string"
@@ -19,5 +19,7 @@ value class TxHash(val value: String) {
         fun emptyHash(): TxHash {
             return TxHash(ByteArray(32).toHex())
         }
+
+        fun fromDbModel(txHash: xyz.funkybit.core.model.db.TxHash): TxHash = TxHash(txHash.value)
     }
 }

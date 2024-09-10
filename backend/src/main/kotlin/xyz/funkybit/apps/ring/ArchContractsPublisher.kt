@@ -17,7 +17,6 @@ import xyz.funkybit.core.utils.bitcoin.ArchUtils
 import xyz.funkybit.core.utils.schnorr.Schnorr
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kotlin.concurrent.thread
 
 object ArchContractsPublisher {
     val logger = KotlinLogging.logger {}
@@ -30,9 +29,7 @@ object ArchContractsPublisher {
 
                 if (deployedContract == null) {
                     logger.info { "Deploying arch contract: $contractType" }
-                    thread(start = true, name = "arch_contract_deployer", isDaemon = false) {
-                        deployContract(contractType)
-                    }
+                    deployContract(contractType)
                 } else if (deployedContract.deprecated) {
                     throw Exception("upgrades not currently supported on Arch.")
                 }
@@ -40,7 +37,7 @@ object ArchContractsPublisher {
         }
     }
 
-    fun deployContract(contractType: ContractType) {
+    private fun deployContract(contractType: ContractType) {
         var programAccount = getProgramAccount()
         while (programAccount?.status?.isFinal() != true) {
             try {
@@ -68,6 +65,7 @@ object ArchContractsPublisher {
         }
     }
 
+    @OptIn(ExperimentalUnsignedTypes::class)
     private fun handleProgramDeployment() {
         val programAccount = ArchAccountEntity.findProgramAccount() ?: ArchUtils.fundArchAccountCreation(ECKey(), ArchAccountType.Program)
         when (programAccount?.status) {

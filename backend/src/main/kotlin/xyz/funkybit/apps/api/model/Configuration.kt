@@ -18,6 +18,9 @@ data class ConfigurationApiResponse(
 ) {
     val evmChains: List<Chain>
         get() = chains.filter { it.networkType == NetworkType.Evm }
+
+    val bitcoinChain: Chain
+        get() = chains.first { it.networkType == NetworkType.Bitcoin }
 }
 
 @Serializable

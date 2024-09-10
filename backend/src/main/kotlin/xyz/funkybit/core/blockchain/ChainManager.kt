@@ -5,6 +5,7 @@ import org.bitcoinj.core.NetworkParameters
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.db.ChainId
+import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigInteger
 import kotlin.time.Duration
@@ -59,6 +60,7 @@ data class BitcoinBlockchainClientConfig(
 ) {
     val params: NetworkParameters = NetworkParameters.fromID(net)!!
     val submitterEcKey: ECKey = ECKey.fromPrivate(submitterPrivateKey)
+    val submitterPubkey = ArchNetworkRpc.Pubkey.fromECKey(ECKey.fromPrivate(submitterPrivateKey))
     val feePayerEcKey: ECKey = ECKey.fromPrivate(feePayerPrivateKey)
     val feePayerAddress = BitcoinAddress.fromKey(params, feePayerEcKey)
 }
@@ -131,7 +133,7 @@ object ChainManager {
         blockExplorerNetName = System.getenv("BLOCK_EXPLORER_NET_NAME_BITCOIN") ?: "Bitcoin Network",
         blockExplorerUrl = System.getenv("BLOCK_EXPLORER_URL_BITCOIN") ?: "http://localhost:1080",
         faucetAddress = BitcoinAddress.canonicalize("bcrt1q3nyukkpkg6yj0y5tj6nj80dh67m30p963mzxy7"),
-        submitterPrivateKey = (System.getenv("BITCOIN_SUBMITTER_PRIVATE_KEY") ?: ECKey().privateKeyAsHex).toHexBytes(),
+        submitterPrivateKey = (System.getenv("BITCOIN_SUBMITTER_PRIVATE_KEY") ?: "0x7ebc626d01c2d916c61dffee4ed2501f579009ad362360d82fcc30e3d8746cec").toHexBytes(),
         feePayerPrivateKey = (System.getenv("BITCOIN_FEE_PAYER_PRIVATE_KEY") ?: "0x614293096668ec4c26ede066b1570edc6bd6d663701dffb8247b63e7a3b0f566").toHexBytes(),
         // address for fee Payer is bcrt1qdca3sam9mldju3ssryrrcmjvd8pgnw30ccaggx
         changeDustThreshold = BigInteger(System.getenv("BITCOIN_CHANGE_DUST_THRESHOLD") ?: "300"),
