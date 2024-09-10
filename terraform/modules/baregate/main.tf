@@ -65,7 +65,8 @@ resource "aws_launch_template" "baregate_ec2" {
       echo ECS_CLUSTER=${var.ecs_cluster_name} >> /etc/ecs/ecs.config;
       mkfs -t xfs /dev/nvme1n1;
       mkdir -p /data/queues;
-      mount /dev/nvme1n1 /data/queues;
+      echo "/dev/nvme1n1 /data/queues xfs defaults,noatime 0 2" >> /etc/fstab;
+      mount /data/queues;
     EOF
   )
   update_default_version = true
