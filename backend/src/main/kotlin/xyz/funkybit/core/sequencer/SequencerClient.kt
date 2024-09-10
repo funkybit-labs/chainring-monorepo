@@ -50,29 +50,29 @@ import java.math.BigInteger
 import java.util.UUID
 
 fun OrderId.toSequencerId(): SequencerOrderId {
-    return this.value.hashToLong().sequencerOrderId()
+    return this.value.hashToLong().toSequencerOrderId()
 }
 
 fun String.hashToLong(): Long {
     return BigInteger(1, ECHelper.sha3(this.toByteArray())).toLong()
 }
-fun String.orderId(): OrderId {
+fun String.toOrderId(): OrderId {
     return OrderId(this)
 }
 
-fun String.clientOrderId(): ClientOrderId {
+fun String.toClientOrderId(): ClientOrderId {
     return ClientOrderId(this)
 }
 
-fun String.withdrawalId(): WithdrawalId {
+fun String.toWithdrawalId(): WithdrawalId {
     return WithdrawalId(this)
 }
 
-fun String.depositId(): DepositId {
+fun String.toDepositId(): DepositId {
     return DepositId(this)
 }
 
-fun Long.sequencerOrderId(): SequencerOrderId {
+fun Long.toSequencerOrderId(): SequencerOrderId {
     return SequencerOrderId(this)
 }
 
@@ -90,10 +90,6 @@ fun Address.toSequencerId(): SequencerWalletId {
     )
 }
 
-fun Long.sequencerUserId(): SequencerUserId {
-    return SequencerUserId(this)
-}
-
 fun UserId.toSequencerId(): SequencerUserId {
     return SequencerUserId(
         BigInteger(
@@ -103,11 +99,15 @@ fun UserId.toSequencerId(): SequencerUserId {
     )
 }
 
+fun Long.toSequencerAccountId(): SequencerUserId {
+    return SequencerUserId(this)
+}
+
 fun EvmAddress.toSequencerId(): SequencerWalletId {
     return SequencerWalletId(BigInteger(1, ECHelper.sha3(this.value.toHexBytes())).toLong())
 }
 
-fun Long.sequencerWalletId(): SequencerWalletId {
+fun Long.toSequencerWalletId(): SequencerWalletId {
     return SequencerWalletId(this)
 }
 
@@ -147,7 +147,7 @@ open class SequencerClient {
                 orderBatch {
                     this.guid = UUID.randomUUID().toString()
                     this.marketId = marketId.value
-                    this.user = user.value
+                    this.account = user.value
                     this.wallet = walletId.value
                     this.ordersToAdd.addAll(
                         ordersToAdd.map { toOrderDSL(it) },
@@ -175,7 +175,7 @@ open class SequencerClient {
                 backToBackOrderRequest {
                     this.guid = UUID.randomUUID().toString()
                     this.order = backToBackOrder {
-                        this.user = userId.value
+                        this.account = userId.value
                         this.wallet = walletId.value
                         this.marketIds.addAll(marketIds.map { it.value })
                         this.order = toOrderDSL(order)
@@ -278,7 +278,7 @@ open class SequencerClient {
                     this.deposits.add(
                         deposit {
                             this.asset = asset.value
-                            this.user = user.value
+                            this.account = user.value
                             this.amount = amount.toIntegerValue()
                             this.externalGuid = depositId.value
                         },
@@ -306,7 +306,7 @@ open class SequencerClient {
                     this.withdrawals.add(
                         withdrawal {
                             this.asset = asset.value
-                            this.user = user.value
+                            this.account = user.value
                             this.amount = amount.toIntegerValue()
                             this.nonce = nonce.toIntegerValue()
                             this.signature = evmSignature.value
@@ -333,7 +333,7 @@ open class SequencerClient {
                     this.failedWithdrawals.add(
                         failedWithdrawal {
                             this.asset = asset.value
-                            this.user = user.value
+                            this.account = user.value
                             this.amount = amount.toIntegerValue()
                         },
                     )
@@ -346,8 +346,8 @@ open class SequencerClient {
     }
 
     suspend fun failSettlement(
-        buyUser: SequencerUserId,
-        sellUser: SequencerUserId,
+        buyAccount: SequencerUserId,
+        sellAccount: SequencerUserId,
         marketId: MarketId,
         buyOrderId: OrderId,
         sellOrderId: OrderId,
@@ -362,8 +362,8 @@ open class SequencerClient {
                     this.guid = UUID.randomUUID().toString()
                     this.failedSettlements.add(
                         xyz.funkybit.sequencer.proto.failedSettlement {
-                            this.buyUser = buyUser.value
-                            this.sellUser = sellUser.value
+                            this.buyAccount = buyAccount.value
+                            this.sellAccount = sellAccount.value
                             this.marketId = marketId.value
                             this.trade = xyz.funkybit.sequencer.proto.tradeCreated {
                                 this.buyOrderGuid = buyOrderId.toSequencerId().value

@@ -45,12 +45,12 @@ import xyz.funkybit.core.model.db.WithdrawalStatus
 import xyz.funkybit.core.model.db.publishBroadcasterNotifications
 import xyz.funkybit.core.model.db.toOrderResponse
 import xyz.funkybit.core.model.toEvmSignature
-import xyz.funkybit.core.sequencer.clientOrderId
-import xyz.funkybit.core.sequencer.depositId
-import xyz.funkybit.core.sequencer.orderId
-import xyz.funkybit.core.sequencer.sequencerOrderId
-import xyz.funkybit.core.sequencer.sequencerWalletId
-import xyz.funkybit.core.sequencer.withdrawalId
+import xyz.funkybit.core.sequencer.toClientOrderId
+import xyz.funkybit.core.sequencer.toDepositId
+import xyz.funkybit.core.sequencer.toOrderId
+import xyz.funkybit.core.sequencer.toSequencerOrderId
+import xyz.funkybit.core.sequencer.toSequencerWalletId
+import xyz.funkybit.core.sequencer.toWithdrawalId
 import xyz.funkybit.sequencer.core.toBigInteger
 import xyz.funkybit.sequencer.proto.BackToBackOrder
 import xyz.funkybit.sequencer.proto.LimitsUpdate
@@ -78,8 +78,8 @@ object SequencerResponseProcessorService {
         when (request.type) {
             SequencerRequest.Type.ApplyBalanceBatch -> {
                 request.balanceBatch!!.withdrawalsList.forEach { withdrawal ->
-                    val withdrawalEntity = WithdrawalEntity.findById(withdrawal.externalGuid.withdrawalId())!!
-                    val balanceChange = response.balancesChangedList.firstOrNull { it.user == withdrawal.user }
+                    val withdrawalEntity = WithdrawalEntity.findById(withdrawal.externalGuid.toWithdrawalId())!!
+                    val balanceChange = response.balancesChangedList.firstOrNull { it.account == withdrawal.account }
                     if (balanceChange == null) {
                         withdrawalEntity.update(WithdrawalStatus.Failed, error(response, "Insufficient Balance"))
                     } else {
@@ -88,15 +88,15 @@ object SequencerResponseProcessorService {
                             WithdrawalStatus.Sequenced,
                             null,
                             actualAmount = balanceChange.delta.toBigInteger().negate(),
-                            fee = response.withdrawalsCreatedList.firstOrNull { it.externalGuid.withdrawalId() == withdrawalEntity.guid.value }?.fee?.toBigInteger() ?: BigInteger.ZERO,
+                            fee = response.withdrawalsCreatedList.firstOrNull { it.externalGuid.toWithdrawalId() == withdrawalEntity.guid.value }?.fee?.toBigInteger() ?: BigInteger.ZERO,
                             responseSequence = response.sequence,
                         )
                     }
                 }
 
                 request.balanceBatch!!.depositsList.forEach { deposit ->
-                    val depositEntity = DepositEntity.findById(deposit.externalGuid.depositId())!!
-                    if (response.balancesChangedList.firstOrNull { it.user == deposit.user } == null) {
+                    val depositEntity = DepositEntity.findById(deposit.externalGuid.toDepositId())!!
+                    if (response.balancesChangedList.firstOrNull { it.account == deposit.account } == null) {
                         depositEntity.markAsFailed(error(response))
                     } else {
                         handleSequencerResponse(response)
@@ -129,7 +129,7 @@ object SequencerResponseProcessorService {
 
                 if (response.error == SequencerError.None) {
                     val market = getMarket(MarketId(request.orderBatch.marketId))
-                    WalletEntity.getBySequencerId(request.orderBatch.wallet.sequencerWalletId())?.let { wallet ->
+                    WalletEntity.getBySequencerId(request.orderBatch.wallet.toSequencerWalletId())?.let { wallet ->
                         handleOrderBatchUpdates(request.orderBatch.ordersToAddList, market, wallet, response)
                         handleSequencerResponse(
                             response,
@@ -141,7 +141,7 @@ object SequencerResponseProcessorService {
 
             SequencerRequest.Type.ApplyBackToBackOrder -> {
                 if (response.error == SequencerError.None) {
-                    WalletEntity.getBySequencerId(request.backToBackOrder.wallet.sequencerWalletId())?.let { wallet ->
+                    WalletEntity.getBySequencerId(request.backToBackOrder.wallet.toSequencerWalletId())?.let { wallet ->
                         handleBackToBackMarketOrder(request.backToBackOrder, wallet, response)
                         handleSequencerResponse(
                             response,
@@ -207,15 +207,15 @@ object SequencerResponseProcessorService {
         if (ordersToAddList.isNotEmpty()) {
             val createAssignments = ordersToAddList.map {
                 CreateOrderAssignment(
-                    orderId = it.externalGuid.orderId(),
-                    clientOrderId = it.clientOrderGuid?.takeIf { it.isNotEmpty() }?.clientOrderId(),
+                    orderId = it.externalGuid.toOrderId(),
+                    clientOrderId = it.clientOrderGuid?.takeIf { it.isNotEmpty() }?.toClientOrderId(),
                     nonce = it.nonce.toBigInteger(),
                     type = toOrderType(it.type),
                     side = toOrderSide(it.type),
                     amount = it.amount.toBigInteger(),
                     levelIx = it.levelIx,
                     signature = it.signature.toEvmSignature(),
-                    sequencerOrderId = it.guid.sequencerOrderId(),
+                    sequencerOrderId = it.guid.toSequencerOrderId(),
                     sequencerTimeNs = response.processingTime.toBigInteger(),
                 )
             }
@@ -233,15 +233,15 @@ object SequencerResponseProcessorService {
     private fun handleBackToBackMarketOrder(backToBackOrder: BackToBackOrder, wallet: WalletEntity, response: SequencerResponse) {
         val createAssignment =
             CreateOrderAssignment(
-                orderId = backToBackOrder.order.externalGuid.orderId(),
-                clientOrderId = backToBackOrder.order.clientOrderGuid?.takeIf { it.isNotEmpty() }?.clientOrderId(),
+                orderId = backToBackOrder.order.externalGuid.toOrderId(),
+                clientOrderId = backToBackOrder.order.clientOrderGuid?.takeIf { it.isNotEmpty() }?.toClientOrderId(),
                 nonce = backToBackOrder.order.nonce.toBigInteger(),
                 type = OrderType.BackToBackMarket,
                 side = toOrderSide(backToBackOrder.order.type),
                 amount = backToBackOrder.order.amount.toBigInteger(),
                 levelIx = backToBackOrder.order.levelIx,
                 signature = backToBackOrder.order.signature.toEvmSignature(),
-                sequencerOrderId = backToBackOrder.order.guid.sequencerOrderId(),
+                sequencerOrderId = backToBackOrder.order.guid.toSequencerOrderId(),
                 sequencerTimeNs = response.processingTime.toBigInteger(),
             )
 
@@ -418,7 +418,7 @@ object SequencerResponseProcessorService {
         logger.debug { "Calculating balance changes" }
         if (balanceChanges.isNotEmpty()) {
             val userWalletsMap = UserEntity.getWithWalletsBySequencerUserIds(
-                balanceChanges.map { SequencerUserId(it.user) }.toSet(),
+                balanceChanges.map { SequencerUserId(it.account) }.toSet(),
             ).toMap().mapKeys { (user, _) -> user.sequencerId.value }
 
             logger.debug { "updating balances" }
@@ -427,7 +427,7 @@ object SequencerResponseProcessorService {
                 balanceChanges.mapNotNull { change ->
                     val symbol = getSymbol(change.asset)
 
-                    userWalletsMap[change.user]?.let { userWallets ->
+                    userWalletsMap[change.account]?.let { userWallets ->
                         userWallets.find { it.family == symbol.walletFamily }?.let { wallet ->
                             walletsWithUpdatedBalances.add(wallet)
                             BalanceChange.Delta(
@@ -531,14 +531,14 @@ object SequencerResponseProcessorService {
 
     private fun handleLimitsUpdates(limitsUpdates: List<LimitsUpdate>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
         val userWalletsMap = UserEntity.getWithWalletsBySequencerUserIds(
-            limitsUpdates.map { SequencerUserId(it.user) }.toSet(),
+            limitsUpdates.map { SequencerUserId(it.account) }.toSet(),
         ).associateBy { it.first.sequencerId.value }
 
         val walletsToNotifyAboutLimitsChanges = mutableSetOf<WalletEntity>()
         LimitEntity.update(
             limitsUpdates.map {
                 val marketId = MarketId(it.marketId)
-                val (user, userWallets) = userWalletsMap[it.user]!!
+                val (user, userWallets) = userWalletsMap[it.account]!!
 
                 MarketEntity[marketId].walletFamilies()
                     .mapNotNull { walletFamily -> userWallets.find { it.family == walletFamily } }

@@ -201,7 +201,7 @@ class TestRoutes(
                 }
 
                 val userGuids = transaction {
-                    val userIds = sequencerResponse.stateDump.balancesList.map { SequencerUserId(it.user) }.toSet()
+                    val userIds = sequencerResponse.stateDump.balancesList.map { SequencerUserId(it.account) }.toSet()
                     UserEntity
                         .getBySequencerIds(userIds)
                         .associateBy(
@@ -216,7 +216,7 @@ class TestRoutes(
                         takerFeeRate = FeeRate(sequencerResponse.stateDump.feeRates.taker),
                         balances = sequencerResponse.stateDump.balancesList.map { b ->
                             StateDump.Balance(
-                                user = userGuids[b.user] ?: b.user.toString(),
+                                user = userGuids[b.account] ?: b.account.toString(),
                                 asset = b.asset,
                                 amount = b.amount.toBigInteger(),
                                 consumed = b.consumedList.map { c ->
@@ -248,7 +248,7 @@ class TestRoutes(
                                         orders = l.ordersList.map { lo ->
                                             StateDump.LevelOrder(
                                                 guid = lo.guid,
-                                                user = userGuids[lo.user] ?: lo.user.toString(),
+                                                user = userGuids[lo.account] ?: lo.account.toString(),
                                                 quantity = lo.quantity.toBigInteger(),
                                                 originalQuantity = lo.originalQuantity.toBigInteger(),
                                             )

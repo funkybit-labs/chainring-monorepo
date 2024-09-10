@@ -16,7 +16,7 @@ message BalancesCheckpoint {
   repeated Balance balances = 1;
 
   message Balance {
-    uint64 user = 1;
+    uint64 account = 1;
     string asset = 2;
     IntegerValue amount = 3;
     repeated Consumption consumed = 4;
@@ -59,7 +59,7 @@ message MarketCheckpoint {
 
   message LevelOrder {
     uint64 guid = 1;
-    uint64 user = 2;
+    uint64 account = 2;
     IntegerValue quantity = 3;
     IntegerValue originalQuantity = 5;
     uint64 feeRate = 6;

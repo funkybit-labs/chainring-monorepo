@@ -51,12 +51,12 @@ fun quantityFromNotionalAndPrice(notional: BigInteger, price: BigDecimal, baseDe
 fun notionalPlusFee(amount: IntegerValue, price: DecimalValue, baseDecimals: Int, quoteDecimals: Int, feeRate: FeeRate): BigInteger =
     notionalPlusFee(amount.toBigInteger(), price.toBigDecimal(), baseDecimals, quoteDecimals, feeRate)
 
-fun Map<Pair<UserGuid, Asset>, BigInteger>.asBalanceChangesList(): List<BalanceChange> =
+fun Map<Pair<AccountGuid, Asset>, BigInteger>.asBalanceChangesList(): List<BalanceChange> =
     mapNotNull { (k, delta) ->
         if (delta != BigInteger.ZERO) {
-            val (user, asset) = k
+            val (account, asset) = k
             balanceChange {
-                this.user = user.value
+                this.account = account.value
                 this.asset = asset.value
                 this.delta = delta.toIntegerValue()
             }

@@ -65,20 +65,17 @@ class ExchangeApiService(
     private val logger = KotlinLogging.logger {}
 
     fun addOrder(
-        userId: UserId,
-        walletAddress: Address,
+        wallet: WalletEntity,
         apiRequest: CreateOrderApiRequest,
     ): CreateOrderApiResponse {
         return when (apiRequest) {
             is CreateOrderApiRequest.BackToBackMarket -> addBackToBackMarketOrder(
-                userId,
-                walletAddress,
+                wallet,
                 apiRequest,
             )
 
             else -> orderBatch(
-                userId,
-                walletAddress,
+                wallet,
                 BatchOrdersApiRequest(
                     marketId = apiRequest.marketId,
                     createOrders = listOf(apiRequest),
@@ -89,12 +86,13 @@ class ExchangeApiService(
     }
 
     private fun addBackToBackMarketOrder(
-        userId: UserId,
-        walletAddress: Address,
+        wallet: WalletEntity,
         orderRequest: CreateOrderApiRequest.BackToBackMarket,
     ): CreateOrderApiResponse {
         val orderId = OrderId.generate()
 
+        val userId = wallet.userGuid.value
+        val walletAddress = wallet.address
         val market1 = getMarket(orderRequest.marketId)
         val baseSymbol = getSymbolEntity(market1.baseSymbol)
         val market2 = getMarket(orderRequest.secondMarketId)
@@ -150,8 +148,7 @@ class ExchangeApiService(
     }
 
     fun orderBatch(
-        userId: UserId,
-        walletAddress: Address,
+        wallet: WalletEntity,
         batchOrdersRequest: BatchOrdersApiRequest,
     ): BatchOrdersApiResponse {
         if (batchOrdersRequest.cancelOrders.isEmpty() && batchOrdersRequest.createOrders.isEmpty()) {
@@ -160,6 +157,8 @@ class ExchangeApiService(
 
         val createOrderRequestsByOrderId = batchOrdersRequest.createOrders.associateBy { OrderId.generate() }
 
+        val userId = wallet.userGuid.value
+        val walletAddress = wallet.address
         val market = getMarket(batchOrdersRequest.marketId)
         val baseSymbol = getSymbolEntity(market.baseSymbol)
         val quoteSymbol = getSymbolEntity(market.quoteSymbol)
@@ -276,12 +275,14 @@ class ExchangeApiService(
     private fun reasonToMessage(reason: Reason): String {
         return when (reason) {
             Reason.DoesNotExist -> "Order does not exist or is already finalized"
-            Reason.NotForUser -> "Order not created by this user"
+            Reason.NotForAccount -> "Order not created by this user"
             else -> ""
         }
     }
 
-    fun withdraw(userId: UserId, walletAddress: Address, apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse {
+    fun withdraw(wallet: WalletEntity, apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse {
+        val userId = wallet.userGuid.value
+        val walletAddress = wallet.address
         val symbol = getSymbolEntity(apiRequest.symbol)
 
         when (walletAddress) {
@@ -349,10 +350,9 @@ class ExchangeApiService(
             DepositApiResponse(Deposit.fromEntity(deposit))
         }
 
-    fun cancelOrder(userId: UserId, walletAddress: Address, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {
+    fun cancelOrder(wallet: WalletEntity, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {
         return orderBatch(
-            userId,
-            walletAddress,
+            wallet,
             BatchOrdersApiRequest(
                 marketId = cancelOrderApiRequest.marketId,
                 createOrders = emptyList(),

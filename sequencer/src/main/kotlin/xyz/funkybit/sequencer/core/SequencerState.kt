@@ -35,8 +35,8 @@ data class FeeRates(
 
 data class SequencerState(
     val markets: MutableMap<MarketId, Market> = mutableMapOf(),
-    val balances: MutableMap<UserGuid, BalanceByAsset> = mutableMapOf(),
-    val consumed: MutableMap<UserGuid, ConsumedByAsset> = mutableMapOf(),
+    val balances: MutableMap<AccountGuid, BalanceByAsset> = mutableMapOf(),
+    val consumed: MutableMap<AccountGuid, ConsumedByAsset> = mutableMapOf(),
     var feeRates: FeeRates = FeeRates(maker = FeeRate.zero, taker = FeeRate.zero),
     var withdrawalFees: MutableMap<Symbol, BigInteger> = mutableMapOf(),
 ) {
@@ -94,11 +94,11 @@ data class SequencerState(
                 measureNanoTime {
                     val balancesCheckpoint = BalancesCheckpoint.parseFrom(wire.read("balances").bytes())
                     balancesCheckpoint.balancesList.forEach { balanceCheckpoint ->
-                        val userGuid = balanceCheckpoint.user.toUserGuid()
+                        val accountGuid = balanceCheckpoint.account.toAccountGuid()
                         val asset = balanceCheckpoint.asset.toAsset()
-                        balances.getOrPut(userGuid) { mutableMapOf() }[asset] = balanceCheckpoint.amount.toBigInteger()
+                        balances.getOrPut(accountGuid) { mutableMapOf() }[asset] = balanceCheckpoint.amount.toBigInteger()
                         if (balanceCheckpoint.consumedCount > 0) {
-                            consumed.getOrPut(userGuid) { mutableMapOf() }.getOrPut(asset) { mutableMapOf() }.putAll(
+                            consumed.getOrPut(accountGuid) { mutableMapOf() }.getOrPut(asset) { mutableMapOf() }.putAll(
                                 balanceCheckpoint.consumedList.associate {
                                     it.marketId.toMarketId() to it.consumed.toBigInteger()
                                 },
@@ -192,15 +192,15 @@ data class SequencerState(
         val balancesMap = balances
 
         return balancesCheckpoint {
-            balancesMap.forEach { (user, userBalances) ->
-                userBalances.forEach { (asset, amount) ->
+            balancesMap.forEach { (account, accountBalances) ->
+                accountBalances.forEach { (asset, amount) ->
                     this.balances.add(
                         balance {
-                            this.user = user.value
+                            this.account = account.value
                             this.asset = asset.value
                             this.amount = amount.toIntegerValue()
                             this.consumed.addAll(
-                                this@SequencerState.consumed.getOrDefault(user, mapOf()).getOrDefault(asset, mapOf()).map {
+                                this@SequencerState.consumed.getOrDefault(account, mapOf()).getOrDefault(asset, mapOf()).map {
                                     consumption {
                                         this.marketId = it.key.value
                                         this.consumed = it.value.toIntegerValue()
