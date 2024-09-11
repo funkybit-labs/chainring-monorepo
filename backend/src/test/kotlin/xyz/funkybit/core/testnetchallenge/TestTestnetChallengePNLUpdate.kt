@@ -18,6 +18,7 @@ import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
 import xyz.funkybit.core.model.db.TestnetChallengePNLType
 import xyz.funkybit.core.model.db.WalletEntity
+import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.testutils.TestWithDb
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -61,7 +62,7 @@ class TestTestnetChallengePNLUpdate : TestWithDb() {
                     BalanceTable.insert {
                         it[guid] = BalanceId.generate()
                         it[type] = balanceType
-                        it[balance] = BigDecimal.valueOf(amount)
+                        it[balance] = BigDecimal.valueOf(amount).toFundamentalUnits(if (symbol == usdc) 6 else 18).toBigDecimal()
                         it[symbolGuid] = symbol.guid
                         it[walletGuid] = if (symbol == btc) wallet1b.guid else wallet1a.guid
                         it[createdAt] = now
@@ -74,7 +75,7 @@ class TestTestnetChallengePNLUpdate : TestWithDb() {
                 BalanceTable.insert {
                     it[guid] = BalanceId.generate()
                     it[type] = BalanceType.Exchange
-                    it[balance] = BigDecimal.valueOf(amount)
+                    it[balance] = BigDecimal.valueOf(amount).toFundamentalUnits(if (symbol == usdc) 6 else 18).toBigDecimal()
                     it[symbolGuid] = symbol.guid
                     it[walletGuid] = if (symbol == btc) wallet2b.guid else wallet2a.guid
                     it[createdAt] = now
