@@ -17,7 +17,6 @@ import xyz.funkybit.apps.api.model.websocket.MyTradesCreated
 import xyz.funkybit.apps.api.model.websocket.MyTradesUpdated
 import xyz.funkybit.apps.api.model.websocket.MyTrades
 import xyz.funkybit.integrationtests.utils.ApiCallFailure
-import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.OHLCDuration
@@ -42,8 +41,7 @@ import kotlin.random.Random
 import kotlinx.datetime.Clock
 import org.knowm.xchart.SwingWrapper
 import org.knowm.xchart.XYChartBuilder
-import org.web3j.crypto.ECKeyPair
-import org.web3j.crypto.Keys
+import xyz.funkybit.core.utils.PriceFeed
 import xyz.funkybit.integrationtests.utils.WalletKeyPair
 
 sealed class LiquidityPlacement {
@@ -77,7 +75,7 @@ class Maker(
     override fun start() {
         super.start()
         if (usePriceFeed) {
-            priceFeed = PriceFeed(marketIds) { prices ->
+            priceFeed = PriceFeed(marketIds, sleepTimeMs = 2000L) { prices ->
                 if (!quotesCreated) {
                     logger.info { "$id: creating quotes from initial prices" }
                     prices.forEach { (marketId, price) ->

@@ -123,7 +123,7 @@ sealed class BitcoinAddress(val value: String) : Address() {
     }
 
     data class Unrecognized(val raw: String) : BitcoinAddress(raw) {
-        override fun script() = ""
+        override fun script() = this.raw
         override fun toString(): String = this.raw
     }
 

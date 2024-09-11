@@ -1,13 +1,13 @@
-package xyz.funkybit.mocker.core
+package xyz.funkybit.core.utils
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import xyz.funkybit.core.model.db.MarketId
-import xyz.funkybit.integrationtests.utils.json
 import kotlin.concurrent.thread
 
-class PriceFeed(marketIds: List<MarketId>, val onPriceUpdate: (Map<MarketId, Double>) -> Unit) {
+class PriceFeed(marketIds: List<MarketId>, private val sleepTimeMs: Long, val onPriceUpdate: (Map<MarketId, Double>) -> Unit) {
     private val rawBaseAndQuoteByMarket = marketIds.associateWith {
         Pair(
             it.baseSymbol().replace(Regex(":.*$"), ""),
@@ -28,21 +28,21 @@ class PriceFeed(marketIds: List<MarketId>, val onPriceUpdate: (Map<MarketId, Dou
     private val logger = KotlinLogging.logger {}
 
     fun start() {
-        priceThread = thread(start = true, isDaemon = false, name = "mock-price-feed") {
+        priceThread = thread(start = true, isDaemon = true, name = "mock-price-feed") {
             while (!stopping) {
                 try {
                     val request = httpClient.newCall(
                         Request.Builder()
                             .url(
-                                "https://min-api.cryptocompare.com/data/pricemulti?${if (apiKey != null) "api_key=$apiKey&" else ""}fsyms=${baseSymbols.joinToString(",")}&tsyms=${quoteSymbols.joinToString(",")}"
+                                "https://min-api.cryptocompare.com/data/pricemulti?${if (apiKey != null) "api_key=$apiKey&" else ""}fsyms=${baseSymbols.joinToString(",")}&tsyms=${quoteSymbols.joinToString(",")}",
                             )
                             .get()
-                            .build()
+                            .build(),
                     )
                     val response = request.execute()
                     if (response.isSuccessful) {
                         // update price for each market
-                        val receivedPrices = json.decodeFromString<Map<String,Map<String,Double>>>(response.body!!.string())
+                        val receivedPrices = Json.decodeFromString<Map<String, Map<String, Double>>>(response.body!!.string())
                         prices.keys.forEach { marketId ->
                             val(marketBase, marketQuote) = rawBaseAndQuoteByMarket[marketId]!!
                             receivedPrices[marketBase]?.let { basePrices ->
@@ -53,7 +53,7 @@ class PriceFeed(marketIds: List<MarketId>, val onPriceUpdate: (Map<MarketId, Dou
                     } else {
                         logger.debug { "Unable to get prices from ${request.request().url}: ${response.code}: ${response.body}" }
                     }
-                    Thread.sleep(2000L)
+                    Thread.sleep(sleepTimeMs)
                 } catch (e: InterruptedException) {
                     stopping = true
                 }

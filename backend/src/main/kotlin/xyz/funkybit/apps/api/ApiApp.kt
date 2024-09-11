@@ -149,6 +149,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                                 testnetChallengeRoutes.enroll,
                                 testnetChallengeRoutes.setNickname,
                                 testnetChallengeRoutes.setAvatarUrl,
+                                testnetChallengeRoutes.getLeaderboard,
                             )
                         }
                     },

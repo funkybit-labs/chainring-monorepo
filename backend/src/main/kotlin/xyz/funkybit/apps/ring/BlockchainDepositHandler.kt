@@ -13,6 +13,7 @@ import xyz.funkybit.core.model.db.BalanceType
 import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.DepositStatus
 import xyz.funkybit.core.model.db.DepositTable
+import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.sequencer.toSequencerId
@@ -90,6 +91,7 @@ class BlockchainDepositHandler(
                         deposit.amount == TestnetChallengeUtils.depositAmount.toFundamentalUnits(TestnetChallengeUtils.depositSymbol().decimals)
                     ) {
                         deposit.wallet.user.testnetChallengeStatus = TestnetChallengeStatus.Enrolled
+                        TestnetChallengePNLEntity.initializeForUser(deposit.wallet.user)
                     }
                 }
             }

@@ -4,6 +4,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.sql.Database
 import xyz.funkybit.core.repeater.tasks.ArchTokenStateSetupTask
 import xyz.funkybit.core.repeater.tasks.GasMonitorTask
+import xyz.funkybit.core.repeater.tasks.PriceFeedManagerTask
 import xyz.funkybit.core.repeater.tasks.ReferralPointsTask
 import xyz.funkybit.core.repeater.tasks.TestnetChallengeMonitorTask
 import xyz.funkybit.core.utils.PgListener
@@ -20,6 +21,7 @@ class Repeater(db: Database, private val automaticTaskScheduling: Boolean = true
         ReferralPointsTask(),
         ArchTokenStateSetupTask(),
         TestnetChallengeMonitorTask(),
+        PriceFeedManagerTask(),
     ).associateBy { it.name }
 
     private val timer = ScheduledThreadPoolExecutor(8)

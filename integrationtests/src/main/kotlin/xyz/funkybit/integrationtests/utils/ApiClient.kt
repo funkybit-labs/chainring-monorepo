@@ -42,6 +42,7 @@ import xyz.funkybit.apps.api.model.FaucetApiResponse
 import xyz.funkybit.apps.api.model.GetLastPriceResponse
 import xyz.funkybit.apps.api.model.GetLimitsApiResponse
 import xyz.funkybit.apps.api.model.GetOrderBookApiResponse
+import xyz.funkybit.apps.api.model.Leaderboard
 import xyz.funkybit.apps.api.model.ListDepositsApiResponse
 import xyz.funkybit.apps.api.model.ListWithdrawalsApiResponse
 import xyz.funkybit.apps.api.model.Order
@@ -60,6 +61,7 @@ import xyz.funkybit.core.model.db.DepositId
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.OrderStatus
+import xyz.funkybit.core.model.db.TestnetChallengePNLType
 import xyz.funkybit.core.model.db.WithdrawalId
 import xyz.funkybit.core.utils.TraceRecorder
 import java.net.HttpURLConnection
@@ -533,6 +535,15 @@ open class ApiClient(
                 .withAuthHeaders(keyPair, chainId = currentChainId),
         ).toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
+    fun tryGetLeaderboard(type: TestnetChallengePNLType): Either<ApiCallFailure, Leaderboard> =
+        executeAndTrace(
+            TraceRecorder.Op.GetLeaderboard,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/testnet-challenge/leaderboard/${type.name}")
+                .get()
+                .build(),
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
     private fun executeAndTrace(op: TraceRecorder.Op, request: Request): Response {
         return traceRecorder.record(op) {
             httpClient.newCall(request).execute()
@@ -634,6 +645,8 @@ open class ApiClient(
     open fun testnetChallengeEnroll() = tryTestnetChallengeEnroll().throwOrReturn()
 
     open fun setNickname(nickName: String) = trySetNickname(nickName).throwOrReturn()
+
+    open fun getLeaderboard(type: TestnetChallengePNLType) = tryGetLeaderboard(type).throwOrReturn()
 }
 
 fun <T> Either<ApiCallFailure, T>.throwOrReturn(): T {
