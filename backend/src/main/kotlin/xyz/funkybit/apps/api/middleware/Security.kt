@@ -63,7 +63,8 @@ val signedTokenSecurity = object : Security {
                                     message = EIP712Helper.structuredDataAsJson(authResult.message),
                                     signature = authResult.signature,
                                 ),
-                                authorizationProof = null, // first wallet of the user
+                                // first wallet of the user
+                                authorizationProof = null,
                             )
                         }
                     }
