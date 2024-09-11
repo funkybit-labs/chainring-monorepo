@@ -147,7 +147,7 @@ export const AccountConfigurationApiResponseSchema = z.object({
   testnetChallengeDepositSymbol: z.string().nullable(),
   testnetChallengeDepositContract: AddressSchema.nullable(),
   nickName: z.string().nullable(),
-  avatarUrl: z.string().nullable()
+  avatarUrl: z.string().nullable(),
 })
 
 const OrderSideSchema = z.enum(['Buy', 'Sell'])

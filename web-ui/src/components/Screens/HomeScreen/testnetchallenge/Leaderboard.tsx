@@ -3,6 +3,7 @@ import { abbreviatedWalletAddress, classNames } from 'utils'
 import { Button } from 'components/common/Button'
 import EditSvg from 'assets/Edit.svg'
 import CameraSvg from 'assets/camera.svg'
+import CelebrationSvg from 'assets/celebration.svg'
 import React, {
   ChangeEvent,
   Fragment,
@@ -19,6 +20,8 @@ import {
   Leaderboard as LB
 } from 'apiClient'
 import { Modal } from 'components/common/Modal'
+import {Tab} from "components/Screens/Header";
+import {CopyToClipboard} from "react-copy-to-clipboard";
 
 type EditMode = 'none' | 'name' | 'icon'
 
@@ -134,11 +137,13 @@ function Board({
 export function Leaderboard({
   avatarUrl,
   nickName,
-  wallets
+  wallets,
+  onChangeTab
 }: {
   avatarUrl?: string
   nickName?: string
   wallets: Wallets
+  onChangeTab: (tab: Tab) => void
 }) {
   const queryClient = useQueryClient()
 
@@ -417,8 +422,14 @@ export function Leaderboard({
           )}
         </div>
       </div>
-      <div className="flex flex-col gap-8 p-2">
-        <div className="h-36 w-full rounded-lg bg-darkBluishGray10"></div>
+      <div className="flex flex-col gap-8 p-2 w-full">
+        <div className="h-36 w-full rounded-lg bg-darkBluishGray10">
+          <div className="text-white flex flex-row justify-center p-4">
+            {/* TODO - only show this until they've earned more points */}
+            <img src={CelebrationSvg} alt={"celebrate"} className="size-12 my-auto mx-4" />
+            <div>Congratulations, you're enrolled in the Testnet Challenge! Now trade <span className="cursor-pointer underline" onClick={() => onChangeTab('Swap')}>Swaps</span> and <span className="cursor-pointer underline" onClick={() => onChangeTab('Limit')}>Limit Orders</span> to get ahead!</div>
+          </div>
+        </div>
         <div className="w-full rounded-lg bg-darkBluishGray8">
           {weeklyLeaderboardQuery.data && (
             <Board
@@ -430,7 +441,15 @@ export function Leaderboard({
         </div>
       </div>
       <div className="flex flex-col gap-8 p-2">
-        <div className="h-36 w-full rounded-lg bg-darkBluishGray8"></div>
+        <div className="h-36 w-full rounded-lg bg-darkBluishGray8">
+          <div className="flex flex-col text-white space-y-4 p-3 text-center">
+            <div className="text-2xl">Refer Friends, Earn More!</div>
+            <div className="text-sm">Share your unique referral link and earn 10% of the funky bits your referrals
+              earn!
+            </div>
+            <div className="text-sm"><CopyToClipboard text={`https://testnet.funkybit.fun/invite/AQ8E8VF`}><div>https://testnet.funkybit.fun/invite/AQ8E8VF</div></CopyToClipboard></div>
+          </div>
+        </div>
         <div className="w-full rounded-lg bg-darkBluishGray8">
           {overallLeaderboardQuery.data && (
             <Board
