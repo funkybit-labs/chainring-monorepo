@@ -215,12 +215,10 @@ export function Header({
         <div className="cursor-pointer space-x-4 text-[16px]">
           {(
             [
+              ...(TestnetChallengeEnabled ? ['Testnet Challenge'] : []),
               'Swap',
               'Limit',
-              'Dashboard',
-              ...(TestnetChallengeEnabled && wallet.primaryCategory !== 'none'
-                ? ['Testnet Challenge']
-                : [])
+              'Dashboard'
             ] as Tab[]
           ).map((t) => (
             <span

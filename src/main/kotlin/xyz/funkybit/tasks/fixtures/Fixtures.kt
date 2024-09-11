@@ -10,6 +10,7 @@ import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.FeeRates
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.SymbolId
+import xyz.funkybit.core.utils.toFundamentalUnits
 import java.math.BigDecimal
 import java.math.BigInteger
 
@@ -169,7 +170,3 @@ fun getFixtures(chainringChainClients: List<BlockchainClient>, bitcoinBlockchain
         )
     )
 )
-
-private fun BigDecimal.toFundamentalUnits(decimals: Int): BigInteger {
-    return this.movePointRight(decimals).toBigInteger()
-}

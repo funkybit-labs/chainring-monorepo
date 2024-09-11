@@ -68,6 +68,7 @@ services:
       EVM_SUBMITTER_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/ring/EVM_SUBMITTER_PRIVATE_KEY-UkdEuD
       BITCOIN_FEE_PAYER_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/ring/BITCOIN_FEE_PAYER_PRIVATE_KEY-Uu248y
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
+      CRYPTOCOMPARE_API_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/ring/CRYPTOCOMPARE_API_KEY-l1cdnw
   sequencer:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/sequencer
     count: 1

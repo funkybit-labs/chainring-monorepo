@@ -13,6 +13,7 @@ import xyz.funkybit.apps.api.model.CreateDepositApiRequest
 import xyz.funkybit.apps.api.model.toSymbolInfo
 import xyz.funkybit.apps.ring.BlockchainDepositHandler
 import xyz.funkybit.core.model.Symbol
+import xyz.funkybit.core.model.db.TestnetChallengePNLType
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
@@ -103,5 +104,20 @@ class TestnetChallengeTest {
         assertNotNull(left)
         assertEquals(422, left!!.httpCode)
         assertEquals("Nickname is already taken", left.error!!.message)
+
+        // leaderboard should have both users
+        val daily = apiClient.getLeaderboard(TestnetChallengePNLType.DailyPNL)
+        assertEquals(1, daily.page)
+        assertEquals(1, daily.lastPage)
+        assertEquals(TestnetChallengePNLType.DailyPNL, daily.type)
+        assertEquals(2, daily.entries.size)
+        val weekly = apiClient.getLeaderboard(TestnetChallengePNLType.WeeklyPNL)
+        assertEquals(1, weekly.page)
+        assertEquals(1, weekly.lastPage)
+        assertEquals(TestnetChallengePNLType.WeeklyPNL, weekly.type)
+        val overall = apiClient.getLeaderboard(TestnetChallengePNLType.OverallPNL)
+        assertEquals(1, overall.page)
+        assertEquals(1, overall.lastPage)
+        assertEquals(TestnetChallengePNLType.OverallPNL, overall.type)
     }
 }
