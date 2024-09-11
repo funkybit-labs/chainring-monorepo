@@ -122,7 +122,13 @@ export function WebsocketProvider({
 
     async function connect(refreshAuth: boolean = false) {
       // don't do anything until we know for sure that wallet is connected
-      if (wallet.primaryCategory === 'none') return
+      if (
+        wallet.primaryCategory === 'evm' &&
+        ['connecting', 'reconnecting'].includes(
+          wallet.evmAccount?.status?.toString() || ''
+        )
+      )
+        return
 
       if (connecting) return
       connecting = true
@@ -156,7 +162,7 @@ export function WebsocketProvider({
     return () => {
       ws.current?.close()
     }
-  }, [wallet.primaryCategory, wallet.primaryAddress])
+  }, [wallet.primaryCategory, wallet.primaryAddress, wallet.evmAccount])
 
   return (
     <WebsocketContext.Provider value={{ subscribe, unsubscribe }}>
