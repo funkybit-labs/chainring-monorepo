@@ -2,6 +2,7 @@ package xyz.funkybit.apps.api.services
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Instant
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.dao.with
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -29,6 +30,7 @@ import xyz.funkybit.core.evm.TokenAddressAndChain
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
@@ -48,6 +50,8 @@ import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.services.LinkedSignerService
 import xyz.funkybit.core.utils.TestnetChallengeUtils
+import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureVerification
+import xyz.funkybit.core.utils.bitcoin.fromSatoshi
 import xyz.funkybit.core.utils.safeToInt
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.core.utils.toHexBytes
@@ -294,11 +298,21 @@ class ExchangeApiService(
                     apiRequest.amount,
                     apiRequest.nonce,
                     apiRequest.amount == BigInteger.ZERO,
-                    apiRequest.signature,
+                    apiRequest.signature as EvmSignature,
                 ),
                 symbol.chainId.value,
             )
-            is BitcoinAddress -> {} // TODO verify signature
+            is BitcoinAddress -> {
+                val bitcoinAddress = BitcoinAddress.canonicalize(walletAddress.value)
+                val bitcoinWithdrawalMessage = String.format(
+                    "[funkybit] Please sign this message to authorize withdrawal of %s %s from the exchange to your wallet.",
+                    apiRequest.amount.fromSatoshi().toPlainString(),
+                    symbol.displayName(),
+                ) + "\nAddress: ${bitcoinAddress.value}, Timestamp: ${Instant.fromEpochMilliseconds(apiRequest.nonce)}"
+                if (!BitcoinSignatureVerification.verifyMessage(bitcoinAddress, apiRequest.signature.value.replace(" ", "+"), bitcoinWithdrawalMessage)) {
+                    throw RequestProcessingError(ReasonCode.SignatureNotValid, "Invalid signature")
+                }
+            }
         }
 
         val withdrawal = transaction {

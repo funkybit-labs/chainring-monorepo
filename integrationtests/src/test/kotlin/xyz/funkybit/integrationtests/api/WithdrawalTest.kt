@@ -9,6 +9,7 @@ import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.websocket.SubscriptionTopic
 import xyz.funkybit.core.evm.EIP712Transaction
+import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalStatus
 import xyz.funkybit.core.utils.toFundamentalUnits
@@ -571,7 +572,7 @@ class WithdrawalTest {
             // resign with a different nonce so signature should fail
             val signature = wallet.signWithdraw(btc.name, btcWithdrawalAmount.inFundamentalUnits).signature
             withdrawal.transactionData = (withdrawal.transactionData!! as EIP712Transaction.WithdrawTx).copy(
-                signature = signature,
+                signature = signature as EvmSignature,
             )
         }
 

@@ -8,13 +8,12 @@ import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.TxHash
 import kotlin.concurrent.thread
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.hours
 
 class BitcoinDepositHandler(
     private val numConfirmations: Int = System.getenv("BITCOIN_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toIntOrNull() ?: DEFAULT_NUM_CONFIRMATIONS,
     private val pollingIntervalInMs: Long = System.getenv("BITCOIN_DEPOSIT_HANDLER_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
-    private val maxWaitTime: Duration = System.getenv("BITCOIN_DEPOSIT_HANDLER_MAX_WAIT_TIME_MS")?.toLongOrNull()?.milliseconds ?: 60.minutes,
+    private val maxWaitTime: Duration = System.getenv("BITCOIN_DEPOSIT_HANDLER_MAX_WAIT_TIME_HOURS")?.toLongOrNull()?.hours ?: 48.hours,
 ) {
     companion object {
         const val DEFAULT_NUM_CONFIRMATIONS: Int = 1
@@ -60,12 +59,11 @@ class BitcoinDepositHandler(
 
     private fun refreshPendingDeposit(pendingDeposit: DepositEntity) {
         val tx = BitcoinClient.getRawTransaction(TxHash(pendingDeposit.transactionHash.value))
-        if ((tx.confirmations ?: 0) >= numConfirmations) {
+        if (tx != null && (tx.confirmations ?: 0) >= numConfirmations) {
             logger.debug { "Marking transaction as confirmed ${tx.confirmations}" }
             pendingDeposit.markAsConfirmed()
         } else if (Clock.System.now() - pendingDeposit.createdAt > maxWaitTime) {
-            // TODO figure out what getRawTransaction returns if the tx gets evicted from mempool
-            pendingDeposit.markAsFailed("Transaction receipt not found", canBeResubmitted = true)
+            pendingDeposit.markAsFailed("Deposit not confirmed within $maxWaitTime", canBeResubmitted = true)
         }
     }
 }

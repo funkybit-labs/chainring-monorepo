@@ -21,6 +21,7 @@ import xyz.funkybit.core.model.rpc.BitcoinRpc
 import xyz.funkybit.core.model.rpc.BitcoinRpcParams
 import xyz.funkybit.core.model.rpc.BitcoinRpcRequest
 import xyz.funkybit.core.utils.bitcoin.inSatsAsDecimalString
+import xyz.funkybit.core.utils.toFundamentalUnits
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.RoundingMode
@@ -41,7 +42,7 @@ object BitcoinClient : JsonRpcClientBase(
     private val minFee = BigDecimal(bitcoinConfig.feeSettings.minValue)
     private val maxFee = BigDecimal(bitcoinConfig.feeSettings.maxValue)
 
-    private val zeroCoinValue = Coin.valueOf(0)
+    val zeroCoinValue = Coin.valueOf(0)
 
     fun getParams(): NetworkParameters = NetworkParameters.fromID(ChainManager.bitcoinBlockchainClientConfig.net)!!
 
@@ -77,14 +78,21 @@ object BitcoinClient : JsonRpcClientBase(
         }
     }
 
-    fun getRawTransaction(txId: TxHash): BitcoinRpc.Transaction {
-        return getValue(
-            BitcoinRpcRequest(
-                "getrawtransaction",
-                BitcoinRpcParams(listOf(txId.value, true)),
-            ),
-            true,
-        )
+    fun getRawTransaction(txId: TxHash): BitcoinRpc.Transaction? {
+        return try {
+            getValue(
+                BitcoinRpcRequest(
+                    "getrawtransaction",
+                    BitcoinRpcParams(listOf(txId.value, true)),
+                ),
+                true,
+            )
+        } catch (e: JsonRpcException) {
+            if (!e.error.message.contains("No such mempool or blockchain transaction")) {
+                throw e
+            }
+            null
+        }
     }
 
     fun sendRawTransaction(rawTransactionHex: String): TxHash {
@@ -210,4 +218,20 @@ object BitcoinClient : JsonRpcClientBase(
 
     fun calculateFee(vsize: Int) =
         estimateSmartFeeInSatPerVByte().toBigInteger() * vsize.toBigInteger()
+
+    fun estimateVSize(numIn: Int, numOut: Int): Int {
+        return 11 + numIn * 63 + numOut * 41
+    }
+
+    fun getNetworkFeeForTx(txId: TxHash): Long {
+        return getRawTransaction(txId)?.let { tx ->
+            (
+                tx.txIns.sumOf {
+                    getRawTransaction(it.txId)!!.txOuts[it.outIndex].value.toFundamentalUnits(8)
+                } - tx.txOuts.sumOf {
+                    it.value.toFundamentalUnits(8)
+                }
+                ).toLong()
+        } ?: throw Exception("Tx not found")
+    }
 }

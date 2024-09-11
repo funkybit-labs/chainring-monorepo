@@ -197,7 +197,7 @@ class BlockProcessor(
                     Asset(symbol.name),
                     withdrawalEventResponse.amount,
                     nonce = nonce.toBigInteger(),
-                    evmSignature = evmSignature,
+                    signature = evmSignature,
                     withdrawal.id,
                 )
             }

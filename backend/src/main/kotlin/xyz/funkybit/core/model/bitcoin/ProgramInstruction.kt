@@ -55,6 +55,26 @@ sealed class ProgramInstruction {
         val tokenDepositsList: List<TokenDeposits>,
     ) : ProgramInstruction()
 
+    @Serializable
+    data class Withdrawal(
+        val addressIndex: UInt,
+        val amount: ULong,
+        val feeAmount: ULong,
+    )
+
+    @Serializable
+    data class TokenWithdrawals(
+        val accountIndex: UByte,
+        val feeAddressIndex: UInt,
+        val withdrawals: List<Withdrawal>,
+    )
+
+    @Serializable
+    data class WithdrawBatchParams(
+        val tokenWithdrawalsList: List<TokenWithdrawals>,
+        val txHex: ByteArray,
+    ) : ProgramInstruction()
+
     @OptIn(ExperimentalUnsignedTypes::class)
     fun serialize() = Borsh.encodeToByteArray(this).toUByteArray()
 }
@@ -65,6 +85,7 @@ object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
     private const val INIT_TOKEN_STATE: Byte = 1
     private const val INIT_TOKEN_BALANCES: Byte = 2
     private const val DEPOSIT_BATCH: Byte = 3
+    private const val WITHDRAW_BATCH: Byte = 4
 
     @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = buildSerialDescriptor("Pubkey", StructureKind.LIST)
@@ -89,6 +110,10 @@ object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
                     is ProgramInstruction.DepositBatchParams -> {
                         encoder.encodeByte(DEPOSIT_BATCH)
                         ProgramInstruction.DepositBatchParams::class.serializer().serialize(encoder, value)
+                    }
+                    is ProgramInstruction.WithdrawBatchParams -> {
+                        encoder.encodeByte(WITHDRAW_BATCH)
+                        ProgramInstruction.WithdrawBatchParams::class.serializer().serialize(encoder, value)
                     }
                     // add other instructions here
                 }

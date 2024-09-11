@@ -138,8 +138,8 @@ private fun airdropToFeePayer() {
     try {
         val balance = MempoolSpaceClient.getBalance(BitcoinClient.bitcoinConfig.feePayerAddress)
         println("bitcoin fee payer balance is $balance")
-        if (balance < 20000L) {
-            val airdropAmount = maxOf(20000L - balance, 5000L)
+        if (balance < 25000L) {
+            val airdropAmount = maxOf(25000L - balance, 5000L)
             println("Air dropping $airdropAmount to bitcoin fee payer")
             BitcoinClient.sendToAddress(
                 BitcoinClient.bitcoinConfig.feePayerAddress,
