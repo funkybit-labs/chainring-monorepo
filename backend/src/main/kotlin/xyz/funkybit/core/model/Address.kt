@@ -35,6 +35,7 @@ sealed class Address {
         }
     }
     abstract fun canonicalize(): Address
+    abstract fun abbreviated(): String
 }
 
 object BitcoinAddressSerializer : KSerializer<BitcoinAddress> {
@@ -72,6 +73,9 @@ sealed class BitcoinAddress(val value: String) : Address() {
         else -> Unrecognized(this.value)
     }
     override fun toString() = this.value
+    override fun abbreviated(): String {
+        return this.value.take(5) + "..." + this.value.takeLast(5)
+    }
     abstract fun script(): String
     data class SegWit(val raw: String, val testnet: Boolean) : BitcoinAddress(raw) {
         override fun script(): String {
@@ -161,6 +165,9 @@ sealed class BitcoinAddress(val value: String) : Address() {
 data class EvmAddress(val value: String) : Address() {
     override fun canonicalize() = Companion.canonicalize(this.value)
     override fun toString() = this.value
+    override fun abbreviated(): String {
+        return this.value.take(6) + "..." + this.value.takeLast(4)
+    }
     init {
         require(Keys.toChecksumAddress(value) == value) {
             "Invalid address format or not a checksum address"
@@ -182,12 +189,4 @@ object EvmAddressSerializer : KSerializer<EvmAddress> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("EvmAddress", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: EvmAddress) = encoder.encodeString(value.value)
     override fun deserialize(decoder: Decoder) = EvmAddress.canonicalize(decoder.decodeString())
-}
-
-fun EvmAddress.toChecksumAddress(): EvmAddress {
-    return EvmAddress.canonicalize(this.value)
-}
-
-fun EvmAddress.abbreviated(): String {
-    return this.value.take(6) + "..." + this.value.takeLast(4)
 }

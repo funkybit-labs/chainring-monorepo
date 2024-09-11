@@ -82,7 +82,10 @@ export function TestnetChallengeTab({
       if (accountRefreshRef.current) clearInterval(accountRefreshRef.current)
     } else {
       accountRefreshRef.current = setInterval(() => {
-        queryClient.invalidateQueries({ queryKey: ['accountConfiguration'] })
+        queryClient.invalidateQueries({
+          queryKey: ['accountConfiguration'],
+          fetchStatus: 'idle'
+        })
       }, 3000)
     }
     return () => {
@@ -185,6 +188,18 @@ export function TestnetChallengeTab({
                             >
                               Enroll
                             </button>
+                            {wallet.primaryCategory === 'none' && (
+                              <div className="text-sm ">
+                                Already enrolled?{' '}
+                                <span
+                                  className="cursor-pointer underline"
+                                  onClick={() => wallet.connect('evm')}
+                                >
+                                  Connect your wallet
+                                </span>
+                                .
+                              </div>
+                            )}
                           </div>
                         </div>
                       </>
@@ -205,7 +220,7 @@ export function TestnetChallengeTab({
                       </>
                     )}
                     {testnetChallengeStatus === 'PendingDeposit' &&
-                      accountConfigQuery.status !== 'pending' && (
+                      accountConfigQuery.status === 'success' && (
                         <>
                           <div className="my-auto">
                             <img
@@ -281,6 +296,9 @@ export function TestnetChallengeTab({
               close={() => setShowTestnetChallengeDepositModal(false)}
               onClosed={() => {
                 setTestnetChallengeDepositSymbol(undefined)
+                queryClient.invalidateQueries({
+                  queryKey: ['accountConfiguration']
+                })
               }}
               initialAmount={'10000'}
               title={'Almost there!'}
