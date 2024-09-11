@@ -1,5 +1,5 @@
 import AvatarSvg from 'assets/avatar.svg'
-import { bitcoinAddressDisplay, classNames, evmAddressDisplay } from 'utils'
+import { shortenedWalletAddress, classNames } from 'utils'
 import { Button } from 'components/common/Button'
 import EditSvg from 'assets/Edit.svg'
 import CameraSvg from 'assets/camera.svg'
@@ -10,7 +10,7 @@ import React, {
   useMemo,
   useState
 } from 'react'
-import { Wallet } from 'contexts/walletProvider'
+import { Wallets } from 'contexts/walletProvider'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   apiClient,
@@ -138,7 +138,7 @@ export function Leaderboard({
 }: {
   avatarUrl?: string
   nickName?: string
-  wallet: Wallet
+  wallet: Wallets
 }) {
   const queryClient = useQueryClient()
 
@@ -183,9 +183,8 @@ export function Leaderboard({
     () =>
       newName ??
       nickName ??
-      (wallet.primaryCategory === 'evm'
-        ? evmAddressDisplay(wallet.primaryAddress ?? '')
-        : bitcoinAddressDisplay(wallet.primaryAddress)),
+      (wallet.primary && shortenedWalletAddress(wallet.primary)) ??
+      '',
     [nickName, wallet, newName]
   )
 

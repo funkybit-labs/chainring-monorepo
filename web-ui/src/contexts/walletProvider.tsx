@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useState
 } from 'react'
-import { Config, useAccount, UseAccountReturnType, WagmiProvider } from 'wagmi'
+import { useAccount, UseAccountReturnType, WagmiProvider } from 'wagmi'
 import {
   BitcoinAccount,
   BitcoinProvider,
@@ -17,21 +17,35 @@ import Spinner from 'components/common/Spinner'
 import { useWeb3Modal, useWeb3ModalEvents } from '@web3modal/wagmi/react'
 import SatsConnect from 'sats-connect'
 import { useEffectOnce } from 'react-use'
-import { apiClient, authorizeWalletApiClient } from 'apiClient'
+import { apiClient, authorizeWalletApiClient, NetworkType } from 'apiClient'
 import { signTypedData } from '@wagmi/core'
 import { signAuthToken } from 'auth'
+import BtcSvg from 'assets/btc.svg'
 
-export type WalletCategory = 'evm' | 'bitcoin' | 'none'
+export interface ConnectedBitcoinWallet {
+  networkType: 'Bitcoin'
+  name: string
+  address: string
+  icon: string
+  disconnect: () => void
+}
+
+export interface ConnectedEvmWallet {
+  networkType: 'Evm'
+  name: string
+  address: string
+  icon: string
+  chainId: number
+  change: () => void
+}
+
+export type ConnectedWallet = ConnectedBitcoinWallet | ConnectedEvmWallet
 
 export const WalletContext = createContext<{
-  connect: (category: WalletCategory) => void
-  disconnect: () => void
-  changeAccount: () => void
-  bitcoinAccount: BitcoinAccount | null
-  evmAccount: UseAccountReturnType<Config> | null
-  primaryAccount: UseAccountReturnType | BitcoinAccount | null
-  primaryCategory: WalletCategory
-  primaryAddress: string | undefined
+  connect: (networkType: NetworkType) => void
+  isConnected: (networkType: NetworkType) => boolean
+  connected: ConnectedWallet[]
+  primary: ConnectedWallet | null
 } | null>(null)
 
 function getGlobal(name: string) {
@@ -86,11 +100,11 @@ function setGlobalPrimaryAddress(address: string | null) {
   setGlobal('primaryAddress', address)
 }
 
-export function getGlobalPrimaryCategory(): WalletCategory | null {
-  return getGlobal('primaryCategory')
+export function getGlobalPrimaryNetworkType(): NetworkType | null {
+  return getGlobal('primaryNetworkType')
 }
-function setGlobalPrimaryCategory(category: WalletCategory) {
-  setGlobal('primaryCategory', category)
+function setGlobalPrimaryNetworkType(networkType: NetworkType | null) {
+  setGlobal('primaryNetworkType', networkType)
 }
 
 export function getGlobalPrimaryChainId(): number | null {
@@ -111,98 +125,122 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
   const bitcoinWallet = useBitcoinWallet()
   const evmAccount = useAccount()
 
-  const globalPrimaryCategory = getGlobalPrimaryCategory()
-  const primaryCategory = useMemo(() => {
-    if (globalPrimaryCategory && globalPrimaryCategory !== 'none') {
-      return globalPrimaryCategory
+  const globalPrimaryNetworkType = getGlobalPrimaryNetworkType()
+  const primaryNetworkType = useMemo(() => {
+    if (globalPrimaryNetworkType) {
+      return globalPrimaryNetworkType
     }
 
     return evmAccount?.status === 'connected'
-      ? 'evm'
+      ? 'Evm'
       : bitcoinAccount?.address
-        ? 'bitcoin'
-        : 'none'
-  }, [globalPrimaryCategory, evmAccount, bitcoinAccount])
-
-  const primaryAccount = useMemo(() => {
-    switch (primaryCategory) {
-      case 'evm':
-        return evmAccount
-      case 'bitcoin':
-        return bitcoinAccount
-    }
-    return null
-  }, [primaryCategory, evmAccount, bitcoinAccount])
+        ? 'Bitcoin'
+        : null
+  }, [globalPrimaryNetworkType, evmAccount, bitcoinAccount])
 
   const primaryAddress = useMemo(() => {
-    switch (primaryCategory) {
-      case 'evm':
+    switch (primaryNetworkType) {
+      case 'Evm':
         return evmAccount?.address
-      case 'bitcoin':
+      case 'Bitcoin':
         return bitcoinAccount?.address
     }
-  }, [primaryCategory, evmAccount, bitcoinAccount])
+  }, [primaryNetworkType, evmAccount, bitcoinAccount])
+
+  const connected = useMemo(() => {
+    const wallets: ConnectedWallet[] = []
+    if (evmAccount?.status === 'connected' && evmAccount.connector.icon) {
+      wallets.push({
+        name: evmAccount.connector.name,
+        networkType: 'Evm',
+        address: evmAccount.address,
+        icon: evmAccount.connector.icon,
+        chainId: evmAccount.chainId,
+        change: function () {
+          openWalletConnectModal({ view: 'Account' }).then(() => {})
+        }
+      })
+    }
+    if (bitcoinAccount?.address !== undefined) {
+      wallets.push({
+        name: 'Bitcoin',
+        networkType: 'Bitcoin',
+        address: bitcoinAccount.address,
+        icon: BtcSvg,
+        disconnect: function () {
+          bitcoinWallet.disconnect()
+          setGlobalBitcoinAccount(null)
+        }
+      })
+    }
+    return wallets
+  }, [evmAccount, bitcoinAccount, bitcoinWallet, openWalletConnectModal])
+
+  const primary = useMemo(() => {
+    return connected.find((cw) => cw.networkType == primaryNetworkType) || null
+  }, [primaryNetworkType, connected])
 
   useEffectOnce(() => {
-    if (globalPrimaryCategory != primaryCategory) {
-      setGlobalPrimaryCategory(primaryCategory)
+    if (globalPrimaryNetworkType != primaryNetworkType) {
+      setGlobalPrimaryNetworkType(primaryNetworkType)
       setGlobalPrimaryAddress(primaryAddress ?? null)
     }
   })
 
   useEffect(() => {
-    const category = getGlobalPrimaryCategory()
+    const networkType = getGlobalPrimaryNetworkType()
     if (evmAccount.status === 'connected') {
-      switch (category) {
+      switch (networkType) {
         case null:
-        case 'none':
-        case 'evm':
+        case 'Evm':
           setGlobalPrimaryAddress(evmAccount.address ?? null)
           setGlobalPrimaryChainId(evmAccount.chainId)
-          setGlobalPrimaryCategory('evm')
+          setGlobalPrimaryNetworkType('Evm')
           break
       }
-    } else if (evmAccount.status === 'disconnected' && category === 'evm') {
+    } else if (evmAccount.status === 'disconnected' && networkType === 'Evm') {
       clearGlobalPrimary()
     }
   }, [evmAccount])
 
-  function connect(category: WalletCategory) {
-    if (category === 'evm') {
+  function connect(networkType: NetworkType) {
+    if (networkType === 'Evm') {
       openWalletConnectModal({ view: 'Connect' }).then(() => {})
-    } else if (category === 'bitcoin') {
+    } else if (networkType === 'Bitcoin') {
       bitcoinWallet.connect()
     }
   }
 
-  function disconnect() {
-    if (primaryCategory === 'bitcoin') {
-      bitcoinWallet.disconnect()
-      setGlobalBitcoinAccount(null)
-    }
+  function isConnected(networkType: NetworkType): boolean {
+    return (
+      (networkType == 'Evm' && evmAccount?.status === 'connected') ||
+      (networkType == 'Bitcoin' && bitcoinAccount !== null)
+    )
   }
 
   useEffect(() => {
-    switch (primaryCategory) {
+    switch (primaryNetworkType) {
       case null:
-      case 'none':
         // no primary wallet yet, so set bitcoin to it
         if (bitcoinWallet.accounts.length > 0) {
           setGlobalPrimaryAddress(bitcoinWallet.accounts[0].address)
           setGlobalBitcoinAccount(bitcoinWallet.accounts[0])
-          setGlobalPrimaryCategory('bitcoin')
+          setGlobalPrimaryNetworkType('Bitcoin')
           setGlobalPrimaryChainId(0)
           setBitcoinAccount(bitcoinWallet.accounts[0])
         }
         break
-      case 'evm':
+      case 'Evm':
         // primary wallet is evm, now also bitcoin wallet was connected, so store it
         if (bitcoinWallet.accounts.length > 0) {
           setGlobalBitcoinAccount(bitcoinWallet.accounts[0])
           setBitcoinAccount(bitcoinWallet.accounts[0])
+        } else {
+          setGlobalBitcoinAccount(null)
+          setBitcoinAccount(null)
         }
         break
-      case 'bitcoin':
+      case 'Bitcoin':
         // bitcoin is already the primary wallet, make sure the current address is still in the account list
         if (
           bitcoinWallet.accounts.length > 0 &&
@@ -216,10 +254,12 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
         } else if (bitcoinWallet.disconnected) {
           clearGlobalPrimary()
           setBitcoinAccount(null)
+        } else {
+          setGlobalPrimaryChainId(0)
         }
         break
     }
-  }, [primaryCategory, bitcoinWallet])
+  }, [primaryNetworkType, bitcoinWallet])
 
   const authorizeBitcoinWallet = useCallback(
     async (
@@ -350,16 +390,16 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (bitcoinAccount && web3ModalEvent.event === 'CONNECT_SUCCESS') {
-      if (primaryCategory == 'evm') {
+      if (primaryNetworkType == 'Evm') {
         authorizeBitcoinWallet(bitcoinAccount, evmAccount)
-      } else if (primaryCategory == 'bitcoin') {
+      } else if (primaryNetworkType == 'Bitcoin') {
         authorizeEvmWallet(bitcoinAccount, evmAccount)
       }
     }
   }, [
     authorizeBitcoinWallet,
     authorizeEvmWallet,
-    primaryCategory,
+    primaryNetworkType,
     bitcoinAccount,
     evmAccount,
     web3ModalEvent
@@ -368,28 +408,16 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
   function clearGlobalPrimary() {
     setGlobalPrimaryAddress(null)
     setGlobalPrimaryChainId(null)
-    setGlobalPrimaryCategory('none')
-  }
-
-  function changeAccount() {
-    switch (primaryCategory) {
-      case 'evm':
-        openWalletConnectModal({ view: 'Account' }).then(() => {})
-        break
-    }
+    setGlobalPrimaryNetworkType(null)
   }
 
   return (
     <WalletContext.Provider
       value={{
         connect,
-        disconnect,
-        changeAccount,
-        bitcoinAccount,
-        evmAccount,
-        primaryAccount,
-        primaryCategory,
-        primaryAddress
+        isConnected,
+        connected,
+        primary
       }}
     >
       <>{children}</>
@@ -411,18 +439,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
-export type Wallet = {
-  connect: (walletCategory: WalletCategory) => void
-  disconnect: () => void
-  changeAccount: () => void
-  primaryAccount: UseAccountReturnType<Config> | BitcoinAccount | null
-  primaryCategory: WalletCategory
-  primaryAddress: string | undefined
-  bitcoinAccount: BitcoinAccount | null
-  evmAccount: UseAccountReturnType<Config> | null
+export type Wallets = {
+  connect: (networkType: NetworkType) => void
+  isConnected: (networkType: NetworkType) => boolean
+  connected: ConnectedWallet[]
+  primary: ConnectedWallet | null
 }
 
-export function useWallet(): Wallet {
+export function useWallets(): Wallets {
   const context = useContext(WalletContext)
   if (!context) {
     throw Error(
@@ -430,25 +454,12 @@ export function useWallet(): Wallet {
     )
   }
 
-  const {
-    connect,
-    disconnect,
-    changeAccount,
-    bitcoinAccount,
-    evmAccount,
-    primaryAccount,
-    primaryCategory,
-    primaryAddress
-  } = context
+  const { connect, isConnected, connected, primary } = context
 
   return {
     connect,
-    disconnect,
-    changeAccount,
-    bitcoinAccount,
-    evmAccount,
-    primaryAccount,
-    primaryCategory,
-    primaryAddress
+    isConnected,
+    connected,
+    primary
   }
 }

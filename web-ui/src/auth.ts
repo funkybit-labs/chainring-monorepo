@@ -16,12 +16,13 @@ export async function loadAuthToken(
   options: LoadAuthTokenOptions = { forceRefresh: false }
 ): Promise<string> {
   const primaryAddress = getGlobalPrimaryAddress()
-  if (primaryAddress) {
+  const primaryChainId = getGlobalPrimaryChainId()
+  if (primaryAddress && primaryChainId !== null) {
     const existingToken = localStorage.getItem(`did-${primaryAddress}`)
     if (existingToken && !options.forceRefresh) return existingToken
 
     if (!signingPromise) {
-      signingPromise = signAuthToken(primaryAddress, getGlobalPrimaryChainId()!)
+      signingPromise = signAuthToken(primaryAddress, primaryChainId)
         .then((authToken) => {
           signingPromise = null
           return authToken

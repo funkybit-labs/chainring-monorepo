@@ -1,4 +1,5 @@
 import TradingSymbol from 'tradingSymbol'
+import { ConnectedWallet } from 'contexts/walletProvider'
 
 export function classNames(...classes: unknown[]): string {
   return classes.filter(Boolean).join(' ')
@@ -12,15 +13,27 @@ export function uniqueFilter<T>(value: T, index: number, self: T[]): boolean {
   return self.indexOf(value) === index
 }
 
-export function evmAddressDisplay(address: string): string {
-  const without0x = address.startsWith('0x') ? address.slice(2) : address
-  return (
-    '0x' + without0x.slice(0, 4) + '...' + without0x.slice(without0x.length - 4)
-  )
-}
+export function shortenedWalletAddress(wallet: ConnectedWallet): string {
+  switch (wallet.networkType) {
+    case 'Evm': {
+      const without0x = wallet.address.startsWith('0x')
+        ? wallet.address.slice(2)
+        : wallet.address
 
-export function bitcoinAddressDisplay(address?: string): string {
-  return address?.slice(0, 5) + '...' + address?.slice(address.length - 5)
+      return (
+        '0x' +
+        without0x.slice(0, 4) +
+        '...' +
+        without0x.slice(without0x.length - 4)
+      )
+    }
+    case 'Bitcoin':
+      return (
+        wallet.address.slice(0, 5) +
+        '...' +
+        wallet.address.slice(wallet.address.length - 5)
+      )
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
