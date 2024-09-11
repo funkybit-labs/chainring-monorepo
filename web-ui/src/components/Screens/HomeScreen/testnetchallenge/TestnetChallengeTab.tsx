@@ -17,7 +17,7 @@ import { Tab } from 'components/Screens/Header'
 
 export function TestnetChallengeTab({
   symbols,
-  exchangeContract,
+  exchangeContract
 }: {
   symbols: TradingSymbols
   exchangeContract?: { name: string; address: string }
@@ -199,33 +199,38 @@ export function TestnetChallengeTab({
                           />
                         </div>
                         <div className="my-auto max-w-64 text-3xl">
-                          Your $10,000 of tUSDC to enter the funkybit Testnet Challenge
-                          is on its way!
+                          Your $10,000 of tUSDC to enter the funkybit Testnet
+                          Challenge is on its way!
                         </div>
                       </>
                     )}
-                    {testnetChallengeStatus === 'PendingDeposit' && accountConfigQuery.status !== 'pending' && (
-                      <>
-                        <div className="my-auto">
-                          <img src={PointRightSvg} alt={'safe'} className="size-48" />
-                        </div>
-                        <div className="my-auto flex max-w-64 flex-col items-start gap-4 text-3xl">
-                          <div>Hold on!</div>
-                          <div className="text-lg">
-                            Before you can trade in the Testnet Challenge, you
-                            must first deposit $10,000 of tUSDC.
+                    {testnetChallengeStatus === 'PendingDeposit' &&
+                      accountConfigQuery.status !== 'pending' && (
+                        <>
+                          <div className="my-auto">
+                            <img
+                              src={PointRightSvg}
+                              alt={'safe'}
+                              className="size-48"
+                            />
                           </div>
-                          <div>
-                            <button
-                              className="rounded-xl bg-darkBluishGray8 px-4 py-2 text-lg"
-                              onClick={() => triggerDepositModal()}
-                            >
-                              Deposit
-                            </button>
+                          <div className="my-auto flex max-w-64 flex-col items-start gap-4 text-3xl">
+                            <div>Hold on!</div>
+                            <div className="text-lg">
+                              Before you can trade in the Testnet Challenge, you
+                              must first deposit $10,000 of tUSDC.
+                            </div>
+                            <div>
+                              <button
+                                className="rounded-xl bg-darkBluishGray8 px-4 py-2 text-lg"
+                                onClick={() => triggerDepositModal()}
+                              >
+                                Deposit
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      </>
-                    )}
+                        </>
+                      )}
                     {testnetChallengeStatus ===
                       'PendingDepositConfirmation' && (
                       <>
