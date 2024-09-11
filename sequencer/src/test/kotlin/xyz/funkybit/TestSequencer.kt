@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.FeeRates
+import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.UserId
 import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.utils.toFundamentalUnits
@@ -33,6 +34,7 @@ import xyz.funkybit.testutils.inWei
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.random.Random
+
 class TestSequencer {
     private val mockClock = MockClock()
 
@@ -1855,6 +1857,19 @@ class TestSequencer {
                 )
             }
         }
+    }
+
+    @Test
+    fun `test wallet authorizations are just stored`() {
+        val sequencer = SequencerClient(mockClock)
+        val user = generateUser()
+
+        sequencer.authorizeWallet(
+            user,
+            NetworkType.Evm,
+            ownershipProof = SequencerClient.SignedMessage("evm_wallet_message", "evm_wallet_signature"),
+            authorizationProof = null,
+        )
     }
 
     private val rnd = Random(0)

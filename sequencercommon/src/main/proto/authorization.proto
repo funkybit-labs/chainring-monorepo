@@ -1,0 +1,32 @@
+syntax = "proto3";
+import "bignum.proto";
+package sequencer;
+
+option java_multiple_files = true;
+option java_package = "xyz.funkybit.sequencer.proto";
+option java_outer_classname = "WalletAuthorizationSchema";
+
+enum NetworkType {
+  Evm = 0;
+  Bitcoin = 1;
+}
+
+message OwnershipProof {
+  string message = 1; // plain text or json representation of EIP712 including type defs
+  string signature = 2;
+}
+
+message AuthorizationProof {
+  string message = 1; // plain text or json representation of EIP712 including type defs
+  string signature = 2;
+}
+
+message Authorization {
+  uint64 account = 1;
+  uint64 wallet = 2;
+  NetworkType networkType = 3; // determines message format of the proofs
+  OwnershipProof ownershipProof = 4;
+  optional AuthorizationProof authorizationProof = 5; // authorization by another wallet
+}
+
+

@@ -50,93 +50,105 @@ object EIP712Helper {
         return encoder.hashStructuredData()
     }
 
+    fun structuredDataAsJson(signInMessage: SignInMessage): String {
+        return StructuredDataEncoder.mapper.writeValueAsString(
+            signInMessageEncoder(signInMessage).jsonMessageObject,
+        )
+    }
+
     fun computeHash(signInMessage: SignInMessage): ByteArray {
-        val encoder = StructuredDataEncoder(
-            StructuredData.EIP712Message(
-                /* types = */
-                hashMapOf(
-                    "EIP712Domain" to listOf(
-                        StructuredData.Entry("name", "string"),
-                        StructuredData.Entry("chainId", "uint32"),
-                    ),
-                    "Sign In" to listOf(
-                        StructuredData.Entry("message", "string"),
-                        StructuredData.Entry("address", "string"),
-                        StructuredData.Entry("chainId", "uint32"),
-                        StructuredData.Entry("timestamp", "string"),
-                    ),
-                ),
-                /* primaryType = */
-                "Sign In",
-                /* message = */
-                mapOf(
-                    "message" to signInMessage.message,
-                    "address" to signInMessage.address,
-                    "chainId" to signInMessage.chainId.value,
-                    "timestamp" to signInMessage.timestamp,
-                ),
-                /* domain = */
-                StructuredData.EIP712Domain(
-                    /* name = */
-                    "funkybit",
-                    /* version = */
-                    null,
-                    /* chainId = */
-                    signInMessage.chainId.toString(),
-                    /* verifyingContract = */
-                    null,
-                    /* salt = */
-                    null,
-                ),
-            ),
-        )
-
-        return encoder.hashStructuredData()
+        return signInMessageEncoder(signInMessage).hashStructuredData()
     }
 
-    fun computeHash(linkMessage: AuthorizeWalletAddressMessage): ByteArray {
-        val encoder = StructuredDataEncoder(
-            StructuredData.EIP712Message(
-                /* types = */
-                hashMapOf(
-                    "EIP712Domain" to listOf(
-                        StructuredData.Entry("name", "string"),
-                        StructuredData.Entry("chainId", "uint32"),
-                    ),
-                    "Authorize" to listOf(
-                        StructuredData.Entry("message", "string"),
-                        StructuredData.Entry("address", "string"),
-                        StructuredData.Entry("authorizedAddress", "string"),
-                        StructuredData.Entry("chainId", "uint32"),
-                        StructuredData.Entry("timestamp", "string"),
-                    ),
+    private fun signInMessageEncoder(signInMessage: SignInMessage) = StructuredDataEncoder(
+        StructuredData.EIP712Message(
+            /* types = */
+            hashMapOf(
+                "EIP712Domain" to listOf(
+                    StructuredData.Entry("name", "string"),
+                    StructuredData.Entry("chainId", "uint32"),
                 ),
-                /* primaryType = */
-                "Authorize",
-                /* message = */
-                mapOf(
-                    "message" to linkMessage.message,
-                    "address" to linkMessage.address,
-                    "authorizedAddress" to linkMessage.authorizedAddress,
-                    "chainId" to linkMessage.chainId.value,
-                    "timestamp" to linkMessage.timestamp,
-                ),
-                /* domain = */
-                StructuredData.EIP712Domain(
-                    /* name = */
-                    "funkybit",
-                    /* version = */
-                    null,
-                    /* chainId = */
-                    linkMessage.chainId.toString(),
-                    /* verifyingContract = */
-                    null,
-                    /* salt = */
-                    null,
+                "Sign In" to listOf(
+                    StructuredData.Entry("message", "string"),
+                    StructuredData.Entry("address", "string"),
+                    StructuredData.Entry("chainId", "uint32"),
+                    StructuredData.Entry("timestamp", "string"),
                 ),
             ),
-        )
+            /* primaryType = */
+            "Sign In",
+            /* message = */
+            mapOf(
+                "message" to signInMessage.message,
+                "address" to signInMessage.address,
+                "chainId" to signInMessage.chainId.value.toString(),
+                "timestamp" to signInMessage.timestamp,
+            ),
+            /* domain = */
+            StructuredData.EIP712Domain(
+                /* name = */
+                "funkybit",
+                /* version = */
+                null,
+                /* chainId = */
+                signInMessage.chainId.toString(),
+                /* verifyingContract = */
+                null,
+                /* salt = */
+                null,
+            ),
+        ),
+    )
 
-        return encoder.hashStructuredData()
+    fun structuredDataAsJson(authorizeMessage: AuthorizeWalletAddressMessage): String {
+        return StructuredDataEncoder.mapper.writeValueAsString(
+            authorizeWalletMessageEncoder(authorizeMessage).jsonMessageObject,
+        )
     }
+
+    fun computeHash(authorizeMessage: AuthorizeWalletAddressMessage): ByteArray {
+        return authorizeWalletMessageEncoder(authorizeMessage).hashStructuredData()
+    }
+
+    private fun authorizeWalletMessageEncoder(authorizeMessage: AuthorizeWalletAddressMessage) = StructuredDataEncoder(
+        StructuredData.EIP712Message(
+            /* types = */
+            hashMapOf(
+                "EIP712Domain" to listOf(
+                    StructuredData.Entry("name", "string"),
+                    StructuredData.Entry("chainId", "uint32"),
+                ),
+                "Authorize" to listOf(
+                    StructuredData.Entry("message", "string"),
+                    StructuredData.Entry("address", "string"),
+                    StructuredData.Entry("authorizedAddress", "string"),
+                    StructuredData.Entry("chainId", "uint32"),
+                    StructuredData.Entry("timestamp", "string"),
+                ),
+            ),
+            /* primaryType = */
+            "Authorize",
+            /* message = */
+            mapOf(
+                "message" to authorizeMessage.message,
+                "address" to authorizeMessage.address,
+                "authorizedAddress" to authorizeMessage.authorizedAddress,
+                "chainId" to authorizeMessage.chainId.value.toString(),
+                "timestamp" to authorizeMessage.timestamp,
+            ),
+            /* domain = */
+            StructuredData.EIP712Domain(
+                /* name = */
+                "funkybit",
+                /* version = */
+                null,
+                /* chainId = */
+                authorizeMessage.chainId.toString(),
+                /* verifyingContract = */
+                null,
+                /* salt = */
+                null,
+            ),
+        ),
+    )
 }

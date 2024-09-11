@@ -2,11 +2,10 @@ package xyz.funkybit.apps.api
 
 import arrow.core.Either
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import org.http4k.contract.ContractRoute
 import org.http4k.contract.Tag
 import org.http4k.contract.meta
@@ -18,6 +17,7 @@ import org.http4k.format.KotlinxSerialization.auto
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.middleware.address
 import xyz.funkybit.apps.api.middleware.addressOnlySignedTokenSecurity
+import xyz.funkybit.apps.api.middleware.signInMessage
 import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.AuthorizeWalletApiRequest
 import xyz.funkybit.apps.api.model.ReasonCode
@@ -31,6 +31,7 @@ import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.WalletAuthorizationEntity
 import xyz.funkybit.core.model.db.WalletEntity
+import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureVerification
 import java.math.BigInteger
 import kotlin.time.Duration.Companion.minutes
@@ -47,7 +48,7 @@ data class AuthorizeWalletAddressMessage(
     val timestamp: String,
 )
 
-object WalletRoutes {
+class WalletRoutes(private val sequencerClient: SequencerClient) {
     private val logger = KotlinLogging.logger {}
 
     val authorizeWallet: ContractRoute = run {
@@ -94,10 +95,24 @@ object WalletRoutes {
 
                                 // also store authorization proof for the future reference
                                 val authorizationMessage = when (apiRequest.authorizedAddress) {
-                                    is EvmAddress -> Json.encodeToString(evmWalletAuthorizationMessage(apiRequest))
+                                    is EvmAddress -> EIP712Helper.structuredDataAsJson(evmWalletAuthorizationMessage(apiRequest))
                                     is BitcoinAddress -> bitcoinWalletAuthorizationMessage(apiRequest)
                                 }
-                                WalletAuthorizationEntity.store(wallet = authorizedWallet, message = authorizationMessage, signature = apiRequest.signature, createdBy = principalAddress)
+                                WalletAuthorizationEntity.create(wallet = authorizedWallet, message = authorizationMessage, signature = apiRequest.signature, createdBy = principalAddress)
+
+                                runBlocking {
+                                    sequencerClient.authorizeWallet(
+                                        authorizedWallet = authorizedWallet,
+                                        ownershipProof = SequencerClient.SignedMessage(
+                                            EIP712Helper.structuredDataAsJson(request.signInMessage.first),
+                                            request.signInMessage.second,
+                                        ),
+                                        authorizationProof = SequencerClient.SignedMessage(
+                                            message = authorizationMessage,
+                                            signature = apiRequest.signature,
+                                        ),
+                                    )
+                                }
 
                                 Response(Status.NO_CONTENT)
                             }

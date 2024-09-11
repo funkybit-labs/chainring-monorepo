@@ -28,7 +28,7 @@ object WalletAuthorizationTable : GUIDTable<WalletAuthorizationId>("wallet_autho
 
 class WalletAuthorizationEntity(guid: EntityID<WalletAuthorizationId>) : GUIDEntity<WalletAuthorizationId>(guid) {
     companion object : EntityClass<WalletAuthorizationId, WalletAuthorizationEntity>(WalletAuthorizationTable) {
-        fun store(wallet: WalletEntity, createdBy: Address, message: String, signature: String): WalletAuthorizationEntity {
+        fun create(wallet: WalletEntity, createdBy: Address, message: String, signature: String): WalletAuthorizationEntity {
             return WalletAuthorizationEntity.new(WalletAuthorizationId.generate()) {
                 this.walletGuid = wallet.guid
                 this.message = message

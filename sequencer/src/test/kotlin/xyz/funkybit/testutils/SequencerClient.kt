@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import xyz.funkybit.core.model.SequencerAccountId
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.FeeRates
+import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.utils.sum
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.sequencer.apps.SequencerApp
@@ -21,6 +22,7 @@ import xyz.funkybit.sequencer.proto.OrderDisposition
 import xyz.funkybit.sequencer.proto.SequencerRequest
 import xyz.funkybit.sequencer.proto.SequencerResponse
 import xyz.funkybit.sequencer.proto.TradeCreated
+import xyz.funkybit.sequencer.proto.authorization
 import xyz.funkybit.sequencer.proto.backToBackOrder
 import xyz.funkybit.sequencer.proto.balanceBatch
 import xyz.funkybit.sequencer.proto.feeRates
@@ -50,6 +52,11 @@ class SequencerClient(clock: Clock) {
     data class SequencerUser(
         val account: SequencerAccountId,
         val wallet: WalletAddress,
+    )
+
+    data class SignedMessage(
+        val message: String,
+        val signature: String,
     )
 
     data class Market(
@@ -336,5 +343,33 @@ class SequencerClient(clock: Clock) {
             },
         )
         return failedSettlementsResponse
+    }
+
+    fun authorizeWallet(user: SequencerUser, networkType: NetworkType, ownershipProof: SignedMessage, authorizationProof: SequencerClient.SignedMessage?): SequencerResponse {
+        val authorizeWalletResponse = sequencer.processRequest(
+            sequencerRequest {
+                this.guid = UUID.randomUUID().toString()
+                this.type = SequencerRequest.Type.AuthorizeWallet
+                this.authorizeWallet = authorization {
+                    this.account = user.account.value
+                    this.wallet = user.wallet.value
+                    this.networkType = when (networkType) {
+                        NetworkType.Evm -> xyz.funkybit.sequencer.proto.NetworkType.Evm
+                        NetworkType.Bitcoin -> xyz.funkybit.sequencer.proto.NetworkType.Bitcoin
+                    }
+                    this.ownershipProof = xyz.funkybit.sequencer.proto.ownershipProof {
+                        message = ownershipProof.message
+                        signature = ownershipProof.signature
+                    }
+                    authorizationProof?.let {
+                        this.authorizationProof = xyz.funkybit.sequencer.proto.authorizationProof {
+                            message = authorizationProof.message
+                            signature = authorizationProof.signature
+                        }
+                    }
+                }
+            },
+        )
+        return authorizeWalletResponse
     }
 }

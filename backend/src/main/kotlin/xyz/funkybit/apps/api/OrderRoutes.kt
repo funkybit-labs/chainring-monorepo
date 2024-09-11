@@ -16,9 +16,6 @@ import org.http4k.lens.Path
 import org.http4k.lens.Query
 import org.http4k.lens.string
 import org.jetbrains.exposed.sql.transactions.transaction
-import xyz.funkybit.apps.api.Examples.cancelOrderResponse
-import xyz.funkybit.apps.api.Examples.createLimitOrderResponse
-import xyz.funkybit.apps.api.Examples.createMarketOrderResponse
 import xyz.funkybit.apps.api.middleware.principal
 import xyz.funkybit.apps.api.middleware.signedTokenSecurity
 import xyz.funkybit.apps.api.model.BatchOrdersApiRequest
@@ -232,8 +229,8 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
             returning(
                 Status.OK,
                 responseBody to BatchOrdersApiResponse(
-                    createdOrders = listOf(createMarketOrderResponse, createLimitOrderResponse),
-                    canceledOrders = listOf(cancelOrderResponse),
+                    createdOrders = listOf(Examples.createMarketOrderResponse, Examples.createLimitOrderResponse),
+                    canceledOrders = listOf(Examples.cancelOrderResponse),
                 ),
             )
         } bindContract Method.POST to { request ->

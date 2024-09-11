@@ -3,6 +3,7 @@ package sequencer;
 import "balance.proto";
 import "order.proto";
 import "market.proto";
+import "authorization.proto";
 import "sequencer.proto";
 import "checkpoint.proto";
 
@@ -27,6 +28,11 @@ message GetStateRequest {
 message SetFeeRatesRequest {
   string guid = 1;
   FeeRates feeRates = 2;
+}
+
+message AuthorizeWalletRequest {
+  string guid = 1;
+  Authorization authorization = 2;
 }
 
 message SetWithdrawalFeesRequest {
@@ -54,4 +60,5 @@ service Gateway {
   rpc SetWithdrawalFees (SetWithdrawalFeesRequest) returns (GatewayResponse);
   rpc SetMarketMinFees (SetMarketMinFeesRequest) returns (GatewayResponse);
   rpc ApplyBackToBackOrder (BackToBackOrderRequest) returns (GatewayResponse);
+  rpc AuthorizeWallet (AuthorizeWalletRequest) returns (GatewayResponse);
 }
