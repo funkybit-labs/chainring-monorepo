@@ -28,7 +28,7 @@ import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.DepositId
 import java.math.BigInteger
 
-class DepositRoutes(val exchangeApiService: ExchangeApiService) {
+class DepositRoutes(private val exchangeApiService: ExchangeApiService) {
     private val logger = KotlinLogging.logger {}
 
     private val depositIdPathParam = Path.map(::DepositId, DepositId::value).of("depositId", "Deposit Id")

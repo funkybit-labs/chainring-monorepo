@@ -19,8 +19,10 @@ import xyz.funkybit.core.model.db.ClientOrderId
 import xyz.funkybit.core.model.db.DepositId
 import xyz.funkybit.core.model.db.FeeRates
 import xyz.funkybit.core.model.db.MarketId
+import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.UserId
+import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WithdrawalId
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.core.utils.toHexBytes
@@ -29,6 +31,9 @@ import xyz.funkybit.sequencer.core.toDecimalValue
 import xyz.funkybit.sequencer.core.toIntegerValue
 import xyz.funkybit.sequencer.proto.GatewayGrpcKt
 import xyz.funkybit.sequencer.proto.SequencerResponse
+import xyz.funkybit.sequencer.proto.authorization
+import xyz.funkybit.sequencer.proto.authorizationProof
+import xyz.funkybit.sequencer.proto.authorizeWalletRequest
 import xyz.funkybit.sequencer.proto.backToBackOrder
 import xyz.funkybit.sequencer.proto.backToBackOrderRequest
 import xyz.funkybit.sequencer.proto.balanceBatch
@@ -40,6 +45,7 @@ import xyz.funkybit.sequencer.proto.getStateRequest
 import xyz.funkybit.sequencer.proto.market
 import xyz.funkybit.sequencer.proto.order
 import xyz.funkybit.sequencer.proto.orderBatch
+import xyz.funkybit.sequencer.proto.ownershipProof
 import xyz.funkybit.sequencer.proto.resetRequest
 import xyz.funkybit.sequencer.proto.setFeeRatesRequest
 import xyz.funkybit.sequencer.proto.setMarketMinFeesRequest
@@ -103,10 +109,6 @@ fun Long.toSequencerAccountId(): SequencerAccountId {
     return SequencerAccountId(this)
 }
 
-fun EvmAddress.toSequencerId(): SequencerWalletId {
-    return SequencerWalletId(BigInteger(1, ECHelper.sha3(this.value.toHexBytes())).toLong())
-}
-
 fun Long.toSequencerWalletId(): SequencerWalletId {
     return SequencerWalletId(this)
 }
@@ -125,6 +127,11 @@ open class SequencerClient {
         val clientOrderId: ClientOrderId?,
         val chainId: ChainId,
         val percentage: Int?,
+    )
+
+    data class SignedMessage(
+        val message: String,
+        val signature: String,
     )
 
     protected val channel: ManagedChannel = ManagedChannelBuilder.forAddress(
@@ -257,6 +264,37 @@ open class SequencerClient {
                             }
                         },
                     )
+                },
+            )
+        }.also {
+            Tracer.newSpan(ServerSpans.gtw, it.processingTime)
+            Tracer.newSpan(ServerSpans.sqr, it.sequencerResponse.processingTime)
+        }.sequencerResponse
+    }
+
+    suspend fun authorizeWallet(authorizedWallet: WalletEntity, ownershipProof: SignedMessage, authorizationProof: SignedMessage?): SequencerResponse {
+        return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
+            stub.authorizeWallet(
+                authorizeWalletRequest {
+                    this.guid = UUID.randomUUID().toString()
+                    authorization {
+                        this.account = authorizedWallet.userGuid.value.toSequencerId().value
+                        this.wallet = authorizedWallet.address.toSequencerId().value
+                        this.networkType = when (authorizedWallet.networkType) {
+                            NetworkType.Evm -> xyz.funkybit.sequencer.proto.NetworkType.Evm
+                            NetworkType.Bitcoin -> xyz.funkybit.sequencer.proto.NetworkType.Bitcoin
+                        }
+                        this.ownershipProof = ownershipProof {
+                            message = ownershipProof.message
+                            signature = ownershipProof.signature
+                        }
+                        authorizationProof?.let {
+                            this.authorizationProof = authorizationProof {
+                                message = authorizationProof.message
+                                signature = authorizationProof.signature
+                            }
+                        }
+                    }
                 },
             )
         }.also {

@@ -430,6 +430,15 @@ class SequencerApp(
                 }
             }
 
+            SequencerRequest.Type.AuthorizeWallet -> {
+                sequencerResponse {
+                    this.sequence = sequence
+                    this.guid = request.guid
+                    this.createdAt = clock.currentTimeMillis()
+                    this.processingTime = clock.nanoTime() - startTime
+                }
+            }
+
             null, SequencerRequest.Type.Unparseable, SequencerRequest.Type.UNRECOGNIZED -> {
                 sequencerResponse {
                     this.sequence = sequence

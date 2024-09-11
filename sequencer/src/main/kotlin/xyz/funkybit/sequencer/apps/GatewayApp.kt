@@ -5,6 +5,7 @@ import io.grpc.Server
 import io.grpc.ServerBuilder
 import net.openhft.chronicle.queue.ChronicleQueue
 import net.openhft.chronicle.queue.ExcerptTailer
+import xyz.funkybit.sequencer.proto.AuthorizeWalletRequest
 import xyz.funkybit.sequencer.proto.BackToBackOrderRequest
 import xyz.funkybit.sequencer.proto.BalanceBatch
 import xyz.funkybit.sequencer.proto.GatewayGrpcKt
@@ -197,6 +198,14 @@ class GatewayApp(
                 this.guid = request.guid
                 this.type = SequencerRequest.Type.ApplyBackToBackOrder
                 this.backToBackOrder = request.order
+            }
+        }
+
+        override suspend fun authorizeWallet(request: AuthorizeWalletRequest): GatewayResponse {
+            return toSequencer {
+                this.guid = request.guid
+                this.type = SequencerRequest.Type.AuthorizeWallet
+                this.authorizeWallet = request.authorization
             }
         }
     }

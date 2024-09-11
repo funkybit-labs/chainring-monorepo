@@ -6,6 +6,7 @@ import "market.proto";
 import "balance.proto";
 import "checkpoint.proto";
 import "trade.proto";
+import "authorization.proto";
 
 option java_multiple_files = true;
 option java_package = "xyz.funkybit.sequencer.proto";
@@ -72,6 +73,7 @@ message SequencerRequest {
     SetMarketMinFees = 7;
     ApplyBackToBackOrder = 8;
     Unparseable = 9;
+    AuthorizeWallet = 10;
   }
   string guid = 1;
   Type type = 2;
@@ -82,6 +84,7 @@ message SequencerRequest {
   repeated WithdrawalFee withdrawalFees = 7;
   repeated MarketMinFee marketMinFees = 8;
   optional BackToBackOrder backToBackOrder = 9;
+  optional Authorization authorizeWallet = 10;
 }
 
 enum SequencerError {

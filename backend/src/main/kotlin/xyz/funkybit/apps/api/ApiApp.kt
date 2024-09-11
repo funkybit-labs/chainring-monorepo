@@ -82,6 +82,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val withdrawalRoutes = WithdrawalRoutes(exchangeApiService)
     private val balanceRoutes = BalanceRoutes()
     private val orderRoutes = OrderRoutes(exchangeApiService)
+    private val walletRoutes = WalletRoutes(sequencerClient)
     private val faucetRoutes = FaucetRoutes(faucetMode, ChainManager.getBlockchainClients())
     private val testnetChallengeRoutes = TestnetChallengeRoutes(ChainManager.getBlockchainClients())
 
@@ -115,7 +116,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                             configRoutes.getConfiguration,
                             configRoutes.getAccountConfiguration,
                             configRoutes.markSymbolAsAdded,
-                            WalletRoutes.authorizeWallet,
+                            walletRoutes.authorizeWallet,
                             orderRoutes.createOrder(),
                             orderRoutes.cancelOrder(),
                             orderRoutes.getOrder(),
