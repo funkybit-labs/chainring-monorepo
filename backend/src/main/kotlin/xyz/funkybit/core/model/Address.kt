@@ -191,3 +191,7 @@ fun EvmAddress.toChecksumAddress(): EvmAddress {
 fun EvmAddress.abbreviated(): String {
     return this.value.take(6) + "..." + this.value.takeLast(4)
 }
+
+fun BitcoinAddress.abbreviated(): String {
+    return this.value.take(5) + "..." + this.value.takeLast(5)
+}

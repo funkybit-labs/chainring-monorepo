@@ -440,6 +440,26 @@ const SetAvatarUrlSchema = z.object({
   url: z.string()
 })
 
+const LeaderboardTypeSchema = z.enum(['DailyPNL', 'WeeklyPNL', 'OverallPNL'])
+
+export type LeaderboardType = z.infer<typeof LeaderboardTypeSchema>
+
+const LeaderboardEntrySchema = z.object({
+  label: z.string(),
+  iconUrl: z.string().nullable(),
+  value: z.number(),
+  pnl: z.number()
+})
+
+const LeaderboardSchema = z.object({
+  type: LeaderboardTypeSchema,
+  page: z.number(),
+  lastPage: z.number(),
+  entries: z.array(LeaderboardEntrySchema)
+})
+
+export type Leaderboard = z.infer<typeof LeaderboardSchema>
+
 const ApiErrorSchema = z.object({
   displayMessage: z.string()
 })
@@ -820,6 +840,30 @@ export const apiClient = new Zodios(apiBaseUrl, [
       }
     ],
     response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'get',
+    path: '/v1/testnet-challenge/leaderboard/:type',
+    alias: 'testnetChallengeGetLeaderboard',
+    parameters: [
+      {
+        name: 'type',
+        type: 'Path',
+        schema: LeaderboardTypeSchema
+      },
+      {
+        name: 'page',
+        type: 'Query',
+        schema: z.number()
+      }
+    ],
+    response: LeaderboardSchema,
     errors: [
       {
         status: 'default',

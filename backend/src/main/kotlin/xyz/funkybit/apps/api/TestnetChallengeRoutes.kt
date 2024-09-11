@@ -105,6 +105,9 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
                 val user = request.principal.user
                 if (TestnetChallengeUtils.enabled && user.testnetChallengeStatus == TestnetChallengeStatus.Enrolled) {
                     if (user.nickname != body.name) {
+                        if (body.name.length > 18) {
+                            throw RequestProcessingError("Nickname is too long, 18 character max")
+                        }
                         if (UserEntity.findByNickname(body.name) != null) {
                             throw RequestProcessingError("Nickname is already taken")
                         } else {

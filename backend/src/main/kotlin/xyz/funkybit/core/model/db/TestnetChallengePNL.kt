@@ -16,6 +16,10 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import xyz.funkybit.apps.api.model.Leaderboard
 import xyz.funkybit.apps.api.model.LeaderboardEntry
+import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.model.abbreviated
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import kotlin.math.ceil
 import kotlin.math.max
@@ -80,13 +84,15 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
                 WITH balance_summary AS (
                     SELECT 
                         u.${UserTable.guid.name} AS user_guid,
-                        SUM(bal.${BalanceTable.balance.name} * COALESCE(mkt.${MarketTable.feedPrice.name}, case when bal.${BalanceTable.symbolGuid.name} = '${referenceSymbol.guid.value}' then 1.0 else 0.0 end)) AS total_balance
+                        SUM(bal.${BalanceTable.balance.name} / POWER(10, ${SymbolTable.decimals.name}) * COALESCE(mkt.${MarketTable.feedPrice.name}, case when bal.${BalanceTable.symbolGuid.name} = '${referenceSymbol.guid.value}' then 1.0 else 0.0 end)) AS total_balance
                     FROM 
                         ${BalanceTable.tableName} AS bal
                     INNER JOIN 
                         ${WalletTable.tableName} AS w ON bal.${BalanceTable.walletGuid.name} = w.${WalletTable.guid.name}
                     INNER JOIN 
-                        "${UserTable.tableName}" AS u ON w.user_guid = u.${UserTable.guid.name}
+                        "${UserTable.tableName}" AS u ON w.${WalletTable.userGuid.name} = u.${UserTable.guid.name}
+                    INNER JOIN
+                        ${SymbolTable.tableName} AS sym ON bal.${BalanceTable.symbolGuid.name} = sym.${SymbolTable.id.name}
                     LEFT JOIN 
                         ${MarketTable.tableName} AS mkt ON
                           mkt.${MarketTable.baseSymbolGuid.name} = bal.${BalanceTable.symbolGuid.name} AND
@@ -149,7 +155,12 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
                 lastPage = maxPage.toInt(),
                 entries.map { entry ->
                     LeaderboardEntry(
-                        entry[UserTable.nickName] ?: entry[WalletTable.address],
+                        entry[UserTable.nickName] ?: Address.auto(entry[WalletTable.address]).let {
+                            when (it) {
+                                is EvmAddress -> it.abbreviated()
+                                is BitcoinAddress -> it.abbreviated()
+                            }
+                        },
                         entry[UserTable.avatarUrl],
                         entry[TestnetChallengePNLTable.currentBalance].toDouble(),
                         entry[pnlRatioExpr].toDouble(),
