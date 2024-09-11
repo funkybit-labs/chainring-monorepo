@@ -13,7 +13,6 @@ import xyz.funkybit.apps.telegrambot.model.OutputMessage
 import xyz.funkybit.apps.telegrambot.model.SwapEstimateError
 import xyz.funkybit.apps.telegrambot.model.estimateSwap
 import xyz.funkybit.core.blockchain.ChainManager
-import xyz.funkybit.core.model.abbreviated
 import xyz.funkybit.core.model.db.DepositStatus
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderStatus

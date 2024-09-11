@@ -19,7 +19,6 @@ import xyz.funkybit.apps.api.model.LeaderboardEntry
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
-import xyz.funkybit.core.model.abbreviated
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import kotlin.math.ceil
 import kotlin.math.max
