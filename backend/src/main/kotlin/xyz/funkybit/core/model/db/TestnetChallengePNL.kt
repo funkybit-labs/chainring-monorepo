@@ -5,11 +5,21 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.times
+import org.jetbrains.exposed.sql.JoinType
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.div
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
+import org.jetbrains.exposed.sql.alias
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.TransactionManager
+import xyz.funkybit.apps.api.model.Leaderboard
+import xyz.funkybit.apps.api.model.LeaderboardEntry
 import xyz.funkybit.core.utils.TestnetChallengeUtils
+import kotlin.math.ceil
+import kotlin.math.max
+import kotlin.math.min
 
 @Serializable
 @JvmInline
@@ -94,6 +104,57 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
                 WHERE 
                     tcp.${TestnetChallengePNLTable.userGuid.name} = bs.user_guid;
                 """.trimIndent(),
+            )
+        }
+
+        fun getLeaderboard(testnetChallengePNLType: TestnetChallengePNLType, page: Long): Leaderboard {
+            val count = TestnetChallengePNLTable
+                .selectAll()
+                .where { TestnetChallengePNLTable.type eq testnetChallengePNLType }
+                .count()
+
+            val rowsPerPage = 20
+            val maxPage = ceil(count.div(rowsPerPage.toDouble())).toLong()
+            // ensure page is sane
+            val normalizedPage = min(maxPage - 1, max(page, 0L))
+            val pnlRatioExpr = (
+                (TestnetChallengePNLTable.currentBalance - TestnetChallengePNLTable.initialBalance)
+                    .div(TestnetChallengePNLTable.initialBalance)
+                )
+                .alias("pnl_percentage")
+            val entries = TestnetChallengePNLTable.innerJoin(
+                UserTable,
+            ).join(
+                WalletTable,
+                JoinType.LEFT,
+                UserTable.guid,
+                WalletTable.userGuid,
+                additionalConstraint = { WalletTable.networkType eq NetworkType.Evm },
+            ).select(
+                TestnetChallengePNLTable.id,
+                TestnetChallengePNLTable.initialBalance,
+                TestnetChallengePNLTable.currentBalance,
+                UserTable.nickName,
+                UserTable.avatarUrl,
+                WalletTable.address,
+                pnlRatioExpr,
+            )
+                .where { TestnetChallengePNLTable.type eq testnetChallengePNLType }
+                .orderBy(pnlRatioExpr, SortOrder.DESC)
+                .limit(rowsPerPage, offset = normalizedPage * rowsPerPage)
+                .toList()
+            return Leaderboard(
+                type = testnetChallengePNLType,
+                page = normalizedPage.toInt() + 1,
+                lastPage = maxPage.toInt(),
+                entries.map { entry ->
+                    LeaderboardEntry(
+                        entry[UserTable.nickName] ?: entry[WalletTable.address],
+                        entry[UserTable.avatarUrl],
+                        entry[TestnetChallengePNLTable.currentBalance].toDouble(),
+                        entry[pnlRatioExpr].toDouble(),
+                    )
+                },
             )
         }
     }
