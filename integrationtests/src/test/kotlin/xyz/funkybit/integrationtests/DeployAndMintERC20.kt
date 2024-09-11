@@ -2,7 +2,6 @@ package xyz.funkybit.integrationtests
 
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.model.EvmAddress
-import xyz.funkybit.core.model.toChecksumAddress
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.tasks.FixturesBlockchainClient
 import java.math.BigDecimal
@@ -26,7 +25,7 @@ class DeployAndMintERC20 {
         ChainManager.blockchainConfigs.map { config ->
             val client = FixturesBlockchainClient(config)
             val address = client.deployMockERC20(tokenName, decimals)
-            println("$tokenName deployed to ${config.name} at ${address.toChecksumAddress()}")
+            println("$tokenName deployed to ${config.name} at ${address.canonicalize()}")
             client.sendMintERC20Tx(address, receiver, BigDecimal.valueOf(1000000L).toFundamentalUnits(18))
         }
     }
