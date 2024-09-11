@@ -7,7 +7,7 @@ import { useConfig } from 'wagmi'
 import TradingSymbols from 'tradingSymbols'
 import { useWallet } from 'contexts/walletProvider'
 import ZeppelinSvg from 'assets/zeppelin.svg'
-import SafeSvg from 'assets/safe.svg'
+import PointRightSvg from 'assets/point-right.svg'
 import StopHandSvg from 'assets/stop-hand.svg'
 import ClockSvg from 'assets/clock.svg'
 import DiscoBall from 'components/Screens/HomeScreen/DiscoBall'
@@ -17,8 +17,7 @@ import { Tab } from 'components/Screens/Header'
 
 export function TestnetChallengeTab({
   symbols,
-  exchangeContract,
-  onChangeTab
+  exchangeContract
 }: {
   symbols: TradingSymbols
   exchangeContract?: { name: string; address: string }
@@ -29,7 +28,8 @@ export function TestnetChallengeTab({
   const wallet = useWallet()
   const accountConfigQuery = useQuery({
     queryKey: ['accountConfiguration'],
-    queryFn: apiClient.getAccountConfiguration
+    queryFn: apiClient.getAccountConfiguration,
+    enabled: wallet.primaryCategory !== 'none'
   })
 
   const [
@@ -83,7 +83,7 @@ export function TestnetChallengeTab({
     } else {
       accountRefreshRef.current = setInterval(() => {
         queryClient.invalidateQueries({ queryKey: ['accountConfiguration'] })
-      }, 1000)
+      }, 3000)
     }
     return () => {
       if (accountRefreshRef.current) clearInterval(accountRefreshRef.current)
@@ -109,20 +109,41 @@ export function TestnetChallengeTab({
 
   const [autoDepositTriggered, setAutoDepositTriggered] = useState(false)
 
+  const [enrollWhenConnected, setEnrollWhenConnected] = useState(false)
+
   useEffect(() => {
     switch (testnetChallengeStatus) {
+      case 'Unenrolled':
+        if (enrollWhenConnected) {
+          testnetChallengeEnrollMutation.mutate()
+          setEnrollWhenConnected(false)
+        }
+        break
       case 'PendingDeposit':
         if (!autoDepositTriggered) triggerDepositModal()
         setAutoDepositTriggered(true)
         break
     }
-  }, [testnetChallengeStatus, triggerDepositModal, autoDepositTriggered])
+  }, [
+    testnetChallengeStatus,
+    triggerDepositModal,
+    autoDepositTriggered,
+    enrollWhenConnected,
+    testnetChallengeEnrollMutation
+  ])
 
+  // once the wallet is connected, invalidate the accountConfigQuery if it becomes unconnected
+  const [walletHasConnected, setWalletHasConnected] = useState(false)
   useEffect(() => {
     if (wallet.primaryCategory === 'none') {
-      onChangeTab('Swap')
+      if (walletHasConnected) {
+        setWalletHasConnected(false)
+        queryClient.invalidateQueries({ queryKey: ['accountConfiguration'] })
+      }
+    } else if (!walletHasConnected) {
+      setWalletHasConnected(true)
     }
-  }, [wallet, onChangeTab])
+  }, [wallet.primaryCategory, walletHasConnected, queryClient])
 
   return (
     <>
@@ -139,7 +160,8 @@ export function TestnetChallengeTab({
               <div className="col-span-1 laptop:col-span-3">
                 <div className="flex h-full flex-col place-content-center">
                   <div className="flex w-full flex-row place-content-center gap-20">
-                    {testnetChallengeStatus === 'Unenrolled' && (
+                    {(testnetChallengeStatus === 'Unenrolled' ||
+                      testnetChallengeStatus === undefined) && (
                       <>
                         <div className="my-auto">
                           <DiscoBall size={250} />
@@ -152,9 +174,14 @@ export function TestnetChallengeTab({
                           <div className="animate-fall self-start">
                             <button
                               className="my-2 rounded-xl bg-darkBluishGray8 px-4 py-2 text-lg"
-                              onClick={() =>
-                                testnetChallengeEnrollMutation.mutate()
-                              }
+                              onClick={() => {
+                                if (wallet.primaryCategory === 'none') {
+                                  setEnrollWhenConnected(true)
+                                  wallet.connect('evm')
+                                } else {
+                                  testnetChallengeEnrollMutation.mutate()
+                                }
+                              }}
                             >
                               Enroll
                             </button>
@@ -172,32 +199,38 @@ export function TestnetChallengeTab({
                           />
                         </div>
                         <div className="my-auto max-w-64 text-3xl">
-                          Your airdrop to enter the funkybit Testnet Challenge
-                          is on its way!
+                          Your $10,000 of tUSDC to enter the funkybit Testnet
+                          Challenge is on its way!
                         </div>
                       </>
                     )}
-                    {testnetChallengeStatus === 'PendingDeposit' && (
-                      <>
-                        <div className="my-auto">
-                          <img src={SafeSvg} alt={'safe'} className="size-48" />
-                        </div>
-                        <div className="my-auto flex max-w-64 flex-col items-center gap-4 text-3xl">
-                          <div>
-                            Before you can trade in the Testnet Challenge, you
-                            must first deposit 10,000 tUSDC.
+                    {testnetChallengeStatus === 'PendingDeposit' &&
+                      accountConfigQuery.status !== 'pending' && (
+                        <>
+                          <div className="my-auto">
+                            <img
+                              src={PointRightSvg}
+                              alt={'safe'}
+                              className="size-48"
+                            />
                           </div>
-                          <div className="self-start">
-                            <button
-                              className="rounded-xl bg-darkBluishGray8 px-4 py-2 text-lg"
-                              onClick={() => triggerDepositModal()}
-                            >
-                              Deposit
-                            </button>
+                          <div className="my-auto flex max-w-64 flex-col items-start gap-4 text-3xl">
+                            <div>Hold on!</div>
+                            <div className="text-lg">
+                              Before you can trade in the Testnet Challenge, you
+                              must first deposit $10,000 of tUSDC.
+                            </div>
+                            <div>
+                              <button
+                                className="rounded-xl bg-darkBluishGray8 px-4 py-2 text-lg"
+                                onClick={() => triggerDepositModal()}
+                              >
+                                Deposit
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      </>
-                    )}
+                        </>
+                      )}
                     {testnetChallengeStatus ===
                       'PendingDepositConfirmation' && (
                       <>
@@ -209,7 +242,7 @@ export function TestnetChallengeTab({
                           />
                         </div>
                         <div className="my-auto flex max-w-64 flex-col items-center text-3xl">
-                          Waiting for your 10,000 tUSDC deposit to be confirmed.
+                          Waiting for your deposit to be confirmed.
                         </div>
                       </>
                     )}
@@ -250,9 +283,9 @@ export function TestnetChallengeTab({
                 setTestnetChallengeDepositSymbol(undefined)
               }}
               initialAmount={'10000'}
-              title={'Airdrop Complete'}
+              title={'Almost there!'}
               message={
-                'You now have 10,000 tUSDC in your wallet, click Submit to deposit it to funkybit.'
+                'You now have $10,000 of tUSDC in your wallet, click Submit to deposit it to funkybit.'
               }
             />
           )}
