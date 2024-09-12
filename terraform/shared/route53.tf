@@ -203,3 +203,19 @@ resource "aws_route53_record" "fb-it-mx" {
   ttl     = "3600"
   records = ["1 smtp.google.com"]
 }
+
+resource "aws_route53_record" "fb-fun-a-blog"{
+  zone_id = aws_route53_zone.fb-fun.zone_id
+  name    = "blog.funkybit.fun"
+  type    = "A"
+  ttl     = "300"
+  records = ["162.159.153.4"]
+}
+
+resource "aws_route53_record" "fb-fun-a-blog2"{
+  zone_id = aws_route53_zone.fb-fun.zone_id
+  name    = "blog.funkybit.fun"
+  type    = "A"
+  ttl     = "300"
+  records = ["162.159.152.4"]
+}
