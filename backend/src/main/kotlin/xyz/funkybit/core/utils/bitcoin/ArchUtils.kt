@@ -4,33 +4,38 @@ import com.funkatronics.kborsh.Borsh
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
+import org.bitcoinj.core.Coin
 import org.bitcoinj.core.ECKey
+import org.bitcoinj.core.Sha256Hash
+import org.bitcoinj.core.Transaction
+import org.bitcoinj.core.TransactionInput
+import org.bitcoinj.core.TransactionOutPoint
+import org.bitcoinj.core.TransactionOutput
+import org.bitcoinj.script.ScriptBuilder
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.bitcoin.ProgramInstruction
 import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.ArchAccountBalanceInfo
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.ArchAccountType
 import xyz.funkybit.core.model.db.ConfirmedBitcoinDeposit
+import xyz.funkybit.core.model.db.SequencedArchWithdrawal
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TxHash
+import xyz.funkybit.core.model.db.UnspentUtxo
+import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.services.UtxoSelectionService
 import xyz.funkybit.core.utils.schnorr.Schnorr
+import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigDecimal
 import java.math.BigInteger
 
 object ArchUtils {
 
     val logger = KotlinLogging.logger {}
-
-    // 10.5 (Overhead), 68 (Vin) * 2, 31(Vout), 27 (Witness) * 2
-    const val P2WPKH_2IN_1OUT_VSIZE = 232
-    const val P2WPKH_2IN_2OUT_VSIZE = 263
-
-    // 57.5 (Vin), 43(Vout), 24 (Witness) (signature(64 bytes) + hash of data(32))
-    const val P2TR_UTXO_IN_OUT_VSIZE = 125
 
     private val submitterPubkey = BitcoinClient.bitcoinConfig.submitterPubkey
 
@@ -49,7 +54,7 @@ object ArchUtils {
             val selectedUtxos = UtxoSelectionService.selectUtxos(
                 config.feePayerAddress,
                 rentAmount,
-                BitcoinClient.calculateFee(P2WPKH_2IN_2OUT_VSIZE),
+                BitcoinClient.calculateFee(BitcoinClient.estimateVSize(1, 2)),
             )
 
             val onboardingTx = BitcoinClient.buildAndSignDepositTx(
@@ -154,6 +159,152 @@ object ArchUtils {
             accountMetas,
             ProgramInstruction.DepositBatchParams(tokenDepositsList).serialize(),
         )
+    }
+
+    @OptIn(ExperimentalUnsignedTypes::class)
+    fun buildWithdrawBatchInstruction(programBitcoinAddress: BitcoinAddress, programPubkey: ArchNetworkRpc.Pubkey, withdrawals: List<SequencedArchWithdrawal>): Pair<ArchNetworkRpc.Instruction, List<UnspentUtxo>> {
+        val accountMetas = mutableListOf(
+            ArchNetworkRpc.AccountMeta(
+                pubkey = submitterPubkey,
+                isSigner = true,
+                isWritable = true,
+            ),
+        )
+        val totalAmount = withdrawals.sumOf { it.withdrawalEntity.chainAmount() }
+        val selectedUtxos = UtxoSelectionService.selectUtxosForProgram(totalAmount, BitcoinClient.calculateFee(BitcoinClient.estimateVSize(withdrawals.size, withdrawals.size + 1)))
+        val txHex = buildWithdrawalTx(withdrawals.map { it.withdrawalEntity }, programBitcoinAddress, totalAmount, selectedUtxos)
+        val tokenWithdrawalsList = withdrawals.groupBy { it.archAccountEntity.rpcPubkey() }.map { (pubKey, tokenWithdrawals) ->
+            ProgramInstruction.TokenWithdrawals(
+                accountIndex = accountMetas.size.toUByte(),
+                feeAddressIndex = 0u,
+                withdrawals = tokenWithdrawals.map {
+                    ProgramInstruction.Withdrawal(
+                        it.balanceIndex.toUInt(),
+                        it.withdrawalEntity.resolvedAmount().toLong().toULong(),
+                        it.withdrawalEntity.fee.toLong().toULong(),
+                    )
+                },
+            ).also {
+                accountMetas.add(
+                    ArchNetworkRpc.AccountMeta(
+                        pubkey = pubKey,
+                        isWritable = true,
+                        isSigner = false,
+                    ),
+                )
+            }
+        }
+        return Pair(
+            ArchNetworkRpc.Instruction(
+                programPubkey,
+                accountMetas,
+                ProgramInstruction.WithdrawBatchParams(
+                    tokenWithdrawalsList,
+                    txHex.toHexBytes(),
+                ).serialize(),
+            ),
+            selectedUtxos,
+        )
+    }
+
+    private fun buildWithdrawalTx(
+        withdrawals: List<WithdrawalEntity>,
+        changeAddress: BitcoinAddress,
+        totalAmount: BigInteger,
+        utxos: List<UnspentUtxo>,
+    ): String {
+        val params = BitcoinClient.getParams()
+        val feeAmount = estimateWithdrawalTxFee(
+            withdrawals.map { (it.wallet.address as BitcoinAddress) },
+            changeAddress,
+            utxos,
+        )
+        val rawTx = Transaction(params)
+        rawTx.setVersion(2)
+        withdrawals.forEach {
+            rawTx.addOutput(
+                TransactionOutput(
+                    params,
+                    rawTx,
+                    Coin.valueOf(it.chainAmount().toLong()),
+                    (it.wallet.address as BitcoinAddress).toBitcoinCoreAddress(params),
+                ),
+            )
+        }
+        val changeAmount = BigInteger.ZERO.max(utxos.sumOf { it.amount } - totalAmount - feeAmount)
+        if (changeAmount > BitcoinClient.bitcoinConfig.changeDustThreshold) {
+            logger.debug { "Adding change output of  $changeAmount" }
+            rawTx.addOutput(
+                TransactionOutput(
+                    params,
+                    rawTx,
+                    Coin.valueOf(changeAmount.toLong()),
+                    changeAddress.toBitcoinCoreAddress(params),
+                ),
+            )
+        }
+        utxos.forEach {
+            logger.debug { "Adding input with value of ${it.amount}" }
+            rawTx.addInput(
+                TransactionInput(
+                    params,
+                    rawTx,
+                    ByteArray(0),
+                    TransactionOutPoint(
+                        params,
+                        it.utxoId.vout(),
+                        Sha256Hash.wrap(it.utxoId.txId().value),
+                    ),
+                    Coin.valueOf(it.amount.toLong()),
+                ),
+            )
+        }
+        return rawTx.toHexString()
+    }
+
+    private fun estimateWithdrawalTxFee(
+        destinationAddresses: List<BitcoinAddress>,
+        changeAddress: BitcoinAddress,
+        utxos: List<UnspentUtxo>,
+    ): BigInteger {
+        val ecKey = ECKey()
+        val params = BitcoinClient.getParams()
+        val rawTx = Transaction(params)
+        rawTx.setVersion(2)
+        destinationAddresses.forEach {
+            rawTx.addOutput(
+                TransactionOutput(
+                    params,
+                    rawTx,
+                    BitcoinClient.zeroCoinValue,
+                    it.toBitcoinCoreAddress(params),
+                ),
+            )
+        }
+        rawTx.addOutput(
+            TransactionOutput(
+                params,
+                rawTx,
+                BitcoinClient.zeroCoinValue,
+                changeAddress.toBitcoinCoreAddress(params),
+            ),
+        )
+        utxos.forEach {
+            rawTx.addSignedInput(
+                TransactionOutPoint(
+                    params,
+                    it.utxoId.vout(),
+                    Sha256Hash.wrap(it.utxoId.txId().value),
+                ),
+                ScriptBuilder.createP2WPKHOutputScript(ecKey),
+                Coin.valueOf(it.amount.toLong()),
+                ecKey,
+                Transaction.SigHash.NONE,
+                true,
+            )
+        }
+        logger.debug { "estimated virtual size for withdraw tx = ${rawTx.vsize}" }
+        return BitcoinClient.calculateFee(rawTx.vsize)
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)

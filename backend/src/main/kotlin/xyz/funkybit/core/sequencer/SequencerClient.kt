@@ -13,6 +13,7 @@ import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.SequencerAccountId
 import xyz.funkybit.core.model.SequencerOrderId
 import xyz.funkybit.core.model.SequencerWalletId
+import xyz.funkybit.core.model.Signature
 import xyz.funkybit.core.model.WithdrawalFee
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ClientOrderId
@@ -334,7 +335,7 @@ open class SequencerClient {
         asset: Asset,
         amount: BigInteger,
         nonce: BigInteger,
-        evmSignature: EvmSignature,
+        signature: Signature,
         withdrawalId: WithdrawalId,
     ): SequencerResponse {
         return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
@@ -347,7 +348,7 @@ open class SequencerClient {
                             this.account = account.value
                             this.amount = amount.toIntegerValue()
                             this.nonce = nonce.toIntegerValue()
-                            this.signature = evmSignature.value
+                            this.signature = signature.value
                             this.externalGuid = withdrawalId.value
                         },
                     )
