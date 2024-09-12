@@ -161,8 +161,10 @@ class TestnetChallengeTest {
 
         // day boundary crossed
         simulateTimeAndLastUpdate(
-            now = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 8, hour = 0, minute = 30), // Sunday
-            lastUpdate = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 7, hour = 23, minute = 30), // Saturday
+            // Sunday
+            now = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 8, hour = 0, minute = 30),
+            // Saturday
+            lastUpdate = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 7, hour = 23, minute = 30),
         )
         triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_leaderboard")
 
@@ -185,8 +187,10 @@ class TestnetChallengeTest {
 
         // day + week boundaries crossed
         simulateTimeAndLastUpdate(
-            now = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 9, hour = 0, minute = 30), // Monday
-            lastUpdate = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 8, hour = 23, minute = 30), // Sunday
+            // Monday
+            now = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 9, hour = 0, minute = 30),
+            // Sunday
+            lastUpdate = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 8, hour = 23, minute = 30),
         )
         triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_leaderboard")
 
