@@ -46,31 +46,28 @@ object TestnetChallengeUserRewardTable : GUIDTable<TestnetChallengeUserRewardId>
 
 class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserRewardId>) : GUIDEntity<TestnetChallengeUserRewardId>(guid) {
     companion object : EntityClass<TestnetChallengeUserRewardId, TestnetChallengeUserRewardEntity>(TestnetChallengeUserRewardTable) {
-        fun createDailyReward(user: UserEntity, amount: BigDecimal) {
-            create(user, TestnetChallengeUserRewardType.DailyReward, amount)
+        fun createDailyReward(userId: UserId, amount: BigDecimal) {
+            create(userId, TestnetChallengeUserRewardType.DailyReward, amount)
         }
 
-        fun createWeeklyReward(user: UserEntity, amount: BigDecimal) {
-            create(user, TestnetChallengeUserRewardType.WeeklyReward, amount)
+        fun createWeeklyReward(userId: UserId, amount: BigDecimal) {
+            create(userId, TestnetChallengeUserRewardType.WeeklyReward, amount)
         }
 
-        fun createOverallReward(user: UserEntity, amount: BigDecimal) {
-            create(user, TestnetChallengeUserRewardType.OverallReward, amount)
+        fun createOverallReward(userId: UserId, amount: BigDecimal) {
+            create(userId, TestnetChallengeUserRewardType.OverallReward, amount)
         }
 
-        fun createReferralBonusReward(user: UserEntity, amount: BigDecimal) {
-            create(user, TestnetChallengeUserRewardType.ReferralBonus, amount, by = "system")
+        fun createReferralBonusReward(userId: UserId, amount: BigDecimal) {
+            create(userId, TestnetChallengeUserRewardType.ReferralBonus, amount, by = "system")
         }
 
-        private fun create(user: UserEntity, type: TestnetChallengeUserRewardType, amount: BigDecimal, by: String = user.guid.value.value) {
+        private fun create(userId: UserId, type: TestnetChallengeUserRewardType, amount: BigDecimal, by: String = userId.value) {
             val now = Clock.System.now()
-
-            val previousBalance = user.pointsBalances().sum()
-            val newBalance = previousBalance + amount
 
             TestnetChallengeUserRewardTable.insertIgnore {
                 it[guid] = EntityID(TestnetChallengeUserRewardId.generate(), TestnetChallengeUserRewardTable)
-                it[userGuid] = user.guid
+                it[userGuid] = userId
                 it[createdAt] = now
                 it[createdBy] = by
                 it[TestnetChallengeUserRewardTable.type] = type
