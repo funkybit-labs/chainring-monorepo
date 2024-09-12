@@ -1,5 +1,5 @@
 import AvatarSvg from 'assets/avatar.svg'
-import { shortenedWalletAddress, classNames } from 'utils'
+import { abbreviatedWalletAddress, classNames } from 'utils'
 import { Button } from 'components/common/Button'
 import EditSvg from 'assets/Edit.svg'
 import CameraSvg from 'assets/camera.svg'
@@ -134,11 +134,11 @@ function Board({
 export function Leaderboard({
   avatarUrl,
   nickName,
-  wallet
+  wallets
 }: {
   avatarUrl?: string
   nickName?: string
-  wallet: Wallets
+  wallets: Wallets
 }) {
   const queryClient = useQueryClient()
 
@@ -183,9 +183,9 @@ export function Leaderboard({
     () =>
       newName ??
       nickName ??
-      (wallet.primary && shortenedWalletAddress(wallet.primary)) ??
+      (wallets.primary && abbreviatedWalletAddress(wallets.primary)) ??
       '',
-    [nickName, wallet, newName]
+    [nickName, wallets, newName]
   )
 
   const [selectedAvatarFile, setSelectedAvatarFile] = useState<File>()

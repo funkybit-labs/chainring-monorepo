@@ -122,7 +122,50 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     getGlobalBitcoinAccount()
   )
 
-  const bitcoinWallet = useBitcoinWallet()
+  const bitcoinWallet = useBitcoinWallet({
+    eventHandler: useCallback((event) => {
+      switch (event._kind) {
+        case 'connected':
+          switch (getGlobalPrimaryNetworkType()) {
+            case null:
+              // no primary wallet yet, so set bitcoin to it
+              setGlobalPrimaryAddress(event.accounts[0].address)
+              setGlobalBitcoinAccount(event.accounts[0])
+              setGlobalPrimaryNetworkType('Bitcoin')
+              setGlobalPrimaryChainId(0)
+              setBitcoinAccount(event.accounts[0])
+              break
+            case 'Evm':
+              // primary wallet is evm, now also bitcoin wallet was connected, so store it
+              setGlobalBitcoinAccount(event.accounts[0])
+              setBitcoinAccount(event.accounts[0])
+              break
+            case 'Bitcoin':
+              // bitcoin is already the primary wallet, make sure the current address is still in the account list
+              if (
+                event.accounts.find(
+                  (a) => a.address === getGlobalPrimaryAddress()
+                ) === undefined
+              ) {
+                clearGlobalPrimary()
+                setGlobalBitcoinAccount(null)
+                setBitcoinAccount(null)
+              } else {
+                setGlobalPrimaryChainId(0)
+              }
+              break
+          }
+          break
+        case 'disconnected':
+          setGlobalBitcoinAccount(null)
+          setBitcoinAccount(null)
+          if (getGlobalPrimaryNetworkType() == 'Bitcoin') {
+            clearGlobalPrimary()
+          }
+      }
+    }, [])
+  })
+
   const evmAccount = useAccount()
 
   const globalPrimaryNetworkType = getGlobalPrimaryNetworkType()
@@ -169,7 +212,6 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
         icon: BtcSvg,
         disconnect: function () {
           bitcoinWallet.disconnect()
-          setGlobalBitcoinAccount(null)
         }
       })
     }
@@ -187,22 +229,6 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     }
   })
 
-  useEffect(() => {
-    const networkType = getGlobalPrimaryNetworkType()
-    if (evmAccount.status === 'connected') {
-      switch (networkType) {
-        case null:
-        case 'Evm':
-          setGlobalPrimaryAddress(evmAccount.address ?? null)
-          setGlobalPrimaryChainId(evmAccount.chainId)
-          setGlobalPrimaryNetworkType('Evm')
-          break
-      }
-    } else if (evmAccount.status === 'disconnected' && networkType === 'Evm') {
-      clearGlobalPrimary()
-    }
-  }, [evmAccount])
-
   function connect(networkType: NetworkType) {
     if (networkType === 'Evm') {
       openWalletConnectModal({ view: 'Connect' }).then(() => {})
@@ -218,48 +244,43 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     )
   }
 
+  // handle EVM wallet connect/disconnect events
   useEffect(() => {
-    switch (primaryNetworkType) {
-      case null:
-        // no primary wallet yet, so set bitcoin to it
-        if (bitcoinWallet.accounts.length > 0) {
-          setGlobalPrimaryAddress(bitcoinWallet.accounts[0].address)
-          setGlobalBitcoinAccount(bitcoinWallet.accounts[0])
-          setGlobalPrimaryNetworkType('Bitcoin')
-          setGlobalPrimaryChainId(0)
-          setBitcoinAccount(bitcoinWallet.accounts[0])
+    async function onConnected() {
+      switch (getGlobalPrimaryNetworkType()) {
+        case null:
+        case 'Evm':
+          setGlobalPrimaryAddress(evmAccount.address!)
+          setGlobalPrimaryChainId(evmAccount.chainId!)
+          setGlobalPrimaryNetworkType('Evm')
+          break
+      }
+    }
+
+    function onDisconnected() {
+      if (getGlobalPrimaryNetworkType() == 'Evm') {
+        clearGlobalPrimary()
+      }
+    }
+
+    switch (web3ModalEvent.event) {
+      case 'CONNECT_SUCCESS':
+        if (evmAccount.status === 'connected') {
+          onConnected()
         }
         break
-      case 'Evm':
-        // primary wallet is evm, now also bitcoin wallet was connected, so store it
-        if (bitcoinWallet.accounts.length > 0) {
-          setGlobalBitcoinAccount(bitcoinWallet.accounts[0])
-          setBitcoinAccount(bitcoinWallet.accounts[0])
-        } else {
-          setGlobalBitcoinAccount(null)
-          setBitcoinAccount(null)
-        }
+      case 'DISCONNECT_SUCCESS':
+        onDisconnected()
         break
-      case 'Bitcoin':
-        // bitcoin is already the primary wallet, make sure the current address is still in the account list
-        if (
-          bitcoinWallet.accounts.length > 0 &&
-          bitcoinWallet.accounts.find(
-            (a) => a.address === getGlobalPrimaryAddress()
-          ) === undefined
-        ) {
-          clearGlobalPrimary()
-          setGlobalBitcoinAccount(null)
-          setBitcoinAccount(null)
-        } else if (bitcoinWallet.disconnected) {
-          clearGlobalPrimary()
-          setBitcoinAccount(null)
-        } else {
-          setGlobalPrimaryChainId(0)
+      case 'MODAL_CLOSE':
+        if (evmAccount.status === 'disconnected') {
+          onDisconnected()
+        } else if (evmAccount.status === 'connected') {
+          onConnected()
         }
         break
     }
-  }, [primaryNetworkType, bitcoinWallet])
+  }, [web3ModalEvent, evmAccount])
 
   const authorizeBitcoinWallet = useCallback(
     async (
@@ -388,22 +409,17 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // This has to be done with effect that reacts on evmAccount and bitcoinAccount changes because otherwise
+  // when done in wallet connected event handler the evmAccount might be in reconnecting state, and it will lead to a failure
   useEffect(() => {
-    if (bitcoinAccount && web3ModalEvent.event === 'CONNECT_SUCCESS') {
-      if (primaryNetworkType == 'Evm') {
+    if (evmAccount.status === 'connected' && bitcoinAccount) {
+      if (getGlobalPrimaryNetworkType() === 'Evm') {
         authorizeBitcoinWallet(bitcoinAccount, evmAccount)
-      } else if (primaryNetworkType == 'Bitcoin') {
+      } else {
         authorizeEvmWallet(bitcoinAccount, evmAccount)
       }
     }
-  }, [
-    authorizeBitcoinWallet,
-    authorizeEvmWallet,
-    primaryNetworkType,
-    bitcoinAccount,
-    evmAccount,
-    web3ModalEvent
-  ])
+  }, [evmAccount, bitcoinAccount, authorizeBitcoinWallet, authorizeEvmWallet])
 
   function clearGlobalPrimary() {
     setGlobalPrimaryAddress(null)

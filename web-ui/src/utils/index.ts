@@ -13,7 +13,7 @@ export function uniqueFilter<T>(value: T, index: number, self: T[]): boolean {
   return self.indexOf(value) === index
 }
 
-export function shortenedWalletAddress(wallet: ConnectedWallet): string {
+export function abbreviatedWalletAddress(wallet: ConnectedWallet): string {
   switch (wallet.networkType) {
     case 'Evm': {
       const without0x = wallet.address.startsWith('0x')

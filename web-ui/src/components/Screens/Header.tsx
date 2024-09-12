@@ -1,6 +1,6 @@
 import logo from 'assets/funkybit-orange-logo-name.png'
 import { useWallets } from 'contexts/walletProvider'
-import { classNames, shortenedWalletAddress, uniqueFilter } from 'utils'
+import { classNames, abbreviatedWalletAddress, uniqueFilter } from 'utils'
 import { Button } from 'components/common/Button'
 import { Popover, Transition } from '@headlessui/react'
 import React, { Fragment, useEffect, useMemo, useState } from 'react'
@@ -96,7 +96,7 @@ export function Header({
                     leaveFrom="opacity-100 translate-y-0"
                     leaveTo="opacity-0 translate-y-1"
                   >
-                    <Popover.Panel className="absolute mt-1 max-h-72 w-max min-w-full overflow-auto rounded-[20px] bg-darkBluishGray6 px-4 py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
+                    <Popover.Panel className="absolute right-0 mt-1 max-h-72 w-max min-w-full overflow-auto rounded-[20px] bg-darkBluishGray6 px-4 py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
                       {wallets.connected.map((connectedWallet) => {
                         return (
                           <div
@@ -109,7 +109,7 @@ export function Header({
                               src={connectedWallet.icon}
                               alt={connectedWallet.name}
                             />
-                            {shortenedWalletAddress(connectedWallet)}
+                            {abbreviatedWalletAddress(connectedWallet)}
                             {connectedWallet.networkType === 'Bitcoin' && (
                               <div>
                                 <Button
