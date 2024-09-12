@@ -28,7 +28,24 @@ export type BitcoinAccount = {
   purpose: 'payment' | 'ordinals' | 'stacks'
   addressType: 'p2tr' | 'p2wpkh' | 'p2sh' | 'stacks' | 'p2pkh' | 'p2wsh'
   walletType: 'software' | 'ledger'
-  signMessage: (address: string, message: string) => Promise<string>
+}
+
+export async function bitcoinSignMessage(
+  address: string,
+  message: string
+): Promise<string | null> {
+  const result = await SatsConnect.request('signMessage', {
+    address,
+    message
+  })
+  if (result.status === 'success') {
+    return result.result.signature
+  } else if (result.error.code === RpcErrorCode.USER_REJECTION) {
+    return null
+  } else {
+    console.log(result.error)
+    throw Error('Failed to sign message with bitcoin wallet')
+  }
 }
 
 export function BitcoinProvider({ children }: { children: React.ReactNode }) {
@@ -50,23 +67,7 @@ export function BitcoinProvider({ children }: { children: React.ReactNode }) {
       purposes: ['payment', 'ordinals']
     })
     if (data.status === 'success') {
-      const newAccounts = data.result.map((a) => {
-        return {
-          ...a,
-          signMessage: async (address: string, message: string) => {
-            const result = await SatsConnect.request('signMessage', {
-              address,
-              message
-            })
-            if (result.status === 'success') {
-              return result.result.signature
-            } else {
-              return ''
-            }
-          }
-        }
-      })
-
+      const newAccounts = data.result
       setAccounts(newAccounts)
       subscriptions.current.forEach((eventHandler) => {
         eventHandler({ _kind: 'connected', accounts: newAccounts })

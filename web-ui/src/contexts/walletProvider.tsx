@@ -10,17 +10,18 @@ import { useAccount, UseAccountReturnType, WagmiProvider } from 'wagmi'
 import {
   BitcoinAccount,
   BitcoinProvider,
+  bitcoinSignMessage,
   useBitcoinWallet
 } from 'contexts/bitcoin'
 import { wagmiConfig } from 'wagmiConfig'
 import Spinner from 'components/common/Spinner'
 import { useWeb3Modal, useWeb3ModalEvents } from '@web3modal/wagmi/react'
-import SatsConnect from 'sats-connect'
 import { useEffectOnce } from 'react-use'
 import { apiClient, authorizeWalletApiClient, NetworkType } from 'apiClient'
-import { signTypedData } from '@wagmi/core'
+import { disconnect as disconnectEvmWallet, signTypedData } from '@wagmi/core'
 import { signAuthToken } from 'auth'
 import BtcSvg from 'assets/btc.svg'
+import { UserRejectedRequestError } from 'viem'
 
 export interface ConnectedBitcoinWallet {
   networkType: 'Bitcoin'
@@ -73,22 +74,9 @@ export function getGlobalBitcoinAccount(): BitcoinAccount | null {
   if (!bitcoinAccount) {
     return null
   }
-
-  return {
-    ...bitcoinAccount,
-    signMessage: async (address, message) => {
-      const result = await SatsConnect.request('signMessage', {
-        address,
-        message
-      })
-      if (result.status === 'success') {
-        return result.result.signature
-      } else {
-        return ''
-      }
-    }
-  }
+  return bitcoinAccount
 }
+
 function setGlobalBitcoinAccount(account: BitcoinAccount | null) {
   setGlobal('bitcoinAccount', account)
 }
@@ -96,6 +84,7 @@ function setGlobalBitcoinAccount(account: BitcoinAccount | null) {
 export function getGlobalPrimaryAddress(): string | null {
   return getGlobal('primaryAddress')
 }
+
 function setGlobalPrimaryAddress(address: string | null) {
   setGlobal('primaryAddress', address)
 }
@@ -103,6 +92,7 @@ function setGlobalPrimaryAddress(address: string | null) {
 export function getGlobalPrimaryNetworkType(): NetworkType | null {
   return getGlobal('primaryNetworkType')
 }
+
 function setGlobalPrimaryNetworkType(networkType: NetworkType | null) {
   setGlobal('primaryNetworkType', networkType)
 }
@@ -110,6 +100,7 @@ function setGlobalPrimaryNetworkType(networkType: NetworkType | null) {
 export function getGlobalPrimaryChainId(): number | null {
   return getGlobal('primaryChainId')
 }
+
 function setGlobalPrimaryChainId(chainId: number | null) {
   setGlobal('primaryChainId', chainId)
 }
@@ -289,58 +280,81 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     ) => {
       const accountConfig = await apiClient.getAccountConfiguration()
       if (accountConfig.authorizedAddresses.length == 0) {
-        const bitcoinAddress = bitcoinAccount.address
-        const evmAddress = evmAccount.address!
-        const chainId = evmAccount.chainId!
-        const timestamp = new Date().toISOString()
+        try {
+          const bitcoinAddress = bitcoinAccount.address
+          const evmAddress = evmAccount.address!
+          const chainId = evmAccount.chainId!
+          const timestamp = new Date().toISOString()
 
-        const bitcoinWalletAuthToken = await signAuthToken(bitcoinAddress, 0)
+          const bitcoinWalletAuthToken = await signAuthToken(bitcoinAddress, 0)
+          if (bitcoinWalletAuthToken == null) {
+            bitcoinWallet.disconnect()
+            return
+          }
 
-        const commonMessage = `[funkybit] Please sign this message to authorize Bitcoin wallet ${bitcoinAddress}. This action will not cost any gas fees.`
-        const evmMessage = {
-          message: commonMessage,
-          address: evmAddress,
-          authorizedAddress: bitcoinAddress,
-          chainId: chainId,
-          timestamp: timestamp
-        }
-        const evmSignature = await signTypedData(wagmiConfig, {
-          domain: {
-            name: 'funkybit',
-            chainId: chainId
-          },
-          types: {
-            EIP712Domain: [
-              { name: 'name', type: 'string' },
-              { name: 'chainId', type: 'uint32' }
-            ],
-            Authorize: [
-              { name: 'message', type: 'string' },
-              { name: 'address', type: 'string' },
-              { name: 'authorizedAddress', type: 'string' },
-              { name: 'chainId', type: 'uint32' },
-              { name: 'timestamp', type: 'string' }
-            ]
-          },
-          message: evmMessage,
-          primaryType: 'Authorize'
-        })
-
-        await authorizeWallet(
-          {
-            address: bitcoinAddress,
-            authToken: bitcoinWalletAuthToken
-          },
-          {
-            address: evmAddress.toLowerCase(),
+          const commonMessage = `[funkybit] Please sign this message to authorize Bitcoin wallet ${bitcoinAddress}. This action will not cost any gas fees.`
+          const evmMessage = {
+            message: commonMessage,
+            address: evmAddress,
+            authorizedAddress: bitcoinAddress,
             chainId: chainId,
-            signature: evmSignature,
             timestamp: timestamp
           }
-        )
+          const evmSignature = await signTypedData(wagmiConfig, {
+            domain: {
+              name: 'funkybit',
+              chainId: chainId
+            },
+            types: {
+              EIP712Domain: [
+                { name: 'name', type: 'string' },
+                { name: 'chainId', type: 'uint32' }
+              ],
+              Authorize: [
+                { name: 'message', type: 'string' },
+                { name: 'address', type: 'string' },
+                { name: 'authorizedAddress', type: 'string' },
+                { name: 'chainId', type: 'uint32' },
+                { name: 'timestamp', type: 'string' }
+              ]
+            },
+            message: evmMessage,
+            primaryType: 'Authorize'
+          }).catch((e) => {
+            if (e instanceof UserRejectedRequestError) {
+              return null
+            } else {
+              throw e
+            }
+          })
+
+          if (evmSignature == null) {
+            bitcoinWallet.disconnect()
+            return
+          }
+
+          await authorizeWallet(
+            {
+              address: bitcoinAddress,
+              authToken: bitcoinWalletAuthToken
+            },
+            {
+              address: evmAddress.toLowerCase(),
+              chainId: chainId,
+              signature: evmSignature,
+              timestamp: timestamp
+            }
+          )
+        } catch (error) {
+          console.log('Error during wallet authorization', error)
+          bitcoinWallet.disconnect()
+          alert(
+            'Something went wrong while authorizing a wallet, please try again or contact customer support'
+          )
+        }
       }
     },
-    []
+    [bitcoinWallet]
   )
 
   const authorizeEvmWallet = useCallback(
@@ -350,32 +364,49 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     ) => {
       const accountConfig = await apiClient.getAccountConfiguration()
       if (accountConfig.authorizedAddresses.length == 0) {
-        const bitcoinAddress = bitcoinAccount.address
-        const evmAddress = evmAccount.address!
-        const chainId = evmAccount.chainId!
-        const timestamp = new Date().toISOString()
+        try {
+          const bitcoinAddress = bitcoinAccount.address
+          const evmAddress = evmAccount.address!
+          const chainId = evmAccount.chainId!
+          const timestamp = new Date().toISOString()
 
-        const evmWalletAuthToken = await signAuthToken(evmAddress, chainId)
-
-        const commonMessage = `[funkybit] Please sign this message to authorize EVM wallet ${evmAddress.toLowerCase()}. This action will not cost any gas fees.`
-        const bitcoinMessage = `${commonMessage}\nAddress: ${bitcoinAddress}, Timestamp: ${timestamp}`
-        const bitcoinSignature = await bitcoinAccount!.signMessage(
-          bitcoinAddress,
-          bitcoinMessage
-        )
-
-        await authorizeWallet(
-          {
-            address: evmAddress,
-            authToken: evmWalletAuthToken
-          },
-          {
-            address: bitcoinAddress,
-            chainId: 0,
-            signature: bitcoinSignature,
-            timestamp: timestamp
+          const evmWalletAuthToken = await signAuthToken(evmAddress, chainId)
+          if (evmWalletAuthToken == null) {
+            disconnectEvmWallet(wagmiConfig)
+            return
           }
-        )
+
+          const commonMessage = `[funkybit] Please sign this message to authorize EVM wallet ${evmAddress.toLowerCase()}. This action will not cost any gas fees.`
+          const bitcoinMessage = `${commonMessage}\nAddress: ${bitcoinAddress}, Timestamp: ${timestamp}`
+          const bitcoinSignature = await bitcoinSignMessage(
+            bitcoinAddress,
+            bitcoinMessage
+          )
+
+          if (bitcoinSignature == null) {
+            disconnectEvmWallet(wagmiConfig)
+            return
+          }
+
+          await authorizeWallet(
+            {
+              address: evmAddress,
+              authToken: evmWalletAuthToken
+            },
+            {
+              address: bitcoinAddress,
+              chainId: 0,
+              signature: bitcoinSignature,
+              timestamp: timestamp
+            }
+          )
+        } catch (error) {
+          console.log('Error during wallet authorization', error)
+          disconnectEvmWallet(wagmiConfig)
+          alert(
+            'Something went wrong while authorizing a wallet, please try again or contact customer support'
+          )
+        }
       }
     },
     []
@@ -390,23 +421,18 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
       timestamp: string
     }
   ) {
-    try {
-      await authorizeWalletApiClient.authorizeWallet(
-        {
-          authorizedAddress: authorizedWallet.address,
-          chainId: authorizingWallet.chainId,
-          address: authorizingWallet.address,
-          timestamp: authorizingWallet.timestamp,
-          signature: authorizingWallet.signature
-        },
-        {
-          headers: { Authorization: `Bearer ${authorizedWallet.authToken}` }
-        }
-      )
-    } catch (e) {
-      console.log(e)
-      alert('Failed to authorize wallet')
-    }
+    await authorizeWalletApiClient.authorizeWallet(
+      {
+        authorizedAddress: authorizedWallet.address,
+        chainId: authorizingWallet.chainId,
+        address: authorizingWallet.address,
+        timestamp: authorizingWallet.timestamp,
+        signature: authorizingWallet.signature
+      },
+      {
+        headers: { Authorization: `Bearer ${authorizedWallet.authToken}` }
+      }
+    )
   }
 
   // This has to be done with effect that reacts on evmAccount and bitcoinAccount changes because otherwise
