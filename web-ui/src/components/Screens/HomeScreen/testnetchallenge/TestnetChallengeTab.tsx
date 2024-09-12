@@ -157,7 +157,7 @@ export function TestnetChallengeTab({
               <Leaderboard
                 avatarUrl={avatarUrl}
                 nickName={nickName}
-                wallet={wallets}
+                wallets={wallets}
               />
             ) : (
               <div className="col-span-1 laptop:col-span-3">
@@ -188,12 +188,12 @@ export function TestnetChallengeTab({
                             >
                               Enroll
                             </button>
-                            {wallet.primaryCategory === 'none' && (
+                            {wallets.connected.length === 0 && (
                               <div className="text-sm ">
                                 Already enrolled?{' '}
                                 <span
                                   className="cursor-pointer underline"
-                                  onClick={() => wallet.connect('evm')}
+                                  onClick={() => wallets.connect('Evm')}
                                 >
                                   Connect your wallet
                                 </span>
