@@ -1,18 +1,22 @@
 import { useConfig } from 'wagmi'
 import { useMemo } from 'react'
-import { useWallet } from 'contexts/walletProvider'
+import { useWallets } from 'contexts/walletProvider'
 
 export function useValidChain() {
   const config = useConfig()
-  const wallet = useWallet()
+  const wallets = useWallets()
+
   return useMemo(() => {
-    switch (wallet.primaryCategory) {
-      case 'evm':
-        return config.chains.find((c) => c.id === wallet.evmAccount?.chainId)
-      case 'bitcoin':
-        return 'Bitcoin'
-      case 'none':
-        return undefined
+    const primaryWallet = wallets.primary
+    if (primaryWallet) {
+      switch (primaryWallet.networkType) {
+        case 'Evm':
+          return config.chains.find((c) => c.id === primaryWallet.chainId)
+        case 'Bitcoin':
+          return 'Bitcoin'
+      }
+    } else {
+      return undefined
     }
-  }, [config, wallet])
+  }, [config, wallets])
 }
