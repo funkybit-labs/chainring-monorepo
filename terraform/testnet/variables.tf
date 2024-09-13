@@ -37,17 +37,6 @@ data "aws_acm_certificate" "funkybit_fun" {
 
 variable "blocked_country_codes" {
   default = [
-    "DZ", #Algeria
-    "BD", #Bangladesh
-    "BY", #Belarus
-    "BO", #Bolivia
-    "CU", #Cuba
-    "IR", #Iran
-    "NP", #Nepal
-    "KP", #North Korea
-    "RU", #Russia
-    "SD", #Sudan
-    "SY", #Syria
     "US", #United States
   ]
 }
