@@ -317,7 +317,8 @@ class V88_TypeId : Migration() {
         }
 
         transaction {
-            exec("""
+            exec(
+                """
                 
                 -- Implementation of an equality operator that makes it easy to compare typeids stored
                 -- as a compound tuple (prefix, uuid) against a typeid in text form.
@@ -355,7 +356,8 @@ class V88_TypeId : Migration() {
                     HASHES,
                     MERGES
                     );
-            """.trimIndent())
+                """.trimIndent(),
+            )
         }
     }
 }
