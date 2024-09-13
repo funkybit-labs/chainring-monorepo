@@ -102,6 +102,18 @@ module "web" {
   certificate_arn = data.aws_acm_certificate.funkybit_fun_us_east_1.arn
 }
 
+module "waf" {
+  source                   = "../modules/waf"
+  aws_region               = var.aws_region
+  aws_lb_arn               = module.alb.https_listener_arn
+  short_env_name           = local.name_prefix
+  ipv4_blacklist_addresses = local.ipv4blacklist
+  ipv4_whitelist_addresses = local.ipv4whitelist
+  ipv6_blacklist_addresses = local.ipv6blacklist
+  ipv6_whitelist_addresses = local.ipv6whitelist
+  blocked_country_codes    = var.blocked_country_codes
+}
+
 module "telegram_mini_app" {
   source      = "../modules/telegram_mini_app"
   name_prefix = local.name_prefix

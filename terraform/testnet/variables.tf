@@ -35,6 +35,42 @@ data "aws_acm_certificate" "funkybit_fun" {
   key_types = ["EC_prime256v1"]
 }
 
+variable "blocked_country_codes" {
+  default = [
+    "DZ", #Algeria
+    "BD", #Bangladesh
+    "BY", #Belarus
+    "BO", #Bolivia
+    "CU", #Cuba
+    "IR", #Iran
+    "NP", #Nepal
+    "KP", #North Korea
+    "RU", #Russia
+    "SD", #Sudan
+    "SY", #Syria
+    "US", #United States
+  ]
+}
+
+
+data "dns_a_record_set" "nlb_ips" {
+  host = "${module.alb.dns_name}"
+}
+
+locals {
+
+  ipv4whitelist = [
+        join(",", data.dns_a_record_set.nlb_ips.addrs)
+   ]
+
+  ipv4blacklist = []
+
+  ipv6whitelist = []
+
+  ipv6blacklist = []
+
+}
+
 terraform {
   required_version = "1.5.7"
 
