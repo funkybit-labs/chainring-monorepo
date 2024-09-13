@@ -31,6 +31,7 @@ import xyz.funkybit.apps.api.model.BalancesApiResponse
 import xyz.funkybit.apps.api.model.BatchOrdersApiRequest
 import xyz.funkybit.apps.api.model.BatchOrdersApiResponse
 import xyz.funkybit.apps.api.model.CancelOrderApiRequest
+import xyz.funkybit.apps.api.model.Card
 import xyz.funkybit.apps.api.model.ConfigurationApiResponse
 import xyz.funkybit.apps.api.model.CreateDepositApiRequest
 import xyz.funkybit.apps.api.model.CreateOrderApiRequest
@@ -544,6 +545,16 @@ open class ApiClient(
                 .build(),
         ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
+    fun tryGetCards(): Either<ApiCallFailure, List<Card>> =
+        executeAndTrace(
+            TraceRecorder.Op.GetCards,
+            Request.Builder()
+                .url("$apiServerRootUrl/v1/testnet-challenge/cards")
+                .get()
+                .build()
+                .withAuthHeaders(keyPair, chainId = currentChainId),
+        ).toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
     private fun executeAndTrace(op: TraceRecorder.Op, request: Request): Response {
         return traceRecorder.record(op) {
             httpClient.newCall(request).execute()
@@ -647,6 +658,8 @@ open class ApiClient(
     open fun setNickname(nickName: String) = trySetNickname(nickName).throwOrReturn()
 
     open fun getLeaderboard(type: TestnetChallengePNLType) = tryGetLeaderboard(type).throwOrReturn()
+
+    open fun getCards() = tryGetCards().throwOrReturn()
 }
 
 fun <T> Either<ApiCallFailure, T>.throwOrReturn(): T {

@@ -15,7 +15,7 @@ import Spinner from 'components/common/Spinner'
 import { WebsocketProvider } from 'contexts/websocket'
 import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
 import Admin from 'components/Screens/Admin'
-import { useWallets } from 'contexts/walletProvider'
+import { ConnectedEvmWallet, useWallets } from 'contexts/walletProvider'
 import { TestnetChallengeTab } from 'components/Screens/HomeScreen/testnetchallenge/TestnetChallengeTab'
 import { TestnetChallengeEnabled } from 'testnetChallenge'
 
@@ -50,15 +50,15 @@ function HomeScreenContent() {
     marketsWithBackToBack
   } = useMemo(() => {
     const config = configQuery.data
-    const connectedWalletsEvmChainId = wallets.connected.find(
+    const connectedEvmWallet = wallets.connected.find(
       (cw) => cw.networkType == 'Evm'
-    )?.chainId
+    ) as ConnectedEvmWallet | undefined
 
     const evmChainConfig = config?.chains
       .filter((chain) => chain.networkType === 'Evm')
       .find(
         (chain) =>
-          chain.id === (connectedWalletsEvmChainId ?? config.chains[0]?.id)
+          chain.id === (connectedEvmWallet?.chainId ?? config.chains[0]?.id)
       )
 
     const bitcoinChainConfig = config?.chains.filter(
@@ -148,7 +148,7 @@ function HomeScreenContent() {
       <>
         <div className="min-h-screen bg-darkBluishGray10">
           <Header
-            initialTab={tab}
+            tab={tab}
             markets={markets}
             onTabChange={saveTab}
             onShowAdmin={() => setShowAdmin(true)}

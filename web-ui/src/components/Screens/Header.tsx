@@ -20,12 +20,12 @@ import { useConfig } from 'wagmi'
 export type Tab = 'Swap' | 'Limit' | 'Dashboard' | 'Testnet Challenge'
 
 export function Header({
-  initialTab,
+  tab,
   markets,
   onTabChange,
   onShowAdmin
 }: {
-  initialTab: Tab
+  tab: Tab
   markets: Markets
   onTabChange: (newTab: Tab) => void
   onShowAdmin: () => void
@@ -34,7 +34,6 @@ export function Header({
   const evmConfig = useConfig()
   const [showMenu, setShowMenu] = useState(false)
   const [showFaucetModal, setShowFaucetModal] = useState<boolean>(false)
-  const [tab, setTab] = useState<Tab>(initialTab)
 
   useEffect(() => {
     function escapeHandler(ev: KeyboardEvent) {
@@ -53,7 +52,8 @@ export function Header({
 
   const accountConfigQuery = useQuery({
     queryKey: ['accountConfiguration'],
-    queryFn: apiClient.getAccountConfiguration
+    queryFn: apiClient.getAccountConfiguration,
+    enabled: wallets.connected.length > 0
   })
 
   const validChain = useValidChain()
@@ -203,7 +203,6 @@ export function Header({
   }
 
   function navigate(id: string) {
-    setTab('Dashboard')
     onTabChange('Dashboard')
     window.location.hash = id
     window.scrollBy({ top: -80, behavior: 'smooth' })
@@ -257,7 +256,6 @@ export function Header({
                   : 'text-darkBluishGray3 hover:text-white'
               )}
               onClick={() => {
-                setTab(t)
                 onTabChange(t)
               }}
             >

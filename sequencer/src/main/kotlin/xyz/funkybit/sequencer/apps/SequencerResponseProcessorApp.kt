@@ -20,6 +20,7 @@ class SequencerResponseProcessorApp(
     val inputQueue: RollingChronicleQueue,
     val outputQueue: RollingChronicleQueue,
     val onAbnormalStop: () -> Unit,
+    private val ecoMode: Boolean = System.getenv("ECO_MODE").toBoolean(),
 ) : BaseApp(dbConfig) {
     override val logger = KotlinLogging.logger {}
     private var stop = false
@@ -63,6 +64,10 @@ class SequencerResponseProcessorApp(
                             }
                         }
                     }
+                }
+
+                if (ecoMode) {
+                    Thread.sleep(10)
                 }
             }
             logger.info { "Processor thread stopped" }

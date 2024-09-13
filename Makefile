@@ -57,7 +57,7 @@ run_backend:
 	./gradlew :run
 
 run_sequencer:
-	SANDBOX_MODE=true ./gradlew :sequencer:run
+	SANDBOX_MODE=true ECO_MODE=true ./gradlew :sequencer:run
 
 run_only_sequencer:
 	SANDBOX_MODE=true ./gradlew :sequencer:run --args=sequencer

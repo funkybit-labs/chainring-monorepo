@@ -5,6 +5,8 @@ import {
   getGlobalPrimaryChainId,
   getGlobalPrimaryAddress
 } from 'contexts/walletProvider'
+import { bitcoinSignMessage } from 'contexts/bitcoin'
+import { UserRejectedRequestError } from 'viem'
 
 export type LoadAuthTokenOptions = {
   forceRefresh: boolean
@@ -23,6 +25,13 @@ export async function loadAuthToken(
 
     if (!signingPromise) {
       signingPromise = signAuthToken(primaryAddress, primaryChainId)
+        .then((maybeToken) => {
+          if (maybeToken == null) {
+            throw Error('Rejected')
+          } else {
+            return maybeToken
+          }
+        })
         .then((authToken) => {
           signingPromise = null
           return authToken
@@ -42,7 +51,7 @@ export async function loadAuthToken(
 export async function signAuthToken(
   address: string,
   chainId: number
-): Promise<string> {
+): Promise<string | null> {
   const evmMessage = {
     message: `[funkybit] Please sign this message to verify your ownership of this wallet address. This action will not cost any gas fees.`,
     address: chainId > 0 ? address.toLowerCase() : address,
@@ -71,6 +80,12 @@ export async function signAuthToken(
           },
           message: evmMessage,
           primaryType: 'Sign In'
+        }).catch((e) => {
+          if (e instanceof UserRejectedRequestError) {
+            return null
+          } else {
+            throw e
+          }
         })
       : await (async () => {
           const bitcoinAccount = getGlobalBitcoinAccount()
@@ -78,8 +93,12 @@ export async function signAuthToken(
           const messageToSign =
             evmMessage.message +
             `\nAddress: ${address}, Timestamp: ${evmMessage.timestamp}`
-          return await bitcoinAccount!.signMessage(address, messageToSign)
+          return await bitcoinSignMessage(address, messageToSign)
         })()
+
+  if (signature == null) {
+    return null
+  }
 
   const signInMessageBody = base64urlEncode(
     new TextEncoder().encode(JSON.stringify(evmMessage))

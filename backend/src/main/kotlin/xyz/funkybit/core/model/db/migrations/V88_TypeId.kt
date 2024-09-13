@@ -4,7 +4,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.db.Migration
 
 @Suppress("ClassName")
-class V87_TypeId : Migration() {
+class V88_TypeId : Migration() {
 
     override fun run() {
         // https://github.com/jetify-com/typeid-sql

@@ -17,7 +17,8 @@ import { Tab } from 'components/Screens/Header'
 
 export function TestnetChallengeTab({
   symbols,
-  exchangeContract
+  exchangeContract,
+  onChangeTab
 }: {
   symbols: TradingSymbols
   exchangeContract?: { name: string; address: string }
@@ -158,6 +159,7 @@ export function TestnetChallengeTab({
                 avatarUrl={avatarUrl}
                 nickName={nickName}
                 wallets={wallets}
+                onChangeTab={onChangeTab}
               />
             ) : (
               <div className="col-span-1 laptop:col-span-3">
