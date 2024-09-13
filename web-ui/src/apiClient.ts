@@ -147,7 +147,7 @@ export const AccountConfigurationApiResponseSchema = z.object({
   testnetChallengeDepositSymbol: z.string().nullable(),
   testnetChallengeDepositContract: AddressSchema.nullable(),
   nickName: z.string().nullable(),
-  avatarUrl: z.string().nullable(),
+  avatarUrl: z.string().nullable()
 })
 
 const OrderSideSchema = z.enum(['Buy', 'Sell'])
@@ -459,6 +459,23 @@ const LeaderboardSchema = z.object({
 })
 
 export type Leaderboard = z.infer<typeof LeaderboardSchema>
+
+const CardTypeSchema = z.enum([
+  'Enrolled',
+  'RecentPoints',
+  'BitcoinConnect',
+  'BitcoinWithdrawal',
+  'EvmWithdrawal'
+])
+
+export type CardType = z.infer<typeof CardTypeSchema>
+
+const CardSchema = z.object({
+  type: CardTypeSchema,
+  params: z.record(z.string(), z.string())
+})
+
+export type Card = z.infer<typeof CardSchema>
 
 const ApiErrorSchema = z.object({
   displayMessage: z.string()
@@ -864,6 +881,19 @@ export const apiClient = new Zodios(apiBaseUrl, [
       }
     ],
     response: LeaderboardSchema,
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'get',
+    path: '/v1/testnet-challenge/cards',
+    alias: 'testnetChallengeGetCards',
+    parameters: [],
+    response: z.array(CardSchema),
     errors: [
       {
         status: 'default',

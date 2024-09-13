@@ -20,18 +20,26 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.middleware.principal
 import xyz.funkybit.apps.api.middleware.signedTokenSecurity
+import xyz.funkybit.apps.api.model.Card
+import xyz.funkybit.apps.api.model.CardType
 import xyz.funkybit.apps.api.model.Leaderboard
+import xyz.funkybit.apps.api.model.LeaderboardEntry
 import xyz.funkybit.apps.api.model.RequestProcessingError
 import xyz.funkybit.apps.api.model.SetAvatarUrl
 import xyz.funkybit.apps.api.model.SetNickname
 import xyz.funkybit.apps.api.model.processingError
 import xyz.funkybit.core.blockchain.BlockchainClient
 import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.model.db.NetworkType
+import xyz.funkybit.core.model.db.OrderEntity
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
 import xyz.funkybit.core.model.db.TestnetChallengePNLType
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
+import xyz.funkybit.core.model.db.TestnetChallengeUserRewardEntity
 import xyz.funkybit.core.model.db.UserEntity
+import xyz.funkybit.core.model.db.WalletEntity
+import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.utils.IconUtils.resolveSymbolUrl
 import xyz.funkybit.core.utils.IconUtils.sanitizeImageUrl
 import xyz.funkybit.core.utils.TestnetChallengeUtils
@@ -161,6 +169,19 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
             queries += Query.int().optional("page", "Page number to retrieve, 1-indexed")
             returning(
                 Status.OK,
+                responseBody to Leaderboard(
+                    type = TestnetChallengePNLType.DailyPNL,
+                    page = 1,
+                    lastPage = 10,
+                    entries = listOf(
+                        LeaderboardEntry(
+                            "label",
+                            "iconUrl",
+                            10000.0,
+                            0.0,
+                        ),
+                    ),
+                ),
             )
         } bindContract Method.GET to { testnetChallengePNLType ->
             { request ->
@@ -169,6 +190,53 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
                 }
                 Response(Status.OK).with(responseBody of leaderboard)
             }
+        }
+    }
+
+    val getCards: ContractRoute = run {
+        val responseBody = Body.auto<List<Card>>().toLens()
+        "testnet-challenge/cards" meta {
+            operationId = "testnet-challenge-get-cards"
+            summary = "Get Cards"
+            security = signedTokenSecurity
+            tags += listOf(Tag("testnet-challenge"))
+            returning(
+                Status.OK,
+                responseBody to listOf(Card(type = CardType.Enrolled, params = emptyMap())),
+            )
+        } bindContract Method.GET to { request ->
+            val cards = mutableListOf<Card>()
+            transaction {
+                // until they have placed an order, they get the newly enrolled card
+                if (!OrderEntity.existsForUser(request.principal.user)) {
+                    cards.add(Card(type = CardType.Enrolled, params = emptyMap()))
+                }
+                // get up to 3 most recent rewards
+                TestnetChallengeUserRewardEntity.findRecentForUser(request.principal.user).forEach { reward ->
+                    cards.add(
+                        Card(
+                            type = CardType.RecentPoints,
+                            params = mapOf(
+                                "points" to reward.amount.toPlainString(),
+                                "type" to reward.type.name,
+                                "category" to (reward.rewardCategory?.name ?: ""),
+                            ),
+                        ),
+                    )
+                }
+                // have they ever connected a bitcoin wallet?
+                if (WalletEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Bitcoin)) {
+                    if (WithdrawalEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Bitcoin)) {
+                        cards.add(Card(type = CardType.BitcoinWithdrawal, params = emptyMap()))
+                    }
+                } else {
+                    cards.add(Card(type = CardType.BitcoinConnect, params = emptyMap()))
+                }
+                if (WalletEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Evm)) {
+                    cards.add(Card(type = CardType.EvmWithdrawal, params = emptyMap()))
+                }
+            }
+            Response(Status.OK).with(responseBody of cards.toList())
         }
     }
 }

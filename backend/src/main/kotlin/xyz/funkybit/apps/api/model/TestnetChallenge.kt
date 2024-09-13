@@ -24,3 +24,18 @@ data class LeaderboardEntry(
     val value: Double,
     val pnl: Double,
 )
+
+@Serializable
+enum class CardType {
+    Enrolled,
+    RecentPoints,
+    BitcoinConnect,
+    BitcoinWithdrawal,
+    EvmWithdrawal,
+}
+
+@Serializable
+data class Card(
+    val type: CardType,
+    val params: Map<String, String>,
+)

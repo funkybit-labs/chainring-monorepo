@@ -3,7 +3,9 @@ import { abbreviatedWalletAddress, classNames } from 'utils'
 import { Button } from 'components/common/Button'
 import EditSvg from 'assets/Edit.svg'
 import CameraSvg from 'assets/camera.svg'
-import CelebrationSvg from 'assets/celebration.svg'
+import CelebrationSvg from 'assets/disco-ball.svg'
+import BtcSvg from 'assets/btc.svg'
+import LightBulbSvg from 'assets/lightbulb.svg'
 import React, {
   ChangeEvent,
   Fragment,
@@ -11,17 +13,18 @@ import React, {
   useMemo,
   useState
 } from 'react'
-import { Wallets } from 'contexts/walletProvider'
+import { useWallets, Wallets } from 'contexts/walletProvider'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   apiClient,
   ApiErrorsSchema,
   LeaderboardType,
-  Leaderboard as LB
+  Leaderboard as LB,
+  Card
 } from 'apiClient'
 import { Modal } from 'components/common/Modal'
-import {Tab} from "components/Screens/Header";
-import {CopyToClipboard} from "react-copy-to-clipboard";
+import { Tab } from 'components/Screens/Header'
+import { CopyToClipboard } from 'react-copy-to-clipboard'
 
 type EditMode = 'none' | 'name' | 'icon'
 
@@ -134,6 +137,166 @@ function Board({
   )
 }
 
+function CardCarousel({
+  cards,
+  onChangeTab
+}: {
+  cards: [Card, ...Card[]]
+  onChangeTab: (tab: Tab) => void
+}) {
+  const [index, setIndex] = useState(0)
+  const [prevIndex, setPrevIndex] = useState(-1)
+  const wallets = useWallets()
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setPrevIndex(index)
+      setIndex(index === cards.length - 1 ? 0 : index + 1)
+    }, 5000)
+    return () => {
+      window.clearInterval(timer)
+    }
+  })
+
+  return (
+    <div>
+      <div className={'relative overflow-x-clip'}>
+        {cards.map((card, ix) => {
+          return (
+            <div
+              key={ix}
+              className={classNames(
+                'h-36 absolute text-white flex flex-row my-auto justify-center p-4',
+                ix === index
+                  ? 'animate-flyFromRight'
+                  : ix === prevIndex
+                    ? 'animate-flyToLeft'
+                    : 'hidden'
+              )}
+            >
+              {card.type === 'Enrolled' && (
+                <>
+                  <img
+                    src={CelebrationSvg}
+                    alt={'celebrate'}
+                    className="mx-4 my-auto size-12"
+                  />
+                  <div className="my-auto">
+                    Congratulations, you&apos;re enrolled in the Testnet
+                    Challenge! Now trade{' '}
+                    <span
+                      className="cursor-pointer underline"
+                      onClick={() => onChangeTab('Swap')}
+                    >
+                      Swaps
+                    </span>{' '}
+                    and{' '}
+                    <span
+                      className="cursor-pointer underline"
+                      onClick={() => onChangeTab('Limit')}
+                    >
+                      Limit Orders
+                    </span>{' '}
+                    to get ahead!
+                  </div>
+                </>
+              )}
+              {card.type === 'BitcoinConnect' && (
+                <>
+                  <img
+                    src={BtcSvg}
+                    alt={'BTC'}
+                    className="mx-4 my-auto size-12"
+                  />
+                  <div className="my-auto">
+                    <span
+                      className="cursor-pointer underline"
+                      onClick={() => wallets.connect('Bitcoin')}
+                    >
+                      Connect
+                    </span>{' '}
+                    your Bitcoin wallet and earn 500 funky bits!
+                  </div>
+                </>
+              )}
+              {card.type === 'RecentPoints' && (
+                <>
+                  <img
+                    src={CelebrationSvg}
+                    alt="celebrate"
+                    className="mx-4 my-auto size-12"
+                  />
+                  <div className="my-auto">
+                    Yes! You&apos;ve earned{' '}
+                    {parseInt(card.params.points).toLocaleString()} funky bits{' '}
+                    {(card.params.type === 'DailyReward' ||
+                      card.params.type === 'WeeklyReward' ||
+                      card.params.type === 'OverallReward') && (
+                      <>
+                        for finishing
+                        {card.params.type === 'DailyReward'
+                          ? ' the day '
+                          : card.params.type === 'WeeklyReward'
+                            ? ' the week '
+                            : card.params.type === 'OverallReward'
+                              ? ' the Testnet Challenge '
+                              : ''}
+                        {card.params.category === 'Top1'
+                          ? card.params.type === 'OverallReward'
+                            ? ' as the undisputed Grandmaster of Funk! We are not worthy! '
+                            : ' with the top PNL! Funk first! '
+                          : card.params.category.startsWith('Top')
+                            ? ` with a PNL in the top ${parseInt(
+                                card.params.category.slice(3)
+                              )} %! `
+                            : card.params.category === 'Bottom1'
+                              ? " with the absolute worst PNL! You're the funky caboose! "
+                              : card.params.category.startsWith('Bottom')
+                                ? ` with a PNL in the bottom ${parseInt(
+                                    card.params.category.slice(6)
+                                  )} %! `
+                                : '. '}
+                      </>
+                    )}
+                    {card.params.type === 'ReferralBonus' && (
+                      <>from your referrals! Keep up the good work!</>
+                    )}
+                  </div>
+                </>
+              )}
+              {(card.type === 'BitcoinWithdrawal' ||
+                card.type === 'EvmWithdrawal') && (
+                <>
+                  <img
+                    src={LightBulbSvg}
+                    alt="light bulb"
+                    className="mx-4 my-auto size-12"
+                  />
+                  <div className="my-auto">
+                    You can earn{' '}
+                    {card.type === 'BitcoinWithdrawal' ? ' 500 ' : ' 100 '}{' '}
+                    funky bits by{' '}
+                    <span
+                      className="cursor-pointer underline"
+                      onClick={() => onChangeTab('Dashboard')}
+                    >
+                      withdrawing
+                    </span>
+                    {card.type === 'BitcoinWithdrawal'
+                      ? ' some tBTC '
+                      : ' to your wallet '}{' '}
+                    and depositing it back.
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export function Leaderboard({
   avatarUrl,
   nickName,
@@ -179,6 +342,11 @@ export function Leaderboard({
         queries: { page: overallLeaderboardPage }
       }),
     refetchInterval: 5000
+  })
+
+  const cardQuery = useQuery({
+    queryKey: ['cards'],
+    queryFn: apiClient.testnetChallengeGetCards
   })
 
   const [newName, setNewName] = useState<string>()
@@ -422,13 +590,14 @@ export function Leaderboard({
           )}
         </div>
       </div>
-      <div className="flex flex-col gap-8 p-2 w-full">
+      <div className="flex w-full flex-col gap-8 p-2">
         <div className="h-36 w-full rounded-lg bg-darkBluishGray10">
-          <div className="text-white flex flex-row justify-center p-4">
-            {/* TODO - only show this until they've earned more points */}
-            <img src={CelebrationSvg} alt={"celebrate"} className="size-12 my-auto mx-4" />
-            <div>Congratulations, you're enrolled in the Testnet Challenge! Now trade <span className="cursor-pointer underline" onClick={() => onChangeTab('Swap')}>Swaps</span> and <span className="cursor-pointer underline" onClick={() => onChangeTab('Limit')}>Limit Orders</span> to get ahead!</div>
-          </div>
+          {cardQuery.data && cardQuery.data.length > 0 && (
+            <CardCarousel
+              cards={[cardQuery.data[0], ...cardQuery.data.slice(1)]}
+              onChangeTab={onChangeTab}
+            />
+          )}
         </div>
         <div className="w-full rounded-lg bg-darkBluishGray8">
           {weeklyLeaderboardQuery.data && (
@@ -442,12 +611,19 @@ export function Leaderboard({
       </div>
       <div className="flex flex-col gap-8 p-2">
         <div className="h-36 w-full rounded-lg bg-darkBluishGray8">
-          <div className="flex flex-col text-white space-y-4 p-3 text-center">
+          <div className="flex flex-col space-y-4 p-3 text-center text-white">
             <div className="text-2xl">Refer Friends, Earn More!</div>
-            <div className="text-sm">Share your unique referral link and earn 10% of the funky bits your referrals
-              earn!
+            <div className="text-sm">
+              Share your unique referral link and earn 10% of the funky bits
+              your referrals earn!
             </div>
-            <div className="text-sm"><CopyToClipboard text={`https://testnet.funkybit.fun/invite/AQ8E8VF`}><div>https://testnet.funkybit.fun/invite/AQ8E8VF</div></CopyToClipboard></div>
+            <div className="text-sm">
+              <CopyToClipboard
+                text={`https://testnet.funkybit.fun/invite/AQ8E8VF`}
+              >
+                <div>https://testnet.funkybit.fun/invite/AQ8E8VF</div>
+              </CopyToClipboard>
+            </div>
           </div>
         </div>
         <div className="w-full rounded-lg bg-darkBluishGray8">

@@ -84,6 +84,7 @@ import xyz.funkybit.core.model.db.migrations.V83_ArchAccountBalanceIndexTable
 import xyz.funkybit.core.model.db.migrations.V84_MarketPriceFeed
 import xyz.funkybit.core.model.db.migrations.V85_TestnetChallengePNL
 import xyz.funkybit.core.model.db.migrations.V86_AddArchTransactionToWithdrawal
+import xyz.funkybit.core.model.db.migrations.V87_TestnetChallengeRewardCategory
 import xyz.funkybit.core.model.db.migrations.V8_ExecutionsAndTrades
 import xyz.funkybit.core.model.db.migrations.V9_SymbolTable
 
@@ -174,4 +175,5 @@ val migrations = listOf(
     V84_MarketPriceFeed(),
     V85_TestnetChallengePNL(),
     V86_AddArchTransactionToWithdrawal(),
+    V87_TestnetChallengeRewardCategory(),
 )
