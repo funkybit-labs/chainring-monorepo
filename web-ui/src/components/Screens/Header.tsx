@@ -53,7 +53,8 @@ export function Header({
 
   const accountConfigQuery = useQuery({
     queryKey: ['accountConfiguration'],
-    queryFn: apiClient.getAccountConfiguration
+    queryFn: apiClient.getAccountConfiguration,
+    enabled: wallets.connected.length > 0
   })
 
   const validChain = useValidChain()
