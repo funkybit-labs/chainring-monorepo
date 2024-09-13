@@ -46,17 +46,6 @@ object TestnetChallengeUserRewardTable : GUIDTable<TestnetChallengeUserRewardId>
 
 class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserRewardId>) : GUIDEntity<TestnetChallengeUserRewardId>(guid) {
     companion object : EntityClass<TestnetChallengeUserRewardId, TestnetChallengeUserRewardEntity>(TestnetChallengeUserRewardTable) {
-        fun createDailyReward(userId: UserId, amount: BigDecimal) {
-            create(userId, TestnetChallengeUserRewardType.DailyReward, amount)
-        }
-
-        fun createWeeklyReward(userId: UserId, amount: BigDecimal) {
-            create(userId, TestnetChallengeUserRewardType.WeeklyReward, amount)
-        }
-
-        fun createOverallReward(userId: UserId, amount: BigDecimal) {
-            create(userId, TestnetChallengeUserRewardType.OverallReward, amount)
-        }
 
         fun createReferralBonusReward(userId: UserId, amount: BigDecimal) {
             create(userId, TestnetChallengeUserRewardType.ReferralBonus, amount, by = "system")

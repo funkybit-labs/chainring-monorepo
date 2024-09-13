@@ -302,8 +302,8 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                     TestnetChallengePNLTable.update({
                         TestnetChallengePNLTable.userGuid.eq(user.guid) and TestnetChallengePNLTable.type.eq(pnl.first)
                     }) {
-                        it[initialBalance] = pnl.second.toBigDecimal()
-                        it[currentBalance] = pnl.second.toBigDecimal()
+                        it[initialBalance] = BigDecimal(10000)
+                        it[currentBalance] = BigDecimal(10000) + pnl.second.toBigDecimal()
                     }
                 }
 
