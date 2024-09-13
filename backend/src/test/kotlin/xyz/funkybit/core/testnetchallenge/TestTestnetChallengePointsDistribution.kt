@@ -10,6 +10,8 @@ import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
 import xyz.funkybit.core.model.db.TestnetChallengePNLTable
 import xyz.funkybit.core.model.db.TestnetChallengePNLType
+import xyz.funkybit.core.model.db.TestnetChallengeRewardCategory
+import xyz.funkybit.core.model.db.TestnetChallengeUserRewardEntity
 import xyz.funkybit.core.model.db.TestnetChallengeUserRewardType
 import xyz.funkybit.core.model.db.UserEntity
 import xyz.funkybit.core.model.db.UserId
@@ -17,6 +19,7 @@ import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.pointsBalances
 import xyz.funkybit.testutils.TestWithDb
 import java.math.BigDecimal
+import kotlin.test.assertNull
 
 class TestTestnetChallengePointsDistribution : TestWithDb() {
 
@@ -24,6 +27,7 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
         var userId: UserId? = null,
         val givenPnl: List<Pair<TestnetChallengePNLType, Int>>,
         val expectedReward: List<Pair<TestnetChallengeUserRewardType, Int>>,
+        val expectedRewardCategory: TestnetChallengeRewardCategory?,
     )
 
     private var testData: List<TestnetChallengeTestCase> = listOf(
@@ -33,12 +37,12 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 200,
                 TestnetChallengePNLType.OverallPNL to 2000,
             ),
-            // top 1
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 12_500,
                 TestnetChallengeUserRewardType.WeeklyReward to 50_000,
                 TestnetChallengeUserRewardType.OverallReward to 500_000,
             ),
+            expectedRewardCategory = TestnetChallengeRewardCategory.Top1,
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -46,12 +50,12 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 190,
                 TestnetChallengePNLType.OverallPNL to 1900,
             ),
-            // top 5% (2nd from 20)
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 1250,
                 TestnetChallengeUserRewardType.WeeklyReward to 5_000,
                 TestnetChallengeUserRewardType.OverallReward to 25_000,
             ),
+            expectedRewardCategory = TestnetChallengeRewardCategory.Top5Percent,
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -59,12 +63,12 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 180,
                 TestnetChallengePNLType.OverallPNL to 1800,
             ),
-            // top 10%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 625,
                 TestnetChallengeUserRewardType.WeeklyReward to 2_500,
                 TestnetChallengeUserRewardType.OverallReward to 12_500,
             ),
+            expectedRewardCategory = TestnetChallengeRewardCategory.Top10Percent,
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -72,12 +76,13 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 170,
                 TestnetChallengePNLType.OverallPNL to 1700,
             ),
-            // top 15% -> top 25%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 250,
                 TestnetChallengeUserRewardType.WeeklyReward to 1_000,
                 TestnetChallengeUserRewardType.OverallReward to 5_000,
             ),
+            // top 15% -> top 25%
+            expectedRewardCategory = TestnetChallengeRewardCategory.Top25Percent,
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -85,12 +90,13 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 160,
                 TestnetChallengePNLType.OverallPNL to 1600,
             ),
-            // top 20% -> top 25%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 250,
                 TestnetChallengeUserRewardType.WeeklyReward to 1_000,
                 TestnetChallengeUserRewardType.OverallReward to 5_000,
             ),
+            // top 20% -> top 25%
+            expectedRewardCategory = TestnetChallengeRewardCategory.Top25Percent,
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -98,12 +104,14 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 150,
                 TestnetChallengePNLType.OverallPNL to 1500,
             ),
-            // top 25%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 250,
                 TestnetChallengeUserRewardType.WeeklyReward to 1_000,
                 TestnetChallengeUserRewardType.OverallReward to 5_000,
             ),
+            // top 25%
+            expectedRewardCategory = TestnetChallengeRewardCategory.Top25Percent,
+
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -111,12 +119,13 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 140,
                 TestnetChallengePNLType.OverallPNL to 1400,
             ),
-            // top 30% -> top 50%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 125,
                 TestnetChallengeUserRewardType.WeeklyReward to 500,
                 TestnetChallengeUserRewardType.OverallReward to 2_500,
             ),
+            // top 30% -> top 50%
+            expectedRewardCategory = TestnetChallengeRewardCategory.Top50Percent,
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -124,12 +133,14 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 130,
                 TestnetChallengePNLType.OverallPNL to 1300,
             ),
-            // top 35% -> top 50%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 125,
                 TestnetChallengeUserRewardType.WeeklyReward to 500,
                 TestnetChallengeUserRewardType.OverallReward to 2_500,
             ),
+            // top 35% -> top 50%
+            expectedRewardCategory = TestnetChallengeRewardCategory.Top50Percent,
+
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -137,12 +148,14 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 120,
                 TestnetChallengePNLType.OverallPNL to 1200,
             ),
-            // top 40% -> top 50%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 125,
                 TestnetChallengeUserRewardType.WeeklyReward to 500,
                 TestnetChallengeUserRewardType.OverallReward to 2_500,
             ),
+            // top 40% -> top 50%
+            expectedRewardCategory = TestnetChallengeRewardCategory.Top50Percent,
+
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -150,12 +163,14 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 110,
                 TestnetChallengePNLType.OverallPNL to 1100,
             ),
-            // top 45% -> top 50%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 125,
                 TestnetChallengeUserRewardType.WeeklyReward to 500,
                 TestnetChallengeUserRewardType.OverallReward to 2_500,
             ),
+            // top 45% -> top 50%
+            expectedRewardCategory = TestnetChallengeRewardCategory.Top50Percent,
+
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -163,12 +178,14 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 100,
                 TestnetChallengePNLType.OverallPNL to 1000,
             ),
-            // top 50%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 125,
                 TestnetChallengeUserRewardType.WeeklyReward to 500,
                 TestnetChallengeUserRewardType.OverallReward to 2_500,
             ),
+            // top 50%
+            expectedRewardCategory = TestnetChallengeRewardCategory.Top50Percent,
+
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -176,12 +193,13 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 90,
                 TestnetChallengePNLType.OverallPNL to 900,
             ),
-            // bottom 45%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 0,
                 TestnetChallengeUserRewardType.WeeklyReward to 0,
                 TestnetChallengeUserRewardType.OverallReward to 0,
             ),
+            // bottom 45%
+            expectedRewardCategory = null,
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -189,12 +207,14 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 80,
                 TestnetChallengePNLType.OverallPNL to 800,
             ),
-            // bottom 40%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 0,
                 TestnetChallengeUserRewardType.WeeklyReward to 0,
                 TestnetChallengeUserRewardType.OverallReward to 0,
             ),
+            // bottom 40%
+            expectedRewardCategory = null,
+
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -202,12 +222,14 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 70,
                 TestnetChallengePNLType.OverallPNL to 700,
             ),
-            // bottom 35%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 0,
                 TestnetChallengeUserRewardType.WeeklyReward to 0,
                 TestnetChallengeUserRewardType.OverallReward to 0,
             ),
+            // bottom 35%
+            expectedRewardCategory = null,
+
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -215,12 +237,14 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 60,
                 TestnetChallengePNLType.OverallPNL to 600,
             ),
-            // bottom 30%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 0,
                 TestnetChallengeUserRewardType.WeeklyReward to 0,
                 TestnetChallengeUserRewardType.OverallReward to 0,
             ),
+            // bottom 30%
+            expectedRewardCategory = null,
+
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -228,12 +252,14 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 50,
                 TestnetChallengePNLType.OverallPNL to 500,
             ),
-            // bottom 25%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 0,
                 TestnetChallengeUserRewardType.WeeklyReward to 0,
                 TestnetChallengeUserRewardType.OverallReward to 0,
             ),
+            // bottom 25%
+            expectedRewardCategory = null,
+
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -241,12 +267,14 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 40,
                 TestnetChallengePNLType.OverallPNL to 400,
             ),
-            // bottom 20%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 0,
                 TestnetChallengeUserRewardType.WeeklyReward to 0,
                 TestnetChallengeUserRewardType.OverallReward to 0,
             ),
+            // bottom 20%
+            expectedRewardCategory = null,
+
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -254,12 +282,14 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 30,
                 TestnetChallengePNLType.OverallPNL to 300,
             ),
-            // bottom 15%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 0,
                 TestnetChallengeUserRewardType.WeeklyReward to 0,
                 TestnetChallengeUserRewardType.OverallReward to 0,
             ),
+            // bottom 15%
+            expectedRewardCategory = null,
+
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -267,12 +297,14 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 20,
                 TestnetChallengePNLType.OverallPNL to 200,
             ),
-            // bottom 10%
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 0,
                 TestnetChallengeUserRewardType.WeeklyReward to 0,
                 TestnetChallengeUserRewardType.OverallReward to 0,
             ),
+            // bottom 10%
+            expectedRewardCategory = null,
+
         ),
         TestnetChallengeTestCase(
             givenPnl = listOf(
@@ -280,12 +312,12 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                 TestnetChallengePNLType.WeeklyPNL to 10,
                 TestnetChallengePNLType.OverallPNL to 100,
             ),
-            // bottom 1
             expectedReward = listOf(
                 TestnetChallengeUserRewardType.DailyReward to 250,
                 TestnetChallengeUserRewardType.WeeklyReward to 1_000,
                 TestnetChallengeUserRewardType.OverallReward to 10_000,
             ),
+            expectedRewardCategory = TestnetChallengeRewardCategory.Bottom1,
         ),
     )
 
@@ -330,6 +362,8 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
     private fun `test testnet challenge points distribution`(rewardType: TestnetChallengeUserRewardType) {
         val balancesBefore = lookupBalances(rewardType)
 
+        testData.forEach { assertNull(lookupRecentReward(it.userId!!, rewardType)) }
+
         transaction {
             TestnetChallengePNLEntity.distributePoints(
                 when (rewardType) {
@@ -342,11 +376,17 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
         }
 
         val balancesAfter = lookupBalances(rewardType)
-
         val actualChanges = actualBalanceChanges(balancesBefore, balancesAfter)
         val expectedChanges = expectedBalanceChanges(rewardType)
-
         assertEquals(expectedChanges, actualChanges)
+
+        testData.forEach {
+            if (it.expectedRewardCategory != null) {
+                val achievedReward = lookupRecentReward(it.userId!!, rewardType)
+                assertEquals(it.expectedReward.toMap()[rewardType]!!.toBigDecimal(), achievedReward!!.amount.setScale(0))
+                assertEquals(it.expectedRewardCategory, achievedReward.rewardCategory)
+            }
+        }
     }
 
     private fun expectedBalanceChanges(rewardType: TestnetChallengeUserRewardType) =
@@ -369,6 +409,17 @@ class TestTestnetChallengePointsDistribution : TestWithDb() {
                     .values
                     .singleOrNull() ?: BigDecimal.ZERO
             }
+        }
+    }
+
+    private fun lookupRecentReward(userId: UserId, rewardType: TestnetChallengeUserRewardType): TestnetChallengeUserRewardEntity? {
+        return transaction {
+            TestnetChallengeUserRewardEntity.findRecentForUser(UserEntity[userId])
+                .filter {
+                    it.type == rewardType
+                }
+                .sortedByDescending { it.createdAt }
+                .singleOrNull()
         }
     }
 }
