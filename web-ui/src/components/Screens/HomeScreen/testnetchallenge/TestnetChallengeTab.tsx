@@ -5,7 +5,7 @@ import TradingSymbol from 'tradingSymbol'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import { useConfig } from 'wagmi'
 import TradingSymbols from 'tradingSymbols'
-import { useWallet } from 'contexts/walletProvider'
+import { useWallets } from 'contexts/walletProvider'
 import ZeppelinSvg from 'assets/zeppelin.svg'
 import PointRightSvg from 'assets/point-right.svg'
 import StopHandSvg from 'assets/stop-hand.svg'
@@ -25,11 +25,11 @@ export function TestnetChallengeTab({
 }) {
   const evmConfig = useConfig()
   const queryClient = useQueryClient()
-  const wallet = useWallet()
+  const wallets = useWallets()
   const accountConfigQuery = useQuery({
     queryKey: ['accountConfiguration'],
     queryFn: apiClient.getAccountConfiguration,
-    enabled: wallet.primaryCategory !== 'none'
+    enabled: wallets.connected.length > 0
   })
 
   const [
@@ -138,7 +138,7 @@ export function TestnetChallengeTab({
   // once the wallet is connected, invalidate the accountConfigQuery if it becomes unconnected
   const [walletHasConnected, setWalletHasConnected] = useState(false)
   useEffect(() => {
-    if (wallet.primaryCategory === 'none') {
+    if (wallets.connected.length === 0) {
       if (walletHasConnected) {
         setWalletHasConnected(false)
         queryClient.invalidateQueries({ queryKey: ['accountConfiguration'] })
@@ -146,7 +146,7 @@ export function TestnetChallengeTab({
     } else if (!walletHasConnected) {
       setWalletHasConnected(true)
     }
-  }, [wallet.primaryCategory, walletHasConnected, queryClient])
+  }, [wallets, walletHasConnected, queryClient])
 
   return (
     <>
@@ -157,7 +157,7 @@ export function TestnetChallengeTab({
               <Leaderboard
                 avatarUrl={avatarUrl}
                 nickName={nickName}
-                wallet={wallet}
+                wallets={wallets}
               />
             ) : (
               <div className="col-span-1 laptop:col-span-3">
@@ -178,9 +178,9 @@ export function TestnetChallengeTab({
                             <button
                               className="my-2 rounded-xl bg-darkBluishGray8 px-4 py-2 text-lg"
                               onClick={() => {
-                                if (wallet.primaryCategory === 'none') {
+                                if (wallets.connected.length === 0) {
                                   setEnrollWhenConnected(true)
-                                  wallet.connect('evm')
+                                  wallets.connect('Evm')
                                 } else {
                                   testnetChallengeEnrollMutation.mutate()
                                 }
@@ -188,12 +188,12 @@ export function TestnetChallengeTab({
                             >
                               Enroll
                             </button>
-                            {wallet.primaryCategory === 'none' && (
+                            {wallets.connected.length === 0 && (
                               <div className="text-sm ">
                                 Already enrolled?{' '}
                                 <span
                                   className="cursor-pointer underline"
-                                  onClick={() => wallet.connect('evm')}
+                                  onClick={() => wallets.connect('Evm')}
                                 >
                                   Connect your wallet
                                 </span>
@@ -286,12 +286,12 @@ export function TestnetChallengeTab({
           testnetChallengeDepositContract &&
           exchangeContract &&
           exchangeContract?.address &&
-          wallet.primaryAddress &&
+          wallets.primary?.address &&
           testnetChallengeDepositSymbol.chainId === evmConfig.state.chainId && (
             <DepositModal
               isOpen={showTestnetChallengeDepositModal}
               exchangeContractAddress={exchangeContract.address}
-              walletAddress={wallet.primaryAddress}
+              walletAddress={wallets.primary.address}
               symbol={testnetChallengeDepositSymbol}
               close={() => setShowTestnetChallengeDepositModal(false)}
               onClosed={() => {

@@ -57,7 +57,7 @@ class UtxoSelectionTest {
         val txId = BitcoinClient.sendToAddress(address, BigInteger("3000"))
 
         waitForTx(address, txId)
-        val expectedVout = BitcoinClient.getRawTransaction(txId).txOuts.first { it.value.compareTo(BigDecimal("0.00003000")) == 0 }.index
+        val expectedVout = BitcoinClient.getRawTransaction(txId)!!.txOuts.first { it.value.compareTo(BigDecimal("0.00003000")) == 0 }.index
 
         // check the expected Utxo is returned
         var selectedUtxos = transaction {
@@ -78,7 +78,7 @@ class UtxoSelectionTest {
         // airdrop some more
         val txId2 = BitcoinClient.sendToAddress(address, BigInteger("3100"))
         waitForTx(address, txId2)
-        val expectedVout2 = BitcoinClient.getRawTransaction(txId2).txOuts.first { it.value.compareTo(BigDecimal("0.00003100")) == 0 }.index
+        val expectedVout2 = BitcoinClient.getRawTransaction(txId2)!!.txOuts.first { it.value.compareTo(BigDecimal("0.00003100")) == 0 }.index
         selectedUtxos = transaction {
             UtxoSelectionService.selectUtxos(address, BigInteger("3000"), BigInteger("1500"))
         }
@@ -93,7 +93,7 @@ class UtxoSelectionTest {
         assertEquals(transaction.txId.bytes.toHex(false), txId3.value)
 
         waitForTx(address, txId3)
-        val tx = BitcoinClient.getRawTransaction(txId3)
+        val tx = BitcoinClient.getRawTransaction(txId3)!!
         val changeVout = tx.txOuts.first { it.value.compareTo(BigDecimal("0.00001600")) == 0 }.index
         val transferVout = tx.txOuts.first { it.value.compareTo(BigDecimal("0.00003000")) == 0 }.index
         val unspentUtxos = transaction {
@@ -144,7 +144,7 @@ class UtxoSelectionTest {
         BitcoinClient.mine(1)
 
         waitForTx(address, txId3)
-        val tx = BitcoinClient.getRawTransaction(txId3)
+        val tx = BitcoinClient.getRawTransaction(txId3)!!
         val changeVout = tx.txOuts.first { it.value.compareTo(BigDecimal("0.00002000")) == 0 }.index
         val transferVout = tx.txOuts.first { it.value.compareTo(BigDecimal(transferAmount.inSatsAsDecimalString())) == 0 }.index
 

@@ -12,6 +12,7 @@ import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.BitcoinAddress
 
 @Serializable
 @JvmInline
@@ -94,6 +95,8 @@ class DeployedSmartContractEntity(guid: EntityID<ContractId>) : GUIDEntity<Contr
                     DeployedSmartContractTable.chainId.eq(chainId) and DeployedSmartContractTable.deprecated.eq(false)
                 }
                 .toList()
+
+        fun programBitcoinAddress() = validContracts(ChainId(0u)).first { it.name == ContractType.Exchange.name }.proxyAddress as BitcoinAddress
     }
 
     var createdAt by DeployedSmartContractTable.createdAt

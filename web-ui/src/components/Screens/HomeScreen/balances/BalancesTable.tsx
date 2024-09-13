@@ -24,7 +24,7 @@ import { useConfig } from 'wagmi'
 import TradingSymbol from 'tradingSymbol'
 import { SymbolAndChain } from 'components/common/SymbolAndChain'
 import { ExpandableValue } from 'components/common/ExpandableValue'
-import { useWallet } from 'contexts/walletProvider'
+import { useWallets } from 'contexts/walletProvider'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 
@@ -37,7 +37,7 @@ export function BalancesTable({
   exchangeContractAddress?: string
   symbols: TradingSymbols
 }) {
-  const wallet = useWallet()
+  const wallets = useWallets()
   const evmConfig = useConfig()
 
   const [depositSymbol, setDepositSymbol] = useState<TradingSymbol | null>(null)
@@ -99,14 +99,6 @@ export function BalancesTable({
     }
   }
 
-  function walletConnectedForSymbol(symbol: TradingSymbol) {
-    return (
-      (symbol.networkType == 'Evm' &&
-        wallet.evmAccount?.status === 'connected') ||
-      (symbol.networkType == 'Bitcoin' && wallet.bitcoinAccount)
-    )
-  }
-
   return (
     <>
       <div className="grid max-h-72 auto-rows-max grid-cols-[max-content_1fr_max-content] overflow-y-scroll">
@@ -125,7 +117,7 @@ export function BalancesTable({
                 />
               </div>
               <div className="mb-4 inline-block space-x-4 text-xs">
-                {walletConnectedForSymbol(symbol) ? (
+                {wallets.isConnected(symbol.networkType) ? (
                   <>
                     <Button
                       style={'normal'}

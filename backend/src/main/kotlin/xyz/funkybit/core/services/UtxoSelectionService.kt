@@ -5,7 +5,10 @@ import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceApi
 import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.bitcoin.UtxoId
+import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.BitcoinWalletStateEntity
+import xyz.funkybit.core.model.db.DeployedSmartContractEntity
+import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.UnspentUtxo
 import xyz.funkybit.core.utils.bitcoin.BitcoinInputsSelector
 import java.math.BigInteger
@@ -17,7 +20,7 @@ object UtxoSelectionService {
     private val inputsSelector = BitcoinInputsSelector()
 
     fun selectUtxos(address: BitcoinAddress, amount: BigInteger, fee: BigInteger): List<UnspentUtxo> {
-        val unspentUtxos = refreshUnspentUtxos(address)
+        val unspentUtxos = refreshUnspentUtxos(address, listOf(), skipMempool = false)
         return inputsSelector.selectInputs(
             amount,
             unspentUtxos.filter { it.reservedBy == null },
@@ -25,12 +28,23 @@ object UtxoSelectionService {
         )
     }
 
-    fun refreshUnspentUtxos(address: BitcoinAddress): List<UnspentUtxo> {
+    fun selectUtxosForProgram(amount: BigInteger, fee: BigInteger): List<UnspentUtxo> {
+        val address = DeployedSmartContractEntity.programBitcoinAddress()
+        val skipTxIds = listOf(ArchAccountEntity.findProgramAccount()!!.utxoId.txId())
+        val unspentUtxos = refreshUnspentUtxos(address, skipTxIds, skipMempool = true)
+        return inputsSelector.selectInputs(
+            amount,
+            unspentUtxos.filter { it.reservedBy == null },
+            fee,
+        )
+    }
+
+    fun refreshUnspentUtxos(address: BitcoinAddress, skipTxIds: List<TxHash> = listOf(), skipMempool: Boolean = false): List<UnspentUtxo> {
         val bitcoinWalletState = BitcoinWalletStateEntity.findByAddress(address)
 
         val unspentUtxos = bitcoinWalletState?.unspentUtxos?.associate { it.utxoId to it }?.toMutableMap() ?: mutableMapOf()
 
-        val lastSeenBlock = updateUtxoMap(unspentUtxos, address, bitcoinWalletState?.lastSeenBlockHeight)
+        val lastSeenBlock = updateUtxoMap(unspentUtxos, address, bitcoinWalletState?.lastSeenBlockHeight, skipMempool, skipTxIds)
         return unspentUtxos.values.toList().also {
             logger.debug { "available amount is ${it.sumOf { u -> u.amount }}" }
             if (bitcoinWalletState != null) {
@@ -59,7 +73,7 @@ object UtxoSelectionService {
         }
     }
 
-    private fun updateUtxoMap(utxoMap: MutableMap<UtxoId, UnspentUtxo>, walletAddress: BitcoinAddress, lastSeenBlockHeight: Long?): Long? {
+    private fun updateUtxoMap(utxoMap: MutableMap<UtxoId, UnspentUtxo>, walletAddress: BitcoinAddress, lastSeenBlockHeight: Long?, skipMempool: Boolean = false, skipTxIds: List<TxHash> = emptyList()): Long? {
         logger.debug { "updating utxos for $walletAddress lastSeenBlockHeight=$lastSeenBlockHeight" }
 
         // mempool pagination is a little odd
@@ -74,7 +88,7 @@ object UtxoSelectionService {
 
         val allTxs = mutableListOf<MempoolSpaceApi.Transaction>()
 
-        var txs = MempoolSpaceClient.getTransactions(walletAddress, null)
+        var txs = MempoolSpaceClient.getTransactions(walletAddress, null).filterNot { skipTxIds.contains(it.txId) || (skipMempool && !it.status.confirmed) }
         var hasMore = true
 
         while (hasMore) {
@@ -91,7 +105,7 @@ object UtxoSelectionService {
                     val lastId = txs.lastOrNull { it.status.confirmed }?.txId
                     if (lastId != null) {
                         txs =
-                            MempoolSpaceClient.getTransactions(walletAddress, lastId).filterNot { it.txId == lastId }
+                            MempoolSpaceClient.getTransactions(walletAddress, lastId).filterNot { it.txId == lastId || skipTxIds.contains(it.txId) }
                     } else {
                         hasMore = false
                     }

@@ -129,13 +129,12 @@ object ChainManager {
 //        password = System.getenv("BITCOIN_NETWORK_RPC_PASSWORD") ?: "password",
         net = System.getenv("BITCOIN_NETWORK_NAME") ?: "org.bitcoin.regtest",
         enableBasicAuth = (System.getenv("BITCOIN_NETWORK_ENABLE_BASIC_AUTH") ?: "true").toBoolean(),
-        feeSettings = FeeEstimationSettings(1, SmartFeeMode.CONSERVATIVE, 5, 5),
+        feeSettings = FeeEstimationSettings(1, SmartFeeMode.CONSERVATIVE, 5, 50),
         blockExplorerNetName = System.getenv("BLOCK_EXPLORER_NET_NAME_BITCOIN") ?: "Bitcoin Network",
         blockExplorerUrl = System.getenv("BLOCK_EXPLORER_URL_BITCOIN") ?: "http://localhost:1080",
         faucetAddress = BitcoinAddress.canonicalize("bcrt1q3nyukkpkg6yj0y5tj6nj80dh67m30p963mzxy7"),
         submitterPrivateKey = (System.getenv("BITCOIN_SUBMITTER_PRIVATE_KEY") ?: "0x7ebc626d01c2d916c61dffee4ed2501f579009ad362360d82fcc30e3d8746cec").toHexBytes(),
-        feePayerPrivateKey = (System.getenv("BITCOIN_FEE_PAYER_PRIVATE_KEY") ?: "0x614293096668ec4c26ede066b1570edc6bd6d663701dffb8247b63e7a3b0f566").toHexBytes(),
-        // address for fee Payer is bcrt1qdca3sam9mldju3ssryrrcmjvd8pgnw30ccaggx
+        feePayerPrivateKey = (System.getenv("BITCOIN_FEE_PAYER_PRIVATE_KEY") ?: ECKey().privateKeyAsHex).toHexBytes(),
         changeDustThreshold = BigInteger(System.getenv("BITCOIN_CHANGE_DUST_THRESHOLD") ?: "300"),
         feeCollectionAddress = BitcoinAddress.canonicalize(System.getenv("BITCOIN_FEE_ACCOUNT_ADDRESS") ?: "bcrt1q5jdpyt2x5utsqgaazdf6jr4cc7yeaec0me0e4u"),
         /* privKey for bcrt1q5jdpyt2x5utsqgaazdf6jr4cc7yeaec0me0e4u = 0x63fe5172a2b186b8015fb60d9c314eb9017a8465ed169d5e5ff41ed8fa8d9a4a */

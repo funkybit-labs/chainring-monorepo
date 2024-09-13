@@ -4,7 +4,7 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.db.Migration
 import xyz.funkybit.core.db.updateEnum
-import xyz.funkybit.core.model.db.BlockchainTransactionTable
+import xyz.funkybit.core.model.db.BlockchainTransactionId
 import xyz.funkybit.core.model.db.DepositId
 import xyz.funkybit.core.model.db.GUIDTable
 import xyz.funkybit.core.model.db.PGEnum
@@ -21,6 +21,10 @@ class V82_AddSettlingStatusToDeposit : Migration() {
         Settling,
     }
 
+    @Suppress("ClassName")
+    object V82_BlockchainTransactionTable : GUIDTable<BlockchainTransactionId>("blockchain_transaction", ::BlockchainTransactionId)
+
+    @Suppress("ClassName")
     object V82_DepositTable : GUIDTable<DepositId>("deposit", ::DepositId) {
         val status = customEnumeration(
             "status",
@@ -30,7 +34,7 @@ class V82_AddSettlingStatusToDeposit : Migration() {
         ).index()
         val archTransactionGuid = reference(
             "arch_tx_guid",
-            BlockchainTransactionTable,
+            V82_BlockchainTransactionTable,
         ).nullable()
     }
 
