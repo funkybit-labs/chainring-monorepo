@@ -226,13 +226,13 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
                 }
                 // have they ever connected a bitcoin wallet?
                 if (WalletEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Bitcoin)) {
-                    if (WithdrawalEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Bitcoin)) {
+                    if (!WithdrawalEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Bitcoin)) {
                         cards.add(Card(type = CardType.BitcoinWithdrawal, params = emptyMap()))
                     }
                 } else {
                     cards.add(Card(type = CardType.BitcoinConnect, params = emptyMap()))
                 }
-                if (WalletEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Evm)) {
+                if (!WithdrawalEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Evm)) {
                     cards.add(Card(type = CardType.EvmWithdrawal, params = emptyMap()))
                 }
             }
