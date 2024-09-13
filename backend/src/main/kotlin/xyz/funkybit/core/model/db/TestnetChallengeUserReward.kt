@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.JoinType
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.alias
 import org.jetbrains.exposed.sql.compoundAnd
 import org.jetbrains.exposed.sql.insertIgnore
@@ -31,6 +32,17 @@ enum class TestnetChallengeUserRewardType {
     ReferralBonus,
 }
 
+enum class TestnetChallengeRewardCategory {
+    Top1,
+    Top1Percent,
+    Top5Percent,
+    Top10Percent,
+    Top25Percent,
+    Top50Percent,
+    Bottom5Percent,
+    Bottom1,
+}
+
 object TestnetChallengeUserRewardTable : GUIDTable<TestnetChallengeUserRewardId>("testnet_challenge_user_reward", ::TestnetChallengeUserRewardId) {
     val createdAt = timestamp("created_at").index()
     val createdBy = varchar("created_by", 10485760)
@@ -42,6 +54,12 @@ object TestnetChallengeUserRewardTable : GUIDTable<TestnetChallengeUserRewardId>
         { value -> TestnetChallengeUserRewardType.valueOf(value as String) },
         { PGEnum("TestnetChallengeUserRewardType", it) },
     ).index()
+    val rewardCategory = customEnumeration(
+        "reward_category",
+        "TestnetChallengeRewardCategory",
+        { value -> TestnetChallengeRewardCategory.valueOf(value as String) },
+        { PGEnum("TestnetChallengeRewardCategory", it) },
+    ).nullable()
 }
 
 class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserRewardId>) : GUIDEntity<TestnetChallengeUserRewardId>(guid) {
@@ -98,6 +116,15 @@ class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserReward
                         )
                 }
         }
+
+        fun findRecentForUser(user: UserEntity): List<TestnetChallengeUserRewardEntity> {
+            return TestnetChallengeUserRewardEntity.find {
+                TestnetChallengeUserRewardTable.userGuid eq user.guid
+            }
+                .orderBy(TestnetChallengeUserRewardTable.createdAt to SortOrder.DESC)
+                .limit(3)
+                .toList()
+        }
     }
 
     var createdAt by TestnetChallengeUserRewardTable.createdAt
@@ -105,6 +132,8 @@ class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserReward
     var userGuid by TestnetChallengeUserRewardTable.userGuid
     var user by UserEntity referencedOn TestnetChallengeUserRewardTable.userGuid
     var amount by TestnetChallengeUserRewardTable.amount
+    var type by TestnetChallengeUserRewardTable.type
+    var rewardCategory by TestnetChallengeUserRewardTable.rewardCategory
 }
 
 fun UserEntity.pointsBalances(): Map<TestnetChallengeUserRewardType, BigDecimal> {

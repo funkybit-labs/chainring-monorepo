@@ -367,6 +367,12 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                 .orderBy(Pair(OrderTable.createdAt, SortOrder.DESC))
                 .map(OrderEntity::wrapRow)
                 .toList()
+
+        fun existsForUser(user: UserEntity): Boolean {
+            return OrderTable.innerJoin(WalletTable).select(OrderTable.id).where {
+                WalletTable.userGuid eq user.guid
+            }.limit(1).any()
+        }
     }
 
     fun update(amount: BigInteger, price: BigDecimal?) {

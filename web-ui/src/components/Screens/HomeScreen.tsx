@@ -148,7 +148,7 @@ function HomeScreenContent() {
       <>
         <div className="min-h-screen bg-darkBluishGray10">
           <Header
-            initialTab={tab}
+            tab={tab}
             markets={markets}
             onTabChange={saveTab}
             onShowAdmin={() => setShowAdmin(true)}
