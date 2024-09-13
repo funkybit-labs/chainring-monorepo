@@ -1,5 +1,12 @@
 package xyz.funkybit.integrationtests.testnetchallenge
 
+import io.mockk.every
+import io.mockk.mockkObject
+import io.mockk.unmockkAll
+import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import org.awaitility.kotlin.await
 import org.http4k.websocket.WsClient
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -15,6 +22,7 @@ import xyz.funkybit.apps.api.model.toSymbolInfo
 import xyz.funkybit.apps.ring.BlockchainDepositHandler
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.OrderSide
+import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
 import xyz.funkybit.core.model.db.TestnetChallengePNLType
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.utils.TestnetChallengeUtils
@@ -33,6 +41,9 @@ import xyz.funkybit.integrationtests.utils.assertMyLimitOrderCreatedMessageRecei
 import xyz.funkybit.integrationtests.utils.signAuthorizeBitcoinWalletRequest
 import java.math.BigDecimal
 import java.time.Duration
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.assertEquals
 
 data class Trader(
     val apiClient: TestApiClient,
@@ -199,5 +210,78 @@ class TestnetChallengeTest : OrderBaseTest() {
             ),
             cards.toSet(),
         )
+    }
+
+    @BeforeTest
+    fun setUp() {
+        // mock Clock and last updated
+        mockkObject(Clock.System)
+        mockkObject(TestnetChallengePNLEntity)
+    }
+
+    @AfterTest
+    fun tearDown() {
+        unmockkAll()
+    }
+
+    @Test
+    fun `test points distribution - daily`() {
+        val apiClient = enrollInTestnetChallenge()
+
+        assertEquals(BigDecimal.ZERO, apiClient.a.getAccountConfiguration().pointsBalance)
+
+        // same day
+        simulateTimeAndLastUpdate(
+            now = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 7, hour = 23, minute = 30),
+            lastUpdate = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 7, hour = 23, minute = 30),
+        )
+        triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_leaderboard")
+        assertEquals(BigDecimal.ZERO, apiClient.a.getAccountConfiguration().pointsBalance)
+
+        // day boundary crossed
+        simulateTimeAndLastUpdate(
+            // Sunday
+            now = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 8, hour = 0, minute = 30),
+            // Saturday
+            lastUpdate = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 7, hour = 23, minute = 30),
+        )
+        triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_leaderboard")
+
+        // daily, 1st place
+        assertEquals(BigDecimal("12500"), apiClient.a.getAccountConfiguration().pointsBalance.setScale(0))
+    }
+
+    @Test
+    fun `test points distribution - weekly`() {
+        val apiClient = enrollInTestnetChallenge()
+        assertEquals(BigDecimal.ZERO, apiClient.a.getAccountConfiguration().pointsBalance)
+
+        // same day
+        simulateTimeAndLastUpdate(
+            now = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 8, hour = 23, minute = 30),
+            lastUpdate = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 8, hour = 22, minute = 30),
+        )
+        triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_leaderboard")
+        assertEquals(BigDecimal.ZERO, apiClient.a.getAccountConfiguration().pointsBalance)
+
+        // day + week boundaries crossed
+        simulateTimeAndLastUpdate(
+            // Monday
+            now = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 9, hour = 0, minute = 30),
+            // Sunday
+            lastUpdate = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 8, hour = 23, minute = 30),
+        )
+        triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_leaderboard")
+
+        // daily + weekly, 1st place
+        assertEquals(
+            expected = BigDecimal("12500") + BigDecimal("50000"),
+            actual = apiClient.a.getAccountConfiguration().pointsBalance.setScale(0),
+        )
+    }
+
+    private fun simulateTimeAndLastUpdate(now: LocalDateTime, lastUpdate: LocalDateTime) {
+        every { Clock.System.now() } returns now.toInstant(TimeZone.UTC)
+        every { TestnetChallengePNLEntity.getLastUpdate() } returns lastUpdate
     }
 }

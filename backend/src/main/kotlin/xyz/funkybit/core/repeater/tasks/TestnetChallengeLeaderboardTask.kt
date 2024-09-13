@@ -1,16 +1,18 @@
 package xyz.funkybit.core.repeater.tasks
 
 import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
-import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
-import xyz.funkybit.core.model.db.TestnetChallengePNLTable
+import xyz.funkybit.core.model.db.TestnetChallengePNLType
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import kotlin.time.Duration.Companion.seconds
 
-class TestnetChallengeLeaderboardTask() : RepeaterBaseTask(
+class TestnetChallengeLeaderboardTask : RepeaterBaseTask(
     invokePeriod = 10.seconds,
 ) {
     override val name: String = "testnet_challenge_leaderboard"
@@ -19,14 +21,24 @@ class TestnetChallengeLeaderboardTask() : RepeaterBaseTask(
         if (TestnetChallengeUtils.enabled) {
             transaction {
                 // get the last update from the pnl table
-                val lastUpdate = TestnetChallengePNLTable.select(TestnetChallengePNLTable.asOf).orderBy(TestnetChallengePNLTable.asOf to SortOrder.DESC).limit(1).singleOrNull()?.let {
-                    it[TestnetChallengePNLTable.asOf].toLocalDateTime(TimeZone.UTC)
+                val lastUpdate = TestnetChallengePNLEntity.getLastUpdate()
+
+                if (lastUpdate != null) {
+                    val now = Clock.System.now().toLocalDateTime(TimeZone.UTC)
+
+                    // if we've crossed a day boundary, reward points and reset the leaderboards
+                    if (now.date == lastUpdate.date.plus(1, DateTimeUnit.DAY)) {
+                        TestnetChallengePNLEntity.distributePoints(TestnetChallengePNLType.DailyPNL)
+                        TestnetChallengePNLEntity.resetCurrentBalance(TestnetChallengePNLType.DailyPNL)
+
+                        // and also week boundary
+                        if (lastUpdate.date.dayOfWeek == DayOfWeek.SUNDAY && now.date.dayOfWeek == DayOfWeek.MONDAY) {
+                            TestnetChallengePNLEntity.distributePoints(TestnetChallengePNLType.WeeklyPNL)
+                            TestnetChallengePNLEntity.resetCurrentBalance(TestnetChallengePNLType.WeeklyPNL)
+                        }
+                    }
                 }
-                val now = Clock.System.now().toLocalDateTime(TimeZone.UTC)
-                // if we've crossed a day boundary, reward points and reset the leaderboards
-                if (lastUpdate != null && (now.dayOfYear - 1 == lastUpdate.dayOfYear || (now.dayOfYear == 1 && now.year - 1 == lastUpdate.year))) {
-                    // TODO - CHAIN-479
-                }
+
                 TestnetChallengePNLEntity.updateAllBalances()
             }
         }

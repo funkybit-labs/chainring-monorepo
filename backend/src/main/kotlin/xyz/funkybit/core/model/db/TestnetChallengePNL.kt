@@ -2,6 +2,9 @@ package xyz.funkybit.core.model.db
 
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
@@ -14,11 +17,10 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.TransactionManager
+import org.jetbrains.exposed.sql.update
 import xyz.funkybit.apps.api.model.Leaderboard
 import xyz.funkybit.apps.api.model.LeaderboardEntry
 import xyz.funkybit.core.model.Address
-import xyz.funkybit.core.model.BitcoinAddress
-import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import kotlin.math.ceil
 import kotlin.math.max
@@ -76,6 +78,16 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
             }
         }
 
+        fun getLastUpdate(): LocalDateTime? {
+            return TestnetChallengePNLTable
+                .select(TestnetChallengePNLTable.asOf)
+                .orderBy(TestnetChallengePNLTable.asOf to SortOrder.DESC)
+                .limit(1).singleOrNull()
+                ?.let {
+                    it[TestnetChallengePNLTable.asOf].toLocalDateTime(TimeZone.UTC)
+                }
+        }
+
         fun updateAllBalances() {
             val referenceSymbol = TestnetChallengeUtils.depositSymbol()
             TransactionManager.current().exec(
@@ -110,6 +122,121 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
                     tcp.${TestnetChallengePNLTable.userGuid.name} = bs.user_guid;
                 """.trimIndent(),
             )
+        }
+
+        fun distributePoints(challengePNLType: TestnetChallengePNLType) {
+            val rewardType = when (challengePNLType) {
+                TestnetChallengePNLType.DailyPNL -> TestnetChallengeUserRewardType.DailyReward
+                TestnetChallengePNLType.WeeklyPNL -> TestnetChallengeUserRewardType.WeeklyReward
+                TestnetChallengePNLType.OverallPNL -> TestnetChallengeUserRewardType.OverallReward
+            }
+
+            TransactionManager.current().exec(
+                """
+                WITH ranked_users AS (SELECT ${TestnetChallengePNLTable.userGuid.name}   AS user_guid,
+                                             ${TestnetChallengePNLTable.type.name}       AS type,
+                                             ROW_NUMBER() OVER (
+                                                PARTITION BY type 
+                                                ORDER BY ((${TestnetChallengePNLTable.currentBalance.name} - ${TestnetChallengePNLTable.initialBalance.name}) / ${TestnetChallengePNLTable.initialBalance.name}) DESC
+                                             )                                           AS rank,
+                                             COUNT(*) OVER (PARTITION BY type)           AS total_users
+                                      FROM ${TestnetChallengePNLTable.tableName}
+                                      WHERE type = '${challengePNLType.name}'),
+                     calculated_rewards AS (SELECT user_guid,
+                                                  type,
+                                                  rank,
+                                                  total_users,
+                                                  CASE
+                                                      -- first
+                                                      WHEN rank = 1 THEN
+                                                          CASE type
+                                                              WHEN '${TestnetChallengePNLType.DailyPNL.name}' THEN 12500
+                                                              WHEN '${TestnetChallengePNLType.WeeklyPNL.name}' THEN 50000
+                                                              WHEN '${TestnetChallengePNLType.OverallPNL.name}' THEN 500000
+                                                          END
+                                                      -- last
+                                                      WHEN rank = total_users THEN
+                                                          CASE type
+                                                              WHEN '${TestnetChallengePNLType.DailyPNL.name}' THEN 250
+                                                              WHEN '${TestnetChallengePNLType.WeeklyPNL.name}' THEN 1000
+                                                              WHEN '${TestnetChallengePNLType.OverallPNL.name}' THEN 10000
+                                                          END
+                                                      -- top 1%
+                                                      WHEN (rank - 1) <= total_users * 0.01 THEN
+                                                          CASE type
+                                                              WHEN '${TestnetChallengePNLType.DailyPNL.name}' THEN 2500
+                                                              WHEN '${TestnetChallengePNLType.WeeklyPNL.name}' THEN 10000
+                                                              WHEN '${TestnetChallengePNLType.OverallPNL.name}' THEN 100000
+                                                          END
+                                                      -- top 5%
+                                                      WHEN (rank - 1) <= total_users * 0.05 THEN
+                                                          CASE type
+                                                              WHEN '${TestnetChallengePNLType.DailyPNL.name}' THEN 1250
+                                                              WHEN '${TestnetChallengePNLType.WeeklyPNL.name}' THEN 5000
+                                                              WHEN '${TestnetChallengePNLType.OverallPNL.name}' THEN 25000
+                                                          END
+                                                      -- top 10%
+                                                      WHEN (rank - 1) <= total_users * 0.10 THEN
+                                                          CASE type
+                                                              WHEN '${TestnetChallengePNLType.DailyPNL.name}' THEN 625
+                                                              WHEN '${TestnetChallengePNLType.WeeklyPNL.name}' THEN 2500
+                                                              WHEN '${TestnetChallengePNLType.OverallPNL.name}' THEN 12500
+                                                          END
+                                                      -- top 25%
+                                                      WHEN (rank - 1) <= total_users * 0.25 THEN
+                                                          CASE type
+                                                              WHEN '${TestnetChallengePNLType.DailyPNL.name}' THEN 250
+                                                              WHEN '${TestnetChallengePNLType.WeeklyPNL.name}' THEN 1000 
+                                                              WHEN '${TestnetChallengePNLType.OverallPNL.name}' THEN 5000 
+                                                          END
+                                                      -- top 50%
+                                                      WHEN (rank - 1) <= total_users * 0.50 THEN 
+                                                          CASE type 
+                                                              WHEN '${TestnetChallengePNLType.DailyPNL.name}' THEN 125 
+                                                              WHEN '${TestnetChallengePNLType.WeeklyPNL.name}' THEN 500
+                                                              WHEN '${TestnetChallengePNLType.OverallPNL.name}' THEN 2500
+                                                          END
+                                                      -- bottom 5%
+                                                      WHEN rank > total_users * 0.95 THEN 
+                                                          CASE type
+                                                              WHEN '${TestnetChallengePNLType.DailyPNL.name}' THEN 125
+                                                              WHEN '${TestnetChallengePNLType.WeeklyPNL.name}' THEN 500
+                                                              WHEN '${TestnetChallengePNLType.OverallPNL.name}' THEN 5000
+                                                          END
+                                                      -- rest
+                                                      ELSE 0 END AS reward,
+                                                  CASE
+                                                      WHEN rank = 1 THEN '${TestnetChallengeRewardCategory.Top1.name}'
+                                                      WHEN rank = total_users THEN '${TestnetChallengeRewardCategory.Bottom1.name}'
+                                                      WHEN (rank - 1) <= total_users * 0.01 THEN '${TestnetChallengeRewardCategory.Top1Percent.name}'
+                                                      WHEN (rank - 1) <= total_users * 0.05 THEN '${TestnetChallengeRewardCategory.Top5Percent.name}'
+                                                      WHEN (rank - 1) <= total_users * 0.10 THEN '${TestnetChallengeRewardCategory.Top10Percent.name}'
+                                                      WHEN (rank - 1) <= total_users * 0.25 THEN '${TestnetChallengeRewardCategory.Top25Percent.name}'
+                                                      WHEN (rank - 1) <= total_users * 0.50 THEN '${TestnetChallengeRewardCategory.Top50Percent.name}'
+                                                      WHEN rank > total_users * 0.95 THEN '${TestnetChallengeRewardCategory.Bottom5Percent.name}'
+                                                      ELSE '' END AS reward_category
+                                           FROM ranked_users)
+                INSERT
+                INTO ${TestnetChallengeUserRewardTable.tableName}(
+                    ${TestnetChallengeUserRewardTable.guid.name}, 
+                    ${TestnetChallengeUserRewardTable.createdAt.name}, 
+                    ${TestnetChallengeUserRewardTable.createdBy.name}, 
+                    ${TestnetChallengeUserRewardTable.userGuid.name}, 
+                    ${TestnetChallengeUserRewardTable.type.name}, 
+                    ${TestnetChallengeUserRewardTable.amount.name},
+                    ${TestnetChallengeUserRewardTable.rewardCategory.name}
+                )
+                SELECT typeid_generate_text('tncurwd'), now(), 'system', user_guid, '${rewardType.name}', reward, reward_category::testnetchallengerewardcategory
+                FROM calculated_rewards
+                WHERE reward > 0;
+                """.trimIndent(),
+            )
+        }
+
+        fun resetCurrentBalance(challengePNLType: TestnetChallengePNLType) {
+            TestnetChallengePNLTable.update({ TestnetChallengePNLTable.type.eq(challengePNLType) }) {
+                it[initialBalance] = currentBalance
+            }
         }
 
         fun getLeaderboard(testnetChallengePNLType: TestnetChallengePNLType, page: Long): Leaderboard {
@@ -154,12 +281,7 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
                 lastPage = maxPage.toInt(),
                 entries.map { entry ->
                     LeaderboardEntry(
-                        entry[UserTable.nickName] ?: Address.auto(entry[WalletTable.address]).let {
-                            when (it) {
-                                is EvmAddress -> it.abbreviated()
-                                is BitcoinAddress -> it.abbreviated()
-                            }
-                        },
+                        entry[UserTable.nickName] ?: Address.auto(entry[WalletTable.address]).abbreviated(),
                         entry[UserTable.avatarUrl],
                         entry[TestnetChallengePNLTable.currentBalance].toDouble(),
                         entry[pnlRatioExpr].toDouble(),

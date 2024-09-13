@@ -37,6 +37,8 @@ import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
+import xyz.funkybit.core.model.db.pointsBalances
+import xyz.funkybit.core.model.db.sum
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -192,6 +194,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                         testnetChallengeDepositContract = null,
                         nickName = "Nick Name",
                         avatarUrl = "https://icons/avatar.svg",
+                        pointsBalance = BigDecimal.ZERO,
                     ),
             )
         } bindContract Method.GET to { request ->
@@ -209,6 +212,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                             testnetChallengeDepositContract = if (TestnetChallengeUtils.enabled) TestnetChallengeUtils.depositSymbol().contractAddress else null,
                             nickName = request.principal.user.nickname,
                             avatarUrl = request.principal.user.avatarUrl,
+                            pointsBalance = request.principal.user.pointsBalances().sum(),
                         ),
                 )
             }

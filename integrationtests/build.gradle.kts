@@ -23,6 +23,7 @@ val protobufKotlinVersion = "4.26.0"
 
 dependencies {
     implementation(kotlin("test"))
+    implementation("io.mockk:mockk:1.13.12")
     implementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$kotlinxSerializationVersion")
