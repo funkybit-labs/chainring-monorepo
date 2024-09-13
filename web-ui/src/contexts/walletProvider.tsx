@@ -6,22 +6,20 @@ import React, {
   useMemo,
   useState
 } from 'react'
-import { useAccount, UseAccountReturnType, WagmiProvider } from 'wagmi'
+import { useAccount, WagmiProvider } from 'wagmi'
 import {
   BitcoinAccount,
   BitcoinProvider,
-  bitcoinSignMessage,
   useBitcoinWallet
 } from 'contexts/bitcoin'
 import { wagmiConfig } from 'wagmiConfig'
 import Spinner from 'components/common/Spinner'
 import { useWeb3Modal, useWeb3ModalEvents } from '@web3modal/wagmi/react'
 import { useEffectOnce } from 'react-use'
-import { apiClient, authorizeWalletApiClient, NetworkType } from 'apiClient'
-import { disconnect as disconnectEvmWallet, signTypedData } from '@wagmi/core'
-import { signAuthToken } from 'auth'
+import { NetworkType } from 'apiClient'
+import { disconnect as disconnectEvmWallet } from '@wagmi/core'
 import BtcSvg from 'assets/btc.svg'
-import { UserRejectedRequestError } from 'viem'
+import { authorizeWallet } from 'walletAuthorization'
 
 export interface ConnectedBitcoinWallet {
   networkType: 'Bitcoin'
@@ -103,6 +101,12 @@ export function getGlobalPrimaryChainId(): number | null {
 
 function setGlobalPrimaryChainId(chainId: number | null) {
   setGlobal('primaryChainId', chainId)
+}
+
+function clearGlobalPrimary() {
+  setGlobalPrimaryAddress(null)
+  setGlobalPrimaryChainId(null)
+  setGlobalPrimaryNetworkType(null)
 }
 
 function WalletProviderInternal({ children }: { children: React.ReactNode }) {
@@ -273,185 +277,37 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     }
   }, [web3ModalEvent, evmAccount])
 
-  const authorizeBitcoinWallet = useCallback(
-    async (
-      bitcoinAccount: BitcoinAccount,
-      evmAccount: UseAccountReturnType
-    ) => {
-      const accountConfig = await apiClient.getAccountConfiguration()
-      if (accountConfig.authorizedAddresses.length == 0) {
-        try {
-          const bitcoinAddress = bitcoinAccount.address
-          const evmAddress = evmAccount.address!
-          const chainId = evmAccount.chainId!
-          const timestamp = new Date().toISOString()
-
-          const bitcoinWalletAuthToken = await signAuthToken(bitcoinAddress, 0)
-          if (bitcoinWalletAuthToken == null) {
-            bitcoinWallet.disconnect()
-            return
-          }
-
-          const commonMessage = `[funkybit] Please sign this message to authorize Bitcoin wallet ${bitcoinAddress}. This action will not cost any gas fees.`
-          const evmMessage = {
-            message: commonMessage,
-            address: evmAddress,
-            authorizedAddress: bitcoinAddress,
-            chainId: chainId,
-            timestamp: timestamp
-          }
-          const evmSignature = await signTypedData(wagmiConfig, {
-            domain: {
-              name: 'funkybit',
-              chainId: chainId
-            },
-            types: {
-              EIP712Domain: [
-                { name: 'name', type: 'string' },
-                { name: 'chainId', type: 'uint32' }
-              ],
-              Authorize: [
-                { name: 'message', type: 'string' },
-                { name: 'address', type: 'string' },
-                { name: 'authorizedAddress', type: 'string' },
-                { name: 'chainId', type: 'uint32' },
-                { name: 'timestamp', type: 'string' }
-              ]
-            },
-            message: evmMessage,
-            primaryType: 'Authorize'
-          }).catch((e) => {
-            if (e instanceof UserRejectedRequestError) {
-              return null
-            } else {
-              throw e
-            }
-          })
-
-          if (evmSignature == null) {
-            bitcoinWallet.disconnect()
-            return
-          }
-
-          await authorizeWallet(
-            {
-              address: bitcoinAddress,
-              authToken: bitcoinWalletAuthToken
-            },
-            {
-              address: evmAddress.toLowerCase(),
-              chainId: chainId,
-              signature: evmSignature,
-              timestamp: timestamp
-            }
-          )
-        } catch (error) {
-          console.log('Error during wallet authorization', error)
+  const disconnect = useCallback(
+    (networkType: NetworkType) => {
+      switch (networkType) {
+        case 'Bitcoin':
           bitcoinWallet.disconnect()
-          alert(
-            'Something went wrong while authorizing a wallet, please try again or contact customer support'
-          )
-        }
+          break
+        case 'Evm':
+          disconnectEvmWallet(wagmiConfig)
+          break
       }
     },
     [bitcoinWallet]
   )
 
-  const authorizeEvmWallet = useCallback(
-    async (
-      bitcoinAccount: BitcoinAccount,
-      evmAccount: UseAccountReturnType
-    ) => {
-      const accountConfig = await apiClient.getAccountConfiguration()
-      if (accountConfig.authorizedAddresses.length == 0) {
-        try {
-          const bitcoinAddress = bitcoinAccount.address
-          const evmAddress = evmAccount.address!
-          const chainId = evmAccount.chainId!
-          const timestamp = new Date().toISOString()
-
-          const evmWalletAuthToken = await signAuthToken(evmAddress, chainId)
-          if (evmWalletAuthToken == null) {
-            disconnectEvmWallet(wagmiConfig)
-            return
-          }
-
-          const commonMessage = `[funkybit] Please sign this message to authorize EVM wallet ${evmAddress.toLowerCase()}. This action will not cost any gas fees.`
-          const bitcoinMessage = `${commonMessage}\nAddress: ${bitcoinAddress}, Timestamp: ${timestamp}`
-          const bitcoinSignature = await bitcoinSignMessage(
-            bitcoinAddress,
-            bitcoinMessage
-          )
-
-          if (bitcoinSignature == null) {
-            disconnectEvmWallet(wagmiConfig)
-            return
-          }
-
-          await authorizeWallet(
-            {
-              address: evmAddress,
-              authToken: evmWalletAuthToken
-            },
-            {
-              address: bitcoinAddress,
-              chainId: 0,
-              signature: bitcoinSignature,
-              timestamp: timestamp
-            }
-          )
-        } catch (error) {
-          console.log('Error during wallet authorization', error)
-          disconnectEvmWallet(wagmiConfig)
-          alert(
-            'Something went wrong while authorizing a wallet, please try again or contact customer support'
-          )
-        }
-      }
-    },
-    []
-  )
-
-  async function authorizeWallet(
-    authorizedWallet: { address: string; authToken: string },
-    authorizingWallet: {
-      address: string
-      chainId: number
-      signature: string
-      timestamp: string
-    }
-  ) {
-    await authorizeWalletApiClient.authorizeWallet(
-      {
-        authorizedAddress: authorizedWallet.address,
-        chainId: authorizingWallet.chainId,
-        address: authorizingWallet.address,
-        timestamp: authorizingWallet.timestamp,
-        signature: authorizingWallet.signature
-      },
-      {
-        headers: { Authorization: `Bearer ${authorizedWallet.authToken}` }
-      }
-    )
-  }
-
   // This has to be done with effect that reacts on evmAccount and bitcoinAccount changes because otherwise
   // when done in wallet connected event handler the evmAccount might be in reconnecting state, and it will lead to a failure
   useEffect(() => {
-    if (evmAccount.status === 'connected' && bitcoinAccount) {
-      if (getGlobalPrimaryNetworkType() === 'Evm') {
-        authorizeBitcoinWallet(bitcoinAccount, evmAccount)
-      } else {
-        authorizeEvmWallet(bitcoinAccount, evmAccount)
-      }
+    const primaryNetworkType = getGlobalPrimaryNetworkType()
+    if (
+      evmAccount.status === 'connected' &&
+      bitcoinAccount &&
+      primaryNetworkType
+    ) {
+      authorizeWallet(
+        primaryNetworkType,
+        bitcoinAccount,
+        evmAccount,
+        disconnect
+      )
     }
-  }, [evmAccount, bitcoinAccount, authorizeBitcoinWallet, authorizeEvmWallet])
-
-  function clearGlobalPrimary() {
-    setGlobalPrimaryAddress(null)
-    setGlobalPrimaryChainId(null)
-    setGlobalPrimaryNetworkType(null)
-  }
+  }, [evmAccount, bitcoinAccount, disconnect])
 
   return (
     <WalletContext.Provider
