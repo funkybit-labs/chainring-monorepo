@@ -18,5 +18,5 @@ export function useValidChain() {
     } else {
       return undefined
     }
-  }, [config, wallets])
+  }, [config, wallets.primary])
 }

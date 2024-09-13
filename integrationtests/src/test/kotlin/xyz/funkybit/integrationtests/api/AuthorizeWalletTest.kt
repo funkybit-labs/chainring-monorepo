@@ -6,12 +6,14 @@ import org.http4k.client.WebsocketClient
 import org.junit.jupiter.api.extension.ExtendWith
 import org.web3j.crypto.ECKeyPair
 import xyz.funkybit.apps.api.model.ApiError
+import xyz.funkybit.apps.api.model.AuthorizedAddress
 import xyz.funkybit.apps.api.model.Market
 import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
+import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.OrderStatus
 import xyz.funkybit.core.model.db.WithdrawalStatus
@@ -62,8 +64,8 @@ class AuthorizeWalletTest : OrderBaseTest() {
             ),
         )
 
-        assertEquals(listOf(evmKeyApiClient.address), bitcoinKeyApiClient.getAccountConfiguration().authorizedAddresses)
-        assertEquals(listOf(bitcoinKeyApiClient.address), evmKeyApiClient.getAccountConfiguration().authorizedAddresses)
+        assertEquals(listOf(AuthorizedAddress(evmKeyApiClient.address, NetworkType.Evm)), bitcoinKeyApiClient.getAccountConfiguration().authorizedAddresses)
+        assertEquals(listOf(AuthorizedAddress(bitcoinKeyApiClient.address, NetworkType.Bitcoin)), evmKeyApiClient.getAccountConfiguration().authorizedAddresses)
     }
 
     @Test
@@ -80,8 +82,8 @@ class AuthorizeWalletTest : OrderBaseTest() {
             ),
         )
 
-        assertEquals(listOf(evmKeyApiClient.address.asEvmAddress()), bitcoinKeyApiClient.getAccountConfiguration().authorizedAddresses)
-        assertEquals(listOf(bitcoinKeyApiClient.address.asBitcoinAddress()), evmKeyApiClient.getAccountConfiguration().authorizedAddresses)
+        assertEquals(listOf(AuthorizedAddress(evmKeyApiClient.address.asEvmAddress(), NetworkType.Evm)), bitcoinKeyApiClient.getAccountConfiguration().authorizedAddresses)
+        assertEquals(listOf(AuthorizedAddress(bitcoinKeyApiClient.address.asBitcoinAddress(), NetworkType.Bitcoin)), evmKeyApiClient.getAccountConfiguration().authorizedAddresses)
     }
 
     @Test

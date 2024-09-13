@@ -1,6 +1,12 @@
 import { Button } from 'components/common/Button'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AddressSchema, AdminMarket, AdminSymbol, apiClient } from 'apiClient'
+import {
+  AddressSchema,
+  AdminMarket,
+  AdminSymbol,
+  apiClient,
+  noAuthApiClient
+} from 'apiClient'
 import { Fragment, useMemo, useState } from 'react'
 import SubmitButton from 'components/common/SubmitButton'
 import Trash from 'assets/Trash.svg'
@@ -16,7 +22,7 @@ export default function Admin({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
   const configQuery = useQuery({
     queryKey: ['configuration'],
-    queryFn: apiClient.getConfiguration
+    queryFn: noAuthApiClient.getConfiguration
   })
 
   const chains = useMemo(() => {

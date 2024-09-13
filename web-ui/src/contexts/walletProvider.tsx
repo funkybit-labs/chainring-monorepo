@@ -9,13 +9,12 @@ import React, {
 import { useAccount, WagmiProvider } from 'wagmi'
 import {
   BitcoinAccount,
-  BitcoinProvider,
-  useBitcoinWallet
+  BitcoinConnector,
+  BitcoinConnectorEvent
 } from 'contexts/bitcoin'
 import { wagmiConfig } from 'wagmiConfig'
 import Spinner from 'components/common/Spinner'
-import { useWeb3Modal, useWeb3ModalEvents } from '@web3modal/wagmi/react'
-import { useEffectOnce } from 'react-use'
+import { useWeb3Modal } from '@web3modal/wagmi/react'
 import { NetworkType } from 'apiClient'
 import { disconnect as disconnectEvmWallet } from '@wagmi/core'
 import BtcSvg from 'assets/btc.svg'
@@ -58,7 +57,7 @@ function getGlobal(name: string) {
 
 function setGlobal(
   name: string,
-  value: string | number | BitcoinAccount | null
+  value: string | number | BitcoinAccount | null | PrimaryWallet
 ) {
   window.localStorage.setItem(
     `funkybit-wallet-${name}`,
@@ -75,118 +74,61 @@ export function getGlobalBitcoinAccount(): BitcoinAccount | null {
   return bitcoinAccount
 }
 
+type PrimaryWallet = {
+  networkType: NetworkType
+  address: string
+  chainId: number
+}
+
+export function getGlobalPrimaryWallet(): PrimaryWallet | null {
+  return getGlobal('primaryWallet')
+}
+
+function setGlobalPrimaryWallet(wallet: PrimaryWallet | null) {
+  setGlobal('primaryWallet', wallet)
+}
+
 function setGlobalBitcoinAccount(account: BitcoinAccount | null) {
   setGlobal('bitcoinAccount', account)
 }
 
-export function getGlobalPrimaryAddress(): string | null {
-  return getGlobal('primaryAddress')
-}
-
-function setGlobalPrimaryAddress(address: string | null) {
-  setGlobal('primaryAddress', address)
-}
-
-export function getGlobalPrimaryNetworkType(): NetworkType | null {
-  return getGlobal('primaryNetworkType')
-}
-
-function setGlobalPrimaryNetworkType(networkType: NetworkType | null) {
-  setGlobal('primaryNetworkType', networkType)
-}
-
-export function getGlobalPrimaryChainId(): number | null {
-  return getGlobal('primaryChainId')
-}
-
-function setGlobalPrimaryChainId(chainId: number | null) {
-  setGlobal('primaryChainId', chainId)
-}
-
-function clearGlobalPrimary() {
-  setGlobalPrimaryAddress(null)
-  setGlobalPrimaryChainId(null)
-  setGlobalPrimaryNetworkType(null)
+export function disconnectWallet(networkType: NetworkType) {
+  switch (networkType) {
+    case 'Bitcoin':
+      BitcoinConnector.disconnect()
+      break
+    case 'Evm':
+      disconnectEvmWallet(wagmiConfig)
+      break
+  }
 }
 
 function WalletProviderInternal({ children }: { children: React.ReactNode }) {
   const { open: openWalletConnectModal } = useWeb3Modal()
-  const { data: web3ModalEvent } = useWeb3ModalEvents()
 
-  const [bitcoinAccount, setBitcoinAccount] = useState<BitcoinAccount | null>(
+  const [bitcoinAccount, _setBitcoinAccount] = useState<BitcoinAccount | null>(
     getGlobalBitcoinAccount()
   )
 
-  const bitcoinWallet = useBitcoinWallet({
-    eventHandler: useCallback((event) => {
-      switch (event._kind) {
-        case 'connected':
-          switch (getGlobalPrimaryNetworkType()) {
-            case null:
-              // no primary wallet yet, so set bitcoin to it
-              setGlobalPrimaryAddress(event.accounts[0].address)
-              setGlobalBitcoinAccount(event.accounts[0])
-              setGlobalPrimaryNetworkType('Bitcoin')
-              setGlobalPrimaryChainId(0)
-              setBitcoinAccount(event.accounts[0])
-              break
-            case 'Evm':
-              // primary wallet is evm, now also bitcoin wallet was connected, so store it
-              setGlobalBitcoinAccount(event.accounts[0])
-              setBitcoinAccount(event.accounts[0])
-              break
-            case 'Bitcoin':
-              // bitcoin is already the primary wallet, make sure the current address is still in the account list
-              if (
-                event.accounts.find(
-                  (a) => a.address === getGlobalPrimaryAddress()
-                ) === undefined
-              ) {
-                clearGlobalPrimary()
-                setGlobalBitcoinAccount(null)
-                setBitcoinAccount(null)
-              } else {
-                setGlobalPrimaryChainId(0)
-              }
-              break
-          }
-          break
-        case 'disconnected':
-          setGlobalBitcoinAccount(null)
-          setBitcoinAccount(null)
-          if (getGlobalPrimaryNetworkType() == 'Bitcoin') {
-            clearGlobalPrimary()
-          }
-      }
-    }, [])
-  })
+  function setBitcoinAccount(newValue: BitcoinAccount | null) {
+    setGlobalBitcoinAccount(newValue)
+    _setBitcoinAccount(newValue)
+  }
+
+  const [primaryWallet, _setPrimaryWallet] = useState<PrimaryWallet | null>(
+    getGlobalPrimaryWallet()
+  )
+
+  function setPrimaryWallet(newValue: PrimaryWallet | null) {
+    setGlobalPrimaryWallet(newValue)
+    _setPrimaryWallet(newValue)
+  }
 
   const evmAccount = useAccount()
 
-  const globalPrimaryNetworkType = getGlobalPrimaryNetworkType()
-  const primaryNetworkType = useMemo(() => {
-    if (globalPrimaryNetworkType) {
-      return globalPrimaryNetworkType
-    }
-
-    return evmAccount?.status === 'connected'
-      ? 'Evm'
-      : bitcoinAccount?.address
-        ? 'Bitcoin'
-        : null
-  }, [globalPrimaryNetworkType, evmAccount, bitcoinAccount])
-
-  const primaryAddress = useMemo(() => {
-    switch (primaryNetworkType) {
-      case 'Evm':
-        return evmAccount?.address
-      case 'Bitcoin':
-        return bitcoinAccount?.address
-    }
-  }, [primaryNetworkType, evmAccount, bitcoinAccount])
-
   const connected = useMemo(() => {
     const wallets: ConnectedWallet[] = []
+
     if (evmAccount?.status === 'connected' && evmAccount.connector.icon) {
       wallets.push({
         name: evmAccount.connector.name,
@@ -206,29 +148,28 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
         address: bitcoinAccount.address,
         icon: BtcSvg,
         disconnect: function () {
-          bitcoinWallet.disconnect()
+          disconnectWallet('Bitcoin')
         }
       })
     }
     return wallets
-  }, [evmAccount, bitcoinAccount, bitcoinWallet, openWalletConnectModal])
+  }, [evmAccount, bitcoinAccount, openWalletConnectModal])
 
   const primary = useMemo(() => {
-    return connected.find((cw) => cw.networkType == primaryNetworkType) || null
-  }, [primaryNetworkType, connected])
-
-  useEffectOnce(() => {
-    if (globalPrimaryNetworkType != primaryNetworkType) {
-      setGlobalPrimaryNetworkType(primaryNetworkType)
-      setGlobalPrimaryAddress(primaryAddress ?? null)
-    }
-  })
+    return (
+      connected.find(
+        (cw) =>
+          cw.networkType == primaryWallet?.networkType &&
+          cw.address == primaryWallet?.address
+      ) || null
+    )
+  }, [connected, primaryWallet])
 
   function connect(networkType: NetworkType) {
     if (networkType === 'Evm') {
       openWalletConnectModal({ view: 'Connect' }).then(() => {})
     } else if (networkType === 'Bitcoin') {
-      bitcoinWallet.connect()
+      BitcoinConnector.connect()
     }
   }
 
@@ -239,62 +180,102 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     )
   }
 
+  const handleBitcoinConnectorEvent = useCallback(
+    (event: BitcoinConnectorEvent) => {
+      switch (event._kind) {
+        case 'connected':
+          switch (primaryWallet?.networkType) {
+            case undefined:
+            case null:
+              // no primary wallet yet, so set bitcoin to it
+              setPrimaryWallet({
+                networkType: 'Bitcoin',
+                address: event.accounts[0].address,
+                chainId: 0
+              })
+              setBitcoinAccount(event.accounts[0])
+              break
+            case 'Evm':
+              // primary wallet is evm, now also bitcoin wallet was connected, so store it
+              setBitcoinAccount(event.accounts[0])
+              break
+            case 'Bitcoin':
+              // bitcoin is already the primary wallet, make sure the current address is still in the account list
+              if (
+                event.accounts.find(
+                  (a) => a.address == primaryWallet?.address
+                ) === undefined
+              ) {
+                setPrimaryWallet(null)
+                setBitcoinAccount(null)
+              }
+              break
+          }
+          break
+        case 'disconnected':
+          setBitcoinAccount(null)
+          if (primaryWallet?.networkType == 'Bitcoin') {
+            setPrimaryWallet(null)
+            if (evmAccount.status === 'connected') {
+              setPrimaryWallet({
+                networkType: 'Evm',
+                address: evmAccount.address,
+                chainId: evmAccount.chainId
+              })
+            }
+          }
+      }
+    },
+    [evmAccount, primaryWallet]
+  )
+
+  useEffect(() => {
+    BitcoinConnector.subscribe(handleBitcoinConnectorEvent)
+    return () => {
+      BitcoinConnector.unsubscribe(handleBitcoinConnectorEvent)
+    }
+  }, [handleBitcoinConnectorEvent])
+
   // handle EVM wallet connect/disconnect events
   useEffect(() => {
     async function onConnected() {
-      switch (getGlobalPrimaryNetworkType()) {
+      switch (primaryWallet?.networkType) {
+        case undefined:
         case null:
-        case 'Evm':
-          setGlobalPrimaryAddress(evmAccount.address!)
-          setGlobalPrimaryChainId(evmAccount.chainId!)
-          setGlobalPrimaryNetworkType('Evm')
+          // case 'Evm':
+          setPrimaryWallet({
+            networkType: 'Evm',
+            address: evmAccount.address!,
+            chainId: evmAccount.chainId!
+          })
           break
       }
     }
 
     function onDisconnected() {
-      if (getGlobalPrimaryNetworkType() == 'Evm') {
-        clearGlobalPrimary()
+      if (primaryWallet?.networkType == 'Evm') {
+        setPrimaryWallet(null)
+        if (bitcoinAccount != null) {
+          setPrimaryWallet({
+            networkType: 'Bitcoin',
+            address: bitcoinAccount.address,
+            chainId: 0
+          })
+        }
       }
     }
 
-    switch (web3ModalEvent.event) {
-      case 'CONNECT_SUCCESS':
-        if (evmAccount.status === 'connected') {
-          onConnected()
-        }
-        break
-      case 'DISCONNECT_SUCCESS':
-        onDisconnected()
-        break
-      case 'MODAL_CLOSE':
-        if (evmAccount.status === 'disconnected') {
-          onDisconnected()
-        } else if (evmAccount.status === 'connected') {
-          onConnected()
-        }
-        break
+    if (evmAccount.status === 'disconnected') {
+      onDisconnected()
+    } else if (evmAccount.status === 'connected') {
+      onConnected()
     }
-  }, [web3ModalEvent, evmAccount])
-
-  const disconnect = useCallback(
-    (networkType: NetworkType) => {
-      switch (networkType) {
-        case 'Bitcoin':
-          bitcoinWallet.disconnect()
-          break
-        case 'Evm':
-          disconnectEvmWallet(wagmiConfig)
-          break
-      }
-    },
-    [bitcoinWallet]
-  )
+  }, [evmAccount, bitcoinAccount, primaryWallet])
 
   // This has to be done with effect that reacts on evmAccount and bitcoinAccount changes because otherwise
   // when done in wallet connected event handler the evmAccount might be in reconnecting state, and it will lead to a failure
   useEffect(() => {
-    const primaryNetworkType = getGlobalPrimaryNetworkType()
+    const primaryNetworkType = primaryWallet?.networkType
     if (
       evmAccount.status === 'connected' &&
       bitcoinAccount &&
@@ -304,10 +285,10 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
         primaryNetworkType,
         bitcoinAccount,
         evmAccount,
-        disconnect
+        disconnectWallet
       )
     }
-  }, [evmAccount, bitcoinAccount, disconnect])
+  }, [evmAccount, bitcoinAccount, primaryWallet])
 
   return (
     <WalletContext.Provider
@@ -325,11 +306,9 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   return wagmiConfig ? (
-    <BitcoinProvider>
-      <WagmiProvider config={wagmiConfig}>
-        <WalletProviderInternal>{children}</WalletProviderInternal>
-      </WagmiProvider>
-    </BitcoinProvider>
+    <WagmiProvider config={wagmiConfig}>
+      <WalletProviderInternal>{children}</WalletProviderInternal>
+    </WagmiProvider>
   ) : (
     <div className="flex h-screen items-center justify-center bg-darkBluishGray10">
       <Spinner />

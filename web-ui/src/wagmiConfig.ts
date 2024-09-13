@@ -2,7 +2,7 @@ import { Config, createConfig, http } from 'wagmi'
 import { coinbaseWallet, injected, walletConnect } from 'wagmi/connectors'
 import { createWeb3Modal } from '@web3modal/wagmi/react'
 import { Chain, defineChain } from 'viem'
-import { apiClient } from 'apiClient'
+import { noAuthApiClient } from 'apiClient'
 
 const walletConnectProjectId = '03908a0893516a0f391370f3a9349b8e'
 
@@ -19,7 +19,7 @@ export let evmChains: [Chain, ...Chain[]]
 export let wagmiConfig: Config
 
 export const initializeWagmiConfig = async () => {
-  const apiConfig = await apiClient.getConfiguration()
+  const apiConfig = await noAuthApiClient.getConfiguration()
 
   const chains = apiConfig.chains
     .filter((chain) => chain.networkType === 'Evm')

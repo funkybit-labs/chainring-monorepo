@@ -1,10 +1,9 @@
 import { UseAccountReturnType as EvmAccount } from 'wagmi'
-import { BitcoinAccount, bitcoinSignMessage } from 'contexts/bitcoin'
-import { signAuthToken } from 'auth'
-import { UserRejectedRequestError } from 'viem'
-import { signTypedData as evmSignTypedData } from '@wagmi/core'
-import { wagmiConfig } from 'wagmiConfig'
-import { apiClient, authorizeWalletApiClient, NetworkType } from 'apiClient'
+import { BitcoinAccount } from 'contexts/bitcoin'
+import { signAuthToken } from 'contexts/auth'
+import { apiClient, noAuthApiClient, NetworkType } from 'apiClient'
+import { bitcoinSignMessage, evmSignTypedData } from 'utils/signingUtils'
+import { abbreviatedAddress } from 'utils'
 
 export type WalletAuthorizationParams = {
   authorizedAddress: string
@@ -64,7 +63,7 @@ export async function signBitcoinWalletAuthorizationByEvmWallet(
     return null
   }
 
-  const authorizingWalletSignature = await evmSignTypedData(wagmiConfig, {
+  const authorizingWalletSignature = await evmSignTypedData({
     domain: {
       name: 'funkybit',
       chainId: authorizingWalletChainId
@@ -90,12 +89,6 @@ export async function signBitcoinWalletAuthorizationByEvmWallet(
       timestamp: timestamp
     },
     primaryType: 'Authorize'
-  }).catch((e) => {
-    if (e instanceof UserRejectedRequestError) {
-      return null
-    } else {
-      throw e
-    }
   })
 
   if (authorizingWalletSignature == null) {
@@ -118,31 +111,42 @@ export async function authorizeWallet(
   evmAccount: EvmAccount,
   disconnectWallet: (networkType: NetworkType) => void
 ) {
+  const walletToAuthorizeNetworkType =
+    primaryNetworkType === 'Bitcoin' ? 'Evm' : 'Bitcoin'
+
   try {
+    const walletAddressToAuthorize =
+      primaryNetworkType === 'Bitcoin'
+        ? evmAccount.address!
+        : bitcoinAccount.address
+
     const accountConfig = await apiClient.getAccountConfiguration()
-    if (accountConfig.authorizedAddresses.length == 0) {
-      let authorizationParams
-      if (primaryNetworkType == 'Bitcoin') {
-        authorizationParams = await signEvmWalletAuthorizationByBitcoinWallet(
-          evmAccount,
-          bitcoinAccount
+    const authorizedAddresses = accountConfig.authorizedAddresses
+    const previouslyAuthorizedAddress = authorizedAddresses.find(
+      (aa) => aa.networkType === walletToAuthorizeNetworkType
+    )
+
+    if (previouslyAuthorizedAddress) {
+      if (previouslyAuthorizedAddress.address !== walletAddressToAuthorize) {
+        disconnectWallet(walletToAuthorizeNetworkType)
+        alert(
+          `Can't connect another ${walletToAuthorizeNetworkType} wallet. You have been using wallet with address ${abbreviatedAddress(
+            previouslyAuthorizedAddress.address,
+            previouslyAuthorizedAddress.networkType
+          )} previously`
         )
-        if (authorizationParams == null) {
-          disconnectWallet('Evm')
-          return
-        }
-      } else {
-        authorizationParams = await signBitcoinWalletAuthorizationByEvmWallet(
-          bitcoinAccount,
-          evmAccount
-        )
-        if (authorizationParams == null) {
-          disconnectWallet('Bitcoin')
-          return
-        }
+      }
+    } else {
+      const authorizationParams = await (primaryNetworkType == 'Bitcoin'
+        ? signEvmWalletAuthorizationByBitcoinWallet(evmAccount, bitcoinAccount)
+        : signBitcoinWalletAuthorizationByEvmWallet(bitcoinAccount, evmAccount))
+
+      if (authorizationParams == null) {
+        disconnectWallet(walletToAuthorizeNetworkType)
+        return
       }
 
-      await authorizeWalletApiClient.authorizeWallet(
+      await noAuthApiClient.authorizeWallet(
         {
           authorizedAddress: authorizationParams.authorizedAddress,
           chainId: authorizationParams.authorizingWalletChainId,
@@ -159,7 +163,7 @@ export async function authorizeWallet(
     }
   } catch (error) {
     console.log('Error during wallet authorization', error)
-    disconnectWallet(primaryNetworkType == 'Bitcoin' ? 'Evm' : 'Bitcoin')
+    disconnectWallet(walletToAuthorizeNetworkType)
     alert(
       'Something went wrong while authorizing a wallet, please try again or reach out on Discord'
     )

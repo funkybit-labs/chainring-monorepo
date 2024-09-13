@@ -1,7 +1,7 @@
 import z from 'zod'
 import { Zodios } from '@zodios/core'
 import { pluginToken } from '@zodios/plugins'
-import { loadAuthToken } from 'auth'
+import { loadAuthToken } from 'contexts/auth'
 import Decimal from 'decimal.js'
 import { useEffect, useState } from 'react'
 import { FEE_RATE_PIPS_MAX_VALUE } from 'utils'
@@ -129,7 +129,7 @@ export type ConfigurationApiResponse = z.infer<
   typeof ConfigurationApiResponseSchema
 >
 
-const TestnetChallengeStatus = z.enum([
+const TestnetChallengeStatusSchema = z.enum([
   'Unenrolled',
   'PendingAirdrop',
   'PendingDeposit',
@@ -137,13 +137,20 @@ const TestnetChallengeStatus = z.enum([
   'Enrolled',
   'Disqualified'
 ])
-export type TestnetChallengeStatusType = z.infer<typeof TestnetChallengeStatus>
+export type TestnetChallengeStatus = z.infer<
+  typeof TestnetChallengeStatusSchema
+>
+
+export const AuthorizedAddressSchema = z.object({
+  address: z.string(),
+  networkType: NetworkTypeSchema
+})
 
 export const AccountConfigurationApiResponseSchema = z.object({
   newSymbols: z.array(SymbolSchema),
   role: z.enum(['User', 'Admin']),
-  authorizedAddresses: z.array(z.string()),
-  testnetChallengeStatus: TestnetChallengeStatus,
+  authorizedAddresses: z.array(AuthorizedAddressSchema),
+  testnetChallengeStatus: TestnetChallengeStatusSchema,
   testnetChallengeDepositSymbol: z.string().nullable(),
   testnetChallengeDepositContract: AddressSchema.nullable(),
   nickName: z.string().nullable(),
@@ -527,12 +534,6 @@ export const ApiErrorsSchema = z.object({
 export type ApiErrors = z.infer<typeof ApiErrorsSchema>
 
 export const apiClient = new Zodios(apiBaseUrl, [
-  {
-    method: 'get',
-    path: '/v1/config',
-    alias: 'getConfiguration',
-    response: ConfigurationApiResponseSchema
-  },
   {
     method: 'get',
     path: '/v1/account-config',
@@ -947,6 +948,7 @@ export const apiClient = new Zodios(apiBaseUrl, [
     ]
   }
 ])
+
 apiClient.use(
   pluginToken({
     getToken: async () => {
@@ -958,7 +960,13 @@ apiClient.use(
   })
 )
 
-export const authorizeWalletApiClient = new Zodios(apiBaseUrl, [
+export const noAuthApiClient = new Zodios(apiBaseUrl, [
+  {
+    method: 'get',
+    path: '/v1/config',
+    alias: 'getConfiguration',
+    response: ConfigurationApiResponseSchema
+  },
   {
     method: 'post',
     path: '/v1/wallets/authorize',

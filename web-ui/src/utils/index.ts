@@ -1,5 +1,6 @@
 import TradingSymbol from 'tradingSymbol'
 import { ConnectedWallet } from 'contexts/walletProvider'
+import { NetworkType } from 'apiClient'
 
 export function classNames(...classes: unknown[]): string {
   return classes.filter(Boolean).join(' ')
@@ -13,12 +14,13 @@ export function uniqueFilter<T>(value: T, index: number, self: T[]): boolean {
   return self.indexOf(value) === index
 }
 
-export function abbreviatedWalletAddress(wallet: ConnectedWallet): string {
-  switch (wallet.networkType) {
+export function abbreviatedAddress(
+  address: string,
+  networkType: NetworkType
+): string {
+  switch (networkType) {
     case 'Evm': {
-      const without0x = wallet.address.startsWith('0x')
-        ? wallet.address.slice(2)
-        : wallet.address
+      const without0x = address.startsWith('0x') ? address.slice(2) : address
 
       return (
         '0x' +
@@ -28,12 +30,12 @@ export function abbreviatedWalletAddress(wallet: ConnectedWallet): string {
       )
     }
     case 'Bitcoin':
-      return (
-        wallet.address.slice(0, 5) +
-        '...' +
-        wallet.address.slice(wallet.address.length - 5)
-      )
+      return address.slice(0, 5) + '...' + address.slice(address.length - 5)
   }
+}
+
+export function abbreviatedWalletAddress(wallet: ConnectedWallet): string {
+  return abbreviatedAddress(wallet.address, wallet.networkType)
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,4 +86,12 @@ export function calculateNotionalMinusFee(
     (notional * BigInt(FEE_RATE_PIPS_MAX_VALUE)) /
     (BigInt(FEE_RATE_PIPS_MAX_VALUE) + feeRate)
   )
+}
+
+export function base64urlEncode(input: Uint8Array): string {
+  return Buffer.from(input)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '')
 }

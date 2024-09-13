@@ -60,7 +60,7 @@ class Wallet(
 
     var currentChainId: ChainId = blockchainClients.first().chainId
 
-    val evmAddress = keyPair.address() as EvmAddress
+    val evmAddress = keyPair.address()
 
     private val exchangeContractAddressByChainId = chains.associate { it.id to it.contracts.first { it.name == ContractType.Exchange.name }.address }
     private val exchangeContractByChainId = blockchainClients.associate { it.chainId to it.loadExchangeContract(exchangeContractAddressByChainId.getValue(it.chainId)) }
