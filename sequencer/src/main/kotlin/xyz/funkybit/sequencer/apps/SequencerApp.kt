@@ -60,6 +60,7 @@ class SequencerApp(
     var checkpointsQueue: RollingChronicleQueue? = defaultCheckpointsQueue,
     val inSandboxMode: Boolean = System.getenv("SANDBOX_MODE").toBoolean(),
     private val strictReplayValidation: Boolean = System.getenv("STRICT_REPLAY_VALIDATION").toBoolean(),
+    private val ecoMode: Boolean = System.getenv("ECO_MODE").toBoolean(),
 ) : BaseApp() {
     override val logger = KotlinLogging.logger {}
     private var stop = false
@@ -962,6 +963,10 @@ class SequencerApp(
                 }
 
                 tailerPrevState = tailerState
+
+                if (ecoMode) {
+                    Thread.sleep(10)
+                }
             }
         }
         sequencerThread.uncaughtExceptionHandler = UncaughtExceptionHandler { _, throwable ->
