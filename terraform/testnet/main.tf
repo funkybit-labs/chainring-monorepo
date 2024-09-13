@@ -112,6 +112,7 @@ module "waf" {
   ipv6_blacklist_addresses = local.ipv6blacklist
   ipv6_whitelist_addresses = local.ipv6whitelist
   blocked_country_codes    = var.blocked_country_codes
+  ip_dos_rate_limit        = var.ip_dos_rate_limit
 }
 
 module "telegram_mini_app" {

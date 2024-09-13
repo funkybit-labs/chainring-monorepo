@@ -41,15 +41,28 @@ variable "blocked_country_codes" {
   ]
 }
 
+variable "ip_dos_rate_limit" {
+  default = 5000
+}
+
 
 data "dns_a_record_set" "nlb_ips" {
   host = "${module.alb.dns_name}"
 }
 
+data "dns_a_record_set" "nlb_mocker_ips" {
+  host = "${module.alb.dns_name}"
+}
+
+data "dns_a_record_set" "tm_app_ips" {
+  host = "${module.telegram_mini_app.dns_name}"
+}
+
 locals {
 
   ipv4whitelist = [
-        join(",", data.dns_a_record_set.nlb_ips.addrs)
+        join(",", data.dns_a_record_set.nlb_ips.addrs),
+        join(",", data.dns_a_record_set.tm_app_ips.addrs)
    ]
 
   ipv4blacklist = []

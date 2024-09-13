@@ -28,3 +28,7 @@ variable "ipv6_whitelist_addresses" {
 variable "blocked_country_codes" {
   description = "Naughty list."
 }
+
+variable "ip_dos_rate_limit" {
+  description = "How many requests per IP address."
+}
