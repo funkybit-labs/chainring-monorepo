@@ -2,7 +2,7 @@ import { Config, createConfig, http } from 'wagmi'
 import { coinbaseWallet, injected, walletConnect } from 'wagmi/connectors'
 import { createWeb3Modal } from '@web3modal/wagmi/react'
 import { Chain, defineChain } from 'viem'
-import { apiClient, ConfigurationApiResponseSchema } from 'apiClient'
+import { apiClient } from 'apiClient'
 
 const walletConnectProjectId = '03908a0893516a0f391370f3a9349b8e'
 
@@ -15,13 +15,11 @@ const walletConnectMetadata = {
   ]
 }
 
-export let allChains: [Chain, ...Chain[]]
+export let evmChains: [Chain, ...Chain[]]
 export let wagmiConfig: Config
 
 export const initializeWagmiConfig = async () => {
-  const apiConfig = ConfigurationApiResponseSchema.parse(
-    await apiClient.getConfiguration()
-  )
+  const apiConfig = await apiClient.getConfiguration()
 
   const chains = apiConfig.chains
     .filter((chain) => chain.networkType === 'Evm')
@@ -51,13 +49,13 @@ export const initializeWagmiConfig = async () => {
     })
 
   if (isNonEmptyArray(chains)) {
-    allChains = chains
+    evmChains = chains
   } else {
     throw new Error('No chains available in the configuration')
   }
 
   wagmiConfig = createConfig({
-    chains: allChains,
+    chains: evmChains,
     transports: chains.reduce(
       (acc: Record<number, ReturnType<typeof http>>, chain: Chain) => {
         acc[chain.id] = http()

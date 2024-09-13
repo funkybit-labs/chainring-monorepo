@@ -5,7 +5,6 @@ import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.core.model.EncryptedString
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.Symbol
-import xyz.funkybit.core.model.abbreviated
 import xyz.funkybit.core.model.db.BalanceEntity
 import xyz.funkybit.core.model.db.BalanceType
 import xyz.funkybit.core.model.db.DepositEntity

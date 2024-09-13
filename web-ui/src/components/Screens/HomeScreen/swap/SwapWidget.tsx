@@ -18,6 +18,7 @@ import Decimal from 'decimal.js'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import MarketPrice from 'components/Screens/HomeScreen/swap/MarketPrice'
+import { useWallets } from 'contexts/walletProvider'
 
 export function SwapWidget({
   markets,
@@ -80,6 +81,7 @@ export function SwapWidget({
       }, [sr, marketPriceInverted])
 
       const switchToEthChain = useSwitchToEthChain()
+      const wallets = useWallets()
 
       function depositAmount(
         deposit: Balance | undefined,
@@ -312,7 +314,10 @@ export function SwapWidget({
               onClick={() => setMarketPriceInverted(!marketPriceInverted)}
             />
             <div className="flex w-full flex-col">
-              {walletAddress && exchangeContractAddress ? (
+              {walletAddress &&
+              exchangeContractAddress &&
+              wallets.isConnected(sr.topSymbol.networkType) &&
+              wallets.isConnected(sr.bottomSymbol.networkType) ? (
                 <>
                   {sr.noPriceFound && (
                     <span className="w-full text-center text-brightRed">

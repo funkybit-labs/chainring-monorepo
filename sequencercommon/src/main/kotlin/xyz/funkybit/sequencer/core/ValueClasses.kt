@@ -9,8 +9,16 @@ value class WalletAddress(val value: Long) {
         val none = WalletAddress(0L)
     }
 }
-
 fun Long.toWalletAddress() = WalletAddress(this)
+
+@JvmInline
+value class AccountGuid(val value: Long) {
+    override fun toString(): String = value.toString()
+    companion object {
+        val none = AccountGuid(0L)
+    }
+}
+fun Long.toAccountGuid() = AccountGuid(this)
 
 @JvmInline
 value class OrderGuid(val value: Long) {

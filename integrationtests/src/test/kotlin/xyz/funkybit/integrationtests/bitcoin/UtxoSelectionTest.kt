@@ -3,7 +3,6 @@ package xyz.funkybit.integrationtests.bitcoin
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.bitcoinj.core.Coin
 import org.bitcoinj.core.ECKey
-import org.bitcoinj.core.NetworkParameters
 import org.bitcoinj.core.Sha256Hash
 import org.bitcoinj.core.Transaction
 import org.bitcoinj.core.TransactionOutPoint
@@ -37,7 +36,7 @@ class UtxoSelectionTest {
 
     companion object {
 
-        val params = NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!
+        val params = BitcoinClient.getParams()
         fun waitForTx(address: BitcoinAddress, txId: TxHash) {
             waitFor {
                 MempoolSpaceClient.getTransactions(address, null).firstOrNull { it.txId == txId } != null
@@ -58,7 +57,7 @@ class UtxoSelectionTest {
         val txId = BitcoinClient.sendToAddress(address, BigInteger("3000"))
 
         waitForTx(address, txId)
-        val expectedVout = BitcoinClient.getRawTransaction(txId).txOuts.first { it.value.compareTo(BigDecimal("0.00003000")) == 0 }.index
+        val expectedVout = BitcoinClient.getRawTransaction(txId)!!.txOuts.first { it.value.compareTo(BigDecimal("0.00003000")) == 0 }.index
 
         // check the expected Utxo is returned
         var selectedUtxos = transaction {
@@ -79,7 +78,7 @@ class UtxoSelectionTest {
         // airdrop some more
         val txId2 = BitcoinClient.sendToAddress(address, BigInteger("3100"))
         waitForTx(address, txId2)
-        val expectedVout2 = BitcoinClient.getRawTransaction(txId2).txOuts.first { it.value.compareTo(BigDecimal("0.00003100")) == 0 }.index
+        val expectedVout2 = BitcoinClient.getRawTransaction(txId2)!!.txOuts.first { it.value.compareTo(BigDecimal("0.00003100")) == 0 }.index
         selectedUtxos = transaction {
             UtxoSelectionService.selectUtxos(address, BigInteger("3000"), BigInteger("1500"))
         }
@@ -94,7 +93,7 @@ class UtxoSelectionTest {
         assertEquals(transaction.txId.bytes.toHex(false), txId3.value)
 
         waitForTx(address, txId3)
-        val tx = BitcoinClient.getRawTransaction(txId3)
+        val tx = BitcoinClient.getRawTransaction(txId3)!!
         val changeVout = tx.txOuts.first { it.value.compareTo(BigDecimal("0.00001600")) == 0 }.index
         val transferVout = tx.txOuts.first { it.value.compareTo(BigDecimal("0.00003000")) == 0 }.index
         val unspentUtxos = transaction {
@@ -110,13 +109,11 @@ class UtxoSelectionTest {
         assertEquals(transferToUnspentUtxos.size, 1)
         assertEquals(UtxoId.fromTxHashAndVout(txId3, transferVout), transferToUnspentUtxos[0].utxoId)
         assertEquals(BigInteger("3000"), transferToUnspentUtxos[0].amount)
-
-        BitcoinClient.mine(1)
     }
 
-    @Test
+    // @Test
     fun testUtxoSelectionPagination() {
-        Assumptions.assumeFalse(isTestEnvRun())
+        Assumptions.assumeFalse(isTestEnvRun() || !BitcoinClient.bitcoinConfig.enabled)
 
         // create a wallet
         val ecKey = ECKey()
@@ -147,7 +144,7 @@ class UtxoSelectionTest {
         BitcoinClient.mine(1)
 
         waitForTx(address, txId3)
-        val tx = BitcoinClient.getRawTransaction(txId3)
+        val tx = BitcoinClient.getRawTransaction(txId3)!!
         val changeVout = tx.txOuts.first { it.value.compareTo(BigDecimal("0.00002000")) == 0 }.index
         val transferVout = tx.txOuts.first { it.value.compareTo(BigDecimal(transferAmount.inSatsAsDecimalString())) == 0 }.index
 

@@ -3,17 +3,25 @@ package xyz.funkybit.core.blockchain.bitcoin
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.decodeFromJsonElement
+import org.bitcoinj.core.Coin
+import org.bitcoinj.core.ECKey
 import org.bitcoinj.core.NetworkParameters
+import org.bitcoinj.core.Sha256Hash
 import org.bitcoinj.core.Transaction
+import org.bitcoinj.core.TransactionOutPoint
+import org.bitcoinj.core.TransactionOutput
+import org.bitcoinj.script.ScriptBuilder
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.SmartFeeMode
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.TxHash
+import xyz.funkybit.core.model.db.UnspentUtxo
 import xyz.funkybit.core.model.rpc.BitcoinRpc
 import xyz.funkybit.core.model.rpc.BitcoinRpcParams
 import xyz.funkybit.core.model.rpc.BitcoinRpcRequest
 import xyz.funkybit.core.utils.bitcoin.inSatsAsDecimalString
+import xyz.funkybit.core.utils.toFundamentalUnits
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.RoundingMode
@@ -34,6 +42,8 @@ object BitcoinClient : JsonRpcClientBase(
     private val minFee = BigDecimal(bitcoinConfig.feeSettings.minValue)
     private val maxFee = BigDecimal(bitcoinConfig.feeSettings.maxValue)
 
+    val zeroCoinValue = Coin.valueOf(0)
+
     fun getParams(): NetworkParameters = NetworkParameters.fromID(ChainManager.bitcoinBlockchainClientConfig.net)!!
 
     fun mine(nBlocks: Int): List<String> {
@@ -41,6 +51,14 @@ object BitcoinClient : JsonRpcClientBase(
             BitcoinRpcRequest(
                 "generatetoaddress",
                 BitcoinRpcParams(listOf(nBlocks, bitcoinConfig.faucetAddress)),
+            ),
+        )
+    }
+
+    fun getBlockCount(): Long {
+        return getValue(
+            BitcoinRpcRequest(
+                "getblockcount",
             ),
         )
     }
@@ -60,14 +78,21 @@ object BitcoinClient : JsonRpcClientBase(
         }
     }
 
-    fun getRawTransaction(txId: TxHash): BitcoinRpc.Transaction {
-        return getValue(
-            BitcoinRpcRequest(
-                "getrawtransaction",
-                BitcoinRpcParams(listOf(txId.value, true)),
-            ),
-            true,
-        )
+    fun getRawTransaction(txId: TxHash): BitcoinRpc.Transaction? {
+        return try {
+            getValue(
+                BitcoinRpcRequest(
+                    "getrawtransaction",
+                    BitcoinRpcParams(listOf(txId.value, true)),
+                ),
+                true,
+            )
+        } catch (e: JsonRpcException) {
+            if (!e.error.message.contains("No such mempool or blockchain transaction")) {
+                throw e
+            }
+            null
+        }
     }
 
     fun sendRawTransaction(rawTransactionHex: String): TxHash {
@@ -102,5 +127,111 @@ object BitcoinClient : JsonRpcClientBase(
     inline fun <reified T> getValue(request: BitcoinRpcRequest, logResponseBody: Boolean = true): T {
         val jsonElement = call(json.encodeToString(request), logResponseBody)
         return json.decodeFromJsonElement(jsonElement)
+    }
+
+    fun buildAndSignDepositTx(
+        accountAddress: BitcoinAddress,
+        amount: BigInteger,
+        utxos: List<UnspentUtxo>,
+        ecKey: ECKey,
+    ): Transaction {
+        val params = getParams()
+        val feeAmount = estimateDepositTxFee(ecKey, accountAddress, utxos)
+        val rawTx = Transaction(params)
+        rawTx.setVersion(2)
+        rawTx.addOutput(
+            TransactionOutput(
+                params,
+                rawTx,
+                Coin.valueOf(amount.toLong()),
+                accountAddress.toBitcoinCoreAddress(params),
+            ),
+        )
+        val changeAmount = BigInteger.ZERO.max(utxos.sumOf { it.amount } - amount - feeAmount)
+        if (changeAmount > bitcoinConfig.changeDustThreshold) {
+            rawTx.addOutput(
+                TransactionOutput(
+                    params,
+                    rawTx,
+                    Coin.valueOf(changeAmount.toLong()),
+                    BitcoinAddress.fromKey(params, ecKey).toBitcoinCoreAddress(params),
+                ),
+            )
+        }
+        utxos.forEach {
+            rawTx.addSignedInput(
+                TransactionOutPoint(
+                    params,
+                    it.utxoId.vout(),
+                    Sha256Hash.wrap(it.utxoId.txId().value),
+                ),
+                ScriptBuilder.createP2WPKHOutputScript(ecKey),
+                Coin.valueOf(it.amount.toLong()),
+                ecKey,
+                Transaction.SigHash.NONE,
+                true,
+            )
+        }
+        return rawTx
+    }
+
+    private fun estimateDepositTxFee(
+        ecKey: ECKey,
+        accountAddress: BitcoinAddress,
+        utxos: List<UnspentUtxo>,
+    ): BigInteger {
+        val params = getParams()
+        val rawTx = Transaction(params)
+        rawTx.setVersion(2)
+        rawTx.addOutput(
+            TransactionOutput(
+                params,
+                rawTx,
+                zeroCoinValue,
+                accountAddress.toBitcoinCoreAddress(params),
+            ),
+        )
+        rawTx.addOutput(
+            TransactionOutput(
+                params,
+                rawTx,
+                zeroCoinValue,
+                BitcoinAddress.fromKey(params, ecKey).toBitcoinCoreAddress(params),
+            ),
+        )
+        utxos.forEach {
+            rawTx.addSignedInput(
+                TransactionOutPoint(
+                    params,
+                    it.utxoId.vout(),
+                    Sha256Hash.wrap(it.utxoId.txId().value),
+                ),
+                ScriptBuilder.createP2WPKHOutputScript(ecKey),
+                Coin.valueOf(it.amount.toLong()),
+                ecKey,
+                Transaction.SigHash.NONE,
+                true,
+            )
+        }
+        return calculateFee(rawTx.vsize)
+    }
+
+    fun calculateFee(vsize: Int) =
+        estimateSmartFeeInSatPerVByte().toBigInteger() * vsize.toBigInteger()
+
+    fun estimateVSize(numIn: Int, numOut: Int): Int {
+        return 11 + numIn * 63 + numOut * 41
+    }
+
+    fun getNetworkFeeForTx(txId: TxHash): Long {
+        return getRawTransaction(txId)?.let { tx ->
+            (
+                tx.txIns.sumOf {
+                    getRawTransaction(it.txId)!!.txOuts[it.outIndex].value.toFundamentalUnits(8)
+                } - tx.txOuts.sumOf {
+                    it.value.toFundamentalUnits(8)
+                }
+                ).toLong()
+        } ?: throw Exception("Tx not found")
     }
 }

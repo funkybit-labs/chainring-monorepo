@@ -1,46 +1,66 @@
 import { Button } from 'components/common/Button'
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useConfig } from 'wagmi'
 import { useValidChain } from 'hooks/useValidChain'
 import { Modal } from 'components/common/Modal'
-import { useWallet } from 'contexts/walletProvider'
+import { useWallets } from 'contexts/walletProvider'
+import { bitcoinEnabled } from 'contexts/bitcoin'
 
 type Props = {
   onSwitchToChain: (chainId: number) => Promise<void> | void
 }
-const bitcoinEnabled = import.meta.env.ENV_ENABLE_BITCOIN
 
 export function ConnectWallet({ onSwitchToChain }: Props) {
   const validChain = useValidChain()
-  const wallet = useWallet()
-  const config = useConfig()
+  const wallets = useWallets()
+  const evmConfig = useConfig()
 
-  const connectedWithInvalidChain =
-    wallet.evmAccount?.isConnected && !validChain
+  const connectedWithInvalidChain = wallets.isConnected('Evm') && !validChain
 
   const [showWalletCategorySelection, setShowWalletCategorySelection] =
     useState(false)
 
-  useEffect(() => {
-    if (showWalletCategorySelection && wallet.primaryCategory !== 'none') {
-      setShowWalletCategorySelection(false)
-    }
-  }, [showWalletCategorySelection, wallet.primaryCategory])
-
   return (
     <>
-      <div className="mt-4">
+      <div>
         <Button
-          caption={() =>
-            connectedWithInvalidChain ? 'Invalid Chain' : 'Connect Wallet'
-          }
-          onClick={() =>
-            connectedWithInvalidChain
-              ? onSwitchToChain(config.chains[0].id)
-              : bitcoinEnabled
-                ? setShowWalletCategorySelection(true)
-                : wallet.connect('evm')
-          }
+          caption={() => {
+            let missingConnection = ''
+            switch (wallets.primary?.networkType) {
+              case 'Bitcoin':
+                missingConnection = 'EVM '
+                break
+              case 'Evm':
+                missingConnection = bitcoinEnabled ? 'Bitcoin ' : 'EVM '
+                break
+            }
+
+            return connectedWithInvalidChain
+              ? 'Invalid Chain'
+              : `Connect ${missingConnection}Wallet`
+          }}
+          onClick={() => {
+            if (connectedWithInvalidChain) {
+              onSwitchToChain(evmConfig.chains[0].id)
+            } else {
+              switch (wallets.primary?.networkType) {
+                case 'Bitcoin':
+                  wallets.connect('Evm')
+                  break
+                case 'Evm':
+                  wallets.connect(bitcoinEnabled ? 'Bitcoin' : 'Evm')
+                  break
+                case undefined:
+                  // For now we always have them connect EVM first
+                  //if (bitcoinEnabled) {
+                  //  setShowWalletCategorySelection(true)
+                  //} else {
+                  wallets.connect('Evm')
+                  //}
+                  break
+              }
+            }
+          }}
           disabled={false}
           primary={true}
           width={'full'}
@@ -58,7 +78,8 @@ export function ConnectWallet({ onSwitchToChain }: Props) {
             <Button
               caption={() => 'EVM Wallets'}
               onClick={() => {
-                wallet.connect('evm')
+                wallets.connect('Evm')
+                setShowWalletCategorySelection(false)
               }}
               disabled={false}
               primary={true}
@@ -68,7 +89,8 @@ export function ConnectWallet({ onSwitchToChain }: Props) {
             <Button
               caption={() => 'Bitcoin Wallets'}
               onClick={() => {
-                wallet.connect('bitcoin')
+                wallets.connect('Bitcoin')
+                setShowWalletCategorySelection(false)
               }}
               disabled={false}
               primary={true}

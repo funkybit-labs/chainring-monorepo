@@ -10,6 +10,7 @@ import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.TestApiClient
 import xyz.funkybit.integrationtests.utils.Wallet
+import xyz.funkybit.integrationtests.utils.WalletKeyPair
 import java.math.BigDecimal
 import kotlin.test.Test
 
@@ -20,7 +21,7 @@ class DepositTest {
 
     @Test
     fun testERC20Deposits() {
-        val apiClient = TestApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
+        val apiClient = TestApiClient(WalletKeyPair.EVM(ECKeyPair.create(walletPrivateKeyHex.toHexBytes())))
         val wallet = Wallet(apiClient)
         val usdc = "USDC:${wallet.currentChainId}"
         val symbolInfo = wallet.chains.first { it.id == wallet.currentChainId }.symbols.first { it.name == usdc }
@@ -41,7 +42,7 @@ class DepositTest {
 
     @Test
     fun testNativeDeposits() {
-        val apiClient = TestApiClient(ECKeyPair.create(walletPrivateKeyHex.toHexBytes()))
+        val apiClient = TestApiClient(WalletKeyPair.EVM(ECKeyPair.create(walletPrivateKeyHex.toHexBytes())))
         val wallet = Wallet(apiClient)
         val symbolInfo = wallet.chains.first { it.id == wallet.currentChainId }.symbols.first { it.contractAddress == null }
 

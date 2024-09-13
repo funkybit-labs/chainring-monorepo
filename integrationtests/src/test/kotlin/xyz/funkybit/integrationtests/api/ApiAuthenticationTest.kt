@@ -12,6 +12,7 @@ import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.utils.ApiCallFailure
 import xyz.funkybit.integrationtests.utils.ApiClient
+import xyz.funkybit.integrationtests.utils.WalletKeyPair
 import xyz.funkybit.integrationtests.utils.assertError
 import xyz.funkybit.integrationtests.utils.assertSuccess
 import xyz.funkybit.integrationtests.utils.empty
@@ -79,7 +80,7 @@ class ApiAuthenticationTest {
                 mapOf(
                     "Authorization" to "Bearer ${
                         ApiClient.issueAuthToken(
-                            ecKeyPair = Keys.createEcKeyPair(),
+                            keyPair = WalletKeyPair.EVM.generate(),
                             address = "0x${Keys.getAddress(Keys.createEcKeyPair())}",
                         )
                     }",

@@ -32,6 +32,7 @@ jobs:
         run: ./gradlew check
         env:
           CI_RUN: 1
+          CRYPTOCOMPARE_API_KEY: ${{ secrets.CRYPTOCOMPARE_API_KEY }}
       - name: Test Report
         uses: dorny/test-reporter@v1.8.0
         if: success() || failure()

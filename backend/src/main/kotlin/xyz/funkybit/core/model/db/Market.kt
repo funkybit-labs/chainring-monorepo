@@ -37,6 +37,7 @@ object MarketTable : GUIDTable<MarketId>("market", ::MarketId) {
     val tickSize = decimal("tick_size", 30, 18)
     val lastPrice = decimal("last_price", 30, 18)
     val minFee = decimal("min_fee", 30, 0).default(BigDecimal.ZERO)
+    val feedPrice = decimal("feed_price", 30, 18).default(BigDecimal.ZERO)
 }
 
 class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
@@ -56,6 +57,7 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
             this.tickSize = tickSize
             this.lastPrice = lastPrice
             this.minFee = minFee
+            this.feedPrice = lastPrice
         }
 
         override fun all(): SizedIterable<MarketEntity> =
@@ -71,6 +73,18 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
                 (MarketTable.baseSymbolGuid.eq(symbol1.guid).and(MarketTable.quoteSymbolGuid.eq(symbol2.guid)))
                     .or(MarketTable.baseSymbolGuid.eq(symbol2.guid).and(MarketTable.quoteSymbolGuid.eq(symbol1.guid)))
             }.singleOrNull()
+    }
+
+    fun networkTypes(): List<NetworkType> {
+        val baseSymbolGuid = this.baseSymbolGuid
+        val quoteSymbolGuid = this.quoteSymbolGuid
+
+        return SymbolTable.innerJoin(ChainTable)
+            .selectAll()
+            .where { SymbolTable.guid.inList(listOf(baseSymbolGuid, quoteSymbolGuid)) }
+            .map { ChainEntity.wrapRow(it) }
+            .map { it.networkType }
+            .distinct()
     }
 
     var createdAt by MarketTable.createdAt
@@ -89,6 +103,8 @@ class MarketEntity(guid: EntityID<MarketId>) : GUIDEntity<MarketId>(guid) {
         toReal = { it.toBigInteger() },
         toColumn = { it.toBigDecimal() },
     )
+
+    var feedPrice by MarketTable.feedPrice
 
     fun priceScale(): Int =
         tickSize.stripTrailingZeros().scale() + 1

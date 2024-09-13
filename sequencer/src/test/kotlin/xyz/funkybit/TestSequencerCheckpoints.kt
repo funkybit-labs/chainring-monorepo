@@ -24,12 +24,12 @@ import xyz.funkybit.sequencer.core.OrderGuid
 import xyz.funkybit.sequencer.core.SequencerState
 import xyz.funkybit.sequencer.core.checkpointsQueue
 import xyz.funkybit.sequencer.core.queueHome
+import xyz.funkybit.sequencer.core.toAccountGuid
 import xyz.funkybit.sequencer.core.toBigDecimal
 import xyz.funkybit.sequencer.core.toBigInteger
 import xyz.funkybit.sequencer.core.toDecimalValue
 import xyz.funkybit.sequencer.core.toIntegerValue
 import xyz.funkybit.sequencer.core.toMarketId
-import xyz.funkybit.sequencer.core.toWalletAddress
 import xyz.funkybit.sequencer.proto.GatewayGrpcKt
 import xyz.funkybit.sequencer.proto.Order
 import xyz.funkybit.sequencer.proto.Order.Type
@@ -66,8 +66,10 @@ class TestSequencerCheckpoints {
     private val currentTime = AtomicLong(System.currentTimeMillis())
     private val testDirPath = Path.of(queueHome, "test")
 
-    private val wallet1 = 123456789L.toWalletAddress()
-    private val wallet2 = 555111555L.toWalletAddress()
+    private val account1 = 123456789L.toAccountGuid()
+    private val wallet1 = 223456789L
+    private val account2 = 555111555L.toAccountGuid()
+    private val wallet2 = 655111555L
     private val btc = Asset("BTC")
     private val eth = Asset("ETH")
     private val usdc = Asset("USDC")
@@ -193,17 +195,17 @@ class TestSequencerCheckpoints {
                             listOf(
                                 deposit {
                                     this.asset = btcEthMarketId.baseAsset().value
-                                    this.wallet = wallet1.value
+                                    this.account = account1.value
                                     this.amount = BigDecimal("1.01").inSats().toIntegerValue()
                                 },
                                 deposit {
                                     this.asset = btcEthMarketId.quoteAsset().value
-                                    this.wallet = wallet1.value
+                                    this.account = account1.value
                                     this.amount = BigDecimal("1.02").inWei().toIntegerValue()
                                 },
                                 deposit {
                                     this.asset = btcEthMarketId.quoteAsset().value
-                                    this.wallet = wallet2.value
+                                    this.account = account2.value
                                     this.amount = BigDecimal("1.03").inWei().toIntegerValue()
                                 },
                             ),
@@ -220,7 +222,8 @@ class TestSequencerCheckpoints {
                     orderBatch {
                         this.guid = UUID.randomUUID().toString()
                         this.marketId = btcEthMarketId.value
-                        this.wallet = wallet1.value
+                        this.account = account1.value
+                        this.wallet = wallet1
                         this.ordersToAdd.add(
                             order {
                                 this.guid = Random.nextLong()
@@ -242,7 +245,8 @@ class TestSequencerCheckpoints {
                     orderBatch {
                         this.guid = UUID.randomUUID().toString()
                         this.marketId = btcEthMarketId.value
-                        this.wallet = wallet1.value
+                        this.account = account1.value
+                        this.wallet = wallet1
                         this.ordersToAdd.add(
                             order {
                                 this.guid = Random.nextLong()
@@ -261,7 +265,8 @@ class TestSequencerCheckpoints {
                     orderBatch {
                         this.guid = UUID.randomUUID().toString()
                         this.marketId = btcEthMarketId.value
-                        this.wallet = wallet1.value
+                        this.account = account1.value
+                        this.wallet = wallet1
                         this.ordersToAdd.add(
                             order {
                                 this.guid = Random.nextLong()
@@ -285,19 +290,19 @@ class TestSequencerCheckpoints {
                         listOf(
                             withdrawal {
                                 this.asset = btcEthMarketId.baseAsset().value
-                                this.wallet = wallet1.value
+                                this.account = account1.value
                                 this.amount = BigDecimal("0.01").inSats().toIntegerValue()
                                 this.externalGuid = "guid1"
                             },
                             withdrawal {
                                 this.asset = btcEthMarketId.quoteAsset().value
-                                this.wallet = wallet1.value
+                                this.account = account1.value
                                 this.amount = BigDecimal("0.02").inWei().toIntegerValue()
                                 this.externalGuid = "guid2"
                             },
                             withdrawal {
                                 this.asset = btcEthMarketId.quoteAsset().value
-                                this.wallet = wallet2.value
+                                this.account = account2.value
                                 this.amount = BigDecimal("0.03").inWei().toIntegerValue()
                                 this.externalGuid = "guid3"
                             },
@@ -327,7 +332,8 @@ class TestSequencerCheckpoints {
                 orderBatch {
                     this.guid = UUID.randomUUID().toString()
                     this.marketId = btcEthMarketId.value
-                    this.wallet = wallet1.value
+                    this.account = account1.value
+                    this.wallet = wallet1
                     this.ordersToAdd.add(
                         order {
                             this.guid = Random.nextLong()
@@ -350,7 +356,8 @@ class TestSequencerCheckpoints {
                 orderBatch {
                     this.guid = UUID.randomUUID().toString()
                     this.marketId = btcEthMarketId.value
-                    this.wallet = wallet2.value
+                    this.account = account2.value
+                    this.wallet = wallet2
                     this.ordersToAdd.add(
                         order {
                             this.guid = Random.nextLong()
@@ -398,7 +405,8 @@ class TestSequencerCheckpoints {
                     orderBatch {
                         this.guid = UUID.randomUUID().toString()
                         this.marketId = btcEthMarketId.value
-                        this.wallet = wallet1.value
+                        this.account = account1.value
+                        this.wallet = wallet1
                         this.ordersToAdd.add(
                             order {
                                 this.guid = Random.nextLong()
@@ -422,7 +430,8 @@ class TestSequencerCheckpoints {
                     orderBatch {
                         this.guid = UUID.randomUUID().toString()
                         this.marketId = btcEthMarketId.value
-                        this.wallet = wallet1.value
+                        this.account = account1.value
+                        this.wallet = wallet1
                         this.ordersToAdd.add(
                             order {
                                 this.guid = Random.nextLong()
@@ -447,7 +456,8 @@ class TestSequencerCheckpoints {
                     orderBatch {
                         this.guid = UUID.randomUUID().toString()
                         this.marketId = btcEthMarketId.value
-                        this.wallet = wallet1.value
+                        this.account = account1.value
+                        this.wallet = wallet1
                         this.ordersToAdd.add(
                             order {
                                 this.guid = Random.nextLong()
@@ -528,20 +538,20 @@ class TestSequencerCheckpoints {
         verifySerialization(
             SequencerState(
                 balances = mutableMapOf(
-                    wallet1 to mutableMapOf(
+                    account1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
                         eth to BigDecimal("2").inWei(),
                     ),
-                    wallet2 to mutableMapOf(
+                    account2 to mutableMapOf(
                         btc to BigDecimal("3").inSats(),
                     ),
                 ),
                 consumed = mutableMapOf(
-                    wallet1 to mutableMapOf(
+                    account1 to mutableMapOf(
                         btc to mutableMapOf(btcEthMarketId to BigDecimal("1").inSats()),
                         eth to mutableMapOf(btcEthMarketId to BigDecimal("2").inWei()),
                     ),
-                    wallet2 to mutableMapOf(
+                    account2 to mutableMapOf(
                         btc to mutableMapOf(btcEthMarketId to BigDecimal("3").inSats()),
                     ),
                 ),
@@ -555,11 +565,11 @@ class TestSequencerCheckpoints {
             SequencerState(
                 feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                 balances = mutableMapOf(
-                    wallet1 to mutableMapOf(
+                    account1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
                         eth to BigDecimal("2").inWei(),
                     ),
-                    wallet2 to mutableMapOf(
+                    account2 to mutableMapOf(
                         btc to BigDecimal("3").inSats(),
                     ),
                 ),
@@ -582,11 +592,11 @@ class TestSequencerCheckpoints {
             SequencerState(
                 feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                 balances = mutableMapOf(
-                    wallet1 to mutableMapOf(
+                    account1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
                         eth to BigDecimal("2").inWei(),
                     ),
-                    wallet2 to mutableMapOf(
+                    account2 to mutableMapOf(
                         btc to BigDecimal("3").inSats(),
                     ),
                 ),
@@ -619,7 +629,7 @@ class TestSequencerCheckpoints {
                             },
                         ).forEach { order ->
                             market.addOrder(
-                                wallet1.value,
+                                account1.value,
                                 order,
                                 FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                             )
@@ -636,11 +646,11 @@ class TestSequencerCheckpoints {
             SequencerState(
                 feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                 balances = mutableMapOf(
-                    wallet1 to mutableMapOf(
+                    account1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
                         eth to BigDecimal("2").inWei(),
                     ),
-                    wallet2 to mutableMapOf(
+                    account2 to mutableMapOf(
                         btc to BigDecimal("3").inSats(),
                     ),
                 ),
@@ -673,7 +683,7 @@ class TestSequencerCheckpoints {
                             },
                         ).forEach { order ->
                             market.addOrder(
-                                wallet1.value,
+                                account1.value,
                                 order,
                                 FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                             )
@@ -690,12 +700,12 @@ class TestSequencerCheckpoints {
             SequencerState(
                 feeRates = FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                 balances = mutableMapOf(
-                    wallet1 to mutableMapOf(
+                    account1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
                         eth to BigDecimal("2").inWei(),
                         usdc to BigDecimal("10000").inWei(),
                     ),
-                    wallet2 to mutableMapOf(
+                    account2 to mutableMapOf(
                         btc to BigDecimal("3").inSats(),
                         usdc to BigDecimal("10000").inWei(),
                     ),
@@ -747,7 +757,7 @@ class TestSequencerCheckpoints {
                             },
                         ).forEach { order ->
                             market.addOrder(
-                                wallet1.value,
+                                account1.value,
                                 order,
                                 FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                             )
@@ -799,7 +809,7 @@ class TestSequencerCheckpoints {
                             },
                         ).forEach { order ->
                             market.addOrder(
-                                wallet1.value,
+                                account1.value,
                                 order,
                                 FeeRates.fromPercents(maker = 1.0, taker = 2.0),
                             )
@@ -835,11 +845,11 @@ class TestSequencerCheckpoints {
                     Symbol("BTC") to BigInteger.TEN,
                 ),
                 balances = mutableMapOf(
-                    wallet1 to mutableMapOf(
+                    account1 to mutableMapOf(
                         btc to BigDecimal("1").inSats(),
                         eth to BigDecimal("2").inWei(),
                     ),
-                    wallet2 to mutableMapOf(
+                    account2 to mutableMapOf(
                         btc to BigDecimal("3").inSats(),
                     ),
                 ),
@@ -864,7 +874,8 @@ class TestSequencerCheckpoints {
                                 orderBatch {
                                     guid = UUID.randomUUID().toString()
                                     marketId = btcEthMarketId.value
-                                    wallet = wallet1.value
+                                    account = account1.value
+                                    wallet = wallet1
                                     ordersToAdd.addAll(orders)
                                 },
                                 feeRates,
@@ -874,7 +885,8 @@ class TestSequencerCheckpoints {
                                 orderBatch {
                                     guid = UUID.randomUUID().toString()
                                     marketId = btcEthMarketId.value
-                                    wallet = wallet1.value
+                                    account = account1.value
+                                    wallet = wallet1
                                     ordersToCancel.addAll(
                                         // remove all except 1 to keep level on the book
                                         orders.take(orders.size - 1).map {
@@ -897,7 +909,7 @@ class TestSequencerCheckpoints {
                                 this.type = orderType
                             }
                         }.forEach { order ->
-                            market.addOrder(wallet1.value, order, feeRates)
+                            market.addOrder(account1.value, order, feeRates)
                         }
 
                         // verify setup
@@ -940,7 +952,8 @@ class TestSequencerCheckpoints {
                                 orderBatch {
                                     guid = UUID.randomUUID().toString()
                                     marketId = btcEthMarketId.value
-                                    wallet = wallet1.value
+                                    account = account1.value
+                                    wallet = wallet1
                                     ordersToAdd.addAll(orders)
                                 },
                                 feeRates,
@@ -950,7 +963,8 @@ class TestSequencerCheckpoints {
                                 orderBatch {
                                     guid = UUID.randomUUID().toString()
                                     marketId = btcEthMarketId.value
-                                    wallet = wallet1.value
+                                    account = account1.value
+                                    wallet = wallet1
                                     ordersToCancel.addAll(
                                         orders.map {
                                             cancelOrder {

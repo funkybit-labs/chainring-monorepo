@@ -23,6 +23,7 @@ import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import Deposit from 'assets/Deposit.svg'
 import MarketPrice from 'components/Screens/HomeScreen/swap/MarketPrice'
+import { useWallets } from 'contexts/walletProvider'
 
 export function LimitModal({
   markets,
@@ -73,6 +74,7 @@ export function LimitModal({
     Renderer: function (sr: SwapRender) {
       const sellAmountInputRef = useRef<HTMLInputElement>(null)
       const config = useConfig()
+      const wallets = useWallets()
       const [marketPriceInverted, setMarketPriceInverted] = useState(false)
 
       const marketPrice = useMemo(() => {
@@ -350,7 +352,10 @@ export function LimitModal({
               onClick={() => setMarketPriceInverted(!marketPriceInverted)}
             />
             <div className="flex w-full flex-col">
-              {walletAddress && exchangeContractAddress ? (
+              {walletAddress &&
+              exchangeContractAddress &&
+              wallets.isConnected(sr.topSymbol.networkType) &&
+              wallets.isConnected(sr.bottomSymbol.networkType) ? (
                 <>
                   {sr.noPriceFound && (
                     <span className="w-full text-center text-brightRed">
@@ -369,7 +374,15 @@ export function LimitModal({
                           sr.lastOrder?.status ?? ''
                         )
                       ) {
-                        return '✓ Swapped'
+                        const ns = sr.lastOrder?.timing?.sequencerTimeNs
+                        if (ns) {
+                          const us = new Decimal(
+                            ns.toString()
+                          ).dividedToIntegerBy(1000)
+                          return '✓ Swapped in ' + us + 'µs'
+                        } else {
+                          return '✓ Swapped'
+                        }
                       } else if (sr.mutation.isSuccess) {
                         return '✓ Submitted'
                       } else if (sr.amountTooLow) {

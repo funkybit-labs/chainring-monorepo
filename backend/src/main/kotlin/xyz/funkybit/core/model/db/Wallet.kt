@@ -5,7 +5,9 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.VarCharColumnType
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.selectAll
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
@@ -30,19 +32,46 @@ object WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
     val sequencerId = long("sequencer_id").uniqueIndex()
     val addedSymbols = array<String>("added_symbols", VarCharColumnType(10485760)).default(emptyList())
     val isAdmin = bool("is_admin").default(false)
+    val networkType = customEnumeration(
+        "network_type",
+        "NetworkType",
+        { value -> NetworkType.valueOf(value as String) },
+        { PGEnum("NetworkType", it) },
+    )
+    val userGuid = reference("user_guid", UserTable).index()
+
+    init {
+        uniqueIndex(
+            customIndexName = "wallet_user_network_type",
+            columns = arrayOf(userGuid, networkType),
+        )
+    }
 }
 
 class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
-
     companion object : EntityClass<WalletId, WalletEntity>(WalletTable) {
-        fun getOrCreate(address: Address): WalletEntity {
-            return findByAddress(address) ?: run {
-                WalletEntity.new(WalletId.generate(address)) {
-                    this.address = address
-                    this.sequencerId = address.toSequencerId()
-                    this.createdAt = Clock.System.now()
-                    this.createdBy = "system"
+        fun getOrCreateWithUser(address: Address): WalletEntity {
+            val canonicalAddress = address.canonicalize()
+            return findByAddress(canonicalAddress)
+                ?: run {
+                    val user = UserEntity.create(canonicalAddress)
+                    createForUser(user, address)
                 }
+        }
+
+        fun createForUser(user: UserEntity, address: Address): WalletEntity {
+            val canonicalAddress = address.canonicalize()
+            return WalletEntity.new(WalletId.generate(canonicalAddress)) {
+                this.address = canonicalAddress
+                sequencerId = canonicalAddress.toSequencerId()
+                createdAt = Clock.System.now()
+                createdBy = "system"
+
+                networkType = when (canonicalAddress) {
+                    is EvmAddress -> NetworkType.Evm
+                    is BitcoinAddress -> NetworkType.Bitcoin
+                }
+                this.user = user
             }
         }
 
@@ -60,12 +89,6 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
             }.firstOrNull()
         }
 
-        fun getBySequencerIds(sequencerIds: Set<SequencerWalletId>): List<WalletEntity> {
-            return WalletEntity.find {
-                WalletTable.sequencerId.inList(sequencerIds.map { it.value })
-            }.toList()
-        }
-
         fun getBySequencerId(sequencerId: SequencerWalletId): WalletEntity? {
             return WalletEntity.find {
                 WalletTable.sequencerId.eq(sequencerId.value)
@@ -79,6 +102,22 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
                 EvmAddress(it[WalletTable.address])
             }
         }
+
+        fun existsForUserAndNetworkType(user: UserEntity, networkType: NetworkType): Boolean {
+            return WalletTable.select(WalletTable.id).where {
+                WalletTable.userGuid.eq(user.guid) and WalletTable.networkType.eq(networkType)
+            }.limit(1).any()
+        }
+    }
+
+    fun authorizedAddresses(): List<Address> {
+        return WalletTable
+            .selectAll()
+            .where {
+                WalletTable.userGuid.eq(userGuid) and WalletTable.guid.neq(guid)
+            }.map {
+                Address.auto(it[WalletTable.address])
+            }
     }
 
     var createdAt by WalletTable.createdAt
@@ -98,4 +137,8 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
     )
     var addedSymbols by WalletTable.addedSymbols
     var isAdmin by WalletTable.isAdmin
+
+    var networkType by WalletTable.networkType
+    var userGuid by WalletTable.userGuid
+    var user by UserEntity referencedOn WalletTable.userGuid
 }

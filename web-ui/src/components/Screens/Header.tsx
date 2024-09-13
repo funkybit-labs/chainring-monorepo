@@ -1,65 +1,39 @@
 import logo from 'assets/funkybit-orange-logo-name.png'
-import { useWallet } from 'contexts/walletProvider'
-import {
-  evmAddressDisplay,
-  classNames,
-  uniqueFilter,
-  bitcoinAddressDisplay
-} from 'utils'
+import { useWallets } from 'contexts/walletProvider'
+import { classNames, abbreviatedWalletAddress, uniqueFilter } from 'utils'
 import { Button } from 'components/common/Button'
-import React, { useEffect, useMemo, useState } from 'react'
+import { Popover, Transition } from '@headlessui/react'
+import React, { Fragment, useEffect, useMemo, useState } from 'react'
 import Markets from 'markets'
-import Menu from 'assets/Menu.svg'
+import MenuSvg from 'assets/Menu.svg'
 import { FaucetModal } from 'components/Screens/HomeScreen/faucet/FaucetModal'
 import faucetIcon from 'assets/faucet.svg'
 import { useValidChain } from 'hooks/useValidChain'
+import { Address } from 'viem'
+import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
+import { TestnetChallengeEnabled } from 'testnetChallenge'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from 'apiClient'
-import { Address } from 'viem'
-import BtcSvg from 'assets/btc.svg'
-import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
+import { useSwitchToEthChain } from 'utils/switchToEthChain'
+import { useConfig } from 'wagmi'
 
-export type Tab = 'Swap' | 'Limit' | 'Dashboard'
+export type Tab = 'Swap' | 'Limit' | 'Dashboard' | 'Testnet Challenge'
 
 export function Header({
-  initialTab,
+  tab,
   markets,
   onTabChange,
   onShowAdmin
 }: {
-  initialTab: Tab
+  tab: Tab
   markets: Markets
   onTabChange: (newTab: Tab) => void
   onShowAdmin: () => void
 }) {
-  const wallet = useWallet()
-  const [name, setName] = useState<string>()
-  const [icon, setIcon] = useState<string>()
+  const wallets = useWallets()
+  const evmConfig = useConfig()
   const [showMenu, setShowMenu] = useState(false)
   const [showFaucetModal, setShowFaucetModal] = useState<boolean>(false)
-  const [tab, setTab] = useState<Tab>(initialTab)
-  const [showDisconnect, setShowDisconnect] = useState(false)
-
-  useEffect(() => {
-    switch (wallet.primaryCategory) {
-      case 'evm':
-        if (wallet.evmAccount?.isConnected && wallet.evmAccount.connector) {
-          setIcon(wallet.evmAccount.connector.icon)
-          setName(wallet.evmAccount.connector.name)
-        }
-        break
-      case 'bitcoin':
-        if (wallet.bitcoinAccount?.address !== undefined) {
-          setIcon(BtcSvg)
-          setName('Bitcoin')
-        }
-        break
-      case 'none':
-        setIcon(undefined)
-        setName(undefined)
-        break
-    }
-  }, [wallet])
 
   useEffect(() => {
     function escapeHandler(ev: KeyboardEvent) {
@@ -78,10 +52,12 @@ export function Header({
 
   const accountConfigQuery = useQuery({
     queryKey: ['accountConfiguration'],
-    queryFn: apiClient.getAccountConfiguration
+    queryFn: apiClient.getAccountConfiguration,
+    enabled: wallets.connected.length > 0
   })
 
   const validChain = useValidChain()
+  const switchToEthChain = useSwitchToEthChain()
 
   const faucetSymbols = useMemo(() => {
     return markets
@@ -93,55 +69,109 @@ export function Header({
   function walletConnector() {
     return (
       <div className="ml-5 whitespace-nowrap">
-        {wallet.primaryCategory !== 'none' ? (
+        {wallets.connected.length > 0 ? (
           <div className={'relative'}>
-            <Button
-              style={validChain ? 'normal' : 'warning'}
-              width={'normal'}
-              tooltip={validChain ? undefined : 'INVALID CHAIN'}
-              caption={() => (
-                <span>
-                  {icon && (
-                    <img
-                      className="mr-2 inline-block size-5"
-                      src={icon}
-                      alt={name ?? ''}
-                    />
-                  )}
-                  {wallet.primaryCategory === 'evm'
-                    ? evmAddressDisplay(wallet.primaryAddress ?? '0x')
-                    : bitcoinAddressDisplay(wallet.primaryAddress)}
-                </span>
+            <Popover className="relative">
+              {() => (
+                <>
+                  <Popover.Button className="flex items-center gap-3 overflow-hidden text-ellipsis rounded-[20px] bg-darkBluishGray7 px-4 py-2 text-darkBluishGray1 transition-colors duration-300 ease-in-out hover:bg-primary4 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-mutedGray">
+                    Connected wallets:
+                    {wallets.connected.map((cw) => {
+                      return (
+                        <img
+                          key={cw.networkType}
+                          className="inline-block size-5"
+                          src={cw.icon}
+                          alt={cw.name}
+                        />
+                      )
+                    })}
+                  </Popover.Button>
+                  <Transition
+                    as={Fragment}
+                    enter="transition ease-out duration-200"
+                    enterFrom="opacity-0 translate-y-1"
+                    enterTo="opacity-100 translate-y-0"
+                    leave="transition ease-in duration-150"
+                    leaveFrom="opacity-100 translate-y-0"
+                    leaveTo="opacity-0 translate-y-1"
+                  >
+                    <Popover.Panel className="absolute right-0 mt-1 max-h-72 w-max min-w-full overflow-auto rounded-[20px] bg-darkBluishGray6 px-4 py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
+                      {wallets.connected.map((connectedWallet) => {
+                        return (
+                          <div
+                            key={connectedWallet.networkType}
+                            className="flex items-center gap-2 py-1"
+                          >
+                            <img
+                              key={connectedWallet.networkType}
+                              className="inline-block size-5"
+                              src={connectedWallet.icon}
+                              alt={connectedWallet.name}
+                            />
+                            {abbreviatedWalletAddress(connectedWallet)}
+                            {connectedWallet.networkType === 'Bitcoin' && (
+                              <div>
+                                <Button
+                                  caption={() => {
+                                    return <div className="p-1">Disconnect</div>
+                                  }}
+                                  onClick={() => {
+                                    connectedWallet.disconnect()
+                                  }}
+                                  disabled={false}
+                                  style={'normal'}
+                                  width={'narrow'}
+                                />
+                              </div>
+                            )}
+                            {connectedWallet.networkType === 'Evm' && (
+                              <div>
+                                {validChain ? (
+                                  <Button
+                                    caption={() => {
+                                      return <div className="p-1">Change</div>
+                                    }}
+                                    onClick={() => {
+                                      connectedWallet.change()
+                                    }}
+                                    disabled={false}
+                                    style={'normal'}
+                                    width={'narrow'}
+                                  />
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <div className="text-statusRed">
+                                      INVALID CHAIN
+                                    </div>
+                                    <Button
+                                      caption={() => {
+                                        return <div className="p-1">Switch</div>
+                                      }}
+                                      onClick={() => {
+                                        switchToEthChain(evmConfig.chains[0].id)
+                                      }}
+                                      disabled={false}
+                                      style={'normal'}
+                                      width={'narrow'}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </Popover.Panel>
+                  </Transition>
+                </>
               )}
-              onClick={() => {
-                if (wallet.primaryCategory === 'evm') {
-                  wallet.changeAccount()
-                } else if (wallet.primaryCategory === 'bitcoin') {
-                  setShowDisconnect(true)
-                }
-              }}
-              disabled={false}
-              primary={false}
-            />
-            {showDisconnect && (
-              <div className={'absolute'}>
-                <Button
-                  caption={() => {
-                    return <>Disconnect</>
-                  }}
-                  onClick={() => {
-                    setShowDisconnect(false)
-                    wallet.disconnect()
-                  }}
-                  disabled={false}
-                  style={'normal'}
-                  width={'normal'}
-                />
-              </div>
-            )}
+            </Popover>
           </div>
         ) : tab === 'Dashboard' ? (
-          <ConnectWallet onSwitchToChain={() => {}} />
+          <div className="mt-4">
+            <ConnectWallet onSwitchToChain={() => {}} />
+          </div>
         ) : (
           <div className="w-[152px]" />
         )}
@@ -152,7 +182,7 @@ export function Header({
   function faucetButton({ onClick }: { onClick: () => void }) {
     return (
       <span className="mx-5 whitespace-nowrap">
-        {faucetSymbols.length > 0 && wallet.primaryCategory !== 'none' ? (
+        {faucetSymbols.length > 0 && wallets.connected.length > 0 ? (
           <Button
             style={'normal'}
             width={'normal'}
@@ -173,7 +203,6 @@ export function Header({
   }
 
   function navigate(id: string) {
-    setTab('Dashboard')
     onTabChange('Dashboard')
     window.location.hash = id
     window.scrollBy({ top: -80, behavior: 'smooth' })
@@ -203,14 +232,21 @@ export function Header({
           <div className="m-4 inline-block cursor-pointer rounded-sm bg-darkBluishGray7 p-2 narrow:hidden">
             <img
               className="inline-block h-4"
-              src={Menu}
+              src={MenuSvg}
               alt="Menu"
               onClick={() => setShowMenu(true)}
             />
           </div>
         </span>
         <div className="cursor-pointer space-x-4 text-[16px]">
-          {(['Swap', 'Limit', 'Dashboard'] as Tab[]).map((t) => (
+          {(
+            [
+              ...(TestnetChallengeEnabled ? ['Testnet Challenge'] : []),
+              'Swap',
+              'Limit',
+              'Dashboard'
+            ] as Tab[]
+          ).map((t) => (
             <span
               key={t}
               className={classNames(
@@ -220,7 +256,6 @@ export function Header({
                   : 'text-darkBluishGray3 hover:text-white'
               )}
               onClick={() => {
-                setTab(t)
                 onTabChange(t)
               }}
             >
@@ -271,12 +306,12 @@ export function Header({
         </>
       )}
       {faucetSymbols.length > 0 &&
-        wallet.primaryCategory !== 'none' &&
+        wallets.connected.length > 0 &&
         showFaucetModal && (
           <div className="fixed">
             <FaucetModal
               isOpen={showFaucetModal}
-              walletAddress={wallet.primaryAddress! as Address}
+              walletAddress={wallets.primary!.address as Address}
               symbols={faucetSymbols}
               close={() => setShowFaucetModal(false)}
             />

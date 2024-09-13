@@ -7,8 +7,9 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import xyz.funkybit.core.model.Percentage
 import xyz.funkybit.core.model.db.FeeRates
+import xyz.funkybit.core.model.db.UserId
+import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.sequencer.core.MarketId
-import xyz.funkybit.sequencer.core.WalletAddress
 import xyz.funkybit.sequencer.core.toBigInteger
 import xyz.funkybit.sequencer.core.toWalletAddress
 import xyz.funkybit.sequencer.proto.Order
@@ -41,7 +42,7 @@ class TestBackToBackOrders {
     @Test
     fun `Test market buy`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"))
@@ -49,19 +50,19 @@ class TestBackToBackOrders {
         val btcChain1 = market1.quoteAsset
         val ethChain1 = market2.quoteAsset
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         sequencer.deposit(maker, btcChain2, BigDecimal("1")).also { response ->
             response.assertLimits(
                 listOf(
-                    ExpectedLimitsUpdate(maker, market1.id, base = BigDecimal("1").inSats(), quote = BigInteger.ZERO),
+                    ExpectedLimitsUpdate(maker.account, market1.id, base = BigDecimal("1").inSats(), quote = BigInteger.ZERO),
                 ),
             )
         }
         sequencer.deposit(maker, btcChain1, BigDecimal("1")).also { response ->
             response.assertLimits(
                 listOf(
-                    ExpectedLimitsUpdate(maker, market1.id, base = BigDecimal("1").inSats(), quote = BigDecimal("1").inSats()),
-                    ExpectedLimitsUpdate(maker, market2.id, base = BigDecimal("1").inSats(), quote = BigInteger.ZERO),
+                    ExpectedLimitsUpdate(maker.account, market1.id, base = BigDecimal("1").inSats(), quote = BigDecimal("1").inSats()),
+                    ExpectedLimitsUpdate(maker.account, market2.id, base = BigDecimal("1").inSats(), quote = BigInteger.ZERO),
                 ),
             )
         }
@@ -71,7 +72,7 @@ class TestBackToBackOrders {
             assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
             response.assertLimits(
                 listOf(
-                    ExpectedLimitsUpdate(maker, market1.id, base = BigInteger.ZERO, quote = BigDecimal("1").inSats()),
+                    ExpectedLimitsUpdate(maker.account, market1.id, base = BigInteger.ZERO, quote = BigDecimal("1").inSats()),
                 ),
             )
             response.ordersChangedList.first()
@@ -82,17 +83,17 @@ class TestBackToBackOrders {
             assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
             response.assertLimits(
                 listOf(
-                    ExpectedLimitsUpdate(maker, market2.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
+                    ExpectedLimitsUpdate(maker.account, market2.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                 ),
             )
             response.ordersChangedList.first()
         }.guid
 
-        val taker = generateWalletAddress()
+        val taker = generateUser()
         sequencer.deposit(taker, ethChain1, BigDecimal("10")).also { response ->
             response.assertLimits(
                 listOf(
-                    ExpectedLimitsUpdate(taker, market2.id, base = BigInteger.ZERO, quote = BigDecimal("10").inWei()),
+                    ExpectedLimitsUpdate(taker.account, market2.id, base = BigInteger.ZERO, quote = BigDecimal("10").inWei()),
                 ),
             )
         }
@@ -117,28 +118,28 @@ class TestBackToBackOrders {
             // taker balance deltas
             assertEquals(
                 BigDecimal("0.5").toFundamentalUnits(btcChain2.decimals),
-                response.balancesChangedList.first { it.wallet == taker.value && it.asset == btcChain2.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == taker.account.value && it.asset == btcChain2.name }.delta.toBigInteger(),
             )
             // 0.5 * 1.05 * 18 + 0.189 (fee)
             assertEquals(
                 BigDecimal("9.639").toFundamentalUnits(ethChain1.decimals).negate(),
-                response.balancesChangedList.first { it.wallet == taker.value && it.asset == ethChain1.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == taker.account.value && it.asset == ethChain1.name }.delta.toBigInteger(),
             )
 
             // maker balance deltas
             assertEquals(
                 BigDecimal("0.5").toFundamentalUnits(btcChain2.decimals).negate(),
-                response.balancesChangedList.first { it.wallet == maker.value && it.asset == btcChain2.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == maker.account.value && it.asset == btcChain2.name }.delta.toBigInteger(),
             )
             // fee 0.00525
             assertEquals(
                 BigDecimal("0.00525").toFundamentalUnits(btcChain1.decimals).negate(),
-                response.balancesChangedList.first { it.wallet == maker.value && it.asset == btcChain1.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == maker.account.value && it.asset == btcChain1.name }.delta.toBigInteger(),
             )
             // 18 * 0.525 - 0.0945
             assertEquals(
                 BigDecimal("9.3555").toFundamentalUnits(ethChain1.decimals),
-                response.balancesChangedList.first { it.wallet == maker.value && it.asset == ethChain1.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == maker.account.value && it.asset == ethChain1.name }.delta.toBigInteger(),
             )
 
             assertEquals(2, response.tradesCreatedCount)
@@ -177,10 +178,10 @@ class TestBackToBackOrders {
                     // and then getting 0.525 BTC back from selling BTC2 for BTC
                     // Maker's BTC balance is 1 - 0.525 - 0.00525 + 0.525 = 0.99475,
                     // limit is balance minus allocated, hence 0.99475 - 0.475 = 0.51975
-                    ExpectedLimitsUpdate(maker, market2.id, base = BigDecimal("0.51975").inSats(), quote = BigDecimal("9.3555").inWei()),
-                    ExpectedLimitsUpdate(maker, market1.id, base = BigInteger.ZERO, quote = BigDecimal("0.99475").inSats()),
-                    ExpectedLimitsUpdate(taker, market2.id, base = BigInteger.ZERO, quote = BigDecimal("0.361").inWei()),
-                    ExpectedLimitsUpdate(taker, market1.id, base = BigDecimal("0.5").inSats(), quote = BigInteger.ZERO),
+                    ExpectedLimitsUpdate(maker.account, market2.id, base = BigDecimal("0.51975").inSats(), quote = BigDecimal("9.3555").inWei()),
+                    ExpectedLimitsUpdate(maker.account, market1.id, base = BigInteger.ZERO, quote = BigDecimal("0.99475").inSats()),
+                    ExpectedLimitsUpdate(taker.account, market2.id, base = BigInteger.ZERO, quote = BigDecimal("0.361").inWei()),
+                    ExpectedLimitsUpdate(taker.account, market1.id, base = BigDecimal("0.5").inSats(), quote = BigInteger.ZERO),
                 ),
             )
         }
@@ -197,7 +198,7 @@ class TestBackToBackOrders {
     @Test
     fun `Test market buy - max swap (100 percent)`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"))
@@ -205,7 +206,7 @@ class TestBackToBackOrders {
         val btcChain1 = market1.quoteAsset
         val ethChain1 = market2.quoteAsset
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         sequencer.deposit(maker, btcChain2, BigDecimal("1"))
         sequencer.deposit(maker, btcChain1, BigDecimal("1"))
 
@@ -215,7 +216,7 @@ class TestBackToBackOrders {
         // place a limit sell
         val makerSellOrder2Guid = sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1"), BigDecimal("18.000"), maker, Order.Type.LimitSell).guid
 
-        val taker = generateWalletAddress()
+        val taker = generateUser()
         sequencer.deposit(taker, ethChain1, BigDecimal("10"))
 
         // swap max ETH:CHAIN1 for BTC:CHAIN2
@@ -235,28 +236,28 @@ class TestBackToBackOrders {
             // taker balance deltas
             assertEquals(
                 BigDecimal("0.518726").toFundamentalUnits(btcChain2.decimals),
-                response.balancesChangedList.first { it.wallet == taker.value && it.asset == btcChain2.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == taker.account.value && it.asset == btcChain2.name }.delta.toBigInteger(),
             )
             // 100% of quote
             assertEquals(
                 BigDecimal("10").toFundamentalUnits(ethChain1.decimals).negate(),
-                response.balancesChangedList.first { it.wallet == taker.value && it.asset == ethChain1.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == taker.account.value && it.asset == ethChain1.name }.delta.toBigInteger(),
             )
 
             // maker balance deltas
             assertEquals(
                 BigDecimal("0.518726").toFundamentalUnits(btcChain2.decimals).negate(),
-                response.balancesChangedList.first { it.wallet == maker.value && it.asset == btcChain2.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == maker.account.value && it.asset == btcChain2.name }.delta.toBigInteger(),
             )
             // fee 0.00544662
             assertEquals(
                 BigDecimal("0.00544662").toFundamentalUnits(btcChain1.decimals).negate(),
-                response.balancesChangedList.first { it.wallet == maker.value && it.asset == btcChain1.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == maker.account.value && it.asset == btcChain1.name }.delta.toBigInteger(),
             )
             // 18 * 0.5446623 - 0.098039214
             assertEquals(
                 BigDecimal("9.705882186").toFundamentalUnits(ethChain1.decimals),
-                response.balancesChangedList.first { it.wallet == maker.value && it.asset == ethChain1.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == maker.account.value && it.asset == ethChain1.name }.delta.toBigInteger(),
             )
 
             assertEquals(2, response.tradesCreatedCount)
@@ -302,7 +303,7 @@ class TestBackToBackOrders {
     @MethodSource("orderAmounts")
     fun `Test market buy - partial fill`(order1Amount: String, order2Amount: String, order1Disposition: OrderDisposition, order2Disposition: OrderDisposition) {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"))
@@ -310,7 +311,7 @@ class TestBackToBackOrders {
         val btcChain1 = market1.quoteAsset
         val ethChain1 = market2.quoteAsset
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         sequencer.deposit(maker, btcChain2, BigDecimal("1"))
         sequencer.deposit(maker, btcChain1, BigDecimal("1"))
 
@@ -320,7 +321,7 @@ class TestBackToBackOrders {
         // place a limit sell
         val makerSellOrder2Guid = sequencer.addOrderAndVerifyAccepted(market2, BigDecimal(order2Amount), BigDecimal("18.000"), maker, Order.Type.LimitSell).guid
 
-        val taker = generateWalletAddress()
+        val taker = generateUser()
         sequencer.deposit(taker, ethChain1, BigDecimal("10"))
 
         // swap ETH:CHAIN1 for BTC:CHAIN2
@@ -379,7 +380,7 @@ class TestBackToBackOrders {
     @Test
     fun `Test market buy - errors`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"), minFee = BigDecimal("0.0001"))
@@ -389,7 +390,7 @@ class TestBackToBackOrders {
         val btcChain1 = market1.quoteAsset
         val ethChain1 = market2.quoteAsset
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         sequencer.deposit(maker, btcChain2, BigDecimal("1"))
         sequencer.deposit(maker, btcChain1, BigDecimal("1"))
 
@@ -399,7 +400,7 @@ class TestBackToBackOrders {
         // place a limit sell
         sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1"), BigDecimal("18.000"), maker, Order.Type.LimitSell).guid
 
-        val taker = generateWalletAddress()
+        val taker = generateUser()
         sequencer.deposit(taker, ethChain1, BigDecimal("5"))
 
         // place a market buy that exceeds the limit
@@ -436,7 +437,7 @@ class TestBackToBackOrders {
     @Test
     fun `Test market sell`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("btcChain2/btcChain1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("btcChain1/ethChain1"))
@@ -444,19 +445,19 @@ class TestBackToBackOrders {
         val btcChain1 = market1.quoteAsset
         val ethChain1 = market2.quoteAsset
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         sequencer.deposit(maker, btcChain1, BigDecimal("2")).also { response ->
             response.assertLimits(
                 listOf(
-                    ExpectedLimitsUpdate(maker, market1.id, base = BigInteger.ZERO, quote = BigDecimal("2").inSats()),
-                    ExpectedLimitsUpdate(maker, market2.id, base = BigDecimal("2").inSats(), quote = BigInteger.ZERO),
+                    ExpectedLimitsUpdate(maker.account, market1.id, base = BigInteger.ZERO, quote = BigDecimal("2").inSats()),
+                    ExpectedLimitsUpdate(maker.account, market2.id, base = BigDecimal("2").inSats(), quote = BigInteger.ZERO),
                 ),
             )
         }
         sequencer.deposit(maker, ethChain1, BigDecimal("20")).also { response ->
             response.assertLimits(
                 listOf(
-                    ExpectedLimitsUpdate(maker, market2.id, base = BigDecimal("2").inSats(), quote = BigDecimal("20").inWei()),
+                    ExpectedLimitsUpdate(maker.account, market2.id, base = BigDecimal("2").inSats(), quote = BigDecimal("20").inWei()),
                 ),
             )
         }
@@ -466,7 +467,7 @@ class TestBackToBackOrders {
             assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
             response.assertLimits(
                 listOf(
-                    ExpectedLimitsUpdate(maker, market1.id, base = BigInteger.ZERO, quote = BigDecimal("1.0405").inSats()),
+                    ExpectedLimitsUpdate(maker.account, market1.id, base = BigInteger.ZERO, quote = BigDecimal("1.0405").inSats()),
                 ),
             )
             response.ordersChangedList.first()
@@ -477,17 +478,17 @@ class TestBackToBackOrders {
             assertEquals(OrderDisposition.Accepted, response.ordersChangedList.first().disposition)
             response.assertLimits(
                 listOf(
-                    ExpectedLimitsUpdate(maker, market2.id, base = BigDecimal("2").inSats(), quote = BigDecimal("1.82").inWei()),
+                    ExpectedLimitsUpdate(maker.account, market2.id, base = BigDecimal("2").inSats(), quote = BigDecimal("1.82").inWei()),
                 ),
             )
             response.ordersChangedList.first()
         }.guid
 
-        val taker = generateWalletAddress()
+        val taker = generateUser()
         sequencer.deposit(taker, btcChain2, BigDecimal("0.6")).also { response ->
             response.assertLimits(
                 listOf(
-                    ExpectedLimitsUpdate(taker, market1.id, base = BigDecimal("0.6").inSats(), quote = BigInteger.ZERO),
+                    ExpectedLimitsUpdate(taker.account, market1.id, base = BigDecimal("0.6").inSats(), quote = BigInteger.ZERO),
                 ),
             )
         }
@@ -510,28 +511,28 @@ class TestBackToBackOrders {
             // taker balance deltas
             assertEquals(
                 BigDecimal("0.5").toFundamentalUnits(btcChain2.decimals).negate(),
-                response.balancesChangedList.first { it.wallet == taker.value && it.asset == btcChain2.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == taker.account.value && it.asset == btcChain2.name }.delta.toBigInteger(),
             )
             // 0.5 * 0.95 * 18 - 0.171 (fee)
             assertEquals(
                 BigDecimal("8.379").toFundamentalUnits(ethChain1.decimals),
-                response.balancesChangedList.first { it.wallet == taker.value && it.asset == ethChain1.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == taker.account.value && it.asset == ethChain1.name }.delta.toBigInteger(),
             )
 
             // maker balance deltas
             assertEquals(
                 BigDecimal("0.5").toFundamentalUnits(btcChain2.decimals),
-                response.balancesChangedList.first { it.wallet == maker.value && it.asset == btcChain2.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == maker.account.value && it.asset == btcChain2.name }.delta.toBigInteger(),
             )
             // fee 0.00475
             assertEquals(
                 BigDecimal("0.00475").toFundamentalUnits(btcChain1.decimals).negate(),
-                response.balancesChangedList.first { it.wallet == maker.value && it.asset == btcChain1.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == maker.account.value && it.asset == btcChain1.name }.delta.toBigInteger(),
             )
             // 0.5 * 18 * 0.95 + 0.0855
             assertEquals(
                 BigDecimal("8.6355").toFundamentalUnits(ethChain1.decimals).negate(),
-                response.balancesChangedList.first { it.wallet == maker.value && it.asset == ethChain1.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == maker.account.value && it.asset == ethChain1.name }.delta.toBigInteger(),
             )
 
             assertEquals(2, response.tradesCreatedCount)
@@ -566,11 +567,11 @@ class TestBackToBackOrders {
             response.assertLimits(
                 listOf(
                     // maker's ETH limit of 1.82 is 11.3645 on balance minus 9.5445 locked in order2
-                    ExpectedLimitsUpdate(maker, market2.id, base = BigDecimal("1.99525000").inSats(), quote = BigDecimal("1.82").inWei()),
+                    ExpectedLimitsUpdate(maker.account, market2.id, base = BigDecimal("1.99525000").inSats(), quote = BigDecimal("1.82").inWei()),
                     // maker's BTC limit of 1.5155 is 1.99525 on balance minus 0.47975 locked in order1
-                    ExpectedLimitsUpdate(maker, market1.id, base = BigDecimal("0.5").inSats(), quote = BigDecimal("1.5155").inSats()),
-                    ExpectedLimitsUpdate(taker, market2.id, base = BigInteger.ZERO, quote = BigDecimal("8.379").inWei()),
-                    ExpectedLimitsUpdate(taker, market1.id, base = BigDecimal("0.1").inSats(), quote = BigInteger.ZERO),
+                    ExpectedLimitsUpdate(maker.account, market1.id, base = BigDecimal("0.5").inSats(), quote = BigDecimal("1.5155").inSats()),
+                    ExpectedLimitsUpdate(taker.account, market2.id, base = BigInteger.ZERO, quote = BigDecimal("8.379").inWei()),
+                    ExpectedLimitsUpdate(taker.account, market1.id, base = BigDecimal("0.1").inSats(), quote = BigInteger.ZERO),
                 ),
             )
         }
@@ -587,7 +588,7 @@ class TestBackToBackOrders {
     @Test
     fun `Test market sell - max swap (100 percent)`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"))
@@ -595,7 +596,7 @@ class TestBackToBackOrders {
         val btcChain1 = market1.quoteAsset
         val ethChain1 = market2.quoteAsset
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         sequencer.deposit(maker, btcChain1, BigDecimal("2"))
         sequencer.deposit(maker, ethChain1, BigDecimal("20"))
 
@@ -605,7 +606,7 @@ class TestBackToBackOrders {
         // place a limit buy
         val makerBuyOrder2Guid = sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1"), BigDecimal("18.000"), maker, Order.Type.LimitBuy).guid
 
-        val taker = generateWalletAddress()
+        val taker = generateUser()
         sequencer.deposit(taker, btcChain2, BigDecimal("0.6"))
 
         // swap BTC:CHAIN2 for ETH:CHAIN1
@@ -626,28 +627,28 @@ class TestBackToBackOrders {
             // taker balance deltas
             assertEquals(
                 BigDecimal("0.6").toFundamentalUnits(btcChain2.decimals).negate(),
-                response.balancesChangedList.first { it.wallet == taker.value && it.asset == btcChain2.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == taker.account.value && it.asset == btcChain2.name }.delta.toBigInteger(),
             )
             // 0.6 * 0.95 * 18 - 0.2052 (fee)
             assertEquals(
                 BigDecimal("10.0548").toFundamentalUnits(ethChain1.decimals),
-                response.balancesChangedList.first { it.wallet == taker.value && it.asset == ethChain1.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == taker.account.value && it.asset == ethChain1.name }.delta.toBigInteger(),
             )
 
             // maker balance deltas
             assertEquals(
                 BigDecimal("0.6").toFundamentalUnits(btcChain2.decimals),
-                response.balancesChangedList.first { it.wallet == maker.value && it.asset == btcChain2.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == maker.account.value && it.asset == btcChain2.name }.delta.toBigInteger(),
             )
             // fee for trade 1 was 0.0057
             assertEquals(
                 BigDecimal("0.0057").toFundamentalUnits(btcChain1.decimals).negate(),
-                response.balancesChangedList.first { it.wallet == maker.value && it.asset == btcChain1.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == maker.account.value && it.asset == btcChain1.name }.delta.toBigInteger(),
             )
             // 0.6 * 18 * 0.95 + 0.1026
             assertEquals(
                 BigDecimal("10.3626").toFundamentalUnits(ethChain1.decimals).negate(),
-                response.balancesChangedList.first { it.wallet == maker.value && it.asset == ethChain1.name }.delta.toBigInteger(),
+                response.balancesChangedList.first { it.account == maker.account.value && it.asset == ethChain1.name }.delta.toBigInteger(),
             )
 
             assertEquals(2, response.tradesCreatedCount)
@@ -694,7 +695,7 @@ class TestBackToBackOrders {
     @MethodSource("orderAmounts")
     fun `Test market sell - partial fill`(order1Amount: String, order2Amount: String, order1Disposition: OrderDisposition, order2Disposition: OrderDisposition) {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"))
@@ -702,7 +703,7 @@ class TestBackToBackOrders {
         val btcChain1 = market1.quoteAsset
         val ethChain1 = market2.quoteAsset
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         sequencer.deposit(maker, btcChain1, BigDecimal("2"))
         sequencer.deposit(maker, ethChain1, BigDecimal("20"))
 
@@ -712,7 +713,7 @@ class TestBackToBackOrders {
         // place a limit buy
         val makerBuyOrder2Guid = sequencer.addOrderAndVerifyAccepted(market2, BigDecimal(order2Amount), BigDecimal("18.000"), maker, Order.Type.LimitBuy).guid
 
-        val taker = generateWalletAddress()
+        val taker = generateUser()
         sequencer.deposit(taker, btcChain2, BigDecimal("0.6"))
 
         // swap BTC:CHAIN2 for ETH:CHAIN1
@@ -771,7 +772,7 @@ class TestBackToBackOrders {
     @Test
     fun `Test market sell - errors`() {
         val sequencer = SequencerClient(mockClock)
-        sequencer.setFeeRates(FeeRates.fromPercents(maker = 1.0, taker = 2.0))
+        sequencer.setFeeRates(FeeRates.fromPercents(maker = BigDecimal("0.01"), taker = BigDecimal("0.02")))
 
         val market1 = sequencer.createMarket(MarketId("BTC:CHAIN2/BTC:CHAIN1"), quoteDecimals = 8, baseDecimals = 8)
         val market2 = sequencer.createMarket(MarketId("BTC:CHAIN1/ETH:CHAIN1"), minFee = BigDecimal("0.01"))
@@ -779,7 +780,7 @@ class TestBackToBackOrders {
         val btcChain1 = market1.quoteAsset
         val ethChain1 = market2.quoteAsset
 
-        val maker = generateWalletAddress()
+        val maker = generateUser()
         sequencer.deposit(maker, btcChain1, BigDecimal("2"))
         sequencer.deposit(maker, ethChain1, BigDecimal("20"))
 
@@ -789,7 +790,7 @@ class TestBackToBackOrders {
         // place a limit buy on 2nd market
         sequencer.addOrderAndVerifyAccepted(market2, BigDecimal("1"), BigDecimal("18.000"), maker, Order.Type.LimitBuy).guid
 
-        val taker = generateWalletAddress()
+        val taker = generateUser()
         sequencer.deposit(taker, btcChain2, BigDecimal("0.4"))
 
         // swap BTC:CHAIN2 for ETH:CHAIN1
@@ -814,7 +815,10 @@ class TestBackToBackOrders {
     }
 
     private val rnd = Random(0)
-
-    private fun generateWalletAddress(): WalletAddress =
-        rnd.nextLong().toWalletAddress()
+    private fun generateUser(): SequencerClient.SequencerUser {
+        return SequencerClient.SequencerUser(
+            account = UserId.generate().toSequencerId(),
+            wallet = rnd.nextLong().toWalletAddress(),
+        )
+    }
 }

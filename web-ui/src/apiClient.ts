@@ -4,6 +4,7 @@ import { pluginToken } from '@zodios/plugins'
 import { loadAuthToken } from 'auth'
 import Decimal from 'decimal.js'
 import { useEffect, useState } from 'react'
+import { FEE_RATE_PIPS_MAX_VALUE } from 'utils'
 
 export const apiBaseUrl = import.meta.env.ENV_API_URL
 
@@ -24,9 +25,20 @@ const decimal = () =>
       }
     })
 
-export const AddressSchema = z.custom<`0x${string}`>((val: unknown) =>
+const feeRatePips = () =>
+  decimal().transform((decimalFee) => {
+    return BigInt(decimalFee.mul(FEE_RATE_PIPS_MAX_VALUE).toNumber())
+  })
+
+export const EvmAddressSchema = z.custom<`0x${string}`>((val: unknown) =>
   /^0x/.test(val as string)
 )
+export type EvmAddressType = z.infer<typeof EvmAddressSchema>
+export const evmAddress = (address: string): EvmAddressType => {
+  // will throw if the address is invalid
+  return EvmAddressSchema.parse(address)
+}
+export const AddressSchema = z.string().min(1)
 export type AddressType = z.infer<typeof AddressSchema>
 
 const DeployedContractSchema = z.object({
@@ -96,10 +108,17 @@ const MarketSchema = z.object({
 export type Market = z.infer<typeof MarketSchema>
 
 const FeeRatesSchema = z.object({
+  maker: feeRatePips(),
+  taker: feeRatePips()
+})
+export type FeeRates = z.infer<typeof FeeRatesSchema>
+
+const SetFeeRatesSchema = z.object({
   maker: z.coerce.bigint(),
   taker: z.coerce.bigint()
 })
-export type FeeRates = z.infer<typeof FeeRatesSchema>
+
+export type SetFeeRates = z.infer<typeof SetFeeRatesSchema>
 
 export const ConfigurationApiResponseSchema = z.object({
   chains: z.array(ChainSchema),
@@ -110,13 +129,26 @@ export type ConfigurationApiResponse = z.infer<
   typeof ConfigurationApiResponseSchema
 >
 
+const TestnetChallengeStatus = z.enum([
+  'Unenrolled',
+  'PendingAirdrop',
+  'PendingDeposit',
+  'PendingDepositConfirmation',
+  'Enrolled',
+  'Disqualified'
+])
+export type TestnetChallengeStatusType = z.infer<typeof TestnetChallengeStatus>
+
 export const AccountConfigurationApiResponseSchema = z.object({
   newSymbols: z.array(SymbolSchema),
-  role: z.enum(['User', 'Admin'])
+  role: z.enum(['User', 'Admin']),
+  authorizedAddresses: z.array(z.string()),
+  testnetChallengeStatus: TestnetChallengeStatus,
+  testnetChallengeDepositSymbol: z.string().nullable(),
+  testnetChallengeDepositContract: AddressSchema.nullable(),
+  nickName: z.string().nullable(),
+  avatarUrl: z.string().nullable()
 })
-export type AccountConfigurationApiResponse = z.infer<
-  typeof AccountConfigurationApiResponseSchema
->
 
 const OrderSideSchema = z.enum(['Buy', 'Sell'])
 export type OrderSide = z.infer<typeof OrderSideSchema>
@@ -237,7 +269,6 @@ const MarketOrderSchema = z.object({
   marketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
-  originalAmount: z.coerce.bigint(),
   executions: z.array(OrderExecutionSchema),
   timing: OrderTimingSchema
 })
@@ -252,6 +283,7 @@ const LimitOrderSchema = z.object({
   amount: z.coerce.bigint(),
   price: decimal(),
   originalAmount: z.coerce.bigint(),
+  autoReduced: z.boolean(),
   executions: z.array(OrderExecutionSchema),
   timing: OrderTimingSchema
 })
@@ -265,7 +297,6 @@ const BackToBackMarketOrderSchema = z.object({
   secondMarketId: z.string(),
   side: OrderSideSchema,
   amount: z.coerce.bigint(),
-  originalAmount: z.coerce.bigint(),
   executions: z.array(OrderExecutionSchema),
   timing: OrderTimingSchema
 })
@@ -393,12 +424,99 @@ const FaucetRequestSchema = z.object({
 })
 export type FaucetRequest = z.infer<typeof FaucetRequestSchema>
 
+const AuthorizeWalletRequestSchema = z.object({
+  authorizedAddress: z.string(),
+  chainId: z.number(),
+  address: z.string(),
+  timestamp: z.string(),
+  signature: z.string()
+})
+
+const SetNicknameSchema = z.object({
+  name: z.string()
+})
+
+const SetAvatarUrlSchema = z.object({
+  url: z.string()
+})
+
+const LeaderboardTypeSchema = z.enum(['DailyPNL', 'WeeklyPNL', 'OverallPNL'])
+
+export type LeaderboardType = z.infer<typeof LeaderboardTypeSchema>
+
+const LeaderboardEntrySchema = z.object({
+  label: z.string(),
+  iconUrl: z.string().nullable(),
+  value: z.number(),
+  pnl: z.number()
+})
+
+const LeaderboardSchema = z.object({
+  type: LeaderboardTypeSchema,
+  page: z.number(),
+  lastPage: z.number(),
+  entries: z.array(LeaderboardEntrySchema)
+})
+
+export type Leaderboard = z.infer<typeof LeaderboardSchema>
+
+const EnrolledCardSchema = z.object({
+  type: z.literal('Enrolled')
+})
+
+const BitcoinConnectCardSchema = z.object({
+  type: z.literal('BitcoinConnect')
+})
+
+const BitcoinWithdrawalCardSchema = z.object({
+  type: z.literal('BitcoinWithdrawal')
+})
+
+const EvmWithdrawalCardSchema = z.object({
+  type: z.literal('EvmWithdrawal')
+})
+
+const PointTypeSchema = z.enum([
+  'DailyReward',
+  'WeeklyReward',
+  'OverallReward',
+  'ReferralBonus'
+])
+
+const RewardCategorySchema = z.enum([
+  'Top1',
+  'Top1Percent',
+  'Top5Percent',
+  'Top10Percent',
+  'Top25Percent',
+  'Top50Percent',
+  'Bottom5Percent',
+  'Bottom1'
+])
+
+const RecentPointsCardSchema = z.object({
+  type: z.literal('RecentPoints'),
+  points: z.number(),
+  pointType: PointTypeSchema,
+  category: RewardCategorySchema.nullable()
+})
+
+const CardSchema = z.discriminatedUnion('type', [
+  EnrolledCardSchema,
+  RecentPointsCardSchema,
+  BitcoinConnectCardSchema,
+  BitcoinWithdrawalCardSchema,
+  EvmWithdrawalCardSchema
+])
+
+export type Card = z.infer<typeof CardSchema>
+
 const ApiErrorSchema = z.object({
   displayMessage: z.string()
 })
 export type ApiError = z.infer<typeof ApiErrorSchema>
 
-const ApiErrorsSchema = z.object({
+export const ApiErrorsSchema = z.object({
   errors: z.array(ApiErrorSchema)
 })
 export type ApiErrors = z.infer<typeof ApiErrorsSchema>
@@ -550,7 +668,7 @@ export const apiClient = new Zodios(apiBaseUrl, [
       {
         name: 'payload',
         type: 'Body',
-        schema: FeeRatesSchema
+        schema: SetFeeRatesSchema
       }
     ],
     response: z.undefined(),
@@ -728,9 +846,96 @@ export const apiClient = new Zodios(apiBaseUrl, [
         schema: ApiErrorsSchema
       }
     ]
+  },
+  {
+    method: 'post',
+    path: '/v1/testnet-challenge',
+    alias: 'testnetChallengeEnroll',
+    parameters: [],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'post',
+    path: '/v1/testnet-challenge/nickname',
+    alias: 'testnetChallengeSetNickname',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: SetNicknameSchema
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'post',
+    path: '/v1/testnet-challenge/avatar',
+    alias: 'testnetChallengeSetAvatarUrl',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: SetAvatarUrlSchema
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'get',
+    path: '/v1/testnet-challenge/leaderboard/:type',
+    alias: 'testnetChallengeGetLeaderboard',
+    parameters: [
+      {
+        name: 'type',
+        type: 'Path',
+        schema: LeaderboardTypeSchema
+      },
+      {
+        name: 'page',
+        type: 'Query',
+        schema: z.number()
+      }
+    ],
+    response: LeaderboardSchema,
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'get',
+    path: '/v1/testnet-challenge/cards',
+    alias: 'testnetChallengeGetCards',
+    parameters: [],
+    response: z.array(CardSchema),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
   }
 ])
-
 apiClient.use(
   pluginToken({
     getToken: async () => {
@@ -741,6 +946,28 @@ apiClient.use(
     }
   })
 )
+
+export const authorizeWalletApiClient = new Zodios(apiBaseUrl, [
+  {
+    method: 'post',
+    path: '/v1/wallets/authorize',
+    alias: 'authorizeWallet',
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: AuthorizeWalletRequestSchema
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  }
+])
 
 export function useMaintenance() {
   const [maintenance, setMaintenance] = useState(false)

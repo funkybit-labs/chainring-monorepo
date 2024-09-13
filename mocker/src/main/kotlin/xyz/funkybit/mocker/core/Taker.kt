@@ -35,6 +35,7 @@ import kotlinx.datetime.Clock
 import okhttp3.WebSocket
 import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
+import xyz.funkybit.integrationtests.utils.WalletKeyPair
 
 class Taker(
     marketIds: List<MarketId>,
@@ -42,9 +43,9 @@ class Taker(
     nativeAssets: Map<String, BigInteger>,
     assets: Map<String, BigInteger>,
     private val priceCorrectionFunction: PriceFunction,
-    keyPair: ECKeyPair = Keys.createEcKeyPair()
+    keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(),
 ) : Actor(marketIds, nativeAssets, assets, keyPair) {
-    override val id: String = "tkr_${EvmAddress(Keys.toChecksumAddress("0x" + Keys.getAddress(keyPair))).value}"
+    override val id: String = "tkr_${keyPair.address().canonicalize()}"
     override val logger: KLogger = KotlinLogging.logger {}
     private var currentOrder: Order.Market? = null
     private var marketPrices = mutableMapOf<MarketId, BigDecimal>()

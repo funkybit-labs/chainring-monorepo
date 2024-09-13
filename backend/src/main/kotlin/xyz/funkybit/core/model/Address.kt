@@ -35,6 +35,7 @@ sealed class Address {
         }
     }
     abstract fun canonicalize(): Address
+    abstract fun abbreviated(): String
 }
 
 object BitcoinAddressSerializer : KSerializer<BitcoinAddress> {
@@ -63,14 +64,18 @@ sealed class BitcoinAddress(val value: String) : Address() {
         this.value.startsWith("tb1q") -> SegWit(this.value, true)
         this.value.startsWith("bcrt1q") -> SegWit(this.value, true)
         this.value.startsWith("bc1p") -> Taproot(this.value, false)
+        this.value.startsWith("bcrt1p") -> Taproot(this.value, true)
         this.value.startsWith("tb1p") -> Taproot(this.value, true)
         this.value.startsWith("3") -> P2SH(this.value, false)
         this.value.startsWith("2") -> P2SH(this.value, true)
         this.value.startsWith("1") -> P2PKH(this.value, false)
-        this.value.startsWith("m") -> P2PKH(this.value, true)
+        this.value.startsWith("m") || this.value.startsWith("n") -> P2PKH(this.value, true)
         else -> Unrecognized(this.value)
     }
     override fun toString() = this.value
+    override fun abbreviated(): String {
+        return this.value.take(5) + "..." + this.value.takeLast(5)
+    }
     abstract fun script(): String
     data class SegWit(val raw: String, val testnet: Boolean) : BitcoinAddress(raw) {
         override fun script(): String {
@@ -78,6 +83,13 @@ sealed class BitcoinAddress(val value: String) : Address() {
             val hash = Utils.HEX.encode(convertBits(decoded.data.copyOfRange(1, decoded.data.size), 5, 8, false))
             return padZeroHexN(ScriptOpCodes.OP_0.toString(16), 2) + opPushData(hash)
         }
+
+        companion object {
+            fun generate(networkParameters: NetworkParameters): SegWit =
+                fromKey(networkParameters, ECKey())
+        }
+
+        override fun toString(): String = this.raw
     }
 
     data class Taproot(val raw: String, val testnet: Boolean) : BitcoinAddress(raw) {
@@ -86,6 +98,8 @@ sealed class BitcoinAddress(val value: String) : Address() {
             val tapTweakedPubkey = Utils.HEX.encode(convertBits(decoded.data.copyOfRange(1, decoded.data.size), 5, 8, false))
             return padZeroHexN(ScriptOpCodes.OP_1.toString(16), 2) + opPushData(tapTweakedPubkey)
         }
+
+        override fun toString(): String = this.raw
     }
 
     data class P2SH(val raw: String, val testnet: Boolean) : BitcoinAddress(raw) {
@@ -94,6 +108,8 @@ sealed class BitcoinAddress(val value: String) : Address() {
             val hash = Utils.HEX.encode(decoded)
             return padZeroHexN(ScriptOpCodes.OP_HASH160.toString(16), 2) + opPushData(hash) + padZeroHexN(ScriptOpCodes.OP_EQUAL.toString(16), 2)
         }
+
+        override fun toString(): String = this.raw
     }
 
     data class P2PKH(val raw: String, val testnet: Boolean) : BitcoinAddress(raw) {
@@ -106,10 +122,13 @@ sealed class BitcoinAddress(val value: String) : Address() {
                 padZeroHexN(ScriptOpCodes.OP_EQUALVERIFY.toString(16), 2) +
                 padZeroHexN(ScriptOpCodes.OP_CHECKSIG.toString(16), 2)
         }
+
+        override fun toString(): String = this.raw
     }
 
     data class Unrecognized(val raw: String) : BitcoinAddress(raw) {
-        override fun script() = ""
+        override fun script() = this.raw
+        override fun toString(): String = this.raw
     }
 
     protected fun convertBits(data: ByteArray, fromBits: Int, toBits: Int, pad: Boolean): ByteArray {
@@ -142,10 +161,13 @@ sealed class BitcoinAddress(val value: String) : Address() {
         org.bitcoinj.core.Address.fromString(params, value)
 }
 
-@Serializable
+@Serializable(with = EvmAddressSerializer::class)
 data class EvmAddress(val value: String) : Address() {
     override fun canonicalize() = Companion.canonicalize(this.value)
     override fun toString() = this.value
+    override fun abbreviated(): String {
+        return this.value.take(6) + "..." + this.value.takeLast(4)
+    }
     init {
         require(Keys.toChecksumAddress(value) == value) {
             "Invalid address format or not a checksum address"
@@ -163,10 +185,8 @@ data class EvmAddress(val value: String) : Address() {
     }
 }
 
-fun EvmAddress.toChecksumAddress(): EvmAddress {
-    return EvmAddress.canonicalize(this.value)
-}
-
-fun EvmAddress.abbreviated(): String {
-    return this.value.take(6) + "..." + this.value.takeLast(4)
+object EvmAddressSerializer : KSerializer<EvmAddress> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("EvmAddress", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: EvmAddress) = encoder.encodeString(value.value)
+    override fun deserialize(decoder: Decoder) = EvmAddress.canonicalize(decoder.decodeString())
 }

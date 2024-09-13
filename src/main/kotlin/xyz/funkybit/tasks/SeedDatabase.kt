@@ -40,7 +40,7 @@ fun seedDatabase(fixtures: Fixtures, symbolContractAddresses: List<SymbolContrac
                 ) {
                     BlockchainNonceEntity.create(submitter, chain.id)
                 }
-                is BitcoinAddress -> TODO()
+                is BitcoinAddress -> {}
             }
         }
 

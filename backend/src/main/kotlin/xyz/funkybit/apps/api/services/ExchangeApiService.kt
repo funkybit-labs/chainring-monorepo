@@ -2,6 +2,9 @@ package xyz.funkybit.apps.api.services
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.Instant
+import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.dao.with
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.BatchOrdersApiRequest
@@ -27,6 +30,7 @@ import xyz.funkybit.core.evm.TokenAddressAndChain
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
@@ -38,11 +42,16 @@ import xyz.funkybit.core.model.db.OrderEntity
 import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.SymbolEntity
+import xyz.funkybit.core.model.db.TestnetChallengeStatus
+import xyz.funkybit.core.model.db.UserId
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.services.LinkedSignerService
+import xyz.funkybit.core.utils.TestnetChallengeUtils
+import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureVerification
+import xyz.funkybit.core.utils.bitcoin.fromSatoshi
 import xyz.funkybit.core.utils.safeToInt
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.core.utils.toHexBytes
@@ -60,17 +69,17 @@ class ExchangeApiService(
     private val logger = KotlinLogging.logger {}
 
     fun addOrder(
-        walletAddress: Address,
+        wallet: WalletEntity,
         apiRequest: CreateOrderApiRequest,
     ): CreateOrderApiResponse {
         return when (apiRequest) {
             is CreateOrderApiRequest.BackToBackMarket -> addBackToBackMarketOrder(
-                walletAddress,
+                wallet,
                 apiRequest,
             )
 
             else -> orderBatch(
-                walletAddress,
+                wallet,
                 BatchOrdersApiRequest(
                     marketId = apiRequest.marketId,
                     createOrders = listOf(apiRequest),
@@ -81,11 +90,13 @@ class ExchangeApiService(
     }
 
     private fun addBackToBackMarketOrder(
-        walletAddress: Address,
+        wallet: WalletEntity,
         orderRequest: CreateOrderApiRequest.BackToBackMarket,
     ): CreateOrderApiResponse {
         val orderId = OrderId.generate()
 
+        val userId = wallet.userGuid.value
+        val walletAddress = wallet.address
         val market1 = getMarket(orderRequest.marketId)
         val baseSymbol = getSymbolEntity(market1.baseSymbol)
         val market2 = getMarket(orderRequest.secondMarketId)
@@ -114,7 +125,8 @@ class ExchangeApiService(
         val response = runBlocking {
             sequencerClient.backToBackOrder(
                 listOf(market1.id, market2.id),
-                walletAddress.toSequencerId().value,
+                userId.toSequencerId(),
+                walletAddress.toSequencerId(),
                 SequencerClient.Order(
                     sequencerOrderId = orderId.toSequencerId().value,
                     amount = orderRequest.amount.fixedAmount(),
@@ -140,7 +152,7 @@ class ExchangeApiService(
     }
 
     fun orderBatch(
-        walletAddress: Address,
+        wallet: WalletEntity,
         batchOrdersRequest: BatchOrdersApiRequest,
     ): BatchOrdersApiResponse {
         if (batchOrdersRequest.cancelOrders.isEmpty() && batchOrdersRequest.createOrders.isEmpty()) {
@@ -149,6 +161,8 @@ class ExchangeApiService(
 
         val createOrderRequestsByOrderId = batchOrdersRequest.createOrders.associateBy { OrderId.generate() }
 
+        val userId = wallet.userGuid.value
+        val walletAddress = wallet.address
         val market = getMarket(batchOrdersRequest.marketId)
         val baseSymbol = getSymbolEntity(market.baseSymbol)
         val quoteSymbol = getSymbolEntity(market.quoteSymbol)
@@ -230,7 +244,7 @@ class ExchangeApiService(
         }
 
         val response = runBlocking {
-            sequencerClient.orderBatch(market.id, walletAddress.toSequencerId().value, ordersToAdd, ordersToCancel)
+            sequencerClient.orderBatch(market.id, userId.toSequencerId(), walletAddress.toSequencerId(), ordersToAdd, ordersToCancel)
         }
 
         when (response.error) {
@@ -265,12 +279,14 @@ class ExchangeApiService(
     private fun reasonToMessage(reason: Reason): String {
         return when (reason) {
             Reason.DoesNotExist -> "Order does not exist or is already finalized"
-            Reason.NotForWallet -> "Order not created by this wallet"
+            Reason.NotForAccount -> "Order not created by this account"
             else -> ""
         }
     }
 
-    fun withdraw(walletAddress: Address, apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse {
+    fun withdraw(wallet: WalletEntity, apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse {
+        val userId = wallet.userGuid.value
+        val walletAddress = wallet.address
         val symbol = getSymbolEntity(apiRequest.symbol)
 
         when (walletAddress) {
@@ -282,11 +298,21 @@ class ExchangeApiService(
                     apiRequest.amount,
                     apiRequest.nonce,
                     apiRequest.amount == BigInteger.ZERO,
-                    apiRequest.signature,
+                    apiRequest.signature as EvmSignature,
                 ),
                 symbol.chainId.value,
             )
-            is BitcoinAddress -> {} // TODO verify signature
+            is BitcoinAddress -> {
+                val bitcoinAddress = BitcoinAddress.canonicalize(walletAddress.value)
+                val bitcoinWithdrawalMessage = String.format(
+                    "[funkybit] Please sign this message to authorize withdrawal of %s %s from the exchange to your wallet.",
+                    apiRequest.amount.fromSatoshi().toPlainString(),
+                    symbol.displayName(),
+                ) + "\nAddress: ${bitcoinAddress.value}, Timestamp: ${Instant.fromEpochMilliseconds(apiRequest.nonce)}"
+                if (!BitcoinSignatureVerification.verifyMessage(bitcoinAddress, apiRequest.signature.value.replace(" ", "+"), bitcoinWithdrawalMessage)) {
+                    throw RequestProcessingError(ReasonCode.SignatureNotValid, "Invalid signature")
+                }
+            }
         }
 
         val withdrawal = transaction {
@@ -304,7 +330,7 @@ class ExchangeApiService(
 
         runBlocking {
             sequencerClient.withdraw(
-                walletAddress.toSequencerId().value,
+                userId.toSequencerId(),
                 Asset(symbol.name),
                 apiRequest.amount,
                 apiRequest.nonce.toBigInteger(),
@@ -319,19 +345,28 @@ class ExchangeApiService(
     fun deposit(walletAddress: Address, apiRequest: CreateDepositApiRequest): DepositApiResponse =
         transaction {
             val deposit = DepositEntity.createOrUpdate(
-                wallet = WalletEntity.getOrCreate(walletAddress),
+                wallet = WalletEntity.getOrCreateWithUser(walletAddress),
                 symbol = getSymbolEntity(apiRequest.symbol),
                 amount = apiRequest.amount,
                 blockNumber = null,
                 transactionHash = apiRequest.txHash,
             ) ?: throw DepositException("Unable to create deposit")
 
+            if (TestnetChallengeUtils.enabled) {
+                if (deposit.wallet.user.testnetChallengeStatus == TestnetChallengeStatus.PendingDeposit &&
+                    deposit.symbol.name == TestnetChallengeUtils.depositSymbolName &&
+                    deposit.amount == TestnetChallengeUtils.depositAmount.toFundamentalUnits(TestnetChallengeUtils.depositSymbol().decimals)
+                ) {
+                    deposit.wallet.user.testnetChallengeStatus = TestnetChallengeStatus.PendingDepositConfirmation
+                }
+            }
+
             DepositApiResponse(Deposit.fromEntity(deposit))
         }
 
-    fun cancelOrder(walletAddress: Address, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {
+    fun cancelOrder(wallet: WalletEntity, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {
         return orderBatch(
-            walletAddress,
+            wallet,
             BatchOrdersApiRequest(
                 marketId = cancelOrderApiRequest.marketId,
                 createOrders = emptyList(),
@@ -340,21 +375,32 @@ class ExchangeApiService(
         ).canceledOrders.first()
     }
 
-    fun cancelOpenOrders(walletEntity: WalletEntity) {
+    fun cancelOpenOrders(userId: EntityID<UserId>) {
         val openOrders = transaction {
-            OrderEntity.listOpenForWallet(walletEntity)
+            OrderEntity
+                .listOpenForUser(userId)
+                .with(OrderEntity::wallet)
+                .map { Pair(it, it.wallet) }
         }
         if (openOrders.isNotEmpty()) {
             runBlocking {
-                openOrders.groupBy { it.marketGuid }.forEach { entry ->
-                    val orderIds = entry.value.map { it.guid.value }
-                    sequencerClient.cancelOrders(
-                        entry.key.value,
-                        walletEntity.address.toSequencerId().value,
-                        orderIds,
-                        cancelAll = true,
+                openOrders
+                    .groupBy(
+                        keySelector = { (order, wallet) -> Pair(order.marketGuid, wallet.address) },
+                        valueTransform = { (order, _) -> order },
                     )
-                }
+                    .forEach { entry ->
+                        val orderIds = entry.value.map { it.guid.value }
+                        val (marketGuid, walletAddress) = entry.key
+
+                        sequencerClient.cancelOrders(
+                            marketGuid.value,
+                            userId.value.toSequencerId(),
+                            walletAddress.toSequencerId(),
+                            orderIds,
+                            cancelAll = true,
+                        )
+                    }
             }
         }
     }

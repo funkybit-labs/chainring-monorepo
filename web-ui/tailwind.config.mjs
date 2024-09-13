@@ -17,10 +17,25 @@ export default {
         swivel: {
           'from': {transform: 'rotateY(0deg)'},
           'to': {transform: 'rotateY(180deg)'}
-        }
+        },
+        fall: {
+          'from': {transform: 'translateY(-1000px)'},
+          'to': {transform: 'translateY(0px)'}
+        },
+        flyToLeft: {
+          'from': {transform: 'translateX(0px)'},
+          'to': {transform: 'translateX(-1000px)'}
+        },
+        flyFromRight: {
+          'from': {transform: 'translateX(1000px)'},
+          'to': {transform: 'translateX(0px)'}
+        },
       },
       animation: {
-        swivel: 'swivel 0.5s linear'
+        swivel: 'swivel 0.5s linear',
+        fall: 'fall 1s ease-out',
+        flyFromRight: 'flyFromRight 2s ease-in-out forwards',
+        flyToLeft: 'flyToLeft 2s ease-in-out forwards',
       }
     },
     colors: {

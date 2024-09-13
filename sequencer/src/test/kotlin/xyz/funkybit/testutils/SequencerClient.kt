@@ -1,12 +1,13 @@
 package xyz.funkybit.testutils
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import xyz.funkybit.core.model.SequencerAccountId
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.FeeRates
+import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.utils.sum
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.sequencer.apps.SequencerApp
-import xyz.funkybit.sequencer.core.Asset
 import xyz.funkybit.sequencer.core.Clock
 import xyz.funkybit.sequencer.core.MarketId
 import xyz.funkybit.sequencer.core.WalletAddress
@@ -21,6 +22,7 @@ import xyz.funkybit.sequencer.proto.OrderDisposition
 import xyz.funkybit.sequencer.proto.SequencerRequest
 import xyz.funkybit.sequencer.proto.SequencerResponse
 import xyz.funkybit.sequencer.proto.TradeCreated
+import xyz.funkybit.sequencer.proto.authorization
 import xyz.funkybit.sequencer.proto.backToBackOrder
 import xyz.funkybit.sequencer.proto.balanceBatch
 import xyz.funkybit.sequencer.proto.feeRates
@@ -47,6 +49,16 @@ class SequencerClient(clock: Clock) {
         val fee: BigInteger,
     )
 
+    data class SequencerUser(
+        val account: SequencerAccountId,
+        val wallet: WalletAddress,
+    )
+
+    data class SignedMessage(
+        val message: String,
+        val signature: String,
+    )
+
     data class Market(
         val id: MarketId,
         val tickSize: BigDecimal,
@@ -68,7 +80,7 @@ class SequencerClient(clock: Clock) {
         market: Market,
         amount: BigDecimal,
         price: BigDecimal?,
-        wallet: WalletAddress,
+        user: SequencerUser,
         orderType: Order.Type,
         percentage: Int = 0,
     ) =
@@ -78,7 +90,8 @@ class SequencerClient(clock: Clock) {
                 this.type = SequencerRequest.Type.ApplyOrderBatch
                 this.orderBatch = orderBatch {
                     this.marketId = market.id.value
-                    this.wallet = wallet.value
+                    this.account = user.account.value
+                    this.wallet = user.wallet.value
                     this.ordersToAdd.add(
                         order {
                             this.guid = Random.nextLong()
@@ -97,7 +110,7 @@ class SequencerClient(clock: Clock) {
         firstMarket: Market,
         secondMarket: Market,
         amount: BigDecimal,
-        wallet: WalletAddress,
+        user: SequencerUser,
         orderType: Order.Type,
         percentage: Int? = null,
     ) =
@@ -107,7 +120,8 @@ class SequencerClient(clock: Clock) {
                 this.type = SequencerRequest.Type.ApplyBackToBackOrder
                 this.backToBackOrder = backToBackOrder {
                     this.marketIds.addAll(listOf(firstMarket.id.value, secondMarket.id.value))
-                    this.wallet = wallet.value
+                    this.account = user.account.value
+                    this.wallet = user.wallet.value
                     this.order = order {
                         this.guid = orderGuid
                         this.amount = amount.toFundamentalUnits(firstMarket.baseDecimals).toIntegerValue()
@@ -122,22 +136,23 @@ class SequencerClient(clock: Clock) {
         market: Market,
         amount: BigDecimal,
         price: BigDecimal?,
-        wallet: WalletAddress,
+        user: SequencerUser,
         orderType: Order.Type,
     ): OrderChanged =
-        addOrder(market, amount, price, wallet, orderType).let {
+        addOrder(market, amount, price, user, orderType).let {
             assertEquals(OrderDisposition.Accepted, it.ordersChangedList.first().disposition)
             it.ordersChangedList.first()
         }
 
-    fun cancelOrder(market: Market, guid: Long, wallet: WalletAddress) =
+    fun cancelOrder(market: Market, guid: Long, user: SequencerUser) =
         sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
                 this.type = SequencerRequest.Type.ApplyOrderBatch
                 this.orderBatch = orderBatch {
                     this.marketId = market.id.value
-                    this.wallet = wallet.value
+                    this.account = user.account.value
+                    this.wallet = user.wallet.value
                     this.ordersToCancel.add(
                         xyz.funkybit.sequencer.proto.cancelOrder {
                             this.guid = guid
@@ -215,7 +230,7 @@ class SequencerClient(clock: Clock) {
         assertEquals(withdrawalFeesSet.size, fees.size)
     }
 
-    fun depositsAndWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigDecimal>, expectedAmount: BigDecimal? = amounts.sum(), expectedWithdrawalFees: List<BigInteger> = listOf()): SequencerResponse {
+    fun depositsAndWithdrawals(user: SequencerUser, asset: Asset, amounts: List<BigDecimal>, expectedAmount: BigDecimal? = amounts.sum(), expectedWithdrawalFees: List<BigInteger> = listOf()): SequencerResponse {
         val depositsAndWithdrawalsResponse = sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
@@ -227,7 +242,7 @@ class SequencerClient(clock: Clock) {
                             deposits.map {
                                 xyz.funkybit.sequencer.proto.deposit {
                                     this.asset = asset.name
-                                    this.wallet = walletAddress.value
+                                    this.account = user.account.value
                                     this.amount = it.toFundamentalUnits(asset.decimals).toIntegerValue()
                                 }
                             },
@@ -238,7 +253,7 @@ class SequencerClient(clock: Clock) {
                             withdrawals.map {
                                 xyz.funkybit.sequencer.proto.withdrawal {
                                     this.asset = asset.name
-                                    this.wallet = walletAddress.value
+                                    this.account = user.account.value
                                     this.amount = (-it).toFundamentalUnits(asset.decimals).toIntegerValue()
                                 }
                             },
@@ -251,7 +266,7 @@ class SequencerClient(clock: Clock) {
             assertEquals(1, depositsAndWithdrawalsResponse.balancesChangedCount)
             val withdrawal = depositsAndWithdrawalsResponse.balancesChangedList.first()
             assertEquals(asset.name, withdrawal.asset)
-            assertEquals(walletAddress.value, withdrawal.wallet)
+            assertEquals(user.account.value, withdrawal.account)
             assertEquals(
                 expectedAmount.setScale(asset.decimals),
                 withdrawal.delta.toBigInteger().fromFundamentalUnits(asset.decimals),
@@ -272,13 +287,13 @@ class SequencerClient(clock: Clock) {
         return depositsAndWithdrawalsResponse
     }
 
-    fun deposit(walletAddress: WalletAddress, asset: Asset, amount: BigDecimal) =
-        depositsAndWithdrawals(walletAddress, asset, listOf(amount))
+    fun deposit(user: SequencerUser, asset: Asset, amount: BigDecimal) =
+        depositsAndWithdrawals(user, asset, listOf(amount))
 
-    fun withdrawal(walletAddress: WalletAddress, asset: Asset, amount: BigDecimal, expectedAmount: BigDecimal? = amount, expectedWithdrawalFee: BigInteger = BigInteger.ZERO) =
-        depositsAndWithdrawals(walletAddress, asset, listOf(-amount), expectedAmount?.negate(), listOf(expectedWithdrawalFee))
+    fun withdrawal(user: SequencerUser, asset: Asset, amount: BigDecimal, expectedAmount: BigDecimal? = amount, expectedWithdrawalFee: BigInteger = BigInteger.ZERO) =
+        depositsAndWithdrawals(user, asset, listOf(-amount), expectedAmount?.negate(), listOf(expectedWithdrawalFee))
 
-    fun failedWithdrawals(walletAddress: WalletAddress, asset: Asset, amounts: List<BigDecimal>, expectedAmount: BigDecimal? = amounts.sum()): SequencerResponse {
+    fun failedWithdrawals(user: SequencerUser, asset: Asset, amounts: List<BigDecimal>, expectedAmount: BigDecimal? = amounts.sum()): SequencerResponse {
         val failedWithdrawalsResponse = sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
@@ -289,7 +304,7 @@ class SequencerClient(clock: Clock) {
                         amounts.map {
                             xyz.funkybit.sequencer.proto.failedWithdrawal {
                                 this.asset = asset.name
-                                this.wallet = walletAddress.value
+                                this.account = user.account.value
                                 this.amount = it.toFundamentalUnits(asset.decimals).toIntegerValue()
                             }
                         },
@@ -301,7 +316,7 @@ class SequencerClient(clock: Clock) {
             assertEquals(1, failedWithdrawalsResponse.balancesChangedCount)
             val withdrawal = failedWithdrawalsResponse.balancesChangedList.first()
             assertEquals(asset.name, withdrawal.asset)
-            assertEquals(walletAddress.value, withdrawal.wallet)
+            assertEquals(user.account.value, withdrawal.account)
             assertEquals(expectedAmount.setScale(asset.decimals), withdrawal.delta.toBigInteger().fromFundamentalUnits(asset.decimals))
         } else {
             assertEquals(0, failedWithdrawalsResponse.balancesChangedCount)
@@ -309,7 +324,7 @@ class SequencerClient(clock: Clock) {
         return failedWithdrawalsResponse
     }
 
-    fun failedSettlement(buyWalletAddress: WalletAddress, sellWalletAddress: WalletAddress, market: Market, trade: TradeCreated): SequencerResponse {
+    fun failedSettlement(buyer: SequencerUser, seller: SequencerUser, market: Market, trade: TradeCreated): SequencerResponse {
         val failedSettlementsResponse = sequencer.processRequest(
             sequencerRequest {
                 this.guid = UUID.randomUUID().toString()
@@ -318,8 +333,8 @@ class SequencerClient(clock: Clock) {
                     this.guid = UUID.randomUUID().toString()
                     this.failedSettlements.add(
                         xyz.funkybit.sequencer.proto.failedSettlement {
-                            this.buyWallet = buyWalletAddress.value
-                            this.sellWallet = sellWalletAddress.value
+                            this.buyAccount = buyer.account.value
+                            this.sellAccount = seller.account.value
                             this.marketId = market.id.value
                             this.trade = trade
                         },
@@ -328,5 +343,33 @@ class SequencerClient(clock: Clock) {
             },
         )
         return failedSettlementsResponse
+    }
+
+    fun authorizeWallet(user: SequencerUser, networkType: NetworkType, ownershipProof: SignedMessage, authorizationProof: SequencerClient.SignedMessage?): SequencerResponse {
+        val authorizeWalletResponse = sequencer.processRequest(
+            sequencerRequest {
+                this.guid = UUID.randomUUID().toString()
+                this.type = SequencerRequest.Type.AuthorizeWallet
+                this.authorizeWallet = authorization {
+                    this.account = user.account.value
+                    this.wallet = user.wallet.value
+                    this.networkType = when (networkType) {
+                        NetworkType.Evm -> xyz.funkybit.sequencer.proto.NetworkType.Evm
+                        NetworkType.Bitcoin -> xyz.funkybit.sequencer.proto.NetworkType.Bitcoin
+                    }
+                    this.ownershipProof = xyz.funkybit.sequencer.proto.ownershipProof {
+                        message = ownershipProof.message
+                        signature = ownershipProof.signature
+                    }
+                    authorizationProof?.let {
+                        this.authorizationProof = xyz.funkybit.sequencer.proto.authorizationProof {
+                            message = authorizationProof.message
+                            signature = authorizationProof.signature
+                        }
+                    }
+                }
+            },
+        )
+        return authorizeWalletResponse
     }
 }

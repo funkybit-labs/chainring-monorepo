@@ -20,6 +20,7 @@ class RingApp(config: RingAppConfig = RingAppConfig()) : BaseApp(config.dbConfig
     private val sequencerClient = SequencerClient()
 
     private val chainWorkers = blockchainClients.map { ChainWorker(it, sequencerClient) }
+    private val archChainWorker = ArchChainWorker(sequencerClient)
     private val settlementCoordinator = SettlementCoordinator(blockchainClients, sequencerClient)
 
     private val repeater = Repeater(db, config.repeaterAutomaticTaskScheduling)
@@ -31,7 +32,7 @@ class RingApp(config: RingAppConfig = RingAppConfig()) : BaseApp(config.dbConfig
         db.upgrade(migrations, logger)
 
         chainWorkers.forEach(ChainWorker::start)
-        BitcoinChainWorker().start()
+        archChainWorker.start()
         settlementCoordinator.start()
         repeater.start()
 
@@ -44,6 +45,7 @@ class RingApp(config: RingAppConfig = RingAppConfig()) : BaseApp(config.dbConfig
         repeater.stop()
         settlementCoordinator.stop()
         chainWorkers.forEach(ChainWorker::stop)
+        archChainWorker.stop()
 
         super.stop()
         logger.info { "Stopped" }

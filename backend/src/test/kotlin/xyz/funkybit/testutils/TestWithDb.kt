@@ -12,8 +12,8 @@ import xyz.funkybit.core.db.DbConfig
 import xyz.funkybit.core.db.connect
 import xyz.funkybit.core.db.migrations
 import xyz.funkybit.core.db.upgrade
-import xyz.funkybit.core.model.db.ArchStateUtxoLogTable
-import xyz.funkybit.core.model.db.ArchStateUtxoTable
+import xyz.funkybit.core.model.db.ArchAccountBalanceIndexTable
+import xyz.funkybit.core.model.db.ArchAccountTable
 import xyz.funkybit.core.model.db.BalanceLogTable
 import xyz.funkybit.core.model.db.BalanceTable
 import xyz.funkybit.core.model.db.BitcoinWalletStateTable
@@ -32,7 +32,10 @@ import xyz.funkybit.core.model.db.OrderExecutionTable
 import xyz.funkybit.core.model.db.OrderTable
 import xyz.funkybit.core.model.db.SettlementBatchTable
 import xyz.funkybit.core.model.db.SymbolTable
+import xyz.funkybit.core.model.db.TestnetChallengePNLTable
+import xyz.funkybit.core.model.db.TestnetChallengeUserRewardTable
 import xyz.funkybit.core.model.db.TradeTable
+import xyz.funkybit.core.model.db.UserTable
 import xyz.funkybit.core.model.db.WalletLinkedSignerTable
 import xyz.funkybit.core.model.db.WalletTable
 import xyz.funkybit.core.model.db.WithdrawalTable
@@ -75,20 +78,23 @@ open class TestWithDb {
             SettlementBatchTable.deleteAll()
             DepositTable.deleteAll()
             WithdrawalTable.deleteAll()
+            ArchAccountBalanceIndexTable.deleteAll()
             BlockchainTransactionTable.deleteAll()
             BalanceLogTable.deleteAll()
             BalanceTable.deleteAll()
             WalletLinkedSignerTable.deleteAll()
             LimitTable.deleteAll()
+            TestnetChallengePNLTable.deleteAll()
+            TestnetChallengeUserRewardTable.deleteAll()
             WalletTable.deleteAll()
+            UserTable.deleteAll()
             OHLCTable.deleteAll()
             FaucetDripTable.deleteAll()
             MarketTable.deleteAll()
             SymbolTable.deleteAll()
             ChainTable.deleteAll()
             BitcoinWalletStateTable.deleteAll()
-            ArchStateUtxoLogTable.deleteAll()
-            ArchStateUtxoTable.deleteAll()
+            ArchAccountTable.deleteAll()
         }
     }
 }

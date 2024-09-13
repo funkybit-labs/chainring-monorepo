@@ -15,7 +15,6 @@ import xyz.funkybit.apps.api.middleware.principal
 import xyz.funkybit.apps.api.middleware.signedTokenSecurity
 import xyz.funkybit.apps.api.model.BalancesApiResponse
 import xyz.funkybit.core.model.db.BalanceEntity.Companion.balancesAsApiResponse
-import xyz.funkybit.core.model.db.WalletEntity
 
 class BalanceRoutes {
     private val logger = KotlinLogging.logger {}
@@ -37,7 +36,7 @@ class BalanceRoutes {
         } bindContract Method.GET to { request ->
             transaction {
                 Response(Status.OK).with(
-                    responseBody of balancesAsApiResponse(WalletEntity.getOrCreate(request.principal)),
+                    responseBody of balancesAsApiResponse(request.principal.userGuid),
                 )
             }
         }

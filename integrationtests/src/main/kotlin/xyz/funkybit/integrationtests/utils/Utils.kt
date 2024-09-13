@@ -1,9 +1,22 @@
 package xyz.funkybit.integrationtests.utils
 
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import org.bitcoinj.core.ECKey
+import org.web3j.crypto.Credentials
+import org.web3j.crypto.ECKeyPair
+import xyz.funkybit.apps.api.AuthorizeWalletAddressMessage
+import xyz.funkybit.apps.api.model.AuthorizeWalletApiRequest
 import xyz.funkybit.apps.api.model.Balance
 import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.apps.api.model.websocket.Limits
+import xyz.funkybit.core.evm.ECHelper
+import xyz.funkybit.core.evm.EIP712Helper
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.Symbol
+import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.utils.fromFundamentalUnits
 import xyz.funkybit.core.utils.toFundamentalUnits
 import java.math.BigDecimal
@@ -87,4 +100,54 @@ fun assertFee(expectedAmount: AssetAmount, amount: BigInteger, symbol: Symbol) {
 
 fun verifyApiReturnsSameLimits(apiClient: TestApiClient, wsMessage: Limits) {
     assertEquals(wsMessage.limits, apiClient.getLimits().limits)
+}
+
+fun signAuthorizeEvmWalletRequest(
+    ecKey: ECKey,
+    address: BitcoinAddress,
+    authorizedAddress: EvmAddress,
+    chainId: ChainId = ChainId(0U),
+    timestamp: Instant = Clock.System.now(),
+): AuthorizeWalletApiRequest {
+    val message = "[funkybit] Please sign this message to authorize EVM wallet ${authorizedAddress.value.lowercase()}. This action will not cost any gas fees."
+    val bitcoinLinkAddressMessage = "$message\nAddress: ${address.value}, Timestamp: $timestamp"
+    val signature = ecKey.signMessage(bitcoinLinkAddressMessage)
+
+    return AuthorizeWalletApiRequest(
+        authorizedAddress = authorizedAddress,
+        chainId = chainId,
+        address = address,
+        timestamp = timestamp.toString(),
+        signature = signature,
+    )
+}
+
+fun signAuthorizeBitcoinWalletRequest(
+    ecKeyPair: ECKeyPair,
+    address: EvmAddress,
+    authorizedAddress: BitcoinAddress,
+    chainId: ChainId = ChainId(1337U),
+    timestamp: Instant = Clock.System.now(),
+): AuthorizeWalletApiRequest {
+    val message = "[funkybit] Please sign this message to authorize Bitcoin wallet ${authorizedAddress.value.lowercase()}. This action will not cost any gas fees."
+    val signature: EvmSignature = ECHelper.signData(
+        Credentials.create(ecKeyPair),
+        EIP712Helper.computeHash(
+            AuthorizeWalletAddressMessage(
+                message = message,
+                address = address.toString(),
+                authorizedAddress = authorizedAddress.toString(),
+                chainId = chainId,
+                timestamp = timestamp.toString(),
+            ),
+        ),
+    )
+
+    return AuthorizeWalletApiRequest(
+        authorizedAddress = authorizedAddress,
+        address = address,
+        chainId = chainId,
+        timestamp = timestamp.toString(),
+        signature = signature.value,
+    )
 }

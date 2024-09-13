@@ -33,6 +33,7 @@ import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.db.DbConfig
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.services.LinkedSignerService
+import xyz.funkybit.core.utils.TestnetChallengeUtils
 import xyz.funkybit.core.websocket.Broadcaster
 import java.time.Duration.ofSeconds
 
@@ -81,7 +82,9 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val withdrawalRoutes = WithdrawalRoutes(exchangeApiService)
     private val balanceRoutes = BalanceRoutes()
     private val orderRoutes = OrderRoutes(exchangeApiService)
+    private val walletRoutes = WalletRoutes(sequencerClient)
     private val faucetRoutes = FaucetRoutes(faucetMode, ChainManager.getBlockchainClients())
+    private val testnetChallengeRoutes = TestnetChallengeRoutes(ChainManager.getBlockchainClients())
 
     private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
         .then(ServerFilters.Cors(corsPolicy))
@@ -113,6 +116,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                             configRoutes.getConfiguration,
                             configRoutes.getAccountConfiguration,
                             configRoutes.markSymbolAsAdded,
+                            walletRoutes.authorizeWallet,
                             orderRoutes.createOrder(),
                             orderRoutes.cancelOrder(),
                             orderRoutes.getOrder(),
@@ -140,6 +144,15 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                         }
                         if (faucetMode != FaucetMode.Off) {
                             routes += faucetRoutes.faucet
+                        }
+                        if (TestnetChallengeUtils.enabled) {
+                            routes += listOf(
+                                testnetChallengeRoutes.enroll,
+                                testnetChallengeRoutes.setNickname,
+                                testnetChallengeRoutes.setAvatarUrl,
+                                testnetChallengeRoutes.getLeaderboard,
+                                testnetChallengeRoutes.getCards,
+                            )
                         }
                     },
                 "/tma/v1" bind

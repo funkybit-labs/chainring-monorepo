@@ -1,11 +1,25 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import SatsConnect, { RpcErrorCode } from 'sats-connect'
+
+export const bitcoinEnabled = import.meta.env.ENV_ENABLE_BITCOIN
+
+type ConnectedEvent = {
+  _kind: 'connected'
+  accounts: BitcoinAccount[]
+}
+type DisconnectedEvent = {
+  _kind: 'disconnected'
+}
+type Event = ConnectedEvent | DisconnectedEvent
+
+type EventHandler = (event: Event) => void
 
 export const BitcoinContext = createContext<{
   connect: () => void
   disconnect: () => void
+  subscribe: (handler: EventHandler) => void
+  unsubscribe: (handler: EventHandler) => void
   accounts: BitcoinAccount[]
-  disconnected: boolean
 } | null>(null)
 
 export type BitcoinAccount = {
@@ -14,12 +28,28 @@ export type BitcoinAccount = {
   purpose: 'payment' | 'ordinals' | 'stacks'
   addressType: 'p2tr' | 'p2wpkh' | 'p2sh' | 'stacks' | 'p2pkh' | 'p2wsh'
   walletType: 'software' | 'ledger'
-  signMessage: (address: string, message: string) => Promise<string>
+}
+
+export async function bitcoinSignMessage(
+  address: string,
+  message: string
+): Promise<string | null> {
+  const result = await SatsConnect.request('signMessage', {
+    address,
+    message
+  })
+  if (result.status === 'success') {
+    return result.result.signature
+  } else if (result.error.code === RpcErrorCode.USER_REJECTION) {
+    return null
+  } else {
+    console.log(result.error)
+    throw Error('Failed to sign message with bitcoin wallet')
+  }
 }
 
 export function BitcoinProvider({ children }: { children: React.ReactNode }) {
   const [accounts, setAccounts] = useState<BitcoinAccount[]>([])
-  const [disconnected, setDisconnected] = useState(false)
 
   useEffect(() => {
     if (accounts.length > 0) {
@@ -37,25 +67,11 @@ export function BitcoinProvider({ children }: { children: React.ReactNode }) {
       purposes: ['payment', 'ordinals']
     })
     if (data.status === 'success') {
-      setDisconnected(false)
-      setAccounts(
-        data.result.map((a) => {
-          return {
-            ...a,
-            signMessage: async (address, message) => {
-              const result = await SatsConnect.request('signMessage', {
-                address,
-                message
-              })
-              if (result.status === 'success') {
-                return result.result.signature
-              } else {
-                return ''
-              }
-            }
-          }
-        })
-      )
+      const newAccounts = data.result
+      setAccounts(newAccounts)
+      subscriptions.current.forEach((eventHandler) => {
+        eventHandler({ _kind: 'connected', accounts: newAccounts })
+      })
     } else {
       setAccounts([])
       if (data.error.code !== RpcErrorCode.USER_REJECTION) {
@@ -64,25 +80,44 @@ export function BitcoinProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const subscriptions = useRef<EventHandler[]>([])
+
+  function subscribe(handler: EventHandler) {
+    subscriptions.current.push(handler)
+  }
+
+  function unsubscribe(handler: EventHandler) {
+    const idx = subscriptions.current.indexOf(handler)
+    if (idx != -1) {
+      subscriptions.current.splice(idx, 1)
+    }
+  }
+
   function disconnect() {
-    setDisconnected(true)
     setAccounts([])
-    console.log('a')
     SatsConnect.request('wallet_renouncePermissions', undefined).finally(() => {
-      SatsConnect.disconnect()
+      SatsConnect.disconnect().finally(() => {
+        subscriptions.current.forEach((eventHandler) => {
+          eventHandler({ _kind: 'disconnected' })
+        })
+      })
     })
   }
 
   return (
     <BitcoinContext.Provider
-      value={{ connect, disconnect, accounts, disconnected }}
+      value={{ connect, disconnect, accounts, subscribe, unsubscribe }}
     >
       {children}
     </BitcoinContext.Provider>
   )
 }
 
-export function useBitcoinWallet() {
+export function useBitcoinWallet({
+  eventHandler
+}: {
+  eventHandler: EventHandler
+}) {
   const context = useContext(BitcoinContext)
   if (!context) {
     throw Error(
@@ -90,6 +125,13 @@ export function useBitcoinWallet() {
     )
   }
 
-  const { connect, disconnect, accounts, disconnected } = context
-  return { connect, disconnect, accounts, disconnected }
+  const { connect, disconnect, subscribe, unsubscribe } = context
+  useEffect(() => {
+    subscribe(eventHandler)
+
+    return () => {
+      unsubscribe(eventHandler)
+    }
+  }, [subscribe, unsubscribe, eventHandler])
+  return { connect, disconnect }
 }

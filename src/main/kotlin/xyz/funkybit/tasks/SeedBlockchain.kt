@@ -22,6 +22,8 @@ import org.web3j.crypto.Keys
 import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.methods.response.VoidResponse
 import org.web3j.utils.Numeric
+import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import java.time.Duration
@@ -41,6 +43,12 @@ fun blockchainClient(chainId: ChainId) = blockchainClientsByChainId.getValue(cha
 fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
     val db = Database.connect(DbConfig())
     TransactionManager.defaultDatabase = db
+
+    // seed the fee payer
+    fixtures.chains.firstOrNull { it.id == BitcoinClient.chainId }?.let {
+        // fund the fee payer
+        airdropToFeePayer()
+    }
 
     val symbolEntities = transaction { SymbolEntity.all().toList() }
 
@@ -124,6 +132,23 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
         }
 
     return symbolContractAddresses
+}
+
+private fun airdropToFeePayer() {
+    try {
+        val balance = MempoolSpaceClient.getBalance(BitcoinClient.bitcoinConfig.feePayerAddress)
+        println("bitcoin fee payer balance is $balance")
+        if (balance < 25000L) {
+            val airdropAmount = maxOf(25000L - balance, 5000L)
+            println("Air dropping $airdropAmount to bitcoin fee payer")
+            BitcoinClient.sendToAddress(
+                BitcoinClient.bitcoinConfig.feePayerAddress,
+                airdropAmount.toBigInteger(),
+            )
+        }
+    } catch (e: Exception) {
+        println("failed to airdrop to fee payer")
+    }
 }
 
 class FixturesBlockchainClient(config: BlockchainClientConfig) : BlockchainClient(config) {

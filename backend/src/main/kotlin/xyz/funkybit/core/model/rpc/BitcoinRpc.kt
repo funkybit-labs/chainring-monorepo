@@ -88,9 +88,7 @@ sealed class BitcoinRpc {
         @SerialName("n")
         val index: Int,
         val scriptPubKey: ScriptPubKey,
-    ) {
-        fun toUtxoId(txId: TxHash) = UtxoId.fromTxHashAndVout(txId, index)
-    }
+    )
 
     @Serializable
     data class Transaction(
@@ -105,6 +103,7 @@ sealed class BitcoinRpc {
         @SerialName("vout")
         val txOuts: List<TxOut>,
         val hex: String,
+        val confirmations: Int?,
     )
 
     @Serializable

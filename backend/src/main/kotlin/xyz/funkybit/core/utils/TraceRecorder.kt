@@ -12,6 +12,7 @@ interface TraceRecorder {
         GetConfiguration,
         GetAccountConfiguration,
         MarkSymbolAsAdded,
+        AuthorizeWallet,
         CreateOrder,
         CancelOrder,
         GetOrder,
@@ -41,6 +42,10 @@ interface TraceRecorder {
         RemoveAdmin,
         SetFeeRates,
         GetLastPrice,
+        TestnetChallengeEnroll,
+        SetNickName,
+        GetLeaderboard,
+        GetCards,
     }
 
     data class Trace(

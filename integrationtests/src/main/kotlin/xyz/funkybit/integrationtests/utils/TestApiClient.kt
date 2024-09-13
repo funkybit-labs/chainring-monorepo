@@ -7,11 +7,10 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.junit.jupiter.api.Assertions
-import org.web3j.crypto.ECKeyPair
-import org.web3j.crypto.Keys
 import xyz.funkybit.apps.api.TestRoutes
 import xyz.funkybit.apps.api.model.AccountConfigurationApiResponse
 import xyz.funkybit.apps.api.model.ApiError
+import xyz.funkybit.apps.api.model.AuthorizeWalletApiRequest
 import xyz.funkybit.apps.api.model.BalancesApiResponse
 import xyz.funkybit.apps.api.model.BatchOrdersApiRequest
 import xyz.funkybit.apps.api.model.BatchOrdersApiResponse
@@ -56,9 +55,17 @@ import kotlin.test.DefaultAsserter.fail
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
-class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder: TraceRecorder = TraceRecorder.noOp) : ApiClient(ecKeyPair, traceRecorder) {
+class TestApiClient(keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(), traceRecorder: TraceRecorder = TraceRecorder.noOp, chainId: ChainId = ChainId(1337u)) : ApiClient(keyPair, traceRecorder, chainId) {
 
     companion object {
+
+        fun withEvmWallet(keyPair: WalletKeyPair.EVM = WalletKeyPair.EVM.generate(), chainId: ChainId = ChainId(1337u)): TestApiClient {
+            return TestApiClient(keyPair = keyPair, chainId = chainId)
+        }
+
+        fun withBitcoinWallet(keyPair: WalletKeyPair.Bitcoin = WalletKeyPair.Bitcoin.generate(), chainId: ChainId = ChainId(0u)): TestApiClient {
+            return TestApiClient(keyPair = keyPair, chainId = chainId)
+        }
 
         fun getOpenApiDocumentation(): String {
             val httpResponse = execute(
@@ -189,10 +196,25 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
     override fun markSymbolAsAdded(symbolName: String) =
         tryMarkSymbolAsAdded(symbolName).assertSuccess()
 
+    override fun authorizeWallet(apiRequest: AuthorizeWalletApiRequest) =
+        tryAuthorizeWallet(apiRequest).assertSuccess()
+
+    fun authorizeBitcoinWallet(evmKeyPair: WalletKeyPair.EVM) {
+        val bitcoinKeyPair = keyPair as WalletKeyPair.Bitcoin
+
+        authorizeWallet(
+            signAuthorizeBitcoinWalletRequest(
+                ecKeyPair = evmKeyPair.ecKeyPair,
+                address = evmKeyPair.address(),
+                authorizedAddress = bitcoinKeyPair.address(),
+            ),
+        )
+    }
+
     override fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
         tryCreateOrder(apiRequest).assertSuccess()
 
-    fun createLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: Wallet, clientOrderId: ClientOrderId? = null, linkedSignerEcKeyPair: ECKeyPair? = null): CreateOrderApiResponse {
+    fun createLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: Wallet, clientOrderId: ClientOrderId? = null, linkedSignerKeyPair: WalletKeyPair? = null): CreateOrderApiResponse {
         val request = CreateOrderApiRequest.Limit(
             nonce = generateOrderNonce(),
             marketId = market.id,
@@ -202,7 +224,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             signature = EvmSignature.emptySignature(),
             verifyingChainId = ChainId.empty,
             clientOrderId = clientOrderId,
-        ).let { wallet.signOrder(it, linkedSignerEcKeyPair = linkedSignerEcKeyPair) }
+        ).let { wallet.signOrder(it, linkedSignerKeyPair = linkedSignerKeyPair) }
 
         val response = createOrder(request)
 
@@ -212,7 +234,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
         return response
     }
 
-    fun tryCreateLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: Wallet, clientOrderId: ClientOrderId? = null, linkedSignerEcKeyPair: ECKeyPair? = null): Either<ApiCallFailure, CreateOrderApiResponse> {
+    fun tryCreateLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: Wallet, clientOrderId: ClientOrderId? = null, linkedSignerKeyPair: WalletKeyPair? = null): Either<ApiCallFailure, CreateOrderApiResponse> {
         val request = CreateOrderApiRequest.Limit(
             nonce = generateOrderNonce(),
             marketId = market.id,
@@ -222,7 +244,7 @@ class TestApiClient(ecKeyPair: ECKeyPair = Keys.createEcKeyPair(), traceRecorder
             signature = EvmSignature.emptySignature(),
             verifyingChainId = ChainId.empty,
             clientOrderId = clientOrderId,
-        ).let { wallet.signOrder(it, linkedSignerEcKeyPair = linkedSignerEcKeyPair) }
+        ).let { wallet.signOrder(it, linkedSignerKeyPair = linkedSignerKeyPair) }
 
         return tryCreateOrder(request)
     }

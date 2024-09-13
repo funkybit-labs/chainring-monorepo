@@ -105,8 +105,8 @@ describe('rollupTrades', () => {
       }
     ],
     feeRates: {
-      maker: 0n,
-      taker: 0n
+      maker: '0.000000',
+      taker: '0.000000'
     }
   })
 

@@ -6,9 +6,11 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.dao.with
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import xyz.funkybit.apps.api.model.Balance
@@ -91,13 +93,15 @@ class BalanceEntity(guid: EntityID<BalanceId>) : GUIDEntity<BalanceId>(guid) {
             )
         }
 
-        fun balancesAsApiResponse(walletEntity: WalletEntity): BalancesApiResponse {
-            val (availableBalances, exchangeBalances) = getBalancesForWallet(
-                walletEntity,
-            ).map {
-                it.refresh(flush = true)
-                it
-            }.partition { it.type == BalanceType.Available }
+        fun balancesAsApiResponse(userId: EntityID<UserId>): BalancesApiResponse =
+            balancesAsApiResponse(userId.value)
+
+        fun balancesAsApiResponse(userId: UserId): BalancesApiResponse {
+            val balances = getBalancesForUserId(userId)
+            balances.forEach { it.refresh(flush = true) }
+
+            val (availableBalances, exchangeBalances) = balances.partition { it.type == BalanceType.Available }
+
             val exchangeBalanceMap = exchangeBalances.associate { it.symbolGuid.value to it.balance }
 
             return BalancesApiResponse(
@@ -181,7 +185,7 @@ class BalanceEntity(guid: EntityID<BalanceId>) : GUIDEntity<BalanceId>(guid) {
             }
         }
 
-        fun getBalances(walletIds: List<WalletId>, symbolIds: List<SymbolId>, type: BalanceType): List<BalanceEntity> {
+        private fun getBalances(walletIds: List<WalletId>, symbolIds: List<SymbolId>, type: BalanceType): List<BalanceEntity> {
             return BalanceEntity.find {
                 BalanceTable.walletGuid.inList(walletIds) and
                     BalanceTable.symbolGuid.inList(symbolIds) and
@@ -189,17 +193,30 @@ class BalanceEntity(guid: EntityID<BalanceId>) : GUIDEntity<BalanceId>(guid) {
             }.with(BalanceEntity::symbol).toList()
         }
 
-        fun getBalancesForWallet(wallet: WalletEntity): List<BalanceEntity> =
-            BalanceEntity.find {
-                BalanceTable.walletGuid.eq(wallet.guid)
-            }.with(BalanceEntity::symbol).toList()
+        fun getBalancesForUserId(userId: EntityID<UserId>): List<BalanceEntity> =
+            getBalancesForUserId(userId.value)
 
-        fun findForWalletAndSymbol(wallet: WalletEntity, symbol: SymbolEntity, type: BalanceType): BalanceEntity? =
-            BalanceEntity.find {
-                BalanceTable.walletGuid.eq(wallet.guid)
-                    .and(BalanceTable.symbolGuid.eq(symbol.guid))
-                    .and(BalanceTable.type.eq(type))
-            }.singleOrNull()
+        fun getBalancesForUserId(userId: UserId): List<BalanceEntity> =
+            BalanceTable
+                .innerJoin(WalletTable)
+                .innerJoin(SymbolTable)
+                .selectAll()
+                .where { WalletTable.userGuid.eq(userId) }
+                .orderBy(Pair(SymbolTable.name, SortOrder.ASC))
+                .map(Companion::wrapRow)
+                .with(BalanceEntity::symbol)
+                .toList()
+
+        fun findForUserAndSymbol(userId: EntityID<UserId>, symbol: SymbolEntity, type: BalanceType): BalanceEntity? =
+            findForUserAndSymbol(userId.value, symbol, type)
+
+        private fun findForUserAndSymbol(userId: UserId, symbol: SymbolEntity, type: BalanceType): BalanceEntity? =
+            BalanceTable
+                .innerJoin(WalletTable)
+                .selectAll()
+                .where { WalletTable.userGuid.eq(userId).and(BalanceTable.symbolGuid.eq(symbol.guid)).and(BalanceTable.type.eq(type)) }
+                .map(Companion::wrapRow)
+                .singleOrNull()
     }
 
     var createdAt by BalanceTable.createdAt

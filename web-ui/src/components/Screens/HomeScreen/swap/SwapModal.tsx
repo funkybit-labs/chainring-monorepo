@@ -23,6 +23,7 @@ import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import Deposit from 'assets/Deposit.svg'
 import MarketPrice from 'components/Screens/HomeScreen/swap/MarketPrice'
+import { useWallets } from 'contexts/walletProvider'
 
 export function SwapModal({
   markets,
@@ -39,6 +40,8 @@ export function SwapModal({
   onMarketChange: (m: Market) => void
   onSideChange: (s: OrderSide) => void
 }) {
+  const wallets = useWallets()
+
   const [animateSide, setAnimateSide] = useState(false)
   function onChangedSide(s: OrderSide) {
     onSideChange(s)
@@ -267,7 +270,10 @@ export function SwapModal({
               />
             </div>
             <div className="flex w-full flex-col">
-              {walletAddress && exchangeContractAddress ? (
+              {walletAddress &&
+              exchangeContractAddress &&
+              wallets.isConnected(sr.topSymbol.networkType) &&
+              wallets.isConnected(sr.bottomSymbol.networkType) ? (
                 <>
                   {sr.noPriceFound && (
                     <span className="w-full text-center text-brightRed">
@@ -286,7 +292,15 @@ export function SwapModal({
                           sr.lastOrder?.status ?? ''
                         )
                       ) {
-                        return '✓ Swapped'
+                        const ns = sr.lastOrder?.timing?.sequencerTimeNs
+                        if (ns) {
+                          const us = new Decimal(
+                            ns.toString()
+                          ).dividedToIntegerBy(1000)
+                          return '✓ Swapped in ' + us + 'µs'
+                        } else {
+                          return '✓ Swapped'
+                        }
                       } else if (sr.mutation.isSuccess) {
                         return '✓ Submitted'
                       } else if (sr.amountTooLow) {

@@ -13,7 +13,12 @@ import xyz.funkybit.core.model.db.BalanceType
 import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.DepositStatus
 import xyz.funkybit.core.model.db.DepositTable
+import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
+import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.sequencer.SequencerClient
+import xyz.funkybit.core.sequencer.toSequencerId
+import xyz.funkybit.core.utils.TestnetChallengeUtils
+import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.sequencer.core.Asset
 import java.math.BigInteger
 import kotlin.concurrent.thread
@@ -79,6 +84,17 @@ class BlockchainDepositHandler(
 
         if (confirmedDeposits.isNotEmpty()) {
             confirmedDeposits.forEach(::sendToSequencer)
+            if (TestnetChallengeUtils.enabled) {
+                confirmedDeposits.forEach { deposit ->
+                    if (listOf(TestnetChallengeStatus.PendingDeposit, TestnetChallengeStatus.PendingDepositConfirmation).contains(deposit.wallet.user.testnetChallengeStatus) &&
+                        deposit.symbol.name == TestnetChallengeUtils.depositSymbolName &&
+                        deposit.amount == TestnetChallengeUtils.depositAmount.toFundamentalUnits(TestnetChallengeUtils.depositSymbol().decimals)
+                    ) {
+                        deposit.wallet.user.testnetChallengeStatus = TestnetChallengeStatus.Enrolled
+                        TestnetChallengePNLEntity.initializeForUser(deposit.wallet.user)
+                    }
+                }
+            }
         }
     }
 
@@ -120,7 +136,7 @@ class BlockchainDepositHandler(
     private fun sendToSequencer(deposit: DepositEntity) {
         try {
             runBlocking {
-                sequencerClient.deposit(deposit.wallet.sequencerId.value, Asset(deposit.symbol.name), deposit.amount, deposit.guid.value)
+                sequencerClient.deposit(deposit.wallet.userGuid.value.toSequencerId(), Asset(deposit.symbol.name), deposit.amount, deposit.guid.value)
             }
             // Updating like this in case SequencerResponseProcessor sets status to Complete before we commit this transaction
             DepositTable.update(

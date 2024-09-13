@@ -9,7 +9,8 @@ import Edit from 'assets/Edit.svg'
 import Input from 'components/Screens/Admin/Input'
 import Add from 'assets/Add.svg'
 import MarketModal from 'components/Screens/Admin/MarketModal'
-import { useWallet } from 'contexts/walletProvider'
+import { useWallets } from 'contexts/walletProvider'
+import { FEE_RATE_PIPS_MAX_VALUE } from 'utils'
 
 export default function Admin({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
@@ -61,7 +62,7 @@ export default function Admin({ onClose }: { onClose: () => void }) {
     return marketsQuery.data ?? []
   }, [marketsQuery.data])
 
-  const wallet = useWallet()
+  const wallets = useWallets()
 
   const [makerFeeRate, setMakerFeeRate] = useState<bigint>()
   const [takerFeeRate, setTakerFeeRate] = useState<bigint>()
@@ -138,7 +139,7 @@ export default function Admin({ onClose }: { onClose: () => void }) {
           width={'normal'}
         />
         <div className="text-lg">funkybit admin</div>
-        <div className="text-sm">{wallet.primaryAddress}</div>
+        <div className="text-sm">{wallets.primary?.address}</div>
       </div>
     )
   }
@@ -180,6 +181,9 @@ export default function Admin({ onClose }: { onClose: () => void }) {
               }
             }}
           />
+          <div className="mt-2 text-sm">
+            1 pip = {(1 / FEE_RATE_PIPS_MAX_VALUE) * 100}%
+          </div>
         </fieldset>
         <fieldset className="rounded-lg border-2 border-white bg-darkBluishGray6 p-4">
           <legend>Taker</legend>
@@ -195,6 +199,9 @@ export default function Admin({ onClose }: { onClose: () => void }) {
               }
             }}
           />
+          <div className="mt-2 text-sm">
+            1 pip = {(1 / FEE_RATE_PIPS_MAX_VALUE) * 100}%
+          </div>
         </fieldset>
         <div className="w-20">
           <SubmitButton

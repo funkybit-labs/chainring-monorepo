@@ -69,6 +69,7 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
             chainId: ChainId,
             transactionData: BlockchainTransactionData,
             batchHash: String?,
+            txHash: TxHash? = null,
         ): BlockchainTransactionEntity {
             val entity = BlockchainTransactionEntity.new(BlockchainTransactionId.generate()) {
                 val now = Clock.System.now()
@@ -78,6 +79,7 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
                 this.transactionData = transactionData
                 this.chainId = EntityID(chainId, ChainTable)
                 this.batchHash = batchHash
+                this.txHash = txHash
             }
             return entity
         }
@@ -95,7 +97,7 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
         this.updatedBy = "system"
     }
 
-    fun markAsSubmitted(txHash: TxHash, blockNumber: BigInteger?, lastSeenBlock: BigInteger?) {
+    fun markAsSubmitted(txHash: TxHash, blockNumber: BigInteger? = null, lastSeenBlock: BigInteger? = null) {
         this.txHash = txHash
         this.blockNumber = blockNumber
         this.lastSeenBlock = lastSeenBlock

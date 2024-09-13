@@ -4,8 +4,7 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.db.Migration
-import xyz.funkybit.core.model.db.ArchStateUtxoId
-import xyz.funkybit.core.model.db.ArchStateUtxoLogId
+import xyz.funkybit.core.model.db.EntityId
 import xyz.funkybit.core.model.db.GUIDTable
 import xyz.funkybit.core.model.db.PGEnum
 import xyz.funkybit.core.model.db.SymbolId
@@ -29,9 +28,12 @@ class V74_ArchStateUtxoTables : Migration() {
         Failed,
     }
 
-    object V74_ArchStateUtxoTable : GUIDTable<ArchStateUtxoId>(
+    @JvmInline
+    value class V74_ArchStateUtxoId(override val value: String) : EntityId
+
+    object V74_ArchStateUtxoTable : GUIDTable<V74_ArchStateUtxoId>(
         "arch_state_utxo",
-        ::ArchStateUtxoId,
+        ::V74_ArchStateUtxoId,
     ) {
         val createdAt = timestamp("created_at")
         val createdBy = varchar("created_by", 10485760)
@@ -55,9 +57,12 @@ class V74_ArchStateUtxoTables : Migration() {
         )
     }
 
-    object V74_ArchStateUtxoLogTable : GUIDTable<ArchStateUtxoLogId>(
+    @JvmInline
+    value class V74_ArchStateUtxoLogId(override val value: String) : EntityId
+
+    object V74_ArchStateUtxoLogTable : GUIDTable<V74_ArchStateUtxoLogId>(
         "arch_state_utxo_log",
-        ::ArchStateUtxoLogId,
+        ::V74_ArchStateUtxoLogId,
     ) {
         val createdAt = timestamp("created_at")
         val createdBy = varchar("created_by", 10485760)

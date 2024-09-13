@@ -9,9 +9,11 @@ import org.http4k.websocket.Websocket
 import org.http4k.websocket.WsMessage
 import org.http4k.websocket.WsResponse
 import org.http4k.websocket.WsStatus
+import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.middleware.AuthResult
 import xyz.funkybit.apps.api.middleware.validateAuthToken
 import xyz.funkybit.apps.api.model.websocket.IncomingWSMessage
+import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.websocket.Broadcaster
 import xyz.funkybit.core.websocket.ConnectedClient
 
@@ -30,7 +32,10 @@ class WebsocketApi(private val broadcaster: Broadcaster) {
                 val connectedClient = when (val auth = request.query("auth")) {
                     null -> ConnectedClient(websocket, null, Instant.DISTANT_FUTURE)
                     else -> when (val result = validateAuthToken(auth)) {
-                        is AuthResult.Success -> ConnectedClient(websocket, result.address, result.expiresAt)
+                        is AuthResult.Success -> {
+                            val wallet = transaction { WalletEntity.getOrCreateWithUser(result.address) }
+                            ConnectedClient(websocket, wallet, result.expiresAt)
+                        }
                         else -> {
                             websocket.close(wsUnauthorized)
                             ConnectedClient(websocket, null, Instant.DISTANT_FUTURE)

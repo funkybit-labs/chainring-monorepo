@@ -21,22 +21,26 @@ import xyz.funkybit.apps.api.model.AccountConfigurationApiResponse
 import xyz.funkybit.apps.api.model.Chain
 import xyz.funkybit.apps.api.model.ConfigurationApiResponse
 import xyz.funkybit.apps.api.model.DeployedContract
+import xyz.funkybit.apps.api.model.FeeRates
 import xyz.funkybit.apps.api.model.Market
 import xyz.funkybit.apps.api.model.Role
 import xyz.funkybit.apps.api.model.SymbolInfo
+import xyz.funkybit.apps.api.model.toSymbolInfo
 import xyz.funkybit.core.model.EvmAddress
-import xyz.funkybit.core.model.FeeRate
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.ChainEntity
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ChainTable
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
-import xyz.funkybit.core.model.db.FeeRates
 import xyz.funkybit.core.model.db.MarketEntity
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.SymbolEntity
-import xyz.funkybit.core.model.db.WalletEntity
+import xyz.funkybit.core.model.db.TestnetChallengeStatus
+import xyz.funkybit.core.model.db.pointsBalances
+import xyz.funkybit.core.model.db.sum
+import xyz.funkybit.core.utils.TestnetChallengeUtils
+import java.math.BigDecimal
 import java.math.BigInteger
 
 class ConfigRoutes(private val faucetMode: FaucetMode) {
@@ -102,8 +106,8 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                             ),
                         ),
                         feeRates = FeeRates(
-                            maker = FeeRate.fromPercents(1.0),
-                            taker = FeeRate.fromPercents(2.0),
+                            maker = BigDecimal("1.0"),
+                            taker = BigDecimal("2.0"),
                         ),
                     ),
             )
@@ -151,7 +155,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                                     minFee = market.minFee,
                                 )
                             }.sortedWith(compareBy({ it.baseSymbol.value }, { it.quoteSymbol.value })),
-                            feeRates = FeeRates.fetch(),
+                            feeRates = FeeRates(xyz.funkybit.core.model.db.FeeRates.fetch()),
                         ),
                 )
             }
@@ -173,15 +177,24 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                         role = Role.User,
                         newSymbols = listOf(
                             SymbolInfo(
-                                name = "RING",
+                                name = "FUNK",
                                 description = "funkybit Token",
                                 contractAddress = EvmAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
                                 decimals = 18u,
                                 faucetSupported = true,
-                                iconUrl = "https://icons/ring.svg",
+                                iconUrl = "https://icons/funk.svg",
                                 withdrawalFee = BigInteger.ZERO,
                             ),
                         ),
+                        authorizedAddresses = listOf(
+                            EvmAddress.zero,
+                        ),
+                        testnetChallengeStatus = TestnetChallengeStatus.Unenrolled,
+                        testnetChallengeDepositSymbol = "USDC:31337",
+                        testnetChallengeDepositContract = null,
+                        nickName = "Nick Name",
+                        avatarUrl = "https://icons/avatar.svg",
+                        pointsBalance = BigDecimal.ZERO,
                     ),
             )
         } bindContract Method.GET to { request ->
@@ -189,18 +202,17 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                 Response(Status.OK).with(
                     responseBody of
                         AccountConfigurationApiResponse(
-                            role = if (WalletEntity.findByAddress(request.principal)?.isAdmin == true) Role.Admin else Role.User,
-                            newSymbols = SymbolEntity.symbolsToAddToWallet(request.principal).map {
-                                SymbolInfo(
-                                    it.name,
-                                    it.description,
-                                    it.contractAddress,
-                                    it.decimals,
-                                    it.faucetSupported(faucetMode),
-                                    it.iconUrl,
-                                    it.withdrawalFee,
-                                )
+                            role = if (request.principal.isAdmin) Role.Admin else Role.User,
+                            newSymbols = SymbolEntity.symbolsToAddToWallet(request.principal.address).map {
+                                it.toSymbolInfo(faucetMode)
                             },
+                            authorizedAddresses = request.principal.authorizedAddresses(),
+                            testnetChallengeStatus = request.principal.user.testnetChallengeStatus,
+                            testnetChallengeDepositSymbol = if (TestnetChallengeUtils.enabled) TestnetChallengeUtils.depositSymbolName else null,
+                            testnetChallengeDepositContract = if (TestnetChallengeUtils.enabled) TestnetChallengeUtils.depositSymbol().contractAddress else null,
+                            nickName = request.principal.user.nickname,
+                            avatarUrl = request.principal.user.avatarUrl,
+                            pointsBalance = request.principal.user.pointsBalances().sum(),
                         ),
                 )
             }
@@ -221,11 +233,11 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
         } bindContract Method.POST to { symbolName ->
             { request ->
                 transaction {
-                    WalletEntity.getOrCreate(request.principal).let {
-                        if (!it.addedSymbols.contains(symbolName)) {
-                            it.addedSymbols += symbolName
-                        }
+                    val wallet = request.principal
+                    if (!wallet.addedSymbols.contains(symbolName)) {
+                        wallet.addedSymbols += symbolName
                     }
+
                     Response(Status.NO_CONTENT)
                 }
             }

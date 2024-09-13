@@ -5,13 +5,12 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.apps.api.FaucetMode
+import xyz.funkybit.apps.api.model.FeeRates
 import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.core.blockchain.BlockchainClient
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.model.EvmAddress
-import xyz.funkybit.core.model.FeeRate
-import xyz.funkybit.core.model.db.FeeRates
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.SymbolEntity
@@ -53,7 +52,7 @@ class ConfigRouteTest {
         }
 
         assertEquals(
-            FeeRates(maker = FeeRate.fromPercents(1.0), taker = FeeRate.fromPercents(2.0)),
+            FeeRates(maker = BigDecimal("0.010000"), taker = BigDecimal("0.020000")),
             config.feeRates,
         )
 
@@ -72,8 +71,6 @@ class ConfigRouteTest {
         val config = apiClient.getConfiguration()
         assertEquals(config.chains.filter { it.networkType == NetworkType.Bitcoin }.size, 1)
         val btcChainConfig = config.chains.single { it.networkType == NetworkType.Bitcoin }
-        assertEquals(btcChainConfig.contracts.size, 1)
-        assertEquals(btcChainConfig.contracts[0].name, ContractType.Exchange.name)
 
         val btcSymbol = btcChainConfig.symbols.first { it.name == "BTC".toChainSymbol(btcChainConfig.id) }
         assertEquals(BigDecimal("0.00000002").toFundamentalUnits(btcSymbol.decimals.toInt()), btcSymbol.withdrawalFee)

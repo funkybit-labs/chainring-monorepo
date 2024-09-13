@@ -8,7 +8,7 @@ import {
   PublishableSchema,
   SubscriptionTopic
 } from 'websocketMessages'
-import { Wallet } from 'contexts/walletProvider'
+import { Wallets } from 'contexts/walletProvider'
 
 const connectionUrl =
   apiBaseUrl.replace('http:', 'ws:').replace('https:', 'wss:') + '/connect'
@@ -30,10 +30,10 @@ export const WebsocketContext = createContext<{
 } | null>(null)
 
 export function WebsocketProvider({
-  wallet,
+  wallets,
   children
 }: {
-  wallet: Wallet
+  wallets: Wallets
   children: React.ReactNode
 }) {
   const ws = useRef<Websocket | null>(null)
@@ -122,12 +122,12 @@ export function WebsocketProvider({
 
     async function connect(refreshAuth: boolean = false) {
       // don't do anything until we know for sure that wallet is connected
-      if (wallet.primaryCategory === 'none') return
+      if (wallets.connected.length == 0) return
 
       if (connecting) return
       connecting = true
 
-      const authQuery = wallet.primaryAddress
+      const authQuery = wallets.primary?.address
         ? `?auth=${await loadAuthToken({ forceRefresh: refreshAuth })}`
         : ''
 
@@ -156,7 +156,7 @@ export function WebsocketProvider({
     return () => {
       ws.current?.close()
     }
-  }, [wallet.primaryCategory, wallet.primaryAddress])
+  }, [wallets])
 
   return (
     <WebsocketContext.Provider value={{ subscribe, unsubscribe }}>

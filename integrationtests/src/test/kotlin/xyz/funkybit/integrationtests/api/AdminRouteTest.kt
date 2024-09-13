@@ -23,6 +23,7 @@ import xyz.funkybit.integrationtests.utils.assertError
 import java.math.BigInteger
 import java.time.Duration
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 @ExtendWith(AppUnderTestRunner::class)
 class AdminRouteTest {
@@ -35,7 +36,7 @@ class AdminRouteTest {
         apiClient.tryListAdmins().assertError(ApiError(ReasonCode.AuthenticationError, "Access denied"))
         assertEquals(Role.User, apiClient.getAccountConfiguration().role)
         transaction {
-            WalletEntity.getOrCreate(apiClient.address).isAdmin = true
+            WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = true
         }
         assertEquals(listOf(apiClient.address), apiClient.listAdmins())
         assertEquals(Role.Admin, apiClient.getAccountConfiguration().role)
@@ -51,15 +52,24 @@ class AdminRouteTest {
     fun `test set fee rates`() {
         val apiClient = TestApiClient()
 
-        val feeRates = apiClient.getConfiguration().feeRates
         transaction {
-            WalletEntity.getOrCreate(apiClient.address).isAdmin = true
+            WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = true
         }
 
-        val newFeeRates = FeeRates(FeeRate(feeRates.maker.value + 1L), FeeRate(feeRates.taker.value + 2L))
+        val feeRates = apiClient.getConfiguration().feeRates.let {
+            FeeRates.fromPercents(maker = it.maker, taker = it.taker)
+        }
+        val newFeeRates = AdminRoutes.Companion.SetFeeRates(
+            FeeRate(feeRates.maker.value + 1L),
+            FeeRate(feeRates.taker.value + 2L),
+        )
         apiClient.setFeeRates(newFeeRates)
+
         await.atMost(sequencerResponseTimeout).untilAsserted {
-            assertEquals(newFeeRates, apiClient.getConfiguration().feeRates)
+            assertEquals(
+                Pair(newFeeRates.maker.toPercents(), newFeeRates.taker.toPercents()),
+                apiClient.getConfiguration().feeRates.let { Pair(it.maker, it.taker) },
+            )
         }
     }
 
@@ -85,7 +95,7 @@ class AdminRouteTest {
         )
         apiClient.tryCreateSymbol(adminRequest).assertError(ApiError(ReasonCode.AuthenticationError, "Access denied"))
         transaction {
-            WalletEntity.getOrCreate(apiClient.address).isAdmin = true
+            WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = true
         }
         try {
             apiClient.createSymbol(adminRequest)
@@ -135,7 +145,7 @@ class AdminRouteTest {
         } finally {
             transaction {
                 SymbolEntity.findById(SymbolId(chainId, "NAME"))?.delete()
-                WalletEntity.getOrCreate(apiClient.address).isAdmin = false
+                WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = false
             }
         }
     }
@@ -144,7 +154,7 @@ class AdminRouteTest {
     fun `test market management`() {
         val apiClient = TestApiClient()
         transaction {
-            WalletEntity.getOrCreate(apiClient.address).isAdmin = true
+            WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = true
         }
 
         val config = apiClient.getConfiguration()
@@ -225,7 +235,7 @@ class AdminRouteTest {
                 MarketEntity.findById(marketId)?.delete()
                 SymbolEntity.findById(SymbolId(chainId1, "NAME"))?.delete()
                 SymbolEntity.findById(SymbolId(chainId2, "NAME"))?.delete()
-                WalletEntity.getOrCreate(apiClient.address).isAdmin = false
+                WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = false
             }
         }
     }

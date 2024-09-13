@@ -73,7 +73,19 @@ import xyz.funkybit.core.model.db.migrations.V73_AddBitcoinWalletStateTable
 import xyz.funkybit.core.model.db.migrations.V74_ArchStateUtxoTables
 import xyz.funkybit.core.model.db.migrations.V75_AddAutoReducedToOrder
 import xyz.funkybit.core.model.db.migrations.V76_AddBlockHeightToBitcoinWalletState
+import xyz.funkybit.core.model.db.migrations.V77_User
+import xyz.funkybit.core.model.db.migrations.V78_ArchAccountTable
+import xyz.funkybit.core.model.db.migrations.V79_UserTestnetChallenge
 import xyz.funkybit.core.model.db.migrations.V7_OrderTable
+import xyz.funkybit.core.model.db.migrations.V80_CrossChainSequencerOrders
+import xyz.funkybit.core.model.db.migrations.V81_UserNicknameIndex
+import xyz.funkybit.core.model.db.migrations.V82_AddSettlingStatusToDeposit
+import xyz.funkybit.core.model.db.migrations.V83_ArchAccountBalanceIndexTable
+import xyz.funkybit.core.model.db.migrations.V84_MarketPriceFeed
+import xyz.funkybit.core.model.db.migrations.V85_TestnetChallengePNL
+import xyz.funkybit.core.model.db.migrations.V86_AddArchTransactionToWithdrawal
+import xyz.funkybit.core.model.db.migrations.V87_TestnetChallengeRewardCategory
+import xyz.funkybit.core.model.db.migrations.V88_TypeId
 import xyz.funkybit.core.model.db.migrations.V8_ExecutionsAndTrades
 import xyz.funkybit.core.model.db.migrations.V9_SymbolTable
 
@@ -154,4 +166,16 @@ val migrations = listOf(
     V74_ArchStateUtxoTables(),
     V75_AddAutoReducedToOrder(),
     V76_AddBlockHeightToBitcoinWalletState(),
+    V77_User(),
+    V78_ArchAccountTable(),
+    V79_UserTestnetChallenge(),
+    V80_CrossChainSequencerOrders(),
+    V81_UserNicknameIndex(),
+    V82_AddSettlingStatusToDeposit(),
+    V83_ArchAccountBalanceIndexTable(),
+    V84_MarketPriceFeed(),
+    V85_TestnetChallengePNL(),
+    V86_AddArchTransactionToWithdrawal(),
+    V87_TestnetChallengeRewardCategory(),
+    V88_TypeId(),
 )

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
+	 viewBox="0 0 512 512" xml:space="preserve">
+<circle style="fill:#FC6F58;" cx="256" cy="256" r="256"/>
+<path style="fill:#F1543F;" d="M510.216,225.771l-83.549-83.549l-77.346,77.8L85.333,369.778l140.438,140.438
+	c75.186,8.888,153.559-15.507,211.249-73.195C494.709,379.33,519.104,300.956,510.216,225.771z"/>
+<rect x="113.778" y="364.175" style="fill:#2B3B4E;" width="56.889" height="28.444"/>
+<rect x="341.333" y="364.175" style="fill:#1E2F3F;" width="56.889" height="28.444"/>
+<rect x="85.333" y="142.222" style="fill:#324A5E;" width="341.333" height="227.556"/>
+<g>
+	<rect x="254.845" y="142.222" style="fill:#2B3B4E;" width="171.822" height="227.556"/>
+	<rect x="101.71" y="158.599" style="fill:#2B3B4E;" width="308.579" height="194.801"/>
+</g>
+<rect x="254.845" y="158.599" style="fill:#1E2F3F;" width="155.445" height="194.801"/>
+<circle style="fill:#B5F1F4;" cx="185.32" cy="256" r="56.889"/>
+<g>
+	<path style="fill:#84DBFF;" d="M242.209,256c0-31.227-25.16-56.565-56.313-56.875v113.748
+		C217.048,312.565,242.209,287.227,242.209,256z"/>
+	<circle style="fill:#84DBFF;" cx="185.32" cy="256" r="44.822"/>
+</g>
+<path style="fill:#31BAFD;" d="M230.141,256c0-24.562-19.758-44.497-44.246-44.808v89.614
+	C210.384,300.497,230.141,280.56,230.141,256z"/>
+<g>
+	<rect x="280.29" y="211.454" style="fill:#E6F3FF;" width="24.662" height="22.025"/>
+	<rect x="280.29" y="245.484" style="fill:#E6F3FF;" width="24.662" height="22.025"/>
+	<rect x="280.29" y="278.531" style="fill:#E6F3FF;" width="24.662" height="22.025"/>
+	<rect x="314.354" y="211.454" style="fill:#E6F3FF;" width="24.662" height="22.025"/>
+	<rect x="314.354" y="245.484" style="fill:#E6F3FF;" width="24.662" height="22.025"/>
+	<rect x="314.354" y="278.531" style="fill:#E6F3FF;" width="24.662" height="22.025"/>
+	<rect x="348.401" y="211.454" style="fill:#E6F3FF;" width="24.662" height="22.025"/>
+	<rect x="348.401" y="245.484" style="fill:#E6F3FF;" width="24.662" height="22.025"/>
+	<rect x="348.401" y="278.531" style="fill:#E6F3FF;" width="24.662" height="22.025"/>
+</g>
+</svg>

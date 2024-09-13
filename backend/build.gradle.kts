@@ -85,6 +85,9 @@ dependencies {
     implementation("aws.sdk.kotlin:s3:1.2.51")
 
     implementation("org.bitcoinj:bitcoinj-core:0.16.3")
+
+    implementation("org.apache.xmlgraphics:batik-all:1.17")
+    implementation("io.github.jycr:java-data-url-handler:0.0.1")
 }
 
 tasks.test {

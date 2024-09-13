@@ -9,7 +9,6 @@ import xyz.funkybit.mocker.core.PriceFunction
 import xyz.funkybit.mocker.core.LiquidityPlacement
 import xyz.funkybit.mocker.core.Maker
 import xyz.funkybit.mocker.core.Taker
-import xyz.funkybit.mocker.core.toFundamentalUnits
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.File
 import java.math.BigDecimal
@@ -20,8 +19,8 @@ import kotlin.time.Duration.Companion.minutes
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import org.web3j.crypto.ECKeyPair
-import org.web3j.crypto.Keys
+import xyz.funkybit.core.utils.toFundamentalUnits
+import xyz.funkybit.integrationtests.utils.WalletKeyPair
 import java.math.BigInteger
 
 
@@ -123,7 +122,7 @@ fun main() {
     timer.cancel()
 }
 
-fun startMaker(market: Market, marketPriceOverride: BigDecimal?, liquidityPlacement: LiquidityPlacement, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, keyPair: ECKeyPair = Keys.createEcKeyPair()): Maker {
+fun startMaker(market: Market, marketPriceOverride: BigDecimal?, liquidityPlacement: LiquidityPlacement, baseAssetAmount: BigDecimal, quoteAssetAmount: BigDecimal, keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(), usePriceFeed: Boolean = false): Maker {
     val baseAssetBtc = market.baseSymbol.value.startsWith("BTC")
     val quoteAssetBtc = market.quoteSymbol.value.startsWith("BTC")
     val baseAsset = market.baseSymbol.value to baseAssetAmount.toFundamentalUnits(market.baseDecimals)
@@ -147,6 +146,7 @@ fun startMaker(market: Market, marketPriceOverride: BigDecimal?, liquidityPlacem
             else -> mapOf(baseAsset, quoteAsset)
         },
         keyPair = keyPair,
+        usePriceFeed = usePriceFeed
     )
     maker.start()
     return maker

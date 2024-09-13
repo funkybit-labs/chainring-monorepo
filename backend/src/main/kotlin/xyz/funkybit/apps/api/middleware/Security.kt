@@ -4,6 +4,7 @@ import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
@@ -37,6 +38,7 @@ import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.telegram.TelegramUserId
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserEntity
 import xyz.funkybit.core.model.toEvmSignature
+import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.services.LinkedSignerService
 import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureVerification
 import java.util.Base64
@@ -47,13 +49,32 @@ import kotlin.time.Duration.Companion.seconds
 val signedTokenSecurity = object : Security {
     override val filter = Filter { next -> wrapWithAuthentication(next) }
 
+    private val sequencerClient = SequencerClient()
+
     private fun wrapWithAuthentication(httpHandler: HttpHandler): HttpHandler = { request ->
         when (val authResult = authenticate(request)) {
             is AuthResult.Success -> {
-                val requestWithPrincipal =
-                    request.with(
-                        principalRequestContextKey of authResult.address.canonicalize(),
-                    )
+                val wallet = transaction {
+                    WalletEntity.getOrCreateWithUser(authResult.address).also {
+                        runBlocking {
+                            sequencerClient.authorizeWallet(
+                                authorizedWallet = it,
+                                ownershipProof = SequencerClient.SignedMessage(
+                                    message = EIP712Helper.structuredDataAsJson(authResult.message),
+                                    signature = authResult.signature,
+                                ),
+                                // first wallet of the user
+                                authorizationProof = null,
+                            )
+                        }
+                    }
+                }
+
+                val requestWithPrincipal = request.with(
+                    principalRequestContextKey of wallet,
+                    addressRequestContextKey of authResult.address.canonicalize(),
+                    signInMessageRequestContextKey of (authResult.message to authResult.signature),
+                )
                 httpHandler(requestWithPrincipal)
             }
             is AuthResult.Failure -> {
@@ -62,15 +83,26 @@ val signedTokenSecurity = object : Security {
             }
         }
     }
+}
 
-    private fun authenticate(request: Request): AuthResult {
-        val authHeader = request.header("Authorization")?.trim() ?: return missingAuthorizationHeader()
+// only validate auth token, do not create wallet and user
+val addressOnlySignedTokenSecurity = object : Security {
+    override val filter = Filter { next -> wrapWithAuthentication(next) }
 
-        if (!authHeader.startsWith(AUTHORIZATION_SCHEME_PREFIX, ignoreCase = true)) {
-            return authFailure("Invalid authentication scheme")
+    private fun wrapWithAuthentication(httpHandler: HttpHandler): HttpHandler = { request ->
+        when (val authResult = authenticate(request)) {
+            is AuthResult.Success -> {
+                val requestWithPrincipal = request.with(
+                    addressRequestContextKey of authResult.address.canonicalize(),
+                    signInMessageRequestContextKey of (authResult.message to authResult.signature),
+                )
+                httpHandler(requestWithPrincipal)
+            }
+            is AuthResult.Failure -> {
+                logger.info { "Authentication failed with status ${authResult.response.status.code} and error '${authResult.response.bodyString()}'" }
+                authResult.response
+            }
         }
-
-        return validateAuthToken(authHeader.removePrefix(AUTHORIZATION_SCHEME_PREFIX))
     }
 }
 
@@ -78,12 +110,22 @@ val adminSecurity = object : Security {
     override val filter = Filter { next -> wrapWithAdminCheck(next) }
 
     private fun wrapWithAdminCheck(httpHandler: HttpHandler): HttpHandler = { request ->
-        if (transaction { WalletEntity.findByAddress(request.principal.canonicalize())?.isAdmin } == true) {
+        if (request.principal.isAdmin) {
             httpHandler(request)
         } else {
             unauthorizedResponse("Access denied")
         }
     }
+}
+
+private fun authenticate(request: Request): AuthResult {
+    val authHeader = request.header("Authorization")?.trim() ?: return missingAuthorizationHeader()
+
+    if (!authHeader.startsWith(AUTHORIZATION_SCHEME_PREFIX, ignoreCase = true)) {
+        return authFailure("Invalid authentication scheme")
+    }
+
+    return validateAuthToken(authHeader.removePrefix(AUTHORIZATION_SCHEME_PREFIX))
 }
 
 fun validateAuthToken(token: String): AuthResult {
@@ -98,8 +140,10 @@ fun validateAuthToken(token: String): AuthResult {
 
     if (validateSignature(signInMessage, signature)) {
         return AuthResult.Success(
-            Address.auto(signInMessage.address),
-            endOfValidityInterval(signInMessage),
+            address = Address.auto(signInMessage.address),
+            expiresAt = endOfValidityInterval(signInMessage),
+            message = signInMessage,
+            signature = signature,
         )
     }
 
@@ -163,15 +207,26 @@ private const val AUTHORIZATION_SCHEME_PREFIX = "Bearer "
 private val AUTH_TOKEN_VALIDITY_INTERVAL = System.getenv("AUTH_TOKEN_VALIDITY_INTERVAL")?.let { Duration.parse(it) } ?: 30.days
 
 sealed class AuthResult {
-    data class Success(val address: Address, val expiresAt: Instant) : AuthResult()
+    data class Success(val address: Address, val expiresAt: Instant, val message: SignInMessage, val signature: String) : AuthResult()
     data class Failure(val response: Response) : AuthResult()
 }
 
 private val principalRequestContextKey =
-    RequestContextKey.optional<Address>(requestContexts)
-
-val Request.principal: Address
+    RequestContextKey.optional<WalletEntity>(requestContexts)
+val Request.principal: WalletEntity
     get() = principalRequestContextKey(this)
+        ?: throw RequestProcessingError(Status.UNAUTHORIZED, ApiError(ReasonCode.AuthenticationError, "Unauthorized"))
+
+private val addressRequestContextKey =
+    RequestContextKey.optional<Address>(requestContexts)
+val Request.address: Address
+    get() = addressRequestContextKey(this)
+        ?: throw RequestProcessingError(Status.UNAUTHORIZED, ApiError(ReasonCode.AuthenticationError, "Unauthorized"))
+
+private val signInMessageRequestContextKey =
+    RequestContextKey.optional<Pair<SignInMessage, String>>(requestContexts)
+val Request.signInMessage: Pair<SignInMessage, String>
+    get() = signInMessageRequestContextKey(this)
         ?: throw RequestProcessingError(Status.UNAUTHORIZED, ApiError(ReasonCode.AuthenticationError, "Unauthorized"))
 
 private fun unauthorizedResponse(message: String) = errorResponse(

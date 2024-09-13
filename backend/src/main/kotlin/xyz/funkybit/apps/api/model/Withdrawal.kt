@@ -2,7 +2,7 @@ package xyz.funkybit.apps.api.model
 
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
-import xyz.funkybit.core.model.EvmSignature
+import xyz.funkybit.core.model.Signature
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.SymbolEntity
@@ -17,9 +17,9 @@ data class CreateWithdrawalApiRequest(
     val symbol: Symbol,
     val amount: BigIntegerJson,
     val nonce: Long,
-    val signature: EvmSignature,
+    val signature: Signature,
 ) {
-    constructor(symbol: SymbolEntity, amount: BigDecimal, nonce: Long, signature: EvmSignature) :
+    constructor(symbol: SymbolEntity, amount: BigDecimal, nonce: Long, signature: Signature) :
         this(Symbol(symbol.name), amount.toFundamentalUnits(symbol.decimals), nonce, signature)
 }
 

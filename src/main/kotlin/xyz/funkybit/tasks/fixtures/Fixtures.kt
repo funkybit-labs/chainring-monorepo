@@ -4,11 +4,13 @@ import xyz.funkybit.core.blockchain.BitcoinBlockchainClientConfig
 import xyz.funkybit.core.blockchain.BlockchainClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.FeeRates
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.SymbolId
+import xyz.funkybit.core.utils.toFundamentalUnits
 import java.math.BigDecimal
 import java.math.BigInteger
 
@@ -59,7 +61,7 @@ data class Fixtures(
 fun String.toChainSymbol(chainId: ChainId) = "$this:$chainId"
 
 fun getFixtures(chainringChainClients: List<BlockchainClient>, bitcoinBlockchainClientConfig: BitcoinBlockchainClientConfig) = Fixtures(
-    feeRates = FeeRates.fromPercents(maker = System.getenv("MAKER_FEE_RATE")?.toDoubleOrNull() ?: 1.0, taker = System.getenv("TAKER_FEE_RATE")?.toDoubleOrNull() ?: 2.0),
+    feeRates = FeeRates.fromPercents(maker = System.getenv("MAKER_FEE_RATE")?.toBigDecimalOrNull() ?: BigDecimal("0.01"), taker = System.getenv("TAKER_FEE_RATE")?.toBigDecimalOrNull() ?: BigDecimal("0.02")),
     chains = chainringChainClients.map {
         Fixtures.Chain(it.chainId, it.config.name, EvmAddress("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"), it.config.url, it.config.blockExplorerNetName, it.config.blockExplorerUrl, NetworkType.Evm)
     } + if (bitcoinBlockchainClientConfig.enabled) {
@@ -67,7 +69,7 @@ fun getFixtures(chainringChainClients: List<BlockchainClient>, bitcoinBlockchain
             Fixtures.Chain(
                 BitcoinClient.chainId,
                 "Bitcoin",
-                EvmAddress("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"),
+                BitcoinAddress.canonicalize("bcrt1qj2w49gms5vm0ea7vhj028p355eyped59vjgufd"),
                 bitcoinBlockchainClientConfig.url,
                 bitcoinBlockchainClientConfig.blockExplorerNetName,
                 bitcoinBlockchainClientConfig.blockExplorerUrl,
@@ -168,7 +170,3 @@ fun getFixtures(chainringChainClients: List<BlockchainClient>, bitcoinBlockchain
         )
     )
 )
-
-private fun BigDecimal.toFundamentalUnits(decimals: Int): BigInteger {
-    return this.movePointRight(decimals).toBigInteger()
-}

@@ -9,19 +9,20 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.andIfNotNull
 import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
 import org.jetbrains.exposed.sql.transactions.TransactionManager
+import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.evm.EIP712Transaction
 import xyz.funkybit.core.evm.TokenAddressAndChain
-import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
-import xyz.funkybit.core.model.toEvmSignature
+import xyz.funkybit.core.model.Signature
 import java.math.BigDecimal
 import java.math.BigInteger
 
@@ -75,6 +76,10 @@ object WithdrawalTable : GUIDTable<WithdrawalId>("withdrawal", ::WithdrawalId) {
     val actualAmount = decimal("actual_amount", 30, 0).nullable()
     val fee = decimal("fee", 30, 0).default(BigDecimal.ZERO)
     val responseSequence = long("response_sequence").nullable().index()
+    val archTransactionGuid = reference(
+        "arch_tx_guid",
+        BlockchainTransactionTable,
+    ).nullable()
 
     init {
         check("tx_when_settling") {
@@ -87,6 +92,12 @@ object WithdrawalTable : GUIDTable<WithdrawalId>("withdrawal", ::WithdrawalId) {
     }
 }
 
+data class SequencedArchWithdrawal(
+    val withdrawalEntity: WithdrawalEntity,
+    val archAccountEntity: ArchAccountEntity,
+    val balanceIndex: Int,
+)
+
 class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(guid) {
     companion object : EntityClass<WithdrawalId, WithdrawalEntity>(WithdrawalTable) {
         fun createPending(
@@ -94,7 +105,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
             symbol: SymbolEntity,
             amount: BigInteger,
             nonce: Long,
-            signature: EvmSignature,
+            signature: Signature,
         ) = WithdrawalEntity.new(WithdrawalId.generate()) {
             val now = Clock.System.now()
             this.wallet = wallet
@@ -126,18 +137,25 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 .toList()
         }
 
-        fun history(address: Address): List<WithdrawalEntity> {
-            return WithdrawalEntity.wrapRows(
-                WithdrawalTable.join(
-                    WalletTable,
-                    JoinType.INNER,
-                    WithdrawalTable.walletGuid,
-                    WalletTable.guid,
-                ).join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid).selectAll().where {
-                    WalletTable.address.eq(address.toString())
-                }.orderBy(Pair(WithdrawalTable.createdAt, SortOrder.DESC)),
-            ).toList()
-        }
+        fun findByIdForUser(withdrawalId: WithdrawalId, userId: EntityID<UserId>): WithdrawalEntity? =
+            WithdrawalTable
+                .join(WalletTable, JoinType.INNER, WithdrawalTable.walletGuid, WalletTable.guid)
+                .join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid)
+                .selectAll()
+                .where { WithdrawalTable.id.eq(withdrawalId).and(WalletTable.userGuid.eq(userId)) }
+                .orderBy(Pair(WithdrawalTable.createdAt, SortOrder.DESC))
+                .let(WithdrawalEntity::wrapRows)
+                .singleOrNull()
+
+        fun history(userId: EntityID<UserId>): List<WithdrawalEntity> =
+            WithdrawalTable
+                .join(WalletTable, JoinType.INNER, WithdrawalTable.walletGuid, WalletTable.guid)
+                .join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid)
+                .selectAll()
+                .where { WalletTable.userGuid.eq(userId) }
+                .orderBy(Pair(WithdrawalTable.createdAt, SortOrder.DESC))
+                .let(WithdrawalEntity::wrapRows)
+                .toList()
 
         fun findSequenced(chainId: ChainId, limit: Int, maxResponseSequence: Long?): List<WithdrawalEntity> {
             return WithdrawalTable
@@ -154,6 +172,54 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 .toList()
         }
 
+        fun findSettlingOnArch(): List<WithdrawalEntity> {
+            return WithdrawalTable
+                .join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid)
+                .selectAll()
+                .where {
+                    WithdrawalTable.status.eq(WithdrawalStatus.Settling) and
+                        SymbolTable.chainId.eq(BitcoinClient.chainId) and
+                        WithdrawalTable.archTransactionGuid.isNotNull() and
+                        WithdrawalTable.blockchainTransactionGuid.isNull()
+                }
+                .map { WithdrawalEntity.wrapRow(it) }
+                .toList()
+        }
+
+        fun findSettlingOnBitcoin(): List<WithdrawalEntity> {
+            return WithdrawalTable
+                .join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid)
+                .selectAll()
+                .where {
+                    WithdrawalTable.status.eq(WithdrawalStatus.Settling) and
+                        SymbolTable.chainId.eq(BitcoinClient.chainId) and
+                        WithdrawalTable.blockchainTransactionGuid.isNotNull()
+                }
+                .map { WithdrawalEntity.wrapRow(it) }
+                .toList()
+        }
+
+        fun findSequencedArchWithdrawals(limit: Int, maxResponseSequence: Long?): List<SequencedArchWithdrawal> {
+            return WithdrawalTable
+                .join(ArchAccountTable, JoinType.INNER, WithdrawalTable.symbolGuid, ArchAccountTable.symbolGuid)
+                .join(ArchAccountBalanceIndexTable, JoinType.INNER, ArchAccountTable.guid, ArchAccountBalanceIndexTable.archAccountGuid, additionalConstraint = { ArchAccountBalanceIndexTable.walletGuid.eq(WithdrawalTable.walletGuid) })
+                .selectAll()
+                .where {
+                    WithdrawalTable.status.eq(WithdrawalStatus.Sequenced)
+                        .and(ArchAccountBalanceIndexTable.status.eq(ArchAccountBalanceIndexStatus.Assigned))
+                        .andIfNotNull(maxResponseSequence?.let { WithdrawalTable.responseSequence.less(it) })
+                }
+                .orderBy(Pair(WithdrawalTable.sequenceId, SortOrder.ASC))
+                .limit(limit)
+                .map {
+                    SequencedArchWithdrawal(
+                        withdrawalEntity = WithdrawalEntity.wrapRow(it),
+                        archAccountEntity = ArchAccountEntity.wrapRow(it),
+                        balanceIndex = it[ArchAccountBalanceIndexTable.addressIndex],
+                    )
+                }
+        }
+
         fun updateToSettling(withdrawals: List<WithdrawalEntity>, blockchainTransactionEntity: BlockchainTransactionEntity, transactionDataByWithdrawalId: Map<WithdrawalId, EIP712Transaction>) {
             BatchUpdateStatement(WithdrawalTable).apply {
                 withdrawals.forEach {
@@ -166,6 +232,23 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 }
                 execute(TransactionManager.current())
             }
+        }
+
+        fun updateToSettlingOnArch(withdrawals: List<WithdrawalEntity>, archTransactionEntity: BlockchainTransactionEntity) {
+            BatchUpdateStatement(WithdrawalTable).apply {
+                withdrawals.forEach {
+                    addBatch(it.id)
+                    this[WithdrawalTable.status] = WithdrawalStatus.Settling
+                    this[WithdrawalTable.archTransactionGuid] = archTransactionEntity.guid.value
+                }
+                execute(TransactionManager.current())
+            }
+        }
+
+        fun existsForUserAndNetworkType(user: UserEntity, networkType: NetworkType): Boolean {
+            return WithdrawalTable.innerJoin(WalletTable).select(WithdrawalTable.id).where {
+                WalletTable.networkType.eq(networkType) and WalletTable.userGuid.eq(user.guid)
+            }.limit(1).any()
         }
     }
 
@@ -203,13 +286,16 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 this.actualAmount ?: this.amount,
                 this.nonce,
                 this.amount == BigInteger.ZERO,
-                this.signature,
+                this.signature as EvmSignature,
                 this.fee,
             )
 
             is BitcoinAddress -> TODO()
         }
     }
+
+    fun resolvedAmount(): BigInteger = actualAmount ?: amount
+    fun chainAmount() = resolvedAmount() - fee
 
     var nonce by WithdrawalTable.nonce
     var walletGuid by WithdrawalTable.walletGuid
@@ -219,7 +305,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
 
     var signature by WithdrawalTable.signature.transform(
         toColumn = { it.value },
-        toReal = { it.toEvmSignature() },
+        toReal = { Signature.auto(it) },
     )
     var createdAt by WithdrawalTable.createdAt
     var createdBy by WithdrawalTable.createdBy
@@ -234,6 +320,9 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
 
     var blockchainTransactionGuid by WithdrawalTable.blockchainTransactionGuid
     var blockchainTransaction by BlockchainTransactionEntity optionalReferencedOn WithdrawalTable.blockchainTransactionGuid
+
+    var archTransactionGuid by WithdrawalTable.archTransactionGuid
+    var archTransaction by BlockchainTransactionEntity optionalReferencedOn WithdrawalTable.archTransactionGuid
 
     var sequenceId by WithdrawalTable.sequenceId
     var transactionData by WithdrawalTable.transactionData
