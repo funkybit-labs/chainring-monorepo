@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.apps.api.FaucetMode
-import xyz.funkybit.apps.api.model.CardType
+import xyz.funkybit.apps.api.model.Card
 import xyz.funkybit.apps.api.model.CreateDepositApiRequest
 import xyz.funkybit.apps.api.model.toSymbolInfo
 import xyz.funkybit.apps.ring.BlockchainDepositHandler
@@ -144,11 +144,11 @@ class TestnetChallengeTest : OrderBaseTest() {
         assertEquals(3, cards.size)
         assertEquals(
             setOf(
-                CardType.Enrolled,
-                CardType.BitcoinConnect,
-                CardType.EvmWithdrawal,
+                Card.Enrolled,
+                Card.BitcoinConnect,
+                Card.EvmWithdrawal,
             ),
-            cards.map { it.type }.toSet(),
+            cards.toSet(),
         )
 
         // once the user places an order, they shouldn't get the Enrolled card
@@ -160,10 +160,10 @@ class TestnetChallengeTest : OrderBaseTest() {
         assertEquals(2, cards.size)
         assertEquals(
             setOf(
-                CardType.BitcoinConnect,
-                CardType.EvmWithdrawal,
+                Card.BitcoinConnect,
+                Card.EvmWithdrawal,
             ),
-            cards.map { it.type }.toSet(),
+            cards.toSet(),
         )
 
         // connect a bitcoin wallet, they shouldn't get the BitcoinConnect card, but
@@ -180,10 +180,10 @@ class TestnetChallengeTest : OrderBaseTest() {
         assertEquals(2, cards.size)
         assertEquals(
             setOf(
-                CardType.BitcoinWithdrawal,
-                CardType.EvmWithdrawal,
+                Card.BitcoinWithdrawal,
+                Card.EvmWithdrawal,
             ),
-            cards.map { it.type }.toSet(),
+            cards.toSet(),
         )
 
         // perform an evm withdrawal, they shouldn't get the EvmWithdrawal card
@@ -195,9 +195,9 @@ class TestnetChallengeTest : OrderBaseTest() {
         assertEquals(1, cards.size)
         assertEquals(
             setOf(
-                CardType.BitcoinWithdrawal,
+                Card.BitcoinWithdrawal,
             ),
-            cards.map { it.type }.toSet(),
+            cards.toSet(),
         )
     }
 }

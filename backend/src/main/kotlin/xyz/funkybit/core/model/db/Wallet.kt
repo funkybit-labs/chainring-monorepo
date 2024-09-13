@@ -106,7 +106,7 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
         fun existsForUserAndNetworkType(user: UserEntity, networkType: NetworkType): Boolean {
             return WalletTable.select(WalletTable.id).where {
                 WalletTable.userGuid.eq(user.guid) and WalletTable.networkType.eq(networkType)
-            }.limit(1).count() == 1L
+            }.limit(1).any()
         }
     }
 

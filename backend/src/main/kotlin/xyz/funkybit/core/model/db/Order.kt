@@ -371,7 +371,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
         fun existsForUser(user: UserEntity): Boolean {
             return OrderTable.innerJoin(WalletTable).select(OrderTable.id).where {
                 WalletTable.userGuid eq user.guid
-            }.limit(1).count() == 1L
+            }.limit(1).any()
         }
     }
 

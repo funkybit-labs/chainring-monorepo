@@ -460,20 +460,54 @@ const LeaderboardSchema = z.object({
 
 export type Leaderboard = z.infer<typeof LeaderboardSchema>
 
-const CardTypeSchema = z.enum([
-  'Enrolled',
-  'RecentPoints',
-  'BitcoinConnect',
-  'BitcoinWithdrawal',
-  'EvmWithdrawal'
+const EnrolledCardSchema = z.object({
+  type: z.literal('Enrolled')
+})
+
+const BitcoinConnectCardSchema = z.object({
+  type: z.literal('BitcoinConnect')
+})
+
+const BitcoinWithdrawalCardSchema = z.object({
+  type: z.literal('BitcoinWithdrawal')
+})
+
+const EvmWithdrawalCardSchema = z.object({
+  type: z.literal('EvmWithdrawal')
+})
+
+const PointTypeSchema = z.enum([
+  'DailyReward',
+  'WeeklyReward',
+  'OverallReward',
+  'ReferralBonus'
 ])
 
-export type CardType = z.infer<typeof CardTypeSchema>
+const RewardCategorySchema = z.enum([
+  'Top1',
+  'Top1Percent',
+  'Top5Percent',
+  'Top10Percent',
+  'Top25Percent',
+  'Top50Percent',
+  'Bottom5Percent',
+  'Bottom1'
+])
 
-const CardSchema = z.object({
-  type: CardTypeSchema,
-  params: z.record(z.string(), z.string())
+const RecentPointsCardSchema = z.object({
+  type: z.literal('RecentPoints'),
+  points: z.number(),
+  pointType: PointTypeSchema,
+  category: RewardCategorySchema.nullable()
 })
+
+const CardSchema = z.discriminatedUnion('type', [
+  EnrolledCardSchema,
+  RecentPointsCardSchema,
+  BitcoinConnectCardSchema,
+  BitcoinWithdrawalCardSchema,
+  EvmWithdrawalCardSchema
+])
 
 export type Card = z.infer<typeof CardSchema>
 

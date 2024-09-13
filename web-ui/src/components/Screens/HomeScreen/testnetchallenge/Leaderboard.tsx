@@ -152,7 +152,7 @@ function CardCarousel({
     const timer = window.setInterval(() => {
       setPrevIndex(index)
       setIndex(index === cards.length - 1 ? 0 : index + 1)
-    }, 5000)
+    }, 10000)
     return () => {
       window.clearInterval(timer)
     }
@@ -227,38 +227,38 @@ function CardCarousel({
                     className="mx-4 my-auto size-12"
                   />
                   <div className="my-auto">
-                    Yes! You&apos;ve earned{' '}
-                    {parseInt(card.params.points).toLocaleString()} funky bits{' '}
-                    {(card.params.type === 'DailyReward' ||
-                      card.params.type === 'WeeklyReward' ||
-                      card.params.type === 'OverallReward') && (
+                    Yes! You&apos;ve earned {card.points.toLocaleString()} funky
+                    bits{' '}
+                    {(card.pointType === 'DailyReward' ||
+                      card.pointType === 'WeeklyReward' ||
+                      card.pointType === 'OverallReward') && (
                       <>
                         for finishing
-                        {card.params.type === 'DailyReward'
+                        {card.pointType === 'DailyReward'
                           ? ' the day '
-                          : card.params.type === 'WeeklyReward'
+                          : card.pointType === 'WeeklyReward'
                             ? ' the week '
-                            : card.params.type === 'OverallReward'
+                            : card.pointType === 'OverallReward'
                               ? ' the Testnet Challenge '
                               : ''}
-                        {card.params.category === 'Top1'
-                          ? card.params.type === 'OverallReward'
+                        {card.category === 'Top1'
+                          ? card.pointType === 'OverallReward'
                             ? ' as the undisputed Grandmaster of Funk! We are not worthy! '
                             : ' with the top PNL! Funk first! '
-                          : card.params.category.startsWith('Top')
+                          : card.category!.startsWith('Top')
                             ? ` with a PNL in the top ${parseInt(
-                                card.params.category.slice(3)
+                                card.category!.slice(3)
                               )} %! `
-                            : card.params.category === 'Bottom1'
+                            : card.category === 'Bottom1'
                               ? " with the absolute worst PNL! You're the funky caboose! "
-                              : card.params.category.startsWith('Bottom')
+                              : card.category!.startsWith('Bottom')
                                 ? ` with a PNL in the bottom ${parseInt(
-                                    card.params.category.slice(6)
+                                    card.category!.slice(6)
                                   )} %! `
                                 : '. '}
                       </>
                     )}
-                    {card.params.type === 'ReferralBonus' && (
+                    {card.pointType === 'ReferralBonus' && (
                       <>from your referrals! Keep up the good work!</>
                     )}
                   </div>

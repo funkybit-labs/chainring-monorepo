@@ -248,7 +248,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
         fun existsForUserAndNetworkType(user: UserEntity, networkType: NetworkType): Boolean {
             return WithdrawalTable.innerJoin(WalletTable).select(WithdrawalTable.id).where {
                 WalletTable.networkType.eq(networkType) and WalletTable.userGuid.eq(user.guid)
-            }.limit(1).count() == 1L
+            }.limit(1).any()
         }
     }
 

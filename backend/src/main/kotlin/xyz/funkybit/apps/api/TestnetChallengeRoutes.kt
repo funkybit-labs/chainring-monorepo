@@ -15,13 +15,10 @@ import org.http4k.format.KotlinxSerialization.auto
 import org.http4k.lens.Path
 import org.http4k.lens.Query
 import org.http4k.lens.int
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.div
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.middleware.principal
 import xyz.funkybit.apps.api.middleware.signedTokenSecurity
 import xyz.funkybit.apps.api.model.Card
-import xyz.funkybit.apps.api.model.CardType
 import xyz.funkybit.apps.api.model.Leaderboard
 import xyz.funkybit.apps.api.model.LeaderboardEntry
 import xyz.funkybit.apps.api.model.RequestProcessingError
@@ -202,38 +199,35 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
             tags += listOf(Tag("testnet-challenge"))
             returning(
                 Status.OK,
-                responseBody to listOf(Card(type = CardType.Enrolled, params = emptyMap())),
+                responseBody to listOf(Card.Enrolled),
             )
         } bindContract Method.GET to { request ->
             val cards = mutableListOf<Card>()
             transaction {
                 // until they have placed an order, they get the newly enrolled card
                 if (!OrderEntity.existsForUser(request.principal.user)) {
-                    cards.add(Card(type = CardType.Enrolled, params = emptyMap()))
+                    cards.add(Card.Enrolled)
                 }
                 // get up to 3 most recent rewards
                 TestnetChallengeUserRewardEntity.findRecentForUser(request.principal.user).forEach { reward ->
                     cards.add(
-                        Card(
-                            type = CardType.RecentPoints,
-                            params = mapOf(
-                                "points" to reward.amount.toPlainString(),
-                                "type" to reward.type.name,
-                                "category" to (reward.rewardCategory?.name ?: ""),
-                            ),
+                        Card.RecentPoints(
+                            points = reward.amount.toLong(),
+                            pointType = reward.type,
+                            category = reward.rewardCategory,
                         ),
                     )
                 }
                 // have they ever connected a bitcoin wallet?
                 if (WalletEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Bitcoin)) {
                     if (!WithdrawalEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Bitcoin)) {
-                        cards.add(Card(type = CardType.BitcoinWithdrawal, params = emptyMap()))
+                        cards.add(Card.BitcoinWithdrawal)
                     }
                 } else {
-                    cards.add(Card(type = CardType.BitcoinConnect, params = emptyMap()))
+                    cards.add(Card.BitcoinConnect)
                 }
                 if (!WithdrawalEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Evm)) {
-                    cards.add(Card(type = CardType.EvmWithdrawal, params = emptyMap()))
+                    cards.add(Card.EvmWithdrawal)
                 }
             }
             Response(Status.OK).with(responseBody of cards.toList())
