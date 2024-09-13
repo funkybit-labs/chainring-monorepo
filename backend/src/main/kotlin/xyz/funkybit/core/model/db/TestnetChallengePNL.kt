@@ -142,7 +142,7 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
                                              COUNT(*) OVER (PARTITION BY type)           AS total_users
                                       FROM ${TestnetChallengePNLTable.tableName}
                                       WHERE type = '${challengePNLType.name}'),
-                     calculated_points AS (SELECT user_guid,
+                     calculated_rewards AS (SELECT user_guid,
                                                   type,
                                                   rank,
                                                   total_users,
@@ -204,7 +204,17 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
                                                               WHEN '${TestnetChallengePNLType.OverallPNL.name}' THEN 5000
                                                           END
                                                       -- rest
-                                                      ELSE 0 END AS points
+                                                      ELSE 0 END AS reward,
+                                                  CASE
+                                                      WHEN rank = 1 THEN '${TestnetChallengeRewardCategory.Top1.name}'
+                                                      WHEN rank = total_users THEN '${TestnetChallengeRewardCategory.Bottom1.name}'
+                                                      WHEN (rank - 1) <= total_users * 0.01 THEN '${TestnetChallengeRewardCategory.Top1Percent.name}'
+                                                      WHEN (rank - 1) <= total_users * 0.05 THEN '${TestnetChallengeRewardCategory.Top5Percent.name}'
+                                                      WHEN (rank - 1) <= total_users * 0.10 THEN '${TestnetChallengeRewardCategory.Top10Percent.name}'
+                                                      WHEN (rank - 1) <= total_users * 0.25 THEN '${TestnetChallengeRewardCategory.Top25Percent.name}'
+                                                      WHEN (rank - 1) <= total_users * 0.50 THEN '${TestnetChallengeRewardCategory.Top50Percent.name}'
+                                                      WHEN rank > total_users * 0.95 THEN '${TestnetChallengeRewardCategory.Bottom5Percent.name}'
+                                                      ELSE '' END AS reward_category
                                            FROM ranked_users)
                 INSERT
                 INTO ${TestnetChallengeUserRewardTable.tableName}(
@@ -213,11 +223,12 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
                     ${TestnetChallengeUserRewardTable.createdBy.name}, 
                     ${TestnetChallengeUserRewardTable.userGuid.name}, 
                     ${TestnetChallengeUserRewardTable.type.name}, 
-                    ${TestnetChallengeUserRewardTable.amount.name}
+                    ${TestnetChallengeUserRewardTable.amount.name},
+                    ${TestnetChallengeUserRewardTable.rewardCategory.name}
                 )
-                SELECT typeid_generate_text('tncurwd'), now(), 'system', user_guid, '${rewardType.name}', points
-                FROM calculated_points
-                WHERE points > 0;
+                SELECT typeid_generate_text('tncurwd'), now(), 'system', user_guid, '${rewardType.name}', reward, reward_category::testnetchallengerewardcategory
+                FROM calculated_rewards
+                WHERE reward > 0;
                 """.trimIndent(),
             )
         }
