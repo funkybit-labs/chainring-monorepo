@@ -236,7 +236,7 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
 
             val rowsPerPage = 20
             val maxPage = ceil(count.div(rowsPerPage.toDouble())).toLong()
-            // ensure page is same
+            // ensure page is sane
             val normalizedPage = min(maxPage - 1, max(page, 0L))
             val pnlRatioExpr = (
                 (TestnetChallengePNLTable.currentBalance - TestnetChallengePNLTable.initialBalance)
