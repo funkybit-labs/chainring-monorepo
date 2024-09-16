@@ -78,7 +78,7 @@ class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserReward
                             r.${TestnetChallengeUserRewardTable.userGuid.name} AS invitee_guid,
                             r.${TestnetChallengeUserRewardTable.amount.name}::numeric AS invitee_points,
                             u.${UserTable.invitedBy.name} AS invitor_guid,
-                            r.${TestnetChallengeUserRewardTable.amount.name} * $referralBonusSize AS invitor_points,        -- 'referralBonusFraction' of the previous bonus
+                            r.${TestnetChallengeUserRewardTable.amount.name} * $referralBonusSize AS invitor_points,        -- 'referralBonusSize' of the previous bonus
                             1 AS level
                         FROM ${TestnetChallengeUserRewardTable.tableName} r
                                  JOIN "${UserTable.tableName}" u ON r.user_guid = u.guid
@@ -94,10 +94,10 @@ class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserReward
                             rc.invitee_guid,
                             rc.invitee_points,
                             u.${UserTable.invitedBy.name} as invitor_guid,
-                            rc.invitor_points * $referralBonusSize AS invitor_points,                                       -- 'referralBonusFraction' of the previous bonus
+                            rc.invitor_points * $referralBonusSize AS invitor_points,                                       -- 'referralBonusSize' of the previous bonus
                             rc.level + 1 AS level
                         FROM referral_chain rc JOIN "${UserTable.tableName}" u ON rc.invitor_guid = u.${UserTable.guid.name}
-                        WHERE u.${UserTable.invitedBy.name} IS NOT NULL                                                         -- stop when no invitor
+                        WHERE u.${UserTable.invitedBy.name} IS NOT NULL                                                     -- stop when no invitor
                           AND rc.invitor_points * $referralBonusSize >= $referralBonusMinAmount                             -- stop when bonus becomes insignificant
                     )
                     INSERT

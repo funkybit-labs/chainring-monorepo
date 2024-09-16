@@ -95,7 +95,9 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
 
                     body.inviteCode?.let {
                         UserEntity.findByInviteCode(body.inviteCode)?.let { invitor ->
-                            user.invitedBy = invitor.guid
+                            if (user.guid != invitor.guid) {
+                                user.invitedBy = invitor.guid
+                            }
                         }
                     }
                 }

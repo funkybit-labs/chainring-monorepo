@@ -294,15 +294,17 @@ class TestnetChallengeTest : OrderBaseTest() {
     @Test
     fun `test referral points`() {
         val trader1 = enrollInTestnetChallenge()
-        val trader2 = enrollInTestnetChallenge()
-        val trader3 = enrollInTestnetChallenge()
-
         val trader11 = enrollInTestnetChallenge(trader1.a.getAccountConfiguration().inviteCode)
         val trader12 = enrollInTestnetChallenge(trader1.a.getAccountConfiguration().inviteCode)
-
         val trader121 = enrollInTestnetChallenge(trader12.a.getAccountConfiguration().inviteCode)
 
+        val trader2 = enrollInTestnetChallenge()
         val trader21 = enrollInTestnetChallenge(trader2.a.getAccountConfiguration().inviteCode)
+
+        val trader3 = enrollInTestnetChallenge()
+        val trader31 = enrollInTestnetChallenge(trader3.a.getAccountConfiguration().inviteCode)
+        val trader311 = enrollInTestnetChallenge(trader31.a.getAccountConfiguration().inviteCode)
+        val trader3111 = enrollInTestnetChallenge(trader311.a.getAccountConfiguration().inviteCode)
 
         listOf(trader1, trader11, trader12, trader121, trader2, trader21, trader3).forEach {
             assertEquals(BigDecimal.ZERO, it.a.getAccountConfiguration().pointsBalance)
@@ -317,16 +319,19 @@ class TestnetChallengeTest : OrderBaseTest() {
             grantDailyPoints(trader2, 500)
             grantDailyPoints(trader21, 500)
             grantDailyPoints(trader3, 500)
+            grantDailyPoints(trader3111, 100)
         }
         assertEquals(0, 0.toBigDecimal().compareTo(trader1.a.getAccountConfiguration().pointsBalance))
         assertEquals(0, 100.toBigDecimal().compareTo(trader11.a.getAccountConfiguration().pointsBalance))
         assertEquals(0, 1000.toBigDecimal().compareTo(trader12.a.getAccountConfiguration().pointsBalance))
         assertEquals(0, 100.toBigDecimal().compareTo(trader121.a.getAccountConfiguration().pointsBalance))
-
         assertEquals(0, 500.toBigDecimal().compareTo(trader2.a.getAccountConfiguration().pointsBalance))
         assertEquals(0, 500.toBigDecimal().compareTo(trader21.a.getAccountConfiguration().pointsBalance))
-
         assertEquals(0, 500.toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 500.toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 0.toBigDecimal().compareTo(trader31.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 0.toBigDecimal().compareTo(trader311.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader3111.a.getAccountConfiguration().pointsBalance))
 
         triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_referral_points")
 
@@ -334,11 +339,28 @@ class TestnetChallengeTest : OrderBaseTest() {
         assertEquals(0, 100.toBigDecimal().compareTo(trader11.a.getAccountConfiguration().pointsBalance))
         assertEquals(0, (1000 + 10).toBigDecimal().compareTo(trader12.a.getAccountConfiguration().pointsBalance))
         assertEquals(0, 100.toBigDecimal().compareTo(trader121.a.getAccountConfiguration().pointsBalance))
-
         assertEquals(0, (500 + 50).toBigDecimal().compareTo(trader2.a.getAccountConfiguration().pointsBalance))
         assertEquals(0, 500.toBigDecimal().compareTo(trader21.a.getAccountConfiguration().pointsBalance))
 
-        assertEquals(0, 500.toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (500 + 0).toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 1.toBigDecimal().compareTo(trader31.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 10.toBigDecimal().compareTo(trader311.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader3111.a.getAccountConfiguration().pointsBalance))
+
+        // repeated executions have no effect
+        triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_referral_points")
+        triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_referral_points")
+
+        assertEquals(0, (10 + 100 + 1).toBigDecimal().compareTo(trader1.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader11.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (1000 + 10).toBigDecimal().compareTo(trader12.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader121.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (500 + 50).toBigDecimal().compareTo(trader2.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 500.toBigDecimal().compareTo(trader21.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (500 + 0).toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 1.toBigDecimal().compareTo(trader31.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 10.toBigDecimal().compareTo(trader311.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader3111.a.getAccountConfiguration().pointsBalance))
     }
 
     private fun grantDailyPoints(trader1: Trader, points: Int) = TestnetChallengeUserRewardTable.insertIgnore {

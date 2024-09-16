@@ -28,7 +28,7 @@ class TestnetChallengeReferralPointsTask : RepeaterBaseTask(
                     earnedAfter = lastGrantedAt,
                     earnedBefore = now,
                     referralBonusSize = BigDecimal("0.1"),
-                    referralBonusMinAmount = BigDecimal("0.01"),
+                    referralBonusMinAmount = BigDecimal("1"),
                 )
 
                 KeyValueStore.setInstant(referralPointsKey, now)
