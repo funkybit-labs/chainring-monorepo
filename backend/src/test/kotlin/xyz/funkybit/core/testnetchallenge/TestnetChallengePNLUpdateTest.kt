@@ -23,7 +23,7 @@ import xyz.funkybit.testutils.TestWithDb
 import java.math.BigDecimal
 import java.math.BigInteger
 
-class TestTestnetChallengePNLUpdate : TestWithDb() {
+class TestnetChallengePNLUpdateTest : TestWithDb() {
     @Test
     fun `test testnet challenge pnl updates`() {
         val now = Clock.System.now()

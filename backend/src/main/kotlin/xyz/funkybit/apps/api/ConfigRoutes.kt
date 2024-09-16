@@ -194,24 +194,28 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                         testnetChallengeDepositContract = null,
                         nickName = "Nick Name",
                         avatarUrl = "https://icons/avatar.svg",
+                        inviteCode = "WYZFRORSQDI",
                         pointsBalance = BigDecimal.ZERO,
                     ),
             )
         } bindContract Method.GET to { request ->
             transaction {
+                val wallet = request.principal
+
                 Response(Status.OK).with(
                     responseBody of
                         AccountConfigurationApiResponse(
-                            role = if (request.principal.isAdmin) Role.Admin else Role.User,
-                            newSymbols = SymbolEntity.symbolsToAddToWallet(request.principal.address).map {
+                            role = if (wallet.isAdmin) Role.Admin else Role.User,
+                            newSymbols = SymbolEntity.symbolsToAddToWallet(wallet.address).map {
                                 it.toSymbolInfo(faucetMode)
                             },
-                            authorizedAddresses = request.principal.authorizedAddresses(),
-                            testnetChallengeStatus = request.principal.user.testnetChallengeStatus,
+                            authorizedAddresses = wallet.authorizedAddresses(),
+                            testnetChallengeStatus = wallet.user.testnetChallengeStatus,
                             testnetChallengeDepositSymbol = if (TestnetChallengeUtils.enabled) TestnetChallengeUtils.depositSymbolName else null,
                             testnetChallengeDepositContract = if (TestnetChallengeUtils.enabled) TestnetChallengeUtils.depositSymbol().contractAddress else null,
-                            nickName = request.principal.user.nickname,
-                            avatarUrl = request.principal.user.avatarUrl,
+                            nickName = wallet.user.nickname,
+                            avatarUrl = wallet.user.avatarUrl,
+                            inviteCode = wallet.user.inviteCode,
                             pointsBalance = request.principal.user.pointsBalances().sum(),
                         ),
                 )

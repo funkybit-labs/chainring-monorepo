@@ -21,7 +21,7 @@ import xyz.funkybit.testutils.TestWithDb
 import java.math.BigDecimal
 import kotlin.test.assertNull
 
-class TestTestnetChallengePointsDistribution : TestWithDb() {
+class TestnetChallengePointsDistributionTest : TestWithDb() {
 
     data class TestnetChallengeTestCase(
         var userId: UserId? = null,

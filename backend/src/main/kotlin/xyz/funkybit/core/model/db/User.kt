@@ -7,6 +7,7 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
+import org.jetbrains.exposed.sql.lowerCase
 import org.jetbrains.exposed.sql.selectAll
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.SequencerAccountId
@@ -109,6 +110,12 @@ class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
         fun findByNickname(name: String): UserEntity? {
             return UserEntity.find {
                 UserTable.nickName eq name
+            }.singleOrNull()
+        }
+
+        fun findByInviteCode(inviteCode: String): UserEntity? {
+            return UserEntity.find {
+                UserTable.inviteCode.lowerCase() eq inviteCode.lowercase()
             }.singleOrNull()
         }
     }
