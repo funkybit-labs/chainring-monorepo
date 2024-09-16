@@ -147,7 +147,8 @@ export const AccountConfigurationApiResponseSchema = z.object({
   testnetChallengeDepositSymbol: z.string().nullable(),
   testnetChallengeDepositContract: AddressSchema.nullable(),
   nickName: z.string().nullable(),
-  avatarUrl: z.string().nullable()
+  avatarUrl: z.string().nullable(),
+  inviteCode: z.string()
 })
 
 const OrderSideSchema = z.enum(['Buy', 'Sell'])
@@ -430,6 +431,10 @@ const AuthorizeWalletRequestSchema = z.object({
   address: z.string(),
   timestamp: z.string(),
   signature: z.string()
+})
+
+const EnrollChallengeSchema = z.object({
+  inviteCode: z.string().nullable()
 })
 
 const SetNicknameSchema = z.object({
@@ -851,7 +856,13 @@ export const apiClient = new Zodios(apiBaseUrl, [
     method: 'post',
     path: '/v1/testnet-challenge',
     alias: 'testnetChallengeEnroll',
-    parameters: [],
+    parameters: [
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: EnrollChallengeSchema
+      }
+    ],
     response: z.undefined(),
     errors: [
       {

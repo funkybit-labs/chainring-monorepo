@@ -1,7 +1,6 @@
 package xyz.funkybit.core.model.db
 
 import de.fxlae.typeid.TypeId
-import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
@@ -10,9 +9,9 @@ import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.alias
 import org.jetbrains.exposed.sql.compoundAnd
-import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.sum
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.math.BigDecimal
 
 @Serializable
@@ -65,21 +64,64 @@ object TestnetChallengeUserRewardTable : GUIDTable<TestnetChallengeUserRewardId>
 class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserRewardId>) : GUIDEntity<TestnetChallengeUserRewardId>(guid) {
     companion object : EntityClass<TestnetChallengeUserRewardId, TestnetChallengeUserRewardEntity>(TestnetChallengeUserRewardTable) {
 
-        fun createReferralBonusReward(userId: UserId, amount: BigDecimal) {
-            create(userId, TestnetChallengeUserRewardType.ReferralBonus, amount, by = "system")
-        }
+        fun distributeReferralPoints(
+            earnedAfter: Instant,
+            earnedBefore: Instant,
+            referralBonusSize: BigDecimal,
+            referralBonusMinAmount: BigDecimal,
+        ) {
+            TransactionManager.current().exec(
+                """
+                    WITH RECURSIVE referral_chain(invitee_guid, invitee_points, invitor_guid, invitor_points, level) AS (
+                        -- initial data set - direct referrer
+                        SELECT
+                            r.${TestnetChallengeUserRewardTable.userGuid.name} AS invitee_guid,
+                            r.${TestnetChallengeUserRewardTable.amount.name}::numeric AS invitee_points,
+                            u.${UserTable.invitedBy.name} AS invitor_guid,
+                            r.${TestnetChallengeUserRewardTable.amount.name} * $referralBonusSize AS invitor_points,        -- 'referralBonusSize' of the previous bonus
+                            1 AS level
+                        FROM ${TestnetChallengeUserRewardTable.tableName} r
+                                 JOIN "${UserTable.tableName}" u ON r.user_guid = u.guid
+                        WHERE u.${UserTable.invitedBy.name} IS NOT NULL
+                          AND r.${TestnetChallengeUserRewardTable.type.name} != '${TestnetChallengeUserRewardType.ReferralBonus.name}'
+                          AND r.${TestnetChallengeUserRewardTable.createdAt.name} > '$earnedAfter'
+                          AND r.${TestnetChallengeUserRewardTable.createdAt.name} <= '$earnedBefore'
 
-        private fun create(userId: UserId, type: TestnetChallengeUserRewardType, amount: BigDecimal, by: String = userId.value) {
-            val now = Clock.System.now()
+                        UNION ALL
 
-            TestnetChallengeUserRewardTable.insertIgnore {
-                it[guid] = EntityID(TestnetChallengeUserRewardId.generate(), TestnetChallengeUserRewardTable)
-                it[userGuid] = userId
-                it[createdAt] = now
-                it[createdBy] = by
-                it[TestnetChallengeUserRewardTable.type] = type
-                it[TestnetChallengeUserRewardTable.amount] = amount
-            }
+                        -- recursive data: next level in the referral chain
+                        SELECT
+                            rc.invitee_guid,
+                            rc.invitee_points,
+                            u.${UserTable.invitedBy.name} as invitor_guid,
+                            rc.invitor_points * $referralBonusSize AS invitor_points,                                       -- 'referralBonusSize' of the previous bonus
+                            rc.level + 1 AS level
+                        FROM referral_chain rc JOIN "${UserTable.tableName}" u ON rc.invitor_guid = u.${UserTable.guid.name}
+                        WHERE u.${UserTable.invitedBy.name} IS NOT NULL                                                     -- stop when no invitor
+                          AND rc.invitor_points * $referralBonusSize >= $referralBonusMinAmount                             -- stop when bonus becomes insignificant
+                    )
+                    INSERT
+                    INTO ${TestnetChallengeUserRewardTable.tableName}(
+                        ${TestnetChallengeUserRewardTable.guid.name}, 
+                        ${TestnetChallengeUserRewardTable.createdAt.name}, 
+                        ${TestnetChallengeUserRewardTable.createdBy.name}, 
+                        ${TestnetChallengeUserRewardTable.userGuid.name}, 
+                        ${TestnetChallengeUserRewardTable.type.name}, 
+                        ${TestnetChallengeUserRewardTable.amount.name},
+                        ${TestnetChallengeUserRewardTable.rewardCategory.name}
+                    )
+                    SELECT 
+                        typeid_generate_text('tncurwd'), 
+                        now(), 
+                        'system', 
+                        invitor_guid, 
+                        '${TestnetChallengeUserRewardType.ReferralBonus.name}', 
+                        sum(invitor_points), 
+                        null 
+                    FROM referral_chain 
+                    GROUP BY invitor_guid
+                """.trimIndent(),
+            )
         }
 
         fun inviteePointsPerInviter(from: Instant, to: Instant): Map<UserId, BigDecimal> {

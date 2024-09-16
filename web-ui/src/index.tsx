@@ -7,6 +7,7 @@ import Spinner from 'components/common/Spinner'
 import React, { useEffect, useState } from 'react'
 import { useMaintenance } from 'apiClient'
 import { WalletProvider } from 'contexts/walletProvider'
+import { testnetChallengeInviteCodeKey } from 'components/Screens/HomeScreen/testnetchallenge/TestnetChallengeTab'
 
 const container = document.getElementById('root') as HTMLDivElement
 const root = createRoot(container)
@@ -17,6 +18,14 @@ const Root = () => {
   const [, setIsConfigInitialized] = useState(false)
 
   useEffect(() => {
+    const urlPath = window.location.pathname
+    if (urlPath.includes('/invite/')) {
+      const code = urlPath.split('/').pop()
+      if (code) {
+        localStorage.setItem(testnetChallengeInviteCodeKey, code)
+      }
+    }
+
     const initConfig = async () => {
       await initializeWagmiConfig()
       setIsConfigInitialized(true)

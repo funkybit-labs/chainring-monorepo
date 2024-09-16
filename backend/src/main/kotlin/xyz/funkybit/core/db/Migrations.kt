@@ -86,6 +86,7 @@ import xyz.funkybit.core.model.db.migrations.V85_TestnetChallengePNL
 import xyz.funkybit.core.model.db.migrations.V86_AddArchTransactionToWithdrawal
 import xyz.funkybit.core.model.db.migrations.V87_TestnetChallengeRewardCategory
 import xyz.funkybit.core.model.db.migrations.V88_TypeId
+import xyz.funkybit.core.model.db.migrations.V89_RewardTimestampWithTimezone
 import xyz.funkybit.core.model.db.migrations.V8_ExecutionsAndTrades
 import xyz.funkybit.core.model.db.migrations.V9_SymbolTable
 
@@ -178,4 +179,5 @@ val migrations = listOf(
     V86_AddArchTransactionToWithdrawal(),
     V87_TestnetChallengeRewardCategory(),
     V88_TypeId(),
+    V89_RewardTimestampWithTimezone(),
 )

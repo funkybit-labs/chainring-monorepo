@@ -6,6 +6,7 @@ import CameraSvg from 'assets/camera.svg'
 import CelebrationSvg from 'assets/disco-ball.svg'
 import BtcSvg from 'assets/btc.svg'
 import LightBulbSvg from 'assets/lightbulb.svg'
+import CopySvg from 'assets/copy.svg'
 import React, {
   ChangeEvent,
   Fragment,
@@ -25,10 +26,13 @@ import {
 import { Modal } from 'components/common/Modal'
 import { Tab } from 'components/Screens/Header'
 import { CopyToClipboard } from 'react-copy-to-clipboard'
+import { Tooltip } from 'react-tooltip'
 
 type EditMode = 'none' | 'name' | 'icon'
 
 const rowsPerPage = 20
+
+export const webInviteBaseUrl = import.meta.env.ENV_WEB_URL + '/invite'
 
 function Board({
   type,
@@ -300,11 +304,13 @@ function CardCarousel({
 export function Leaderboard({
   avatarUrl,
   nickName,
+  inviteCode,
   wallets,
   onChangeTab
 }: {
   avatarUrl?: string
   nickName?: string
+  inviteCode: string
   wallets: Wallets
   onChangeTab: (tab: Tab) => void
 }) {
@@ -452,6 +458,12 @@ export function Leaderboard({
       })
     }
   }, [avatarPreview, MAX_DATA_URL_SIZE])
+
+  const [copyTooltipText, setCopyTooltipText] = useState('Copy to clipboard')
+  const handleCopy = () => {
+    setCopyTooltipText('Copied!')
+    setTimeout(() => setCopyTooltipText('Copy to clipboard'), 2000)
+  }
 
   return (
     <>
@@ -617,12 +629,22 @@ export function Leaderboard({
               Share your unique referral link and earn 10% of the funky bits
               your referrals earn!
             </div>
-            <div className="text-sm">
-              <CopyToClipboard
-                text={`https://testnet.funkybit.fun/invite/AQ8E8VF`}
+            <div className="flex justify-center text-sm">
+              <div className="pr-4">
+                {webInviteBaseUrl}/{inviteCode}
+              </div>
+              <button
+                data-tooltip-id="txCopyTooltip"
+                data-tooltip-content={copyTooltipText}
               >
-                <div>https://testnet.funkybit.fun/invite/AQ8E8VF</div>
-              </CopyToClipboard>
+                <CopyToClipboard
+                  text={`${webInviteBaseUrl}/${inviteCode}`}
+                  onCopy={handleCopy}
+                >
+                  <img src={CopySvg} alt={'copy'} className="size-4" />
+                </CopyToClipboard>
+                <Tooltip id="txCopyTooltip" place="top" delayShow={200} />
+              </button>
             </div>
           </div>
         </div>

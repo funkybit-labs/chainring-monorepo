@@ -15,6 +15,9 @@ data class SetNickname(val name: String)
 data class SetAvatarUrl(val url: String)
 
 @Serializable
+data class Enroll(val inviteCode: String?)
+
+@Serializable
 data class Leaderboard(
     val type: TestnetChallengePNLType,
     val page: Int,

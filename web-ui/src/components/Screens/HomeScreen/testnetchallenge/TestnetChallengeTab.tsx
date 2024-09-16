@@ -15,6 +15,7 @@ import DepositModal from 'components/Screens/HomeScreen/DepositModal'
 import { Leaderboard } from 'components/Screens/HomeScreen/testnetchallenge/Leaderboard'
 import { Tab } from 'components/Screens/Header'
 
+export const testnetChallengeInviteCodeKey = 'testnetChallengeInviteCode'
 export function TestnetChallengeTab({
   symbols,
   exchangeContract,
@@ -56,22 +57,29 @@ export function TestnetChallengeTab({
 
   const testnetChallengeEnrollMutation = useMutation({
     mutationFn: async () => {
-      await apiClient.testnetChallengeEnroll(undefined)
+      await apiClient.testnetChallengeEnroll({
+        inviteCode: localStorage.getItem(testnetChallengeInviteCodeKey)
+      })
     },
-    onSuccess: () =>
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accountConfiguration'] })
+      localStorage.removeItem(testnetChallengeInviteCodeKey)
+    }
   })
 
-  const { testnetChallengeStatus, nickName, avatarUrl } = useMemo(() => {
-    if (accountConfigQuery.data) {
-      return {
-        testnetChallengeStatus: accountConfigQuery.data.testnetChallengeStatus,
-        nickName: accountConfigQuery.data.nickName ?? undefined,
-        avatarUrl: accountConfigQuery.data.avatarUrl ?? undefined
+  const { testnetChallengeStatus, nickName, avatarUrl, inviteCode } =
+    useMemo(() => {
+      if (accountConfigQuery.data) {
+        return {
+          testnetChallengeStatus:
+            accountConfigQuery.data.testnetChallengeStatus,
+          nickName: accountConfigQuery.data.nickName ?? undefined,
+          avatarUrl: accountConfigQuery.data.avatarUrl ?? undefined,
+          inviteCode: accountConfigQuery.data.inviteCode
+        }
       }
-    }
-    return {}
-  }, [accountConfigQuery.data])
+      return {}
+    }, [accountConfigQuery.data])
 
   const accountRefreshRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -158,6 +166,7 @@ export function TestnetChallengeTab({
               <Leaderboard
                 avatarUrl={avatarUrl}
                 nickName={nickName}
+                inviteCode={inviteCode}
                 wallets={wallets}
                 onChangeTab={onChangeTab}
               />

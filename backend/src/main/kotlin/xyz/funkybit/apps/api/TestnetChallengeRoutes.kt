@@ -19,6 +19,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.middleware.principal
 import xyz.funkybit.apps.api.middleware.signedTokenSecurity
 import xyz.funkybit.apps.api.model.Card
+import xyz.funkybit.apps.api.model.Enroll
 import xyz.funkybit.apps.api.model.Leaderboard
 import xyz.funkybit.apps.api.model.LeaderboardEntry
 import xyz.funkybit.apps.api.model.RequestProcessingError
@@ -45,15 +46,20 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
     private val logger = KotlinLogging.logger { }
 
     val enroll: ContractRoute = run {
+        val requestBody = Body.auto<Enroll>().toLens()
+
         "testnet-challenge" meta {
             operationId = "testnet-challenge-enroll"
             summary = "Enroll in Testnet Challenge"
             tags += listOf(Tag("testnet-challenge"))
             security = signedTokenSecurity
+            receiving(requestBody to Enroll("WYZFRORSQDI"))
             returning(
                 Status.OK,
             )
         } bindContract Method.POST to { request ->
+            val body = requestBody(request)
+
             transaction {
                 val user = request.principal.user
                 if (TestnetChallengeUtils.enabled && user.testnetChallengeStatus == TestnetChallengeStatus.Unenrolled) {
@@ -86,6 +92,14 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
                     )
                     user.testnetChallengeStatus = TestnetChallengeStatus.PendingAirdrop
                     user.testnetAirdropTxHash = txHash.value
+
+                    body.inviteCode?.let {
+                        UserEntity.findByInviteCode(body.inviteCode)?.let { invitor ->
+                            if (user.guid != invitor.guid) {
+                                user.invitedBy = invitor.guid
+                            }
+                        }
+                    }
                 }
             }
             Response(Status.OK)

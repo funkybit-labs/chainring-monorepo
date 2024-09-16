@@ -47,6 +47,7 @@ data class AccountConfigurationApiResponse(
     val testnetChallengeDepositContract: Address?,
     val nickName: String?,
     val avatarUrl: String?,
+    val inviteCode: String,
     val pointsBalance: BigDecimalJson,
 )
 

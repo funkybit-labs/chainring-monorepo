@@ -9,6 +9,8 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import org.awaitility.kotlin.await
 import org.http4k.websocket.WsClient
+import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -25,6 +27,10 @@ import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
 import xyz.funkybit.core.model.db.TestnetChallengePNLType
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
+import xyz.funkybit.core.model.db.TestnetChallengeUserRewardId
+import xyz.funkybit.core.model.db.TestnetChallengeUserRewardTable
+import xyz.funkybit.core.model.db.TestnetChallengeUserRewardType
+import xyz.funkybit.core.model.db.UserEntity
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import xyz.funkybit.integrationtests.api.asBitcoinAddress
 import xyz.funkybit.integrationtests.api.asEcKeyPair
@@ -57,7 +63,7 @@ data class Trader(
 
 @ExtendWith(AppUnderTestRunner::class)
 class TestnetChallengeTest : OrderBaseTest() {
-    private fun enrollInTestnetChallenge(): Trader {
+    private fun enrollInTestnetChallenge(inviteCode: String? = null): Trader {
         val trader = setupTrader(
             marketId = btcUsdcMarket.id,
             airdrops = listOf(),
@@ -72,7 +78,7 @@ class TestnetChallengeTest : OrderBaseTest() {
             assertNull(it.nickName)
             assertNull(it.avatarUrl)
         }
-        trader.a.testnetChallengeEnroll()
+        trader.a.testnetChallengeEnroll(inviteCode)
         trader.a.getAccountConfiguration().let {
             assertEquals(TestnetChallengeStatus.PendingAirdrop, it.testnetChallengeStatus)
             assertNull(it.nickName)
@@ -278,6 +284,92 @@ class TestnetChallengeTest : OrderBaseTest() {
             expected = BigDecimal("12500") + BigDecimal("50000"),
             actual = apiClient.a.getAccountConfiguration().pointsBalance.setScale(0),
         )
+    }
+
+    @Test
+    fun `testnet challenge invalid invite code`() {
+        enrollInTestnetChallenge(inviteCode = "does_not_throw_if_code_not_found")
+    }
+
+    @Test
+    fun `test referral points`() {
+        val trader1 = enrollInTestnetChallenge()
+        val trader11 = enrollInTestnetChallenge(trader1.a.getAccountConfiguration().inviteCode)
+        val trader12 = enrollInTestnetChallenge(trader1.a.getAccountConfiguration().inviteCode)
+        val trader121 = enrollInTestnetChallenge(trader12.a.getAccountConfiguration().inviteCode)
+
+        val trader2 = enrollInTestnetChallenge()
+        val trader21 = enrollInTestnetChallenge(trader2.a.getAccountConfiguration().inviteCode)
+
+        val trader3 = enrollInTestnetChallenge()
+        val trader31 = enrollInTestnetChallenge(trader3.a.getAccountConfiguration().inviteCode)
+        val trader311 = enrollInTestnetChallenge(trader31.a.getAccountConfiguration().inviteCode)
+        val trader3111 = enrollInTestnetChallenge(trader311.a.getAccountConfiguration().inviteCode)
+
+        listOf(trader1, trader11, trader12, trader121, trader2, trader21, trader3).forEach {
+            assertEquals(BigDecimal.ZERO, it.a.getAccountConfiguration().pointsBalance)
+        }
+
+        // setup points
+        transaction {
+            grantDailyPoints(trader1, 0)
+            grantDailyPoints(trader11, 100)
+            grantDailyPoints(trader12, 1000)
+            grantDailyPoints(trader121, 100)
+            grantDailyPoints(trader2, 500)
+            grantDailyPoints(trader21, 500)
+            grantDailyPoints(trader3, 500)
+            grantDailyPoints(trader3111, 100)
+        }
+        assertEquals(0, 0.toBigDecimal().compareTo(trader1.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader11.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 1000.toBigDecimal().compareTo(trader12.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader121.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 500.toBigDecimal().compareTo(trader2.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 500.toBigDecimal().compareTo(trader21.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 500.toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 500.toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 0.toBigDecimal().compareTo(trader31.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 0.toBigDecimal().compareTo(trader311.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader3111.a.getAccountConfiguration().pointsBalance))
+
+        triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_referral_points")
+
+        assertEquals(0, (10 + 100 + 1).toBigDecimal().compareTo(trader1.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader11.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (1000 + 10).toBigDecimal().compareTo(trader12.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader121.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (500 + 50).toBigDecimal().compareTo(trader2.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 500.toBigDecimal().compareTo(trader21.a.getAccountConfiguration().pointsBalance))
+
+        assertEquals(0, (500 + 0).toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 1.toBigDecimal().compareTo(trader31.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 10.toBigDecimal().compareTo(trader311.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader3111.a.getAccountConfiguration().pointsBalance))
+
+        // repeated executions have no effect
+        triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_referral_points")
+        triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_referral_points")
+
+        assertEquals(0, (10 + 100 + 1).toBigDecimal().compareTo(trader1.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader11.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (1000 + 10).toBigDecimal().compareTo(trader12.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader121.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (500 + 50).toBigDecimal().compareTo(trader2.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 500.toBigDecimal().compareTo(trader21.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (500 + 0).toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 1.toBigDecimal().compareTo(trader31.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 10.toBigDecimal().compareTo(trader311.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, 100.toBigDecimal().compareTo(trader3111.a.getAccountConfiguration().pointsBalance))
+    }
+
+    private fun grantDailyPoints(trader1: Trader, points: Int) = TestnetChallengeUserRewardTable.insertIgnore {
+        it[guid] = EntityID(TestnetChallengeUserRewardId.generate(), TestnetChallengeUserRewardTable)
+        it[userGuid] = UserEntity.findByInviteCode(trader1.a.getAccountConfiguration().inviteCode)!!.guid
+        it[createdAt] = Clock.System.now()
+        it[createdBy] = "test referral points"
+        it[type] = TestnetChallengeUserRewardType.DailyReward
+        it[amount] = points.toBigDecimal()
     }
 
     private fun simulateTimeAndLastUpdate(now: LocalDateTime, lastUpdate: LocalDateTime) {

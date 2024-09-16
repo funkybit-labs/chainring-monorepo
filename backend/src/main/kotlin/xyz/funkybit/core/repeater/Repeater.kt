@@ -8,6 +8,7 @@ import xyz.funkybit.core.repeater.tasks.PriceFeedManagerTask
 import xyz.funkybit.core.repeater.tasks.ReferralPointsTask
 import xyz.funkybit.core.repeater.tasks.TestnetChallengeLeaderboardTask
 import xyz.funkybit.core.repeater.tasks.TestnetChallengeMonitorTask
+import xyz.funkybit.core.repeater.tasks.TestnetChallengeReferralPointsTask
 import xyz.funkybit.core.utils.PgListener
 import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -24,6 +25,7 @@ class Repeater(db: Database, private val automaticTaskScheduling: Boolean = true
         TestnetChallengeMonitorTask(),
         PriceFeedManagerTask(),
         TestnetChallengeLeaderboardTask(),
+        TestnetChallengeReferralPointsTask(),
     ).associateBy { it.name }
 
     private val timer = ScheduledThreadPoolExecutor(8)
