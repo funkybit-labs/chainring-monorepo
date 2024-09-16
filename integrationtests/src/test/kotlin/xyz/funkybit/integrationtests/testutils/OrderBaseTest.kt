@@ -13,10 +13,12 @@ import org.junit.jupiter.params.provider.Arguments
 import org.web3j.crypto.Credentials
 import xyz.funkybit.apps.api.model.Market
 import xyz.funkybit.apps.api.model.SymbolInfo
+import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.db.BlockchainTransactionStatus
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ChainSettlementBatchEntity
 import xyz.funkybit.core.model.db.MarketId
+import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderExecutionEntity
 import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.SettlementBatchEntity
@@ -27,7 +29,12 @@ import xyz.funkybit.core.model.db.TradeEntity
 import xyz.funkybit.core.model.db.TradeId
 import xyz.funkybit.core.model.db.TradeTable
 import xyz.funkybit.core.model.db.TxHash
+import xyz.funkybit.integrationtests.api.asBitcoinAddress
+import xyz.funkybit.integrationtests.api.asECKey
+import xyz.funkybit.integrationtests.api.asEcKeyPair
+import xyz.funkybit.integrationtests.api.asEvmAddress
 import xyz.funkybit.integrationtests.utils.AssetAmount
+import xyz.funkybit.integrationtests.utils.BitcoinWallet
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
 import xyz.funkybit.integrationtests.utils.Faucet
 import xyz.funkybit.integrationtests.utils.TestApiClient
@@ -41,6 +48,8 @@ import xyz.funkybit.integrationtests.utils.assertMyTradesMessageReceived
 import xyz.funkybit.integrationtests.utils.assertOrderBookMessageReceived
 import xyz.funkybit.integrationtests.utils.assertPricesMessageReceived
 import xyz.funkybit.integrationtests.utils.blocking
+import xyz.funkybit.integrationtests.utils.signAuthorizeBitcoinWalletRequest
+import xyz.funkybit.integrationtests.utils.signAuthorizeEvmWalletRequest
 import xyz.funkybit.integrationtests.utils.subscribeToBalances
 import xyz.funkybit.integrationtests.utils.subscribeToLimits
 import xyz.funkybit.integrationtests.utils.subscribeToMyOrders
@@ -69,6 +78,7 @@ open class OrderBaseTest {
         lateinit var usdcDaiMarket: Market
         lateinit var usdc2Dai2Market: Market
         lateinit var btcbtc2Market: Market
+        var btcbtcArchMarket: Market? = null
         lateinit var chainIdBySymbol: Map<String, ChainId>
 
         @JvmStatic
@@ -84,6 +94,7 @@ open class OrderBaseTest {
             btcUsdcMarket = config.markets.first { it.id.value == "BTC:$chain1/USDC:$chain1" }
             btc2Usdc2Market = config.markets.first { it.id.value == "BTC:$chain2/USDC:$chain2" }
             btcbtc2Market = config.markets.first { it.id.value == "BTC:$chain1/BTC:$chain2" }
+            btcbtcArchMarket = config.markets.firstOrNull { it.id.value == "BTC:$chain1/BTC:${BitcoinClient.chainId}" }
             symbols = config.chains.flatMap { it.symbols }.associateBy { it.name }
             btc = symbols.getValue("BTC:$chain1")
             btc2 = symbols.getValue("BTC:$chain2")
@@ -110,6 +121,13 @@ open class OrderBaseTest {
         )
     }
 
+    data class TraderClients(
+        val apiClient: TestApiClient,
+        val evmWallet: Wallet,
+        val wsClient: WsClient,
+        val bitcoinWallet: BitcoinWallet?,
+    )
+
     fun setupTrader(
         marketId: MarketId,
         airdrops: List<AssetAmount>,
@@ -117,9 +135,40 @@ open class OrderBaseTest {
         subscribeToOrderBook: Boolean = true,
         subscribeToPrices: Boolean = true,
         subscribeToLimits: Boolean = true,
-    ): Triple<TestApiClient, Wallet, WsClient> {
-        val apiClient = TestApiClient()
-        val wallet = Wallet(apiClient)
+        setupBitcoinWallet: Boolean = false,
+    ): TraderClients {
+        val (apiClient, wallet, bitcoinWallet) = if (setupBitcoinWallet) {
+            val apiClient = TestApiClient.withBitcoinWallet()
+            val bitcoinWallet = BitcoinWallet(apiClient)
+            apiClient.getAccountConfiguration()
+            val evmApiClient = TestApiClient()
+            evmApiClient.authorizeWallet(
+                apiRequest = signAuthorizeEvmWalletRequest(
+                    ecKey = apiClient.keyPair.asECKey(),
+                    address = apiClient.address.asBitcoinAddress(),
+                    authorizedAddress = evmApiClient.address.asEvmAddress(),
+                ),
+            )
+            Triple(apiClient, Wallet(evmApiClient), bitcoinWallet)
+        } else {
+            val apiClient = TestApiClient()
+            val wallet = Wallet(apiClient)
+            apiClient.getAccountConfiguration()
+            val bitcoinWallet = if (airdrops.any { chainIdBySymbol.getValue(it.symbol.name).networkType() == NetworkType.Bitcoin }) {
+                val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
+                bitcoinKeyApiClient.authorizeWallet(
+                    apiRequest = signAuthorizeBitcoinWalletRequest(
+                        ecKeyPair = apiClient.keyPair.asEcKeyPair(),
+                        address = apiClient.address.asEvmAddress(),
+                        authorizedAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                    ),
+                )
+                BitcoinWallet(bitcoinKeyApiClient)
+            } else {
+                null
+            }
+            Triple(apiClient, wallet, bitcoinWallet)
+        }
 
         val wsClient = WebsocketClient.blocking(apiClient.authToken).apply {
             if (subscribeToOrderBook) {
@@ -151,22 +200,42 @@ open class OrderBaseTest {
 
         airdrops.forEach {
             val chainId = chainIdBySymbol.getValue(it.symbol.name)
-            if (chainId != wallet.currentChainId) {
-                wallet.switchChain(chainId)
-            }
-            if (it.symbol.contractAddress == null) {
-                Faucet.fundAndMine(wallet.evmAddress, it.inFundamentalUnits, chainId)
-            } else {
-                wallet.mintERC20AndMine(it)
+            when (chainId.networkType()) {
+                NetworkType.Evm -> {
+                    if (chainId != wallet.currentChainId) {
+                        wallet.switchChain(chainId)
+                    }
+                    if (it.symbol.contractAddress == null) {
+                        Faucet.fundAndMine(wallet.evmAddress, it.inFundamentalUnits, chainId)
+                    } else {
+                        wallet.mintERC20AndMine(it)
+                    }
+                }
+                NetworkType.Bitcoin -> {
+                    waitForTx(
+                        bitcoinWallet!!.walletAddress,
+                        bitcoinWallet.airdropNative(it.inFundamentalUnits),
+                    )
+                }
             }
         }
 
         deposits.forEach {
             val chainId = chainIdBySymbol.getValue(it.symbol.name)
-            if (chainId != wallet.currentChainId) {
-                wallet.switchChain(chainId)
+            when (chainId.networkType()) {
+                NetworkType.Evm -> {
+                    if (chainId != wallet.currentChainId) {
+                        wallet.switchChain(chainId)
+                    }
+                    wallet.depositAndMine(it)
+                }
+                NetworkType.Bitcoin -> {
+                    waitForTx(
+                        bitcoinWallet!!.walletAddress,
+                        TxHash(bitcoinWallet.depositNative(it.inFundamentalUnits).deposit.txHash.value),
+                    )
+                }
             }
-            wallet.depositAndMine(it)
             wsClient.assertBalancesMessageReceived()
             if (subscribeToLimits) {
                 wsClient.assertLimitsMessageReceived().also { wsMessage ->
@@ -177,7 +246,7 @@ open class OrderBaseTest {
 
         assertBalances(deposits.map { ExpectedBalance(it) }, apiClient.getBalances().balances)
 
-        return Triple(apiClient, wallet, wsClient)
+        return TraderClients(apiClient, wallet, wsClient, bitcoinWallet)
     }
 
     fun waitForSettlementToFinishWithForking(tradeIds: List<TradeId>, rollbackSettlement: Boolean = false) {

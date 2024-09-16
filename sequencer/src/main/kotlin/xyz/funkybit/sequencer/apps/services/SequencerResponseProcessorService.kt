@@ -11,9 +11,9 @@ import xyz.funkybit.apps.api.model.websocket.MyTradesCreated
 import xyz.funkybit.apps.api.model.websocket.OrderBook
 import xyz.funkybit.apps.api.model.websocket.OrderBookDiff
 import xyz.funkybit.core.evm.ECHelper
-import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.FeeRate
 import xyz.funkybit.core.model.SequencerAccountId
+import xyz.funkybit.core.model.Signature
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.BalanceChange
 import xyz.funkybit.core.model.db.BalanceEntity
@@ -39,6 +39,7 @@ import xyz.funkybit.core.model.db.OrderType
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TradeEntity
 import xyz.funkybit.core.model.db.UserEntity
+import xyz.funkybit.core.model.db.UserId
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalStatus
@@ -214,7 +215,7 @@ object SequencerResponseProcessorService {
                     side = toOrderSide(it.type),
                     amount = it.amount.toBigInteger(),
                     levelIx = it.levelIx,
-                    signature = it.signature.toEvmSignature(),
+                    signature = Signature.auto(it.signature),
                     sequencerOrderId = it.guid.toSequencerOrderId(),
                     sequencerTimeNs = response.processingTime.toBigInteger(),
                 )
@@ -225,7 +226,7 @@ object SequencerResponseProcessorService {
             val createdOrders = OrderEntity.listOrdersWithExecutions(createAssignments.map { it.orderId }).map { it.toOrderResponse() }
 
             publishBroadcasterNotifications(
-                createdOrders.map { BroadcasterNotification(MyOrderCreated(it), wallet.address) },
+                createdOrders.map { BroadcasterNotification(MyOrderCreated(it), wallet.userGuid.value) },
             )
         }
     }
@@ -253,7 +254,7 @@ object SequencerResponseProcessorService {
         val createdOrder = OrderEntity.listOrdersWithExecutions(listOf(createAssignment.orderId)).map { it.toOrderResponse() }.first()
 
         publishBroadcasterNotifications(
-            listOf(BroadcasterNotification(MyOrderCreated(createdOrder), wallet.address)),
+            listOf(BroadcasterNotification(MyOrderCreated(createdOrder), wallet.userGuid.value)),
         )
     }
 
@@ -277,7 +278,7 @@ object SequencerResponseProcessorService {
     }
 
     private fun handleTrades(createdTrades: List<TradeCreated>, responseSequence: Long, orderIdsInRequest: List<Long> = listOf(), timestamp: Instant, broadcasterNotifications: MutableList<BroadcasterNotification>): List<Pair<TradeEntity, OrderEntity>> {
-        val executionsCreatedByWallet = mutableMapOf<Address, MutableList<OrderExecutionEntity>>()
+        val executionsCreatedByUser = mutableMapOf<UserId, MutableList<OrderExecutionEntity>>()
         val tradesWithTakerOrders = createdTrades.mapNotNull { trade ->
             logger.debug { "Trade Created: buyOrderGuid=${trade.buyOrderGuid}, sellOrderGuid=${trade.sellOrderGuid}, amount=${trade.amount.toBigInteger()} levelIx=${trade.levelIx}, buyerFee=${trade.buyerFee.toBigInteger()}, sellerFee=${trade.sellerFee.toBigInteger()}" }
             val buyOrder = OrderEntity.findBySequencerOrderId(trade.buyOrderGuid)
@@ -317,8 +318,8 @@ object SequencerResponseProcessorService {
                     )
 
                     execution.refresh(flush = true)
-                    executionsCreatedByWallet
-                        .getOrPut(execution.order.wallet.address) { mutableListOf() }
+                    executionsCreatedByUser
+                        .getOrPut(execution.order.wallet.userGuid.value) { mutableListOf() }
                         .add(execution)
                 }
 
@@ -329,18 +330,18 @@ object SequencerResponseProcessorService {
             }
         }
 
-        executionsCreatedByWallet.forEach { (walletAddress, executions) ->
-            logger.debug { "Sending TradesCreated to wallet $walletAddress" }
+        executionsCreatedByUser.forEach { (userId, executions) ->
+            logger.debug { "Sending TradesCreated to user $userId" }
             broadcasterNotifications.add(
                 BroadcasterNotification(
                     MyTradesCreated(executions.map { it.toTradeResponse() }),
-                    recipient = walletAddress,
+                    recipient = userId,
                 ),
             )
         }
 
         // schedule MarketTradesCreated notification
-        executionsCreatedByWallet
+        executionsCreatedByUser
             .values
             .flatten()
             .filter { it.role == ExecutionRole.Taker }
@@ -408,7 +409,7 @@ object SequencerResponseProcessorService {
             broadcasterNotifications.add(
                 BroadcasterNotification(
                     MyOrderUpdated(orderToUpdate.toOrderResponse(executions)),
-                    recipient = orderToUpdate.wallet.address,
+                    recipient = orderToUpdate.wallet.userGuid.value,
                 ),
             )
         }
@@ -422,14 +423,14 @@ object SequencerResponseProcessorService {
             ).toMap().mapKeys { (user, _) -> user.sequencerId.value }
 
             logger.debug { "updating balances" }
-            val walletsWithUpdatedBalances = mutableSetOf<WalletEntity>()
+            val userIdsWithUpdatedBalances = mutableSetOf<UserId>()
             BalanceEntity.updateBalances(
                 balanceChanges.mapNotNull { change ->
                     val symbol = getSymbol(change.asset)
 
                     userWalletsMap[change.account]?.let { userWallets ->
                         userWallets.find { it.networkType == symbol.chain.networkType }?.let { wallet ->
-                            walletsWithUpdatedBalances.add(wallet)
+                            userIdsWithUpdatedBalances.add(wallet.userGuid.value)
                             BalanceChange.Delta(
                                 walletId = wallet.guid.value,
                                 symbolId = symbol.guid.value,
@@ -442,7 +443,7 @@ object SequencerResponseProcessorService {
             )
             logger.debug { "done updating balances" }
 
-            walletsWithUpdatedBalances.forEach {
+            userIdsWithUpdatedBalances.forEach {
                 broadcasterNotifications.add(BroadcasterNotification.walletBalances(it))
             }
         }
@@ -534,7 +535,7 @@ object SequencerResponseProcessorService {
             limitsUpdates.map { SequencerAccountId(it.account) }.toSet(),
         ).associateBy { it.first.sequencerId.value }
 
-        val walletsToNotifyAboutLimitsChanges = mutableSetOf<WalletEntity>()
+        val usersToNotifyAboutLimitsChanges = mutableSetOf<UserId>()
         LimitEntity.update(
             limitsUpdates.map {
                 val marketId = MarketId(it.marketId)
@@ -542,7 +543,7 @@ object SequencerResponseProcessorService {
 
                 MarketEntity[marketId].networkTypes()
                     .mapNotNull { networkType -> userWallets.find { it.networkType == networkType } }
-                    .forEach { wallet -> walletsToNotifyAboutLimitsChanges.add(wallet) }
+                    .forEach { wallet -> usersToNotifyAboutLimitsChanges.add(wallet.userGuid.value) }
 
                 Pair(
                     user.guid.value,
@@ -555,7 +556,7 @@ object SequencerResponseProcessorService {
             },
         )
 
-        walletsToNotifyAboutLimitsChanges.forEach { wallet ->
+        usersToNotifyAboutLimitsChanges.forEach { wallet ->
             broadcasterNotifications.add(
                 BroadcasterNotification.limits(wallet),
             )

@@ -214,7 +214,7 @@ class TestApiClient(keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(), trace
     override fun createOrder(apiRequest: CreateOrderApiRequest): CreateOrderApiResponse =
         tryCreateOrder(apiRequest).assertSuccess()
 
-    fun createLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: Wallet, clientOrderId: ClientOrderId? = null, linkedSignerKeyPair: WalletKeyPair? = null): CreateOrderApiResponse {
+    fun createLimitOrder(market: Market, side: OrderSide, amount: BigDecimal, price: BigDecimal, wallet: OrderSigner, clientOrderId: ClientOrderId? = null, linkedSignerKeyPair: WalletKeyPair? = null): CreateOrderApiResponse {
         val request = CreateOrderApiRequest.Limit(
             nonce = generateOrderNonce(),
             marketId = market.id,
@@ -249,7 +249,7 @@ class TestApiClient(keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(), trace
         return tryCreateOrder(request)
     }
 
-    fun createMarketOrder(market: Market, side: OrderSide, amount: BigDecimal?, wallet: Wallet, clientOrderId: ClientOrderId? = null, percentage: Percentage? = null): CreateOrderApiResponse {
+    fun createMarketOrder(market: Market, side: OrderSide, amount: BigDecimal?, wallet: OrderSigner, clientOrderId: ClientOrderId? = null, percentage: Percentage? = null): CreateOrderApiResponse {
         val request = CreateOrderApiRequest.Market(
             nonce = generateOrderNonce(),
             marketId = market.id,
@@ -268,7 +268,7 @@ class TestApiClient(keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(), trace
         return response
     }
 
-    fun createBackToBackMarketOrder(markets: List<Market>, side: OrderSide, amount: BigDecimal?, wallet: Wallet, clientOrderId: ClientOrderId? = null, percentage: Percentage? = null): CreateOrderApiResponse {
+    fun createBackToBackMarketOrder(markets: List<Market>, side: OrderSide, amount: BigDecimal?, wallet: OrderSigner, clientOrderId: ClientOrderId? = null, percentage: Percentage? = null): CreateOrderApiResponse {
         val request = CreateOrderApiRequest.BackToBackMarket(
             nonce = generateOrderNonce(),
             marketId = markets[0].id,

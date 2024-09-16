@@ -3,11 +3,17 @@ package xyz.funkybit.integrationtests.testutils
 import org.awaitility.kotlin.await
 import org.http4k.websocket.WsClient
 import org.jetbrains.exposed.sql.transactions.transaction
+import xyz.funkybit.apps.api.model.SymbolInfo
+import xyz.funkybit.core.model.bitcoin.ArchAccountState
+import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.BlockchainTransactionStatus
+import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalId
 import xyz.funkybit.core.model.db.WithdrawalStatus
+import xyz.funkybit.core.utils.bitcoin.ArchUtils
+import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
 import xyz.funkybit.integrationtests.utils.Faucet
 import xyz.funkybit.integrationtests.utils.TestApiClient
@@ -50,5 +56,14 @@ fun waitForFinalizedWithdrawal(id: WithdrawalId, expectedStatus: WithdrawalStatu
         transaction {
             WithdrawalEntity[id].status == expectedStatus
         }
+    }
+}
+
+fun getFeeAccountBalanceOnArch(symbol: SymbolInfo): AssetAmount {
+    return transaction {
+        val symbolEntity = SymbolEntity.forName(symbol.name)
+        val tokenAccountPubKey = ArchAccountEntity.findTokenAccountForSymbol(symbolEntity)!!.rpcPubkey()
+        val tokenState = ArchUtils.getAccountState<ArchAccountState.Token>(tokenAccountPubKey)
+        AssetAmount(symbol, tokenState.balances[0].balance.toLong().toBigInteger())
     }
 }

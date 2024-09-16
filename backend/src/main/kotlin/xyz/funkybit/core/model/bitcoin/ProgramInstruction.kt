@@ -75,6 +75,27 @@ sealed class ProgramInstruction {
         val txHex: ByteArray,
     ) : ProgramInstruction()
 
+    @Serializable
+    data class SettlementAdjustments(
+        val accountIndex: UByte,
+        val increments: List<Adjustment>,
+        val decrements: List<Adjustment>,
+        val feeAmount: ULong,
+    )
+
+    @Serializable
+    data class PrepareSettlementBatchParams(
+        val settlements: List<SettlementAdjustments>,
+    ) : ProgramInstruction()
+
+    @Serializable
+    data class SubmitSettlementBatchParams(
+        val settlements: List<SettlementAdjustments>,
+    ) : ProgramInstruction()
+
+    @Serializable
+    data object RollbackSettlement : ProgramInstruction()
+
     @OptIn(ExperimentalUnsignedTypes::class)
     fun serialize() = Borsh.encodeToByteArray(this).toUByteArray()
 }
@@ -86,6 +107,9 @@ object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
     private const val INIT_TOKEN_BALANCES: Byte = 2
     private const val DEPOSIT_BATCH: Byte = 3
     private const val WITHDRAW_BATCH: Byte = 4
+    private const val PREPARE_SETTLEMENT_BATCH: Byte = 5
+    private const val SUBMIT_SETTLEMENT_BATCH: Byte = 6
+    private const val ROLLBACK_SETTLEMENT_BATCH: Byte = 7
 
     @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = buildSerialDescriptor("Pubkey", StructureKind.LIST)
@@ -115,7 +139,17 @@ object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
                         encoder.encodeByte(WITHDRAW_BATCH)
                         ProgramInstruction.WithdrawBatchParams::class.serializer().serialize(encoder, value)
                     }
-                    // add other instructions here
+                    is ProgramInstruction.PrepareSettlementBatchParams -> {
+                        encoder.encodeByte(PREPARE_SETTLEMENT_BATCH)
+                        ProgramInstruction.PrepareSettlementBatchParams::class.serializer().serialize(encoder, value)
+                    }
+                    is ProgramInstruction.SubmitSettlementBatchParams -> {
+                        encoder.encodeByte(SUBMIT_SETTLEMENT_BATCH)
+                        ProgramInstruction.SubmitSettlementBatchParams::class.serializer().serialize(encoder, value)
+                    }
+                    is ProgramInstruction.RollbackSettlement -> {
+                        encoder.encodeByte(ROLLBACK_SETTLEMENT_BATCH)
+                    }
                 }
             }
             else -> throw Exception("not required")

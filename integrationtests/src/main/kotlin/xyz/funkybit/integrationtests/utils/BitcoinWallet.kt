@@ -5,32 +5,46 @@ import kotlinx.datetime.Instant
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.model.Chain
 import xyz.funkybit.apps.api.model.CreateDepositApiRequest
+import xyz.funkybit.apps.api.model.CreateOrderApiRequest
 import xyz.funkybit.apps.api.model.CreateWithdrawalApiRequest
 import xyz.funkybit.apps.api.model.DepositApiResponse
+import xyz.funkybit.apps.api.model.OrderAmount
+import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.Signature
 import xyz.funkybit.core.model.Symbol
+import xyz.funkybit.core.model.bitcoin.ArchAccountState
+import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
+import xyz.funkybit.core.model.db.ArchAccountEntity
+import xyz.funkybit.core.model.db.MarketId
+import xyz.funkybit.core.model.db.NetworkType
+import xyz.funkybit.core.model.db.OrderSide
+import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.services.UtxoSelectionService
+import xyz.funkybit.core.utils.bitcoin.ArchUtils
 import xyz.funkybit.core.utils.bitcoin.fromSatoshi
+import xyz.funkybit.core.utils.fromFundamentalUnits
+import xyz.funkybit.core.utils.toFundamentalUnits
 import java.math.BigInteger
 
 class BitcoinWallet(
     val keyPair: WalletKeyPair.Bitcoin,
-    val chain: Chain,
+    val allChains: List<Chain>,
     val apiClient: ApiClient,
-) {
+) : OrderSigner {
     val logger = KotlinLogging.logger {}
     companion object {
         operator fun invoke(apiClient: ApiClient): BitcoinWallet {
-            val config = apiClient.getConfiguration().bitcoinChain
+            val config = apiClient.getConfiguration().chains
             return BitcoinWallet(apiClient.keyPair as WalletKeyPair.Bitcoin, config, apiClient)
         }
     }
 
+    val chain = allChains.first { it.networkType == NetworkType.Bitcoin }
     val walletAddress = keyPair.address()
     val exchangeDepositAddress = chain.contracts.first { it.name == ContractType.Exchange.name }.address as BitcoinAddress
     val nativeSymbol = chain.symbols.first { it.contractAddress == null }
@@ -48,6 +62,37 @@ class BitcoinWallet(
             ),
         )
     }
+    fun getExchangeBalance(symbol: SymbolInfo): AssetAmount =
+        AssetAmount(
+            symbol,
+            if (symbol.contractAddress == null) {
+                getExchangeNativeBalance(symbol.name)
+            } else {
+                BigInteger.ZERO
+            }.fromFundamentalUnits(symbol.decimals),
+        )
+
+    private fun getExchangeNativeBalance(symbol: String): BigInteger {
+        return transaction {
+            val symbolEntity = SymbolEntity.forName(symbol)
+            ArchAccountBalanceIndexEntity.findForWalletAddressAndSymbol(walletAddress, symbolEntity)?.addressIndex?.let { index ->
+                val tokenAccountPubKey = ArchAccountEntity.findTokenAccountForSymbol(symbolEntity)!!.rpcPubkey()
+                val tokenState = ArchUtils.getAccountState<ArchAccountState.Token>(tokenAccountPubKey)
+                assert(tokenState.balances[index].walletAddress == walletAddress.value)
+                tokenState.balances[index].balance.toLong().toBigInteger()
+            } ?: BigInteger.ZERO
+        }
+    }
+
+    private fun marketSymbols(marketId: MarketId): Pair<SymbolInfo, SymbolInfo> =
+        marketId
+            .baseAndQuoteSymbols()
+            .let { (base, quote) ->
+                Pair(
+                    allChains.map { it.symbols.filter { s -> s.name == base } }.flatten().first(),
+                    allChains.map { it.symbols.filter { s -> s.name == quote } }.flatten().first(),
+                )
+            }
 
     private fun sendNativeDepositTx(amount: BigInteger): TxHash {
         return transaction {
@@ -90,5 +135,46 @@ class BitcoinWallet(
             nonce,
             Signature.auto(signature),
         )
+    }
+
+    override fun signOrder(request: CreateOrderApiRequest.Market): CreateOrderApiRequest.Market {
+        return request.copy(
+            signature = sign(request),
+            verifyingChainId = chain.id,
+        )
+    }
+
+    override fun signOrder(request: CreateOrderApiRequest.Limit, linkedSignerKeyPair: WalletKeyPair?): CreateOrderApiRequest.Limit {
+        return request.copy(
+            signature = sign(request),
+            verifyingChainId = chain.id,
+        )
+    }
+
+    override fun signOrder(request: CreateOrderApiRequest.BackToBackMarket): CreateOrderApiRequest.BackToBackMarket {
+        return request.copy(
+            signature = sign(request),
+            verifyingChainId = chain.id,
+        )
+    }
+
+    private fun sign(request: CreateOrderApiRequest): Signature {
+        val (baseSymbol, quoteSymbol) = marketSymbols(request.marketId)
+        val bitcoinAddress = BitcoinAddress.canonicalize(walletAddress.value)
+        val amount = when (request.amount) {
+            is OrderAmount.Fixed -> request.amount.fixedAmount().fromFundamentalUnits(baseSymbol.decimals)
+            is OrderAmount.Percent -> "${request.amount.percentage()}% of your "
+        }
+        val bitcoinOrderMessage = "[funkybit] Please sign this message to authorize a swap. This action will not cost any gas fees." +
+            if (request.side == OrderSide.Buy) {
+                "\nSwap $amount ${quoteSymbol.name} for ${baseSymbol.name}"
+            } else {
+                "\nSwap $amount ${baseSymbol.name} for ${quoteSymbol.name}"
+            } + when (request) {
+                is CreateOrderApiRequest.Limit -> "\nPrice: ${request.price.toFundamentalUnits(quoteSymbol.decimals)}"
+                else -> "\nPrice: Market"
+            } + "\nAddress: ${bitcoinAddress.value}, Nonce: ${request.nonce}"
+        logger.debug { "wallet - message to sign = [$bitcoinOrderMessage" }
+        return Signature.auto(keyPair.ecKey.signMessage(bitcoinOrderMessage))
     }
 }

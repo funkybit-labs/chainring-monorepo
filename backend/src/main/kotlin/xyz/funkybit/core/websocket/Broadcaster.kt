@@ -25,7 +25,6 @@ import xyz.funkybit.apps.api.model.websocket.OutgoingWSMessage
 import xyz.funkybit.apps.api.model.websocket.Prices
 import xyz.funkybit.apps.api.model.websocket.SubscriptionTopic
 import xyz.funkybit.apps.api.wsUnauthorized
-import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.db.BalanceEntity
 import xyz.funkybit.core.model.db.BroadcasterJobEntity
 import xyz.funkybit.core.model.db.BroadcasterJobId
@@ -39,6 +38,7 @@ import xyz.funkybit.core.model.db.OrderBookSnapshot
 import xyz.funkybit.core.model.db.OrderEntity
 import xyz.funkybit.core.model.db.OrderExecutionEntity
 import xyz.funkybit.core.model.db.OrderStatus
+import xyz.funkybit.core.model.db.UserId
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.toOrderResponse
 import xyz.funkybit.core.utils.PgListener
@@ -68,7 +68,7 @@ typealias TopicSubscriptions = ConcurrentHashMap<SubscriptionTopic, Subscription
 
 class Broadcaster(val db: Database) {
     private val subscriptions = TopicSubscriptions()
-    private val subscriptionsByWallet = ConcurrentHashMap<Address, TopicSubscriptions>()
+    private val subscriptionsByUser = ConcurrentHashMap<UserId, TopicSubscriptions>()
     private val lastPricePublish = mutableMapOf<Pair<MarketId, ConnectedClient>, Instant>()
     private val orderBooksByMarket = ConcurrentHashMap<MarketId, OrderBook>()
     private val pricesByMarketAndPeriod = ConcurrentHashMap<SubscriptionTopic.Prices, MutableList<OHLC>>()
@@ -92,7 +92,7 @@ class Broadcaster(val db: Database) {
         }.addIfAbsent(client)
 
         client.principal?.also { wallet ->
-            subscriptionsByWallet.getOrPut(wallet.address) {
+            subscriptionsByUser.getOrPut(wallet.userGuid.value) {
                 TopicSubscriptions()
             }.getOrPut(topic) {
                 Subscriptions()
@@ -117,8 +117,8 @@ class Broadcaster(val db: Database) {
             lastPricePublish.remove(Pair(topic.marketId, client))
         }
         return client.principal?.let { wallet ->
-            subscriptionsByWallet[wallet.address]?.get(topic)?.remove(client)
-            subscriptionsByWallet[wallet.address]?.get(topic)?.isNotEmpty() ?: false
+            subscriptionsByUser[wallet.userGuid.value]?.get(topic)?.remove(client)
+            subscriptionsByUser[wallet.userGuid.value]?.get(topic)?.isNotEmpty() ?: false
         } ?: false
     }
 
@@ -129,7 +129,7 @@ class Broadcaster(val db: Database) {
 
         client.principal?.also { wallet ->
             if (!hasSubscriptions) {
-                subscriptionsByWallet.remove(wallet.address)
+                subscriptionsByUser.remove(wallet.userGuid.value)
             }
         }
     }
@@ -357,6 +357,6 @@ class Broadcaster(val db: Database) {
         }
     }
 
-    private fun findClients(address: Address, topic: SubscriptionTopic): List<ConnectedClient> =
-        subscriptionsByWallet[address]?.get(topic) ?: emptyList()
+    private fun findClients(userId: UserId, topic: SubscriptionTopic): List<ConnectedClient> =
+        subscriptionsByUser[userId]?.get(topic) ?: emptyList()
 }

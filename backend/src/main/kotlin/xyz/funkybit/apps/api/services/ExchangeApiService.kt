@@ -18,6 +18,7 @@ import xyz.funkybit.apps.api.model.CreateWithdrawalApiRequest
 import xyz.funkybit.apps.api.model.Deposit
 import xyz.funkybit.apps.api.model.DepositApiResponse
 import xyz.funkybit.apps.api.model.Market
+import xyz.funkybit.apps.api.model.OrderAmount
 import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.RequestProcessingError
 import xyz.funkybit.apps.api.model.RequestStatus
@@ -52,6 +53,7 @@ import xyz.funkybit.core.services.LinkedSignerService
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureVerification
 import xyz.funkybit.core.utils.bitcoin.fromSatoshi
+import xyz.funkybit.core.utils.fromFundamentalUnits
 import xyz.funkybit.core.utils.safeToInt
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.core.utils.toHexBytes
@@ -115,11 +117,18 @@ class ExchangeApiService(
                         amount = if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
                         price = BigInteger.ZERO,
                         nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
-                        signature = orderRequest.signature,
+                        signature = orderRequest.signature as EvmSignature,
                     ),
                     verifyingChainId = orderRequest.verifyingChainId,
                 )
-            is BitcoinAddress -> {} // TODO verify signature
+            is BitcoinAddress -> {
+                verifyBitcoinSignature(
+                    walletAddress,
+                    orderRequest,
+                    baseSymbol,
+                    quoteSymbol,
+                )
+            }
         }
 
         val response = runBlocking {
@@ -166,6 +175,13 @@ class ExchangeApiService(
         val market = getMarket(batchOrdersRequest.marketId)
         val baseSymbol = getSymbolEntity(market.baseSymbol)
         val quoteSymbol = getSymbolEntity(market.quoteSymbol)
+        val symbolNetworks = listOf(baseSymbol, quoteSymbol).map { it.chainId.value.networkType() }.toSet()
+        symbolNetworks.subtract(setOf(wallet.networkType)).forEach { networkType ->
+            transaction {
+                wallet.authorizedWallet(networkType)
+                    ?: throw RequestProcessingError("No authorized wallet found for network type for this symbol")
+            }
+        }
 
         val ordersToAdd = createOrderRequestsByOrderId.map { (orderId, orderRequest) ->
             val levelIx = when (orderRequest) {
@@ -200,11 +216,18 @@ class ExchangeApiService(
                                 else -> BigInteger.ZERO
                             },
                             nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
-                            signature = orderRequest.signature,
+                            signature = orderRequest.signature as EvmSignature,
                         ),
                         verifyingChainId = orderRequest.verifyingChainId,
                     )
-                is BitcoinAddress -> {} // TODO verify signature
+                is BitcoinAddress -> {
+                    verifyBitcoinSignature(
+                        walletAddress,
+                        orderRequest,
+                        baseSymbol,
+                        quoteSymbol,
+                    )
+                }
             }
 
             SequencerClient.Order(
@@ -276,6 +299,25 @@ class ExchangeApiService(
         )
     }
 
+    private fun verifyBitcoinSignature(bitcoinAddress: BitcoinAddress, orderRequest: CreateOrderApiRequest, baseSymbol: SymbolEntity, quoteSymbol: SymbolEntity) {
+        val amount = when (orderRequest.amount) {
+            is OrderAmount.Fixed -> orderRequest.amount.fixedAmount().fromFundamentalUnits(baseSymbol.decimals)
+            is OrderAmount.Percent -> "${orderRequest.amount.percentage()}% of your "
+        }
+        val bitcoinOrderMessage = "[funkybit] Please sign this message to authorize a swap. This action will not cost any gas fees." +
+            if (orderRequest.side == OrderSide.Buy) {
+                "\nSwap $amount ${quoteSymbol.name} for ${baseSymbol.name}"
+            } else {
+                "\nSwap $amount ${baseSymbol.name} for ${quoteSymbol.name}"
+            } + when (orderRequest) {
+                is CreateOrderApiRequest.Limit -> "\nPrice: ${orderRequest.price.toFundamentalUnits(quoteSymbol.decimals)}"
+                else -> "\nPrice: Market"
+            } + "\nAddress: ${bitcoinAddress.value}, Nonce: ${orderRequest.nonce}"
+        if (!BitcoinSignatureVerification.verifyMessage(bitcoinAddress, orderRequest.signature.value.replace(" ", "+"), bitcoinOrderMessage)) {
+            throw RequestProcessingError(ReasonCode.SignatureNotValid, "Invalid signature")
+        }
+    }
+
     private fun reasonToMessage(reason: Reason): String {
         return when (reason) {
             Reason.DoesNotExist -> "Order does not exist or is already finalized"
@@ -286,8 +328,8 @@ class ExchangeApiService(
 
     fun withdraw(wallet: WalletEntity, apiRequest: CreateWithdrawalApiRequest): WithdrawalApiResponse {
         val userId = wallet.userGuid.value
-        val walletAddress = wallet.address
         val symbol = getSymbolEntity(apiRequest.symbol)
+        val walletAddress = getWalletAddressForChain(wallet, symbol.chainId.value)
 
         when (walletAddress) {
             is EvmAddress -> verifyEIP712Signature(
@@ -342,11 +384,14 @@ class ExchangeApiService(
         return WithdrawalApiResponse(withdrawal)
     }
 
-    fun deposit(walletAddress: Address, apiRequest: CreateDepositApiRequest): DepositApiResponse =
-        transaction {
+    fun deposit(wallet: WalletEntity, apiRequest: CreateDepositApiRequest): DepositApiResponse {
+        return transaction {
+            val symbol = getSymbolEntity(apiRequest.symbol)
+            val walletAddress = getWalletAddressForChain(wallet, symbol.chainId.value)
+
             val deposit = DepositEntity.createOrUpdate(
-                wallet = WalletEntity.getOrCreateWithUser(walletAddress),
-                symbol = getSymbolEntity(apiRequest.symbol),
+                wallet = WalletEntity.getByAddress(walletAddress),
+                symbol = symbol,
                 amount = apiRequest.amount,
                 blockNumber = null,
                 transactionHash = apiRequest.txHash,
@@ -363,6 +408,7 @@ class ExchangeApiService(
 
             DepositApiResponse(Deposit.fromEntity(deposit))
         }
+    }
 
     fun cancelOrder(wallet: WalletEntity, cancelOrderApiRequest: CancelOrderApiRequest): CancelOrderApiResponse {
         return orderBatch(
@@ -482,6 +528,16 @@ class ExchangeApiService(
             if (!isValidSignature) {
                 throw RequestProcessingError(ReasonCode.SignatureNotValid, "Invalid signature")
             }
+        }
+    }
+
+    private fun getWalletAddressForChain(wallet: WalletEntity, chainId: ChainId): Address {
+        return transaction {
+            if (wallet.networkType == chainId.networkType()) {
+                wallet.address
+            } else {
+                wallet.authorizedWallet(chainId.networkType())?.address
+            } ?: throw RequestProcessingError("No authorized wallet found for network type for this symbol")
         }
     }
 }

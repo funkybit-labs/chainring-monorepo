@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.Percentage
+import xyz.funkybit.core.model.Signature
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ClientOrderId
@@ -64,7 +65,7 @@ sealed class CreateOrderApiRequest {
     abstract val marketId: MarketId
     abstract val side: OrderSide
     abstract val amount: OrderAmount
-    abstract val signature: EvmSignature
+    abstract val signature: Signature
     abstract val verifyingChainId: ChainId
     abstract val clientOrderId: ClientOrderId?
 
@@ -75,7 +76,7 @@ sealed class CreateOrderApiRequest {
         override val marketId: MarketId,
         override val side: OrderSide,
         override val amount: OrderAmount,
-        override val signature: EvmSignature,
+        override val signature: Signature,
         override val verifyingChainId: ChainId,
         override val clientOrderId: ClientOrderId? = null,
     ) : CreateOrderApiRequest()
@@ -88,7 +89,7 @@ sealed class CreateOrderApiRequest {
         val secondMarketId: MarketId,
         override val side: OrderSide,
         override val amount: OrderAmount,
-        override val signature: EvmSignature,
+        override val signature: Signature,
         override val verifyingChainId: ChainId,
         override val clientOrderId: ClientOrderId? = null,
     ) : CreateOrderApiRequest()
@@ -101,7 +102,7 @@ sealed class CreateOrderApiRequest {
         override val side: OrderSide,
         override val amount: OrderAmount,
         val price: BigDecimalJson,
-        override val signature: EvmSignature,
+        override val signature: Signature,
         override val verifyingChainId: ChainId,
         override val clientOrderId: ClientOrderId? = null,
     ) : CreateOrderApiRequest()
