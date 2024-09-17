@@ -41,11 +41,9 @@ export async function loadAuthToken(
   options: LoadAuthTokenOptions = { forceRefresh: false }
 ): Promise<string> {
   const primaryWallet = getGlobalPrimaryWallet()
-  // console.log(primaryWallet)
 
   if (primaryWallet) {
     const existingToken = localStorage.getItem(`did-${primaryWallet.address}`)
-    // console.log(!!existingToken)
     if (existingToken && !options.forceRefresh) return existingToken
 
     if (!signingPromise) {
@@ -158,15 +156,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthenticated(primaryAuthTokenExists())
     }
   }, [wallets.connected])
-
-  // useEffect(() => {
-  //   // console.log(wallets.primary)
-  //   if (wallets.primary) {
-  //     // trigger auth-token signing in case
-  //     // we don't have a token for new primary wallet yet
-  //     loadAuthToken()
-  //   }
-  // }, [wallets.primary])
 
   useEffect(() => {
     Auth.subscribe(handleAuthEvent)
