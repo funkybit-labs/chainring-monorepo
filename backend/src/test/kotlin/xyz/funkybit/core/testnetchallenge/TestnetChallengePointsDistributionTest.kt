@@ -370,7 +370,7 @@ class TestnetChallengePointsDistributionTest : TestWithDb() {
                     TestnetChallengeUserRewardType.DailyReward -> TestnetChallengePNLType.DailyPNL
                     TestnetChallengeUserRewardType.WeeklyReward -> TestnetChallengePNLType.WeeklyPNL
                     TestnetChallengeUserRewardType.OverallReward -> TestnetChallengePNLType.OverallPNL
-                    TestnetChallengeUserRewardType.ReferralBonus -> throw IllegalArgumentException()
+                    else -> throw IllegalArgumentException()
                 },
             )
         }

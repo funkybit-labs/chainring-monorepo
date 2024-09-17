@@ -31,6 +31,7 @@ import xyz.funkybit.core.model.db.TestnetChallengeUserRewardId
 import xyz.funkybit.core.model.db.TestnetChallengeUserRewardTable
 import xyz.funkybit.core.model.db.TestnetChallengeUserRewardType
 import xyz.funkybit.core.model.db.UserEntity
+import xyz.funkybit.core.model.db.WithdrawalStatus
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import xyz.funkybit.integrationtests.api.asBitcoinAddress
 import xyz.funkybit.integrationtests.api.asEcKeyPair
@@ -43,6 +44,7 @@ import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
 import xyz.funkybit.integrationtests.utils.TestApiClient
 import xyz.funkybit.integrationtests.utils.Wallet
+import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyLimitOrderCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.signAuthorizeBitcoinWalletRequest
 import java.math.BigDecimal
@@ -158,12 +160,17 @@ class TestnetChallengeTest : OrderBaseTest() {
 
         // cards
         var cards = trader.a.getCards()
-        assertEquals(3, cards.size)
+        assertEquals(4, cards.size)
         assertEquals(
             setOf(
                 Card.Enrolled,
                 Card.BitcoinConnect,
                 Card.EvmWithdrawal,
+                Card.RecentPoints(
+                    points = 100L,
+                    pointType = TestnetChallengeUserRewardType.EvmWalletConnected,
+                    category = null,
+                ),
             ),
             cards.toSet(),
         )
@@ -174,11 +181,16 @@ class TestnetChallengeTest : OrderBaseTest() {
             assertMyLimitOrderCreatedMessageReceived(response)
         }
         cards = trader.a.getCards()
-        assertEquals(2, cards.size)
+        assertEquals(3, cards.size)
         assertEquals(
             setOf(
                 Card.BitcoinConnect,
                 Card.EvmWithdrawal,
+                Card.RecentPoints(
+                    points = 100L,
+                    pointType = TestnetChallengeUserRewardType.EvmWalletConnected,
+                    category = null,
+                ),
             ),
             cards.toSet(),
         )
@@ -194,25 +206,86 @@ class TestnetChallengeTest : OrderBaseTest() {
             ),
         )
         cards = trader.a.getCards()
-        assertEquals(2, cards.size)
+        assertEquals(4, cards.size)
         assertEquals(
             setOf(
                 Card.BitcoinWithdrawal,
                 Card.EvmWithdrawal,
+                Card.RecentPoints(
+                    points = 100L,
+                    pointType = TestnetChallengeUserRewardType.EvmWalletConnected,
+                    category = null,
+                ),
+                Card.RecentPoints(
+                    points = 500L,
+                    pointType = TestnetChallengeUserRewardType.BitcoinWalletConnected,
+                    category = null,
+                ),
             ),
             cards.toSet(),
         )
 
-        // perform an evm withdrawal, they shouldn't get the EvmWithdrawal card
-        val usdcWithdrawalAmount = AssetAmount(usdc, "0.001")
+        // perform an evm withdrawal (greater that withdrawal fee), they shouldn't get the EvmWithdrawal card
+        val usdcWithdrawalAmount = AssetAmount(usdc, "10.0001")
 
-        trader.a.createWithdrawal(trader.w.signWithdraw(btc.name, usdcWithdrawalAmount.inFundamentalUnits))
+        trader.a.createWithdrawal(trader.w.signWithdraw(usdc.name, usdcWithdrawalAmount.inFundamentalUnits))
 
         cards = trader.a.getCards()
-        assertEquals(1, cards.size)
+        assertEquals(3, cards.size)
         assertEquals(
             setOf(
                 Card.BitcoinWithdrawal,
+                Card.RecentPoints(
+                    points = 100L,
+                    pointType = TestnetChallengeUserRewardType.EvmWalletConnected,
+                    category = null,
+                ),
+                Card.RecentPoints(
+                    points = 500L,
+                    pointType = TestnetChallengeUserRewardType.BitcoinWalletConnected,
+                    category = null,
+                ),
+            ),
+            cards.toSet(),
+        )
+        trader.ws.apply {
+            assertBalancesMessageReceived()
+        }
+
+        // await for withdrawal to be completed and also trigger deposit to earn 'EvmWithdrawalDeposit' award
+        await.pollInSameThread().atMost(
+            Duration.ofSeconds(10),
+        ).pollInterval(
+            Duration.ofMillis(500),
+        ).pollDelay(
+            Duration.ofMillis(50),
+        ).until {
+            trader.w.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+            trader.a.listWithdrawals().withdrawals.first().status == WithdrawalStatus.Complete
+        }
+        val usdcDepositAmount = AssetAmount(usdc, "10")
+        trader.w.depositAndMine(usdcDepositAmount)
+
+        cards = trader.a.getCards()
+        assertEquals(4, cards.size)
+        assertEquals(
+            setOf(
+                Card.BitcoinWithdrawal,
+                Card.RecentPoints(
+                    points = 100L,
+                    pointType = TestnetChallengeUserRewardType.EvmWalletConnected,
+                    category = null,
+                ),
+                Card.RecentPoints(
+                    points = 500L,
+                    pointType = TestnetChallengeUserRewardType.BitcoinWalletConnected,
+                    category = null,
+                ),
+                Card.RecentPoints(
+                    points = 250L,
+                    pointType = TestnetChallengeUserRewardType.EvmWithdrawalDeposit,
+                    category = null,
+                ),
             ),
             cards.toSet(),
         )
@@ -234,7 +307,8 @@ class TestnetChallengeTest : OrderBaseTest() {
     fun `test points distribution - daily`() {
         val apiClient = enrollInTestnetChallenge()
 
-        assertEquals(BigDecimal.ZERO, apiClient.a.getAccountConfiguration().pointsBalance)
+        // evm wallet connected
+        assertEquals(100.toBigDecimal(), apiClient.a.getAccountConfiguration().pointsBalance.setScale(0))
 
         // same day
         simulateTimeAndLastUpdate(
@@ -242,7 +316,7 @@ class TestnetChallengeTest : OrderBaseTest() {
             lastUpdate = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 7, hour = 23, minute = 30),
         )
         triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_leaderboard")
-        assertEquals(BigDecimal.ZERO, apiClient.a.getAccountConfiguration().pointsBalance)
+        assertEquals(100.toBigDecimal(), apiClient.a.getAccountConfiguration().pointsBalance.setScale(0))
 
         // day boundary crossed
         simulateTimeAndLastUpdate(
@@ -254,13 +328,15 @@ class TestnetChallengeTest : OrderBaseTest() {
         triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_leaderboard")
 
         // daily, 1st place
-        assertEquals(BigDecimal("12500"), apiClient.a.getAccountConfiguration().pointsBalance.setScale(0))
+        assertEquals((100 + 12500).toBigDecimal(), apiClient.a.getAccountConfiguration().pointsBalance.setScale(0))
     }
 
     @Test
     fun `test points distribution - weekly`() {
         val apiClient = enrollInTestnetChallenge()
-        assertEquals(BigDecimal.ZERO, apiClient.a.getAccountConfiguration().pointsBalance)
+
+        // evm wallet connected
+        assertEquals(100.toBigDecimal(), apiClient.a.getAccountConfiguration().pointsBalance.setScale(0))
 
         // same day
         simulateTimeAndLastUpdate(
@@ -268,7 +344,7 @@ class TestnetChallengeTest : OrderBaseTest() {
             lastUpdate = LocalDateTime(year = 2024, monthNumber = 9, dayOfMonth = 8, hour = 22, minute = 30),
         )
         triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_leaderboard")
-        assertEquals(BigDecimal.ZERO, apiClient.a.getAccountConfiguration().pointsBalance)
+        assertEquals(100.toBigDecimal(), apiClient.a.getAccountConfiguration().pointsBalance.setScale(0))
 
         // day + week boundaries crossed
         simulateTimeAndLastUpdate(
@@ -279,9 +355,9 @@ class TestnetChallengeTest : OrderBaseTest() {
         )
         triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_leaderboard")
 
-        // daily + weekly, 1st place
+        // evm wallet connected + daily + weekly, 1st place
         assertEquals(
-            expected = BigDecimal("12500") + BigDecimal("50000"),
+            expected = BigDecimal("100") + BigDecimal("12500") + BigDecimal("50000"),
             actual = apiClient.a.getAccountConfiguration().pointsBalance.setScale(0),
         )
     }
@@ -307,7 +383,8 @@ class TestnetChallengeTest : OrderBaseTest() {
         val trader3111 = enrollInTestnetChallenge(trader311.a.getAccountConfiguration().inviteCode)
 
         listOf(trader1, trader11, trader12, trader121, trader2, trader21, trader3).forEach {
-            assertEquals(BigDecimal.ZERO, it.a.getAccountConfiguration().pointsBalance)
+            // only evm wallet connected reward
+            assertEquals(100.toBigDecimal(), it.a.getAccountConfiguration().pointsBalance.setScale(0))
         }
 
         // setup points
@@ -321,46 +398,46 @@ class TestnetChallengeTest : OrderBaseTest() {
             grantDailyPoints(trader3, 500)
             grantDailyPoints(trader3111, 100)
         }
-        assertEquals(0, 0.toBigDecimal().compareTo(trader1.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 100.toBigDecimal().compareTo(trader11.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 1000.toBigDecimal().compareTo(trader12.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 100.toBigDecimal().compareTo(trader121.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 500.toBigDecimal().compareTo(trader2.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 500.toBigDecimal().compareTo(trader21.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 500.toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 500.toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 0.toBigDecimal().compareTo(trader31.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 0.toBigDecimal().compareTo(trader311.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 100.toBigDecimal().compareTo(trader3111.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 0).toBigDecimal().compareTo(trader1.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 100).toBigDecimal().compareTo(trader11.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 1000).toBigDecimal().compareTo(trader12.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 100).toBigDecimal().compareTo(trader121.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 500).toBigDecimal().compareTo(trader2.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 500).toBigDecimal().compareTo(trader21.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 500).toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 500).toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 0).toBigDecimal().compareTo(trader31.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 0).toBigDecimal().compareTo(trader311.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 100).toBigDecimal().compareTo(trader3111.a.getAccountConfiguration().pointsBalance))
 
         triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_referral_points")
 
-        assertEquals(0, (10 + 100 + 1).toBigDecimal().compareTo(trader1.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 100.toBigDecimal().compareTo(trader11.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, (1000 + 10).toBigDecimal().compareTo(trader12.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 100.toBigDecimal().compareTo(trader121.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, (500 + 50).toBigDecimal().compareTo(trader2.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 500.toBigDecimal().compareTo(trader21.a.getAccountConfiguration().pointsBalance))
-
-        assertEquals(0, (500 + 0).toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 1.toBigDecimal().compareTo(trader31.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 10.toBigDecimal().compareTo(trader311.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 100.toBigDecimal().compareTo(trader3111.a.getAccountConfiguration().pointsBalance))
+        // evm wallet connected reward is also calculated into referral points
+        assertEquals(0, (121 + 10 + 100 + 1).toBigDecimal().compareTo(trader1.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 100).toBigDecimal().compareTo(trader11.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (110 + 1000 + 10).toBigDecimal().compareTo(trader12.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 100).toBigDecimal().compareTo(trader121.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (110 + 500 + 50).toBigDecimal().compareTo(trader2.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 500).toBigDecimal().compareTo(trader21.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (111 + 500 + 0).toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (111 + 1).toBigDecimal().compareTo(trader31.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (110 + 10).toBigDecimal().compareTo(trader311.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 100).toBigDecimal().compareTo(trader3111.a.getAccountConfiguration().pointsBalance))
 
         // repeated executions have no effect
         triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_referral_points")
         triggerRepeaterTaskAndWaitForCompletion("testnet_challenge_referral_points")
 
-        assertEquals(0, (10 + 100 + 1).toBigDecimal().compareTo(trader1.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 100.toBigDecimal().compareTo(trader11.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, (1000 + 10).toBigDecimal().compareTo(trader12.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 100.toBigDecimal().compareTo(trader121.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, (500 + 50).toBigDecimal().compareTo(trader2.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 500.toBigDecimal().compareTo(trader21.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, (500 + 0).toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 1.toBigDecimal().compareTo(trader31.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 10.toBigDecimal().compareTo(trader311.a.getAccountConfiguration().pointsBalance))
-        assertEquals(0, 100.toBigDecimal().compareTo(trader3111.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (121 + 10 + 100 + 1).toBigDecimal().compareTo(trader1.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 100).toBigDecimal().compareTo(trader11.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (110 + 1000 + 10).toBigDecimal().compareTo(trader12.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 100).toBigDecimal().compareTo(trader121.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (110 + 500 + 50).toBigDecimal().compareTo(trader2.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 500).toBigDecimal().compareTo(trader21.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (111 + 500 + 0).toBigDecimal().compareTo(trader3.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (111 + 1).toBigDecimal().compareTo(trader31.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (110 + 10).toBigDecimal().compareTo(trader311.a.getAccountConfiguration().pointsBalance))
+        assertEquals(0, (100 + 100).toBigDecimal().compareTo(trader3111.a.getAccountConfiguration().pointsBalance))
     }
 
     private fun grantDailyPoints(trader1: Trader, points: Int) = TestnetChallengeUserRewardTable.insertIgnore {
