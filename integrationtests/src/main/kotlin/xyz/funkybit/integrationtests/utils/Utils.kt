@@ -48,6 +48,11 @@ data class AssetAmount(
     operator fun times(other: BigDecimal): AssetAmount {
         return AssetAmount(symbol, (amount * other).setScale(symbol.decimals.toInt(), RoundingMode.FLOOR))
     }
+
+    operator fun div(other: BigDecimal) = AssetAmount(
+        symbol,
+        (amount / other).setScale(symbol.decimals.toInt(), RoundingMode.FLOOR),
+    )
 }
 
 fun Iterable<AssetAmount>.sum(): AssetAmount = reduce { acc, next -> acc + next }

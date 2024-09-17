@@ -168,7 +168,7 @@ data class MarketTradesCreated(
         constructor(takerOrderExecution: OrderExecutionEntity) :
             this(
                 takerOrderExecution.tradeGuid.value,
-                takerOrderExecution.order.side,
+                takerOrderExecution.side,
                 takerOrderExecution.trade.amount,
                 takerOrderExecution.trade.price,
                 takerOrderExecution.timestamp,

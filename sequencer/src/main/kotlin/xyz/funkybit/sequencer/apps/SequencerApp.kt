@@ -6,25 +6,33 @@ import net.openhft.chronicle.queue.TailerDirection
 import net.openhft.chronicle.queue.TailerState
 import net.openhft.chronicle.queue.impl.RollingChronicleQueue
 import xyz.funkybit.core.model.Symbol
+import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.sequencer.core.AccountGuid
 import xyz.funkybit.sequencer.core.Asset
+import xyz.funkybit.sequencer.core.BaseAmount
 import xyz.funkybit.sequencer.core.Clock
 import xyz.funkybit.sequencer.core.FeeRate
 import xyz.funkybit.sequencer.core.FeeRates
 import xyz.funkybit.sequencer.core.Market
 import xyz.funkybit.sequencer.core.MarketId
+import xyz.funkybit.sequencer.core.QuoteAmount
 import xyz.funkybit.sequencer.core.SequencerState
 import xyz.funkybit.sequencer.core.asBalanceChangesList
 import xyz.funkybit.sequencer.core.notional
+import xyz.funkybit.sequencer.core.notionalFee
 import xyz.funkybit.sequencer.core.notionalPlusFee
+import xyz.funkybit.sequencer.core.sumBaseAmounts
 import xyz.funkybit.sequencer.core.sumBigIntegers
+import xyz.funkybit.sequencer.core.sumQuoteAmounts
 import xyz.funkybit.sequencer.core.toAccountGuid
 import xyz.funkybit.sequencer.core.toAsset
+import xyz.funkybit.sequencer.core.toBaseAmount
 import xyz.funkybit.sequencer.core.toBigDecimal
 import xyz.funkybit.sequencer.core.toBigInteger
 import xyz.funkybit.sequencer.core.toDecimalValue
 import xyz.funkybit.sequencer.core.toIntegerValue
 import xyz.funkybit.sequencer.core.toOrderGuid
+import xyz.funkybit.sequencer.core.toQuoteAmount
 import xyz.funkybit.sequencer.proto.BackToBackOrder
 import xyz.funkybit.sequencer.proto.LimitsUpdate
 import xyz.funkybit.sequencer.proto.Order
@@ -89,7 +97,7 @@ class SequencerApp(
                             maxOrdersPerLevel = market.maxOrdersPerLevel,
                             baseDecimals = market.baseDecimals,
                             quoteDecimals = market.quoteDecimals,
-                            minFee = if (market.hasMinFee()) market.minFee.toBigInteger() else BigInteger.ZERO,
+                            minFee = if (market.hasMinFee()) market.minFee.toQuoteAmount() else QuoteAmount.ZERO,
                         ),
                     )
                 }
@@ -167,7 +175,7 @@ class SequencerApp(
                     error = SequencerError.InvalidMarketMinFee
                 } else {
                     marketMinFees.forEach {
-                        state.markets[MarketId(it.marketId)]?.minFee = it.minFee.toBigInteger()
+                        state.markets[MarketId(it.marketId)]?.minFee = it.minFee.toQuoteAmount()
                     }
                 }
 
@@ -200,14 +208,15 @@ class SequencerApp(
                     when {
                         firstMarket == null -> SequencerError.UnknownMarket
                         secondMarket == null -> SequencerError.UnknownMarket
-                        firstMarketId.quoteAsset() != secondMarketId.baseAsset() -> SequencerError.InvalidBackToBackOrder
-                        firstMarketId.baseAsset() == secondMarketId.quoteAsset() -> SequencerError.InvalidBackToBackOrder
+                        setOf(firstMarketId.baseAsset(), firstMarketId.quoteAsset(), secondMarketId.baseAsset(), secondMarketId.quoteAsset()).size != 3 -> SequencerError.InvalidBackToBackOrder
                         else -> {
-                            when (order.type) {
-                                Order.Type.MarketSell -> handleBackToBackSellOrder(
+                            when (Pair(order.type, firstMarketId.quoteAsset() == secondMarketId.baseAsset() || firstMarketId.baseAsset() == secondMarketId.quoteAsset())) {
+                                Order.Type.MarketSell to true -> handleBackToBackOrder(
                                     request.backToBackOrder,
                                     firstMarket,
                                     secondMarket,
+                                    OrderSide.Sell,
+                                    OrderSide.Sell,
                                     ordersChanged,
                                     trades,
                                     balanceChanges,
@@ -215,10 +224,12 @@ class SequencerApp(
                                     accountsWithLimitChanges,
                                 )
 
-                                Order.Type.MarketBuy -> handleBackToBackBuyOrder(
+                                Order.Type.MarketBuy to true -> handleBackToBackOrder(
                                     request.backToBackOrder,
                                     firstMarket,
                                     secondMarket,
+                                    OrderSide.Buy,
+                                    OrderSide.Buy,
                                     ordersChanged,
                                     trades,
                                     balanceChanges,
@@ -226,6 +237,31 @@ class SequencerApp(
                                     accountsWithLimitChanges,
                                 )
 
+                                Order.Type.MarketSell to false -> handleBackToBackOrder(
+                                    request.backToBackOrder,
+                                    firstMarket,
+                                    secondMarket,
+                                    OrderSide.Sell,
+                                    OrderSide.Buy,
+                                    ordersChanged,
+                                    trades,
+                                    balanceChanges,
+                                    accountsAndAssetsWithBalanceChanges,
+                                    accountsWithLimitChanges,
+                                )
+
+                                Order.Type.MarketBuy to false -> handleBackToBackOrder(
+                                    request.backToBackOrder,
+                                    firstMarket,
+                                    secondMarket,
+                                    OrderSide.Buy,
+                                    OrderSide.Sell,
+                                    ordersChanged,
+                                    trades,
+                                    balanceChanges,
+                                    accountsAndAssetsWithBalanceChanges,
+                                    accountsWithLimitChanges,
+                                )
                                 else -> SequencerError.InvalidBackToBackOrder
                             }
                         }
@@ -338,29 +374,29 @@ class SequencerApp(
                     state.markets[marketId]?.let { market ->
                         val baseAsset = market.id.baseAsset()
                         val quoteAsset = market.id.quoteAsset()
-                        val baseAmount = failedSettlement.trade.amount.toBigInteger()
+                        val baseAmount = failedSettlement.trade.amount.toBaseAmount()
                         val price = market.price(failedSettlement.trade.levelIx)
                         val notional = notional(baseAmount, price, market.baseDecimals, market.quoteDecimals)
 
                         val sellAccount = failedSettlement.sellAccount.toAccountGuid()
                         val sellerBaseRefund = baseAmount
-                        val sellerQuoteRefund = (notional - failedSettlement.trade.sellerFee.toBigInteger()).negate()
+                        val sellerQuoteRefund = (notional - failedSettlement.trade.sellerFee.toQuoteAmount()).negate()
 
                         val buyAccount = failedSettlement.buyAccount.toAccountGuid()
                         val buyerBaseRefund = baseAmount.negate()
-                        val buyerQuoteRefund = notional + failedSettlement.trade.buyerFee.toBigInteger()
+                        val buyerQuoteRefund = notional + failedSettlement.trade.buyerFee.toQuoteAmount()
 
-                        state.balances.getOrPut(sellAccount) { mutableMapOf() }.merge(baseAsset, sellerBaseRefund, ::sumBigIntegers)
-                        balancesChanged.merge(Pair(sellAccount, baseAsset), sellerBaseRefund, ::sumBigIntegers)
+                        state.balances.getOrPut(sellAccount) { mutableMapOf() }.merge(baseAsset, sellerBaseRefund.toBigInteger(), ::sumBigIntegers)
+                        balancesChanged.merge(Pair(sellAccount, baseAsset), sellerBaseRefund.toBigInteger(), ::sumBigIntegers)
 
-                        state.balances.getOrPut(sellAccount) { mutableMapOf() }.merge(quoteAsset, sellerQuoteRefund, ::sumBigIntegers)
-                        balancesChanged.merge(Pair(sellAccount, quoteAsset), sellerQuoteRefund, ::sumBigIntegers)
+                        state.balances.getOrPut(sellAccount) { mutableMapOf() }.merge(quoteAsset, sellerQuoteRefund.toBigInteger(), ::sumBigIntegers)
+                        balancesChanged.merge(Pair(sellAccount, quoteAsset), sellerQuoteRefund.toBigInteger(), ::sumBigIntegers)
 
-                        state.balances.getOrPut(buyAccount) { mutableMapOf() }.merge(baseAsset, buyerBaseRefund, ::sumBigIntegers)
-                        balancesChanged.merge(Pair(buyAccount, baseAsset), buyerBaseRefund, ::sumBigIntegers)
+                        state.balances.getOrPut(buyAccount) { mutableMapOf() }.merge(baseAsset, buyerBaseRefund.toBigInteger(), ::sumBigIntegers)
+                        balancesChanged.merge(Pair(buyAccount, baseAsset), buyerBaseRefund.toBigInteger(), ::sumBigIntegers)
 
-                        state.balances.getOrPut(buyAccount) { mutableMapOf() }.merge(quoteAsset, buyerQuoteRefund, ::sumBigIntegers)
-                        balancesChanged.merge(Pair(buyAccount, quoteAsset), buyerQuoteRefund, ::sumBigIntegers)
+                        state.balances.getOrPut(buyAccount) { mutableMapOf() }.merge(quoteAsset, buyerQuoteRefund.toBigInteger(), ::sumBigIntegers)
+                        balancesChanged.merge(Pair(buyAccount, quoteAsset), buyerQuoteRefund.toBigInteger(), ::sumBigIntegers)
                     }
                 }
 
@@ -508,10 +544,12 @@ class SequencerApp(
             }
             .sortedWith(compareBy(LimitsUpdate::getAccount, LimitsUpdate::getMarketId))
 
-    private fun handleBackToBackSellOrder(
+    private fun handleBackToBackOrder(
         request: BackToBackOrder,
         firstMarket: Market,
         secondMarket: Market,
+        firstSide: OrderSide,
+        secondSide: OrderSide,
         ordersChanged: MutableList<OrderChanged>,
         trades: MutableList<TradeCreated>,
         balanceChanges: MutableMap<Pair<AccountGuid, Asset>, BigInteger>,
@@ -520,26 +558,105 @@ class SequencerApp(
     ): SequencerError {
         val account = request.account.toAccountGuid()
         val order = request.order
-        val startingAmount = if (order.hasPercentage() && order.percentage > 0) {
-            calculateAmountForPercentageSell(
-                firstMarket,
-                account,
-                order.percentage,
-            )
+        // compute absolute base order amount if specified in percentage
+        val (startingAmount, maxAvailable) = if (order.hasPercentage() && order.percentage > 0) {
+            when (firstSide) {
+                OrderSide.Sell -> Pair(
+                    calculateAmountForPercentageSell(
+                        firstMarket,
+                        account,
+                        order.percentage,
+                    ),
+                    null,
+                )
+                OrderSide.Buy -> {
+                    val (amount, maxAvailable) = calculateAmountForPercentageBuy(
+                        firstMarket,
+                        account,
+                        order.percentage,
+                    )
+                    Pair(amount, maxAvailable)
+                }
+            }
         } else {
-            order.amount.toBigInteger()
+            Pair(order.amount.toBaseAmount(), null)
         }
 
-        val (quantity, bridgeAssetReceived) = firstMarket.quantityAndNotionalForMarketSell(startingAmount)
-        val bridgeAssetAvailable = secondMarket.clearingQuantityForMarketSell(bridgeAssetReceived)
-        if (quantity == BigInteger.ZERO || bridgeAssetAvailable == BigInteger.ZERO) {
+        // now see how much of bridge asset we expect to end up with after first leg
+        val (firstLegBase, firstLegQuote) = when (firstSide) {
+            OrderSide.Sell -> firstMarket.quantityAndNotionalForMarketSell(startingAmount, FeeRate(0))
+            OrderSide.Buy -> firstMarket.quantityAndNotionalForMarketBuy(startingAmount)
+        }
+        // find out how much is available in the second market
+        val bridgeAssetAvailable = when (secondSide) {
+            OrderSide.Sell -> secondMarket.clearingQuantityForMarketSell(
+                when (firstSide) {
+                    OrderSide.Sell -> firstLegQuote.toBaseAmount()
+                    OrderSide.Buy -> firstLegBase
+                },
+            )
+
+            OrderSide.Buy -> secondMarket.quantityAndNotionalForMarketBuy(
+                secondMarket.quantityForMarketBuy(
+                    when (firstSide) {
+                        OrderSide.Sell -> firstLegQuote
+                        OrderSide.Buy -> firstLegBase.toQuoteAmount()
+                    },
+                ),
+            ).second.toBaseAmount()
+        }
+        if (firstLegBase == BaseAmount.ZERO || bridgeAssetAvailable == BaseAmount.ZERO) {
             return SequencerError.InvalidBackToBackOrder
         }
-        val (quantityForFirstOrder, quantityForSecondOrder) = if (bridgeAssetReceived != bridgeAssetAvailable) {
-            val newQuantity = firstMarket.quantityForMarketSell(bridgeAssetAvailable)
-            firstMarket.quantityAndNotionalForMarketSell(newQuantity)
+        val (quantityForFirstOrder, quantityForSecondOrder) = if (when (firstSide) {
+                OrderSide.Sell -> firstLegQuote > bridgeAssetAvailable.toQuoteAmount()
+                OrderSide.Buy -> firstLegBase > bridgeAssetAvailable
+            }
+        ) {
+            when (firstSide) {
+                OrderSide.Sell ->
+                    when (secondSide) {
+                        OrderSide.Sell -> firstMarket.quantityAndNotionalForMarketSell(bridgeAssetAvailable, FeeRate.zero).let { (firstLegBase, firstLegQuote) ->
+                            // if we cannot get it all done in the second market, need to reduce further
+                            secondMarket.quantityAndNotionalForMarketSell(firstLegQuote.toBaseAmount(), state.feeRates.maker).let {
+                                if (it.first < firstLegQuote.toBaseAmount()) {
+                                    val adjustedFirstLegBase = (firstLegBase.toBigDecimal() * (it.first.toBigDecimal().setScale(18) / firstLegQuote.toBigDecimal())).toBigInteger().toBaseAmount()
+                                    adjustedFirstLegBase to firstMarket.quantityAndNotionalForMarketSell(adjustedFirstLegBase, FeeRate.zero).second.toBaseAmount()
+                                } else {
+                                    firstLegBase to firstLegQuote.toBaseAmount()
+                                }
+                            }
+                        }
+                        OrderSide.Buy -> firstMarket.quantityAndNotionalForMarketSell(bridgeAssetAvailable, FeeRate(0)).let {
+                            it.first to secondMarket.quantityForMarketBuy(it.second - notionalFee(it.second, state.feeRates.taker))
+                        }
+                    }
+
+                OrderSide.Buy ->
+                    when (secondSide) {
+                        OrderSide.Buy ->
+                            Pair(
+                                bridgeAssetAvailable,
+                                secondMarket.quantityForMarketBuy(bridgeAssetAvailable.toQuoteAmount() - notionalFee(bridgeAssetAvailable.toQuoteAmount(), state.feeRates.taker)),
+                            )
+                        OrderSide.Sell ->
+                            Pair(
+                                bridgeAssetAvailable,
+                                secondMarket.quantityAndNotionalForMarketSell(bridgeAssetAvailable, state.feeRates.maker).first,
+                            )
+                    }
+            }
         } else {
-            Pair(quantity, bridgeAssetReceived)
+            Pair(
+                firstLegBase,
+                when (secondSide) {
+                    OrderSide.Sell -> when (firstSide) {
+                        OrderSide.Sell -> firstLegQuote.toBaseAmount()
+                        OrderSide.Buy -> firstLegBase
+                    }
+                    OrderSide.Buy -> secondMarket.quantityForMarketBuy(firstLegQuote - notionalFee(firstLegQuote, state.feeRates.taker))
+                },
+            )
         }
 
         val firstOrderBatch = orderBatch {
@@ -550,23 +667,32 @@ class SequencerApp(
             this.ordersToAdd.add(
                 order {
                     this.guid = order.guid
-                    this.type = order.type
+                    this.type = when (firstSide) {
+                        OrderSide.Sell -> Order.Type.MarketSell
+                        OrderSide.Buy -> Order.Type.MarketBuy
+                    }
                     this.amount = quantityForFirstOrder.toIntegerValue()
                     if (order.hasPercentage()) {
                         this.percentage = percentage
                     }
+                    maxAvailable?.let { this.maxAvailable = it.toIntegerValue() }
                 },
             )
         }
 
-        checkLimits(firstMarket, firstOrderBatch)?.let {
-            return it
+        if (firstSide === OrderSide.Buy) {
+            checkLimits(firstMarket, firstOrderBatch)?.let {
+                return it
+            }
         }
 
         // make sure 2nd leg meets min fee requirement.
         val secondOrder = order {
             this.guid = order.guid
-            this.type = order.type
+            this.type = when (secondSide) {
+                OrderSide.Sell -> Order.Type.MarketSell
+                OrderSide.Buy -> Order.Type.MarketBuy
+            }
             this.amount = quantityForSecondOrder.toIntegerValue()
         }
         if (secondMarket.isBelowMinFee(secondOrder, state.feeRates)) {
@@ -617,123 +743,6 @@ class SequencerApp(
                 orderChanged {
                     this.guid = order.guid
                     this.disposition = if (quantityForFirstOrder != startingAmount) OrderDisposition.PartiallyFilled else OrderDisposition.Filled
-                    if (order.hasPercentage()) {
-                        this.newQuantity = startingAmount.toIntegerValue()
-                    }
-                },
-            )
-            trades.addAll(secondOrderResult.createdTrades)
-        } else {
-            ordersChanged.addAll(firstOrderResult.ordersChanged)
-        }
-        return SequencerError.None
-    }
-
-    private fun handleBackToBackBuyOrder(
-        request: BackToBackOrder,
-        firstMarket: Market,
-        secondMarket: Market,
-        ordersChanged: MutableList<OrderChanged>,
-        trades: MutableList<TradeCreated>,
-        balanceChanges: MutableMap<Pair<AccountGuid, Asset>, BigInteger>,
-        accountsAndAssetsWithBalanceChanges: MutableSet<Pair<AccountGuid, Asset>>,
-        accountsWithLimitChanges: MutableSet<Pair<AccountGuid, MarketId>>,
-    ): SequencerError {
-        val account = request.account.toAccountGuid()
-        val order = request.order
-
-        val (startingAmount, maxAvailable) = if (order.hasPercentage() && order.percentage > 0) {
-            val (amount, maxAvailable) = calculateAmountForPercentageBuy(
-                secondMarket,
-                account,
-                order.percentage,
-            )
-            Pair(firstMarket.quantityForMarketBuy(amount), maxAvailable)
-        } else {
-            Pair(order.amount.toBigInteger(), null)
-        }
-
-        // determine how much of the bridge asset we need to buy the base asset
-        val (quantity, bridgeAssetNeeded) = firstMarket.quantityAndNotionalForMarketBuy(startingAmount)
-        // now see how much of the bridge asset is available in the 2nd market
-        val (_, bridgeAssetAvailable) = secondMarket.clearingPriceAndQuantityForMarketBuy(
-            bridgeAssetNeeded,
-        )
-        if (quantity == BigInteger.ZERO || bridgeAssetAvailable == BigInteger.ZERO) {
-            return SequencerError.InvalidBackToBackOrder
-        }
-        // if there is less available then we need, then adjust the quantity of 2nd order to fit
-        val quantityForSecondOrder = if (bridgeAssetAvailable < bridgeAssetNeeded) {
-            firstMarket.quantityForMarketBuy(bridgeAssetAvailable)
-        } else {
-            quantity
-        }
-
-        val firstOrderBatch = orderBatch {
-            this.guid = request.guid
-            this.account = account.value
-            this.wallet = request.wallet
-            this.marketId = secondMarket.id.value
-            this.ordersToAdd.add(
-                order {
-                    this.guid = order.guid
-                    this.type = order.type
-                    this.amount = bridgeAssetAvailable.toIntegerValue()
-                    if (order.hasPercentage()) {
-                        this.percentage = order.percentage
-                    }
-                    maxAvailable?.let { this.maxAvailable = it.toIntegerValue() }
-                },
-            )
-        }
-
-        checkLimits(secondMarket, firstOrderBatch)?.let {
-            return it
-        }
-
-        val firstOrderResult =
-            secondMarket.applyOrderBatch(firstOrderBatch, state.feeRates)
-        val disposition = firstOrderResult.ordersChanged.firstOrNull()?.disposition
-        if (disposition == OrderDisposition.Filled || disposition == OrderDisposition.PartiallyFilled) {
-            applyBalanceAndConsumptionChanges(
-                secondMarket.id,
-                firstOrderResult,
-                accountsAndAssetsWithBalanceChanges,
-                balanceChanges,
-                accountsWithLimitChanges,
-            )
-            ordersChanged.addAll(firstOrderResult.ordersChanged.filterNot { it.guid == order.guid })
-            trades.addAll(firstOrderResult.createdTrades)
-
-            val secondOrderResult = firstMarket.applyOrderBatch(
-                orderBatch {
-                    this.guid = request.guid
-                    this.account = account.value
-                    this.wallet = request.wallet
-                    this.marketId = firstMarket.id.value
-                    this.ordersToAdd.add(
-                        order {
-                            this.guid = order.guid
-                            this.type = order.type
-                            this.amount = quantityForSecondOrder.toIntegerValue()
-                        },
-                    )
-                },
-                FeeRates(state.feeRates.maker, FeeRate(0)),
-            )
-            applyBalanceAndConsumptionChanges(
-                firstMarket.id,
-                secondOrderResult,
-                accountsAndAssetsWithBalanceChanges,
-                balanceChanges,
-                accountsWithLimitChanges,
-            )
-            ordersChanged.addAll(secondOrderResult.ordersChanged.filterNot { it.guid == order.guid })
-            ordersChanged.add(
-                orderChanged {
-                    this.guid = order.guid
-                    this.disposition =
-                        if (quantityForSecondOrder != startingAmount) OrderDisposition.PartiallyFilled else OrderDisposition.Filled
                     if (order.hasPercentage()) {
                         this.newQuantity = startingAmount.toIntegerValue()
                     }
@@ -806,24 +815,24 @@ class SequencerApp(
 
     private fun checkLimits(market: Market, orderBatch: OrderBatch): SequencerError? {
         // compute cumulative assets required change from applying all orders in order batch
-        val baseAssetsRequired = mutableMapOf<AccountGuid, BigInteger>()
-        val quoteAssetsRequired = mutableMapOf<AccountGuid, BigInteger>()
+        val baseAssetsRequired = mutableMapOf<AccountGuid, BaseAmount>()
+        val quoteAssetsRequired = mutableMapOf<AccountGuid, QuoteAmount>()
         orderBatch.ordersToAddList.forEach { order ->
             when (order.type) {
                 Order.Type.LimitSell, Order.Type.MarketSell -> {
-                    baseAssetsRequired.merge(orderBatch.account.toAccountGuid(), order.amount.toBigInteger(), ::sumBigIntegers)
+                    baseAssetsRequired.merge(orderBatch.account.toAccountGuid(), order.amount.toBaseAmount(), ::sumBaseAmounts)
                 }
                 Order.Type.LimitBuy -> {
                     val notionalAndFee = calculateLimitBuyOrderNotionalPlusFee(order, market)
-                    quoteAssetsRequired.merge(orderBatch.account.toAccountGuid(), notionalAndFee, ::sumBigIntegers)
+                    quoteAssetsRequired.merge(orderBatch.account.toAccountGuid(), notionalAndFee, ::sumQuoteAmounts)
                 }
                 Order.Type.MarketBuy -> {
                     // the quote assets required for a market buy depends on what the clearing price would be
-                    val (clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger())
+                    val (clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBaseAmount())
                     quoteAssetsRequired.merge(
                         orderBatch.account.toAccountGuid(),
-                        notionalPlusFee(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals, state.feeRates.taker),
-                        ::sumBigIntegers,
+                        notional(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals),
+                        ::sumQuoteAmounts,
                     )
                 }
                 else -> {}
@@ -832,18 +841,18 @@ class SequencerApp(
         orderBatch.ordersToCancelList.forEach { cancelOrder ->
             market.ordersByGuid[cancelOrder.guid.toOrderGuid()]?.let { order ->
                 val (baseAssets, quoteAssets) = market.assetsReservedForOrder(order)
-                if (baseAssets > BigInteger.ZERO) {
-                    baseAssetsRequired.merge(order.account, -baseAssets, ::sumBigIntegers)
+                if (baseAssets > BaseAmount.ZERO) {
+                    baseAssetsRequired.merge(order.account, -baseAssets, ::sumBaseAmounts)
                 }
-                if (quoteAssets > BigInteger.ZERO) {
-                    quoteAssetsRequired.merge(order.account, -quoteAssets, ::sumBigIntegers)
+                if (quoteAssets > QuoteAmount.ZERO) {
+                    quoteAssetsRequired.merge(order.account, -quoteAssets, ::sumQuoteAmounts)
                 }
             }
         }
 
         baseAssetsRequired.forEach { (account, required) ->
             val baseRequired = market.baseAssetsRequired(account)
-            val baseBalance = state.balances[account]?.get(market.id.baseAsset()) ?: BigInteger.ZERO
+            val baseBalance = state.balances[account]?.get(market.id.baseAsset())?.toBaseAmount() ?: BaseAmount.ZERO
             if (required + baseRequired > baseBalance) {
                 logger.debug { "Account $account requires $required + $baseRequired = ${required + baseRequired} but only has $baseBalance" }
                 return SequencerError.ExceedsLimit
@@ -852,7 +861,7 @@ class SequencerApp(
 
         quoteAssetsRequired.forEach { (account, required) ->
             val quoteRequired = market.quoteAssetsRequired(account)
-            val quoteBalance = state.balances[account]?.get(market.id.quoteAsset()) ?: BigInteger.ZERO
+            val quoteBalance = state.balances[account]?.get(market.id.quoteAsset())?.toQuoteAmount() ?: QuoteAmount.ZERO
             if (required + quoteRequired > quoteBalance) {
                 logger.debug { "Account $account requires $required + $quoteRequired = ${required + quoteRequired} but only has $quoteBalance" }
                 return SequencerError.ExceedsLimit
@@ -862,29 +871,29 @@ class SequencerApp(
         return null
     }
 
-    private fun calculateAmountForPercentageSell(market: Market, account: AccountGuid, percent: Int): BigInteger {
+    private fun calculateAmountForPercentageSell(market: Market, account: AccountGuid, percent: Int): BaseAmount {
         return market.calculateAmountForPercentageSell(
             account,
-            state.balances[account]?.get(market.id.baseAsset()) ?: BigInteger.ZERO,
+            state.balances[account]?.get(market.id.baseAsset())?.toBaseAmount() ?: BaseAmount.ZERO,
             percent,
         )
     }
 
-    private fun calculateAmountForPercentageBuy(market: Market, account: AccountGuid, percent: Int): Pair<BigInteger, BigInteger?> {
+    private fun calculateAmountForPercentageBuy(market: Market, account: AccountGuid, percent: Int): Pair<BaseAmount, QuoteAmount?> {
         return market.calculateAmountForPercentageBuy(
             account,
-            state.balances[account]?.get(market.id.quoteAsset()) ?: BigInteger.ZERO,
+            state.balances[account]?.get(market.id.quoteAsset())?.toQuoteAmount() ?: QuoteAmount.ZERO,
             percent,
             state.feeRates.taker.value.toBigInteger(),
         )
     }
 
-    private fun calculateLimitBuyOrderNotionalPlusFee(order: Order, market: Market): BigInteger {
+    private fun calculateLimitBuyOrderNotionalPlusFee(order: Order, market: Market): QuoteAmount {
         val orderPrice = market.price(order.levelIx)
         return if (order.levelIx >= market.bestOfferIx) {
             // limit order crosses the market
-            val (clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBigInteger(), stopAtLevelIx = order.levelIx)
-            val remainingQuantity = order.amount.toBigInteger() - availableQuantity
+            val (clearingPrice, availableQuantity) = market.clearingPriceAndQuantityForMarketBuy(order.amount.toBaseAmount(), stopAtLevelIx = order.levelIx)
+            val remainingQuantity = order.amount.toBaseAmount() - availableQuantity
 
             val marketChunkNotional = notionalPlusFee(availableQuantity, clearingPrice, market.baseDecimals, market.quoteDecimals, state.feeRates.taker)
             val limitChunkNotional = notionalPlusFee(remainingQuantity, orderPrice, market.baseDecimals, market.quoteDecimals, state.feeRates.maker)

@@ -411,6 +411,7 @@ open class SequencerClient {
                                 this.levelIx = levelIx
                                 this.buyerFee = buyerFee.toIntegerValue()
                                 this.sellerFee = sellerFee.toIntegerValue()
+                                // TODO - isSell
                             }
                         },
                     )

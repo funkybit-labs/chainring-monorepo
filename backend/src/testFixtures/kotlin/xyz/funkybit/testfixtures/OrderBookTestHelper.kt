@@ -96,6 +96,7 @@ object OrderBookTestHelper {
                             role = if (order.type == OrderType.Market) ExecutionRole.Taker else ExecutionRole.Maker,
                             feeAmount = BigInteger.ZERO,
                             feeSymbol = Symbol(order.market.quoteSymbol.name),
+                            side = order.side,
                         )
                     }
 
