@@ -95,3 +95,11 @@ export function base64urlEncode(input: Uint8Array): string {
     .replace(/\//g, '_')
     .replace(/=/g, '')
 }
+
+export function minBigInt(a: bigint, b: bigint): bigint {
+  if (a <= b) {
+    return a
+  } else {
+    return b
+  }
+}

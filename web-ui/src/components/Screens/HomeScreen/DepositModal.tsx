@@ -20,11 +20,13 @@ import { encodeFunctionData, EncodeFunctionDataParameters } from 'viem'
 import { isErrorFromAlias } from '@zodios/core'
 import TradingSymbol from 'tradingSymbol'
 import { ExpandableValue } from 'components/common/ExpandableValue'
+import { minBigInt } from 'utils'
 
 export default function DepositModal({
   exchangeContractAddress,
   walletAddress,
   symbol,
+  testnetChallengeDepositLimit,
   isOpen,
   close,
   onClosed,
@@ -35,6 +37,7 @@ export default function DepositModal({
   exchangeContractAddress: string
   walletAddress: string
   symbol: TradingSymbol
+  testnetChallengeDepositLimit?: bigint
   isOpen: boolean
   close: () => void
   onClosed: () => void
@@ -162,7 +165,10 @@ export default function DepositModal({
 
     try {
       if (walletBalanceQuery.status == 'success') {
-        const availableAmount = walletBalanceQuery.data
+        const availableAmount =
+          testnetChallengeDepositLimit !== undefined
+            ? minBigInt(testnetChallengeDepositLimit, walletBalanceQuery.data)
+            : walletBalanceQuery.data
         return amount > 0 && amount <= availableAmount
       } else {
         return false
@@ -170,7 +176,7 @@ export default function DepositModal({
     } catch {
       return false
     }
-  }, [submitPhase, walletBalanceQuery, amount])
+  }, [submitPhase, walletBalanceQuery, amount, testnetChallengeDepositLimit])
 
   return (
     <Modal

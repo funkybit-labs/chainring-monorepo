@@ -13,8 +13,10 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.apps.api.FaucetMode
@@ -31,6 +33,7 @@ import xyz.funkybit.core.model.db.TestnetChallengeUserRewardId
 import xyz.funkybit.core.model.db.TestnetChallengeUserRewardTable
 import xyz.funkybit.core.model.db.TestnetChallengeUserRewardType
 import xyz.funkybit.core.model.db.UserEntity
+import xyz.funkybit.core.model.db.WithdrawalStatus
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import xyz.funkybit.integrationtests.api.asBitcoinAddress
 import xyz.funkybit.integrationtests.api.asEcKeyPair
@@ -39,6 +42,7 @@ import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.OrderBaseTest
 import xyz.funkybit.integrationtests.testutils.triggerRepeaterTaskAndWaitForCompletion
 import xyz.funkybit.integrationtests.testutils.waitForBalance
+import xyz.funkybit.integrationtests.testutils.waitForFinalizedWithdrawal
 import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
 import xyz.funkybit.integrationtests.utils.TestApiClient
@@ -46,6 +50,7 @@ import xyz.funkybit.integrationtests.utils.Wallet
 import xyz.funkybit.integrationtests.utils.assertMyLimitOrderCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.signAuthorizeBitcoinWalletRequest
 import java.math.BigDecimal
+import java.math.BigInteger
 import java.time.Duration
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -77,12 +82,14 @@ class TestnetChallengeTest : OrderBaseTest() {
             assertEquals(TestnetChallengeStatus.Unenrolled, it.testnetChallengeStatus)
             assertNull(it.nickName)
             assertNull(it.avatarUrl)
+            assertTrue(it.testnetChallengeDepositLimits.isEmpty())
         }
         trader.a.testnetChallengeEnroll(inviteCode)
         trader.a.getAccountConfiguration().let {
             assertEquals(TestnetChallengeStatus.PendingAirdrop, it.testnetChallengeStatus)
             assertNull(it.nickName)
             assertNull(it.avatarUrl)
+            assertTrue(it.testnetChallengeDepositLimits.isEmpty())
         }
         trader.w.currentBlockchainClient().mine()
 
@@ -97,14 +104,23 @@ class TestnetChallengeTest : OrderBaseTest() {
             trader.a.getAccountConfiguration().testnetChallengeStatus == TestnetChallengeStatus.PendingDeposit
         }
 
-        val depositSymbol = transaction { TestnetChallengeUtils.depositSymbol() }
-        val usdcDepositAmount = AssetAmount(depositSymbol.toSymbolInfo(FaucetMode.AllSymbols), "10000")
+        trader.a.getAccountConfiguration().let {
+            assertEquals(TestnetChallengeStatus.PendingDeposit, it.testnetChallengeStatus)
+            assertNull(it.nickName)
+            assertNull(it.avatarUrl)
+            assertTrue(it.testnetChallengeDepositLimits.isEmpty())
+        }
+
+        val depositSymbolEntity = transaction { TestnetChallengeUtils.depositSymbol() }
+        val depositSymbol = Symbol(depositSymbolEntity.name)
+        val usdcDepositAmount = AssetAmount(depositSymbolEntity.toSymbolInfo(FaucetMode.AllSymbols), "10000")
         val usdcDepositTxHash = trader.w.sendDepositTx(usdcDepositAmount)
         trader.w.currentBlockchainClient().mine()
-        trader.a.createDeposit(CreateDepositApiRequest(Symbol(depositSymbol.name), usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
+        trader.a.createDeposit(CreateDepositApiRequest(depositSymbol, usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
 
         trader.a.getAccountConfiguration().let {
             assertEquals(TestnetChallengeStatus.PendingDepositConfirmation, it.testnetChallengeStatus)
+            assertTrue(it.testnetChallengeDepositLimits.isEmpty())
         }
         trader.w.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
 
@@ -119,6 +135,8 @@ class TestnetChallengeTest : OrderBaseTest() {
             assertEquals(TestnetChallengeStatus.Enrolled, it.testnetChallengeStatus)
             assertNull(it.nickName)
             assertNull(it.avatarUrl)
+            assertFalse(it.testnetChallengeDepositLimits.isEmpty())
+            assertTrue(it.testnetChallengeDepositLimits.all { dl -> dl.limit == BigInteger.ZERO })
         }
 
         return trader
@@ -131,6 +149,8 @@ class TestnetChallengeTest : OrderBaseTest() {
         trader.a.getAccountConfiguration().let {
             assertEquals("My Nickname", it.nickName)
             assertNull(it.avatarUrl)
+            assertFalse(it.testnetChallengeDepositLimits.isEmpty())
+            assertTrue(it.testnetChallengeDepositLimits.all { dl -> dl.limit == BigInteger.ZERO })
         }
         // idempotent
         trader.a.setNickname("My Nickname")
@@ -204,9 +224,9 @@ class TestnetChallengeTest : OrderBaseTest() {
         )
 
         // perform an evm withdrawal, they shouldn't get the EvmWithdrawal card
-        val usdcWithdrawalAmount = AssetAmount(usdc, "0.001")
+        val usdcWithdrawalAmount = AssetAmount(usdc, "100")
 
-        trader.a.createWithdrawal(trader.w.signWithdraw(btc.name, usdcWithdrawalAmount.inFundamentalUnits))
+        val usdcWithdrawal = trader.a.createWithdrawal(trader.w.signWithdraw(usdc.name, usdcWithdrawalAmount.inFundamentalUnits)).withdrawal
 
         cards = trader.a.getCards()
         assertEquals(1, cards.size)
@@ -216,6 +236,40 @@ class TestnetChallengeTest : OrderBaseTest() {
             ),
             cards.toSet(),
         )
+
+        // check that USDC deposit is limited to the withdrawn amount
+        waitForFinalizedWithdrawal(usdcWithdrawal.id, WithdrawalStatus.Complete)
+        trader.a.getAccountConfiguration().let {
+            assertEquals(TestnetChallengeStatus.Enrolled, it.testnetChallengeStatus)
+            assertFalse(it.testnetChallengeDepositLimits.isEmpty())
+            assertEquals(usdcWithdrawalAmount.inFundamentalUnits, it.testnetChallengeDepositLimits.first { (symbol, _) -> symbol.value == usdc.name }.limit)
+        }
+
+        // deposit 50 USDC back and check that USDC deposit is now limited to the withdrawn amount - the deposited amount
+        val usdcDepositAmount = AssetAmount(usdc, "50")
+        var usdcDepositTxHash = trader.w.sendDepositTx(usdcDepositAmount)
+        trader.w.currentBlockchainClient().mine()
+        trader.a.createDeposit(CreateDepositApiRequest(Symbol(usdc.name), usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
+        trader.w.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+        trader.a.getAccountConfiguration().let {
+            assertEquals(TestnetChallengeStatus.Enrolled, it.testnetChallengeStatus)
+            assertFalse(it.testnetChallengeDepositLimits.isEmpty())
+            assertEquals(
+                usdcWithdrawalAmount.inFundamentalUnits - usdcDepositAmount.inFundamentalUnits,
+                it.testnetChallengeDepositLimits.first { (symbol, _) -> symbol.value == usdc.name }.limit,
+            )
+        }
+
+        // deposit another 50 USDC and check that USDC deposit limit is 0
+        usdcDepositTxHash = trader.w.sendDepositTx(usdcDepositAmount)
+        trader.w.currentBlockchainClient().mine()
+        trader.a.createDeposit(CreateDepositApiRequest(Symbol(usdc.name), usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
+        trader.w.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+        trader.a.getAccountConfiguration().let {
+            assertEquals(TestnetChallengeStatus.Enrolled, it.testnetChallengeStatus)
+            assertFalse(it.testnetChallengeDepositLimits.isEmpty())
+            assertTrue(it.testnetChallengeDepositLimits.all { dl -> dl.limit == BigInteger.ZERO })
+        }
     }
 
     @BeforeTest

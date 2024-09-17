@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useState
 } from 'react'
-import { Balance } from 'apiClient'
+import { AccountConfigurationApiResponse, Balance } from 'apiClient'
 import { useQueryClient } from '@tanstack/react-query'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { balancesTopic, Publishable } from 'websocketMessages'
@@ -31,11 +31,13 @@ import { useSwitchToEthChain } from 'utils/switchToEthChain'
 export function BalancesTable({
   walletAddress,
   exchangeContractAddress,
-  symbols
+  symbols,
+  accountConfig
 }: {
   walletAddress?: string
   exchangeContractAddress?: string
   symbols: TradingSymbols
+  accountConfig?: AccountConfigurationApiResponse
 }) {
   const wallets = useWallets()
   const evmConfig = useConfig()
@@ -173,6 +175,11 @@ export function BalancesTable({
           exchangeContractAddress={exchangeContractAddress!}
           walletAddress={walletAddress!}
           symbol={depositSymbol}
+          testnetChallengeDepositLimit={
+            accountConfig?.testnetChallengeDepositLimits?.find(
+              (dl) => dl.symbol == depositSymbol.name
+            )?.limit
+          }
           close={() => setShowDepositModal(false)}
           onClosed={() => setDepositSymbol(null)}
         />

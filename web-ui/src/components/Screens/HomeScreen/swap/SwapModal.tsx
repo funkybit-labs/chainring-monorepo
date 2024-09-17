@@ -1,7 +1,12 @@
 import Markets, { Market } from 'markets'
 import React, { LegacyRef, useEffect, useMemo, useRef, useState } from 'react'
 import TradingSymbol from 'tradingSymbol'
-import { Balance, FeeRates, OrderSide } from 'apiClient'
+import {
+  AccountConfigurationApiResponse,
+  Balance,
+  FeeRates,
+  OrderSide
+} from 'apiClient'
 import { formatUnits } from 'viem'
 import { SymbolSelector } from 'components/Screens/HomeScreen/SymbolSelector'
 import AmountInput from 'components/common/AmountInput'
@@ -30,6 +35,7 @@ export function SwapModal({
   exchangeContractAddress,
   walletAddress,
   feeRates,
+  accountConfig,
   onMarketChange,
   onSideChange
 }: {
@@ -37,6 +43,7 @@ export function SwapModal({
   exchangeContractAddress?: string
   walletAddress?: string
   feeRates: FeeRates
+  accountConfig?: AccountConfigurationApiResponse
   onMarketChange: (m: Market) => void
   onSideChange: (s: OrderSide) => void
 }) {
@@ -326,6 +333,11 @@ export function SwapModal({
               exchangeContractAddress={exchangeContractAddress!}
               walletAddress={walletAddress!}
               symbol={depositSymbol}
+              testnetChallengeDepositLimit={
+                accountConfig?.testnetChallengeDepositLimits?.find(
+                  (dl) => dl.symbol == depositSymbol.name
+                )?.limit
+              }
               close={() => setShowDepositModal(false)}
               onClosed={() => {
                 setDepositSymbol(null)

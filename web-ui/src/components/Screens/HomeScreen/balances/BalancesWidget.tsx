@@ -1,4 +1,4 @@
-import { apiClient, Chain } from 'apiClient'
+import { AccountConfigurationApiResponse, apiClient, Chain } from 'apiClient'
 import React, { useMemo, useState } from 'react'
 import { Widget } from 'components/common/Widget'
 import TradingSymbols from 'tradingSymbols'
@@ -21,12 +21,14 @@ export default function BalancesWidget({
   walletAddress,
   exchangeContractAddress,
   symbols,
-  chains
+  chains,
+  accountConfig
 }: {
   walletAddress?: string
   exchangeContractAddress?: string
   symbols: TradingSymbols
   chains: Chain[]
+  accountConfig?: AccountConfigurationApiResponse
 }) {
   const { isAuthenticated } = useAuth()
   const [selectedTab, setSelectedTab] = useState<Tab>('Available')
@@ -123,6 +125,7 @@ export default function BalancesWidget({
                           walletAddress={walletAddress}
                           exchangeContractAddress={exchangeContractAddress}
                           symbols={symbols}
+                          accountConfig={accountConfig}
                         />
                       )
                     case 'Withdrawals':

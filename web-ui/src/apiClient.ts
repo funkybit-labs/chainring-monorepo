@@ -146,6 +146,14 @@ export const AuthorizedAddressSchema = z.object({
   networkType: NetworkTypeSchema
 })
 
+export const TestnetChallengeDepositLimitSchema = z.object({
+  symbol: z.string(),
+  limit: z.coerce.bigint()
+})
+export type TestnetChallengeDepositLimit = z.infer<
+  typeof TestnetChallengeDepositLimitSchema
+>
+
 export const AccountConfigurationApiResponseSchema = z.object({
   newSymbols: z.array(SymbolSchema),
   role: z.enum(['User', 'Admin']),
@@ -153,10 +161,14 @@ export const AccountConfigurationApiResponseSchema = z.object({
   testnetChallengeStatus: TestnetChallengeStatusSchema,
   testnetChallengeDepositSymbol: z.string().nullable(),
   testnetChallengeDepositContract: AddressSchema.nullable(),
+  testnetChallengeDepositLimits: z.array(TestnetChallengeDepositLimitSchema),
   nickName: z.string().nullable(),
   avatarUrl: z.string().nullable(),
   inviteCode: z.string()
 })
+export type AccountConfigurationApiResponse = z.infer<
+  typeof AccountConfigurationApiResponseSchema
+>
 
 const OrderSideSchema = z.enum(['Buy', 'Sell'])
 export type OrderSide = z.infer<typeof OrderSideSchema>
