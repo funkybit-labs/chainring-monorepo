@@ -10,6 +10,7 @@ import { WithdrawalsTable } from 'components/Screens/HomeScreen/balances/Withdra
 import { DepositsTable } from 'components/Screens/HomeScreen/balances/DepositsTable'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
+import { useAuth } from 'contexts/auth'
 
 export const withdrawalsQueryKey = ['withdrawals']
 export const depositsQueryKey = ['deposits']
@@ -27,35 +28,36 @@ export default function BalancesWidget({
   symbols: TradingSymbols
   chains: Chain[]
 }) {
+  const { isAuthenticated } = useAuth()
   const [selectedTab, setSelectedTab] = useState<Tab>('Available')
 
   const depositsQuery = useQuery({
     queryKey: depositsQueryKey,
     queryFn: apiClient.listDeposits,
-    enabled: walletAddress !== undefined
+    enabled: isAuthenticated
   })
 
   const pendingDepositsCount = useMemo(() => {
-    return walletAddress === undefined
-      ? 0
-      : (depositsQuery.data?.deposits || []).filter(
+    return isAuthenticated
+      ? (depositsQuery.data?.deposits || []).filter(
           (d) => d.status == 'Pending'
         ).length
-  }, [depositsQuery.data, walletAddress])
+      : 0
+  }, [depositsQuery.data, isAuthenticated])
 
   const withdrawalsQuery = useQuery({
     queryKey: withdrawalsQueryKey,
     queryFn: apiClient.listWithdrawals,
-    enabled: walletAddress !== undefined
+    enabled: isAuthenticated
   })
 
   const pendingWithdrawalsCount = useMemo(() => {
-    return walletAddress === undefined
-      ? 0
-      : (withdrawalsQuery.data?.withdrawals || []).filter(
+    return isAuthenticated
+      ? (withdrawalsQuery.data?.withdrawals || []).filter(
           (w) => w.status == 'Pending'
         ).length
-  }, [withdrawalsQuery.data, walletAddress])
+      : 0
+  }, [withdrawalsQuery.data, isAuthenticated])
 
   const switchToEthChain = useSwitchToEthChain()
 

@@ -110,13 +110,16 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
         }
     }
 
-    fun authorizedAddresses(): List<Address> {
+    fun authorizedAddresses(): List<Pair<Address, NetworkType>> {
         return WalletTable
             .selectAll()
             .where {
                 WalletTable.userGuid.eq(userGuid) and WalletTable.guid.neq(guid)
             }.map {
-                Address.auto(it[WalletTable.address])
+                Pair(
+                    Address.auto(it[WalletTable.address]),
+                    it[WalletTable.networkType],
+                )
             }
     }
 

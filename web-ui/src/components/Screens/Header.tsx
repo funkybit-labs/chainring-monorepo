@@ -16,6 +16,7 @@ import { useQuery } from '@tanstack/react-query'
 import { apiClient } from 'apiClient'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import { useConfig } from 'wagmi'
+import { useAuth } from 'contexts/auth'
 
 export type Tab = 'Swap' | 'Limit' | 'Dashboard' | 'Testnet Challenge'
 
@@ -30,6 +31,7 @@ export function Header({
   onTabChange: (newTab: Tab) => void
   onShowAdmin: () => void
 }) {
+  const { isAuthenticated } = useAuth()
   const wallets = useWallets()
   const evmConfig = useConfig()
   const [showMenu, setShowMenu] = useState(false)
@@ -53,7 +55,7 @@ export function Header({
   const accountConfigQuery = useQuery({
     queryKey: ['accountConfiguration'],
     queryFn: apiClient.getAccountConfiguration,
-    enabled: wallets.connected.length > 0
+    enabled: isAuthenticated
   })
 
   const validChain = useValidChain()
@@ -182,7 +184,7 @@ export function Header({
   function faucetButton({ onClick }: { onClick: () => void }) {
     return (
       <span className="mx-5 whitespace-nowrap">
-        {faucetSymbols.length > 0 && wallets.connected.length > 0 ? (
+        {faucetSymbols.length > 0 && isAuthenticated ? (
           <Button
             style={'normal'}
             width={'normal'}
@@ -306,12 +308,13 @@ export function Header({
         </>
       )}
       {faucetSymbols.length > 0 &&
-        wallets.connected.length > 0 &&
+        isAuthenticated &&
+        wallets.primary &&
         showFaucetModal && (
           <div className="fixed">
             <FaucetModal
               isOpen={showFaucetModal}
-              walletAddress={wallets.primary!.address as Address}
+              walletAddress={wallets.primary.address as Address}
               symbols={faucetSymbols}
               close={() => setShowFaucetModal(false)}
             />

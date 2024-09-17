@@ -38,10 +38,13 @@ enum class Role {
 }
 
 @Serializable
+data class AuthorizedAddress(val address: Address, val networkType: NetworkType)
+
+@Serializable
 data class AccountConfigurationApiResponse(
     val newSymbols: List<SymbolInfo>,
     val role: Role,
-    val authorizedAddresses: List<Address>,
+    val authorizedAddresses: List<AuthorizedAddress>,
     val testnetChallengeStatus: TestnetChallengeStatus,
     val testnetChallengeDepositSymbol: String?,
     val testnetChallengeDepositContract: Address?,

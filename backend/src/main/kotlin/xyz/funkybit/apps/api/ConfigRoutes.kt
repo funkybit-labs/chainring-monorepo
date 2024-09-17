@@ -18,6 +18,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.middleware.principal
 import xyz.funkybit.apps.api.middleware.signedTokenSecurity
 import xyz.funkybit.apps.api.model.AccountConfigurationApiResponse
+import xyz.funkybit.apps.api.model.AuthorizedAddress
 import xyz.funkybit.apps.api.model.Chain
 import xyz.funkybit.apps.api.model.ConfigurationApiResponse
 import xyz.funkybit.apps.api.model.DeployedContract
@@ -187,7 +188,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                             ),
                         ),
                         authorizedAddresses = listOf(
-                            EvmAddress.zero,
+                            AuthorizedAddress(EvmAddress.zero, NetworkType.Evm),
                         ),
                         testnetChallengeStatus = TestnetChallengeStatus.Unenrolled,
                         testnetChallengeDepositSymbol = "USDC:31337",
@@ -209,7 +210,9 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                             newSymbols = SymbolEntity.symbolsToAddToWallet(wallet.address).map {
                                 it.toSymbolInfo(faucetMode)
                             },
-                            authorizedAddresses = wallet.authorizedAddresses(),
+                            authorizedAddresses = wallet.authorizedAddresses().map { (address, networkType) ->
+                                AuthorizedAddress(address, networkType)
+                            },
                             testnetChallengeStatus = wallet.user.testnetChallengeStatus,
                             testnetChallengeDepositSymbol = if (TestnetChallengeUtils.enabled) TestnetChallengeUtils.depositSymbolName else null,
                             testnetChallengeDepositContract = if (TestnetChallengeUtils.enabled) TestnetChallengeUtils.depositSymbol().contractAddress else null,

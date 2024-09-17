@@ -1,4 +1,4 @@
-import { apiClient, Chain, OrderSide } from 'apiClient'
+import { Chain, noAuthApiClient, OrderSide } from 'apiClient'
 import BalancesWidget from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import { Header, Tab } from 'components/Screens/Header'
 import React, { LegacyRef, useEffect, useMemo, useState } from 'react'
@@ -27,7 +27,7 @@ function WebsocketWrapper({ contents }: { contents: JSX.Element }) {
 function HomeScreenContent() {
   const configQuery = useQuery({
     queryKey: ['configuration'],
-    queryFn: apiClient.getConfiguration
+    queryFn: noAuthApiClient.getConfiguration
   })
 
   const wallets = useWallets()

@@ -8,6 +8,7 @@ import React, { useEffect, useState } from 'react'
 import { useMaintenance } from 'apiClient'
 import { WalletProvider } from 'contexts/walletProvider'
 import { testnetChallengeInviteCodeKey } from 'components/Screens/HomeScreen/testnetchallenge/TestnetChallengeTab'
+import { AuthProvider } from 'contexts/auth'
 
 const container = document.getElementById('root') as HTMLDivElement
 const root = createRoot(container)
@@ -45,9 +46,11 @@ const Root = () => {
       )}
       {wagmiConfig ? (
         <WalletProvider>
-          <QueryClientProvider client={queryClient}>
-            <App />
-          </QueryClientProvider>
+          <AuthProvider>
+            <QueryClientProvider client={queryClient}>
+              <App />
+            </QueryClientProvider>
+          </AuthProvider>
         </WalletProvider>
       ) : (
         <div className="flex h-screen items-center justify-center bg-darkBluishGray10">

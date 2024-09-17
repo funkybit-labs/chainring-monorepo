@@ -14,6 +14,7 @@ import DiscoBall from 'components/Screens/HomeScreen/DiscoBall'
 import DepositModal from 'components/Screens/HomeScreen/DepositModal'
 import { Leaderboard } from 'components/Screens/HomeScreen/testnetchallenge/Leaderboard'
 import { Tab } from 'components/Screens/Header'
+import { useAuth } from 'contexts/auth'
 
 export const testnetChallengeInviteCodeKey = 'testnetChallengeInviteCode'
 export function TestnetChallengeTab({
@@ -25,13 +26,14 @@ export function TestnetChallengeTab({
   exchangeContract?: { name: string; address: string }
   onChangeTab: (tab: Tab) => void
 }) {
+  const { isAuthenticated } = useAuth()
   const evmConfig = useConfig()
   const queryClient = useQueryClient()
   const wallets = useWallets()
   const accountConfigQuery = useQuery({
     queryKey: ['accountConfiguration'],
     queryFn: apiClient.getAccountConfiguration,
-    enabled: wallets.connected.length > 0
+    enabled: isAuthenticated
   })
 
   const [

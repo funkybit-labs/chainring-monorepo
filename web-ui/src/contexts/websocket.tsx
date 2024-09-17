@@ -1,7 +1,7 @@
 import { useEffect, createContext, useRef, useContext } from 'react'
 import { ExponentialBackoff, Websocket, WebsocketBuilder } from 'websocket-ts'
 import { apiBaseUrl } from 'apiClient'
-import { loadAuthToken } from 'auth'
+import { loadAuthToken } from 'contexts/auth'
 import {
   IncomingWSMessage,
   Publishable,
