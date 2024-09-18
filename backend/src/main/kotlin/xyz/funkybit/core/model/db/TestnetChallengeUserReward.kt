@@ -149,7 +149,7 @@ class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserReward
                 is BitcoinAddress -> TestnetChallengeUserRewardType.BitcoinWalletConnected
                 is EvmAddress -> TestnetChallengeUserRewardType.EvmWalletConnected
             }
-            createIfNotExist(user, wallet, rewardType)
+            createIfNotExists(user, wallet, rewardType)
         }
 
         fun createWithdrawalReward(user: UserEntity, wallet: WalletEntity) {
@@ -159,7 +159,7 @@ class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserReward
             }
 
             // both withdrawal and deposit are required for the award.
-            createIfNotExist(user, wallet, rewardType, prerequisites = { DepositEntity.existsCompletedForWallet(wallet) })
+            createIfNotExists(user, wallet, rewardType, prerequisites = { DepositEntity.existsCompletedForWallet(wallet) })
         }
 
         fun createDepositReward(user: UserEntity, wallet: WalletEntity) {
@@ -169,10 +169,10 @@ class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserReward
             }
 
             // both withdrawal and deposit are required for the award.
-            createIfNotExist(user, wallet, rewardType, prerequisites = { WithdrawalEntity.existsCompletedForWallet(wallet) })
+            createIfNotExists(user, wallet, rewardType, prerequisites = { WithdrawalEntity.existsCompletedForWallet(wallet) })
         }
 
-        private fun createIfNotExist(user: UserEntity, wallet: WalletEntity, rewardType: TestnetChallengeUserRewardType, prerequisites: (WalletEntity) -> Boolean = { true }) {
+        private fun createIfNotExists(user: UserEntity, wallet: WalletEntity, rewardType: TestnetChallengeUserRewardType, prerequisites: (WalletEntity) -> Boolean = { true }) {
             val pointsForRewardType = RewardPointsConfig.getPointsForRewardType(rewardType)
 
             pointsForRewardType?.let { points ->
