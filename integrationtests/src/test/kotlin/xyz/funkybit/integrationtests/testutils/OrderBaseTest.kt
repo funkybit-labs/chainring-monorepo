@@ -136,6 +136,7 @@ open class OrderBaseTest {
         subscribeToPrices: Boolean = true,
         subscribeToLimits: Boolean = true,
         setupBitcoinWallet: Boolean = false,
+        secondaryMarketId: MarketId? = null,
     ): TraderClients {
         val (apiClient, wallet, bitcoinWallet) = if (setupBitcoinWallet) {
             val apiClient = TestApiClient.withBitcoinWallet()
@@ -154,31 +155,39 @@ open class OrderBaseTest {
             val apiClient = TestApiClient()
             val wallet = Wallet(apiClient)
             apiClient.getAccountConfiguration()
-            val bitcoinWallet = if (airdrops.any { chainIdBySymbol.getValue(it.symbol.name).networkType() == NetworkType.Bitcoin }) {
-                val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
-                bitcoinKeyApiClient.authorizeWallet(
-                    apiRequest = signAuthorizeBitcoinWalletRequest(
-                        ecKeyPair = apiClient.keyPair.asEcKeyPair(),
-                        address = apiClient.address.asEvmAddress(),
-                        authorizedAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
-                    ),
-                )
-                BitcoinWallet(bitcoinKeyApiClient)
-            } else {
-                null
-            }
+            val bitcoinWallet =
+                if (airdrops.any { chainIdBySymbol.getValue(it.symbol.name).networkType() == NetworkType.Bitcoin }) {
+                    val bitcoinKeyApiClient = TestApiClient.withBitcoinWallet()
+                    bitcoinKeyApiClient.authorizeWallet(
+                        apiRequest = signAuthorizeBitcoinWalletRequest(
+                            ecKeyPair = apiClient.keyPair.asEcKeyPair(),
+                            address = apiClient.address.asEvmAddress(),
+                            authorizedAddress = bitcoinKeyApiClient.address.asBitcoinAddress(),
+                        ),
+                    )
+                    BitcoinWallet(bitcoinKeyApiClient)
+                } else {
+                    null
+                }
             Triple(apiClient, wallet, bitcoinWallet)
         }
-
         val wsClient = WebsocketClient.blocking(apiClient.authToken).apply {
             if (subscribeToOrderBook) {
                 subscribeToOrderBook(marketId)
                 assertOrderBookMessageReceived(marketId)
+                secondaryMarketId?.let {
+                    subscribeToOrderBook(it)
+                    assertOrderBookMessageReceived(it)
+                }
             }
 
             if (subscribeToPrices) {
                 subscribeToPrices(marketId)
                 assertPricesMessageReceived(marketId)
+                secondaryMarketId?.let {
+                    subscribeToPrices(it)
+                    assertPricesMessageReceived(it)
+                }
             }
 
             subscribeToMyOrders()
@@ -211,6 +220,7 @@ open class OrderBaseTest {
                         wallet.mintERC20AndMine(it)
                     }
                 }
+
                 NetworkType.Bitcoin -> {
                     waitForTx(
                         bitcoinWallet!!.walletAddress,
@@ -229,6 +239,7 @@ open class OrderBaseTest {
                     }
                     wallet.depositAndMine(it)
                 }
+
                 NetworkType.Bitcoin -> {
                     waitForTx(
                         bitcoinWallet!!.walletAddress,

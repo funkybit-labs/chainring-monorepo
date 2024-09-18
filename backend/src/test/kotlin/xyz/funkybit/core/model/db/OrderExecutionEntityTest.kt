@@ -213,6 +213,7 @@ class OrderExecutionEntityTest : TestWithDb() {
                         feeAmount = BigInteger.ONE,
                         feeSymbol = Symbol("ETH"),
                         marketEntity = order1.market,
+                        side = order1.side,
                     )
                     OrderExecutionEntity.create(
                         now,
@@ -227,6 +228,7 @@ class OrderExecutionEntityTest : TestWithDb() {
                         feeAmount = BigInteger.ONE,
                         feeSymbol = Symbol("ETH"),
                         marketEntity = order1.market,
+                        side = order2.side,
                     )
                 }
             }

@@ -298,22 +298,24 @@ object SequencerResponseProcessorService {
 
                 // create executions for both
                 listOf(Pair(buyOrder, sellOrder), Pair(sellOrder, buyOrder)).forEach { (order, counterOrder) ->
+                    val (role, side) = if (orderIdsInRequest.contains(order.sequencerOrderId?.value)) {
+                        Pair(ExecutionRole.Taker, if (trade.takerSold) OrderSide.Sell else OrderSide.Buy)
+                    } else {
+                        Pair(ExecutionRole.Maker, if (trade.takerSold) OrderSide.Buy else OrderSide.Sell)
+                    }
                     val execution = OrderExecutionEntity.create(
                         timestamp = timestamp,
                         orderEntity = order,
                         counterOrderEntity = counterOrder,
                         tradeEntity = tradeEntity,
-                        role = if (orderIdsInRequest.contains(order.sequencerOrderId?.value)) {
-                            ExecutionRole.Taker
-                        } else {
-                            ExecutionRole.Maker
-                        },
+                        role = role,
                         feeAmount = if (order == buyOrder) {
                             trade.buyerFee.toBigInteger()
                         } else {
                             trade.sellerFee.toBigInteger()
                         },
                         feeSymbol = Symbol(tradeMarket.quoteSymbol.name),
+                        side = side,
                         marketEntity = tradeMarket,
                     )
 

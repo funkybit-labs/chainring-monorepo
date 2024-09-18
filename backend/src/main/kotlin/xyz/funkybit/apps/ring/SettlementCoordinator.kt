@@ -28,6 +28,7 @@ import xyz.funkybit.core.model.db.BlockchainTransactionEntity
 import xyz.funkybit.core.model.db.BroadcasterNotification
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ChainSettlementBatchEntity
+import xyz.funkybit.core.model.db.ExecutionRole
 import xyz.funkybit.core.model.db.MarketEntity
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
@@ -357,7 +358,7 @@ class SettlementCoordinator(
                 val quoteSymbolId = quoteSymbolEntity.guid.value
                 val baseSymbolChainId = baseSymbolEntity.chainId.value
                 val quoteSymbolChainId = quoteSymbolEntity.chainId.value
-                when (it.order.side) {
+                when (it.side) {
                     OrderSide.Buy -> {
                         if (baseSymbolChainId == chainId) {
                             balanceAdjustments.getOrPut(baseSymbolId) { mutableMapOf() }.merge(walletAddress, it.trade.amount, ::sumBigIntegers)
@@ -526,10 +527,10 @@ class SettlementCoordinator(
 
                 tradeEntity.fail()
 
-                val buyExecution = executions.first { it.order.side == OrderSide.Buy }
+                val buyExecution = executions.first { it.side == OrderSide.Buy }
                 val buyOrder = buyExecution.order
 
-                val sellExecution = executions.first { it.order.side == OrderSide.Sell }
+                val sellExecution = executions.first { it.side == OrderSide.Sell }
                 val sellOrder = sellExecution.order
 
                 val market = tradeEntity.market
@@ -545,6 +546,7 @@ class SettlementCoordinator(
                         levelIx = tradeEntity.price.divideToIntegralValue(market.tickSize).toInt(),
                         buyerFee = buyExecution.feeAmount,
                         sellerFee = sellExecution.feeAmount,
+                        takerSold = sellExecution.role == ExecutionRole.Taker,
                     )
                 }
                 if (sequencerResponse.error == SequencerError.None) {
