@@ -805,9 +805,9 @@ data class Market(
 
     fun calculateAmountForPercentageBuy(account: AccountGuid, assetBalance: QuoteAmount, percent: Int, takerFeeRate: BigInteger): Pair<BaseAmount, QuoteAmount?> {
         val quoteAssetsRequired = quoteAssetsRequired(account)
-        val quoteAssetLimit = QuoteAmount((QuoteAmount.ZERO.max(assetBalance - quoteAssetsRequired).toBigInteger() * percent.toBigInteger()) / Percentage.MAX_VALUE.toBigInteger())
-        val quoteAssetLimitAdjustedForFee = (quoteAssetLimit * FeeRate.MAX_VALUE.toBigInteger().toQuoteAmount()) / (FeeRate.MAX_VALUE.toBigInteger().toQuoteAmount() + takerFeeRate.toQuoteAmount())
-        return Pair(quantityForMarketBuy(quoteAssetLimitAdjustedForFee), if (quoteAssetsRequired == QuoteAmount.ZERO && percent == 100) assetBalance else null)
+        val quoteAssetLimit = (assetBalance - quoteAssetsRequired).toBigDecimal().max(BigDecimal.ZERO) * (percent.toBigDecimal().setScale(18) / Percentage.MAX_VALUE.toBigDecimal())
+        val quoteAssetLimitAdjustedForFee = (quoteAssetLimit * FeeRate.MAX_VALUE.toBigDecimal().setScale(30)) / (FeeRate.MAX_VALUE.toBigDecimal() + takerFeeRate.toBigDecimal())
+        return Pair(quantityForMarketBuy(quoteAssetLimitAdjustedForFee.toQuoteAmount()), if (quoteAssetsRequired == QuoteAmount.ZERO && percent == 100) assetBalance else null)
     }
 
     // returns baseAsset and quoteAsset reserved by order

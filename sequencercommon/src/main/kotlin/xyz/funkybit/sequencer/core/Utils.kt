@@ -9,6 +9,7 @@ import xyz.funkybit.sequencer.proto.balanceChange
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.MathContext
+import java.math.RoundingMode
 
 fun BigDecimal.toDecimalValue(): DecimalValue = DecimalValue.newBuilder()
     .setScale(this.scale())
@@ -40,9 +41,7 @@ fun notional(amount: BaseAmount, price: BigDecimal, baseDecimals: Int, quoteDeci
     (amount.toBigDecimal() * price).movePointRight(quoteDecimals - baseDecimals).toQuoteAmount()
 
 fun notionalFee(notional: QuoteAmount, feeRate: FeeRate): QuoteAmount =
-    QuoteAmount(
-        notional.value * feeRate.value.toBigInteger() / FeeRate.MAX_VALUE.toBigInteger(),
-    )
+    (notional.value.toBigDecimal() * feeRate.value.toBigDecimal() / FeeRate.MAX_VALUE.toBigDecimal()).toQuoteAmount()
 
 fun notionalPlusFee(amount: BaseAmount, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int, feeRate: FeeRate): QuoteAmount =
     (amount.value.toBigDecimal() * price).movePointRight(quoteDecimals - baseDecimals).toQuoteAmount().let { notional ->
@@ -50,7 +49,7 @@ fun notionalPlusFee(amount: BaseAmount, price: BigDecimal, baseDecimals: Int, qu
     }
 
 fun quantityFromNotionalAndPrice(notional: QuoteAmount, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int): BaseAmount =
-    (notional.toBigDecimal().setScale(18) / price).movePointRight(baseDecimals - quoteDecimals).toBaseAmount()
+    (notional.toBigDecimal().setScale(18) / price).movePointRight(baseDecimals - quoteDecimals).setScale(0, RoundingMode.HALF_EVEN).toBaseAmount()
 
 fun notionalPlusFee(amount: IntegerValue, price: DecimalValue, baseDecimals: Int, quoteDecimals: Int, feeRate: FeeRate): QuoteAmount =
     notionalPlusFee(amount.toBaseAmount(), price.toBigDecimal(), baseDecimals, quoteDecimals, feeRate)

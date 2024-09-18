@@ -451,7 +451,7 @@ class TestSequencer {
             assertEquals(3, response.ordersChangedCount)
             response.ordersChangedList[0].also {
                 assertEquals(OrderDisposition.Filled, it.disposition)
-                assertEquals(BigDecimal("0.54740714").toFundamentalUnits(market.baseDecimals), it.newQuantity.toBigInteger())
+                assertEquals(BigDecimal("0.54740715").toFundamentalUnits(market.baseDecimals), it.newQuantity.toBigInteger())
             }
             assertEquals(OrderDisposition.Filled, response.ordersChangedList[1].disposition)
             assertEquals(OrderDisposition.PartiallyFilled, response.ordersChangedList[2].disposition)
@@ -459,8 +459,8 @@ class TestSequencer {
             response.assertLimits(
                 listOf(
                     ExpectedLimitsUpdate(lp1.account, market.id, base = BigDecimal("0.80237155").inSats(), quote = BigDecimal("3.472825937625").inWei()),
-                    ExpectedLimitsUpdate(lp2.account, market.id, base = BigDecimal("0.20948617").inSats(), quote = BigDecimal("6.233056255800").inWei()),
-                    ExpectedLimitsUpdate(tkr.account, market.id, base = BigDecimal("0.54740714").inSats(), quote = BigDecimal("0").inWei()),
+                    ExpectedLimitsUpdate(lp2.account, market.id, base = BigDecimal("0.20948617").inSats(), quote = BigDecimal("6.233056434").inWei()),
+                    ExpectedLimitsUpdate(tkr.account, market.id, base = BigDecimal("0.54740715").inSats(), quote = BigDecimal("0").inWei()),
                 ),
             )
         }
@@ -1717,7 +1717,7 @@ class TestSequencer {
                     BigDecimal("0.1").toFundamentalUnits(market.baseDecimals),
                 )
                 assertEquals(
-                    it.buyerFee.toBigInteger(),
+                    it.buyerFee.toQuoteAmount(),
                     notionalFee(
                         notional(it.amount.toBaseAmount(), BigDecimal("17.5"), market.baseDecimals, market.quoteDecimals),
                         xyz.funkybit.sequencer.core.FeeRate(feeRates.taker.value),
@@ -1731,7 +1731,7 @@ class TestSequencer {
                     BigDecimal("0.06617647").toFundamentalUnits(market.baseDecimals),
                 )
                 assertEquals(
-                    it.buyerFee.toBigInteger(),
+                    it.buyerFee.toQuoteAmount(),
                     notionalFee(
                         notional(it.amount.toBaseAmount(), BigDecimal("18.0"), market.baseDecimals, market.quoteDecimals),
                         xyz.funkybit.sequencer.core.FeeRate(feeRates.taker.value),
@@ -1764,10 +1764,10 @@ class TestSequencer {
 
         sequencer.addOrder(market, BigDecimal.ZERO, null, tkr, Order.Type.MarketBuy, percentage = 100).also { response ->
             assertEquals(mockClock.currentTimeMillis(), response.createdAt)
-            assertEquals(3, response.ordersChangedCount)
+            assertEquals(4, response.ordersChangedCount)
             response.ordersChangedList[0].also {
                 assertEquals(OrderDisposition.Filled, it.disposition)
-                assertEquals(BigDecimal("0.12492374").toFundamentalUnits(market.baseDecimals), it.newQuantity.toBigInteger())
+                assertEquals(BigDecimal("0.12492375").toFundamentalUnits(market.baseDecimals), it.newQuantity.toBigInteger())
             }
             assertEquals(OrderDisposition.Filled, response.ordersChangedList[1].disposition)
             assertEquals(OrderDisposition.PartiallyFilled, response.ordersChangedList[2].disposition)
@@ -1778,7 +1778,7 @@ class TestSequencer {
                     BigDecimal("0.1").toFundamentalUnits(market.baseDecimals),
                 )
                 assertEquals(
-                    it.buyerFee.toBigInteger(),
+                    it.buyerFee.toQuoteAmount(),
                     notionalFee(
                         notional(it.amount.toBaseAmount(), BigDecimal("17.5"), market.baseDecimals, market.quoteDecimals),
                         xyz.funkybit.sequencer.core.FeeRate(feeRates.taker.value),
@@ -1789,10 +1789,10 @@ class TestSequencer {
             response.tradesCreatedList[1].also {
                 assertEquals(
                     it.amount.toBigInteger(),
-                    BigDecimal("0.02492374").toFundamentalUnits(market.baseDecimals),
+                    BigDecimal("0.02492375").toFundamentalUnits(market.baseDecimals),
                 )
                 assertEquals(
-                    it.buyerFee.toBigInteger(),
+                    it.buyerFee.toQuoteAmount(),
                     notionalFee(
                         notional(it.amount.toBaseAmount(), BigDecimal("18.0"), market.baseDecimals, market.quoteDecimals),
                         xyz.funkybit.sequencer.core.FeeRate(feeRates.taker.value),
@@ -1837,7 +1837,7 @@ class TestSequencer {
                     BigDecimal("0.1").toFundamentalUnits(market.baseDecimals),
                 )
                 assertEquals(
-                    it.buyerFee.toBigInteger(),
+                    it.buyerFee.toQuoteAmount(),
                     notionalFee(
                         notional(it.amount.toBaseAmount(), BigDecimal("17.5"), market.baseDecimals, market.quoteDecimals),
                         xyz.funkybit.sequencer.core.FeeRate(feeRates.taker.value),
@@ -1851,7 +1851,7 @@ class TestSequencer {
                     BigDecimal("0.01").toFundamentalUnits(market.baseDecimals),
                 )
                 assertEquals(
-                    it.buyerFee.toBigInteger(),
+                    it.buyerFee.toQuoteAmount(),
                     notionalFee(
                         notional(it.amount.toBaseAmount(), BigDecimal("18.0"), market.baseDecimals, market.quoteDecimals),
                         xyz.funkybit.sequencer.core.FeeRate(feeRates.taker.value),

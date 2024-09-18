@@ -19,7 +19,6 @@ import xyz.funkybit.sequencer.core.QuoteAmount
 import xyz.funkybit.sequencer.core.SequencerState
 import xyz.funkybit.sequencer.core.asBalanceChangesList
 import xyz.funkybit.sequencer.core.notional
-import xyz.funkybit.sequencer.core.notionalFee
 import xyz.funkybit.sequencer.core.notionalPlusFee
 import xyz.funkybit.sequencer.core.sumBaseAmounts
 import xyz.funkybit.sequencer.core.sumBigIntegers
@@ -54,6 +53,7 @@ import xyz.funkybit.sequencer.proto.sequencerRequest
 import xyz.funkybit.sequencer.proto.sequencerResponse
 import xyz.funkybit.sequencer.proto.withdrawalCreated
 import java.lang.Thread.UncaughtExceptionHandler
+import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.concurrent.thread
 import kotlin.system.exitProcess
@@ -544,6 +544,10 @@ class SequencerApp(
             }
             .sortedWith(compareBy(LimitsUpdate::getAccount, LimitsUpdate::getMarketId))
 
+    private fun adjustNotionalForTakerFee(notional: QuoteAmount): QuoteAmount {
+        return (notional.toBigDecimal() / (BigDecimal.ONE + (state.feeRates.taker.value.toBigDecimal().setScale(18) / FeeRate.MAX_VALUE.toBigDecimal()))).toQuoteAmount()
+    }
+
     private fun handleBackToBackOrder(
         request: BackToBackOrder,
         firstMarket: Market,
@@ -627,8 +631,10 @@ class SequencerApp(
                                 }
                             }
                         }
-                        OrderSide.Buy -> firstMarket.quantityAndNotionalForMarketSell(bridgeAssetAvailable, FeeRate(0)).let {
-                            it.first to secondMarket.quantityForMarketBuy(it.second - notionalFee(it.second, state.feeRates.taker))
+                        OrderSide.Buy -> firstMarket.quantityAndNotionalForMarketSell(bridgeAssetAvailable, FeeRate.zero).let {
+                            it.first to secondMarket.quantityForMarketBuy(
+                                adjustNotionalForTakerFee(it.second),
+                            )
                         }
                     }
 
@@ -637,7 +643,9 @@ class SequencerApp(
                         OrderSide.Buy ->
                             Pair(
                                 bridgeAssetAvailable,
-                                secondMarket.quantityForMarketBuy(bridgeAssetAvailable.toQuoteAmount() - notionalFee(bridgeAssetAvailable.toQuoteAmount(), state.feeRates.taker)),
+                                secondMarket.quantityForMarketBuy(
+                                    adjustNotionalForTakerFee(bridgeAssetAvailable.toQuoteAmount()),
+                                ),
                             )
                         OrderSide.Sell ->
                             Pair(
@@ -654,7 +662,12 @@ class SequencerApp(
                         OrderSide.Sell -> firstLegQuote.toBaseAmount()
                         OrderSide.Buy -> firstLegBase
                     }
-                    OrderSide.Buy -> secondMarket.quantityForMarketBuy(firstLegQuote - notionalFee(firstLegQuote, state.feeRates.taker))
+                    OrderSide.Buy -> secondMarket.quantityForMarketBuy(
+                        when (firstSide) {
+                            OrderSide.Sell -> adjustNotionalForTakerFee(firstLegQuote)
+                            OrderSide.Buy -> adjustNotionalForTakerFee(firstLegBase.toQuoteAmount())
+                        },
+                    )
                 },
             )
         }
@@ -680,10 +693,8 @@ class SequencerApp(
             )
         }
 
-        if (firstSide === OrderSide.Buy) {
-            checkLimits(firstMarket, firstOrderBatch)?.let {
-                return it
-            }
+        checkLimits(firstMarket, firstOrderBatch)?.let {
+            return it
         }
 
         // make sure 2nd leg meets min fee requirement.
@@ -709,6 +720,7 @@ class SequencerApp(
             firstOrderBatch,
             FeeRates(state.feeRates.maker, FeeRate(0)),
         )
+
         val disposition = firstOrderResult.ordersChanged.firstOrNull()?.disposition
         if (disposition == OrderDisposition.Filled || disposition == OrderDisposition.PartiallyFilled) {
             applyBalanceAndConsumptionChanges(

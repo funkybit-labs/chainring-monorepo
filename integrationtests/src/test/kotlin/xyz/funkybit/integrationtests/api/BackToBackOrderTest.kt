@@ -331,7 +331,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 assertEquals(OrderSide.Sell, it.trades[1].side)
                 assertEquals(BigDecimal("2.999999999999999999").toFundamentalUnits(btc2.decimals), it.trades[1].amount)
                 assertEquals(BigDecimal("66000.00").setScale(18), it.trades[1].price)
-                assertEquals(BigDecimal("3959.999999").toFundamentalUnits(usdc2.decimals), it.trades[1].feeAmount)
+                assertEquals(BigDecimal("3960.0").toFundamentalUnits(usdc2.decimals), it.trades[1].feeAmount)
                 assertEquals(usdc2.name, it.trades[1].feeSymbol.value)
             }
             assertMyOrderUpdatedMessageReceived {
@@ -341,7 +341,7 @@ class BackToBackOrderTest : OrderBaseTest() {
             assertBalancesMessageReceived(
                 listOf(
                     ExpectedBalance(inputSymbol, total = BigDecimal("4.9"), available = BigDecimal("1.929702970297029703")),
-                    ExpectedBalance(outputSymbol, total = BigDecimal("0"), available = BigDecimal("194040")),
+                    ExpectedBalance(outputSymbol, total = BigDecimal("0"), available = BigDecimal("194039.999999")),
                 ),
             )
             assertLimitsMessageReceived()
@@ -383,18 +383,21 @@ class BackToBackOrderTest : OrderBaseTest() {
         val makerFeeTrade2 = notionalTrade2 * BigDecimal("0.01").setScale(18)
         val takerFee = notionalTrade2 * BigDecimal("0.02")
 
+        val btc2RoundingAdjustment = AssetAmount(btc2, BigInteger.ONE)
+        val usdc2RoundingAdjustment = AssetAmount(usdc2, BigInteger.ONE)
+
         assertBalances(
             listOf(
                 ExpectedBalance(makerStartingInputBalance + AssetAmount(btc, BigDecimal("2.970297029702970297"))),
-                ExpectedBalance(makerStartingBridgeBalance - makerFeeTrade1),
-                ExpectedBalance(makerStartingOutputBalance - notionalTrade2 - makerFeeTrade2),
+                ExpectedBalance(makerStartingBridgeBalance - makerFeeTrade1 - btc2RoundingAdjustment),
+                ExpectedBalance(makerStartingOutputBalance - notionalTrade2 - makerFeeTrade2 - usdc2RoundingAdjustment),
             ),
             makerApiClient.getBalances().balances,
         )
         assertBalances(
             listOf(
                 ExpectedBalance(takerStartingInputBalance - AssetAmount(btc, trade1.amount)),
-                ExpectedBalance(takerStartingOutputBalance + notionalTrade2 - takerFee),
+                ExpectedBalance(takerStartingOutputBalance + notionalTrade2 - takerFee - usdc2RoundingAdjustment),
             ),
             takerApiClient.getBalances().balances,
         )
@@ -449,7 +452,16 @@ class BackToBackOrderTest : OrderBaseTest() {
         val outputPrice = BigDecimal("1.05")
         val bridgePrice = BigDecimal("18")
         val firstLegOrderAmount = AssetAmount(btc2, BigDecimal("0.5"))
-        val secondLegOrderAmount = AssetAmount(btc, firstLegOrderAmount.amount) * (BigDecimal.ONE.setScale(18) / outputPrice) * BigDecimal("0.98")
+        val secondLegOrderAmount = AssetAmount(
+            btc,
+            firstLegOrderAmount.amount *
+                // notional -> base adjustment
+                BigDecimal.ONE.setScale(18) / outputPrice /
+                // fee adjustment
+                BigDecimal("1.02") -
+                // rounding adjustment
+                BigDecimal(1).movePointLeft(18),
+        )
 
         val limitSellOrder1 = makerApiClient.batchOrders(
             BatchOrdersApiRequest(
@@ -521,9 +533,9 @@ class BackToBackOrderTest : OrderBaseTest() {
 
                 assertEquals(btcbtc2Market.id, it.trades[1].marketId)
                 assertEquals(OrderSide.Buy, it.trades[1].side)
-                assertTrue((secondLegOrderAmount.inFundamentalUnits - it.trades[1].amount).abs() <= BigInteger.ONE)
+                assertEquals(secondLegOrderAmount.inFundamentalUnits, it.trades[1].amount)
                 assertEquals(outputPrice.setScale(18), it.trades[1].price)
-                assertEquals(BigDecimal("0.0098").toFundamentalUnits(bridgeSymbol.decimals), it.trades[1].feeAmount)
+                assertEquals(BigDecimal("0.009803921568627451").toFundamentalUnits(bridgeSymbol.decimals), it.trades[1].feeAmount)
                 assertEquals(btc2.name, it.trades[1].feeSymbol.value)
             }
             assertMyOrderUpdatedMessageReceived {
@@ -532,7 +544,7 @@ class BackToBackOrderTest : OrderBaseTest() {
             }
             assertBalancesMessageReceived(
                 listOf(
-                    ExpectedBalance(outputSymbol, total = BigDecimal("0"), available = BigDecimal("0.466666666666666667")),
+                    ExpectedBalance(outputSymbol, total = BigDecimal("0"), available = BigDecimal("0.466853408029878617")),
                     ExpectedBalance(inputSymbol, total = BigDecimal("10"), available = BigDecimal("1.000000000000000018")),
                 ),
             )
@@ -576,9 +588,12 @@ class BackToBackOrderTest : OrderBaseTest() {
         val makerFeeTrade2 = notionalTrade2 * BigDecimal("0.01")
         val takerFee = notionalTrade2 * BigDecimal("0.02")
 
+        val eth2RoundingAdjustment = AssetAmount(eth2, BigInteger.ONE)
+        val btc2RoundingAdjustment = AssetAmount(btc2, BigInteger.ONE)
+
         assertBalances(
             listOf(
-                ExpectedBalance(makerStartingInputBalance + notionalTrade1 - makerFeeTrade1),
+                ExpectedBalance(makerStartingInputBalance + notionalTrade1 - makerFeeTrade1 - eth2RoundingAdjustment),
                 ExpectedBalance(makerStartingBridgeBalance - baseTrade1 + notionalTrade2 - makerFeeTrade2),
                 ExpectedBalance(makerStartingOutputBalance - AssetAmount(outputSymbol, trade2.amount)),
             ),
@@ -588,7 +603,7 @@ class BackToBackOrderTest : OrderBaseTest() {
             listOf(
                 ExpectedBalance(takerStartingOutputBalance + AssetAmount(outputSymbol, trade2.amount)),
                 ExpectedBalance(takerStartingInputBalance - notionalTrade1),
-                ExpectedBalance(takerStartingBridgeBalance + baseTrade1 - notionalTrade2 - takerFee),
+                ExpectedBalance(takerStartingBridgeBalance + baseTrade1 - notionalTrade2 - takerFee - btc2RoundingAdjustment),
             ),
             takerApiClient.getBalances().balances,
         )
@@ -637,14 +652,20 @@ class BackToBackOrderTest : OrderBaseTest() {
         val makerStartingBridgeBalance = makerWallet.getExchangeBalance(bridgeSymbol)
         val makerStartingInputBalance = makerWallet.getExchangeBalance(inputSymbol)
         val takerStartingOutputBalance = takerWallet.getExchangeBalance(outputSymbol)
-        val takerStartingBridgeBalance = takerWallet.getExchangeBalance(bridgeSymbol)
         val takerStartingInputBalance = takerWallet.getExchangeBalance(inputSymbol)
 
         val firstLegPrice = BigDecimal("17.55")
         val secondLegPrice = BigDecimal("1.01")
         val secondLegAvailableAmount = AssetAmount(btc, "0.81")
         val secondLegNotional = notional(secondLegAvailableAmount.inFundamentalUnits.toBaseAmount(), secondLegPrice, btc.decimals.toInt(), btc2.decimals.toInt())
-        val secondLegOrderAmount = secondLegAvailableAmount * BigDecimal("0.98")
+        val secondLegOrderAmount = AssetAmount(
+            btc,
+            secondLegAvailableAmount.amount /
+                // fee adjustment
+                BigDecimal("1.02") +
+                // rounding adjustment
+                BigDecimal(1).movePointLeft(18),
+        )
         val firstLegAvailableAmount = AssetAmount(btc2, "1.15")
 
         val limitSellOrder1 = makerApiClient.batchOrders(
@@ -720,7 +741,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 assertEquals(OrderSide.Buy, it.trades[1].side)
                 assertEquals(secondLegOrderAmount.inFundamentalUnits, it.trades[1].amount)
                 assertEquals(secondLegPrice.setScale(18), it.trades[1].price)
-                assertEquals(BigDecimal("0.01603476").toFundamentalUnits(inputSymbol.decimals), it.trades[1].feeAmount)
+                assertEquals(BigDecimal("0.016041176470588235").toFundamentalUnits(inputSymbol.decimals), it.trades[1].feeAmount)
                 assertEquals(btc2.name, it.trades[1].feeSymbol.value)
             }
             assertMyOrderUpdatedMessageReceived {
@@ -769,12 +790,13 @@ class BackToBackOrderTest : OrderBaseTest() {
 
         val makerFeeTrade1 = notionalTrade1 * BigDecimal("0.01")
         val makerFeeTrade2 = notionalTrade2 * BigDecimal("0.01")
-        val takerFee = notionalTrade2 * BigDecimal("0.02")
+
+        val btc2RoundingAdjustment = AssetAmount(btc2, BigInteger.ONE)
 
         assertBalances(
             listOf(
                 ExpectedBalance(makerStartingOutputBalance - secondLegOrderAmount),
-                ExpectedBalance(makerStartingBridgeBalance - AssetAmount(bridgeSymbol, trade1.amount) + notionalTrade2 - makerFeeTrade2),
+                ExpectedBalance(makerStartingBridgeBalance - AssetAmount(bridgeSymbol, trade1.amount) + notionalTrade2 - makerFeeTrade2 - btc2RoundingAdjustment),
                 ExpectedBalance(makerStartingInputBalance + notionalTrade1 - makerFeeTrade1),
             ),
             makerApiClient.getBalances().balances,
@@ -783,7 +805,6 @@ class BackToBackOrderTest : OrderBaseTest() {
             listOf(
                 ExpectedBalance(takerStartingOutputBalance + secondLegOrderAmount),
                 ExpectedBalance(takerStartingInputBalance - notionalTrade1),
-                ExpectedBalance(takerStartingBridgeBalance + AssetAmount(bridgeSymbol, trade1.amount) - notionalTrade2 - takerFee),
             ),
             takerApiClient.getBalances().balances,
         )
@@ -837,7 +858,7 @@ class BackToBackOrderTest : OrderBaseTest() {
 
         val bridgePrice = BigDecimal("20.0").setScale(18)
         val inputOrderAmount = AssetAmount(btc, BigDecimal("1.0"))
-        val bridgeOrderAmount = AssetAmount(eth2, inputOrderAmount.amount) * bridgePrice * BigDecimal("0.98")
+        val bridgeOrderAmount = AssetAmount(eth2, inputOrderAmount.amount) * bridgePrice / BigDecimal("1.02")
         val outputPrice = BigDecimal("19.5")
 
         val limitBuyOrder = makerApiClient.batchOrders(
@@ -912,7 +933,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 assertEquals(OrderSide.Buy, it.trades[1].side)
                 assertEquals(AssetAmount(btc2, bridgeOrderAmount.amount.setScale(18, RoundingMode.HALF_EVEN) / outputPrice.setScale(18)).inFundamentalUnits, it.trades[1].amount)
                 assertEquals(outputPrice.setScale(18), it.trades[1].price)
-                assertEquals(BigDecimal("0.3919999999999999999").toFundamentalUnits(outputSymbol.decimals), it.trades[1].feeAmount)
+                assertEquals(BigDecimal("0.392156862745098039").toFundamentalUnits(outputSymbol.decimals), it.trades[1].feeAmount)
                 assertEquals(eth2.name, it.trades[1].feeSymbol.value)
             }
             assertMyOrderUpdatedMessageReceived {
@@ -922,7 +943,7 @@ class BackToBackOrderTest : OrderBaseTest() {
             assertBalancesMessageReceived(
                 listOf(
                     ExpectedBalance(inputSymbol, total = BigDecimal("1.0"), available = BigDecimal("0.0")),
-                    ExpectedBalance(outputSymbol, total = BigDecimal("0"), available = BigDecimal("1.005128205128205128")),
+                    ExpectedBalance(outputSymbol, total = BigDecimal("0"), available = BigDecimal("1.005530417295123177")),
                 ),
             )
             assertLimitsMessageReceived()
@@ -971,10 +992,12 @@ class BackToBackOrderTest : OrderBaseTest() {
         val makerFeeTrade2 = AssetAmount(bridgeSymbol, notionalTrade2.amount) * BigDecimal("0.01")
         val takerFee = AssetAmount(bridgeSymbol, notionalTrade2.amount) * BigDecimal("0.02")
 
+        val eth2RoundingAdjustment = AssetAmount(eth2, BigInteger.ONE)
+
         assertBalances(
             listOf(
                 ExpectedBalance(makerStartingInputBalance + inputOrderAmount),
-                ExpectedBalance(makerStartingBridgeBalance - notionalTrade1 + bridgeAmount - makerFeeTrade1 - makerFeeTrade2),
+                ExpectedBalance(makerStartingBridgeBalance - notionalTrade1 + bridgeAmount - makerFeeTrade1 - makerFeeTrade2 - eth2RoundingAdjustment),
                 ExpectedBalance(makerStartingOutputBalance - outputAmount),
             ),
             makerApiClient.getBalances().balances,
@@ -1034,7 +1057,6 @@ class BackToBackOrderTest : OrderBaseTest() {
         val makerStartingBridgeBalance = makerWallet.getExchangeBalance(bridgeSymbol)
         val makerStartingOutputBalance = makerWallet.getExchangeBalance(outputSymbol)
         val takerStartingInputBalance = takerWallet.getExchangeBalance(inputSymbol)
-        val takerStartingBridgeBalance = takerWallet.getExchangeBalance(bridgeSymbol)
         val takerStartingOutputBalance = takerWallet.getExchangeBalance(outputSymbol)
 
         val bridgePrice = BigDecimal("17.0").setScale(18)
@@ -1114,7 +1136,7 @@ class BackToBackOrderTest : OrderBaseTest() {
                 assertEquals(OrderSide.Sell, it.trades[1].side)
                 assertEquals(it.trades[0].amount, it.trades[1].amount)
                 assertEquals(outputPrice.setScale(18), it.trades[1].price)
-                assertEquals(BigDecimal("0.308823529411764705").toFundamentalUnits(outputSymbol.decimals), it.trades[1].feeAmount)
+                assertEquals(BigDecimal("0.308823529411764706").toFundamentalUnits(outputSymbol.decimals), it.trades[1].feeAmount)
                 assertEquals(eth2.name, it.trades[1].feeSymbol.value)
             }
             assertMyOrderUpdatedMessageReceived {
@@ -1124,7 +1146,7 @@ class BackToBackOrderTest : OrderBaseTest() {
             assertBalancesMessageReceived(
                 listOf(
                     ExpectedBalance(inputSymbol, total = BigDecimal("15.2"), available = BigDecimal("0.200000000000000004")),
-                    ExpectedBalance(outputSymbol, total = BigDecimal("0"), available = BigDecimal("15.132352941176470585")),
+                    ExpectedBalance(outputSymbol, total = BigDecimal("0"), available = BigDecimal("15.132352941176470584")),
                 ),
             )
             assertLimitsMessageReceived()
@@ -1167,18 +1189,21 @@ class BackToBackOrderTest : OrderBaseTest() {
         val makerFeeTrade2 = AssetAmount(outputSymbol, notionalTrade2.amount) * BigDecimal("0.01")
         val takerFee = AssetAmount(outputSymbol, notionalTrade2.amount) * BigDecimal("0.02")
 
+        val ethRoundingAdjustment = AssetAmount(eth, BigInteger.ONE)
+        val eth2RoundingAdjustment = AssetAmount(eth2, BigInteger.ONE)
+
         assertBalances(
             listOf(
-                ExpectedBalance(makerStartingInputBalance + notionalTrade1 - makerFeeTrade1),
+                ExpectedBalance(makerStartingInputBalance + notionalTrade1 - makerFeeTrade1 - ethRoundingAdjustment),
                 ExpectedBalance(makerStartingBridgeBalance - AssetAmount(bridgeSymbol, trade1.amount) + bridgeAmount),
-                ExpectedBalance(makerStartingOutputBalance - notionalTrade2 - makerFeeTrade2),
+                ExpectedBalance(makerStartingOutputBalance - notionalTrade2 - makerFeeTrade2 - eth2RoundingAdjustment),
             ),
             makerApiClient.getBalances().balances,
         )
         assertBalances(
             listOf(
                 ExpectedBalance(takerStartingInputBalance - notionalTrade1),
-                ExpectedBalance(takerStartingOutputBalance + notionalTrade2 - takerFee),
+                ExpectedBalance(takerStartingOutputBalance + notionalTrade2 - takerFee - eth2RoundingAdjustment),
             ),
             takerApiClient.getBalances().balances,
         )

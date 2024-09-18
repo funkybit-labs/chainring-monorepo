@@ -4,7 +4,6 @@ import com.google.protobuf.kotlin.toByteString
 import xyz.funkybit.sequencer.proto.IntegerValue
 import java.math.BigDecimal
 import java.math.BigInteger
-import java.math.RoundingMode
 
 @JvmInline
 value class WalletAddress(val value: Long) {
@@ -143,7 +142,7 @@ value class BaseAmount(val value: BigInteger) {
 }
 
 fun BigDecimal.toQuoteAmount() = QuoteAmount(this.toBigInteger())
-fun BigDecimal.toBaseAmount() = BaseAmount(this.setScale(0, RoundingMode.HALF_EVEN).toBigIntegerExact())
+fun BigDecimal.toBaseAmount() = BaseAmount(this.toBigInteger())
 fun BigInteger.toQuoteAmount() = QuoteAmount(this)
 fun BigInteger.toBaseAmount() = BaseAmount(this)
 fun IntegerValue.toQuoteAmount() = QuoteAmount(this.toBigInteger())
