@@ -37,7 +37,7 @@ import xyz.funkybit.contracts.generated.ERC20
 import xyz.funkybit.contracts.generated.Exchange
 import xyz.funkybit.contracts.generated.MockERC20
 import xyz.funkybit.contracts.generated.UUPSUpgradeable
-import xyz.funkybit.core.evm.BatchSettlement
+import xyz.funkybit.core.evm.EvmSettlement
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
@@ -460,12 +460,12 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
             .rollbackBatch()
             .encodeFunctionCall()
 
-    fun encodePrepareSettlementBatchFunctionCall(batchSettlement: BatchSettlement): String =
+    fun encodePrepareSettlementBatchFunctionCall(batchSettlement: EvmSettlement.Batch): String =
         loadExchangeContract(exchangeContractAddress)
             .prepareSettlementBatch(DefaultFunctionEncoder().encodeParameters(listOf(batchSettlement)).toHexBytes())
             .encodeFunctionCall()
 
-    fun encodeSubmitSettlementBatchFunctionCall(batchSettlement: BatchSettlement): String =
+    fun encodeSubmitSettlementBatchFunctionCall(batchSettlement: EvmSettlement.Batch): String =
         loadExchangeContract(exchangeContractAddress)
             .submitSettlementBatch(DefaultFunctionEncoder().encodeParameters(listOf(batchSettlement)).toHexBytes())
             .encodeFunctionCall()

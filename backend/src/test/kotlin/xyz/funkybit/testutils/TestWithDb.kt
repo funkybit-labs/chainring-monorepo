@@ -91,10 +91,10 @@ open class TestWithDb {
             OHLCTable.deleteAll()
             FaucetDripTable.deleteAll()
             MarketTable.deleteAll()
+            ArchAccountTable.deleteAll()
             SymbolTable.deleteAll()
             ChainTable.deleteAll()
             BitcoinWalletStateTable.deleteAll()
-            ArchAccountTable.deleteAll()
         }
     }
 }

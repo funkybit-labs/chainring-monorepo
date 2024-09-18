@@ -3,18 +3,23 @@ package xyz.funkybit.apps.ring
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.abi.DefaultFunctionEncoder
 import xyz.funkybit.apps.api.model.websocket.MyTradesUpdated
 import xyz.funkybit.core.blockchain.BlockchainClient
 import xyz.funkybit.core.blockchain.DefaultBlockParam
-import xyz.funkybit.core.evm.Adjustment
-import xyz.funkybit.core.evm.BatchSettlement
+import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
+import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.evm.ECHelper.sha3
-import xyz.funkybit.core.evm.TokenAdjustmentList
-import xyz.funkybit.core.evm.WalletTradeList
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.model.Settlement
+import xyz.funkybit.core.model.WalletAndSymbol
+import xyz.funkybit.core.model.bitcoin.ArchAccountState
+import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
+import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.BalanceChange
 import xyz.funkybit.core.model.db.BalanceEntity
 import xyz.funkybit.core.model.db.BalanceType
@@ -25,6 +30,7 @@ import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ChainSettlementBatchEntity
 import xyz.funkybit.core.model.db.MarketEntity
 import xyz.funkybit.core.model.db.MarketId
+import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderExecutionEntity
 import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.SettlementBatchEntity
@@ -33,11 +39,16 @@ import xyz.funkybit.core.model.db.SettlementStatus
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.SymbolId
 import xyz.funkybit.core.model.db.TradeEntity
+import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.WalletEntity
+import xyz.funkybit.core.model.db.WalletId
 import xyz.funkybit.core.model.db.publishBroadcasterNotifications
+import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.utils.BlockchainUtils.getAsOfBlockOrLater
+import xyz.funkybit.core.utils.bitcoin.ArchUtils
+import xyz.funkybit.core.utils.bitcoin.ArchUtils.retrieveOrCreateBalanceIndexes
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.core.utils.toHexBytes
 import xyz.funkybit.core.utils.tryAcquireAdvisoryLock
@@ -47,6 +58,9 @@ import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.concurrent.thread
 import kotlin.time.Duration.Companion.milliseconds
+
+class ChainNotReadyForSettlementException() : Exception("chain not ready for settlement")
+class BatchSizeExceedsChainLimitException(val numTrades: Int) : Exception("batch size exceeds chain limit")
 
 class SettlementCoordinator(
     blockchainClients: List<BlockchainClient>,
@@ -59,7 +73,7 @@ class SettlementCoordinator(
 ) {
     private val marketMap = mutableMapOf<MarketId, MarketEntity>()
     private val symbolMap = mutableMapOf<SymbolId, SymbolEntity>()
-    private val chainIds = blockchainClients.map { it.chainId }
+    private val chainIds = blockchainClients.map { it.chainId } + if (BitcoinClient.bitcoinConfig.enabled) listOf(BitcoinClient.chainId) else listOf()
     private val blockchainClientsByChainId = blockchainClients.associateBy { it.chainId }
     private val advisoryLockKey = Long.MAX_VALUE
 
@@ -103,7 +117,7 @@ class SettlementCoordinator(
 
     private fun processSettlementBatch(): Boolean {
         val batch = SettlementBatchEntity.findInProgressBatch()
-            ?: createNextBatch()
+            ?: createNextBatchWithLimitBackoff()
             ?: return false
 
         return when (batch.status) {
@@ -159,8 +173,23 @@ class SettlementCoordinator(
         completeSettlement(tradesSettling, batch.submissionTxBlockNumbers())
     }
 
-    private fun createNextBatch(): SettlementBatchEntity? {
-        val tradesToPrepare = TradeEntity.findPendingForNewSettlementBatch()
+    fun createNextBatchWithLimitBackoff(): SettlementBatchEntity? {
+        var limit = 100
+        while (true) {
+            try {
+                return createNextBatch(limit)
+            } catch (e: BatchSizeExceedsChainLimitException) {
+                if (e.numTrades > 10) {
+                    limit = maxOf(e.numTrades - 10, 10)
+                } else {
+                    throw Exception("10 trades and limit error, something wrong")
+                }
+            }
+        }
+    }
+
+    private fun createNextBatch(limit: Int = 100): SettlementBatchEntity? {
+        val tradesToPrepare = TradeEntity.findPendingForNewSettlementBatch(limit = limit)
         if (tradesToPrepare.isEmpty()) {
             return null
         }
@@ -182,15 +211,40 @@ class SettlementCoordinator(
             return null
         }
 
+        val batchSettlementsByChain = getBatchSettlements(tradesToPrepare)
+        val transactionDataByChain: Map<ChainId, Pair<BlockchainTransactionData, String>> = batchSettlementsByChain.mapValues { (chainId, batchSettlement) ->
+            try {
+                createBlockchainTransactionDataAndHash(chainId, batchSettlement, tradesToPrepare.size)
+            } catch (e: ChainNotReadyForSettlementException) {
+                return null
+            }
+        }
+
         return SettlementBatchEntity.create().also {
             TradeEntity.markAsSettling(tradesToPrepare.map { it.guid.value }, it)
-            getBatchSettlements(tradesToPrepare).forEach { (chainId, batchSettlement) ->
+            transactionDataByChain.forEach { (chainId, transactionDataAndHash) ->
                 ChainSettlementBatchEntity.create(
                     chainId = chainId,
                     settlementBatch = it,
-                    createBlockchainTransactionRecord(chainId, batchSettlement, calculateBatchHash(batchSettlement)),
+                    createBlockchainTransactionRecord(chainId, transactionDataAndHash.first, transactionDataAndHash.second),
                 )
             }
+        }
+    }
+
+    private fun createBlockchainTransactionDataAndHash(chainId: ChainId, batchSettlement: Settlement.Batch, numTrades: Int? = null, isSubmit: Boolean = false): Pair<BlockchainTransactionData, String> {
+        return when (chainId.networkType()) {
+            NetworkType.Bitcoin -> {
+                val indexMap = retrieveOrCreateBalanceIndexes(batchSettlement) ?: run {
+                    logger.warn { "Hit settlement but not all token addresses are set up" }
+                    throw ChainNotReadyForSettlementException()
+                }
+                createArchBlockchainTransactionData(batchSettlement, indexMap, numTrades = numTrades, isSubmit = isSubmit)
+            }
+            NetworkType.Evm -> Pair(
+                createEvmBlockchainTransactionData(chainId, batchSettlement, isSubmit = isSubmit),
+                calculateEvmBatchHash(chainId, batchSettlement),
+            )
         }
     }
 
@@ -209,8 +263,9 @@ class SettlementCoordinator(
             val chainId = chainSettlementBatch.chainId.value
             val batchSettlement = batchSettlementsByChainId[chainId]
             if (batchSettlement != null) {
+                val (transactionData, batchHash) = createBlockchainTransactionDataAndHash(chainId, batchSettlement)
                 chainSettlementBatch.markAsPreparing(
-                    createBlockchainTransactionRecord(chainId, batchSettlement, calculateBatchHash(batchSettlement)),
+                    createBlockchainTransactionRecord(chainId, transactionData, batchHash),
                 )
             } else {
                 // no remaining for this chain - mark as complete
@@ -223,15 +278,27 @@ class SettlementCoordinator(
         batch.markAsRollingBack()
         batch.chainBatches.filter { it.status == SettlementBatchStatus.Prepared }.forEach {
             val chainId = it.chainId.value
-            val blockchainClient = blockchainClientsByChainId.getValue(chainId)
-            it.markAsRollingBack(
-                BlockchainTransactionEntity.create(
-                    chainId = chainId,
-                    transactionData = BlockchainTransactionData(
+            val transactionData = when (chainId.networkType()) {
+                NetworkType.Evm -> {
+                    val blockchainClient = blockchainClientsByChainId.getValue(chainId)
+                    BlockchainTransactionData(
                         blockchainClient.encodeRollbackBatchFunctionCall(),
                         blockchainClient.exchangeContractAddress,
                         BigInteger.ZERO,
-                    ),
+                    )
+                }
+                NetworkType.Bitcoin -> {
+                    BlockchainTransactionData(
+                        Json.encodeToString(ArchUtils.buildRollbackSettlementBatchInstruction(archProgramPubkey())),
+                        EvmAddress.zero,
+                        BigInteger.ZERO,
+                    )
+                }
+            }
+            it.markAsRollingBack(
+                BlockchainTransactionEntity.create(
+                    chainId = chainId,
+                    transactionData = transactionData,
                     null,
                 ),
             )
@@ -253,8 +320,9 @@ class SettlementCoordinator(
             val chainId = chainSettlementBatch.chainId.value
             val batchSettlement = batchSettlementsByChainId[chainId]
             if (batchSettlement != null) {
+                val transactionData = createBlockchainTransactionDataAndHash(chainId, batchSettlement, isSubmit = true).first
                 chainSettlementBatch.markAsSubmitting(
-                    createBlockchainTransactionRecord(chainId, batchSettlement, chainSettlementBatch.preparationTx.batchHash, isSubmit = true),
+                    createBlockchainTransactionRecord(chainId, transactionData, chainSettlementBatch.preparationTx.batchHash),
                 )
             } else {
                 // no remaining for this chain - mark as complete
@@ -263,19 +331,26 @@ class SettlementCoordinator(
         }
     }
 
-    private fun getBatchSettlements(trades: List<TradeEntity>): Map<ChainId, BatchSettlement> {
+    private fun getBatchSettlements(trades: List<TradeEntity>): Map<ChainId, Settlement.Batch> {
         val executions = OrderExecutionEntity.findForTrades(trades)
         return chainIds.mapNotNull { chainId ->
             val wallets = mutableSetOf<Address>()
-            val tradeGuids = mutableMapOf<Address, MutableSet<ByteArray>>()
+            val tradeGuids = mutableMapOf<Address, MutableSet<TxHash>>()
             val balanceAdjustments = mutableMapOf<SymbolId, MutableMap<Address, BigInteger>>()
             val feeAmounts = mutableMapOf<SymbolId, BigInteger>()
             val netAmounts = mutableMapOf<SymbolId, BigInteger>()
+            val walletIdMap = mutableMapOf<Address, WalletId>()
             executions.filter { isForChain(it.trade.marketGuid.value, chainId) }.forEach {
                 val market = getMarket(it.trade.marketGuid.value)
-                val walletAddress = it.order.wallet.address
+                val walletForNetwork = if (chainId.networkType() == it.order.wallet.networkType) {
+                    it.order.wallet
+                } else {
+                    it.order.wallet.authorizedWallet(chainId.networkType())!!
+                }
+                val walletAddress = walletForNetwork.address
                 wallets.add(walletAddress)
-                tradeGuids.getOrPut(walletAddress) { mutableSetOf() }.add(it.trade.tradeHash.toHexBytes())
+                walletIdMap[walletAddress] = walletForNetwork.guid.value
+                tradeGuids.getOrPut(walletAddress) { mutableSetOf() }.add(TxHash(it.trade.tradeHash))
                 val baseSymbolEntity = symbolMap.getValue(market.baseSymbolGuid.value)
                 val quoteSymbolEntity = symbolMap.getValue(market.quoteSymbolGuid.value)
                 val baseSymbolId = baseSymbolEntity.guid.value
@@ -343,20 +418,19 @@ class SettlementCoordinator(
             }
             if (wallets.isNotEmpty()) {
                 val walletAddresses = wallets.toList()
-                chainId to BatchSettlement(
-                    walletAddresses.map { it.toString() },
+                chainId to Settlement.Batch(
+                    walletAddresses.map { Address.auto(it.toString()) },
                     walletAddresses.map { walletAddress ->
-                        WalletTradeList(
-                            tradeGuids.getValue(walletAddress).toList(),
-                        )
+                        tradeGuids.getValue(walletAddress).toList()
                     },
                     (balanceAdjustments.keys).map { symbolId ->
-                        TokenAdjustmentList(
+                        Settlement.TokenAdjustmentList(
+                            symbolId = symbolId,
                             token = (symbolMap.getValue(symbolId).contractAddress ?: EvmAddress.zero).toString(),
                             increments = balanceAdjustments.getValue(symbolId).filter { it.value > BigInteger.ZERO }
-                                .map { Adjustment(walletAddresses.indexOf(it.key).toBigInteger(), it.value) },
+                                .map { Settlement.Adjustment(walletIdMap.getValue(it.key), walletAddresses.indexOf(it.key), it.value) },
                             decrements = balanceAdjustments.getValue(symbolId).filter { it.value < BigInteger.ZERO }
-                                .map { Adjustment(walletAddresses.indexOf(it.key).toBigInteger(), it.value.abs()) },
+                                .map { Settlement.Adjustment(walletIdMap.getValue(it.key), walletAddresses.indexOf(it.key), it.value.abs()) },
                             feeAmount = feeAmounts.getOrDefault(symbolId, BigInteger.ZERO),
                         )
                     },
@@ -366,17 +440,50 @@ class SettlementCoordinator(
             }
         }.toMap()
     }
-    private fun createBlockchainTransactionRecord(chainId: ChainId, batchSettlement: BatchSettlement, batchHash: String?, isSubmit: Boolean = false): BlockchainTransactionEntity {
+
+    private fun createArchBlockchainTransactionData(batchSettlement: Settlement.Batch, indexMap: Map<WalletAndSymbol, Int>, numTrades: Int? = null, isSubmit: Boolean = false): Pair<BlockchainTransactionData, String> {
+        val (instruction, batchHash) = if (isSubmit) {
+            ArchUtils.buildSubmitSettlementBatchInstruction(
+                archProgramPubkey(),
+                batchSettlement,
+                indexMap,
+            )
+        } else {
+            ArchUtils.buildPrepareSettlementBatchInstruction(
+                archProgramPubkey(),
+                batchSettlement,
+                indexMap,
+            ).also {
+                if (numTrades != null && it.first.serialize().size > ArchNetworkClient.MAX_INSTRUCTION_SIZE) {
+                    throw BatchSizeExceedsChainLimitException(numTrades)
+                }
+            }
+        }
+
+        return Pair(
+            BlockchainTransactionData(
+                data = Json.encodeToString(instruction),
+                to = EvmAddress.zero,
+                value = BigInteger.ZERO,
+            ),
+            batchHash,
+        )
+    }
+
+    private fun createEvmBlockchainTransactionData(chainId: ChainId, batchSettlement: Settlement.Batch, isSubmit: Boolean = false): BlockchainTransactionData {
         val blockchainClient = blockchainClientsByChainId.getValue(chainId)
-        val transactionData = BlockchainTransactionData(
+        return BlockchainTransactionData(
             data = if (isSubmit) {
-                blockchainClient.encodeSubmitSettlementBatchFunctionCall(batchSettlement)
+                blockchainClient.encodeSubmitSettlementBatchFunctionCall(batchSettlement.toEvm())
             } else {
-                blockchainClient.encodePrepareSettlementBatchFunctionCall(batchSettlement)
+                blockchainClient.encodePrepareSettlementBatchFunctionCall(batchSettlement.toEvm())
             },
             to = blockchainClient.exchangeContractAddress,
             value = BigInteger.ZERO,
         )
+    }
+
+    private fun createBlockchainTransactionRecord(chainId: ChainId, transactionData: BlockchainTransactionData, batchHash: String?): BlockchainTransactionEntity {
         return BlockchainTransactionEntity.create(
             chainId = chainId,
             transactionData = transactionData,
@@ -384,9 +491,12 @@ class SettlementCoordinator(
         )
     }
 
-    private fun calculateBatchHash(batchSettlement: BatchSettlement): String {
-        return sha3(DefaultFunctionEncoder().encodeParameters(listOf(batchSettlement)).toHexBytes()).toHex(false)
+    private fun calculateEvmBatchHash(chainId: ChainId, batchSettlement: Settlement.Batch): String {
+        return sha3(DefaultFunctionEncoder().encodeParameters(listOf(batchSettlement.toEvm())).toHexBytes()).toHex(false)
     }
+
+    private fun archProgramPubkey(): ArchNetworkRpc.Pubkey =
+        ArchAccountEntity.findProgramAccount()!!.rpcPubkey()
 
     private fun notionalWithFee(amount: BigInteger, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int, feeAmount: BigInteger): BigInteger =
         (amount.toBigDecimal() * price).movePointRight(quoteDecimals - baseDecimals).toBigInteger() + feeAmount
@@ -460,19 +570,19 @@ class SettlementCoordinator(
                 }
 
                 wallets.forEach { wallet ->
-                    broadcasterNotifications.add(BroadcasterNotification.walletBalances(wallet))
+                    broadcasterNotifications.add(BroadcasterNotification.walletBalances(wallet.userGuid.value))
                 }
             }
         }
 
         trades
             .flatMap { it.executions }
-            .groupBy { it.order.wallet.address }
-            .forEach { (walletAddress, executions) ->
+            .groupBy { it.order.wallet.userGuid.value }
+            .forEach { (userId, executions) ->
                 broadcasterNotifications.add(
                     BroadcasterNotification(
                         MyTradesUpdated(executions.map { it.toTradeResponse() }),
-                        recipient = walletAddress,
+                        recipient = userId,
                     ),
                 )
             }
@@ -481,20 +591,38 @@ class SettlementCoordinator(
     }
 
     private fun updateBalances(wallets: List<WalletEntity>, symbolIds: List<SymbolId>, chainId: ChainId, blockNumber: BigInteger?) {
-        val getBalances: (DefaultBlockParam) -> Map<Address, Map<Address, BigInteger>> = { blockParam ->
-            blockchainClientsByChainId.getValue(chainId).getExchangeBalances(
-                wallets.map { it.address },
-                symbolIds.map { symbolMap.getValue(it).contractAddress ?: EvmAddress.zero },
-                blockParam,
-            )
+        val chainWallets = wallets.map { if (it.networkType == chainId.networkType()) it else it.authorizedWallet(chainId.networkType())!! }
+        val finalExchangeBalances = when (chainId.networkType()) {
+            NetworkType.Evm -> {
+                val getBalances: (DefaultBlockParam) -> Map<Address, Map<Address, BigInteger>> = { blockParam ->
+                    blockchainClientsByChainId.getValue(chainId).getExchangeBalances(
+                        chainWallets.map { it.address },
+                        symbolIds.map { symbolMap.getValue(it).contractAddress ?: EvmAddress.zero },
+                        blockParam,
+                    )
+                }
+                blockNumber?.let { number ->
+                    getAsOfBlockOrLater(DefaultBlockParam.BlockNumber(number), getBalances)
+                } ?: getBalances(DefaultBlockParam.Latest)
+            }
+            NetworkType.Bitcoin -> {
+                val balanceIndexes = ArchAccountBalanceIndexEntity.findForWalletsAndSymbols(chainWallets.map { it.id.value }, symbolIds)
+                chainWallets.associate { wallet ->
+                    wallet.address to symbolIds.associate {
+                        val entry = balanceIndexes[WalletAndSymbol(wallet.id.value, it)]!!
+                        EvmAddress.zero as Address to ArchUtils.getAccountState<ArchAccountState.Token>(
+                            entry.archAccount.rpcPubkey(),
+                        ).balances[entry.addressIndex].balance.toLong().toBigInteger()
+                    }
+                }.also {
+                    logger.debug { "Arch balances are $it" }
+                }
+            }
         }
-        val finalExchangeBalances = blockNumber?.let { number ->
-            getAsOfBlockOrLater(DefaultBlockParam.BlockNumber(number), getBalances)
-        } ?: getBalances(DefaultBlockParam.Latest)
 
         logger.debug { "finalExchangeBalances = $finalExchangeBalances" }
         BalanceEntity.updateBalances(
-            wallets.map { wallet ->
+            chainWallets.map { wallet ->
                 symbolIds.map { symbolId ->
                     val symbolInfo = symbolMap.getValue(symbolId)
                     BalanceChange.Replace(

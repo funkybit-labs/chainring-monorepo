@@ -189,7 +189,7 @@ class InputHandler(
                                 .deposit(currentState.amount, currentState.symbol)
                                 ?.let { txHash ->
                                     exchangeApiService
-                                        .deposit(currentWallet.evmAddress, CreateDepositApiRequest(currentState.symbol, currentState.amount, txHash))
+                                        .deposit(currentWallet.wallet, CreateDepositApiRequest(currentState.symbol, currentState.amount, txHash))
                                         .deposit.id
                                 }
 

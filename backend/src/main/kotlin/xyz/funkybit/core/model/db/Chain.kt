@@ -22,6 +22,9 @@ value class ChainId(val value: ULong) : Comparable<ChainId> {
     fun toLong(): Long = value.toLong()
     override fun compareTo(other: ChainId): Int = compareValuesBy(this, other) { it.value }
 
+    fun networkType(): NetworkType {
+        return if (this == ChainId(0u)) NetworkType.Bitcoin else NetworkType.Evm
+    }
     companion object {
         val empty = ChainId(BigInteger.ZERO)
     }

@@ -3,6 +3,7 @@ package xyz.funkybit.apps.ring
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -20,12 +21,16 @@ import xyz.funkybit.core.model.db.BalanceEntity
 import xyz.funkybit.core.model.db.BalanceType
 import xyz.funkybit.core.model.db.BlockchainTransactionData
 import xyz.funkybit.core.model.db.BlockchainTransactionEntity
+import xyz.funkybit.core.model.db.BlockchainTransactionStatus
 import xyz.funkybit.core.model.db.BroadcasterNotification
+import xyz.funkybit.core.model.db.ChainId
+import xyz.funkybit.core.model.db.ChainSettlementBatchEntity
 import xyz.funkybit.core.model.db.CreateArchAccountBalanceIndexAssignment
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.DepositStatus
 import xyz.funkybit.core.model.db.DepositTable
+import xyz.funkybit.core.model.db.SettlementBatchStatus
 import xyz.funkybit.core.model.db.TradeEntity
 import xyz.funkybit.core.model.db.UpdateArchAccountBalanceIndexAssignment
 import xyz.funkybit.core.model.db.WithdrawalEntity
@@ -38,6 +43,7 @@ import xyz.funkybit.core.services.UtxoSelectionService
 import xyz.funkybit.core.utils.bitcoin.ArchUtils
 import xyz.funkybit.core.utils.bitcoin.BitcoinInsufficientFundsException
 import xyz.funkybit.core.utils.toHex
+import xyz.funkybit.core.utils.tryAcquireAdvisoryLock
 import xyz.funkybit.sequencer.core.Asset
 import xyz.funkybit.sequencer.proto.SequencerError
 import kotlin.concurrent.thread
@@ -60,23 +66,62 @@ class ArchTransactionHandler(
     private var bitcoinWorkerThread: Thread? = null
     val logger = KotlinLogging.logger {}
 
+    private lateinit var programAccount: ArchAccountEntity
+    private lateinit var programStateAccount: ArchAccountEntity
+    private lateinit var programBitcoinAddress: BitcoinAddress
+
     fun start() {
         logger.debug { "Starting batch transaction handler for $chainId" }
         archWorkerThread = thread(start = true, name = "arch-transaction-handler-$chainId", isDaemon = true) {
             logger.debug { "Arch Transaction handler thread starting" }
-            val (programPubkey, programBitcoinAddress) = transaction {
-                Pair(
-                    ArchAccountEntity.findProgramAccount()!!.rpcPubkey(),
-                    DeployedSmartContractEntity.programBitcoinAddress(),
-                )
+            transaction {
+                programAccount = ArchAccountEntity.findProgramAccount()!!
+                programStateAccount = ArchAccountEntity.findProgramStateAccount()!!
+                programBitcoinAddress = DeployedSmartContractEntity.programBitcoinAddress()
+
+                val inProgressSettlementBatch = ChainSettlementBatchEntity.findInProgressBatch(chainId)
+                if (inProgressSettlementBatch == null && batchInProgressOnChain()) {
+                    logger.debug { "rolling back on chain on startup" }
+                    rollbackOnChain()
+                }
             }
+
+            var settlementBatchInProgress = false
+            var withdrawalBatchInProgress = false
 
             while (true) {
                 try {
                     transaction {
-                        processBalanceIndexBatch(programPubkey)
-                        processDepositBatch(programPubkey)
-                        processWithdrawalBatch(programBitcoinAddress, programPubkey)
+                        if (tryAcquireAdvisoryLock(chainId.value.toLong())) {
+                            processBalanceIndexBatch()
+                            processDepositBatch()
+                        }
+                    }
+                    if (withdrawalBatchInProgress) {
+                        withdrawalBatchInProgress = transaction {
+                            if (tryAcquireAdvisoryLock(chainId.value.toLong())) {
+                                processWithdrawalBatch()
+                            } else {
+                                withdrawalBatchInProgress(chainId)
+                            }
+                        }
+                    } else {
+                        settlementBatchInProgress = transaction {
+                            if (tryAcquireAdvisoryLock(chainId.value.toLong())) {
+                                processSettlementBatch()
+                            } else {
+                                settlementBatchInProgress(chainId)
+                            }
+                        }
+                        if (!settlementBatchInProgress) {
+                            withdrawalBatchInProgress = transaction {
+                                if (tryAcquireAdvisoryLock(chainId.value.toLong())) {
+                                    processWithdrawalBatch()
+                                } else {
+                                    withdrawalBatchInProgress(chainId)
+                                }
+                            }
+                        }
                     }
 
                     Thread.sleep(pollingInterval.inWholeMilliseconds)
@@ -121,12 +166,14 @@ class ArchTransactionHandler(
         }
     }
 
-    private fun processBalanceIndexBatch(programPubkey: ArchNetworkRpc.Pubkey): Boolean {
+    private fun processBalanceIndexBatch(): Boolean {
+        val programPubkey = programAccount.rpcPubkey()
         val assigningBalanceIndexUpdates = ArchAccountBalanceIndexEntity.findAllForStatus(ArchAccountBalanceIndexStatus.Assigning)
         return if (assigningBalanceIndexUpdates.isNotEmpty()) {
             assigningBalanceIndexUpdates.firstOrNull()?.entity?.archTransaction?.let { archTransaction ->
                 ArchNetworkClient.getProcessedTransaction(archTransaction.txHash!!)?.let { processedTx ->
                     if (processedTx.status == ArchNetworkRpc.Status.Processed) {
+                        Thread.sleep(2000)
                         archTransaction.markAsCompleted()
                         val assignments = assigningBalanceIndexUpdates.groupBy { it.archAccountAddress }.flatMap { (pubkey, updates) ->
                             val tokenAccountState: ArchAccountState.Token = ArchUtils.getAccountState(pubkey)
@@ -168,13 +215,21 @@ class ArchTransactionHandler(
         }
     }
 
-    private fun processDepositBatch(programPubkey: ArchNetworkRpc.Pubkey): Boolean {
+    private fun settlementBatchInProgress(chainId: ChainId) =
+        ChainSettlementBatchEntity.findInProgressBatch(chainId) != null
+
+    private fun withdrawalBatchInProgress(chainId: ChainId) =
+        WithdrawalEntity.findSettling(chainId).isNotEmpty()
+
+    private fun processDepositBatch(): Boolean {
+        val programPubkey = programAccount.rpcPubkey()
         val settlingDeposits = DepositEntity.getSettlingForUpdate(chainId)
         return if (settlingDeposits.isNotEmpty()) {
             // handle settling deposits
             settlingDeposits.first().archTransaction?.let { archTransaction ->
                 ArchNetworkClient.getProcessedTransaction(archTransaction.txHash!!)?.let {
                     if (it.status == ArchNetworkRpc.Status.Processed) {
+                        Thread.sleep(2000)
                         archTransaction.markAsCompleted()
                         BalanceEntity.updateBalances(
                             settlingDeposits.map { deposit ->
@@ -229,13 +284,18 @@ class ArchTransactionHandler(
         }
     }
 
-    private fun processWithdrawalBatch(programBitcoinAddress: BitcoinAddress, programPubkey: ArchNetworkRpc.Pubkey): Boolean {
+    private fun processWithdrawalBatch(): Boolean {
+        val programPubkey = programAccount.rpcPubkey()
+        if (settlementBatchInProgress(chainId)) {
+            return false
+        }
         val settlingWithdrawals = WithdrawalEntity.findSettlingOnArch()
         logger.debug { "processWithdrawalBatch count = ${settlingWithdrawals.size}" }
         return if (settlingWithdrawals.isNotEmpty()) {
             val archTransaction = settlingWithdrawals.first().archTransaction!!
             ArchNetworkClient.getProcessedTransaction(archTransaction.txHash!!)?.let { processedTx ->
                 if (processedTx.status == ArchNetworkRpc.Status.Processed) {
+                    Thread.sleep(2000)
                     archTransaction.markAsCompleted()
                     if (processedTx.bitcoinTxIds.isNotEmpty()) {
                         val bitcoinTxId = processedTx.bitcoinTxIds.first()
@@ -289,6 +349,95 @@ class ArchTransactionHandler(
         }
     }
 
+    private fun processSettlementBatch(): Boolean {
+        val inProgressBatch = ChainSettlementBatchEntity.findInProgressBatch(chainId)
+            ?: return false
+
+        return when (inProgressBatch.status) {
+            SettlementBatchStatus.Preparing -> {
+                when (inProgressBatch.preparationTx.status) {
+                    BlockchainTransactionStatus.Pending -> {
+                        // send prepare transaction call
+                        submitToArch(inProgressBatch.preparationTx)
+                    }
+                    BlockchainTransactionStatus.Submitted -> {
+                        refreshSubmittedTransaction(
+                            tx = inProgressBatch.preparationTx,
+                        ) { _, error ->
+                            if (error == null) {
+                                val onChainBatchHash = getOnChainBatchHash()
+                                if (onChainBatchHash != inProgressBatch.preparationTx.batchHash) {
+                                    inProgressBatch.markAsFailed("Batch hash mismatch for settlement batch ${inProgressBatch.guid.value}, on chain value: $onChainBatchHash, db value: ${inProgressBatch.preparationTx.batchHash}")
+                                } else {
+                                    inProgressBatch.markAsPrepared()
+                                }
+                            } else {
+                                inProgressBatch.markAsFailed(error)
+                            }
+                        }
+                    }
+                    else -> {}
+                }
+                true
+            }
+            SettlementBatchStatus.Submitting -> {
+                submitBatch(inProgressBatch)
+                true
+            }
+
+            SettlementBatchStatus.RollingBack -> {
+                rollbackBatch(inProgressBatch)
+                true
+            }
+            SettlementBatchStatus.Submitted -> {
+                inProgressBatch.submissionTx?.let { submissionTx ->
+                    refreshSubmittedTransaction(
+                        tx = submissionTx,
+                    ) { _, error ->
+                        if (error == null) {
+                            inProgressBatch.markAsCompleted()
+                        } else {
+                            inProgressBatch.markAsFailed(error)
+                        }
+                    }
+                }
+                true
+            }
+
+            else -> false
+        }
+    }
+
+    private fun submitBatch(currentBatch: ChainSettlementBatchEntity) {
+        currentBatch.submissionTx?.let { submissionTx ->
+            submitToArch(submissionTx)
+            if (submissionTx.status == BlockchainTransactionStatus.Submitted) {
+                currentBatch.markAsSubmitted()
+            }
+        }
+    }
+
+    private fun rollbackBatch(currentBatch: ChainSettlementBatchEntity) {
+        // rollback if a batch in progress on chain already
+        if (batchInProgressOnChain()) {
+            currentBatch.rollbackTx?.let { rollbackTx ->
+                logger.debug { "Submitting rollback Tx " }
+                submitToArch(rollbackTx)
+                if (rollbackTx.status == BlockchainTransactionStatus.Submitted) {
+                    currentBatch.markAsRolledBack()
+                }
+            }
+        } else {
+            currentBatch.markAsRolledBack()
+        }
+    }
+
+    private fun batchInProgressOnChain() = getOnChainBatchHash().isNotEmpty()
+
+    private fun getOnChainBatchHash(): String {
+        return ArchUtils.getAccountState<ArchAccountState.Program>(programStateAccount.rpcPubkey()).settlementBatchHash
+    }
+
     private fun sendToSequencer(deposit: DepositEntity) {
         try {
             runBlocking {
@@ -310,6 +459,17 @@ class ArchTransactionHandler(
 
     private fun submitToArch(transaction: BlockchainTransactionEntity, instruction: ArchNetworkRpc.Instruction) {
         transaction.markAsSubmitted(ArchUtils.signAndSendInstruction(instruction))
+    }
+
+    private fun submitToArch(transaction: BlockchainTransactionEntity) {
+        submitToArch(
+            transaction,
+            Json.decodeFromString(transaction.transactionData.data),
+        )
+    }
+
+    private fun rollbackOnChain() {
+        ArchUtils.signAndSendInstruction(ArchUtils.buildRollbackSettlementBatchInstruction(programPubkey = programAccount.rpcPubkey()))
     }
 
     private fun createNextWithdrawalBatch(programBitcoinAddress: BitcoinAddress, programPubkey: ArchNetworkRpc.Pubkey): Boolean {
@@ -389,7 +549,7 @@ class ArchTransactionHandler(
                     ),
                     BalanceType.Exchange,
                 )
-                publishBroadcasterNotifications(listOf(BroadcasterNotification.walletBalances(withdrawalEntity.wallet)))
+                publishBroadcasterNotifications(listOf(BroadcasterNotification.walletBalances(withdrawalEntity.wallet.userGuid.value)))
             } else {
                 val sequencerResponse = runBlocking {
                     sequencerClient.failWithdraw(
@@ -405,5 +565,18 @@ class ArchTransactionHandler(
                 }
             }
         }
+    }
+
+    private fun refreshSubmittedTransaction(tx: BlockchainTransactionEntity, onComplete: (ArchNetworkRpc.ProcessedTransaction, String?) -> Unit) {
+        val txHash = tx.txHash ?: return
+        val processedTx = ArchNetworkClient.getProcessedTransaction(txHash) ?: return
+        if (processedTx.status == ArchNetworkRpc.Status.Processed) {
+            Thread.sleep(2000)
+            // invoke callbacks for transactions in this confirmed batch
+            onComplete(processedTx, null)
+            // mark batch as complete
+            tx.markAsCompleted()
+        }
+        // TODO error handling once Arch returns errors
     }
 }

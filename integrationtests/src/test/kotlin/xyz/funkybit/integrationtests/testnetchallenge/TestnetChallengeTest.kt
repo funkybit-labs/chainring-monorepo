@@ -71,7 +71,7 @@ class TestnetChallengeTest : OrderBaseTest() {
             subscribeToOrderBook = false,
             subscribeToLimits = false,
             subscribeToPrices = false,
-        ).let { Trader(it.first, it.second, it.third) }
+        ).let { Trader(it.apiClient, it.evmWallet, it.wsClient) }
 
         trader.a.getAccountConfiguration().let {
             assertEquals(TestnetChallengeStatus.Unenrolled, it.testnetChallengeStatus)

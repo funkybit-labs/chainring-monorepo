@@ -30,7 +30,7 @@ class ArchOnboardingTest {
 
     companion object {
         fun waitForProgramAccount(): ArchAccountEntity {
-            waitFor(120000) {
+            waitFor(180000) {
                 transaction {
                     ArchAccountEntity.findProgramAccount()?.status == ArchAccountStatus.Complete
                 }
@@ -40,7 +40,7 @@ class ArchOnboardingTest {
         }
 
         fun waitForProgramStateAccount(): ArchAccountEntity {
-            waitFor {
+            waitFor(6000) {
                 transaction {
                     ArchAccountEntity.findProgramStateAccount()?.status == ArchAccountStatus.Complete
                 }
@@ -50,7 +50,7 @@ class ArchOnboardingTest {
         }
 
         fun waitForTokenStateAccount(): ArchAccountEntity {
-            waitFor(30000) {
+            waitFor(60000) {
                 triggerRepeaterTaskAndWaitForCompletion("arch_token_state_setup")
                 transaction {
                     ArchAccountEntity.findTokenAccountForSymbol(

@@ -123,6 +123,16 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
             }
     }
 
+    fun authorizedWallet(networkType: NetworkType): WalletEntity? {
+        return WalletTable
+            .selectAll()
+            .where {
+                WalletTable.userGuid.eq(userGuid) and WalletTable.guid.neq(guid) and WalletTable.networkType.eq(networkType)
+            }.map {
+                WalletEntity.wrapRow(it)
+            }.firstOrNull()
+    }
+
     var createdAt by WalletTable.createdAt
     var createdBy by WalletTable.createdBy
     var address by WalletTable.address.transform(

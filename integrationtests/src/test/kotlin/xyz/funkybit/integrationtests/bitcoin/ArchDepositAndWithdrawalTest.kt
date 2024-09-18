@@ -7,26 +7,21 @@ import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.apps.api.model.Deposit
-import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
-import xyz.funkybit.core.model.bitcoin.ArchAccountState
-import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
-import xyz.funkybit.core.model.db.ArchAccountEntity
-import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalId
 import xyz.funkybit.core.model.db.WithdrawalStatus
-import xyz.funkybit.core.utils.bitcoin.ArchUtils
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForProgramAccount
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForProgramStateAccount
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForTokenStateAccount
-import xyz.funkybit.integrationtests.bitcoin.UtxoSelectionTest.Companion.waitForTx
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
+import xyz.funkybit.integrationtests.testutils.getFeeAccountBalanceOnArch
 import xyz.funkybit.integrationtests.testutils.isTestEnvRun
 import xyz.funkybit.integrationtests.testutils.waitFor
 import xyz.funkybit.integrationtests.testutils.waitForBalance
+import xyz.funkybit.integrationtests.testutils.waitForTx
 import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.BitcoinWallet
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
@@ -62,7 +57,7 @@ class ArchDepositAndWithdrawalTest {
 
         val btc = bitcoinWallet.nativeSymbol
 
-        val airdropAmount = BigInteger("12000")
+        val airdropAmount = BigInteger("15000")
         waitForTx(bitcoinWallet.walletAddress, bitcoinWallet.airdropNative(airdropAmount))
 
         assertEquals(bitcoinWallet.getWalletNativeBalance(), airdropAmount)
@@ -101,7 +96,7 @@ class ArchDepositAndWithdrawalTest {
             apiClient.listDeposits().deposits.filter { it.symbol.value == btc.name },
         )
 
-        val startingFeeAccountBalance = getFeeAccountBalanceOnArch(btc).balance
+        val startingFeeAccountBalance = getFeeAccountBalanceOnArch(btc)
         val withdrawAmount = BigInteger("3000")
         val withdrawalApiRequest = bitcoinWallet.signWithdraw(btc.name, withdrawAmount)
         val pendingBtcWithdrawal = apiClient.createWithdrawal(withdrawalApiRequest).withdrawal
@@ -147,18 +142,12 @@ class ArchDepositAndWithdrawalTest {
 
         // verify the wallet and fee account balance at the exchange
         assertEquals(
-            ArchAccountState.Balance(
-                bitcoinWallet.walletAddress.value,
-                (depositAmount - withdrawAmount).toLong().toULong(),
-            ),
-            getBalanceOnArch(bitcoinWallet, btc),
+            depositAmount - withdrawAmount,
+            bitcoinWallet.getExchangeBalance(btc).inFundamentalUnits,
         )
         assertEquals(
-            ArchAccountState.Balance(
-                BitcoinClient.bitcoinConfig.feeCollectionAddress.value,
-                startingFeeAccountBalance + withdrawal.fee.toLong().toULong(),
-            ),
-            getFeeAccountBalanceOnArch(btc),
+            startingFeeAccountBalance.inFundamentalUnits + withdrawal.fee,
+            getFeeAccountBalanceOnArch(btc).inFundamentalUnits,
         )
 
         // the wallets local balance should be change from the deposit plus the withdrawal amount - withdrawal fee
@@ -200,11 +189,8 @@ class ArchDepositAndWithdrawalTest {
 
         // now verify that the onchain balance is as expected
         assertEquals(
-            ArchAccountState.Balance(
-                bitcoinWallet.walletAddress.value,
-                (depositAmount - withdrawAmount + deposit2Amount).toLong().toULong(),
-            ),
-            getBalanceOnArch(bitcoinWallet, btc),
+            depositAmount - withdrawAmount + deposit2Amount,
+            bitcoinWallet.getExchangeBalance(btc).inFundamentalUnits,
         )
 
         assertEquals(
@@ -225,25 +211,6 @@ class ArchDepositAndWithdrawalTest {
             transaction {
                 WithdrawalEntity[id].status == expectedStatus
             }
-        }
-    }
-
-    private fun getBalanceOnArch(bitcoinWallet: BitcoinWallet, symbol: SymbolInfo): ArchAccountState.Balance {
-        return transaction {
-            val symbolEntity = SymbolEntity.forName(symbol.name)
-            val index = ArchAccountBalanceIndexEntity.findForWalletAddressAndSymbol(bitcoinWallet.walletAddress, symbolEntity)!!.addressIndex
-            val tokenAccountPubKey = ArchAccountEntity.findTokenAccountForSymbol(symbolEntity)!!.rpcPubkey()
-            val tokenState = ArchUtils.getAccountState<ArchAccountState.Token>(tokenAccountPubKey)
-            tokenState.balances[index]
-        }
-    }
-
-    private fun getFeeAccountBalanceOnArch(symbol: SymbolInfo): ArchAccountState.Balance {
-        return transaction {
-            val symbolEntity = SymbolEntity.forName(symbol.name)
-            val tokenAccountPubKey = ArchAccountEntity.findTokenAccountForSymbol(symbolEntity)!!.rpcPubkey()
-            val tokenState = ArchUtils.getAccountState<ArchAccountState.Token>(tokenAccountPubKey)
-            tokenState.balances[0]
         }
     }
 }

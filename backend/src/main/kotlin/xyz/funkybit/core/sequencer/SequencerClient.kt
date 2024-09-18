@@ -123,7 +123,7 @@ open class SequencerClient {
         val levelIx: Int?,
         val orderType: xyz.funkybit.sequencer.proto.Order.Type,
         val nonce: BigInteger?,
-        val signature: EvmSignature?,
+        val signature: Signature?,
         val orderId: OrderId,
         val clientOrderId: ClientOrderId?,
         val chainId: ChainId,

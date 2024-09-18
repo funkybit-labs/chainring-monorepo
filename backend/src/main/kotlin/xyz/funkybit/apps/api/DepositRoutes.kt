@@ -57,7 +57,7 @@ class DepositRoutes(private val exchangeApiService: ExchangeApiService) {
             )
         } bindContract Method.POST to { request ->
             Response(Status.CREATED).with(
-                responseBody of exchangeApiService.deposit(request.principal.address, requestBody(request)),
+                responseBody of exchangeApiService.deposit(request.principal, requestBody(request)),
             )
         }
     }
