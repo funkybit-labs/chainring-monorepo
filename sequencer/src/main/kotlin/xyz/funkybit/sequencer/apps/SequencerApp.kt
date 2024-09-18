@@ -574,12 +574,11 @@ class SequencerApp(
                     null,
                 )
                 OrderSide.Buy -> {
-                    val (amount, maxAvailable) = calculateAmountForPercentageBuy(
+                    calculateAmountForPercentageBuy(
                         firstMarket,
                         account,
                         order.percentage,
                     )
-                    Pair(amount, maxAvailable)
                 }
             }
         } else {
