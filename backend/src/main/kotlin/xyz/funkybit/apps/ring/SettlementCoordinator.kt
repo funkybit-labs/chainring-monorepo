@@ -28,6 +28,7 @@ import xyz.funkybit.core.model.db.BlockchainTransactionEntity
 import xyz.funkybit.core.model.db.BroadcasterNotification
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ChainSettlementBatchEntity
+import xyz.funkybit.core.model.db.ExecutionRole
 import xyz.funkybit.core.model.db.MarketEntity
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
@@ -545,6 +546,7 @@ class SettlementCoordinator(
                         levelIx = tradeEntity.price.divideToIntegralValue(market.tickSize).toInt(),
                         buyerFee = buyExecution.feeAmount,
                         sellerFee = sellExecution.feeAmount,
+                        takerSold = sellExecution.role == ExecutionRole.Taker,
                     )
                 }
                 if (sequencerResponse.error == SequencerError.None) {

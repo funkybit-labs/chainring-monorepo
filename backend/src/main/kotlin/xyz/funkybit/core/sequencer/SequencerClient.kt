@@ -394,6 +394,7 @@ open class SequencerClient {
         levelIx: Int,
         buyerFee: BigInteger,
         sellerFee: BigInteger,
+        takerSold: Boolean,
     ): SequencerResponse {
         return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
             stub.applyBalanceBatch(
@@ -411,7 +412,7 @@ open class SequencerClient {
                                 this.levelIx = levelIx
                                 this.buyerFee = buyerFee.toIntegerValue()
                                 this.sellerFee = sellerFee.toIntegerValue()
-                                // TODO - isSell
+                                this.takerSold = takerSold
                             }
                         },
                     )
