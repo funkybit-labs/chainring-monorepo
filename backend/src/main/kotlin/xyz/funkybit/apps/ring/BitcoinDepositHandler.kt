@@ -59,6 +59,9 @@ class BitcoinDepositHandler(
 
     private fun refreshPendingDeposit(pendingDeposit: DepositEntity) {
         val tx = BitcoinClient.getRawTransaction(TxHash(pendingDeposit.transactionHash.value))
+        if (pendingDeposit.blockNumber == null && tx?.confirmations == 1) {
+            pendingDeposit.updateBlockNumber((BitcoinClient.getBlockCount() - 1).toBigInteger())
+        }
         if (tx != null && (tx.confirmations ?: 0) >= numConfirmations) {
             logger.debug { "Marking transaction as confirmed ${tx.confirmations}" }
             pendingDeposit.markAsConfirmed()

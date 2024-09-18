@@ -12,13 +12,14 @@ import xyz.funkybit.apps.api.model.OrderAmount
 import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
-import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.Signature
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.bitcoin.ArchAccountState
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
 import xyz.funkybit.core.model.db.ArchAccountEntity
+import xyz.funkybit.core.model.db.BitcoinUtxoAddressMonitorEntity
+import xyz.funkybit.core.model.db.BitcoinUtxoEntity
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderSide
@@ -45,12 +46,16 @@ class BitcoinWallet(
     }
 
     val chain = allChains.first { it.networkType == NetworkType.Bitcoin }
-    val walletAddress = keyPair.address()
+    val walletAddress = keyPair.address().also {
+        transaction { BitcoinUtxoAddressMonitorEntity.createIfNotExists(it) }
+    }
     val exchangeDepositAddress = chain.contracts.first { it.name == ContractType.Exchange.name }.address as BitcoinAddress
     val nativeSymbol = chain.symbols.first { it.contractAddress == null }
 
     fun getWalletNativeBalance(): BigInteger {
-        return MempoolSpaceClient.getBalance(walletAddress).toBigInteger()
+        return transaction {
+            BitcoinUtxoEntity.findUnspentTotal(walletAddress)
+        }
     }
 
     fun depositNative(amount: BigInteger): DepositApiResponse {
@@ -110,7 +115,7 @@ class BitcoinWallet(
             )
 
             BitcoinClient.sendRawTransaction(depositTx.toHexString()).also { txId ->
-                UtxoSelectionService.reserveUtxos(walletAddress, selectedUtxos.map { it.utxoId }.toSet(), txId.value)
+                UtxoSelectionService.reserveUtxos(selectedUtxos, txId.value)
             }
         }
     }

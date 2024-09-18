@@ -135,7 +135,7 @@ object ChainManager {
 //        blockExplorerUrl = System.getenv("BLOCK_EXPLORER_URL_BITCOIN") ?: "http://localhost:1080",
         faucetAddress = BitcoinAddress.canonicalize("bcrt1q3nyukkpkg6yj0y5tj6nj80dh67m30p963mzxy7"),
         submitterPrivateKey = (System.getenv("BITCOIN_SUBMITTER_PRIVATE_KEY") ?: "0x7ebc626d01c2d916c61dffee4ed2501f579009ad362360d82fcc30e3d8746cec").toHexBytes(),
-        feePayerPrivateKey = (System.getenv("BITCOIN_FEE_PAYER_PRIVATE_KEY") ?: ECKey().privateKeyAsHex).toHexBytes(),
+        feePayerPrivateKey = (System.getenv("BITCOIN_FEE_PAYER_PRIVATE_KEY") ?: "cec2c679ef0d11820c75b17174a8635d7aa1ce740b0bf32d80967c3bf7b3676d").toHexBytes(),
         changeDustThreshold = BigInteger(System.getenv("BITCOIN_CHANGE_DUST_THRESHOLD") ?: "300"),
         feeCollectionAddress = BitcoinAddress.canonicalize(System.getenv("BITCOIN_FEE_ACCOUNT_ADDRESS") ?: "bcrt1q5jdpyt2x5utsqgaazdf6jr4cc7yeaec0me0e4u"),
         /* privKey for bcrt1q5jdpyt2x5utsqgaazdf6jr4cc7yeaec0me0e4u = 0x63fe5172a2b186b8015fb60d9c314eb9017a8465ed169d5e5ff41ed8fa8d9a4a */

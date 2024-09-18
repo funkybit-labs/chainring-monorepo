@@ -17,7 +17,7 @@ import org.web3j.crypto.Keys
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.bitcoin.SystemInstruction
-import xyz.funkybit.core.model.bitcoin.UtxoId
+import xyz.funkybit.core.model.db.BitcoinUtxoId
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.utils.doubleSha256FromHex
 import xyz.funkybit.core.utils.schnorr.Point
@@ -165,7 +165,7 @@ sealed class ArchNetworkRpc {
         val txId: TxHash,
         val vout: Int,
     ) {
-        fun toUtxoId() = UtxoId.fromTxHashAndVout(txId, vout)
+        fun toUtxoId() = BitcoinUtxoId.fromTxHashAndVout(txId, vout)
 
         fun serialize(): ByteArray {
             val buffer = ByteBuffer.allocate(36)

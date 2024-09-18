@@ -14,7 +14,6 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import xyz.funkybit.core.model.EncryptedString
-import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.encrypt
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.utils.schnorr.Point
@@ -101,7 +100,7 @@ object ArchAccountTable : GUIDTable<ArchAccountId>("arch_account", ::ArchAccount
 
 class ArchAccountEntity(guid: EntityID<ArchAccountId>) : GUIDEntity<ArchAccountId>(guid) {
     companion object : EntityClass<ArchAccountId, ArchAccountEntity>(ArchAccountTable) {
-        fun create(utxoId: UtxoId, ecKey: ECKey, accountType: ArchAccountType, symbolEntity: SymbolEntity? = null): ArchAccountEntity {
+        fun create(utxoId: BitcoinUtxoId, ecKey: ECKey, accountType: ArchAccountType, symbolEntity: SymbolEntity? = null): ArchAccountEntity {
             return ArchAccountEntity.new(ArchAccountId.generate()) {
                 this.utxoId = utxoId
                 this.type = accountType
@@ -184,7 +183,7 @@ class ArchAccountEntity(guid: EntityID<ArchAccountId>) : GUIDEntity<ArchAccountI
     fun rpcPubkey() = ArchNetworkRpc.Pubkey.fromHexString(this.publicKey)
 
     var utxoId by ArchAccountTable.utxoId.transform(
-        toReal = { UtxoId(it) },
+        toReal = { BitcoinUtxoId(it) },
         toColumn = { it.value },
     )
     var creationTxId by ArchAccountTable.creationTxId.transform(

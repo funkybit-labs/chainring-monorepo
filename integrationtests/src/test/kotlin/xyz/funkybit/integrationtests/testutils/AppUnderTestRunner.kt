@@ -28,7 +28,9 @@ import xyz.funkybit.core.model.db.ArchAccountStatus
 import xyz.funkybit.core.model.db.ArchAccountTable
 import xyz.funkybit.core.model.db.BalanceLogTable
 import xyz.funkybit.core.model.db.BalanceTable
-import xyz.funkybit.core.model.db.BitcoinWalletStateTable
+import xyz.funkybit.core.model.db.BitcoinUtxoAddressMonitorEntity
+import xyz.funkybit.core.model.db.BitcoinUtxoAddressMonitorTable
+import xyz.funkybit.core.model.db.BitcoinUtxoTable
 import xyz.funkybit.core.model.db.BlockTable
 import xyz.funkybit.core.model.db.BlockchainTransactionTable
 import xyz.funkybit.core.model.db.BroadcasterJobTable
@@ -123,6 +125,8 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                             sequencerResponseProcessorApp.start()
                             gatewayApp.start()
                             transaction {
+                                BitcoinUtxoTable.deleteAll()
+                                BitcoinUtxoAddressMonitorTable.deleteAll()
                                 blockchainClients.forEach { blockchainClient ->
                                     DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(
                                         ContractType.Exchange.name,
@@ -147,6 +151,8 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                                         BitcoinClient.chainId,
                                     )
                                     ArchAccountTable.deleteAll()
+                                } else {
+                                    BitcoinUtxoAddressMonitorEntity.createIfNotExists(DeployedSmartContractEntity.programBitcoinAddress())
                                 }
                                 WithdrawalEntity.findPending().forEach { it.update(WithdrawalStatus.Failed, "restarting test") }
                                 BlockTable.deleteAll()
@@ -280,7 +286,6 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
             UserTable.deleteAll()
             OHLCTable.deleteAll()
             FaucetDripTable.deleteAll()
-            BitcoinWalletStateTable.deleteAll()
             notifyDbListener("broadcaster_ctl", "clear-cache")
         }
     }

@@ -23,9 +23,9 @@ import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.methods.response.VoidResponse
 import org.web3j.utils.Numeric
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
-import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.db.BitcoinUtxoEntity
 import java.time.Duration
 
 data class SymbolContractAddress(
@@ -136,14 +136,10 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
 
 private fun airdropToFeePayer() {
     try {
-        val balance = MempoolSpaceClient.getBalance(BitcoinClient.bitcoinConfig.feePayerAddress)
-        println("bitcoin fee payer balance is $balance")
-        if (balance < 25000L) {
-            val airdropAmount = maxOf(25000L - balance, 5000L)
-            println("Air dropping $airdropAmount to bitcoin fee payer")
+        (0 .. 2).forEach { _ ->
             BitcoinClient.sendToAddress(
                 BitcoinClient.bitcoinConfig.feePayerAddress,
-                airdropAmount.toBigInteger(),
+                BigInteger("8000"),
             )
         }
     } catch (e: Exception) {

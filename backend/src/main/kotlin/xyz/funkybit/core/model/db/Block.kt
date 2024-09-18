@@ -6,6 +6,7 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.web3j.protocol.core.methods.response.EthBlock
+import xyz.funkybit.core.model.rpc.BitcoinRpc
 import java.math.BigInteger
 
 @Serializable
@@ -28,6 +29,9 @@ class BlockEntity(guid: EntityID<BlockHash>) : GUIDEntity<BlockHash>(guid) {
     companion object : EntityClass<BlockHash, BlockEntity>(BlockTable) {
         fun create(blockFromRpcNode: EthBlock.Block, chainId: ChainId): BlockEntity =
             create(BlockHash(blockFromRpcNode.hash), blockFromRpcNode.number, BlockHash(blockFromRpcNode.parentHash), chainId)
+
+        fun create(blockFromRpcNode: BitcoinRpc.Block, blockNumber: Long, chainId: ChainId): BlockEntity =
+            create(BlockHash(blockFromRpcNode.hash), blockNumber.toBigInteger(), BlockHash(blockFromRpcNode.previousBlockhash ?: ""), chainId)
 
         fun create(hash: BlockHash, number: BigInteger, parentHash: BlockHash, chainId: ChainId): BlockEntity =
             BlockEntity.new(hash) {

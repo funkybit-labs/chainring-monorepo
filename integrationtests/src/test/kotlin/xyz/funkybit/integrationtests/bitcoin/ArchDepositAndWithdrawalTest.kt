@@ -8,7 +8,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.apps.api.model.Deposit
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
-import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
+import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.db.BitcoinUtxoEntity
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalId
@@ -63,21 +64,21 @@ class ArchDepositAndWithdrawalTest {
         assertEquals(bitcoinWallet.getWalletNativeBalance(), airdropAmount)
 
         // now deposit to the exchange
-        val startingTotalDepositsAtExchange = MempoolSpaceClient.getBalance(bitcoinWallet.exchangeDepositAddress)
+        val startingTotalDepositsAtExchange = getBalance(bitcoinWallet.exchangeDepositAddress)
         val depositAmount = BigInteger("7000")
         val pendingBtcDeposit = bitcoinWallet.depositNative(depositAmount).deposit
         val depositTxId = TxHash(pendingBtcDeposit.txHash.value)
-        waitForTx(bitcoinWallet.walletAddress, depositTxId)
+        waitForTx(bitcoinWallet.exchangeDepositAddress, depositTxId)
 
         assertEquals(
-            MempoolSpaceClient.getBalance(bitcoinWallet.exchangeDepositAddress),
+            getBalance(bitcoinWallet.exchangeDepositAddress),
             startingTotalDepositsAtExchange + depositAmount.toLong(),
         )
 
         val depositNetworkFee = BitcoinClient.getNetworkFeeForTx(depositTxId).toBigInteger()
         var expectedWalletBalance = airdropAmount - depositAmount - depositNetworkFee
         assertEquals(
-            MempoolSpaceClient.getBalance(bitcoinWallet.walletAddress),
+            getBalance(bitcoinWallet.walletAddress),
             expectedWalletBalance.toLong(),
         )
 
@@ -153,7 +154,7 @@ class ArchDepositAndWithdrawalTest {
         // the wallets local balance should be change from the deposit plus the withdrawal amount - withdrawal fee
         expectedWalletBalance = expectedWalletBalance + withdrawAmount - withdrawal.fee
         assertEquals(
-            MempoolSpaceClient.getBalance(bitcoinWallet.walletAddress),
+            getBalance(bitcoinWallet.walletAddress),
             expectedWalletBalance.toLong(),
         )
 
@@ -164,17 +165,17 @@ class ArchDepositAndWithdrawalTest {
 
         assertEquals(
             expectedProgramBalance,
-            MempoolSpaceClient.getBalance(bitcoinWallet.exchangeDepositAddress),
+            getBalance(bitcoinWallet.exchangeDepositAddress),
         )
 
         // now do a 2nd deposit
         val deposit2Amount = BigInteger("2500")
         val pendingBtcDeposit2 = bitcoinWallet.depositNative(deposit2Amount).deposit
         val deposit2TxId = TxHash(pendingBtcDeposit2.txHash.value)
-        waitForTx(bitcoinWallet.walletAddress, deposit2TxId)
+        waitForTx(bitcoinWallet.exchangeDepositAddress, deposit2TxId)
 
         assertEquals(
-            MempoolSpaceClient.getBalance(bitcoinWallet.exchangeDepositAddress),
+            getBalance(bitcoinWallet.exchangeDepositAddress),
             expectedProgramBalance + deposit2Amount.toLong(),
         )
 
@@ -195,13 +196,13 @@ class ArchDepositAndWithdrawalTest {
 
         assertEquals(
             expectedProgramBalance + deposit2Amount.toLong(),
-            MempoolSpaceClient.getBalance(bitcoinWallet.exchangeDepositAddress),
+            getBalance(bitcoinWallet.exchangeDepositAddress),
         )
 
         val deposit2NetworkFee = BitcoinClient.getNetworkFeeForTx(deposit2TxId).toBigInteger()
         expectedWalletBalance = expectedWalletBalance - deposit2Amount - deposit2NetworkFee
         assertEquals(
-            MempoolSpaceClient.getBalance(bitcoinWallet.walletAddress),
+            getBalance(bitcoinWallet.walletAddress),
             expectedWalletBalance.toLong(),
         )
     }
@@ -211,6 +212,12 @@ class ArchDepositAndWithdrawalTest {
             transaction {
                 WithdrawalEntity[id].status == expectedStatus
             }
+        }
+    }
+
+    private fun getBalance(address: BitcoinAddress): Long {
+        return transaction {
+            BitcoinUtxoEntity.findUnspentTotal(address).toLong()
         }
     }
 }

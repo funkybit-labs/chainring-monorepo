@@ -1,9 +1,9 @@
 package xyz.funkybit.core.utils.bitcoin
 
-import xyz.funkybit.core.model.db.UnspentUtxo
+import xyz.funkybit.core.model.db.BitcoinUtxoEntity
 import java.math.BigInteger
 
-private typealias InputShuffleFn = (List<UnspentUtxo>) -> List<UnspentUtxo>
+private typealias InputShuffleFn = (List<BitcoinUtxoEntity>) -> List<BitcoinUtxoEntity>
 
 class BitcoinInputsSelector(
     private val iterations: Int = 10,
@@ -12,9 +12,9 @@ class BitcoinInputsSelector(
 
     fun selectInputs(
         amount: BigInteger,
-        availableInputs: List<UnspentUtxo>,
+        availableInputs: List<BitcoinUtxoEntity>,
         fee: BigInteger,
-    ): List<UnspentUtxo> {
+    ): List<BitcoinUtxoEntity> {
         val totalAvailable = availableInputs.sumOf { it.amount }
 
         if (totalAvailable < amount + fee) {
@@ -31,17 +31,17 @@ class BitcoinInputsSelector(
     }
 
     private data class InputsSelectionCandidate(
-        val inputs: List<UnspentUtxo>,
+        val inputs: List<BitcoinUtxoEntity>,
         val amountLocked: BigInteger,
     )
 
     // see https://murch.one/wp-content/uploads/2016/11/erhardt2016coinselection.pdf
     private fun singleRandomDraw(
         requestedAmount: BigInteger,
-        availableInputs: List<UnspentUtxo>,
+        availableInputs: List<BitcoinUtxoEntity>,
         fee: BigInteger,
     ): InputsSelectionCandidate? {
-        val selectedInputs = mutableListOf<UnspentUtxo>()
+        val selectedInputs = mutableListOf<BitcoinUtxoEntity>()
         var selectedAmount = BigInteger.ZERO
 
         shuffleInputs(availableInputs).forEach { input ->
