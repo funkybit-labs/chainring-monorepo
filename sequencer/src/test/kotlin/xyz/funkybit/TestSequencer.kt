@@ -14,7 +14,9 @@ import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.sequencer.core.MarketId
 import xyz.funkybit.sequencer.core.notional
 import xyz.funkybit.sequencer.core.notionalFee
+import xyz.funkybit.sequencer.core.toBaseAmount
 import xyz.funkybit.sequencer.core.toBigInteger
+import xyz.funkybit.sequencer.core.toQuoteAmount
 import xyz.funkybit.sequencer.core.toWalletAddress
 import xyz.funkybit.sequencer.proto.Order
 import xyz.funkybit.sequencer.proto.OrderChangeRejected
@@ -1717,7 +1719,7 @@ class TestSequencer {
                 assertEquals(
                     it.buyerFee.toBigInteger(),
                     notionalFee(
-                        notional(it.amount.toBigInteger(), BigDecimal("17.5"), market.baseDecimals, market.quoteDecimals),
+                        notional(it.amount.toBaseAmount(), BigDecimal("17.5"), market.baseDecimals, market.quoteDecimals),
                         xyz.funkybit.sequencer.core.FeeRate(feeRates.taker.value),
                     ),
                 )
@@ -1731,9 +1733,9 @@ class TestSequencer {
                 assertEquals(
                     it.buyerFee.toBigInteger(),
                     notionalFee(
-                        notional(it.amount.toBigInteger(), BigDecimal("18.0"), market.baseDecimals, market.quoteDecimals),
+                        notional(it.amount.toBaseAmount(), BigDecimal("18.0"), market.baseDecimals, market.quoteDecimals),
                         xyz.funkybit.sequencer.core.FeeRate(feeRates.taker.value),
-                    ) + BigDecimal("0.000000010800000000").toFundamentalUnits(market.quoteDecimals),
+                    ) + BigDecimal("0.000000010800000000").toFundamentalUnits(market.quoteDecimals).toQuoteAmount(),
                 )
             }
         }
@@ -1778,7 +1780,7 @@ class TestSequencer {
                 assertEquals(
                     it.buyerFee.toBigInteger(),
                     notionalFee(
-                        notional(it.amount.toBigInteger(), BigDecimal("17.5"), market.baseDecimals, market.quoteDecimals),
+                        notional(it.amount.toBaseAmount(), BigDecimal("17.5"), market.baseDecimals, market.quoteDecimals),
                         xyz.funkybit.sequencer.core.FeeRate(feeRates.taker.value),
                     ),
                 )
@@ -1792,7 +1794,7 @@ class TestSequencer {
                 assertEquals(
                     it.buyerFee.toBigInteger(),
                     notionalFee(
-                        notional(it.amount.toBigInteger(), BigDecimal("18.0"), market.baseDecimals, market.quoteDecimals),
+                        notional(it.amount.toBaseAmount(), BigDecimal("18.0"), market.baseDecimals, market.quoteDecimals),
                         xyz.funkybit.sequencer.core.FeeRate(feeRates.taker.value),
                     ),
                 )
@@ -1837,7 +1839,7 @@ class TestSequencer {
                 assertEquals(
                     it.buyerFee.toBigInteger(),
                     notionalFee(
-                        notional(it.amount.toBigInteger(), BigDecimal("17.5"), market.baseDecimals, market.quoteDecimals),
+                        notional(it.amount.toBaseAmount(), BigDecimal("17.5"), market.baseDecimals, market.quoteDecimals),
                         xyz.funkybit.sequencer.core.FeeRate(feeRates.taker.value),
                     ),
                 )
@@ -1851,7 +1853,7 @@ class TestSequencer {
                 assertEquals(
                     it.buyerFee.toBigInteger(),
                     notionalFee(
-                        notional(it.amount.toBigInteger(), BigDecimal("18.0"), market.baseDecimals, market.quoteDecimals),
+                        notional(it.amount.toBaseAmount(), BigDecimal("18.0"), market.baseDecimals, market.quoteDecimals),
                         xyz.funkybit.sequencer.core.FeeRate(feeRates.taker.value),
                     ),
                 )
