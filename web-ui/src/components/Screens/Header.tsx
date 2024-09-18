@@ -12,8 +12,6 @@ import { useValidChain } from 'hooks/useValidChain'
 import { Address } from 'viem'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { TestnetChallengeEnabled } from 'testnetChallenge'
-import { useQuery } from '@tanstack/react-query'
-import { apiClient } from 'apiClient'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import { useConfig } from 'wagmi'
 import { useAuth } from 'contexts/auth'
@@ -23,11 +21,13 @@ export type Tab = 'Swap' | 'Limit' | 'Dashboard' | 'Testnet Challenge'
 export function Header({
   tab,
   markets,
+  isAdmin,
   onTabChange,
   onShowAdmin
 }: {
   tab: Tab
   markets: Markets
+  isAdmin: boolean
   onTabChange: (newTab: Tab) => void
   onShowAdmin: () => void
 }) {
@@ -51,12 +51,6 @@ export function Header({
       document.removeEventListener('keydown', escapeHandler, false)
     }
   }, [showMenu])
-
-  const accountConfigQuery = useQuery({
-    queryKey: ['accountConfiguration'],
-    queryFn: apiClient.getAccountConfiguration,
-    enabled: isAuthenticated
-  })
 
   const validChain = useValidChain()
   const switchToEthChain = useSwitchToEthChain()
@@ -210,9 +204,6 @@ export function Header({
     window.scrollBy({ top: -80, behavior: 'smooth' })
     setShowMenu(false)
   }
-  const isAdmin = useMemo(() => {
-    return accountConfigQuery.data && accountConfigQuery.data.role === 'Admin'
-  }, [accountConfigQuery.data])
 
   return (
     <>

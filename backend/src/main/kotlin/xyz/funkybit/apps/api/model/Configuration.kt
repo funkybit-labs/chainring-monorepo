@@ -48,10 +48,17 @@ data class AccountConfigurationApiResponse(
     val testnetChallengeStatus: TestnetChallengeStatus,
     val testnetChallengeDepositSymbol: String?,
     val testnetChallengeDepositContract: Address?,
+    val testnetChallengeDepositLimits: List<TestnetChallengeDepositLimit>,
     val nickName: String?,
     val avatarUrl: String?,
     val inviteCode: String,
     val pointsBalance: BigDecimalJson,
+)
+
+@Serializable
+data class TestnetChallengeDepositLimit(
+    val symbol: Symbol,
+    val limit: BigIntegerJson,
 )
 
 @Serializable

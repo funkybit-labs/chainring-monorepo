@@ -26,6 +26,7 @@ import xyz.funkybit.apps.api.model.FeeRates
 import xyz.funkybit.apps.api.model.Market
 import xyz.funkybit.apps.api.model.Role
 import xyz.funkybit.apps.api.model.SymbolInfo
+import xyz.funkybit.apps.api.model.TestnetChallengeDepositLimit
 import xyz.funkybit.apps.api.model.toSymbolInfo
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.Symbol
@@ -193,6 +194,9 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                         testnetChallengeStatus = TestnetChallengeStatus.Unenrolled,
                         testnetChallengeDepositSymbol = "USDC:31337",
                         testnetChallengeDepositContract = null,
+                        testnetChallengeDepositLimits = listOf(
+                            TestnetChallengeDepositLimit(Symbol("USDC:31337"), BigInteger.valueOf(10_000)),
+                        ),
                         nickName = "Nick Name",
                         avatarUrl = "https://icons/avatar.svg",
                         inviteCode = "WYZFRORSQDI",
@@ -216,6 +220,7 @@ class ConfigRoutes(private val faucetMode: FaucetMode) {
                             testnetChallengeStatus = wallet.user.testnetChallengeStatus,
                             testnetChallengeDepositSymbol = if (TestnetChallengeUtils.enabled) TestnetChallengeUtils.depositSymbolName else null,
                             testnetChallengeDepositContract = if (TestnetChallengeUtils.enabled) TestnetChallengeUtils.depositSymbol().contractAddress else null,
+                            testnetChallengeDepositLimits = TestnetChallengeUtils.depositLimits(wallet.user),
                             nickName = wallet.user.nickname,
                             avatarUrl = wallet.user.avatarUrl,
                             inviteCode = wallet.user.inviteCode,
