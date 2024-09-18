@@ -288,3 +288,6 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
 
 fun isTestEnvRun(): Boolean =
     (getenv("TEST_ENV_RUN") ?: "0") == "1"
+
+fun isBitcoinDisabled(): Boolean =
+    (getenv("BITCOIN_NETWORK_ENABLED") ?: "true") == "false"
