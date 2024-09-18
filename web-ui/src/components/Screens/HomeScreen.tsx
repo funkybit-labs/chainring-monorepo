@@ -25,6 +25,8 @@ function WebsocketWrapper({ contents }: { contents: JSX.Element }) {
   return <WebsocketProvider wallets={wallets}>{contents}</WebsocketProvider>
 }
 
+export const accountConfigQueryKey = ['accountConfiguration']
+
 function HomeScreenContent() {
   const configQuery = useQuery({
     queryKey: ['configuration'],
@@ -140,7 +142,7 @@ function HomeScreenContent() {
   const { isAuthenticated } = useAuth()
 
   const accountConfigQuery = useQuery({
-    queryKey: ['accountConfiguration'],
+    queryKey: accountConfigQueryKey,
     queryFn: apiClient.getAccountConfiguration,
     enabled: isAuthenticated
   })

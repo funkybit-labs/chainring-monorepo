@@ -18,6 +18,7 @@ import DiscoBall from 'components/Screens/HomeScreen/DiscoBall'
 import DepositModal from 'components/Screens/HomeScreen/DepositModal'
 import { Leaderboard } from 'components/Screens/HomeScreen/testnetchallenge/Leaderboard'
 import { Tab } from 'components/Screens/Header'
+import { accountConfigQueryKey } from 'components/Screens/HomeScreen'
 
 export const testnetChallengeInviteCodeKey = 'testnetChallengeInviteCode'
 export function TestnetChallengeTab({
@@ -63,7 +64,7 @@ export function TestnetChallengeTab({
       })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accountConfiguration'] })
+      queryClient.invalidateQueries({ queryKey: accountConfigQueryKey })
       localStorage.removeItem(testnetChallengeInviteCodeKey)
     }
   })
@@ -92,7 +93,7 @@ export function TestnetChallengeTab({
     } else {
       accountRefreshRef.current = setInterval(() => {
         queryClient.invalidateQueries({
-          queryKey: ['accountConfiguration'],
+          queryKey: accountConfigQueryKey,
           fetchStatus: 'idle'
         })
       }, 3000)
@@ -149,7 +150,7 @@ export function TestnetChallengeTab({
     if (wallets.connected.length === 0) {
       if (walletHasConnected) {
         setWalletHasConnected(false)
-        queryClient.invalidateQueries({ queryKey: ['accountConfiguration'] })
+        queryClient.invalidateQueries({ queryKey: accountConfigQueryKey })
       }
     } else if (!walletHasConnected) {
       setWalletHasConnected(true)
@@ -304,15 +305,15 @@ export function TestnetChallengeTab({
               walletAddress={wallets.primary.address}
               symbol={testnetChallengeDepositSymbol}
               testnetChallengeDepositLimit={
-                accountConfig?.testnetChallengeDepositLimits?.find(
-                  (dl) => dl.symbol == testnetChallengeDepositSymbol.name
-                )?.limit
+                accountConfig?.testnetChallengeDepositLimits[
+                  testnetChallengeDepositSymbol.name
+                ]
               }
               close={() => setShowTestnetChallengeDepositModal(false)}
               onClosed={() => {
                 setTestnetChallengeDepositSymbol(undefined)
                 queryClient.invalidateQueries({
-                  queryKey: ['accountConfiguration']
+                  queryKey: accountConfigQueryKey
                 })
               }}
               initialAmount={'10000'}

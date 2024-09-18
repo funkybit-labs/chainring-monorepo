@@ -21,6 +21,7 @@ import { isErrorFromAlias } from '@zodios/core'
 import TradingSymbol from 'tradingSymbol'
 import { ExpandableValue } from 'components/common/ExpandableValue'
 import { minBigInt } from 'utils'
+import { accountConfigQueryKey } from 'components/Screens/HomeScreen'
 
 export default function DepositModal({
   exchangeContractAddress,
@@ -156,6 +157,9 @@ export default function DepositModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: depositsQueryKey })
+      // this is needed so that deposit button status is updated
+      // for Testnet challenge participant
+      queryClient.invalidateQueries({ queryKey: accountConfigQueryKey })
       close()
     }
   })
@@ -194,6 +198,18 @@ export default function DepositModal({
                 {message && (
                   <p className="my-2 text-center text-sm text-white">
                     {message}
+                  </p>
+                )}
+                {testnetChallengeDepositLimit !== undefined && (
+                  <p className="mb-4 text-center text-sm text-white">
+                    During the Testnet Challenge, deposits are limited to
+                    previously withdrawn assets. Current deposit limit:{' '}
+                    <ExpandableValue
+                      value={formatUnits(
+                        testnetChallengeDepositLimit,
+                        symbol.decimals
+                      )}
+                    />
                   </p>
                 )}
                 <AmountInput

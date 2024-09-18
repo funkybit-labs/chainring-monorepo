@@ -150,9 +150,6 @@ export const TestnetChallengeDepositLimitSchema = z.object({
   symbol: z.string(),
   limit: z.coerce.bigint()
 })
-export type TestnetChallengeDepositLimit = z.infer<
-  typeof TestnetChallengeDepositLimitSchema
->
 
 export const AccountConfigurationApiResponseSchema = z.object({
   newSymbols: z.array(SymbolSchema),
@@ -161,7 +158,11 @@ export const AccountConfigurationApiResponseSchema = z.object({
   testnetChallengeStatus: TestnetChallengeStatusSchema,
   testnetChallengeDepositSymbol: z.string().nullable(),
   testnetChallengeDepositContract: AddressSchema.nullable(),
-  testnetChallengeDepositLimits: z.array(TestnetChallengeDepositLimitSchema),
+  testnetChallengeDepositLimits: z
+    .array(TestnetChallengeDepositLimitSchema)
+    .transform((data) => {
+      return Object.fromEntries(data.map((it) => [it.symbol, it.limit]))
+    }),
   nickName: z.string().nullable(),
   avatarUrl: z.string().nullable(),
   inviteCode: z.string()

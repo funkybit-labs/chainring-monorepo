@@ -27,6 +27,8 @@ import { ExpandableValue } from 'components/common/ExpandableValue'
 import { useWallets } from 'contexts/walletProvider'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
+import { TnChallengeDepositsLimitedTooltip } from 'components/common/TnChallengeDepositsLimitedTooltip'
+import { accountConfigQueryKey } from 'components/Screens/HomeScreen'
 
 export function BalancesTable({
   walletAddress,
@@ -66,6 +68,9 @@ export function BalancesTable({
           setBalances(message.balances)
           queryClient.invalidateQueries({ queryKey: withdrawalsQueryKey })
           queryClient.invalidateQueries({ queryKey: depositsQueryKey })
+          // this is needed so that deposit button status is updated
+          // for Testnet challenge participant
+          queryClient.invalidateQueries({ queryKey: accountConfigQueryKey })
         }
       },
       [queryClient]
@@ -118,26 +123,16 @@ export function BalancesTable({
                   value={formatUnits(balance.available, symbol.decimals)}
                 />
               </div>
-              <div className="mb-4 inline-block space-x-4 text-xs">
+              <div className="mb-4 flex justify-stretch space-x-4 text-xs">
                 {wallets.isConnected(symbol.networkType) ? (
                   <>
-                    <Button
-                      style={'normal'}
-                      width={'normal'}
-                      caption={() => (
-                        <span className="whitespace-nowrap">
-                          <span className="mr-4 hidden narrow:inline">
-                            Deposit
-                          </span>
-                          <img
-                            className="inline"
-                            src={Deposit}
-                            alt={'Deposit'}
-                          />
-                        </span>
-                      )}
+                    <DepositButton
                       onClick={() => openDepositModal(symbol)}
-                      disabled={false}
+                      testnetChallengeDepositLimit={
+                        accountConfig?.testnetChallengeDepositLimits[
+                          symbol.name
+                        ]
+                      }
                     />
                     <Button
                       style={'normal'}
@@ -159,9 +154,11 @@ export function BalancesTable({
                     />
                   </>
                 ) : (
-                  <ConnectWallet
-                    onSwitchToChain={(chainId) => switchToEthChain(chainId)}
-                  />
+                  <div className={'w-full'}>
+                    <ConnectWallet
+                      onSwitchToChain={(chainId) => switchToEthChain(chainId)}
+                    />
+                  </div>
                 )}
               </div>
             </Fragment>
@@ -176,9 +173,7 @@ export function BalancesTable({
           walletAddress={walletAddress!}
           symbol={depositSymbol}
           testnetChallengeDepositLimit={
-            accountConfig?.testnetChallengeDepositLimits?.find(
-              (dl) => dl.symbol == depositSymbol.name
-            )?.limit
+            accountConfig?.testnetChallengeDepositLimits[depositSymbol.name]
           }
           close={() => setShowDepositModal(false)}
           onClosed={() => setDepositSymbol(null)}
@@ -196,5 +191,35 @@ export function BalancesTable({
         />
       )}
     </>
+  )
+}
+
+function DepositButton({
+  testnetChallengeDepositLimit,
+  onClick
+}: {
+  testnetChallengeDepositLimit?: bigint
+  onClick: () => void
+}) {
+  const button = (
+    <Button
+      style={'normal'}
+      width={'normal'}
+      caption={() => (
+        <span className="whitespace-nowrap">
+          <span className="mr-4 hidden narrow:inline">Deposit</span>
+          <img className="inline" src={Deposit} alt={'Deposit'} />
+        </span>
+      )}
+      onClick={onClick}
+      disabled={testnetChallengeDepositLimit === 0n}
+    />
+  )
+  return testnetChallengeDepositLimit === 0n ? (
+    <TnChallengeDepositsLimitedTooltip>
+      {button}
+    </TnChallengeDepositsLimitedTooltip>
+  ) : (
+    button
   )
 }

@@ -26,9 +26,9 @@ import Decimal from 'decimal.js'
 import { ExpandableValue } from 'components/common/ExpandableValue'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
-import Deposit from 'assets/Deposit.svg'
 import MarketPrice from 'components/Screens/HomeScreen/swap/MarketPrice'
 import { useWallets } from 'contexts/walletProvider'
+import { DepositButton } from 'components/Screens/HomeScreen/swap/DepositButton'
 
 export function SwapModal({
   markets,
@@ -171,17 +171,14 @@ export function SwapModal({
                     sr.topSymbol
                   )}
                   {walletAddress && exchangeContractAddress && (
-                    <button
-                      className="rounded bg-darkBluishGray6 px-2 py-1 text-darkBluishGray2 hover:bg-blue5"
+                    <DepositButton
+                      testnetChallengeDepositLimit={
+                        accountConfig?.testnetChallengeDepositLimits[
+                          sr.topSymbol.name
+                        ]
+                      }
                       onClick={() => openDepositModal(sr.topSymbol)}
-                    >
-                      <span className="hidden narrow:inline">Deposit</span>
-                      <img
-                        className="hidden max-narrow:inline"
-                        src={Deposit}
-                        alt={'Deposit'}
-                      />
-                    </button>
+                    />
                   )}
                 </div>
               </div>
@@ -202,6 +199,11 @@ export function SwapModal({
                     openDepositModal(sr.topSymbol)
                   }}
                   inputRef={sellAmountInputRef}
+                  testnetChallengeDepositLimit={
+                    accountConfig?.testnetChallengeDepositLimits[
+                      sr.topSymbol.name
+                    ]
+                  }
                 />
                 <SymbolSelector
                   markets={markets}
@@ -334,9 +336,7 @@ export function SwapModal({
               walletAddress={walletAddress!}
               symbol={depositSymbol}
               testnetChallengeDepositLimit={
-                accountConfig?.testnetChallengeDepositLimits?.find(
-                  (dl) => dl.symbol == depositSymbol.name
-                )?.limit
+                accountConfig?.testnetChallengeDepositLimits[depositSymbol.name]
               }
               close={() => setShowDepositModal(false)}
               onClosed={() => {
@@ -356,7 +356,8 @@ function SellAmountInput({
   onChange,
   sellAssetsNeeded,
   onDeposit,
-  inputRef
+  inputRef,
+  testnetChallengeDepositLimit
 }: {
   value: string
   disabled: boolean
@@ -364,6 +365,7 @@ function SellAmountInput({
   sellAssetsNeeded: bigint
   onDeposit: () => void
   inputRef: React.RefObject<HTMLInputElement>
+  testnetChallengeDepositLimit?: bigint
 }) {
   const [divRef, { width: spanWidth }] = useMeasure<HTMLDivElement>()
   useEffect(() => {
@@ -400,20 +402,13 @@ function SellAmountInput({
         </span>
         {sellAssetsNeeded > 0n && (
           <>
-            <span className="hidden text-sm text-brightRed narrow:inline">
+            <span className="mr-2 hidden text-sm text-brightRed narrow:inline">
               Insufficient Balance
             </span>
-            <button
-              className="ml-2 rounded bg-darkBluishGray6 px-2 py-1 text-sm text-darkBluishGray2 hover:bg-blue5"
+            <DepositButton
+              testnetChallengeDepositLimit={testnetChallengeDepositLimit}
               onClick={onDeposit}
-            >
-              <span className="hidden narrow:inline">Deposit</span>
-              <img
-                className="hidden max-narrow:inline"
-                src={Deposit}
-                alt={'Deposit'}
-              />
-            </button>
+            />
           </>
         )}
       </span>
