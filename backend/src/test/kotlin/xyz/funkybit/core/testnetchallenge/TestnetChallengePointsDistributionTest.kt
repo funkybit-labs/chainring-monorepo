@@ -342,14 +342,15 @@ class TestnetChallengePointsDistributionTest : TestWithDb() {
             val chainId = ChainId(1337UL)
             ChainEntity.create(chainId, "chain", "", "", "", NetworkType.Evm)
             SymbolEntity.create("USDC", chainId, null, 6.toUByte(), "USDC", false, BigInteger.ZERO)
-
+        }
+        transaction {
             testData = testData.map {
-                setupTestchallengeUser(it)
+                setupTestChallengeUser(it)
             }
         }
     }
 
-    private fun setupTestchallengeUser(testcase: TestnetChallengeTestCase, enrollmentStatus: TestnetChallengeStatus = TestnetChallengeStatus.Enrolled) = transaction {
+    private fun setupTestChallengeUser(testcase: TestnetChallengeTestCase, enrollmentStatus: TestnetChallengeStatus = TestnetChallengeStatus.Enrolled) = transaction {
         val wallet = WalletEntity.getOrCreateWithUser(EvmAddress.generate())
         val user = wallet.user
         val initialDeposit = BigDecimal(10000)
@@ -518,7 +519,7 @@ class TestnetChallengePointsDistributionTest : TestWithDb() {
     @Test
     fun `test testnet challenge points distribution - only enrolled users`() {
         // disqualified top earner is excluded from points distribution
-        setupTestchallengeUser(
+        setupTestChallengeUser(
             testcase = TestnetChallengeTestCase(
                 givenPnl = listOf(
                     TestnetChallengePNLType.DailyPNL to 20000,
