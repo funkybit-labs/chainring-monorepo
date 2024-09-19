@@ -1,5 +1,6 @@
 package xyz.funkybit.core.testnetchallenge
 
+import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -7,6 +8,13 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.model.EvmSignature
+import xyz.funkybit.core.model.TxHash
+import xyz.funkybit.core.model.db.ChainEntity
+import xyz.funkybit.core.model.db.ChainId
+import xyz.funkybit.core.model.db.DepositEntity
+import xyz.funkybit.core.model.db.NetworkType
+import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
 import xyz.funkybit.core.model.db.TestnetChallengePNLTable
 import xyz.funkybit.core.model.db.TestnetChallengePNLType
@@ -17,15 +25,21 @@ import xyz.funkybit.core.model.db.TestnetChallengeUserRewardType
 import xyz.funkybit.core.model.db.UserEntity
 import xyz.funkybit.core.model.db.UserId
 import xyz.funkybit.core.model.db.WalletEntity
+import xyz.funkybit.core.model.db.WalletId
+import xyz.funkybit.core.model.db.WithdrawalEntity
+import xyz.funkybit.core.model.db.WithdrawalStatus
 import xyz.funkybit.core.model.db.pointsBalances
+import xyz.funkybit.core.utils.TestnetChallengeUtils
 import xyz.funkybit.testutils.TestWithDb
 import java.math.BigDecimal
+import java.math.BigInteger
 import kotlin.test.assertNull
 
 class TestnetChallengePointsDistributionTest : TestWithDb() {
 
     data class TestnetChallengeTestCase(
         var userId: UserId? = null,
+        var walletId: WalletId? = null,
         val givenPnl: List<Pair<TestnetChallengePNLType, Int>>,
         val expectedReward: List<Pair<TestnetChallengeUserRewardType, Int>>,
         val expectedRewardCategory: TestnetChallengeRewardCategory?,
@@ -324,14 +338,22 @@ class TestnetChallengePointsDistributionTest : TestWithDb() {
 
     @BeforeEach
     fun setup() {
-        testData = testData.map {
-            setupTestchallengeUser(it)
+        transaction {
+            val chainId = ChainId(1337UL)
+            ChainEntity.create(chainId, "chain", "", "", "", NetworkType.Evm)
+            SymbolEntity.create("USDC", chainId, null, 6.toUByte(), "USDC", false, BigInteger.ZERO)
+        }
+        transaction {
+            testData = testData.map {
+                setupTestChallengeUser(it)
+            }
         }
     }
 
-    private fun setupTestchallengeUser(testcase: TestnetChallengeTestCase, enrollmentStatus: TestnetChallengeStatus = TestnetChallengeStatus.Enrolled) = transaction {
+    private fun setupTestChallengeUser(testcase: TestnetChallengeTestCase, enrollmentStatus: TestnetChallengeStatus = TestnetChallengeStatus.Enrolled) = transaction {
         val wallet = WalletEntity.getOrCreateWithUser(EvmAddress.generate())
         val user = wallet.user
+        val initialDeposit = BigDecimal(10000)
 
         // enroll to testnet challenge
         user.testnetChallengeStatus = enrollmentStatus
@@ -340,12 +362,15 @@ class TestnetChallengePointsDistributionTest : TestWithDb() {
             TestnetChallengePNLTable.update({
                 TestnetChallengePNLTable.userGuid.eq(user.guid) and TestnetChallengePNLTable.type.eq(pnl.first)
             }) {
-                it[initialBalance] = BigDecimal(10000)
-                it[currentBalance] = BigDecimal(10000) + pnl.second.toBigDecimal()
+                it[initialBalance] = initialDeposit
+                it[currentBalance] = initialDeposit + pnl.second.toBigDecimal()
             }
         }
 
-        testcase.copy(userId = user.guid.value)
+        val deposit = DepositEntity.createOrUpdate(wallet, TestnetChallengeUtils.depositSymbol(), initialDeposit.toBigInteger(), blockNumber = null, TxHash.generate())
+        deposit!!.markAsComplete()
+
+        testcase.copy(userId = user.guid.value, walletId = wallet.guid.value)
     }
 
     @Test
@@ -394,9 +419,107 @@ class TestnetChallengePointsDistributionTest : TestWithDb() {
     }
 
     @Test
+    fun `withdrawal does not affect ranking`() {
+        val challengeType = TestnetChallengePNLType.DailyPNL
+        val rewardType = TestnetChallengeUserRewardType.DailyReward
+
+        val balancesBefore = lookupBalances(rewardType)
+
+        testData.forEach { assertNull(lookupRecentReward(it.userId!!, rewardType)) }
+
+        // create withdrawal for top-1 and bottom-1 users
+        listOf(testData.first(), testData.last()).map {
+            transaction {
+                val userId = it.userId!!
+                val wallet = WalletEntity[it.walletId!!]
+                val withdrawAmount = 5000
+                val withdrawal = WithdrawalEntity.createPending(wallet, TestnetChallengeUtils.depositSymbol(), withdrawAmount.toBigInteger(), Clock.System.now().epochSeconds, EvmSignature.emptySignature())
+                withdrawal.update(WithdrawalStatus.Complete, error = null)
+
+                // reduce currentBalance
+                val dailyPnL = it.givenPnl.find { it.first == challengeType }!!
+                TestnetChallengePNLTable.update({
+                    TestnetChallengePNLTable.userGuid.eq(userId) and TestnetChallengePNLTable.type.eq(dailyPnL.first)
+                }) {
+                    it[initialBalance] = BigDecimal(10000)
+                    it[currentBalance] = BigDecimal(10000 - withdrawAmount) + dailyPnL.second.toBigDecimal()
+                }
+            }
+        }
+
+        transaction {
+            TestnetChallengePNLEntity.distributePoints(challengeType)
+        }
+
+        // verify withdrawal had no effect on points distribution
+        val balancesAfter = lookupBalances(rewardType)
+        val actualChanges = actualBalanceChanges(balancesBefore, balancesAfter)
+        val expectedChanges = expectedBalanceChanges(rewardType)
+        assertEquals(expectedChanges, actualChanges)
+
+        testData.forEach {
+            if (it.expectedRewardCategory != null) {
+                val achievedReward = lookupRecentReward(it.userId!!, rewardType)
+                assertEquals(it.expectedReward.toMap()[rewardType]!!.toBigDecimal(), achievedReward!!.amount.setScale(0))
+                assertEquals(it.expectedRewardCategory, achievedReward.rewardCategory)
+            }
+        }
+    }
+
+    @Test
+    fun `deposit does not affect ranking`() {
+        val challengeType = TestnetChallengePNLType.DailyPNL
+        val rewardType = TestnetChallengeUserRewardType.DailyReward
+
+        val balancesBefore = lookupBalances(rewardType)
+
+        testData.forEach { assertNull(lookupRecentReward(it.userId!!, rewardType)) }
+
+        // create deposit for top-1 and bottom-1 users
+        listOf(testData.first(), testData.last()).map {
+            transaction {
+                // create withdrawal
+                val userId = it.userId!!
+                val wallet = WalletEntity[it.walletId!!]
+                val depositAmount = 5000
+
+                val deposit = DepositEntity.createOrUpdate(wallet, TestnetChallengeUtils.depositSymbol(), depositAmount.toBigInteger(), blockNumber = null, TxHash.generate())
+                deposit!!.markAsComplete()
+
+                // increase currentBalance
+                val dailyPnL = it.givenPnl.find { it.first == challengeType }!!
+                TestnetChallengePNLTable.update({
+                    TestnetChallengePNLTable.userGuid.eq(userId) and TestnetChallengePNLTable.type.eq(dailyPnL.first)
+                }) {
+                    it[initialBalance] = BigDecimal(10000)
+                    it[currentBalance] = BigDecimal(10000 + depositAmount) + dailyPnL.second.toBigDecimal()
+                }
+            }
+        }
+
+        transaction {
+            TestnetChallengePNLEntity.distributePoints(challengeType)
+        }
+
+        // verify deposit had no effect on points distribution
+        val balancesAfter = lookupBalances(rewardType)
+        val actualChanges = actualBalanceChanges(balancesBefore, balancesAfter)
+        val expectedChanges = expectedBalanceChanges(rewardType)
+        assertEquals(expectedChanges, actualChanges)
+
+        testData.forEach {
+            if (it.expectedRewardCategory != null) {
+                val achievedReward = lookupRecentReward(it.userId!!, rewardType)
+                assertEquals(it.expectedReward.toMap()[rewardType]!!.toBigDecimal(), achievedReward!!.amount.setScale(0))
+                assertEquals(it.expectedRewardCategory, achievedReward.rewardCategory)
+            }
+        }
+    }
+
+    @Test
     fun `test testnet challenge points distribution - only enrolled users`() {
         // disqualified top earner is excluded from points distribution
-        setupTestchallengeUser(
+        setupTestChallengeUser(
             testcase = TestnetChallengeTestCase(
                 givenPnl = listOf(
                     TestnetChallengePNLType.DailyPNL to 20000,

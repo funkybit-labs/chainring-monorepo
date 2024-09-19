@@ -90,6 +90,7 @@ import xyz.funkybit.core.model.db.migrations.V89_RewardTimestampWithTimezone
 import xyz.funkybit.core.model.db.migrations.V8_ExecutionsAndTrades
 import xyz.funkybit.core.model.db.migrations.V90_OrderExecutionSide
 import xyz.funkybit.core.model.db.migrations.V91_TestnetChallengeRewardTypes
+import xyz.funkybit.core.model.db.migrations.V92_DepositWithdrawalTimestamps
 import xyz.funkybit.core.model.db.migrations.V9_SymbolTable
 
 val migrations = listOf(
@@ -184,4 +185,5 @@ val migrations = listOf(
     V89_RewardTimestampWithTimezone(),
     V90_OrderExecutionSide(),
     V91_TestnetChallengeRewardTypes(),
+    V92_DepositWithdrawalTimestamps(),
 )

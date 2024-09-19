@@ -2,6 +2,7 @@ package xyz.funkybit.core.model.db
 
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -124,7 +125,7 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
             )
         }
 
-        fun distributePoints(challengePNLType: TestnetChallengePNLType) {
+        fun distributePoints(challengePNLType: TestnetChallengePNLType, intervalStart: Instant = Instant.fromEpochMilliseconds(0), intervalEnd: Instant = Clock.System.now()) {
             val rewardType = when (challengePNLType) {
                 TestnetChallengePNLType.DailyPNL -> TestnetChallengeUserRewardType.DailyReward
                 TestnetChallengePNLType.WeeklyPNL -> TestnetChallengeUserRewardType.WeeklyReward
@@ -133,17 +134,62 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
 
             TransactionManager.current().exec(
                 """
-                WITH ranked_users AS (SELECT pnl.${TestnetChallengePNLTable.userGuid.name}   AS user_guid,
-                                             pnl.${TestnetChallengePNLTable.type.name}       AS type,
-                                             ROW_NUMBER() OVER (
-                                                PARTITION BY pnl.${TestnetChallengePNLTable.type.name} 
-                                                ORDER BY ((pnl.${TestnetChallengePNLTable.currentBalance.name} - pnl.${TestnetChallengePNLTable.initialBalance.name}) / pnl.${TestnetChallengePNLTable.initialBalance.name}) DESC
-                                             )                                               AS rank,
-                                             COUNT(*) OVER (PARTITION BY pnl.type)           AS total_users
+                WITH
+                    -- initial testnet challenge symbol deposit per user
+                    testnet_challenge_initial_deposits AS (SELECT deposit_guid
+                                                                FROM (SELECT d.${DepositTable.guid.name} AS deposit_guid, 
+                                                                             ROW_NUMBER() OVER (PARTITION BY w.${WalletTable.userGuid.name} ORDER BY d.${DepositTable.createdAt.name} ASC) AS rn
+                                                                      FROM ${DepositTable.tableName} d 
+                                                                            LEFT JOIN ${WalletTable.tableName} w ON w.${WalletTable.guid.name} = d.${DepositTable.walletGuid.name}
+                                                                      WHERE d.${DepositTable.status.name} IN ('${DepositStatus.Confirmed}', '${DepositStatus.Complete}')
+                                                                        AND d.symbol_guid = '${TestnetChallengeUtils.depositSymbol().guid.value}') AS testnet_initial_deposits
+                                                                WHERE rn = 1),
+                    
+                    -- sum of testnet challenge symbol deposits (exclude initial) per within interval 
+                    cumulative_deposits AS (SELECT u.${UserTable.guid.name} AS user_guid, 
+                                                   SUM(t.${DepositTable.amount.name}) AS amount
+                                             FROM ${TestnetChallengePNLTable.tableName} pnl
+                                                      LEFT JOIN "${UserTable.tableName}" u ON u.${UserTable.guid.name} = pnl.${TestnetChallengePNLTable.userGuid.name}
+                                                      LEFT JOIN ${WalletTable.tableName} w ON w.${WalletTable.userGuid.name} = u.${UserTable.guid.name}
+                                                      LEFT JOIN ${DepositTable.tableName} t ON t.${DepositTable.walletGuid.name} = w.${WalletTable.guid.name}
+                                             WHERE pnl.${TestnetChallengePNLTable.type.name} = '${challengePNLType.name}'
+                                               AND t.${DepositTable.symbolGuid.name} = '${TestnetChallengeUtils.depositSymbol().guid.value}'
+                                               AND t.${DepositTable.status.name} in ('${DepositStatus.Confirmed}', '${DepositStatus.Complete}') -- exchange balance is updated already on Confirmed
+                                               AND t.${DepositTable.guid.name} NOT IN (SELECT * FROM testnet_challenge_initial_deposits)
+                                               AND t.${DepositTable.updatedAt.name} > '$intervalStart'                                          -- consider deposits that occured in current time interval
+                                               AND t.${DepositTable.updatedAt.name} <= '$intervalEnd'
+                                             GROUP BY u.${UserTable.guid.name}),
+                    
+                    -- sum of challenge symbol withdrwals per user within interval 
+                    cumulative_withdrawals AS (SELECT u.${UserTable.guid.name} AS user_guid,
+                                                      SUM(t.${WithdrawalTable.amount.name}) AS amount
+                                                FROM ${TestnetChallengePNLTable.tableName} pnl
+                                                         LEFT JOIN "${UserTable.tableName}" u ON u.${UserTable.guid.name} = pnl.${TestnetChallengePNLTable.userGuid.name}
+                                                         LEFT JOIN ${WalletTable.tableName} w ON w.${WalletTable.userGuid.name} = u.${UserTable.guid.name}
+                                                         LEFT JOIN ${WithdrawalTable.tableName} t ON t.${WithdrawalTable.walletGuid.name} = w.${WalletTable.guid.name}
+                                                WHERE pnl.${TestnetChallengePNLTable.type.name} = '${challengePNLType.name}'
+                                                  AND t.${WithdrawalTable.symbolGuid.name} = '${TestnetChallengeUtils.depositSymbol().guid.value}'
+                                                  AND t.${WithdrawalTable.status.name} = '${WithdrawalStatus.Complete}'   -- exchange balance is updated
+                                                  AND t.${WithdrawalTable.updatedAt.name} > '$intervalStart'              -- consider withdrawals that occured in current time interval
+                                                  AND t.${WithdrawalTable.updatedAt.name} <= '$intervalEnd'
+                                                GROUP BY u.${UserTable.guid.name}),
+                    
+                    -- users ranked by PnL, current balance is adjusted by cummulative deposits and withdrawals
+                    ranked_users AS (SELECT pnl.${TestnetChallengePNLTable.userGuid.name}                            AS user_guid,
+                                            pnl.${TestnetChallengePNLTable.type.name}                                AS type,
+                                            ROW_NUMBER() OVER (
+                                               PARTITION BY pnl.${TestnetChallengePNLTable.type.name} 
+                                               ORDER BY ((pnl.${TestnetChallengePNLTable.currentBalance.name} - COALESCE(cd.amount, 0) + COALESCE(cw.amount, 0) - pnl.${TestnetChallengePNLTable.initialBalance.name}) / pnl.${TestnetChallengePNLTable.initialBalance.name}) DESC
+                                            )                                                                        AS rank,
+                                            COUNT(*) OVER (PARTITION BY pnl.${TestnetChallengePNLTable.type.name})   AS total_users
                                       FROM ${TestnetChallengePNLTable.tableName} pnl
-                                            LEFT JOIN "${UserTable.tableName}" u ON u.guid = pnl.${TestnetChallengePNLTable.userGuid.name}
-                                      WHERE pnl.${TestnetChallengePNLTable.type.name} = '${challengePNLType.name}'
-                                            AND u.${UserTable.testnetChallengeStatus.name} = '${TestnetChallengeStatus.Enrolled}'),
+                                            LEFT JOIN cumulative_deposits cd on pnl.${TestnetChallengePNLTable.userGuid.name} = cd.user_guid
+                                            LEFT JOIN cumulative_withdrawals cw on pnl.${TestnetChallengePNLTable.userGuid.name} = cw.user_guid
+                                            LEFT JOIN "${UserTable.tableName}" u ON u.${UserTable.guid.name} = pnl.${TestnetChallengePNLTable.userGuid.name}
+                                      WHERE pnl.type = '${challengePNLType.name}' 
+                                        AND u.${UserTable.testnetChallengeStatus.name} = '${TestnetChallengeStatus.Enrolled}'),
+                     
+                     -- based on the rank calculate points to be granted
                      calculated_rewards AS (SELECT user_guid,
                                                   type,
                                                   rank,
@@ -218,6 +264,8 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
                                                       WHEN rank > total_users * 0.95 THEN '${TestnetChallengeRewardCategory.Bottom5Percent.name}'
                                                       ELSE '' END AS reward_category
                                            FROM ranked_users)
+                
+                -- grant points
                 INSERT
                 INTO ${TestnetChallengeUserRewardTable.tableName}(
                     ${TestnetChallengeUserRewardTable.guid.name}, 
