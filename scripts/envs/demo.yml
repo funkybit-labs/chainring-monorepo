@@ -4,6 +4,10 @@ environment:
     EVM_CHAINS: Bitlayer,Botanix
     EVM_NETWORK_URL_Bitlayer: http://demo-anvil.funkybit.fun:8545
     EVM_NETWORK_URL_Botanix: http://demo-anvil2.funkybit.fun:8545
+    BLOCK_EXPLORER_NET_NAME_Bitlayer: Bitlayer
+    BLOCK_EXPLORER_NET_NAME_Botanix: Botanix
+    BLOCK_EXPLORER_URL_Bitlayer: https://demo-otterscan.funkybit.fun
+    BLOCK_EXPLORER_URL_Botanix: https://demo-otterscan2.funkybit.fun
     AUTH_TOKEN_VALIDITY_INTERVAL: P30D
     SEQUENCER_HOST_NAME: demo-sequencer.funkybit.fun
     SEQUENCER_PORT: "5337"
