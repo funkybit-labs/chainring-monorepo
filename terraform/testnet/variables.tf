@@ -47,22 +47,27 @@ variable "ip_dos_rate_limit" {
 
 
 data "dns_a_record_set" "nlb_ips" {
-  host = "${module.alb.dns_name}"
+  host = module.alb.dns_name
 }
 
 data "dns_a_record_set" "nlb_mocker_ips" {
-  host = "${module.alb.dns_name}"
+  host = module.alb.dns_name
 }
 
 data "dns_a_record_set" "tm_app_ips" {
-  host = "${module.telegram_mini_app.dns_name}"
+  host = module.telegram_mini_app.dns_name
+}
+
+data "dns_a_record_set" "web_app_ips" {
+  host = "${local.name_prefix}.${local.zone_name}"
 }
 
 locals {
 
   ipv4whitelist = [
         join(",", data.dns_a_record_set.nlb_ips.addrs),
-        join(",", data.dns_a_record_set.tm_app_ips.addrs)
+        join(",", data.dns_a_record_set.tm_app_ips.addrs),
+        join(",", data.dns_a_record_set.web_app_ips.addrs)
    ]
 
   ipv4blacklist = []
