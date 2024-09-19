@@ -61,7 +61,7 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
 
         fun createForUser(user: UserEntity, address: Address): WalletEntity {
             val canonicalAddress = address.canonicalize()
-            return WalletEntity.new(WalletId.generate(canonicalAddress)) {
+            val wallet = WalletEntity.new(WalletId.generate(canonicalAddress)) {
                 this.address = canonicalAddress
                 sequencerId = canonicalAddress.toSequencerId()
                 createdAt = Clock.System.now()
@@ -73,6 +73,10 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
                 }
                 this.user = user
             }
+
+            TestnetChallengeUserRewardEntity.createWalletConnectedReward(user, wallet)
+
+            return wallet
         }
 
         fun getByAddress(address: Address): WalletEntity =

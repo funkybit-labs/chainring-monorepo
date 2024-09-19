@@ -26,8 +26,10 @@ import xyz.funkybit.apps.api.model.RequestProcessingError
 import xyz.funkybit.apps.api.model.SetAvatarUrl
 import xyz.funkybit.apps.api.model.SetNickname
 import xyz.funkybit.apps.api.model.processingError
+import xyz.funkybit.apps.api.model.testnetChallengeDisqualifiedError
 import xyz.funkybit.core.blockchain.BlockchainClient
 import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderEntity
 import xyz.funkybit.core.model.db.SymbolEntity
@@ -64,8 +66,13 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
                 val user = request.principal.user
                 if (TestnetChallengeUtils.enabled && user.testnetChallengeStatus == TestnetChallengeStatus.Unenrolled) {
                     val symbol = TestnetChallengeUtils.depositSymbol()
-                    val blockchainClient = blockchainClients.first { it.chainId == symbol.chainId.value }
 
+                    if (DepositEntity.existsForUserAndSymbol(user, symbol)) {
+                        user.testnetChallengeStatus = TestnetChallengeStatus.Disqualified
+                        return@transaction testnetChallengeDisqualifiedError("Disqualified due to prior deposit")
+                    }
+
+                    val blockchainClient = blockchainClients.first { it.chainId == symbol.chainId.value }
                     val amount = TestnetChallengeUtils.depositAmount
 
                     val address = request.principal.address
@@ -101,8 +108,8 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
                         }
                     }
                 }
+                Response(Status.OK)
             }
-            Response(Status.OK)
         }
     }
 

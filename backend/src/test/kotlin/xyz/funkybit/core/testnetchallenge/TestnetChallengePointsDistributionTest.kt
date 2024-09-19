@@ -11,6 +11,7 @@ import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
 import xyz.funkybit.core.model.db.TestnetChallengePNLTable
 import xyz.funkybit.core.model.db.TestnetChallengePNLType
 import xyz.funkybit.core.model.db.TestnetChallengeRewardCategory
+import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.model.db.TestnetChallengeUserRewardEntity
 import xyz.funkybit.core.model.db.TestnetChallengeUserRewardType
 import xyz.funkybit.core.model.db.UserEntity
@@ -324,24 +325,27 @@ class TestnetChallengePointsDistributionTest : TestWithDb() {
     @BeforeEach
     fun setup() {
         testData = testData.map {
-            transaction {
-                val wallet = WalletEntity.getOrCreateWithUser(EvmAddress.generate())
-                val user = wallet.user
+            setupTestchallengeUser(it)
+        }
+    }
 
-                // setup pnl balance per type
-                TestnetChallengePNLEntity.initializeForUser(user)
-                it.givenPnl.forEach { pnl ->
-                    TestnetChallengePNLTable.update({
-                        TestnetChallengePNLTable.userGuid.eq(user.guid) and TestnetChallengePNLTable.type.eq(pnl.first)
-                    }) {
-                        it[initialBalance] = BigDecimal(10000)
-                        it[currentBalance] = BigDecimal(10000) + pnl.second.toBigDecimal()
-                    }
-                }
+    private fun setupTestchallengeUser(testcase: TestnetChallengeTestCase, enrollmentStatus: TestnetChallengeStatus = TestnetChallengeStatus.Enrolled) = transaction {
+        val wallet = WalletEntity.getOrCreateWithUser(EvmAddress.generate())
+        val user = wallet.user
 
-                it.copy(userId = user.guid.value)
+        // enroll to testnet challenge
+        user.testnetChallengeStatus = enrollmentStatus
+        TestnetChallengePNLEntity.initializeForUser(user)
+        testcase.givenPnl.forEach { pnl ->
+            TestnetChallengePNLTable.update({
+                TestnetChallengePNLTable.userGuid.eq(user.guid) and TestnetChallengePNLTable.type.eq(pnl.first)
+            }) {
+                it[initialBalance] = BigDecimal(10000)
+                it[currentBalance] = BigDecimal(10000) + pnl.second.toBigDecimal()
             }
         }
+
+        testcase.copy(userId = user.guid.value)
     }
 
     @Test
@@ -370,7 +374,7 @@ class TestnetChallengePointsDistributionTest : TestWithDb() {
                     TestnetChallengeUserRewardType.DailyReward -> TestnetChallengePNLType.DailyPNL
                     TestnetChallengeUserRewardType.WeeklyReward -> TestnetChallengePNLType.WeeklyPNL
                     TestnetChallengeUserRewardType.OverallReward -> TestnetChallengePNLType.OverallPNL
-                    TestnetChallengeUserRewardType.ReferralBonus -> throw IllegalArgumentException()
+                    else -> throw IllegalArgumentException()
                 },
             )
         }
@@ -387,6 +391,25 @@ class TestnetChallengePointsDistributionTest : TestWithDb() {
                 assertEquals(it.expectedRewardCategory, achievedReward.rewardCategory)
             }
         }
+    }
+
+    @Test
+    fun `test testnet challenge points distribution - only enrolled users`() {
+        // disqualified top earner is excluded from points distribution
+        setupTestchallengeUser(
+            testcase = TestnetChallengeTestCase(
+                givenPnl = listOf(
+                    TestnetChallengePNLType.DailyPNL to 20000,
+                    TestnetChallengePNLType.WeeklyPNL to 20000,
+                    TestnetChallengePNLType.OverallPNL to 20000,
+                ),
+                expectedReward = emptyList(),
+                expectedRewardCategory = null,
+            ),
+            enrollmentStatus = TestnetChallengeStatus.Disqualified,
+        )
+
+        `test testnet challenge points distribution`(TestnetChallengeUserRewardType.DailyReward)
     }
 
     private fun expectedBalanceChanges(rewardType: TestnetChallengeUserRewardType) =

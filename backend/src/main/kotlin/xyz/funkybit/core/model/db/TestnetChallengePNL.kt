@@ -133,15 +133,17 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
 
             TransactionManager.current().exec(
                 """
-                WITH ranked_users AS (SELECT ${TestnetChallengePNLTable.userGuid.name}   AS user_guid,
-                                             ${TestnetChallengePNLTable.type.name}       AS type,
+                WITH ranked_users AS (SELECT pnl.${TestnetChallengePNLTable.userGuid.name}   AS user_guid,
+                                             pnl.${TestnetChallengePNLTable.type.name}       AS type,
                                              ROW_NUMBER() OVER (
-                                                PARTITION BY type 
-                                                ORDER BY ((${TestnetChallengePNLTable.currentBalance.name} - ${TestnetChallengePNLTable.initialBalance.name}) / ${TestnetChallengePNLTable.initialBalance.name}) DESC
-                                             )                                           AS rank,
-                                             COUNT(*) OVER (PARTITION BY type)           AS total_users
-                                      FROM ${TestnetChallengePNLTable.tableName}
-                                      WHERE type = '${challengePNLType.name}'),
+                                                PARTITION BY pnl.${TestnetChallengePNLTable.type.name} 
+                                                ORDER BY ((pnl.${TestnetChallengePNLTable.currentBalance.name} - pnl.${TestnetChallengePNLTable.initialBalance.name}) / pnl.${TestnetChallengePNLTable.initialBalance.name}) DESC
+                                             )                                               AS rank,
+                                             COUNT(*) OVER (PARTITION BY pnl.type)           AS total_users
+                                      FROM ${TestnetChallengePNLTable.tableName} pnl
+                                            LEFT JOIN "${UserTable.tableName}" u ON u.guid = pnl.${TestnetChallengePNLTable.userGuid.name}
+                                      WHERE pnl.${TestnetChallengePNLTable.type.name} = '${challengePNLType.name}'
+                                            AND u.${UserTable.testnetChallengeStatus.name} = '${TestnetChallengeStatus.Enrolled}'),
                      calculated_rewards AS (SELECT user_guid,
                                                   type,
                                                   rank,
