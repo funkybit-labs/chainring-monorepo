@@ -6,8 +6,8 @@ import org.awaitility.kotlin.await
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInList
 import org.jetbrains.exposed.sql.transactions.transaction
-import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.db.BitcoinUtxoEntity
 import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.DepositStatus
 import xyz.funkybit.core.model.db.DepositTable
@@ -74,6 +74,8 @@ fun waitForActivityToComplete() {
 
 fun waitForTx(address: BitcoinAddress, txId: TxHash) {
     waitFor {
-        MempoolSpaceClient.getTransactions(address, null).firstOrNull { it.txId == txId } != null
+        transaction {
+            BitcoinUtxoEntity.findUnspentByAddress(address).map { it.guid.value.txId() }.toSet().contains(txId)
+        }
     }
 }

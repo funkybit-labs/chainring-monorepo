@@ -14,9 +14,9 @@ import org.bitcoinj.script.ScriptBuilder
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.SmartFeeMode
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.db.BitcoinUtxoEntity
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.TxHash
-import xyz.funkybit.core.model.db.UnspentUtxo
 import xyz.funkybit.core.model.rpc.BitcoinRpc
 import xyz.funkybit.core.model.rpc.BitcoinRpcParams
 import xyz.funkybit.core.model.rpc.BitcoinRpcRequest
@@ -60,6 +60,35 @@ object BitcoinClient : JsonRpcClientBase(
             BitcoinRpcRequest(
                 "getblockcount",
             ),
+        )
+    }
+
+    fun getBlockHash(blockHeight: Long): String {
+        return getValue(
+            BitcoinRpcRequest(
+                "getblockhash",
+                BitcoinRpcParams(listOf(blockHeight)),
+            ),
+        )
+    }
+
+    fun getBlock(blockhash: String, verbosity: Int = 2): BitcoinRpc.Block {
+        return getValue(
+            BitcoinRpcRequest(
+                "getblock",
+                BitcoinRpcParams(listOf(blockhash, verbosity)),
+            ),
+            true,
+        )
+    }
+
+    fun getBlockHeader(blockhash: String): BitcoinRpc.Block {
+        return getValue(
+            BitcoinRpcRequest(
+                "getblockheader",
+                BitcoinRpcParams(listOf(blockhash)),
+            ),
+            true,
         )
     }
 
@@ -132,7 +161,7 @@ object BitcoinClient : JsonRpcClientBase(
     fun buildAndSignDepositTx(
         accountAddress: BitcoinAddress,
         amount: BigInteger,
-        utxos: List<UnspentUtxo>,
+        utxos: List<BitcoinUtxoEntity>,
         ecKey: ECKey,
     ): Transaction {
         val params = getParams()
@@ -162,8 +191,8 @@ object BitcoinClient : JsonRpcClientBase(
             rawTx.addSignedInput(
                 TransactionOutPoint(
                     params,
-                    it.utxoId.vout(),
-                    Sha256Hash.wrap(it.utxoId.txId().value),
+                    it.vout(),
+                    Sha256Hash.wrap(it.txId().value),
                 ),
                 ScriptBuilder.createP2WPKHOutputScript(ecKey),
                 Coin.valueOf(it.amount.toLong()),
@@ -178,7 +207,7 @@ object BitcoinClient : JsonRpcClientBase(
     private fun estimateDepositTxFee(
         ecKey: ECKey,
         accountAddress: BitcoinAddress,
-        utxos: List<UnspentUtxo>,
+        utxos: List<BitcoinUtxoEntity>,
     ): BigInteger {
         val params = getParams()
         val rawTx = Transaction(params)
@@ -203,8 +232,8 @@ object BitcoinClient : JsonRpcClientBase(
             rawTx.addSignedInput(
                 TransactionOutPoint(
                     params,
-                    it.utxoId.vout(),
-                    Sha256Hash.wrap(it.utxoId.txId().value),
+                    it.vout(),
+                    Sha256Hash.wrap(it.txId().value),
                 ),
                 ScriptBuilder.createP2WPKHOutputScript(ecKey),
                 Coin.valueOf(it.amount.toLong()),
@@ -227,7 +256,7 @@ object BitcoinClient : JsonRpcClientBase(
         return getRawTransaction(txId)?.let { tx ->
             (
                 tx.txIns.sumOf {
-                    getRawTransaction(it.txId)!!.txOuts[it.outIndex].value.toFundamentalUnits(8)
+                    getRawTransaction(it.txId!!)!!.txOuts[it.outIndex!!].value.toFundamentalUnits(8)
                 } - tx.txOuts.sumOf {
                     it.value.toFundamentalUnits(8)
                 }

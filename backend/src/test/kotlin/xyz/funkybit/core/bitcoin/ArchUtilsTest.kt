@@ -10,12 +10,12 @@ import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.Settlement
 import xyz.funkybit.core.model.WalletAndSymbol
-import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexStatus
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexTable
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.ArchAccountType
+import xyz.funkybit.core.model.db.BitcoinUtxoId
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.WalletEntity
@@ -44,8 +44,8 @@ class ArchUtilsTest : TestWithDb() {
             rune = createNativeSymbol("RUNE", chain.id.value, decimals = 8U)
             wallet1 = createWallet(BitcoinAddress.fromKey(BitcoinClient.getParams(), ECKey()))
             wallet2 = createWallet(BitcoinAddress.fromKey(BitcoinClient.getParams(), ECKey()))
-            btcTokenAccount = ArchAccountEntity.create(UtxoId("hash:1"), ECKey(), ArchAccountType.TokenState, btc)
-            runeTokenAccount = ArchAccountEntity.create(UtxoId("hash:2"), ECKey(), ArchAccountType.TokenState, rune)
+            btcTokenAccount = ArchAccountEntity.create(BitcoinUtxoId("hash:1"), ECKey(), ArchAccountType.TokenState, btc)
+            runeTokenAccount = ArchAccountEntity.create(BitcoinUtxoId("hash:2"), ECKey(), ArchAccountType.TokenState, rune)
         }
     }
 

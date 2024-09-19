@@ -16,12 +16,14 @@ import xyz.funkybit.core.model.db.ArchAccountBalanceIndexTable
 import xyz.funkybit.core.model.db.ArchAccountTable
 import xyz.funkybit.core.model.db.BalanceLogTable
 import xyz.funkybit.core.model.db.BalanceTable
-import xyz.funkybit.core.model.db.BitcoinWalletStateTable
+import xyz.funkybit.core.model.db.BitcoinUtxoAddressMonitorTable
+import xyz.funkybit.core.model.db.BitcoinUtxoTable
 import xyz.funkybit.core.model.db.BlockTable
 import xyz.funkybit.core.model.db.BlockchainTransactionTable
 import xyz.funkybit.core.model.db.BroadcasterJobTable
 import xyz.funkybit.core.model.db.ChainSettlementBatchTable
 import xyz.funkybit.core.model.db.ChainTable
+import xyz.funkybit.core.model.db.DeployedSmartContractTable
 import xyz.funkybit.core.model.db.DepositTable
 import xyz.funkybit.core.model.db.FaucetDripTable
 import xyz.funkybit.core.model.db.LimitTable
@@ -63,6 +65,8 @@ open class TestWithDb {
     @BeforeEach
     fun cleanupDb() {
         transaction {
+            BitcoinUtxoTable.deleteAll()
+            BitcoinUtxoAddressMonitorTable.deleteAll()
             BlockTable.deleteAll()
             TelegramBotUserWalletTable.deleteAll()
             TelegramBotUserTable.deleteAll()
@@ -94,7 +98,8 @@ open class TestWithDb {
             ArchAccountTable.deleteAll()
             SymbolTable.deleteAll()
             ChainTable.deleteAll()
-            BitcoinWalletStateTable.deleteAll()
+            ArchAccountTable.deleteAll()
+            DeployedSmartContractTable.deleteAll()
         }
     }
 }

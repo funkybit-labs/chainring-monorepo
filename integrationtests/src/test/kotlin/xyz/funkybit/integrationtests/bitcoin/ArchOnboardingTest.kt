@@ -30,40 +30,46 @@ class ArchOnboardingTest {
 
     companion object {
         fun waitForProgramAccount(): ArchAccountEntity {
-            waitFor(180000) {
-                transaction {
-                    ArchAccountEntity.findProgramAccount()?.status == ArchAccountStatus.Complete
+            if (programAccount()?.status != ArchAccountStatus.Complete) {
+                waitFor(180000) {
+                    programAccount()?.status == ArchAccountStatus.Complete
                 }
+                Thread.sleep(2000)
             }
-            Thread.sleep(2000)
-            return transaction { ArchAccountEntity.findProgramAccount()!! }
+            return programAccount()!!
         }
 
         fun waitForProgramStateAccount(): ArchAccountEntity {
-            waitFor(6000) {
-                transaction {
-                    ArchAccountEntity.findProgramStateAccount()?.status == ArchAccountStatus.Complete
+            if (programStateAccount()?.status != ArchAccountStatus.Complete) {
+                waitFor(6000) {
+                    programStateAccount()?.status == ArchAccountStatus.Complete
                 }
+                Thread.sleep(2000)
             }
-            Thread.sleep(2000)
-            return transaction { ArchAccountEntity.findProgramStateAccount()!! }
+            return programStateAccount()!!
         }
 
         fun waitForTokenStateAccount(): ArchAccountEntity {
-            waitFor(60000) {
-                triggerRepeaterTaskAndWaitForCompletion("arch_token_state_setup")
-                transaction {
-                    ArchAccountEntity.findTokenAccountForSymbol(
-                        SymbolEntity.forChain(BitcoinClient.chainId).first(),
-                    )?.status == ArchAccountStatus.Complete
+            if (tokenStateAccount()?.status != ArchAccountStatus.Complete) {
+                waitFor(60000) {
+                    triggerRepeaterTaskAndWaitForCompletion("arch_token_state_setup")
+                    transaction {
+                        tokenStateAccount()?.status == ArchAccountStatus.Complete
+                    }
                 }
+                Thread.sleep(2000)
             }
-            Thread.sleep(2000)
-            return transaction {
-                ArchAccountEntity.findTokenAccountForSymbol(
-                    SymbolEntity.forChain(BitcoinClient.chainId).first(),
-                )!!
-            }
+            return tokenStateAccount()!!
+        }
+
+        private fun programAccount() = transaction { ArchAccountEntity.findProgramAccount() }
+
+        private fun programStateAccount() = transaction { ArchAccountEntity.findProgramStateAccount() }
+
+        private fun tokenStateAccount() = transaction {
+            ArchAccountEntity.findTokenAccountForSymbol(
+                SymbolEntity.forChain(BitcoinClient.chainId).first(),
+            )
         }
     }
 

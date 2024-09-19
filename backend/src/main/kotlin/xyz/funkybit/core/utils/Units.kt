@@ -28,3 +28,7 @@ fun BigDecimal.setScale(decimals: UByte, roundingMode: RoundingMode): BigDecimal
 
 fun String.crPoints(): BigDecimal =
     BigDecimal(this).setScale(18)
+
+fun BigDecimal.toSatoshi(): Long {
+    return this.movePointRight(8).toLong()
+}

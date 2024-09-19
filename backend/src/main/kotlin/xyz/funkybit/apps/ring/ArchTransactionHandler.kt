@@ -525,7 +525,7 @@ class ArchTransactionHandler(
             transaction.flush()
             WithdrawalEntity.updateToSettlingOnArch(sequencedWithdrawals.map { it.withdrawalEntity }, transaction)
             submitToArch(transaction, instruction)
-            UtxoSelectionService.reserveUtxos(programBitcoinAddress, selectedUtxos.map { it.utxoId }.toSet(), transaction.txHash?.value ?: "")
+            UtxoSelectionService.reserveUtxos(selectedUtxos, transaction.txHash?.value ?: "")
 
             return true
         }

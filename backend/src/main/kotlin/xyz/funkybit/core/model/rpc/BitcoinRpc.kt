@@ -13,7 +13,6 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.encodeCollection
 import xyz.funkybit.apps.api.model.BigDecimalJson
-import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.TxHash
 import java.util.*
 
@@ -33,7 +32,6 @@ object BitcoinRpcParamsSerializer : KSerializer<BitcoinRpcParams> {
     @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = buildSerialDescriptor("RpcParams", StructureKind.LIST)
 
-    @OptIn(InternalSerializationApi::class)
     override fun serialize(encoder: Encoder, value: BitcoinRpcParams) {
         when (val param = value.value) {
             is List<*> -> encoder.encodeCollection(descriptor, param.size) {
@@ -74,13 +72,11 @@ sealed class BitcoinRpc {
     @Serializable
     data class TxIn(
         @SerialName("txid")
-        val txId: TxHash,
+        val txId: TxHash?,
         @SerialName("vout")
-        val outIndex: Int,
+        val outIndex: Int?,
         val scriptSig: ScriptSig?,
-    ) {
-        fun toUtxoId() = UtxoId.fromTxHashAndVout(txId, outIndex)
-    }
+    )
 
     @Serializable
     data class TxOut(
@@ -93,7 +89,7 @@ sealed class BitcoinRpc {
     @Serializable
     data class Transaction(
         @SerialName("txid")
-        val txId: String,
+        val txId: TxHash,
         val hash: String,
         val size: Int,
         val vsize: Int,
@@ -112,8 +108,8 @@ sealed class BitcoinRpc {
         val confirmations: Int,
         @SerialName("nTx")
         val numberOfTx: Int,
-        // @SerialName("tx")
-        // val transactions: List<Transaction>?,
+        @SerialName("tx")
+        val transactions: List<Transaction>?,
         val time: Long,
         @SerialName("mediantime")
         val medianTime: Long,

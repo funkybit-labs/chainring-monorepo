@@ -242,7 +242,7 @@ open class OrderBaseTest {
 
                 NetworkType.Bitcoin -> {
                     waitForTx(
-                        bitcoinWallet!!.walletAddress,
+                        bitcoinWallet!!.exchangeDepositAddress,
                         TxHash(bitcoinWallet.depositNative(it.inFundamentalUnits).deposit.txHash.value),
                     )
                 }

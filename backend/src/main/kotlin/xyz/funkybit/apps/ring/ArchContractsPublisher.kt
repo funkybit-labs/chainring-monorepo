@@ -11,6 +11,7 @@ import xyz.funkybit.core.model.db.AccountSetupState
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.ArchAccountStatus
 import xyz.funkybit.core.model.db.ArchAccountType
+import xyz.funkybit.core.model.db.BitcoinUtxoAddressMonitorEntity
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.utils.bitcoin.ArchUtils
@@ -200,6 +201,7 @@ object ArchContractsPublisher {
                         logger.debug { "Initialized program state account ${programStateAccount.publicKey} " }
                         // get the address of the program to use for deposits
                         val address = ArchNetworkClient.getAccountAddress(programAccount.rpcPubkey())
+                        BitcoinUtxoAddressMonitorEntity.createIfNotExists(address)
                         DeployedSmartContractEntity.create(
                             name = contractType.name,
                             chainId = BitcoinClient.chainId,

@@ -19,18 +19,18 @@ import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.Settlement
 import xyz.funkybit.core.model.WalletAndSymbol
 import xyz.funkybit.core.model.bitcoin.ProgramInstruction
-import xyz.funkybit.core.model.bitcoin.UtxoId
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexStatus
 import xyz.funkybit.core.model.db.ArchAccountBalanceInfo
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.ArchAccountType
+import xyz.funkybit.core.model.db.BitcoinUtxoEntity
+import xyz.funkybit.core.model.db.BitcoinUtxoId
 import xyz.funkybit.core.model.db.ConfirmedBitcoinDeposit
 import xyz.funkybit.core.model.db.CreateArchAccountBalanceIndexAssignment
 import xyz.funkybit.core.model.db.SequencedArchWithdrawal
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TxHash
-import xyz.funkybit.core.model.db.UnspentUtxo
 import xyz.funkybit.core.model.db.WalletTable
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
@@ -74,10 +74,10 @@ object ArchUtils {
             )
 
             val txId = BitcoinClient.sendRawTransaction(onboardingTx.toHexString())
-            UtxoSelectionService.reserveUtxos(config.feePayerAddress, selectedUtxos.map { it.utxoId }.toSet(), txId.value)
-            ArchAccountEntity.create(UtxoId.fromTxHashAndVout(txId, 0), ecKey, accountType, symbolEntity)
+            UtxoSelectionService.reserveUtxos(selectedUtxos, txId.value)
+            ArchAccountEntity.create(BitcoinUtxoId.fromTxHashAndVout(txId, 0), ecKey, accountType, symbolEntity)
         } catch (e: Exception) {
-            logger.warn(e) { "Unable to onboard state UTXO: ${e.message}" }
+            logger.warn { "Unable to onboard state UTXO: ${e.message}" }
             null
         }
     }
@@ -171,7 +171,7 @@ object ArchUtils {
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)
-    fun buildWithdrawBatchInstruction(programBitcoinAddress: BitcoinAddress, programPubkey: ArchNetworkRpc.Pubkey, withdrawals: List<SequencedArchWithdrawal>): Pair<ArchNetworkRpc.Instruction, List<UnspentUtxo>> {
+    fun buildWithdrawBatchInstruction(programBitcoinAddress: BitcoinAddress, programPubkey: ArchNetworkRpc.Pubkey, withdrawals: List<SequencedArchWithdrawal>): Pair<ArchNetworkRpc.Instruction, List<BitcoinUtxoEntity>> {
         val accountMetas = mutableListOf(
             ArchNetworkRpc.AccountMeta(
                 pubkey = submitterPubkey,
@@ -314,7 +314,7 @@ object ArchUtils {
         withdrawals: List<WithdrawalEntity>,
         changeAddress: BitcoinAddress,
         totalAmount: BigInteger,
-        utxos: List<UnspentUtxo>,
+        utxos: List<BitcoinUtxoEntity>,
     ): String {
         val params = BitcoinClient.getParams()
         val feeAmount = estimateWithdrawalTxFee(
@@ -355,8 +355,8 @@ object ArchUtils {
                     ByteArray(0),
                     TransactionOutPoint(
                         params,
-                        it.utxoId.vout(),
-                        Sha256Hash.wrap(it.utxoId.txId().value),
+                        it.vout(),
+                        Sha256Hash.wrap(it.txId().value),
                     ),
                     Coin.valueOf(it.amount.toLong()),
                 ),
@@ -368,7 +368,7 @@ object ArchUtils {
     private fun estimateWithdrawalTxFee(
         destinationAddresses: List<BitcoinAddress>,
         changeAddress: BitcoinAddress,
-        utxos: List<UnspentUtxo>,
+        utxos: List<BitcoinUtxoEntity>,
     ): BigInteger {
         val ecKey = ECKey()
         val params = BitcoinClient.getParams()
@@ -396,8 +396,8 @@ object ArchUtils {
             rawTx.addSignedInput(
                 TransactionOutPoint(
                     params,
-                    it.utxoId.vout(),
-                    Sha256Hash.wrap(it.utxoId.txId().value),
+                    it.vout(),
+                    Sha256Hash.wrap(it.txId().value),
                 ),
                 ScriptBuilder.createP2WPKHOutputScript(ecKey),
                 Coin.valueOf(it.amount.toLong()),
