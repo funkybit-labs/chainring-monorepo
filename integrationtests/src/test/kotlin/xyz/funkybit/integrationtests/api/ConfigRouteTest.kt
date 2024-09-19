@@ -16,7 +16,7 @@ import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
-import xyz.funkybit.integrationtests.testutils.isTestEnvRun
+import xyz.funkybit.integrationtests.testutils.isBitcoinDisabled
 import xyz.funkybit.integrationtests.utils.TestApiClient
 import xyz.funkybit.tasks.fixtures.toChainSymbol
 import java.math.BigDecimal
@@ -64,7 +64,7 @@ class ConfigRouteTest {
 
     @Test
     fun testBitcoinConfiguration() {
-        Assumptions.assumeFalse(isTestEnvRun())
+        Assumptions.assumeFalse(isBitcoinDisabled())
 
         val apiClient = TestApiClient()
 

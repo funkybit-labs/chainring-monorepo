@@ -1,6 +1,9 @@
 package xyz.funkybit.sequencer.core
 
+import com.google.protobuf.kotlin.toByteString
+import xyz.funkybit.sequencer.proto.IntegerValue
 import java.math.BigDecimal
+import java.math.BigInteger
 
 @JvmInline
 value class WalletAddress(val value: Long) {
@@ -85,3 +88,62 @@ value class FeeRate(val value: Long) {
     fun inPercents(): Double =
         (100 * value).toDouble() / MAX_VALUE
 }
+
+@JvmInline
+value class QuoteAmount(val value: BigInteger) {
+    constructor(value: String) : this(value.toBigInteger())
+
+    operator fun compareTo(quantity: QuoteAmount) = this.value.compareTo(quantity.value)
+    operator fun plus(other: QuoteAmount) = QuoteAmount(this.value + other.value)
+    operator fun minus(other: QuoteAmount) = QuoteAmount(this.value - other.value)
+    operator fun times(other: QuoteAmount) = QuoteAmount(this.value * other.value)
+    operator fun div(other: QuoteAmount) = QuoteAmount(this.value / other.value)
+    operator fun unaryMinus() = QuoteAmount(-this.value)
+    fun toByteArray(): ByteArray = this.value.toByteArray()
+    fun toBigInteger() = this.value
+    fun toBigDecimal() = BigDecimal(this.value)
+    fun toIntegerValue(): IntegerValue = IntegerValue.newBuilder()
+        .setValue(this.toByteArray().toByteString())
+        .build()
+    fun toBaseAmount() = BaseAmount(this.value)
+    fun min(other: QuoteAmount) = QuoteAmount(this.value.min(other.value))
+    fun max(other: QuoteAmount) = QuoteAmount(this.value.max(other.value))
+    fun negate() = QuoteAmount(this.value.negate())
+
+    companion object {
+        val ZERO = QuoteAmount(BigInteger.ZERO)
+    }
+}
+
+@JvmInline
+value class BaseAmount(val value: BigInteger) {
+    constructor(value: String) : this(value.toBigInteger())
+
+    operator fun compareTo(quantity: BaseAmount) = this.value.compareTo(quantity.value)
+    operator fun plus(other: BaseAmount) = BaseAmount(this.value + other.value)
+    operator fun minus(other: BaseAmount) = BaseAmount(this.value - other.value)
+    operator fun times(other: BaseAmount) = BaseAmount(this.value * other.value)
+    operator fun div(other: BaseAmount) = BaseAmount(this.value / other.value)
+    operator fun unaryMinus() = BaseAmount(-this.value)
+    fun toByteArray(): ByteArray = this.value.toByteArray()
+    fun toBigInteger() = this.value
+    fun toBigDecimal() = BigDecimal(this.value)
+    fun toIntegerValue(): IntegerValue = IntegerValue.newBuilder()
+        .setValue(this.toByteArray().toByteString())
+        .build()
+    fun toQuoteAmount() = QuoteAmount(this.value)
+    fun min(other: BaseAmount) = BaseAmount(this.value.min(other.value))
+    fun max(other: BaseAmount) = BaseAmount(this.value.max(other.value))
+    fun negate() = BaseAmount(this.value.negate())
+
+    companion object {
+        val ZERO = BaseAmount(BigInteger.ZERO)
+    }
+}
+
+fun BigDecimal.toQuoteAmount() = QuoteAmount(this.toBigInteger())
+fun BigDecimal.toBaseAmount() = BaseAmount(this.toBigInteger())
+fun BigInteger.toQuoteAmount() = QuoteAmount(this)
+fun BigInteger.toBaseAmount() = BaseAmount(this)
+fun IntegerValue.toQuoteAmount() = QuoteAmount(this.toBigInteger())
+fun IntegerValue.toBaseAmount() = BaseAmount(this.toBigInteger())

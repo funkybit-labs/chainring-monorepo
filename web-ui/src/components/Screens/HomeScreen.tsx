@@ -1,4 +1,4 @@
-import { Chain, noAuthApiClient, OrderSide } from 'apiClient'
+import { apiClient, Chain, noAuthApiClient, OrderSide } from 'apiClient'
 import BalancesWidget from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import { Header, Tab } from 'components/Screens/Header'
 import React, { LegacyRef, useEffect, useMemo, useState } from 'react'
@@ -18,11 +18,14 @@ import Admin from 'components/Screens/Admin'
 import { ConnectedEvmWallet, useWallets } from 'contexts/walletProvider'
 import { TestnetChallengeTab } from 'components/Screens/HomeScreen/testnetchallenge/TestnetChallengeTab'
 import { TestnetChallengeEnabled } from 'testnetChallenge'
+import { useAuth } from 'contexts/auth'
 
 function WebsocketWrapper({ contents }: { contents: JSX.Element }) {
   const wallets = useWallets()
   return <WebsocketProvider wallets={wallets}>{contents}</WebsocketProvider>
 }
+
+export const accountConfigQueryKey = ['accountConfiguration']
 
 function HomeScreenContent() {
   const configQuery = useQuery({
@@ -136,6 +139,21 @@ function HomeScreenContent() {
   const [overriddenSide, setOverriddenSide] = useState<OrderSide | undefined>()
   const [showAdmin, setShowAdmin] = useState(false)
 
+  const { isAuthenticated } = useAuth()
+
+  const accountConfigQuery = useQuery({
+    queryKey: accountConfigQueryKey,
+    queryFn: apiClient.getAccountConfiguration,
+    enabled: isAuthenticated
+  })
+
+  const isAdmin = useMemo(() => {
+    return (
+      (accountConfigQuery.data && accountConfigQuery.data.role === 'Admin') ||
+      false
+    )
+  }, [accountConfigQuery.data])
+
   function saveTab(tab: Tab) {
     setTab(tab)
     window.sessionStorage.setItem('tab', tab)
@@ -150,6 +168,7 @@ function HomeScreenContent() {
           <Header
             tab={tab}
             markets={markets}
+            isAdmin={isAdmin}
             onTabChange={saveTab}
             onShowAdmin={() => setShowAdmin(true)}
           />
@@ -165,6 +184,7 @@ function HomeScreenContent() {
                   walletAddress={wallets.primary?.address}
                   exchangeContractAddress={exchangeContract?.address}
                   feeRates={feeRates}
+                  accountConfig={accountConfigQuery.data}
                   onMarketChange={setSelectedMarket}
                   onSideChange={setSide}
                 />
@@ -175,6 +195,7 @@ function HomeScreenContent() {
                   walletAddress={wallets.primary?.address}
                   exchangeContractAddress={exchangeContract?.address}
                   feeRates={feeRates}
+                  accountConfig={accountConfigQuery.data}
                   onMarketChange={setSelectedMarket}
                   onSideChange={setSide}
                 />
@@ -196,6 +217,7 @@ function HomeScreenContent() {
                           exchangeContractAddress={exchangeContract?.address}
                           symbols={symbols}
                           chains={chains}
+                          accountConfig={accountConfigQuery.data}
                         />
                       </div>
                     )}
@@ -251,6 +273,7 @@ function HomeScreenContent() {
                 <TestnetChallengeTab
                   symbols={symbols}
                   exchangeContract={exchangeContract}
+                  accountConfig={accountConfigQuery.data}
                   onChangeTab={saveTab}
                 />
               )}

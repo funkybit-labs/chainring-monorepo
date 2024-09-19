@@ -115,7 +115,7 @@ fun getFixtures(chainringChainClients: List<BlockchainClient>, bitcoinBlockchain
                 minFee = BigDecimal("0.02")
             ),
         )
-    }.flatten() + if (chainringChainClients.size > 1) listOf(
+    }.flatten() + (if (chainringChainClients.size > 1) listOf(
         Fixtures.Market(
             baseSymbol = SymbolId(chainringChainClients[0].chainId, "BTC"),
             quoteSymbol = SymbolId(chainringChainClients[1].chainId, "BTC"),
@@ -130,7 +130,17 @@ fun getFixtures(chainringChainClients: List<BlockchainClient>, bitcoinBlockchain
             lastPrice = "17.525".toBigDecimal(),
             BigDecimal("0.00001")
         ),
-    ) else emptyList(),
+    ) else emptyList()) + if (bitcoinBlockchainClientConfig.enabled) {
+        listOf(
+            Fixtures.Market(
+                baseSymbol = SymbolId(chainringChainClients[0].chainId, "BTC"),
+                quoteSymbol = SymbolId(BitcoinClient.chainId, "BTC"),
+                tickSize = "0.001".toBigDecimal(),
+                lastPrice = "1.0005".toBigDecimal(),
+                BigDecimal("0.00000001")
+            ),
+        )
+    } else listOf(),
     wallets = listOf(
         Fixtures.Wallet(
             privateKeyHex = "0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356",

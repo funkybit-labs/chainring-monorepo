@@ -1,9 +1,11 @@
 package xyz.funkybit
 
+import xyz.funkybit.sequencer.core.BaseAmount
 import xyz.funkybit.sequencer.core.BookSide
 import xyz.funkybit.sequencer.core.FeeRate
 import xyz.funkybit.sequencer.core.LevelOrder
 import xyz.funkybit.sequencer.core.OrderBookLevel
+import xyz.funkybit.sequencer.core.toBaseAmount
 import xyz.funkybit.sequencer.core.toBigInteger
 import xyz.funkybit.sequencer.core.toIntegerValue
 import xyz.funkybit.sequencer.proto.Order
@@ -181,7 +183,7 @@ class TestOrderBookLevel {
             .map { getNextOrder(amount = it.toBigInteger()) }
             .chunked(42)
             .forEach { sublist ->
-                val subListAmount = sublist.sumOf { it.amount.toBigInteger() }
+                val subListAmount = sublist.sumOf { it.amount.toBigInteger() }.toBaseAmount()
 
                 // add chuck of orders and verify totalQuantity
                 val addedOrders: List<LevelOrder> = sublist.map { obl.addOrder(0L, it, feeRate = FeeRate.zero).second!! }
@@ -189,7 +191,7 @@ class TestOrderBookLevel {
 
                 // remove chuck of orders and verify totalQuantity is 0
                 addedOrders.forEach { obl.removeLevelOrder(it) }
-                assertEquals(BigInteger.ZERO, obl.totalQuantity)
+                assertEquals(BaseAmount.ZERO, obl.totalQuantity)
             }
     }
 

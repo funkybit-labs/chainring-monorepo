@@ -88,7 +88,8 @@ import xyz.funkybit.core.model.db.migrations.V87_TestnetChallengeRewardCategory
 import xyz.funkybit.core.model.db.migrations.V88_TypeId
 import xyz.funkybit.core.model.db.migrations.V89_RewardTimestampWithTimezone
 import xyz.funkybit.core.model.db.migrations.V8_ExecutionsAndTrades
-import xyz.funkybit.core.model.db.migrations.V90_TestnetChallengeRewardTypes
+import xyz.funkybit.core.model.db.migrations.V90_OrderExecutionSide
+import xyz.funkybit.core.model.db.migrations.V91_TestnetChallengeRewardTypes
 import xyz.funkybit.core.model.db.migrations.V9_SymbolTable
 
 val migrations = listOf(
@@ -181,5 +182,6 @@ val migrations = listOf(
     V87_TestnetChallengeRewardCategory(),
     V88_TypeId(),
     V89_RewardTimestampWithTimezone(),
-    V90_TestnetChallengeRewardTypes(),
+    V90_OrderExecutionSide(),
+    V91_TestnetChallengeRewardTypes(),
 )

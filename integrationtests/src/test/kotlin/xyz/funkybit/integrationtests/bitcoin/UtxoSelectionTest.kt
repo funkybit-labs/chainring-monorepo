@@ -14,10 +14,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
-import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.bitcoin.UtxoId
-import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.UnspentUtxo
 import xyz.funkybit.core.services.UtxoSelectionService
 import xyz.funkybit.core.utils.bitcoin.BitcoinInsufficientFundsException
@@ -25,7 +23,7 @@ import xyz.funkybit.core.utils.bitcoin.inSatsAsDecimalString
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.isTestEnvRun
-import xyz.funkybit.integrationtests.testutils.waitFor
+import xyz.funkybit.integrationtests.testutils.waitForTx
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.test.assertEquals
@@ -35,13 +33,7 @@ class UtxoSelectionTest {
     private val logger = KotlinLogging.logger {}
 
     companion object {
-
         val params = BitcoinClient.getParams()
-        fun waitForTx(address: BitcoinAddress, txId: TxHash) {
-            waitFor {
-                MempoolSpaceClient.getTransactions(address, null).firstOrNull { it.txId == txId } != null
-            }
-        }
     }
 
     @Test

@@ -692,7 +692,7 @@ class BlockchainTransactionHandler(
                     ),
                     BalanceType.Exchange,
                 )
-                broadcasterNotifications.add(BroadcasterNotification.walletBalances(withdrawalEntity.wallet))
+                broadcasterNotifications.add(BroadcasterNotification.walletBalances(withdrawalEntity.wallet.userGuid.value))
             } else {
                 val sequencerResponse = runBlocking {
                     sequencerClient.failWithdraw(

@@ -8,9 +8,9 @@ import xyz.funkybit.core.model.db.PGEnum
 import xyz.funkybit.core.model.db.TestnetChallengeUserRewardId
 
 @Suppress("ClassName")
-class V90_TestnetChallengeRewardTypes : Migration() {
+class V91_TestnetChallengeRewardTypes : Migration() {
 
-    enum class V90_TestnetChallengeUserRewardType {
+    enum class V91_TestnetChallengeUserRewardType {
         DailyReward,
         WeeklyReward,
         OverallReward,
@@ -21,18 +21,18 @@ class V90_TestnetChallengeRewardTypes : Migration() {
         BitcoinWithdrawalDeposit,
     }
 
-    object V90_TestnetChallengeUserRewardTable : GUIDTable<TestnetChallengeUserRewardId>("testnet_challenge_user_reward", ::TestnetChallengeUserRewardId) {
+    object V91_TestnetChallengeUserRewardTable : GUIDTable<TestnetChallengeUserRewardId>("testnet_challenge_user_reward", ::TestnetChallengeUserRewardId) {
         val type = customEnumeration(
             "type",
             "TestnetChallengeUserRewardType",
-            { value -> V90_TestnetChallengeUserRewardType.valueOf(value as String) },
+            { value -> V91_TestnetChallengeUserRewardType.valueOf(value as String) },
             { PGEnum("TestnetChallengeUserRewardType", it) },
         ).index()
     }
 
     override fun run() {
         transaction {
-            updateEnum<V90_TestnetChallengeUserRewardType>(listOf(V90_TestnetChallengeUserRewardTable.type), "TestnetChallengeUserRewardType")
+            updateEnum<V91_TestnetChallengeUserRewardType>(listOf(V91_TestnetChallengeUserRewardTable.type), "TestnetChallengeUserRewardType")
         }
     }
 }

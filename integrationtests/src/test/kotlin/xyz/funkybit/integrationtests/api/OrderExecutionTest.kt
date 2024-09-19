@@ -130,7 +130,10 @@ class OrderExecutionTest : OrderBaseTest() {
 
         makerWsClient.assertLimitsMessageReceived(
             if (market == btcEthMarket) {
-                listOf(
+                listOfNotNull(
+                    btcbtcArchMarket?.let {
+                        MarketLimits(it.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO)
+                    },
                     MarketLimits(btcbtc2Market.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO),
                     MarketLimits(btcEthMarket.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = AssetAmount(eth, "1.99781802125").inFundamentalUnits),
                     MarketLimits(btcEth2Market.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO),
@@ -141,7 +144,10 @@ class OrderExecutionTest : OrderBaseTest() {
                     MarketLimits(usdc2Dai2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                 )
             } else {
-                listOf(
+                listOfNotNull(
+                    btcbtcArchMarket?.let {
+                        MarketLimits(it.id, base = BigInteger.ZERO, quote = BigInteger.ZERO)
+                    },
                     MarketLimits(btcbtc2Market.id, base = BigInteger.ZERO, quote = makerStartingBaseBalance.inFundamentalUnits),
                     MarketLimits(btcEthMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(btcEth2Market.id, base = BigInteger.ZERO, quote = makerStartingQuoteBalance.inFundamentalUnits),
@@ -183,7 +189,10 @@ class OrderExecutionTest : OrderBaseTest() {
 
         makerWsClient.assertLimitsMessageReceived(
             if (market == btcEthMarket) {
-                listOf(
+                listOfNotNull(
+                    btcbtcArchMarket?.let {
+                        MarketLimits(it.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO)
+                    },
                     MarketLimits(btcbtc2Market.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO),
                     MarketLimits(btcEthMarket.id, base = AssetAmount(btc, "0.19945679").inFundamentalUnits, quote = AssetAmount(eth, "1.99781802125").inFundamentalUnits),
                     MarketLimits(btcEth2Market.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO),
@@ -194,7 +203,10 @@ class OrderExecutionTest : OrderBaseTest() {
                     MarketLimits(usdc2Dai2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                 )
             } else {
-                listOf(
+                listOfNotNull(
+                    btcbtcArchMarket?.let {
+                        MarketLimits(it.id, base = BigInteger.ZERO, quote = BigInteger.ZERO)
+                    },
                     MarketLimits(btcbtc2Market.id, base = BigInteger.ZERO, quote = makerStartingBaseBalance.inFundamentalUnits),
                     MarketLimits(btcEthMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(btcEth2Market.id, base = BigInteger.ZERO, quote = makerStartingQuoteBalance.inFundamentalUnits),
@@ -326,7 +338,10 @@ class OrderExecutionTest : OrderBaseTest() {
             }
             assertLimitsMessageReceived(
                 if (market == btcEthMarket) {
-                    listOf(
+                    listOfNotNull(
+                        btcbtcArchMarket?.let {
+                            MarketLimits(it.id, base = AssetAmount(btc, "0.1995679").inFundamentalUnits, quote = BigInteger.ZERO)
+                        },
                         MarketLimits(btcbtc2Market.id, base = AssetAmount(btc, "0.1995679").inFundamentalUnits, quote = BigInteger.ZERO),
                         MarketLimits(btcEthMarket.id, base = AssetAmount(btc, "0.19945679").inFundamentalUnits, quote = AssetAmount(eth, "2.0053255427").inFundamentalUnits),
                         MarketLimits(btcEth2Market.id, base = AssetAmount(btc, "0.1995679").inFundamentalUnits, quote = BigInteger.ZERO),
@@ -337,7 +352,10 @@ class OrderExecutionTest : OrderBaseTest() {
                         MarketLimits(usdc2Dai2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     )
                 } else {
-                    listOf(
+                    listOfNotNull(
+                        btcbtcArchMarket?.let {
+                            MarketLimits(it.id, base = BigInteger.ZERO, quote = BigInteger.ZERO)
+                        },
                         MarketLimits(btcbtc2Market.id, base = BigInteger.ZERO, quote = AssetAmount(btc2, "0.1995679").inFundamentalUnits),
                         MarketLimits(btcEthMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                         MarketLimits(btcEth2Market.id, base = BigInteger.ZERO, quote = AssetAmount(eth2, "2.00750752145").inFundamentalUnits),

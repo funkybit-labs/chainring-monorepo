@@ -18,8 +18,8 @@ import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import xyz.funkybit.apps.api.model.Order
-import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.SequencerOrderId
+import xyz.funkybit.core.model.Signature
 import xyz.funkybit.core.model.db.OrderExecutionTable.nullable
 import xyz.funkybit.core.utils.toByteArrayNoSign
 import xyz.funkybit.core.utils.toHex
@@ -83,7 +83,7 @@ data class CreateOrderAssignment(
     val side: OrderSide,
     val amount: BigInteger,
     val levelIx: Int?,
-    val signature: EvmSignature,
+    val signature: Signature,
     val sequencerOrderId: SequencerOrderId,
     val sequencerTimeNs: BigInteger,
 )

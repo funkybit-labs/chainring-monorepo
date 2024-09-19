@@ -29,7 +29,7 @@ data class Market(
     val maxOrdersPerLevel: Int,
     val baseDecimals: Int,
     val quoteDecimals: Int,
-    var minFee: BigInteger = BigInteger.ZERO,
+    var minFee: QuoteAmount = QuoteAmount.ZERO,
 ) {
 
     private val logger = KotlinLogging.logger { }
@@ -72,14 +72,14 @@ data class Market(
         val ordersChangeRejected: List<OrderChangeRejected>,
     )
 
-    private fun sumBigIntegerPair(a: Pair<BigInteger, BigInteger>, b: Pair<BigInteger, BigInteger>) = Pair(a.first + b.first, a.second + b.second)
+    private fun sumBaseQuoteAmountPair(a: Pair<BaseAmount, QuoteAmount>, b: Pair<BaseAmount, QuoteAmount>) = Pair(a.first + b.first, a.second + b.second)
 
     fun applyOrderBatch(orderBatch: OrderBatch, feeRates: FeeRates): AddOrdersResult {
         val ordersChanged = mutableListOf<OrderChanged>()
         val ordersChangeRejected = mutableListOf<OrderChangeRejected>()
         val createdTrades = mutableListOf<TradeCreated>()
         val balanceChanges = mutableMapOf<Pair<AccountGuid, Asset>, BigInteger>()
-        val consumptionChanges = mutableMapOf<AccountGuid, Pair<BigInteger, BigInteger>>()
+        val consumptionChanges = mutableMapOf<AccountGuid, Pair<BaseAmount, QuoteAmount>>()
         orderBatch.ordersToCancelList.forEach { cancelOrder ->
             val validationResult = validateOrderForAccount(orderBatch.account, cancelOrder.guid)
             if (validationResult == OrderChangeRejected.Reason.None) {
@@ -93,7 +93,7 @@ data class Market(
                     consumptionChanges.merge(
                         result.account,
                         Pair(-result.baseAssetAmount, -result.quoteAssetAmount),
-                        ::sumBigIntegerPair,
+                        ::sumBaseQuoteAmountPair,
                     )
                 }
             } else {
@@ -118,7 +118,7 @@ data class Market(
             )
             if (orderResult.disposition == OrderDisposition.Accepted || orderResult.disposition == OrderDisposition.PartiallyFilled) {
                 // immediately filled limit order's amount should not count to consumption
-                val filledAmount = orderResult.executions.sumOf { it.amount }
+                val filledAmount = BaseAmount(orderResult.executions.sumOf { it.amount.value })
 
                 val feeRateInBps = when (orderResult.disposition) {
                     OrderDisposition.Accepted -> feeRates.maker
@@ -130,16 +130,16 @@ data class Market(
                     Order.Type.LimitBuy -> consumptionChanges.merge(
                         orderBatch.account.toAccountGuid(),
                         Pair(
-                            BigInteger.ZERO,
-                            notionalPlusFee(order.amount.toBigInteger() - filledAmount, price(order.levelIx), baseDecimals, quoteDecimals, feeRateInBps),
+                            BaseAmount.ZERO,
+                            notionalPlusFee(order.amount.toBaseAmount() - filledAmount, price(order.levelIx), baseDecimals, quoteDecimals, feeRateInBps),
                         ),
-                        ::sumBigIntegerPair,
+                        ::sumBaseQuoteAmountPair,
                     )
 
                     Order.Type.LimitSell -> consumptionChanges.merge(
                         orderBatch.account.toAccountGuid(),
-                        Pair(order.amount.toBigInteger() - filledAmount, BigInteger.ZERO),
-                        ::sumBigIntegerPair,
+                        Pair(order.amount.toBaseAmount() - filledAmount, QuoteAmount.ZERO),
+                        ::sumBaseQuoteAmountPair,
                     )
 
                     else -> {}
@@ -149,7 +149,7 @@ data class Market(
             // On the last trade for this order, any balance changes accumulated on previous trades for the quote asset will
             // be decremented and the remaining available will be passed in. Any remaining dust after applying
             // the balances changes from last trade will then be swept into the buyer fee of the last trade.
-            val remainingAvailable = if (order.hasMaxAvailable()) order.maxAvailable.toBigInteger() else null
+            val remainingAvailable = if (order.hasMaxAvailable()) order.maxAvailable.toQuoteAmount() else null
             orderResult.executions.forEachIndexed { index, execution ->
                 processExecution(
                     account = orderBatch.account.toAccountGuid(),
@@ -161,7 +161,7 @@ data class Market(
                     consumptionChanges = consumptionChanges,
                     feeRates = feeRates,
                     remainingAvailable = if (remainingAvailable != null && index + 1 == orderResult.executions.size) {
-                        remainingAvailable + (balanceChanges[Pair(orderBatch.account.toAccountGuid(), id.quoteAsset())] ?: BigInteger.ZERO)
+                        remainingAvailable + (balanceChanges[Pair(orderBatch.account.toAccountGuid(), id.quoteAsset())]?.toQuoteAmount() ?: QuoteAmount.ZERO)
                     } else {
                         null
                     },
@@ -177,12 +177,12 @@ data class Market(
                     ConsumptionChange(
                         account = it.key,
                         asset = this.id.baseAsset(),
-                        delta = it.value.first,
+                        delta = it.value.first.value,
                     ),
                     ConsumptionChange(
                         account = it.key,
                         asset = this.id.quoteAsset(),
-                        delta = it.value.second,
+                        delta = it.value.second.value,
                     ),
                 )
             },
@@ -209,9 +209,9 @@ data class Market(
         createdTrades: MutableList<TradeCreated>,
         ordersChanged: MutableList<OrderChanged>,
         balanceChanges: MutableMap<Pair<AccountGuid, Asset>, BigInteger>,
-        consumptionChanges: MutableMap<AccountGuid, Pair<BigInteger, BigInteger>>,
+        consumptionChanges: MutableMap<AccountGuid, Pair<BaseAmount, QuoteAmount>>,
         feeRates: FeeRates,
-        remainingAvailable: BigInteger?,
+        remainingAvailable: QuoteAmount?,
     ) {
         val notional = notional(execution.amount, execution.price, baseDecimals, quoteDecimals)
 
@@ -220,11 +220,11 @@ data class Market(
 
         val buyOrderGuid: Long
         val buyer: AccountGuid
-        var buyerFee: BigInteger
+        var buyerFee: QuoteAmount
 
         val sellOrderGuid: Long
         val seller: AccountGuid
-        val sellerFee: BigInteger
+        val sellerFee: QuoteAmount
 
         if (takerOrder.type == Order.Type.MarketBuy || takerOrder.type == Order.Type.LimitBuy) {
             buyOrderGuid = takerOrder.guid
@@ -246,7 +246,7 @@ data class Market(
             seller = execution.counterOrder.account
             sellerFee = notionalFee(notional, execution.counterOrder.feeRate)
 
-            consumptionChanges.merge(seller, Pair(-execution.amount, BigInteger.ZERO), ::sumBigIntegerPair)
+            consumptionChanges.merge(seller, Pair(-execution.amount, QuoteAmount.ZERO), ::sumBaseQuoteAmountPair)
         } else {
             buyOrderGuid = execution.counterOrder.guid.value
             buyer = execution.counterOrder.account
@@ -256,7 +256,7 @@ data class Market(
             seller = account
             sellerFee = notionalFee(notional, feeRates.taker)
 
-            consumptionChanges.merge(buyer, Pair(BigInteger.ZERO, -(notional + buyerFee)), ::sumBigIntegerPair)
+            consumptionChanges.merge(buyer, Pair(BaseAmount.ZERO, -(notional + buyerFee)), ::sumBaseQuoteAmountPair)
         }
 
         createdTrades.add(
@@ -268,6 +268,7 @@ data class Market(
                 amount = execution.amount.toIntegerValue()
                 levelIx = execution.levelIx
                 this.marketId = id.value
+                this.takerSold = takerOrder.type == Order.Type.MarketSell || takerOrder.type == Order.Type.LimitSell
             },
         )
 
@@ -283,22 +284,23 @@ data class Market(
             },
         )
 
-        balanceChanges.merge(Pair(buyer, quote), -(notional + buyerFee), ::sumBigIntegers)
-        balanceChanges.merge(Pair(seller, base), -execution.amount, ::sumBigIntegers)
-        balanceChanges.merge(Pair(buyer, base), execution.amount, ::sumBigIntegers)
-        balanceChanges.merge(Pair(seller, quote), notional - sellerFee, ::sumBigIntegers)
+        balanceChanges.merge(Pair(buyer, quote), -(notional + buyerFee).toBigInteger(), ::sumBigIntegers)
+        balanceChanges.merge(Pair(seller, base), -execution.amount.toBigInteger(), ::sumBigIntegers)
+        balanceChanges.merge(Pair(buyer, base), execution.amount.toBigInteger(), ::sumBigIntegers)
+        balanceChanges.merge(Pair(seller, quote), (notional - sellerFee).toBigInteger(), ::sumBigIntegers)
     }
 
     fun autoReduce(account: AccountGuid, asset: Asset, limit: BigInteger): List<OrderChanged> {
-        var total = BigInteger.ZERO
         return if (asset == id.baseAsset()) {
+            var total = BaseAmount.ZERO
+            val baseLimit = limit.toBaseAmount()
             sellOrdersByAccount[account]?.let { sellOrders ->
                 sellOrders.sortedBy { it.level.ix }.mapNotNull { levelOrder ->
-                    if (levelOrder.quantity <= limit - total) {
+                    if (levelOrder.quantity <= baseLimit - total) {
                         total += levelOrder.quantity
                         null
                     } else {
-                        levelOrder.quantity = limit - total
+                        levelOrder.quantity = baseLimit - total
                         total += levelOrder.quantity
                         orderChanged {
                             this.guid = levelOrder.guid.value
@@ -309,25 +311,27 @@ data class Market(
                 }
             } ?: emptyList()
         } else {
+            var total = QuoteAmount.ZERO
+            val quoteLimit = limit.toQuoteAmount()
             buyOrdersByAccount[account]?.let { buyOrders ->
                 buyOrders.sortedByDescending { it.level.ix }.mapNotNull { levelOrder ->
                     val price = levelOrder.level.price
                     val notionalAmount = notionalPlusFee(levelOrder.quantity, price, baseDecimals, quoteDecimals, levelOrder.feeRate)
-                    if (notionalAmount + total <= limit) {
+                    if (notionalAmount + total <= quoteLimit) {
                         total += notionalAmount
                         null
                     } else {
                         // invert the notional calculation using the remaining notional amount
-                        val remainingNotionalPlusFee = (limit - total)
+                        val remainingNotionalPlusFee = (quoteLimit - total)
 
                         // Reduce remainingNotionalPlusFee by the expected fee
                         // Example calculation: when remainingNotionalPlusFee is 204 and fee is 2% we should end up with remainingNotional=200
                         // Formula is: remainingNotional = (204 / (100 + 2)) * 2
                         val feeRateInPercents = levelOrder.feeRate.inPercents().toBigDecimal()
-                        val fee = ((remainingNotionalPlusFee.toBigDecimal() / (BigDecimal(100).setScale(10) + feeRateInPercents)) * feeRateInPercents).toBigInteger()
+                        val fee = ((remainingNotionalPlusFee.toBigDecimal() / (BigDecimal(100).setScale(10) + feeRateInPercents)) * feeRateInPercents).toQuoteAmount()
                         val remainingNotional = remainingNotionalPlusFee - fee
 
-                        levelOrder.quantity = (remainingNotional.toBigDecimal() / price).movePointRight(baseDecimals - quoteDecimals).toBigInteger()
+                        levelOrder.quantity = (remainingNotional.toBigDecimal() / price).movePointRight(baseDecimals - quoteDecimals).toBaseAmount()
                         total += remainingNotionalPlusFee
                         orderChanged {
                             this.guid = levelOrder.guid.value
@@ -340,16 +344,16 @@ data class Market(
         }
     }
 
-    fun baseAssetsRequired(account: AccountGuid): BigInteger =
-        sellOrdersByAccount[account]?.map { it.quantity }?.reduceOrNull(::sumBigIntegers) ?: BigInteger.ZERO
+    fun baseAssetsRequired(account: AccountGuid): BaseAmount =
+        sellOrdersByAccount[account]?.map { it.quantity }?.reduceOrNull(::sumBaseAmounts) ?: BaseAmount.ZERO
 
-    fun quoteAssetsRequired(account: AccountGuid): BigInteger =
+    fun quoteAssetsRequired(account: AccountGuid): QuoteAmount =
         buyOrdersByAccount[account]?.map { order ->
             notionalPlusFee(order.quantity, order.level.price, baseDecimals, quoteDecimals, order.feeRate)
-        }?.reduceOrNull(::sumBigIntegers) ?: BigInteger.ZERO
+        }?.reduceOrNull(::sumQuoteAmounts) ?: QuoteAmount.ZERO
 
     private fun handleCrossingOrder(order: Order, stopAtLevelIx: Int? = null): AddOrderResult {
-        val originalAmount = order.amount.toBigInteger()
+        val originalAmount = order.amount.toBaseAmount()
         var remainingAmount = originalAmount
         val executions = mutableListOf<Execution>()
         val exhaustedLevels = mutableListOf<OrderBookLevel>()
@@ -380,22 +384,22 @@ data class Market(
                 executions.addAll(orderBookLevelFill.executions)
 
                 // schedule removal for later, still might need to resolve prev or next level
-                if (currentLevel.totalQuantity == BigInteger.ZERO) exhaustedLevels.add(currentLevel)
+                if (currentLevel.totalQuantity == BaseAmount.ZERO) exhaustedLevels.add(currentLevel)
 
-                if (remainingAmount == BigInteger.ZERO) break
+                if (remainingAmount == BaseAmount.ZERO) break
 
                 currentLevel = if (isBuyOrder) currentLevel.next() else currentLevel.prev()
             }
 
             if (isBuyOrder) {
                 bestOfferIx = currentLevel?.let {
-                    if (it.totalQuantity > BigInteger.ZERO) it.ix else it.next()?.ix
+                    if (it.totalQuantity > BaseAmount.ZERO) it.ix else it.next()?.ix
                 } ?: -1
                 // also reset maxOfferIx in case when sell side is fully exhausted
                 if (bestOfferIx == -1) maxOfferIx = -1
             } else {
                 bestBidIx = currentLevel?.let {
-                    if (it.totalQuantity > BigInteger.ZERO) it.ix else it.prev()?.ix
+                    if (it.totalQuantity > BaseAmount.ZERO) it.ix else it.prev()?.ix
                 } ?: -1
                 // also reset minBidIx in case when buy side is fully exhausted
                 if (bestBidIx == -1) minBidIx = -1
@@ -425,7 +429,7 @@ data class Market(
                 }
             }
 
-            if (remainingAmount > BigInteger.ZERO) {
+            if (remainingAmount > BaseAmount.ZERO) {
                 AddOrderResult(OrderDisposition.PartiallyFilled, executions)
             } else {
                 AddOrderResult(OrderDisposition.Filled, executions)
@@ -452,7 +456,7 @@ data class Market(
                         buyOrdersByAccount.remove(levelOrder.account)
                     }
                 }
-                RemoveOrderResult(levelOrder.account, BigInteger.ZERO, notionalPlusFee(levelOrder.quantity, level.price, baseDecimals, quoteDecimals, levelOrder.feeRate))
+                RemoveOrderResult(levelOrder.account, BaseAmount.ZERO, notionalPlusFee(levelOrder.quantity, level.price, baseDecimals, quoteDecimals, levelOrder.feeRate))
             } else {
                 sellOrdersByAccount[levelOrder.account]?.let {
                     it.remove(levelOrder)
@@ -460,12 +464,12 @@ data class Market(
                         sellOrdersByAccount.remove(levelOrder.account)
                     }
                 }
-                RemoveOrderResult(levelOrder.account, levelOrder.quantity, BigInteger.ZERO)
+                RemoveOrderResult(levelOrder.account, levelOrder.quantity, QuoteAmount.ZERO)
             }
             level.removeLevelOrder(levelOrder)
             // if we exhausted this level, we may need to adjust bid/offer values
             // and also remove level from the book
-            if (level.totalQuantity == BigInteger.ZERO) {
+            if (level.totalQuantity == BaseAmount.ZERO) {
                 if (level.side == BookSide.Buy) {
                     if (level.ix == minBidIx) {
                         val nextLevel = level.next()
@@ -520,7 +524,7 @@ data class Market(
             if (bestBidIx != -1 && levelIx <= bestBidIx) {
                 // in case when crossing market execute as market sell order until `levelIx`
                 val crossingOrderResult = handleCrossingOrder(order, stopAtLevelIx = levelIx)
-                val filledAmount = crossingOrderResult.executions.sumOf { it.amount }
+                val filledAmount = crossingOrderResult.executions.sumOf { it.amount.value }
                 val remainingAmount = order.amount.toBigInteger() - filledAmount
 
                 if (remainingAmount > BigInteger.ZERO) {
@@ -558,7 +562,7 @@ data class Market(
             if (bestOfferIx != -1 && levelIx >= bestOfferIx) {
                 // in case when crossing market execute as market buy order until `levelIx`
                 val crossingOrderResult = handleCrossingOrder(order, stopAtLevelIx = levelIx)
-                val filledAmount = crossingOrderResult.executions.sumOf { it.amount }
+                val filledAmount = crossingOrderResult.executions.sumOf { it.amount.value }
                 val remainingAmount = order.amount.toBigInteger() - filledAmount
 
                 if (remainingAmount > BigInteger.ZERO) {
@@ -628,7 +632,7 @@ data class Market(
         // in case of empty book let it proceed, order will be rejected anyway
         if (levelIx == -1) return false
 
-        return notionalFee(notional(order.amount.toBigInteger(), price(levelIx), baseDecimals, quoteDecimals), feeRate) < minFee
+        return notionalFee(notional(order.amount.toBaseAmount(), price(levelIx), baseDecimals, quoteDecimals), feeRate) < minFee
     }
 
     private fun createLimitBuyOrder(levelIx: Int, account: Long, order: Order, feeRate: FeeRate): OrderDisposition {
@@ -667,7 +671,7 @@ data class Market(
     }
 
     // calculate how much liquidity is available for a market buy (until stopAtLevelIx), and what the final clearing price would be
-    fun clearingPriceAndQuantityForMarketBuy(amount: BigInteger, stopAtLevelIx: Int? = null): Pair<BigDecimal, BigInteger> {
+    fun clearingPriceAndQuantityForMarketBuy(amount: BaseAmount, stopAtLevelIx: Int? = null): Pair<BigDecimal, BaseAmount> {
         var remainingAmount = amount
         var totalPriceUnits = BigDecimal.ZERO
 
@@ -677,42 +681,42 @@ data class Market(
             totalPriceUnits += quantityAtLevel.toBigDecimal().setScale(18) * currentLevel.price
             remainingAmount -= quantityAtLevel
 
-            if (remainingAmount == BigInteger.ZERO) break
+            if (remainingAmount == BaseAmount.ZERO) break
 
             currentLevel = currentLevel.next()
         }
 
         val availableQuantity = amount - remainingAmount
-        val clearingPrice = if (availableQuantity == BigInteger.ZERO) BigDecimal.ZERO else totalPriceUnits / availableQuantity.toBigDecimal()
+        val clearingPrice = if (availableQuantity == BaseAmount.ZERO) BigDecimal.ZERO else totalPriceUnits / availableQuantity.toBigDecimal()
 
         return Pair(clearingPrice, availableQuantity)
     }
 
-    fun quantityAndNotionalForMarketBuy(amount: BigInteger): Pair<BigInteger, BigInteger> {
+    fun quantityAndNotionalForMarketBuy(amount: BaseAmount): Pair<BaseAmount, QuoteAmount> {
         var remainingAmount = amount
-        var notional = BigInteger.ZERO
+        var notional = QuoteAmount.ZERO
 
         var currentLevel = if (bestOfferIx != -1) levels.get(bestOfferIx) else null
         while (currentLevel != null) {
             val quantityAtLevel = currentLevel.totalQuantity.min(remainingAmount)
             notional += notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals)
             remainingAmount -= quantityAtLevel
-            if (remainingAmount == BigInteger.ZERO) break
+            if (remainingAmount == BaseAmount.ZERO) break
 
             currentLevel = currentLevel.next()
         }
         return Pair(amount - remainingAmount, notional)
     }
 
-    fun quantityForMarketBuy(notional: BigInteger): BigInteger {
+    fun quantityForMarketBuy(notional: QuoteAmount): BaseAmount {
         var remainingNotional = notional
-        var baseAmount = BigInteger.ZERO
+        var baseAmount = BaseAmount.ZERO
 
         var currentLevel = if (bestOfferIx != -1) levels.get(bestOfferIx) else null
         while (currentLevel != null) {
             val quantityAtLevel = currentLevel.totalQuantity
 
-            if (quantityAtLevel > BigInteger.ZERO) {
+            if (quantityAtLevel > BaseAmount.ZERO) {
                 val notionalAtLevel = remainingNotional.min(notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals))
 
                 if (notionalAtLevel == remainingNotional) {
@@ -735,7 +739,7 @@ data class Market(
     }
 
     // calculate how much liquidity is available for a market sell order (until stopAtLevelIx)
-    fun clearingQuantityForMarketSell(amount: BigInteger, stopAtLevelIx: Int? = null): BigInteger {
+    fun clearingQuantityForMarketSell(amount: BaseAmount, stopAtLevelIx: Int? = null): BaseAmount {
         var remainingAmount = amount
 
         var currentLevel = if (bestBidIx != -1) levels.get(bestBidIx) else null
@@ -743,7 +747,7 @@ data class Market(
             val quantityAtLevel = currentLevel.totalQuantity.min(remainingAmount)
             remainingAmount -= quantityAtLevel
 
-            if (remainingAmount == BigInteger.ZERO) break
+            if (remainingAmount == BaseAmount.ZERO) break
 
             currentLevel = currentLevel.prev()
         }
@@ -751,15 +755,16 @@ data class Market(
         return amount - remainingAmount
     }
 
-    fun quantityAndNotionalForMarketSell(amount: BigInteger): Pair<BigInteger, BigInteger> {
+    fun quantityAndNotionalForMarketSell(amount: BaseAmount, feeRate: FeeRate): Pair<BaseAmount, QuoteAmount> {
         var remainingAmount = amount
-        var notionalReceived = BigInteger.ZERO
+        var notionalReceived = QuoteAmount.ZERO
         var currentLevel = if (bestBidIx != -1) levels.get(bestBidIx) else null
         while (currentLevel != null) {
             val quantityAtLevel = currentLevel.totalQuantity.min(remainingAmount)
-            notionalReceived += notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals)
+            val notionalAmount = notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals)
+            notionalReceived += notionalAmount - notionalFee(notionalAmount, feeRate)
             remainingAmount -= quantityAtLevel
-            if (remainingAmount == BigInteger.ZERO) {
+            if (remainingAmount == BaseAmount.ZERO) {
                 break
             }
             currentLevel = currentLevel.prev()
@@ -767,14 +772,14 @@ data class Market(
         return Pair(amount - remainingAmount, notionalReceived)
     }
 
-    fun quantityForMarketSell(notional: BigInteger): BigInteger {
+    fun quantityForMarketSell(notional: QuoteAmount): BaseAmount {
         var remainingNotional = notional
-        var baseAmount = BigInteger.ZERO
+        var baseAmount = BaseAmount.ZERO
 
         var currentLevel = if (bestBidIx != -1) levels.get(bestBidIx) else null
         while (currentLevel != null) {
             val quantityAtLevel = currentLevel.totalQuantity
-            if (quantityAtLevel > BigInteger.ZERO) {
+            if (quantityAtLevel > BaseAmount.ZERO) {
                 val notionalAtLevel =
                     remainingNotional.min(notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals))
                 if (notionalAtLevel == remainingNotional) {
@@ -793,25 +798,25 @@ data class Market(
         return baseAmount
     }
 
-    fun calculateAmountForPercentageSell(account: AccountGuid, assetBalance: BigInteger, percent: Int): BigInteger {
-        val baseAssetLimit = BigInteger.ZERO.max(assetBalance - baseAssetsRequired(account))
-        return clearingQuantityForMarketSell(baseAssetLimit) * percent.toBigInteger() / Percentage.MAX_VALUE.toBigInteger()
+    fun calculateAmountForPercentageSell(account: AccountGuid, assetBalance: BaseAmount, percent: Int): BaseAmount {
+        val baseAssetLimit = BaseAmount.ZERO.max(assetBalance - baseAssetsRequired(account))
+        return (clearingQuantityForMarketSell(baseAssetLimit).toBigInteger() * percent.toBigInteger() / Percentage.MAX_VALUE.toBigInteger()).toBaseAmount()
     }
 
-    fun calculateAmountForPercentageBuy(account: AccountGuid, assetBalance: BigInteger, percent: Int, takerFeeRate: BigInteger): Pair<BigInteger, BigInteger?> {
+    fun calculateAmountForPercentageBuy(account: AccountGuid, assetBalance: QuoteAmount, percent: Int, takerFeeRate: BigInteger): Pair<BaseAmount, QuoteAmount?> {
         val quoteAssetsRequired = quoteAssetsRequired(account)
-        val quoteAssetLimit = (BigInteger.ZERO.max(assetBalance - quoteAssetsRequired) * percent.toBigInteger()) / Percentage.MAX_VALUE.toBigInteger()
-        val quoteAssetLimitAdjustedForFee = (quoteAssetLimit * FeeRate.MAX_VALUE.toBigInteger()) / (FeeRate.MAX_VALUE.toBigInteger() + takerFeeRate)
-        return Pair(quantityForMarketBuy(quoteAssetLimitAdjustedForFee), if (quoteAssetsRequired == BigInteger.ZERO && percent == 100) assetBalance else null)
+        val quoteAssetLimit = (assetBalance - quoteAssetsRequired).toBigDecimal().max(BigDecimal.ZERO) * (percent.toBigDecimal().setScale(18) / Percentage.MAX_VALUE.toBigDecimal())
+        val quoteAssetLimitAdjustedForFee = (quoteAssetLimit * FeeRate.MAX_VALUE.toBigDecimal().setScale(30)) / (FeeRate.MAX_VALUE.toBigDecimal() + takerFeeRate.toBigDecimal())
+        return Pair(quantityForMarketBuy(quoteAssetLimitAdjustedForFee.toQuoteAmount()), if (quoteAssetsRequired == QuoteAmount.ZERO && percent == 100) assetBalance else null)
     }
 
     // returns baseAsset and quoteAsset reserved by order
-    fun assetsReservedForOrder(levelOrder: LevelOrder): Pair<BigInteger, BigInteger> {
+    fun assetsReservedForOrder(levelOrder: LevelOrder): Pair<BaseAmount, QuoteAmount> {
         val level = levelOrder.level
         return if (level.side == BookSide.Buy) {
-            BigInteger.ZERO to notionalPlusFee(levelOrder.quantity, level.price, baseDecimals, quoteDecimals, levelOrder.feeRate)
+            BaseAmount.ZERO to notionalPlusFee(levelOrder.quantity, level.price, baseDecimals, quoteDecimals, levelOrder.feeRate)
         } else {
-            levelOrder.quantity to BigInteger.ZERO
+            levelOrder.quantity to QuoteAmount.ZERO
         }
     }
 
@@ -905,7 +910,7 @@ data class Market(
                 maxOrdersPerLevel = checkpoint.maxOrdersPerLevel,
                 baseDecimals = checkpoint.baseDecimals,
                 quoteDecimals = checkpoint.quoteDecimals,
-                minFee = if (checkpoint.hasMinFee()) checkpoint.minFee.toBigInteger() else BigInteger.ZERO,
+                minFee = if (checkpoint.hasMinFee()) checkpoint.minFee.toBigInteger().toQuoteAmount() else QuoteAmount.ZERO,
             ).apply {
                 maxOfferIx = checkpoint.maxOfferIx
                 bestOfferIx = checkpoint.bestOfferIx

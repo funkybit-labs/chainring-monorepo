@@ -123,7 +123,7 @@ open class SequencerClient {
         val levelIx: Int?,
         val orderType: xyz.funkybit.sequencer.proto.Order.Type,
         val nonce: BigInteger?,
-        val signature: EvmSignature?,
+        val signature: Signature?,
         val orderId: OrderId,
         val clientOrderId: ClientOrderId?,
         val chainId: ChainId,
@@ -394,6 +394,7 @@ open class SequencerClient {
         levelIx: Int,
         buyerFee: BigInteger,
         sellerFee: BigInteger,
+        takerSold: Boolean,
     ): SequencerResponse {
         return Tracer.newCoroutineSpan(ServerSpans.sqrClt) {
             stub.applyBalanceBatch(
@@ -411,6 +412,7 @@ open class SequencerClient {
                                 this.levelIx = levelIx
                                 this.buyerFee = buyerFee.toIntegerValue()
                                 this.sellerFee = sellerFee.toIntegerValue()
+                                this.takerSold = takerSold
                             }
                         },
                     )

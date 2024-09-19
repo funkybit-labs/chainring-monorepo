@@ -9,6 +9,7 @@ import xyz.funkybit.apps.api.model.Chain
 import xyz.funkybit.apps.api.model.CreateDepositApiRequest
 import xyz.funkybit.apps.api.model.CreateOrderApiRequest
 import xyz.funkybit.apps.api.model.CreateWithdrawalApiRequest
+import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.apps.api.model.OrderAmount
 import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.apps.ring.BlockchainDepositHandler
@@ -23,6 +24,7 @@ import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.MarketId
+import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.utils.fromFundamentalUnits
 import xyz.funkybit.core.utils.toFundamentalUnits
@@ -32,19 +34,27 @@ import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.time.Duration
 
+interface OrderSigner {
+    fun signOrder(request: CreateOrderApiRequest.Market): CreateOrderApiRequest.Market
+    fun signOrder(request: CreateOrderApiRequest.Limit, linkedSignerKeyPair: WalletKeyPair? = null): CreateOrderApiRequest.Limit
+    fun signOrder(request: CreateOrderApiRequest.BackToBackMarket): CreateOrderApiRequest.BackToBackMarket
+}
+
 class Wallet(
     val keyPair: WalletKeyPair.EVM,
-    val chains: List<Chain>,
+    val allChains: List<Chain>,
     val apiClient: ApiClient,
-) {
+) : OrderSigner {
     val logger = KotlinLogging.logger {}
     companion object {
         operator fun invoke(apiClient: ApiClient): Wallet {
-            val config = apiClient.getConfiguration().evmChains
+            val config = apiClient.getConfiguration().chains
             // TODO: add bitcoin support
             return Wallet(apiClient.keyPair as WalletKeyPair.EVM, config, apiClient)
         }
     }
+
+    val chains = allChains.filter { it.networkType == NetworkType.Evm }
     private val blockchainClients = ChainManager.blockchainConfigs.map {
         TestBlockchainClient(ChainManager.getBlockchainClient(it, keyPair.privateKey.toByteArray().toHex()).config)
             .also { blockchainClient ->
@@ -241,17 +251,17 @@ class Wallet(
         )
     }
 
-    fun signOrder(request: CreateOrderApiRequest.Limit, linkedSignerKeyPair: WalletKeyPair? = null): CreateOrderApiRequest.Limit =
+    override fun signOrder(request: CreateOrderApiRequest.Limit, linkedSignerKeyPair: WalletKeyPair?): CreateOrderApiRequest.Limit =
         request.copy(
             signature = limitOrderEip712TxSignature(request.marketId, request.amount, request.price, request.side, request.nonce, linkedSignerKeyPair),
             verifyingChainId = this.currentChainId,
         )
 
-    private fun chainId(symbol: SymbolInfo) = chains.first {
+    private fun chainId(symbol: SymbolInfo) = allChains.first {
         it.symbols.contains(symbol)
     }.id
 
-    fun signOrder(request: CreateOrderApiRequest.BackToBackMarket): CreateOrderApiRequest.BackToBackMarket {
+    override fun signOrder(request: CreateOrderApiRequest.BackToBackMarket): CreateOrderApiRequest.BackToBackMarket {
         val (baseSymbol, _) = marketSymbols(request.marketId)
         val (_, quoteSymbol) = marketSymbols(request.secondMarketId)
 
@@ -272,7 +282,7 @@ class Wallet(
         )
     }
 
-    fun signOrder(request: CreateOrderApiRequest.Market): CreateOrderApiRequest.Market {
+    override fun signOrder(request: CreateOrderApiRequest.Market): CreateOrderApiRequest.Market {
         val (baseSymbol, quoteSymbol) = marketSymbols(request.marketId)
 
         val tx = EIP712Transaction.Order(
@@ -343,8 +353,8 @@ class Wallet(
             .baseAndQuoteSymbols()
             .let { (base, quote) ->
                 Pair(
-                    chains.map { it.symbols.filter { s -> s.name == base } }.flatten().first(),
-                    chains.map { it.symbols.filter { s -> s.name == quote } }.flatten().first(),
+                    allChains.map { it.symbols.filter { s -> s.name == base } }.flatten().first(),
+                    allChains.map { it.symbols.filter { s -> s.name == quote } }.flatten().first(),
                 )
             }
 

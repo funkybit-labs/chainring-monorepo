@@ -9,6 +9,7 @@ import xyz.funkybit.sequencer.proto.balanceChange
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.MathContext
+import java.math.RoundingMode
 
 fun BigDecimal.toDecimalValue(): DecimalValue = DecimalValue.newBuilder()
     .setScale(this.scale())
@@ -31,25 +32,27 @@ fun IntegerValue.toBigInteger(): BigInteger = BigInteger(
 )
 
 fun sumBigIntegers(a: BigInteger, b: BigInteger): BigInteger = a + b
+fun sumBaseAmounts(a: BaseAmount, b: BaseAmount): BaseAmount = a + b
+fun sumQuoteAmounts(a: QuoteAmount, b: QuoteAmount): QuoteAmount = a + b
 
 fun Iterable<BigInteger>.sum(): BigInteger = reduce(::sumBigIntegers)
 
-fun notional(amount: BigInteger, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int): BigInteger =
-    (amount.toBigDecimal() * price).movePointRight(quoteDecimals - baseDecimals).toBigInteger()
+fun notional(amount: BaseAmount, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int): QuoteAmount =
+    (amount.toBigDecimal() * price).movePointRight(quoteDecimals - baseDecimals).toQuoteAmount()
 
-fun notionalFee(notional: BigInteger, feeRate: FeeRate): BigInteger =
-    notional * feeRate.value.toBigInteger() / FeeRate.MAX_VALUE.toBigInteger()
+fun notionalFee(notional: QuoteAmount, feeRate: FeeRate): QuoteAmount =
+    (notional.value.toBigDecimal() * feeRate.value.toBigDecimal() / FeeRate.MAX_VALUE.toBigDecimal()).toQuoteAmount()
 
-fun notionalPlusFee(amount: BigInteger, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int, feeRate: FeeRate): BigInteger =
-    (amount.toBigDecimal() * price).movePointRight(quoteDecimals - baseDecimals).toBigInteger().let { notional ->
+fun notionalPlusFee(amount: BaseAmount, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int, feeRate: FeeRate): QuoteAmount =
+    (amount.value.toBigDecimal() * price).movePointRight(quoteDecimals - baseDecimals).toQuoteAmount().let { notional ->
         notional + notionalFee(notional, feeRate)
     }
 
-fun quantityFromNotionalAndPrice(notional: BigInteger, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int): BigInteger =
-    (notional.toBigDecimal().setScale(18) / price).movePointRight(baseDecimals - quoteDecimals).toBigInteger()
+fun quantityFromNotionalAndPrice(notional: QuoteAmount, price: BigDecimal, baseDecimals: Int, quoteDecimals: Int): BaseAmount =
+    (notional.toBigDecimal().setScale(18) / price).movePointRight(baseDecimals - quoteDecimals).setScale(0, RoundingMode.HALF_EVEN).toBaseAmount()
 
-fun notionalPlusFee(amount: IntegerValue, price: DecimalValue, baseDecimals: Int, quoteDecimals: Int, feeRate: FeeRate): BigInteger =
-    notionalPlusFee(amount.toBigInteger(), price.toBigDecimal(), baseDecimals, quoteDecimals, feeRate)
+fun notionalPlusFee(amount: IntegerValue, price: DecimalValue, baseDecimals: Int, quoteDecimals: Int, feeRate: FeeRate): QuoteAmount =
+    notionalPlusFee(amount.toBaseAmount(), price.toBigDecimal(), baseDecimals, quoteDecimals, feeRate)
 
 fun Map<Pair<AccountGuid, Asset>, BigInteger>.asBalanceChangesList(): List<BalanceChange> =
     mapNotNull { (k, delta) ->

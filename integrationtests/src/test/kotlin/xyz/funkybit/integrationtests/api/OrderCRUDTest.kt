@@ -66,7 +66,8 @@ class OrderCRUDTest : OrderBaseTest() {
         wsClient.subscribeToLimits()
         wsClient
             .assertLimitsMessageReceived(
-                listOf(
+                listOfNotNull(
+                    btcbtcArchMarket?.let { MarketLimits(it.id, base = BigInteger.ZERO, quote = BigInteger.ZERO) },
                     MarketLimits(btcbtc2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(btcEthMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(btcEth2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
@@ -88,7 +89,8 @@ class OrderCRUDTest : OrderBaseTest() {
 
         wsClient
             .assertLimitsMessageReceived(
-                listOf(
+                listOfNotNull(
+                    btcbtcArchMarket?.let { MarketLimits(it.id, base = BigInteger.ZERO, quote = BigInteger.ZERO) },
                     MarketLimits(btcbtc2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(btcEthMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(btcEth2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
@@ -113,7 +115,8 @@ class OrderCRUDTest : OrderBaseTest() {
         wsClient.assertMyLimitOrderCreatedMessageReceived(createLimitOrderResponse)
         wsClient
             .assertLimitsMessageReceived(
-                listOf(
+                listOfNotNull(
+                    btcbtcArchMarket?.let { MarketLimits(it.id, base = BigInteger.ZERO, quote = BigInteger.ZERO) },
                     MarketLimits(btcbtc2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(btcEthMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(btcEth2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
@@ -146,7 +149,8 @@ class OrderCRUDTest : OrderBaseTest() {
         }
         wsClient
             .assertLimitsMessageReceived(
-                listOf(
+                listOfNotNull(
+                    btcbtcArchMarket?.let { MarketLimits(it.id, base = BigInteger.ZERO, quote = BigInteger.ZERO) },
                     MarketLimits(btcbtc2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(btcEthMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(btcEth2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),

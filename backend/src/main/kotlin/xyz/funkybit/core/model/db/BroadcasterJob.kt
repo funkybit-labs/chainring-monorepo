@@ -15,7 +15,6 @@ import xyz.funkybit.apps.api.model.websocket.Limits
 import xyz.funkybit.apps.api.model.websocket.Prices
 import xyz.funkybit.apps.api.model.websocket.Publishable
 import xyz.funkybit.core.db.notifyDbListener
-import xyz.funkybit.core.model.Address
 import java.math.BigDecimal
 
 private val logger = KotlinLogging.logger {}
@@ -23,19 +22,19 @@ private val logger = KotlinLogging.logger {}
 @Serializable
 data class BroadcasterNotification(
     val message: Publishable,
-    val recipient: Address?,
+    val recipient: UserId?,
 ) {
     companion object {
         fun pricesForMarketPeriods(marketId: MarketId, duration: OHLCDuration, ohlc: List<OHLCEntity>, full: Boolean, dailyChange: BigDecimal): BroadcasterNotification =
             BroadcasterNotification(Prices(marketId, duration, ohlc.map { it.toWSResponse() }, full, dailyChange.stripTrailingZeros()), null)
 
-        fun limits(wallet: WalletEntity): BroadcasterNotification =
-            BroadcasterNotification(Limits(LimitEntity.forUserId(wallet.userGuid)), recipient = wallet.address)
+        fun limits(userId: UserId): BroadcasterNotification =
+            BroadcasterNotification(Limits(LimitEntity.forUserId(userId)), recipient = userId)
 
-        fun walletBalances(wallet: WalletEntity): BroadcasterNotification =
+        fun walletBalances(userId: UserId): BroadcasterNotification =
             BroadcasterNotification(
-                Balances(BalanceEntity.balancesAsApiResponse(wallet.userGuid).balances),
-                recipient = wallet.address,
+                Balances(BalanceEntity.balancesAsApiResponse(userId).balances),
+                recipient = userId,
             )
     }
 }

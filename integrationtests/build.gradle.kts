@@ -87,6 +87,7 @@ tasks.test {
         "--add-opens=java.base/java.io=ALL-UNNAMED",
         "--add-opens=java.base/java.util=ALL-UNNAMED"
     )
+    maxHeapSize = "768m"
 }
 
 tasks.withType<KotlinCompile> {
