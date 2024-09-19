@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
+import xyz.funkybit.apps.api.Examples.withdrawal
 import xyz.funkybit.apps.api.FaucetMode
 import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.Card
@@ -51,7 +52,6 @@ import xyz.funkybit.integrationtests.utils.ExpectedBalance
 import xyz.funkybit.integrationtests.utils.Faucet
 import xyz.funkybit.integrationtests.utils.TestApiClient
 import xyz.funkybit.integrationtests.utils.Wallet
-import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
 import xyz.funkybit.integrationtests.utils.assertError
 import xyz.funkybit.integrationtests.utils.assertMyLimitOrderCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.signAuthorizeBitcoinWalletRequest
@@ -61,7 +61,6 @@ import java.time.Duration
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.assertEquals
-import xyz.funkybit.apps.api.Examples.withdrawal
 
 data class Trader(
     val apiClient: TestApiClient,
