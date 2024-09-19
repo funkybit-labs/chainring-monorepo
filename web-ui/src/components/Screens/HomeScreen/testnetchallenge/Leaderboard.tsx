@@ -27,6 +27,7 @@ import { Modal } from 'components/common/Modal'
 import { Tab } from 'components/Screens/Header'
 import { CopyToClipboard } from 'react-copy-to-clipboard'
 import { Tooltip } from 'react-tooltip'
+import { accountConfigQueryKey } from 'components/Screens/HomeScreen'
 
 type EditMode = 'none' | 'name' | 'icon'
 
@@ -412,7 +413,7 @@ export function Leaderboard({
         })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accountConfiguration'] })
+      queryClient.invalidateQueries({ queryKey: accountConfigQueryKey })
       queryClient.invalidateQueries({ queryKey: ['leaderboard'] })
       setNewName(undefined)
     },
@@ -427,7 +428,7 @@ export function Leaderboard({
     onSuccess: () => {
       setAvatarDataUrl(undefined)
       setSelectedAvatarFile(undefined)
-      queryClient.invalidateQueries({ queryKey: ['accountConfiguration'] })
+      queryClient.invalidateQueries({ queryKey: accountConfigQueryKey })
       queryClient.invalidateQueries({ queryKey: ['leaderboard'] })
     },
     onError: () => {

@@ -7,7 +7,6 @@ import xyz.funkybit.sequencer.proto.MarketCheckpointKt.orderBookLevel
 import xyz.funkybit.sequencer.proto.Order
 import xyz.funkybit.sequencer.proto.OrderDisposition
 import java.math.BigDecimal
-import java.math.BigInteger
 
 enum class BookSide {
     Buy,
@@ -17,22 +16,22 @@ enum class BookSide {
 val noExecutions = listOf<Execution>()
 
 data class OrderBookLevelFill(
-    val remainingAmount: BigInteger,
+    val remainingAmount: BaseAmount,
     val executions: List<Execution>,
 )
 
 data class LevelOrder(
     var guid: OrderGuid,
     var account: AccountGuid,
-    var quantity: BigInteger,
+    var quantity: BaseAmount,
     var feeRate: FeeRate,
     var level: OrderBookLevel,
-    var originalQuantity: BigInteger = quantity,
+    var originalQuantity: BaseAmount = quantity,
 ) {
     fun update(account: Long, order: Order, feeRate: FeeRate) {
         this.guid = order.guid.toOrderGuid()
         this.account = account.toAccountGuid()
-        this.quantity = order.amount.toBigInteger()
+        this.quantity = order.amount.toBaseAmount()
         this.originalQuantity = this.quantity
         this.feeRate = feeRate
     }
@@ -40,7 +39,7 @@ data class LevelOrder(
     fun reset() {
         this.guid = OrderGuid.none
         this.account = AccountGuid.none
-        this.quantity = BigInteger.ZERO
+        this.quantity = BaseAmount.ZERO
         this.feeRate = FeeRate.zero
         this.originalQuantity = this.quantity
     }
@@ -58,9 +57,9 @@ data class LevelOrder(
     fun fromCheckpoint(checkpoint: MarketCheckpoint.LevelOrder, level: OrderBookLevel) {
         this.guid = OrderGuid(checkpoint.guid)
         this.account = AccountGuid(checkpoint.account)
-        this.quantity = checkpoint.quantity.toBigInteger()
+        this.quantity = checkpoint.quantity.toBaseAmount()
         this.level = level
-        this.originalQuantity = checkpoint.originalQuantity.toBigInteger()
+        this.originalQuantity = checkpoint.originalQuantity.toBaseAmount()
         this.feeRate = FeeRate(checkpoint.feeRate)
     }
 
@@ -95,9 +94,9 @@ data class LevelOrder(
 class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val maxOrderCount: Int) : AVLTree.Node<OrderBookLevel>(ix) {
 
     val orders = Array(maxOrderCount) { _ ->
-        LevelOrder(guid = 0L.toOrderGuid(), account = 0L.toAccountGuid(), quantity = BigInteger.ZERO, feeRate = FeeRate.zero, level = this)
+        LevelOrder(guid = 0L.toOrderGuid(), account = 0L.toAccountGuid(), quantity = BaseAmount.ZERO, feeRate = FeeRate.zero, level = this)
     }
-    var totalQuantity = BigInteger.ZERO
+    var totalQuantity = BaseAmount.ZERO
     var orderHead = 0
     var orderTail = 0
 
@@ -118,7 +117,7 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
         ix = 0
         side = BookSide.Sell
         price = BigDecimal.ZERO
-        totalQuantity = BigInteger.ZERO
+        totalQuantity = BaseAmount.ZERO
         super.reset()
     }
 
@@ -161,7 +160,7 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
             val index = (orderHead + i) % maxOrderCount
             orders[index].fromCheckpoint(orderCheckpoint, level = this)
         }
-        totalQuantity = checkpoint.totalQuantity.toBigInteger()
+        totalQuantity = checkpoint.totalQuantity.toBaseAmount()
     }
 
     fun addOrder(account: Long, order: Order, feeRate: FeeRate): Pair<OrderDisposition, LevelOrder?> {
@@ -177,11 +176,11 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
         }
     }
 
-    fun fillOrder(requestedAmount: BigInteger): OrderBookLevelFill {
+    fun fillOrder(requestedAmount: BaseAmount): OrderBookLevelFill {
         var orderIx = orderHead
         val executions = mutableListOf<Execution>()
         var remainingAmount = requestedAmount
-        while (orderIx != orderTail && remainingAmount > BigInteger.ZERO) {
+        while (orderIx != orderTail && remainingAmount > BaseAmount.ZERO) {
             val curOrder = orders[orderIx]
             if (remainingAmount >= curOrder.quantity) {
                 executions.add(
@@ -208,7 +207,7 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
                 )
                 totalQuantity -= remainingAmount
                 curOrder.quantity -= remainingAmount
-                remainingAmount = BigInteger.ZERO
+                remainingAmount = BaseAmount.ZERO
             }
         }
         // remove consumed orders
@@ -294,7 +293,7 @@ class OrderBookLevel(ix: Int, var side: BookSide, var price: BigDecimal, val max
 
 data class Execution(
     val counterOrder: LevelOrder,
-    val amount: BigInteger,
+    val amount: BaseAmount,
     val levelIx: Int,
     val price: BigDecimal,
     val counterOrderExhausted: Boolean,
@@ -307,6 +306,6 @@ data class AddOrderResult(
 
 data class RemoveOrderResult(
     val account: AccountGuid,
-    val baseAssetAmount: BigInteger,
-    val quoteAssetAmount: BigInteger,
+    val baseAssetAmount: BaseAmount,
+    val quoteAssetAmount: QuoteAmount,
 )

@@ -45,6 +45,12 @@ object OrderExecutionTable : GUIDTable<ExecutionId>("order_execution", ::Executi
     val feeAmount = decimal("fee_amount", 30, 0)
     val feeSymbol = varchar("fee_symbol", 10485760)
     val marketGuid = reference("market_guid", MarketTable).nullable()
+    val side = customEnumeration(
+        "side",
+        "OrderSide",
+        { value -> OrderSide.valueOf(value as String) },
+        { PGEnum("OrderSide", it) },
+    )
 }
 
 class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId>(guid) {
@@ -56,7 +62,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             executionRole = this.role,
             counterOrderId = this.counterOrderGuid.value,
             timestamp = this.timestamp,
-            side = this.order.side,
+            side = this.side,
             amount = this.trade.amount,
             price = this.trade.price,
             feeAmount = this.feeAmount,
@@ -75,6 +81,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             role: ExecutionRole,
             feeAmount: BigInteger,
             feeSymbol: Symbol,
+            side: OrderSide,
             marketEntity: MarketEntity? = null,
         ) = OrderExecutionEntity.new(ExecutionId.generate()) {
             val now = Clock.System.now()
@@ -87,6 +94,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             this.feeAmount = feeAmount
             this.feeSymbol = feeSymbol
             this.marketGuid = marketEntity?.guid
+            this.side = side
         }
 
         fun findForOrder(orderEntity: OrderEntity): List<OrderExecutionEntity> {
@@ -172,4 +180,5 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
 
     var marketGuid by OrderExecutionTable.marketGuid
     var market by MarketEntity optionalReferencedOn OrderExecutionTable.marketGuid
+    var side by OrderExecutionTable.side
 }

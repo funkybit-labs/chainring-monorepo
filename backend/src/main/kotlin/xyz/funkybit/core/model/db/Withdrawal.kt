@@ -250,6 +250,12 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 WalletTable.networkType.eq(networkType) and WalletTable.userGuid.eq(user.guid)
             }.limit(1).any()
         }
+
+        fun existsCompletedForWallet(wallet: WalletEntity): Boolean {
+            return WithdrawalTable.select(WithdrawalTable.id).where {
+                WithdrawalTable.walletGuid.eq(wallet.guid) and WithdrawalTable.status.eq(WithdrawalStatus.Complete)
+            }.limit(1).any()
+        }
     }
 
     fun update(
@@ -275,6 +281,10 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
         }
         responseSequence?.let {
             this.responseSequence = responseSequence
+        }
+
+        if (status == WithdrawalStatus.Complete) {
+            TestnetChallengeUserRewardEntity.createWithdrawalReward(this.wallet.user, this.wallet)
         }
     }
 

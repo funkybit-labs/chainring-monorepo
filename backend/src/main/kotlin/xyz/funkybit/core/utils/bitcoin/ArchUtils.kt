@@ -12,23 +12,32 @@ import org.bitcoinj.core.TransactionInput
 import org.bitcoinj.core.TransactionOutPoint
 import org.bitcoinj.core.TransactionOutput
 import org.bitcoinj.script.ScriptBuilder
+import org.jetbrains.exposed.dao.id.EntityID
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.Settlement
+import xyz.funkybit.core.model.WalletAndSymbol
 import xyz.funkybit.core.model.bitcoin.ProgramInstruction
 import xyz.funkybit.core.model.bitcoin.UtxoId
+import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
+import xyz.funkybit.core.model.db.ArchAccountBalanceIndexStatus
 import xyz.funkybit.core.model.db.ArchAccountBalanceInfo
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.ArchAccountType
 import xyz.funkybit.core.model.db.ConfirmedBitcoinDeposit
+import xyz.funkybit.core.model.db.CreateArchAccountBalanceIndexAssignment
 import xyz.funkybit.core.model.db.SequencedArchWithdrawal
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.UnspentUtxo
+import xyz.funkybit.core.model.db.WalletTable
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.services.UtxoSelectionService
 import xyz.funkybit.core.utils.schnorr.Schnorr
+import xyz.funkybit.core.utils.sha256
+import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -207,6 +216,100 @@ object ArchUtils {
         )
     }
 
+    private fun buildSettlementBatch(
+        batchSettlement: Settlement.Batch,
+        indexMap: Map<WalletAndSymbol, Int>,
+    ): Pair<List<ArchNetworkRpc.AccountMeta>, List<ProgramInstruction.SettlementAdjustments>> {
+        val tokenAccountBySymbolId = ArchAccountEntity.findTokenAccountsForSymbols(
+            batchSettlement.tokenAdjustmentLists.map { it.symbolId },
+        ).associateBy { it.symbolGuid!!.value }
+        val accountMetas = mutableListOf(
+            ArchNetworkRpc.AccountMeta(
+                pubkey = submitterPubkey,
+                isSigner = true,
+                isWritable = true,
+            ),
+        )
+        val settlements = batchSettlement.tokenAdjustmentLists.mapIndexed { index, tokenAdjustmentList ->
+            ProgramInstruction.SettlementAdjustments(
+                accountIndex = (index + 1).toUByte(),
+                increments = tokenAdjustmentList.increments.map {
+                    ProgramInstruction.Adjustment(
+                        addressIndex = indexMap.getValue(WalletAndSymbol(it.walletId, tokenAdjustmentList.symbolId)).toUInt(),
+                        amount = it.amount.toLong().toULong(),
+                    )
+                },
+                decrements = tokenAdjustmentList.decrements.map {
+                    ProgramInstruction.Adjustment(
+                        addressIndex = indexMap.getValue(WalletAndSymbol(it.walletId, tokenAdjustmentList.symbolId)).toUInt(),
+                        amount = it.amount.toLong().toULong(),
+                    )
+                },
+                feeAmount = tokenAdjustmentList.feeAmount.toLong().toULong(),
+            ).also {
+                accountMetas.add(
+                    ArchNetworkRpc.AccountMeta(
+                        pubkey = tokenAccountBySymbolId.getValue(tokenAdjustmentList.symbolId).rpcPubkey(),
+                        isWritable = true,
+                        isSigner = false,
+                    ),
+                )
+            }
+        }
+        return Pair(accountMetas, settlements)
+    }
+
+    @OptIn(ExperimentalUnsignedTypes::class)
+    fun buildPrepareSettlementBatchInstruction(
+        programPubkey: ArchNetworkRpc.Pubkey,
+        batchSettlement: Settlement.Batch,
+        indexMap: Map<WalletAndSymbol, Int>,
+    ): Pair<ArchNetworkRpc.Instruction, String> {
+        val (accountMetas, settlements) = buildSettlementBatch(batchSettlement, indexMap)
+        return Pair(
+            ArchNetworkRpc.Instruction(
+                programPubkey,
+                accountMetas,
+                ProgramInstruction.PrepareSettlementBatchParams(settlements).serialize(),
+            ),
+            sha256(Borsh.encodeToByteArray(ProgramInstruction.PrepareSettlementBatchParams(settlements))).toHex(false),
+        )
+    }
+
+    @OptIn(ExperimentalUnsignedTypes::class)
+    fun buildSubmitSettlementBatchInstruction(
+        programPubkey: ArchNetworkRpc.Pubkey,
+        batchSettlement: Settlement.Batch,
+        indexMap: Map<WalletAndSymbol, Int>,
+    ): Pair<ArchNetworkRpc.Instruction, String> {
+        val (accountMetas, settlements) = buildSettlementBatch(batchSettlement, indexMap)
+        return Pair(
+            ArchNetworkRpc.Instruction(
+                programPubkey,
+                accountMetas,
+                ProgramInstruction.SubmitSettlementBatchParams(settlements).serialize(),
+            ),
+            sha256(Borsh.encodeToByteArray(ProgramInstruction.PrepareSettlementBatchParams(settlements))).toHex(false),
+        )
+    }
+
+    @OptIn(ExperimentalUnsignedTypes::class)
+    fun buildRollbackSettlementBatchInstruction(
+        programPubkey: ArchNetworkRpc.Pubkey,
+    ): ArchNetworkRpc.Instruction {
+        return ArchNetworkRpc.Instruction(
+            programPubkey,
+            listOf(
+                ArchNetworkRpc.AccountMeta(
+                    pubkey = submitterPubkey,
+                    isSigner = true,
+                    isWritable = true,
+                ),
+            ),
+            ProgramInstruction.RollbackSettlement.serialize(),
+        )
+    }
+
     private fun buildWithdrawalTx(
         withdrawals: List<WithdrawalEntity>,
         changeAddress: BitcoinAddress,
@@ -379,6 +482,34 @@ object ArchUtils {
 
     fun signAndSendInstruction(instruction: ArchNetworkRpc.Instruction, privateKey: ByteArray? = null): TxHash {
         return signAndSendInstructions(listOf(instruction), privateKey ?: BitcoinClient.bitcoinConfig.submitterPrivateKey)
+    }
+
+    fun retrieveOrCreateBalanceIndexes(batchSettlement: Settlement.Batch): Map<WalletAndSymbol, Int>? {
+        val walletSymbolSet = batchSettlement.tokenAdjustmentLists.flatMap {
+            it.increments.map { inc -> WalletAndSymbol(inc.walletId, it.symbolId) } +
+                it.decrements.map { dec -> WalletAndSymbol(dec.walletId, it.symbolId) }
+        }.toSet()
+        val balanceIndexByWalletAndSymbol = ArchAccountBalanceIndexEntity.findForWalletsAndSymbols(
+            walletSymbolSet.map { it.walletId }.toSet().toList(),
+            batchSettlement.tokenAdjustmentLists.map { it.symbolId },
+        )
+        val missing = walletSymbolSet.subtract(balanceIndexByWalletAndSymbol.keys)
+        return if (missing.isNotEmpty()) {
+            val tokenAccount = ArchAccountEntity.findTokenAccountsForSymbols(missing.map { it.symbolId }.toSet().toList())
+            ArchAccountBalanceIndexEntity.batchCreate(
+                missing.map { walletAndSymbol ->
+                    CreateArchAccountBalanceIndexAssignment(
+                        EntityID(walletAndSymbol.walletId, WalletTable),
+                        tokenAccount.find { it.symbolGuid?.value == walletAndSymbol.symbolId }!!.guid,
+                    )
+                },
+            )
+            null
+        } else if (walletSymbolSet.any { balanceIndexByWalletAndSymbol[it]?.status != ArchAccountBalanceIndexStatus.Assigned }) {
+            null
+        } else {
+            walletSymbolSet.associateWith { balanceIndexByWalletAndSymbol[it]!!.addressIndex }
+        }
     }
 }
 

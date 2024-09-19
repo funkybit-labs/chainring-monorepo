@@ -4,7 +4,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.db.Migration
 
 @Suppress("ClassName")
-class V90_DepositWithdrawalTimestamps : Migration() {
+class V92_DepositWithdrawalTimestamps : Migration() {
 
     override fun run() {
         transaction {

@@ -15,6 +15,7 @@ import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.update
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.WalletAndSymbol
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 
 @Serializable
@@ -118,6 +119,24 @@ class ArchAccountBalanceIndexEntity(guid: EntityID<ArchAccountBalanceIndexId>) :
                 .map {
                     ArchAccountBalanceIndexEntity.wrapRow(it)
                 }.firstOrNull()
+        }
+
+        fun findForWalletsAndSymbols(walletIds: List<WalletId>, symbolIds: List<SymbolId>): Map<WalletAndSymbol, ArchAccountBalanceIndexEntity> {
+            return ArchAccountBalanceIndexTable
+                .join(
+                    ArchAccountTable,
+                    JoinType.INNER,
+                    ArchAccountTable.guid,
+                    ArchAccountBalanceIndexTable.archAccountGuid,
+                )
+                .selectAll()
+                .where { ArchAccountBalanceIndexTable.walletGuid.inList(walletIds) and ArchAccountTable.symbolGuid.inList(symbolIds) }
+                .associate {
+                    WalletAndSymbol(
+                        it[ArchAccountBalanceIndexTable.walletGuid].value,
+                        it[ArchAccountTable.symbolGuid]!!.value,
+                    ) to wrapRow(it)
+                }
         }
 
         fun updateToAssigning(archAccountBalanceIndexEntities: List<ArchAccountBalanceIndexEntity>, blockchainTransactionEntity: BlockchainTransactionEntity) {

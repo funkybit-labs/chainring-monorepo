@@ -175,17 +175,19 @@ class TestnetChallengePNLEntity(guid: EntityID<TestnetChallengePNLId>) : GUIDEnt
                                                 GROUP BY u.${UserTable.guid.name}),
                     
                     -- users ranked by PnL, current balance is adjusted by cummulative deposits and withdrawals
-                    ranked_users AS (SELECT pnl.${TestnetChallengePNLTable.userGuid.name}   AS user_guid,
-                                            pnl.${TestnetChallengePNLTable.type.name}       AS type,
+                    ranked_users AS (SELECT pnl.${TestnetChallengePNLTable.userGuid.name}                            AS user_guid,
+                                            pnl.${TestnetChallengePNLTable.type.name}                                AS type,
                                             ROW_NUMBER() OVER (
-                                               PARTITION BY pnl.type 
+                                               PARTITION BY pnl.${TestnetChallengePNLTable.type.name} 
                                                ORDER BY ((pnl.${TestnetChallengePNLTable.currentBalance.name} - COALESCE(cd.amount, 0) + COALESCE(cw.amount, 0) - pnl.${TestnetChallengePNLTable.initialBalance.name}) / pnl.${TestnetChallengePNLTable.initialBalance.name}) DESC
-                                            )                                               AS rank,
-                                            COUNT(*) OVER (PARTITION BY pnl.type)           AS total_users
+                                            )                                                                        AS rank,
+                                            COUNT(*) OVER (PARTITION BY pnl.${TestnetChallengePNLTable.type.name})   AS total_users
                                       FROM ${TestnetChallengePNLTable.tableName} pnl
                                             LEFT JOIN cumulative_deposits cd on pnl.${TestnetChallengePNLTable.userGuid.name} = cd.user_guid
                                             LEFT JOIN cumulative_withdrawals cw on pnl.${TestnetChallengePNLTable.userGuid.name} = cw.user_guid
-                                      WHERE pnl.type = '${challengePNLType.name}'),
+                                            LEFT JOIN "${UserTable.tableName}" u ON u.${UserTable.guid.name} = pnl.${TestnetChallengePNLTable.userGuid.name}
+                                      WHERE pnl.type = '${challengePNLType.name}' 
+                                        AND u.${UserTable.testnetChallengeStatus.name} = '${TestnetChallengeStatus.Enrolled}'),
                      
                      -- based on the rank calculate points to be granted
                      calculated_rewards AS (SELECT user_guid,

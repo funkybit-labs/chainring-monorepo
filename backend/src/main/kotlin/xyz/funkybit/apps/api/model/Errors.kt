@@ -40,6 +40,8 @@ enum class ReasonCode {
     SignupRequired,
 
     AuthorizeWallerError,
+
+    Disqualified,
 }
 
 val jsonWithDefaults = Json { encodeDefaults = true }
@@ -67,3 +69,5 @@ fun unexpectedError(): Response = errorResponse(Status.INTERNAL_SERVER_ERROR, Ap
 
 val orderNotFoundError = notFoundError(ReasonCode.OrderNotFound, "Requested order does not exist")
 val invalidInviteCodeError = processingError(ReasonCode.InvalidInviteCode, "Invite code is not valid")
+
+fun testnetChallengeDisqualifiedError(message: String) = processingError(ReasonCode.Disqualified, message)

@@ -132,6 +132,13 @@ class ArchAccountEntity(guid: EntityID<ArchAccountId>) : GUIDEntity<ArchAccountI
             }.firstOrNull()
         }
 
+        fun findTokenAccountsForSymbols(symbolIds: List<SymbolId>): List<ArchAccountEntity> {
+            return ArchAccountEntity.find {
+                ArchAccountTable.type.eq(ArchAccountType.TokenState) and
+                    ArchAccountTable.symbolGuid.inList(symbolIds)
+            }.toList()
+        }
+
         fun findAllTokenAccounts(): List<ArchAccountEntity> {
             return ArchAccountEntity.find {
                 ArchAccountTable.type.eq(ArchAccountType.TokenState)

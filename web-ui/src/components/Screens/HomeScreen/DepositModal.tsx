@@ -20,11 +20,14 @@ import { encodeFunctionData, EncodeFunctionDataParameters } from 'viem'
 import { isErrorFromAlias } from '@zodios/core'
 import TradingSymbol from 'tradingSymbol'
 import { ExpandableValue } from 'components/common/ExpandableValue'
+import { minBigInt } from 'utils'
+import { accountConfigQueryKey } from 'components/Screens/HomeScreen'
 
 export default function DepositModal({
   exchangeContractAddress,
   walletAddress,
   symbol,
+  testnetChallengeDepositLimit,
   isOpen,
   close,
   onClosed,
@@ -35,6 +38,7 @@ export default function DepositModal({
   exchangeContractAddress: string
   walletAddress: string
   symbol: TradingSymbol
+  testnetChallengeDepositLimit?: bigint
   isOpen: boolean
   close: () => void
   onClosed: () => void
@@ -153,6 +157,9 @@ export default function DepositModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: depositsQueryKey })
+      // this is needed so that deposit button status is updated
+      // for Testnet challenge participant
+      queryClient.invalidateQueries({ queryKey: accountConfigQueryKey })
       close()
     }
   })
@@ -162,7 +169,10 @@ export default function DepositModal({
 
     try {
       if (walletBalanceQuery.status == 'success') {
-        const availableAmount = walletBalanceQuery.data
+        const availableAmount =
+          testnetChallengeDepositLimit !== undefined
+            ? minBigInt(testnetChallengeDepositLimit, walletBalanceQuery.data)
+            : walletBalanceQuery.data
         return amount > 0 && amount <= availableAmount
       } else {
         return false
@@ -170,7 +180,7 @@ export default function DepositModal({
     } catch {
       return false
     }
-  }, [submitPhase, walletBalanceQuery, amount])
+  }, [submitPhase, walletBalanceQuery, amount, testnetChallengeDepositLimit])
 
   return (
     <Modal
@@ -188,6 +198,18 @@ export default function DepositModal({
                 {message && (
                   <p className="my-2 text-center text-sm text-white">
                     {message}
+                  </p>
+                )}
+                {testnetChallengeDepositLimit !== undefined && (
+                  <p className="mb-4 text-center text-sm text-white">
+                    During the Testnet Challenge, deposits are limited to
+                    previously withdrawn assets. Current deposit limit:{' '}
+                    <ExpandableValue
+                      value={formatUnits(
+                        testnetChallengeDepositLimit,
+                        symbol.decimals
+                      )}
+                    />
                   </p>
                 )}
                 <AmountInput

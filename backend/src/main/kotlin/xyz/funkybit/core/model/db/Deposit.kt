@@ -7,7 +7,6 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.decimalLiteral
@@ -216,6 +215,18 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
                     it[DepositTable.error] = error
                 }
         }
+
+        fun existsForUserAndSymbol(user: UserEntity, symbol: SymbolEntity): Boolean {
+            return DepositTable.innerJoin(WalletTable).select(DepositTable.id).where {
+                DepositTable.symbolGuid.eq(symbol.guid) and WalletTable.userGuid.eq(user.guid)
+            }.limit(1).any()
+        }
+
+        fun existsCompletedForWallet(wallet: WalletEntity): Boolean {
+            return DepositTable.select(DepositTable.id).where {
+                DepositTable.walletGuid eq wallet.guid and DepositTable.status.eq(DepositStatus.Complete)
+            }.limit(1).any()
+        }
     }
 
     fun updateBlockNumber(blockNumber: BigInteger) {
@@ -242,6 +253,8 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
         val now = Clock.System.now()
         this.updatedAt = now
         this.status = DepositStatus.Complete
+
+        TestnetChallengeUserRewardEntity.createDepositReward(this.wallet.user, this.wallet)
     }
 
     var walletGuid by DepositTable.walletGuid

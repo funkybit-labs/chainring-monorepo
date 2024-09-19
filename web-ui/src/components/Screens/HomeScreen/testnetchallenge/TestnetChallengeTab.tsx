@@ -1,6 +1,10 @@
-import { AddressType, apiClient } from 'apiClient'
+import {
+  AccountConfigurationApiResponse,
+  AddressType,
+  apiClient
+} from 'apiClient'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import TradingSymbol from 'tradingSymbol'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import { useConfig } from 'wagmi'
@@ -14,27 +18,23 @@ import DiscoBall from 'components/Screens/HomeScreen/DiscoBall'
 import DepositModal from 'components/Screens/HomeScreen/DepositModal'
 import { Leaderboard } from 'components/Screens/HomeScreen/testnetchallenge/Leaderboard'
 import { Tab } from 'components/Screens/Header'
-import { useAuth } from 'contexts/auth'
+import { accountConfigQueryKey } from 'components/Screens/HomeScreen'
 
 export const testnetChallengeInviteCodeKey = 'testnetChallengeInviteCode'
 export function TestnetChallengeTab({
   symbols,
   exchangeContract,
+  accountConfig,
   onChangeTab
 }: {
   symbols: TradingSymbols
   exchangeContract?: { name: string; address: string }
+  accountConfig?: AccountConfigurationApiResponse
   onChangeTab: (tab: Tab) => void
 }) {
-  const { isAuthenticated } = useAuth()
   const evmConfig = useConfig()
   const queryClient = useQueryClient()
   const wallets = useWallets()
-  const accountConfigQuery = useQuery({
-    queryKey: ['accountConfiguration'],
-    queryFn: apiClient.getAccountConfiguration,
-    enabled: isAuthenticated
-  })
 
   const [
     showTestnetChallengeDepositModal,
@@ -64,24 +64,23 @@ export function TestnetChallengeTab({
       })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accountConfiguration'] })
+      queryClient.invalidateQueries({ queryKey: accountConfigQueryKey })
       localStorage.removeItem(testnetChallengeInviteCodeKey)
     }
   })
 
   const { testnetChallengeStatus, nickName, avatarUrl, inviteCode } =
     useMemo(() => {
-      if (accountConfigQuery.data) {
+      if (accountConfig) {
         return {
-          testnetChallengeStatus:
-            accountConfigQuery.data.testnetChallengeStatus,
-          nickName: accountConfigQuery.data.nickName ?? undefined,
-          avatarUrl: accountConfigQuery.data.avatarUrl ?? undefined,
-          inviteCode: accountConfigQuery.data.inviteCode
+          testnetChallengeStatus: accountConfig.testnetChallengeStatus,
+          nickName: accountConfig.nickName ?? undefined,
+          avatarUrl: accountConfig.avatarUrl ?? undefined,
+          inviteCode: accountConfig.inviteCode
         }
       }
       return {}
-    }, [accountConfigQuery.data])
+    }, [accountConfig])
 
   const accountRefreshRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -94,7 +93,7 @@ export function TestnetChallengeTab({
     } else {
       accountRefreshRef.current = setInterval(() => {
         queryClient.invalidateQueries({
-          queryKey: ['accountConfiguration'],
+          queryKey: accountConfigQueryKey,
           fetchStatus: 'idle'
         })
       }, 3000)
@@ -105,9 +104,8 @@ export function TestnetChallengeTab({
   }, [testnetChallengeStatus, queryClient])
 
   const triggerDepositModal = useCallback(() => {
-    const symbolName = accountConfigQuery.data?.testnetChallengeDepositSymbol
-    const symbolContract =
-      accountConfigQuery.data?.testnetChallengeDepositContract
+    const symbolName = accountConfig?.testnetChallengeDepositSymbol
+    const symbolContract = accountConfig?.testnetChallengeDepositContract
     if (symbolName && symbolContract) {
       const symbol = symbols?.findByName(symbolName)
       if (symbol) {
@@ -119,7 +117,7 @@ export function TestnetChallengeTab({
         setShowTestnetChallengeDepositModal(true)
       }
     }
-  }, [accountConfigQuery, evmConfig.state.chainId, symbols])
+  }, [accountConfig, evmConfig.state.chainId, symbols])
 
   const [autoDepositTriggered, setAutoDepositTriggered] = useState(false)
 
@@ -152,7 +150,7 @@ export function TestnetChallengeTab({
     if (wallets.connected.length === 0) {
       if (walletHasConnected) {
         setWalletHasConnected(false)
-        queryClient.invalidateQueries({ queryKey: ['accountConfiguration'] })
+        queryClient.invalidateQueries({ queryKey: accountConfigQueryKey })
       }
     } else if (!walletHasConnected) {
       setWalletHasConnected(true)
@@ -233,7 +231,7 @@ export function TestnetChallengeTab({
                       </>
                     )}
                     {testnetChallengeStatus === 'PendingDeposit' &&
-                      accountConfigQuery.status === 'success' && (
+                      accountConfig && (
                         <>
                           <div className="my-auto">
                             <img
@@ -306,11 +304,16 @@ export function TestnetChallengeTab({
               exchangeContractAddress={exchangeContract.address}
               walletAddress={wallets.primary.address}
               symbol={testnetChallengeDepositSymbol}
+              testnetChallengeDepositLimit={
+                accountConfig?.testnetChallengeDepositLimits[
+                  testnetChallengeDepositSymbol.name
+                ]
+              }
               close={() => setShowTestnetChallengeDepositModal(false)}
               onClosed={() => {
                 setTestnetChallengeDepositSymbol(undefined)
                 queryClient.invalidateQueries({
-                  queryKey: ['accountConfiguration']
+                  queryKey: accountConfigQueryKey
                 })
               }}
               initialAmount={'10000'}
