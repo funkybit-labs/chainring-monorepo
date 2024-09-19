@@ -216,6 +216,12 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
                 }
         }
 
+        fun existsForUserAndSymbol(user: UserEntity, symbol: SymbolEntity): Boolean {
+            return DepositTable.innerJoin(WalletTable).select(DepositTable.id).where {
+                DepositTable.symbolGuid.eq(symbol.guid) and WalletTable.userGuid.eq(user.guid)
+            }.limit(1).any()
+        }
+
         fun existsCompletedForWallet(wallet: WalletEntity): Boolean {
             return DepositTable.select(DepositTable.id).where {
                 DepositTable.walletGuid eq wallet.guid and DepositTable.status.eq(DepositStatus.Complete)

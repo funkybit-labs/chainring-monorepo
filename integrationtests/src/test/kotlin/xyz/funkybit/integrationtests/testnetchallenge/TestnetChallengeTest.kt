@@ -18,11 +18,14 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.apps.api.FaucetMode
+import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.Card
 import xyz.funkybit.apps.api.model.CreateDepositApiRequest
+import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.toSymbolInfo
 import xyz.funkybit.apps.ring.BlockchainDepositHandler
 import xyz.funkybit.core.model.Symbol
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
 import xyz.funkybit.core.model.db.TestnetChallengePNLType
@@ -42,9 +45,11 @@ import xyz.funkybit.integrationtests.testutils.triggerRepeaterTaskAndWaitForComp
 import xyz.funkybit.integrationtests.testutils.waitForBalance
 import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
+import xyz.funkybit.integrationtests.utils.Faucet
 import xyz.funkybit.integrationtests.utils.TestApiClient
 import xyz.funkybit.integrationtests.utils.Wallet
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
+import xyz.funkybit.integrationtests.utils.assertError
 import xyz.funkybit.integrationtests.utils.assertMyLimitOrderCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.signAuthorizeBitcoinWalletRequest
 import java.math.BigDecimal
@@ -289,6 +294,51 @@ class TestnetChallengeTest : OrderBaseTest() {
             ),
             cards.toSet(),
         )
+    }
+
+    @Test
+    fun `testnet challenge enrollment - disqualified due to prior deposit`() {
+        val trader = setupTrader(
+            marketId = btcUsdcMarket.id,
+            airdrops = listOf(),
+            deposits = listOf(),
+            subscribeToOrderBook = false,
+            subscribeToLimits = false,
+            subscribeToPrices = false,
+        ).let { Trader(it.first, it.second, it.third) }
+
+        trader.a.getAccountConfiguration().let {
+            assertEquals(TestnetChallengeStatus.Unenrolled, it.testnetChallengeStatus)
+        }
+
+        // airdrop to emulate transfer from another address
+        val symbol = transaction { TestnetChallengeUtils.depositSymbol() }
+        val amount = TestnetChallengeUtils.depositAmount
+        val amountInFundamentalUnits = amount.movePointRight(symbol.decimals.toInt()).toBigInteger()
+        val nativeAmount = BigDecimal("1").movePointRight(18).toBigInteger()
+        Faucet.fundAndMine(trader.w.evmAddress, nativeAmount, trader.w.currentChainId)
+        trader.w.mintERC20AndMine(symbol.name, amountInFundamentalUnits)
+        val receipt = trader.w.depositAndMine(AssetAmount(symbol.toSymbolInfo(FaucetMode.AllSymbols), amountInFundamentalUnits))
+        trader.a.createDeposit(
+            CreateDepositApiRequest(
+                symbol = Symbol(symbol.name),
+                amount = amountInFundamentalUnits,
+                txHash = TxHash(receipt.transactionHash),
+            ),
+        )
+
+        // deposit
+        val depositSymbol = transaction { TestnetChallengeUtils.depositSymbol() }
+        val usdcDepositAmount = AssetAmount(depositSymbol.toSymbolInfo(FaucetMode.AllSymbols), "10000")
+        val usdcDepositTxHash = trader.w.sendDepositTx(usdcDepositAmount)
+        trader.w.currentBlockchainClient().mine()
+        trader.a.createDeposit(CreateDepositApiRequest(Symbol(depositSymbol.name), usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
+
+        // prior deposit leads to disqualification
+        trader.a.tryTestnetChallengeEnroll().assertError(ApiError(ReasonCode.Disqualified, "Disqualified due to prior deposit"))
+        trader.a.getAccountConfiguration().let {
+            assertEquals(TestnetChallengeStatus.Disqualified, it.testnetChallengeStatus)
+        }
     }
 
     @BeforeTest
