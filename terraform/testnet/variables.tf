@@ -62,13 +62,16 @@ data "dns_a_record_set" "web_app_ips" {
   host = "${local.name_prefix}.${local.zone_name}"
 }
 
+
+
 locals {
 
   ipv4whitelist = [
-        join(",", data.dns_a_record_set.nlb_ips.addrs),
-        join(",", data.dns_a_record_set.tm_app_ips.addrs),
-        join(",", data.dns_a_record_set.web_app_ips.addrs)
+
+    for i in concat(data.dns_a_record_set.nlb_ips.addrs,data.dns_a_record_set.tm_app_ips.addrs,data.dns_a_record_set.web_app_ips.addrs) : format("%s/32" , i )
+
    ]
+
 
   ipv4blacklist = []
 

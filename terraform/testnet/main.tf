@@ -105,7 +105,8 @@ module "web" {
 module "waf" {
   source                   = "../modules/waf"
   aws_region               = var.aws_region
-  aws_lb_arn               = module.alb.https_listener_arn
+  aws_lb_arn               = module.alb.lb_arn
+  #aws_lb_arn               = module.alb.https_listener_arn
   short_env_name           = local.name_prefix
   ipv4_blacklist_addresses = local.ipv4blacklist
   ipv4_whitelist_addresses = local.ipv4whitelist
