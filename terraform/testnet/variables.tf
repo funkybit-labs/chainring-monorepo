@@ -35,6 +35,52 @@ data "aws_acm_certificate" "funkybit_fun" {
   key_types = ["EC_prime256v1"]
 }
 
+variable "blocked_country_codes" {
+  default = [
+    "US", #United States
+  ]
+}
+
+variable "ip_dos_rate_limit" {
+  default = 5000
+}
+
+
+data "dns_a_record_set" "nlb_ips" {
+  host = module.alb.dns_name
+}
+
+data "dns_a_record_set" "nlb_mocker_ips" {
+  host = module.alb.dns_name
+}
+
+data "dns_a_record_set" "tm_app_ips" {
+  host = module.telegram_mini_app.dns_name
+}
+
+data "dns_a_record_set" "web_app_ips" {
+  host = "${local.name_prefix}.${local.zone_name}"
+}
+
+
+
+locals {
+
+  ipv4whitelist = [
+
+    for i in concat(data.dns_a_record_set.nlb_ips.addrs,data.dns_a_record_set.tm_app_ips.addrs,data.dns_a_record_set.web_app_ips.addrs) : format("%s/32" , i )
+
+   ]
+
+
+  ipv4blacklist = []
+
+  ipv6whitelist = []
+
+  ipv6blacklist = []
+
+}
+
 terraform {
   required_version = "1.5.7"
 
