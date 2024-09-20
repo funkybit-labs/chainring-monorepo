@@ -25,7 +25,6 @@ import xyz.funkybit.core.model.db.BlockchainTransactionStatus
 import xyz.funkybit.core.model.db.BroadcasterNotification
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ChainSettlementBatchEntity
-import xyz.funkybit.core.model.db.CreateArchAccountBalanceIndexAssignment
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.DepositStatus
@@ -176,7 +175,7 @@ class ArchTransactionHandler(
                         Thread.sleep(2000)
                         archTransaction.markAsCompleted()
                         val assignments = assigningBalanceIndexUpdates.groupBy { it.archAccountAddress }.flatMap { (pubkey, updates) ->
-                            val tokenAccountState: ArchAccountState.Token = ArchUtils.getAccountState(pubkey)
+                            val (tokenAccountState, size) = ArchUtils.getAccountStateAndSize<ArchAccountState.Token>(pubkey)
                             val balances = tokenAccountState.balances.reversed()
                             updates.map { update ->
                                 val index = balances.indexOfFirst { it.walletAddress == update.walletAddress.value }
@@ -188,6 +187,12 @@ class ArchTransactionHandler(
                                     update.entity,
                                     balances.size - index - 1,
                                 )
+                            }.also {
+                                ArchAccountEntity.getByPubkey(pubkey)?.let {
+                                    if (size > getTokenAccountSizeThreshold()) {
+                                        it.markAsFull()
+                                    }
+                                }
                             }
                         }
                         ArchAccountBalanceIndexEntity.updateToAssigned(assignments)
@@ -213,6 +218,12 @@ class ArchTransactionHandler(
                 false
             }
         }
+    }
+
+    private fun getTokenAccountSizeThreshold(): Int {
+        // this threshold is below the 10MB limit (10485760), once we cross this threshold
+        // we initiate the creation of a new token account that new balances will be assigned to
+        return ArchUtils.tokenAccountSizeThreshold
     }
 
     private fun settlementBatchInProgress(chainId: ChainId) =
@@ -243,13 +254,9 @@ class ArchTransactionHandler(
             }
             true
         } else {
-            val confirmedDeposits = DepositEntity.getConfirmedBitcoinDeposits()
+            val confirmedDepositsWithAssignedIndex = ArchUtils.getConfirmedBitcoinDeposits()
 
-            // handle deposits with an already assigned balance index
-            val confirmedDepositsWithAssignedIndex = confirmedDeposits.filter {
-                it.balanceIndexStatus == ArchAccountBalanceIndexStatus.Assigned
-            }
-            val hasConfirmedDeposits = if (confirmedDepositsWithAssignedIndex.isNotEmpty()) {
+            if (confirmedDepositsWithAssignedIndex.isNotEmpty()) {
                 logger.debug { "Handling ${confirmedDepositsWithAssignedIndex.size} confirmed deposits" }
                 val instruction = ArchUtils.buildDepositBatchInstruction(programPubkey, confirmedDepositsWithAssignedIndex)
                 val transaction = BlockchainTransactionEntity.create(
@@ -263,23 +270,6 @@ class ArchTransactionHandler(
                 true
             } else {
                 false
-            }
-
-            // for deposits with no balance index, initiate index creation
-            val confirmedDepositsWithoutAssignedIndex = confirmedDeposits.filter { it.balanceIndexStatus == null }
-            if (confirmedDepositsWithoutAssignedIndex.isNotEmpty()) {
-                logger.debug { "Handling ${confirmedDepositsWithoutAssignedIndex.size} confirmed deposits with no index" }
-                ArchAccountBalanceIndexEntity.batchCreate(
-                    confirmedDepositsWithoutAssignedIndex.map {
-                        CreateArchAccountBalanceIndexAssignment(
-                            walletGuid = it.depositEntity.walletGuid,
-                            archAccountGuid = it.archAccountEntity.guid,
-                        )
-                    }.toSet().toList(),
-                )
-                true
-            } else {
-                hasConfirmedDeposits
             }
         }
     }

@@ -15,6 +15,7 @@ import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.evm.ECHelper.sha3
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.model.PubkeyAndIndex
 import xyz.funkybit.core.model.Settlement
 import xyz.funkybit.core.model.WalletAndSymbol
 import xyz.funkybit.core.model.bitcoin.ArchAccountState
@@ -244,7 +245,7 @@ class SettlementCoordinator(
             }
             NetworkType.Evm -> Pair(
                 createEvmBlockchainTransactionData(chainId, batchSettlement, isSubmit = isSubmit),
-                calculateEvmBatchHash(chainId, batchSettlement),
+                calculateEvmBatchHash(batchSettlement),
             )
         }
     }
@@ -442,7 +443,7 @@ class SettlementCoordinator(
         }.toMap()
     }
 
-    private fun createArchBlockchainTransactionData(batchSettlement: Settlement.Batch, indexMap: Map<WalletAndSymbol, Int>, numTrades: Int? = null, isSubmit: Boolean = false): Pair<BlockchainTransactionData, String> {
+    private fun createArchBlockchainTransactionData(batchSettlement: Settlement.Batch, indexMap: Map<WalletAndSymbol, PubkeyAndIndex>, numTrades: Int? = null, isSubmit: Boolean = false): Pair<BlockchainTransactionData, String> {
         val (instruction, batchHash) = if (isSubmit) {
             ArchUtils.buildSubmitSettlementBatchInstruction(
                 archProgramPubkey(),
@@ -492,7 +493,7 @@ class SettlementCoordinator(
         )
     }
 
-    private fun calculateEvmBatchHash(chainId: ChainId, batchSettlement: Settlement.Batch): String {
+    private fun calculateEvmBatchHash(batchSettlement: Settlement.Batch): String {
         return sha3(DefaultFunctionEncoder().encodeParameters(listOf(batchSettlement.toEvm())).toHexBytes()).toHex(false)
     }
 

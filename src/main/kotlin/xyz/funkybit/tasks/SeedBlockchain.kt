@@ -136,7 +136,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
 
 private fun airdropToFeePayer() {
     try {
-        (0 .. 2).forEach { _ ->
+        (0 .. 5).forEach { _ ->
             BitcoinClient.sendToAddress(
                 BitcoinClient.bitcoinConfig.feePayerAddress,
                 BigInteger("8000"),

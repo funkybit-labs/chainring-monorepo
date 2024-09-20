@@ -70,7 +70,7 @@ class ArchTokenStateSetupTask : RepeaterBaseTask(
 
     private fun findSymbolsWithNoAccount(): List<SymbolEntity> {
         val allSymbols = SymbolEntity.forChain(BitcoinClient.chainId)
-        val symbolsWithTokenState = ArchAccountEntity.findAllTokenAccounts().map { it.symbolGuid }.toSet()
+        val symbolsWithTokenState = ArchAccountEntity.findAllTokenAccounts().filterNot { it.status == ArchAccountStatus.Full }.map { it.symbolGuid }.toSet()
         return allSymbols.filterNot { symbolsWithTokenState.contains(it.guid) }
     }
 

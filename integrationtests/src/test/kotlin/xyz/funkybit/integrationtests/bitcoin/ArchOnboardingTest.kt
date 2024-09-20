@@ -68,9 +68,9 @@ class ArchOnboardingTest {
         private fun programStateAccount() = transaction { ArchAccountEntity.findProgramStateAccount() }
 
         private fun tokenStateAccount() = transaction {
-            ArchAccountEntity.findTokenAccountForSymbol(
+            ArchAccountEntity.findTokenAccountsForSymbol(
                 SymbolEntity.forChain(BitcoinClient.chainId).first(),
-            )
+            ).firstOrNull { it.status == ArchAccountStatus.Complete }
         }
     }
 

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.PubkeyAndIndex
 import xyz.funkybit.core.model.Settlement
 import xyz.funkybit.core.model.WalletAndSymbol
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
@@ -50,7 +51,7 @@ class ArchUtilsTest : TestWithDb() {
     }
 
     @Test
-    fun `test balance indexes`() {
+    fun `test balance indexes for settlement`() {
         transaction {
             assertEquals(ArchAccountBalanceIndexEntity.count(), 0)
         }
@@ -112,14 +113,14 @@ class ArchUtilsTest : TestWithDb() {
             }
         }
 
-        // verify returns with the indexes
+        // retrieve returns with the pubkey and indexes
         transaction {
             assertEquals(
                 mapOf(
-                    WalletAndSymbol(wallet1.id.value, btc.id.value) to 100,
-                    WalletAndSymbol(wallet1.id.value, rune.id.value) to 101,
-                    WalletAndSymbol(wallet2.id.value, btc.id.value) to 200,
-                    WalletAndSymbol(wallet2.id.value, rune.id.value) to 201,
+                    WalletAndSymbol(wallet1.id.value, btc.id.value) to PubkeyAndIndex(btcTokenAccount.rpcPubkey(), 100),
+                    WalletAndSymbol(wallet1.id.value, rune.id.value) to PubkeyAndIndex(runeTokenAccount.rpcPubkey(), 101),
+                    WalletAndSymbol(wallet2.id.value, btc.id.value) to PubkeyAndIndex(btcTokenAccount.rpcPubkey(), 200),
+                    WalletAndSymbol(wallet2.id.value, rune.id.value) to PubkeyAndIndex(runeTokenAccount.rpcPubkey(), 201),
                 ),
                 ArchUtils.retrieveOrCreateBalanceIndexes(
                     getSettlementBatch(),

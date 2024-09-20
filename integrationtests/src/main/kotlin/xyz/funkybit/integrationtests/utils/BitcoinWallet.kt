@@ -17,7 +17,6 @@ import xyz.funkybit.core.model.Signature
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.bitcoin.ArchAccountState
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
-import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.BitcoinUtxoAddressMonitorEntity
 import xyz.funkybit.core.model.db.BitcoinUtxoEntity
 import xyz.funkybit.core.model.db.MarketId
@@ -80,11 +79,12 @@ class BitcoinWallet(
     private fun getExchangeNativeBalance(symbol: String): BigInteger {
         return transaction {
             val symbolEntity = SymbolEntity.forName(symbol)
-            ArchAccountBalanceIndexEntity.findForWalletAddressAndSymbol(walletAddress, symbolEntity)?.addressIndex?.let { index ->
-                val tokenAccountPubKey = ArchAccountEntity.findTokenAccountForSymbol(symbolEntity)!!.rpcPubkey()
+            ArchAccountBalanceIndexEntity.findForWalletAddressAndSymbol(walletAddress, symbolEntity)?.let { archAccountBalanceIndexEntity ->
+                val tokenAccountPubKey = archAccountBalanceIndexEntity.archAccount.rpcPubkey()
+                val addressIndex = archAccountBalanceIndexEntity.addressIndex
                 val tokenState = ArchUtils.getAccountState<ArchAccountState.Token>(tokenAccountPubKey)
-                assert(tokenState.balances[index].walletAddress == walletAddress.value)
-                tokenState.balances[index].balance.toLong().toBigInteger()
+                assert(tokenState.balances[addressIndex].walletAddress == walletAddress.value)
+                tokenState.balances[addressIndex].balance.toLong().toBigInteger()
             } ?: BigInteger.ZERO
         }
     }

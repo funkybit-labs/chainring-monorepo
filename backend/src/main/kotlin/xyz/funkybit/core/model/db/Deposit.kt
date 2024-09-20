@@ -72,13 +72,6 @@ object DepositTable : GUIDTable<DepositId>("deposit", ::DepositId) {
 
 class DepositException(message: String) : Exception(message)
 
-data class ConfirmedBitcoinDeposit(
-    val depositEntity: DepositEntity,
-    val archAccountEntity: ArchAccountEntity,
-    val balanceIndexStatus: ArchAccountBalanceIndexStatus?,
-    val balanceIndex: Int?,
-)
-
 class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
     companion object : EntityClass<DepositId, DepositEntity>(DepositTable) {
         fun findByTxHash(txHash: TxHash): DepositEntity? {
@@ -101,23 +94,6 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
 
         fun getConfirmedForUpdate(chainId: ChainId): List<DepositEntity> =
             getForUpdate(chainId, DepositStatus.Confirmed)
-
-        fun getConfirmedBitcoinDeposits(): List<ConfirmedBitcoinDeposit> {
-            return DepositTable
-                .join(ArchAccountTable, JoinType.INNER, DepositTable.symbolGuid, ArchAccountTable.symbolGuid)
-                .join(ArchAccountBalanceIndexTable, JoinType.LEFT, ArchAccountTable.guid, ArchAccountBalanceIndexTable.archAccountGuid, additionalConstraint = { ArchAccountBalanceIndexTable.walletGuid.eq(DepositTable.walletGuid) })
-                .selectAll()
-                .where { DepositTable.status.eq(DepositStatus.Confirmed) }
-                .orderBy(DepositTable.createdAt to SortOrder.ASC)
-                .map {
-                    ConfirmedBitcoinDeposit(
-                        depositEntity = DepositEntity.wrapRow(it),
-                        archAccountEntity = ArchAccountEntity.wrapRow(it),
-                        balanceIndexStatus = it[ArchAccountBalanceIndexTable.status],
-                        balanceIndex = it[ArchAccountBalanceIndexTable.addressIndex],
-                    )
-                }
-        }
 
         fun getSettlingForUpdate(chainId: ChainId): List<DepositEntity> =
             getForUpdate(chainId, DepositStatus.Settling)
