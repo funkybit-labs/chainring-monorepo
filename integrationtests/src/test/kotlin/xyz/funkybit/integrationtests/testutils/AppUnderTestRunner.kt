@@ -121,6 +121,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                         }
 
                         if (!isTestEnvRun()) {
+                            deleteAll()
                             sequencerApp.start()
                             sequencerResponseProcessorApp.start()
                             gatewayApp.start()

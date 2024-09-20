@@ -6,6 +6,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.model.bitcoin.BitcoinNetworkType
 import xyz.funkybit.core.model.bitcoin.ProgramInstruction
 import xyz.funkybit.core.model.db.AccountSetupState
 import xyz.funkybit.core.model.db.ArchAccountEntity
@@ -111,7 +112,7 @@ object ArchContractsPublisher {
                             message = message,
                         )
                     }.toList()
-                    val txIds = txs.asSequence().chunked(100) { rtxs ->
+                    val txIds = txs.asSequence().chunked(50) { rtxs ->
                         ArchNetworkClient.sendTransactions(rtxs).also {
                             Thread.sleep(4000)
                         }
@@ -250,6 +251,8 @@ object ArchContractsPublisher {
             ),
             ProgramInstruction.InitProgramStateParams(
                 feeAccount = BitcoinClient.bitcoinConfig.feeCollectionAddress,
+                programChangeAddress = ArchNetworkClient.getAccountAddress(programAccount.rpcPubkey()),
+                networkType = BitcoinNetworkType.fromNetworkParams(BitcoinClient.getParams()),
             ),
         ).also {
             transaction {

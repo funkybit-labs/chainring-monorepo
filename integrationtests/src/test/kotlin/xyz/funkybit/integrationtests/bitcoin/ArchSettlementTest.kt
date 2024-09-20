@@ -29,6 +29,7 @@ import xyz.funkybit.integrationtests.utils.assertMyOrderUpdatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyTradesCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyTradesUpdatedMessageReceived
 import xyz.funkybit.integrationtests.utils.ofAsset
+import xyz.funkybit.sequencer.core.FeeRate
 import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -59,7 +60,7 @@ class ArchSettlementTest : OrderBaseTest() {
         val (takerApiClient, takerEvmWallet, takerWsClient, takerBitcoinWallet) = setupTrader(
             market.id,
             airdrops = listOf(
-                AssetAmount(quoteSymbol, "0.00008"),
+                AssetAmount(quoteSymbol, "0.00009"),
             ),
             deposits = listOf(
                 AssetAmount(quoteSymbol, "0.00005"),
@@ -118,7 +119,7 @@ class ArchSettlementTest : OrderBaseTest() {
                         order = marketBuyOrderApiResponse,
                         price = BigDecimal("0.999"),
                         amount = AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount.fixedAmount()),
-                        fee = AssetAmount(quoteSymbol, "0.00000059"),
+                        fee = AssetAmount(quoteSymbol, "0.00000060"),
                         settlementStatus = SettlementStatus.Pending,
                     ),
                 ),
@@ -133,7 +134,7 @@ class ArchSettlementTest : OrderBaseTest() {
             assertBalancesMessageReceived(
                 listOf(
                     ExpectedBalance(baseSymbol, total = BigDecimal("0"), available = BigDecimal("0.00003")),
-                    ExpectedBalance(quoteSymbol, total = BigDecimal("0.00005000"), available = BigDecimal("0.00001944")),
+                    ExpectedBalance(quoteSymbol, total = BigDecimal("0.00005000"), available = BigDecimal("0.00001943")),
                 ),
             )
         }
@@ -145,7 +146,7 @@ class ArchSettlementTest : OrderBaseTest() {
                         order = limitSellOrderApiResponse,
                         price = BigDecimal("0.999"),
                         amount = AssetAmount(baseSymbol, "0.00003"),
-                        fee = AssetAmount(quoteSymbol, "0.00000029"),
+                        fee = AssetAmount(quoteSymbol, "0.00000030"),
                         settlementStatus = SettlementStatus.Pending,
                     ),
                 ),
@@ -160,7 +161,7 @@ class ArchSettlementTest : OrderBaseTest() {
             assertBalancesMessageReceived(
                 listOf(
                     ExpectedBalance(baseSymbol, total = BigDecimal("0.6"), available = BigDecimal("0.59997")),
-                    ExpectedBalance(quoteSymbol, total = BigDecimal("0"), available = BigDecimal("0.00002968")),
+                    ExpectedBalance(quoteSymbol, total = BigDecimal("0"), available = BigDecimal("0.00002967")),
                 ),
             )
         }
@@ -170,19 +171,19 @@ class ArchSettlementTest : OrderBaseTest() {
         }
 
         takerWsClient.apply {
-            assertLimitsMessageReceived(market, base = BigDecimal("0.00003"), quote = BigDecimal("0.00001944"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0.00003"), quote = BigDecimal("0.00001943"))
         }
 
         makerWsClient.apply {
-            assertLimitsMessageReceived(market, base = BigDecimal("0.59997"), quote = BigDecimal("0.00002968"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0.59997"), quote = BigDecimal("0.00002967"))
         }
 
         waitForSettlementToFinish(listOf(trade.id.value))
 
         val baseQuantity = AssetAmount(baseSymbol, trade.amount)
         val notional = trade.price.ofAsset(quoteSymbol) * baseQuantity.amount
-        val makerFee = notional * BigDecimal("0.01")
-        val takerFee = notional * BigDecimal("0.02")
+        val makerFee = notional * BigDecimal("10000") / BigDecimal(FeeRate.MAX_VALUE)
+        val takerFee = notional * BigDecimal("20000") / BigDecimal(FeeRate.MAX_VALUE)
 
         assertBalances(
             listOf(
@@ -251,7 +252,7 @@ class ArchSettlementTest : OrderBaseTest() {
         val (makerApiClient, makerEvmWallet, makerWsClient, makerBitcoinWallet) = setupTrader(
             market.id,
             airdrops = listOf(
-                AssetAmount(quoteSymbol, "0.00008"),
+                AssetAmount(quoteSymbol, "0.00009"),
             ),
             deposits = listOf(
                 AssetAmount(quoteSymbol, "0.00005"),
@@ -278,7 +279,7 @@ class ArchSettlementTest : OrderBaseTest() {
         )
         makerWsClient.apply {
             assertMyLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
-            assertLimitsMessageReceived(market, base = BigDecimal("0"), quote = BigDecimal("0.00001974"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0"), quote = BigDecimal("0.00001973"))
         }
 
         // place a sell order
@@ -297,7 +298,7 @@ class ArchSettlementTest : OrderBaseTest() {
                         order = marketSellOrderApiResponse,
                         price = BigDecimal("0.999"),
                         amount = AssetAmount(baseSymbol, marketSellOrderApiResponse.order.amount.fixedAmount()),
-                        fee = AssetAmount(quoteSymbol, "0.00000059"),
+                        fee = AssetAmount(quoteSymbol, "0.00000060"),
                         settlementStatus = SettlementStatus.Pending,
                     ),
                 ),
@@ -312,7 +313,7 @@ class ArchSettlementTest : OrderBaseTest() {
             assertBalancesMessageReceived(
                 listOf(
                     ExpectedBalance(baseSymbol, total = BigDecimal("0.6"), available = BigDecimal("0.59997")),
-                    ExpectedBalance(quoteSymbol, total = BigDecimal("0"), available = BigDecimal("0.00002938")),
+                    ExpectedBalance(quoteSymbol, total = BigDecimal("0"), available = BigDecimal("0.00002937")),
                 ),
             )
         }
@@ -324,7 +325,7 @@ class ArchSettlementTest : OrderBaseTest() {
                         order = limitBuyOrderApiResponse,
                         price = BigDecimal("0.999"),
                         amount = AssetAmount(baseSymbol, "0.00003"),
-                        fee = AssetAmount(quoteSymbol, "0.00000029"),
+                        fee = AssetAmount(quoteSymbol, "0.00000030"),
                         settlementStatus = SettlementStatus.Pending,
                     ),
                 ),
@@ -339,7 +340,7 @@ class ArchSettlementTest : OrderBaseTest() {
             assertBalancesMessageReceived(
                 listOf(
                     ExpectedBalance(baseSymbol, total = BigDecimal("0"), available = BigDecimal("0.00003")),
-                    ExpectedBalance(quoteSymbol, total = BigDecimal("0.00005000"), available = BigDecimal("0.00001974")),
+                    ExpectedBalance(quoteSymbol, total = BigDecimal("0.00005000"), available = BigDecimal("0.00001973")),
                 ),
             )
         }
@@ -349,19 +350,19 @@ class ArchSettlementTest : OrderBaseTest() {
         }
 
         takerWsClient.apply {
-            assertLimitsMessageReceived(market, base = BigDecimal("0.59997"), quote = BigDecimal("0.00002938"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0.59997"), quote = BigDecimal("0.00002937"))
         }
 
         makerWsClient.apply {
-            assertLimitsMessageReceived(market, base = BigDecimal("0.00003"), quote = BigDecimal("0.00001974"))
+            assertLimitsMessageReceived(market, base = BigDecimal("0.00003"), quote = BigDecimal("0.00001973"))
         }
 
         waitForSettlementToFinish(listOf(trade.id.value))
 
         val baseQuantity = AssetAmount(baseSymbol, trade.amount)
         val notional = trade.price.ofAsset(quoteSymbol) * baseQuantity.amount
-        val makerFee = notional * BigDecimal("0.01")
-        val takerFee = notional * BigDecimal("0.02")
+        val makerFee = notional * BigDecimal("10000") / BigDecimal(FeeRate.MAX_VALUE)
+        val takerFee = notional * BigDecimal("20000") / BigDecimal(FeeRate.MAX_VALUE)
 
         assertBalances(
             listOf(
