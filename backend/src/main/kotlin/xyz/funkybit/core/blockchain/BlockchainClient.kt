@@ -47,6 +47,7 @@ import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.toEvmSignature
 import xyz.funkybit.core.utils.fromFundamentalUnits
+import xyz.funkybit.core.utils.quietMode
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigDecimal
@@ -142,7 +143,7 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
             val builder = OkHttpClient.Builder()
 
             fun shouldLogRpcInvocation(requestBody: String, responseBody: String): Boolean =
-                runCatching {
+                !quietMode && runCatching {
                     val rpcMethod = Json.parseToJsonElement(requestBody).jsonObject["method"]?.jsonPrimitive?.contentOrNull
                     val rpcResult = Json.parseToJsonElement(responseBody).jsonObject["result"]
                     // filter out periodic calls for event logs unless they contain any results

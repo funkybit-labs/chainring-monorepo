@@ -4,6 +4,7 @@ import { parseUnits } from 'viem'
 import Markets, { Market } from 'markets'
 import Decimal from 'decimal.js'
 import { calculateNotional } from 'utils/index'
+import TradingSymbol from 'tradingSymbol'
 
 export const ohlcDurationsMs: Record<OHLCDuration, number> = {
   ['P1M']: 60 * 1000,
@@ -68,6 +69,65 @@ function fillGaps(
   }
 }
 
+export function notionalToBaseWithScaling(
+  notional: bigint,
+  price: string,
+  scaling: number
+) {
+  const decimalPrice = new Decimal(price)
+  if (decimalPrice.isZero()) {
+    return BigInt(0)
+  }
+  return BigInt(
+    new Decimal(notional.toString())
+      .div(new Decimal(price))
+      .mul(Math.pow(10, scaling))
+      .toDecimalPlaces(0)
+      .toNumber()
+  )
+}
+
+export function backToBackSetup(
+  side: OrderSide,
+  market: Market,
+  markets: Markets
+): {
+  inputSymbol: TradingSymbol
+  outputSymbol: TradingSymbol
+  bridgeSymbol: TradingSymbol
+  firstMarket: Market
+  firstLegSide: OrderSide
+  secondMarket: Market
+  secondLegSide: OrderSide
+} {
+  const inputSymbol = side === 'Buy' ? market.quoteSymbol : market.baseSymbol
+  const outputSymbol = side === 'Buy' ? market.baseSymbol : market.quoteSymbol
+  const b2bMarkets = market.marketIds.map((id) => markets.getById(id))
+  const firstMarket = b2bMarkets.filter((m) =>
+    [m.baseSymbol.name, m.quoteSymbol.name].includes(inputSymbol.name)
+  )[0]
+  const firstLegSide = firstMarket.baseSymbol === inputSymbol ? 'Sell' : 'Buy'
+  const secondMarket = b2bMarkets.filter((m) =>
+    [m.baseSymbol.name, m.quoteSymbol.name].includes(outputSymbol.name)
+  )[0]
+  const secondLegSide =
+    secondMarket.quoteSymbol === outputSymbol ? 'Sell' : 'Buy'
+  const bridgeSymbol =
+    firstMarket.baseSymbol === inputSymbol
+      ? firstMarket.quoteSymbol
+      : firstMarket.baseSymbol
+
+  return {
+    inputSymbol,
+    outputSymbol,
+    bridgeSymbol,
+    firstMarket,
+    firstLegSide,
+    secondMarket,
+    secondLegSide
+  }
+}
+
 export function getMarketPrice(
   side: OrderSide,
   amount: bigint,
@@ -81,37 +141,90 @@ export function getMarketPrice(
       return 0n
     }
 
-    const firstMarket = markets.getById(market.marketIds[0])
-    const secondMarket = markets.getById(market.marketIds[1])
-    const firstOrderPrice = calculateMarketPrice(
-      side,
-      amount,
-      markets.getById(market.marketIds[0]),
-      orderBook
-    )
-    const firstOrderNotional = calculateNotional(
-      firstOrderPrice,
-      amount,
-      market.baseSymbol
-    )
-    const secondOrderPrice = calculateMarketPrice(
-      side,
-      firstOrderNotional,
+    const {
+      outputSymbol,
+      bridgeSymbol,
+      firstMarket,
+      firstLegSide,
       secondMarket,
-      secondMarketOrderBook
+      secondLegSide
+    } = backToBackSetup(side, market, markets)
+    if (firstMarket === undefined || secondMarket === undefined) {
+      return 0n
+    }
+    const firstOrderBook =
+      firstMarket.id === market.marketIds[0] ? orderBook : secondMarketOrderBook
+    const secondOrderBook =
+      secondMarket.id === market.marketIds[0]
+        ? orderBook
+        : secondMarketOrderBook
+
+    // the user specifies the amount of the input symbol to the back-to-back, but if the first back to back side is a
+    // buy, then the amount they entered is actually the notional amount in the first market, so we need to adjust it to
+    // be the base amount
+    const firstLegAmount =
+      firstLegSide === 'Buy'
+        ? notionalToBaseWithScaling(
+            amount,
+            firstOrderBook.last.price,
+            firstMarket.baseSymbol.decimals - market.baseSymbol.decimals
+          )
+        : amount
+
+    const firstLegPrice = calculateMarketPrice(
+      firstLegSide,
+      firstLegAmount,
+      firstMarket,
+      firstOrderBook
     )
-    return scaledDecimalToBigint(
-      bigintToScaledDecimal(
-        firstOrderPrice,
+    if (firstLegPrice == 0n) {
+      return 0n
+    }
+    const firstLegNotional = calculateNotional(
+      firstLegPrice,
+      firstLegAmount,
+      firstMarket.baseSymbol
+    )
+    const bridgeAmount =
+      firstLegSide === 'Buy' ? firstLegAmount : firstLegNotional
+    const secondLegAmount =
+      secondLegSide === 'Sell'
+        ? bridgeAmount
+        : notionalToBaseWithScaling(
+            bridgeAmount,
+            secondOrderBook.last.price,
+            outputSymbol.decimals - bridgeSymbol.decimals
+          )
+
+    const secondLegPrice = calculateMarketPrice(
+      secondLegSide,
+      secondLegAmount,
+      secondMarket,
+      secondOrderBook
+    )
+    if (secondLegPrice == 0n) {
+      return 0n
+    }
+    let scaledTotalPrice = new Decimal(1)
+    if (side === 'Buy') {
+      scaledTotalPrice = bigintToScaledDecimal(
+        secondLegPrice,
+        secondMarket.quoteSymbol.decimals
+      )
+      scaledTotalPrice = scaledTotalPrice.div(
+        bigintToScaledDecimal(firstLegPrice, firstMarket.quoteSymbol.decimals)
+      )
+    } else {
+      scaledTotalPrice = bigintToScaledDecimal(
+        firstLegPrice,
         firstMarket.quoteSymbol.decimals
-      ).mul(
-        bigintToScaledDecimal(
-          secondOrderPrice,
-          secondMarket.quoteSymbol.decimals
-        )
-      ),
-      secondMarket.quoteSymbol.decimals
-    )
+      )
+      scaledTotalPrice = scaledTotalPrice.div(
+        bigintToScaledDecimal(secondLegPrice, secondMarket.quoteSymbol.decimals)
+      )
+    }
+
+    return scaledDecimalToBigint(scaledTotalPrice, market.quoteSymbol.decimals)
   } else {
     return calculateMarketPrice(side, amount, market, orderBook)
   }

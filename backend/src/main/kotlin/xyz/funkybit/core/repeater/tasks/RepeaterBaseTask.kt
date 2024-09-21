@@ -4,6 +4,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.db.notifyDbListener
+import xyz.funkybit.core.utils.quietMode
 import java.util.TimerTask
 import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.Semaphore
@@ -29,7 +30,7 @@ abstract class RepeaterBaseTask(
         if (isLockAcquired) {
             val startTime = Clock.System.now()
             try {
-                logger.debug { "Acquired lock for ${this.javaClass.simpleName}" }
+                if (!quietMode) logger.debug { "Acquired lock for ${this.javaClass.simpleName}" }
                 runWithLock()
                 transaction {
                     notifyDbListener(REPEATER_APP_TASK_DONE_CHANNEL, name)
@@ -45,7 +46,7 @@ abstract class RepeaterBaseTask(
                 }
                 try {
                     lock.release()
-                    logger.debug { "Lock released for ${this.javaClass.simpleName}" }
+                    if (!quietMode) logger.debug { "Lock released for ${this.javaClass.simpleName}" }
                 } catch (t: Throwable) {
                     logger.warn(t) { "Could not release lock, retrying" }
                     try {

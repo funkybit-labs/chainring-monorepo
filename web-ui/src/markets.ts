@@ -1,4 +1,4 @@
-import { Market as ApiMarket } from 'apiClient'
+import { Market as ApiMarket, OrderSide } from 'apiClient'
 import TradingSymbols from 'tradingSymbols'
 import Decimal from 'decimal.js'
 import TradingSymbol from 'tradingSymbol'
@@ -12,6 +12,7 @@ export class Market {
   readonly lastPrice: Decimal
   readonly minFee: bigint
   readonly marketIds: string[]
+  readonly backToBackSides?: OrderSide[]
 
   constructor(
     id: string,
@@ -20,7 +21,8 @@ export class Market {
     tickSize: Decimal,
     lastPrice: Decimal,
     minFee: bigint,
-    marketIds: string[]
+    marketIds: string[],
+    backToBackSides?: OrderSide[]
   ) {
     this.id = id
     this.baseSymbol = baseSymbol
@@ -30,6 +32,7 @@ export class Market {
     this.quoteDecimalPlaces = this.tickSize.decimalPlaces() + 1
     this.minFee = minFee
     this.marketIds = marketIds
+    this.backToBackSides = backToBackSides
   }
 
   isBackToBack(): boolean {
@@ -55,7 +58,8 @@ export default class Markets {
           m.tickSize,
           m.lastPrice,
           m.minFee,
-          []
+          [],
+          undefined
         )
       })
       .concat(
@@ -96,74 +100,83 @@ export default class Markets {
   ): Market[] {
     if (addBackToBackMarkets) {
       const singleMarketsById = new Map(markets.map((m) => [m.id, m]))
-      const allowedBases = markets.map((market) => market.baseSymbol)
-      const allowedQuotes = markets.map((market) => market.quoteSymbol)
       const backToBackMarketsById = new Map<string, Market>()
 
-      allowedBases.forEach((baseSymbol) => {
-        allowedQuotes
-          .filter((quoteSymbol) => quoteSymbol !== baseSymbol)
-          .forEach((quoteSymbol) => {
-            const marketId = `${baseSymbol}/${quoteSymbol}`
-            const reverseMarketId = `${quoteSymbol}/${baseSymbol}`
-
+      singleMarketsById.forEach((market, id) => {
+        singleMarketsById.forEach((otherMarket, otherId) => {
+          let potentialBackToBackSymbols: string[] = []
+          let backToBackSides: OrderSide[] = []
+          let tickSize: Decimal | undefined
+          let lastPrice: Decimal | undefined
+          if (otherId !== id) {
+            if (otherMarket.baseSymbol === market.baseSymbol) {
+              potentialBackToBackSymbols = [
+                market.quoteSymbol,
+                otherMarket.quoteSymbol
+              ]
+              tickSize = otherMarket.tickSize
+              lastPrice = new Decimal(1)
+                .div(market.lastPrice)
+                .mul(otherMarket.lastPrice)
+              backToBackSides = ['Buy', 'Sell']
+            } else if (otherMarket.baseSymbol === market.quoteSymbol) {
+              potentialBackToBackSymbols = [
+                market.baseSymbol,
+                otherMarket.quoteSymbol
+              ]
+              tickSize = otherMarket.tickSize
+              lastPrice = market.lastPrice.mul(otherMarket.lastPrice)
+              backToBackSides = ['Sell', 'Sell']
+            } else if (otherMarket.quoteSymbol === market.baseSymbol) {
+              potentialBackToBackSymbols = [
+                market.quoteSymbol,
+                otherMarket.baseSymbol
+              ]
+              tickSize = new Decimal(1).div(otherMarket.tickSize)
+              lastPrice = new Decimal(1)
+                .div(market.lastPrice)
+                .mul(new Decimal(1).div(otherMarket.lastPrice))
+              backToBackSides = ['Buy', 'Buy']
+            } else if (otherMarket.quoteSymbol === market.quoteSymbol) {
+              potentialBackToBackSymbols = [
+                market.baseSymbol,
+                otherMarket.baseSymbol
+              ]
+              tickSize = new Decimal(1).div(otherMarket.tickSize)
+              lastPrice = market.lastPrice.mul(
+                new Decimal(1).div(otherMarket.lastPrice)
+              )
+              backToBackSides = ['Sell', 'Buy']
+            }
+          }
+          if (
+            potentialBackToBackSymbols.length > 0 &&
+            tickSize !== undefined &&
+            lastPrice !== undefined
+          ) {
+            const marketId = `${potentialBackToBackSymbols[0]}/${potentialBackToBackSymbols[1]}`
+            const reversedMarketId = `${potentialBackToBackSymbols[1]}/${potentialBackToBackSymbols[0]}`
             if (
               !backToBackMarketsById.has(marketId) &&
-              !backToBackMarketsById.has(reverseMarketId) &&
-              !singleMarketsById.has(marketId) &&
-              !singleMarketsById.has(reverseMarketId)
+              !backToBackMarketsById.has(reversedMarketId)
             ) {
-              // find all the markets with this base and group by the quote
-              const marketsWithBase = markets
-                .filter((market) => market.baseSymbol === baseSymbol)
-                .reduce((acc, market) => {
-                  if (!acc.has(market.quoteSymbol)) {
-                    acc.set(market.quoteSymbol, [])
-                  }
-                  acc.get(market.quoteSymbol)!.push(market)
-                  return acc
-                }, new Map<string, ApiMarket[]>())
-
-              // all the markets with this quote and group by the base
-              const marketsWithQuote = markets
-                .filter((market) => market.quoteSymbol === quoteSymbol)
-                .reduce((acc, market) => {
-                  if (!acc.has(market.baseSymbol)) {
-                    acc.set(market.baseSymbol, [])
-                  }
-                  acc.get(market.baseSymbol)!.push(market)
-                  return acc
-                }, new Map<string, ApiMarket[]>())
-
-              // if there are common symbols in the grouping keys then we can create a back to back market - sort and take first symbol for now
-              const commonSymbols = Array.from(marketsWithBase.keys())
-                .filter((symbol) => marketsWithQuote.has(symbol))
-                .sort((a, b) => b.localeCompare(a))
-              if (commonSymbols.length > 0) {
-                const bridgeSymbol = commonSymbols[0]
-                if (bridgeSymbol) {
-                  const firstMarket = singleMarketsById.get(
-                    `${baseSymbol}/${bridgeSymbol}`
-                  )!
-                  const secondMarket = singleMarketsById.get(
-                    `${bridgeSymbol}/${quoteSymbol}`
-                  )!
-                  backToBackMarketsById.set(
-                    marketId,
-                    new Market(
-                      marketId,
-                      symbols.getByName(firstMarket.baseSymbol),
-                      symbols.getByName(secondMarket.quoteSymbol),
-                      secondMarket.tickSize,
-                      firstMarket.lastPrice.mul(secondMarket.lastPrice),
-                      secondMarket.minFee,
-                      [firstMarket.id, secondMarket.id]
-                    )
-                  )
-                }
-              }
+              // new back-to-back
+              backToBackMarketsById.set(
+                marketId,
+                new Market(
+                  marketId,
+                  symbols.getByName(potentialBackToBackSymbols[0]),
+                  symbols.getByName(potentialBackToBackSymbols[1]),
+                  tickSize,
+                  lastPrice,
+                  otherMarket.minFee,
+                  [market.id, otherMarket.id],
+                  backToBackSides
+                )
+              )
             }
-          })
+          }
+        })
       })
       return Array.from(backToBackMarketsById.values())
     } else {

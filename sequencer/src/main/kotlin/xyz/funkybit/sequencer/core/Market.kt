@@ -74,7 +74,7 @@ data class Market(
 
     private fun sumBaseQuoteAmountPair(a: Pair<BaseAmount, QuoteAmount>, b: Pair<BaseAmount, QuoteAmount>) = Pair(a.first + b.first, a.second + b.second)
 
-    fun applyOrderBatch(orderBatch: OrderBatch, feeRates: FeeRates): AddOrdersResult {
+    fun applyOrderBatch(orderBatch: OrderBatch, feeRates: FeeRates, sweepDust: Boolean = false): AddOrdersResult {
         val ordersChanged = mutableListOf<OrderChanged>()
         val ordersChangeRejected = mutableListOf<OrderChangeRejected>()
         val createdTrades = mutableListOf<TradeCreated>()
@@ -370,14 +370,12 @@ data class Market(
                 if (stopAtLevelIx != null) {
                     // stopAtLevelIx is provided to handle crossing-market execution of limit orders
                     if (
-                        isBuyOrder && currentLevel.ix > stopAtLevelIx ||
-                        isSellOrder && currentLevel.ix < stopAtLevelIx
+                        isBuyOrder && levelIx > stopAtLevelIx ||
+                        isSellOrder && levelIx < stopAtLevelIx
                     ) {
                         break
                     }
                 }
-
-                logger.debug { "handle crossing order $levelIx" }
 
                 val orderBookLevelFill = currentLevel.fillOrder(remainingAmount)
                 remainingAmount = orderBookLevelFill.remainingAmount
@@ -692,22 +690,6 @@ data class Market(
         return Pair(clearingPrice, availableQuantity)
     }
 
-    fun quantityAndNotionalForMarketBuy(amount: BaseAmount): Pair<BaseAmount, QuoteAmount> {
-        var remainingAmount = amount
-        var notional = QuoteAmount.ZERO
-
-        var currentLevel = if (bestOfferIx != -1) levels.get(bestOfferIx) else null
-        while (currentLevel != null) {
-            val quantityAtLevel = currentLevel.totalQuantity.min(remainingAmount)
-            notional += notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals)
-            remainingAmount -= quantityAtLevel
-            if (remainingAmount == BaseAmount.ZERO) break
-
-            currentLevel = currentLevel.next()
-        }
-        return Pair(amount - remainingAmount, notional)
-    }
-
     fun quantityForMarketBuy(notional: QuoteAmount): BaseAmount {
         var remainingNotional = notional
         var baseAmount = BaseAmount.ZERO
@@ -717,7 +699,8 @@ data class Market(
             val quantityAtLevel = currentLevel.totalQuantity
 
             if (quantityAtLevel > BaseAmount.ZERO) {
-                val notionalAtLevel = remainingNotional.min(notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals))
+                val notionalCalculated = notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals)
+                val notionalAtLevel = remainingNotional.min(notionalCalculated)
 
                 if (notionalAtLevel == remainingNotional) {
                     return baseAmount + quantityFromNotionalAndPrice(
@@ -739,7 +722,7 @@ data class Market(
     }
 
     // calculate how much liquidity is available for a market sell order (until stopAtLevelIx)
-    fun clearingQuantityForMarketSell(amount: BaseAmount, stopAtLevelIx: Int? = null): BaseAmount {
+    private fun clearingQuantityForMarketSell(amount: BaseAmount, stopAtLevelIx: Int? = null): BaseAmount {
         var remainingAmount = amount
 
         var currentLevel = if (bestBidIx != -1) levels.get(bestBidIx) else null
@@ -753,49 +736,6 @@ data class Market(
         }
 
         return amount - remainingAmount
-    }
-
-    fun quantityAndNotionalForMarketSell(amount: BaseAmount, feeRate: FeeRate): Pair<BaseAmount, QuoteAmount> {
-        var remainingAmount = amount
-        var notionalReceived = QuoteAmount.ZERO
-        var currentLevel = if (bestBidIx != -1) levels.get(bestBidIx) else null
-        while (currentLevel != null) {
-            val quantityAtLevel = currentLevel.totalQuantity.min(remainingAmount)
-            val notionalAmount = notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals)
-            notionalReceived += notionalAmount - notionalFee(notionalAmount, feeRate)
-            remainingAmount -= quantityAtLevel
-            if (remainingAmount == BaseAmount.ZERO) {
-                break
-            }
-            currentLevel = currentLevel.prev()
-        }
-        return Pair(amount - remainingAmount, notionalReceived)
-    }
-
-    fun quantityForMarketSell(notional: QuoteAmount): BaseAmount {
-        var remainingNotional = notional
-        var baseAmount = BaseAmount.ZERO
-
-        var currentLevel = if (bestBidIx != -1) levels.get(bestBidIx) else null
-        while (currentLevel != null) {
-            val quantityAtLevel = currentLevel.totalQuantity
-            if (quantityAtLevel > BaseAmount.ZERO) {
-                val notionalAtLevel =
-                    remainingNotional.min(notional(quantityAtLevel, currentLevel.price, baseDecimals, quoteDecimals))
-                if (notionalAtLevel == remainingNotional) {
-                    return baseAmount + quantityFromNotionalAndPrice(
-                        remainingNotional,
-                        currentLevel.price,
-                        baseDecimals,
-                        quoteDecimals,
-                    )
-                }
-                baseAmount += quantityAtLevel
-                remainingNotional -= notionalAtLevel
-            }
-            currentLevel = currentLevel.prev()
-        }
-        return baseAmount
     }
 
     fun calculateAmountForPercentageSell(account: AccountGuid, assetBalance: BaseAmount, percent: Int): BaseAmount {

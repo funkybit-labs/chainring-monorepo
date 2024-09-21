@@ -19,6 +19,7 @@ import {
   calculateNotionalMinusFee
 } from 'utils'
 import {
+  backToBackSetup,
   bigintToScaledDecimal,
   getMarketPrice,
   scaledDecimalToBigint
@@ -268,21 +269,21 @@ export function SwapInternals({
           }
         } else if (message.type === 'Limits') {
           if (market.isBackToBack()) {
-            const firstMarketLimits = limitsForMarket(
-              message,
-              market.marketIds[0]
-            )
-            if (firstMarketLimits) {
-              setBaseLimit(firstMarketLimits.base)
-            }
-
-            const lastMarketLimits = limitsForMarket(
-              message,
-              market.marketIds[market.marketIds.length - 1]
-            )
-            if (lastMarketLimits) {
-              setQuoteLimit(lastMarketLimits.quote)
-            }
+            market.marketIds.forEach((marketId) => {
+              const m = markets.getById(marketId)
+              const limits = limitsForMarket(message, marketId)
+              if (limits) {
+                if (baseSymbol === m.baseSymbol) {
+                  setBaseLimit(limits.base)
+                } else if (baseSymbol === m.quoteSymbol) {
+                  setBaseLimit(limits.quote)
+                } else if (quoteSymbol === m.baseSymbol) {
+                  setQuoteLimit(limits.base)
+                } else if (quoteSymbol === m.quoteSymbol) {
+                  setQuoteLimit(limits.quote)
+                }
+              }
+            })
           } else {
             const marketLimits = limitsForMarket(message, market.id)
             if (marketLimits) {
@@ -296,7 +297,7 @@ export function SwapInternals({
           setLastOrder(message.order)
         }
       },
-      [market]
+      [market, markets, quoteSymbol, baseSymbol]
     ),
     onUnsubscribe: useCallback(() => {
       setBalances([])
@@ -696,16 +697,32 @@ export function SwapInternals({
       setLastOrderId(undefined)
       try {
         const nonce = generateOrderNonce()
-
+        let effectiveBaseSymbol = baseSymbol
+        let effectiveQuoteSymbol = quoteSymbol
+        let effectiveAmount = baseAmount
+        let effectiveSide = side
+        if (market.isBackToBack()) {
+          const { inputSymbol, outputSymbol } = backToBackSetup(
+            side,
+            market,
+            markets
+          )
+          effectiveQuoteSymbol = outputSymbol
+          effectiveBaseSymbol = inputSymbol
+          if (baseSymbol == outputSymbol) {
+            effectiveAmount = quoteAmount
+          }
+          effectiveSide = 'Sell'
+        }
         const signature = await signOrderCreation(
           wallets.primary!,
           config.state.chainId,
           nonce,
           contracts!.exchange(config.state.chainId)!.address,
-          baseSymbol,
-          quoteSymbol,
-          side,
-          baseAmount,
+          effectiveBaseSymbol,
+          effectiveQuoteSymbol,
+          effectiveSide,
+          effectiveSide == 'Buy' ? effectiveAmount : -effectiveAmount,
           isLimitOrder ? limitPrice : null,
           isLimitOrder ? null : percentage
         )
@@ -730,10 +747,15 @@ export function SwapInternals({
             verifyingChainId: config.state.chainId
           })
         } else if (market.isBackToBack()) {
+          const { firstMarket, secondMarket } = backToBackSetup(
+            side,
+            market,
+            markets
+          )
           response = await apiClient.createOrder({
             nonce: nonce,
-            marketId: market.marketIds[0],
-            secondMarketId: market.marketIds[1],
+            marketId: firstMarket.id,
+            secondMarketId: secondMarket.id,
             type: 'backToBackMarket',
             side: side,
             amount: percentage
@@ -743,7 +765,7 @@ export function SwapInternals({
                 }
               : {
                   type: 'fixed',
-                  value: baseAmount
+                  value: effectiveAmount
                 },
             signature: signature,
             verifyingChainId: config.state.chainId

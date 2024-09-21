@@ -55,20 +55,22 @@ val signedTokenSecurity = object : Security {
         when (val authResult = authenticate(request)) {
             is AuthResult.Success -> {
                 val wallet = transaction {
-                    WalletEntity.getOrCreateWithUser(authResult.address).also {
-                        runBlocking {
-                            sequencerClient.authorizeWallet(
-                                authorizedWallet = it,
-                                ownershipProof = SequencerClient.SignedMessage(
-                                    message = EIP712Helper.structuredDataAsJson(authResult.message),
-                                    signature = authResult.signature,
-                                ),
-                                // first wallet of the user
-                                authorizationProof = null,
-                            )
+                    WalletEntity.getOrCreateWithUser(authResult.address).also { (wallet, created) ->
+                        if (created) {
+                            runBlocking {
+                                sequencerClient.authorizeWallet(
+                                    authorizedWallet = wallet,
+                                    ownershipProof = SequencerClient.SignedMessage(
+                                        message = EIP712Helper.structuredDataAsJson(authResult.message),
+                                        signature = authResult.signature,
+                                    ),
+                                    // first wallet of the user
+                                    authorizationProof = null,
+                                )
+                            }
                         }
                     }
-                }
+                }.first
 
                 val requestWithPrincipal = request.with(
                     principalRequestContextKey of wallet,

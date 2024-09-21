@@ -16,6 +16,7 @@ import xyz.funkybit.apps.api.model.websocket.IncomingWSMessage
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.websocket.Broadcaster
 import xyz.funkybit.core.websocket.ConnectedClient
+import xyz.funkybit.core.websocket.InvalidSubscriptionException
 
 val wsUnauthorized = WsStatus(code = 3000, description = "Unauthorized")
 
@@ -33,7 +34,7 @@ class WebsocketApi(private val broadcaster: Broadcaster) {
                     null -> ConnectedClient(websocket, null, Instant.DISTANT_FUTURE)
                     else -> when (val result = validateAuthToken(auth)) {
                         is AuthResult.Success -> {
-                            val wallet = transaction { WalletEntity.getOrCreateWithUser(result.address) }
+                            val wallet = transaction { WalletEntity.getOrCreateWithUser(result.address).first }
                             ConnectedClient(websocket, wallet, result.expiresAt)
                         }
                         else -> {
@@ -56,7 +57,12 @@ class WebsocketApi(private val broadcaster: Broadcaster) {
                 connectedClient.onMessage { wsMessage ->
                     when (val message = messageLens(wsMessage)) {
                         is IncomingWSMessage.Subscribe -> {
-                            broadcaster.subscribe(message.topic, connectedClient)
+                            try {
+                                broadcaster.subscribe(message.topic, connectedClient)
+                            } catch (e: InvalidSubscriptionException) {
+                                // probably we should extend the protocol to tell them this failed
+                                logger.warn { "Got a subscription for an invalid topic: ${message.topic}" }
+                            }
                         }
 
                         is IncomingWSMessage.Unsubscribe -> {

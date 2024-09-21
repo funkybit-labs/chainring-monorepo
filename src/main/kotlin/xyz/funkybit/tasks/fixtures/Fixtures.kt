@@ -150,7 +150,7 @@ fun getFixtures(evmClients: List<BlockchainClient>) = Fixtures(
                 baseSymbol = SymbolId(client.chainId, "USDC"),
                 quoteSymbol = SymbolId(client.chainId, "DAI"),
                 tickSize = "0.01".toBigDecimal(),
-                lastPrice = "2.005".toBigDecimal(),
+                lastPrice = "1.005".toBigDecimal(),
                 minFee = BigDecimal("0.02")
             ),
             Fixtures.Market(
@@ -178,14 +178,14 @@ fun getFixtures(evmClients: List<BlockchainClient>) = Fixtures(
         ),
     ) else emptyList()) + if (BitcoinClient.config.enabled) {
         listOf(
-            Fixtures.Market(
-                baseSymbol = SymbolId(evmClients[0].chainId, "BTC"),
-                quoteSymbol = SymbolId(BitcoinClient.chainId, "BTC"),
-                tickSize = "0.001".toBigDecimal(),
-                lastPrice = "1.0005".toBigDecimal(),
-                BigDecimal("0.00000001")
-            ),
-        )
+                Fixtures.Market(
+                    baseSymbol = SymbolId(evmClients[0].chainId, "BTC"),
+                    quoteSymbol = SymbolId(BitcoinClient.chainId, "BTC"),
+                    tickSize = "0.001".toBigDecimal(),
+                    lastPrice = "1.0005".toBigDecimal(),
+                    BigDecimal("0.00000001")
+                ),
+            )
     } else listOf(),
     wallets = listOf(
         Fixtures.Wallet(

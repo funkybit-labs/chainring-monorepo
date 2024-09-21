@@ -50,12 +50,12 @@ object WalletTable : GUIDTable<WalletId>("wallet", ::WalletId) {
 
 class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
     companion object : EntityClass<WalletId, WalletEntity>(WalletTable) {
-        fun getOrCreateWithUser(address: Address): WalletEntity {
+        fun getOrCreateWithUser(address: Address): Pair<WalletEntity, Boolean> {
             val canonicalAddress = address.canonicalize()
-            return findByAddress(canonicalAddress)
+            return findByAddress(canonicalAddress)?.let { it to false }
                 ?: run {
                     val user = UserEntity.create(canonicalAddress)
-                    createForUser(user, address)
+                    createForUser(user, address) to true
                 }
         }
 

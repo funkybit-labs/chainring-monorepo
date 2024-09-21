@@ -10,6 +10,8 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import kotlin.time.Duration
 
+val quietMode = System.getenv("QUIET_MODE")?.toBoolean() ?: false
+
 fun humanReadable(duration: Duration): String {
     return humanReadableNanoseconds((duration.inWholeNanoseconds))
 }

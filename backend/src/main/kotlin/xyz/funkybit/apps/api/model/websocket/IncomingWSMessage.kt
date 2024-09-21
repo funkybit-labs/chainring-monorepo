@@ -4,6 +4,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
+import xyz.funkybit.core.model.db.MarketEntity
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.OHLCDuration
 
@@ -28,17 +29,25 @@ sealed class IncomingWSMessage {
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("type")
 sealed class SubscriptionTopic {
+    open fun validate() = true
+
     @Serializable
     @SerialName("OrderBook")
-    data class OrderBook(val marketId: MarketId) : SubscriptionTopic()
+    data class OrderBook(val marketId: MarketId) : SubscriptionTopic() {
+        override fun validate() = MarketEntity.findById(marketId) != null
+    }
 
     @Serializable
     @SerialName("IncrementalOrderBook")
-    data class IncrementalOrderBook(val marketId: MarketId) : SubscriptionTopic()
+    data class IncrementalOrderBook(val marketId: MarketId) : SubscriptionTopic() {
+        override fun validate() = MarketEntity.findById(marketId) != null
+    }
 
     @Serializable
     @SerialName("Prices")
-    data class Prices(val marketId: MarketId, val duration: OHLCDuration) : SubscriptionTopic()
+    data class Prices(val marketId: MarketId, val duration: OHLCDuration) : SubscriptionTopic() {
+        override fun validate() = MarketEntity.findById(marketId) != null
+    }
 
     @Serializable
     @SerialName("MyTrades")
@@ -46,7 +55,9 @@ sealed class SubscriptionTopic {
 
     @Serializable
     @SerialName("MarketTrades")
-    data class MarketTrades(val marketId: MarketId) : SubscriptionTopic()
+    data class MarketTrades(val marketId: MarketId) : SubscriptionTopic() {
+        override fun validate() = MarketEntity.findById(marketId) != null
+    }
 
     @Serializable
     @SerialName("MyOrders")

@@ -36,10 +36,10 @@ class TestnetChallengePNLUpdateTest : TestWithDb() {
             val eth = SymbolEntity.create("ETH", chainId, null, 18.toUByte(), "ETH", false, BigInteger.ZERO)
             MarketEntity.create(btc, usdc, BigDecimal.valueOf(10L), BigDecimal.valueOf(60000), "")
             MarketEntity.create(eth, usdc, BigDecimal.valueOf(10L), BigDecimal.valueOf(2500), "")
-            val wallet1a = WalletEntity.getOrCreateWithUser(EvmAddress.generate())
+            val wallet1a = WalletEntity.getOrCreateWithUser(EvmAddress.generate()).first
             val user1 = wallet1a.user
             val wallet1b = WalletEntity.createForUser(user1, BitcoinAddress.canonicalize("btcaddress1"))
-            val wallet2a = WalletEntity.getOrCreateWithUser(EvmAddress.generate())
+            val wallet2a = WalletEntity.getOrCreateWithUser(EvmAddress.generate()).first
             val user2 = wallet2a.user
             val wallet2b = WalletEntity.createForUser(user2, BitcoinAddress.canonicalize("btcaddress2"))
 

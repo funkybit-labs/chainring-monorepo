@@ -108,10 +108,11 @@ export function rollupTradesGroup(
     }
   })
 
+  const allMarkets = new Set(tradeRows.map((r) => r.marketId))
   const firstTrade = tradeRows[0]
   const lastTrade = tradeRows[trades.length - 1]
 
-  if (firstTrade.marketId == lastTrade.marketId) {
+  if (allMarkets.size === 1) {
     const market = markets.getById(firstTrade.marketId)
     const aggregate = aggregateRows(tradeRows)
 
@@ -129,9 +130,11 @@ export function rollupTradesGroup(
       trades: tradeRows,
       expanded: false
     }
-  } else {
+  } else if (allMarkets.size === 2) {
     const firstTradeMarket = markets.getById(firstTrade.marketId)
-    const lastTradeMarket = markets.getById(lastTrade.marketId)
+    const lastTradeMarket = markets.getById(
+      Array.from(allMarkets).find((m) => m !== firstTrade.marketId)!
+    )
 
     const firstMarketAggregate = aggregateRows(
       tradeRows.filter((c) => c.marketId == firstTradeMarket.id)
@@ -141,22 +144,42 @@ export function rollupTradesGroup(
       tradeRows.filter((c) => c.marketId == lastTradeMarket.id)
     )
 
+    const bridgeSymbol =
+      firstTradeMarket.baseSymbol === lastTradeMarket.baseSymbol
+        ? firstTradeMarket.baseSymbol
+        : firstTradeMarket.quoteSymbol === lastTradeMarket.quoteSymbol
+          ? firstTradeMarket.quoteSymbol
+          : firstTradeMarket.baseSymbol === lastTradeMarket.quoteSymbol
+            ? firstTradeMarket.baseSymbol
+            : firstTradeMarket.quoteSymbol
+    const sellSymbol =
+      firstTradeMarket.baseSymbol === bridgeSymbol
+        ? firstTradeMarket.quoteSymbol
+        : firstTradeMarket.baseSymbol
+    const buySymbol =
+      lastTradeMarket.baseSymbol === bridgeSymbol
+        ? lastTradeMarket.quoteSymbol
+        : lastTradeMarket.baseSymbol
+
     return {
       id: tradeGroupId(trades[0]),
       timestamp: trades[0].timestamp,
-      sellSymbol: firstTrade.sellSymbol,
-      buySymbol: lastTrade.buySymbol,
+      sellSymbol: sellSymbol,
+      buySymbol: buySymbol,
       aggregatedAmount: firstMarketAggregate.amount,
       aggregatedPrice: firstMarketAggregate.price.mul(
         lastMarketAggregate.price
       ),
-      priceDecimalPlaces: firstTrade.priceDecimalPlaces,
+      priceDecimalPlaces:
+        firstTrade.priceDecimalPlaces + lastTrade.priceDecimalPlaces,
       aggregatedFeeAmount: tradeRows.reduce((acc, c) => acc + c.feeAmount, 0n),
       feeSymbol: tradeRows.find((tr) => tr.feeAmount > 0)!.feeSymbol,
       settlementStatus: trades[0].settlementStatus,
       trades: tradeRows,
       expanded: false
     }
+  } else {
+    throw Error('Trade group has > 2 markets')
   }
 }
 

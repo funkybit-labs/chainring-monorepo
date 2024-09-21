@@ -23,7 +23,6 @@ import xyz.funkybit.integrationtests.utils.assertError
 import java.math.BigInteger
 import java.time.Duration
 import kotlin.test.Test
-import kotlin.test.assertEquals
 
 @ExtendWith(AppUnderTestRunner::class)
 class AdminRouteTest {
@@ -36,7 +35,7 @@ class AdminRouteTest {
         apiClient.tryListAdmins().assertError(ApiError(ReasonCode.AuthenticationError, "Access denied"))
         assertEquals(Role.User, apiClient.getAccountConfiguration().role)
         transaction {
-            WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = true
+            WalletEntity.getOrCreateWithUser(apiClient.address).first.isAdmin = true
         }
         assertEquals(listOf(apiClient.address), apiClient.listAdmins())
         assertEquals(Role.Admin, apiClient.getAccountConfiguration().role)
@@ -53,7 +52,7 @@ class AdminRouteTest {
         val apiClient = TestApiClient()
 
         transaction {
-            WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = true
+            WalletEntity.getOrCreateWithUser(apiClient.address).first.isAdmin = true
         }
 
         val feeRates = apiClient.getConfiguration().feeRates.let {
@@ -95,7 +94,7 @@ class AdminRouteTest {
         )
         apiClient.tryCreateSymbol(adminRequest).assertError(ApiError(ReasonCode.AuthenticationError, "Access denied"))
         transaction {
-            WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = true
+            WalletEntity.getOrCreateWithUser(apiClient.address).first.isAdmin = true
         }
         try {
             apiClient.createSymbol(adminRequest)
@@ -145,7 +144,7 @@ class AdminRouteTest {
         } finally {
             transaction {
                 SymbolEntity.findById(SymbolId(chainId, "NAME"))?.delete()
-                WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = false
+                WalletEntity.getOrCreateWithUser(apiClient.address).first.isAdmin = false
             }
         }
     }
@@ -154,7 +153,7 @@ class AdminRouteTest {
     fun `test market management`() {
         val apiClient = TestApiClient()
         transaction {
-            WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = true
+            WalletEntity.getOrCreateWithUser(apiClient.address).first.isAdmin = true
         }
 
         val config = apiClient.getConfiguration()
@@ -235,7 +234,7 @@ class AdminRouteTest {
                 MarketEntity.findById(marketId)?.delete()
                 SymbolEntity.findById(SymbolId(chainId1, "NAME"))?.delete()
                 SymbolEntity.findById(SymbolId(chainId2, "NAME"))?.delete()
-                WalletEntity.getOrCreateWithUser(apiClient.address).isAdmin = false
+                WalletEntity.getOrCreateWithUser(apiClient.address).first.isAdmin = false
             }
         }
     }

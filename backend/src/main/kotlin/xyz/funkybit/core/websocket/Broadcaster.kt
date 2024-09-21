@@ -66,6 +66,8 @@ data class ConnectedClient(
 typealias Subscriptions = CopyOnWriteArrayList<ConnectedClient>
 typealias TopicSubscriptions = ConcurrentHashMap<SubscriptionTopic, Subscriptions>
 
+class InvalidSubscriptionException : Exception("Invalid subscription")
+
 class Broadcaster(val db: Database) {
     private val subscriptions = TopicSubscriptions()
     private val subscriptionsByUser = ConcurrentHashMap<UserId, TopicSubscriptions>()
@@ -95,6 +97,10 @@ class Broadcaster(val db: Database) {
             subscriptionsByUser.getOrPut(wallet.userGuid.value) {
                 TopicSubscriptions()
             }.getOrPut(topic) {
+                // first check that the topic is valid
+                if (!transaction { topic.validate() }) {
+                    throw InvalidSubscriptionException()
+                }
                 Subscriptions()
             }.addIfAbsent(client)
         }

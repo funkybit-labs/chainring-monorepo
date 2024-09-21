@@ -299,7 +299,7 @@ class BlockchainTransactionHandler(
                                 }
                                 if (failedTrades.isNotEmpty()) {
                                     failedTrades.forEach {
-                                        logger.warn { "Failed trade address=${it._address}, needed=${it.requestedAmount} balance=${it.balance}" }
+                                        logger.warn { "Failed trade tx=${inProgressBatch.preparationTx.guid.value} chain=$chainId token=${it.token} address=${it._address}, needed=${it.requestedAmount} balance=${it.balance}" }
                                     }
                                     TradeEntity.markAsFailedSettling(failedTrades.map { it.tradeHashes.map { it.toHex() } }.flatten().toSet(), "Insufficient Balance")
                                 }

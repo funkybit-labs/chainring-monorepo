@@ -11,6 +11,7 @@ import xyz.funkybit.integrationtests.utils.ApiClient
 import xyz.funkybit.integrationtests.utils.assertPricesMessageReceived
 import xyz.funkybit.integrationtests.utils.blocking
 import xyz.funkybit.integrationtests.utils.subscribeToPrices
+import xyz.funkybit.tasks.blockchainClients
 
 @ExtendWith(AppUnderTestRunner::class)
 class PricesTest {
@@ -26,10 +27,11 @@ class PricesTest {
 
     private fun `test authenticated prices over websocket`(auth: String?) {
         val client = WebsocketClient.blocking(auth)
-        client.subscribeToPrices(MarketId("BTC/ETH"), duration = OHLCDuration.P15M)
+        val chainId = blockchainClients.first().chainId
+        client.subscribeToPrices(MarketId("BTC:$chainId/ETH:$chainId"), duration = OHLCDuration.P15M)
 
-        client.assertPricesMessageReceived(MarketId("BTC/ETH"), duration = OHLCDuration.P15M) { msg ->
-            assertEquals("BTC/ETH", msg.market.value)
+        client.assertPricesMessageReceived(MarketId("BTC:$chainId/ETH:$chainId"), duration = OHLCDuration.P15M) { msg ->
+            assertEquals("BTC:$chainId/ETH:$chainId", msg.market.value)
         }
 
         client.close()

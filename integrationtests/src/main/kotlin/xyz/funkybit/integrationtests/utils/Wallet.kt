@@ -262,16 +262,29 @@ class Wallet(
     }.id
 
     override fun signOrder(request: CreateOrderApiRequest.BackToBackMarket): CreateOrderApiRequest.BackToBackMarket {
-        val (baseSymbol, _) = marketSymbols(request.marketId)
-        val (_, quoteSymbol) = marketSymbols(request.secondMarketId)
+        val market1Symbols = marketSymbols(request.marketId)
+        val market2Symbols = marketSymbols(request.secondMarketId)
+        val(inputSymbol, bridgeSymbol, outputSymbol) = if (listOf(market2Symbols.first.name, market2Symbols.second.name).contains(market1Symbols.first.name)) {
+            if (market2Symbols.first.name == market1Symbols.first.name) {
+                Triple(market1Symbols.second, market1Symbols.first, market2Symbols.second)
+            } else {
+                Triple(market1Symbols.second, market1Symbols.first, market2Symbols.first)
+            }
+        } else {
+            if (market2Symbols.first.name == market1Symbols.second.name) {
+                Triple(market1Symbols.first, market1Symbols.second, market2Symbols.second)
+            } else {
+                Triple(market1Symbols.first, market1Symbols.second, market2Symbols.first)
+            }
+        }
 
         val tx = EIP712Transaction.Order(
             evmAddress,
-            baseChainId = chainId(baseSymbol),
-            baseToken = baseSymbol.contractAddress ?: EvmAddress.zero,
-            quoteChainId = chainId(quoteSymbol),
-            quoteToken = quoteSymbol.contractAddress ?: EvmAddress.zero,
-            amount = if (request.side == OrderSide.Buy) request.amount else request.amount.negate(),
+            baseChainId = chainId(inputSymbol),
+            baseToken = inputSymbol.contractAddress ?: EvmAddress.zero,
+            quoteChainId = chainId(outputSymbol),
+            quoteToken = outputSymbol.contractAddress ?: EvmAddress.zero,
+            amount = request.amount.negate(),
             price = BigInteger.ZERO,
             nonce = BigInteger(1, request.nonce.toHexBytes()),
             signature = EvmSignature.emptySignature(),

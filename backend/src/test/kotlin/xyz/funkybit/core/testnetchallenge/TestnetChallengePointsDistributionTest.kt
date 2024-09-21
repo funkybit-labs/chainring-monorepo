@@ -351,7 +351,7 @@ class TestnetChallengePointsDistributionTest : TestWithDb() {
     }
 
     private fun setupTestChallengeUser(testcase: TestnetChallengeTestCase, enrollmentStatus: TestnetChallengeStatus = TestnetChallengeStatus.Enrolled) = transaction {
-        val wallet = WalletEntity.getOrCreateWithUser(EvmAddress.generate())
+        val wallet = WalletEntity.getOrCreateWithUser(EvmAddress.generate()).first
         val user = wallet.user
         val initialDeposit = BigDecimal(10000)
 
