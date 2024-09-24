@@ -62,8 +62,12 @@ fun waitForFinalizedWithdrawal(id: WithdrawalId, expectedStatus: WithdrawalStatu
 fun getFeeAccountBalanceOnArch(symbol: SymbolInfo): AssetAmount {
     return transaction {
         val symbolEntity = SymbolEntity.forName(symbol.name)
-        val tokenAccountPubKey = ArchAccountEntity.findTokenAccountForSymbol(symbolEntity)!!.rpcPubkey()
-        val tokenState = ArchUtils.getAccountState<ArchAccountState.Token>(tokenAccountPubKey)
-        AssetAmount(symbol, tokenState.balances[0].balance.toLong().toBigInteger())
+        AssetAmount(
+            symbol,
+            ArchAccountEntity.findTokenAccountsForSymbol(symbolEntity).sumOf {
+                val tokenState = ArchUtils.getAccountState<ArchAccountState.Token>(it.rpcPubkey())
+                tokenState.balances[0].balance.toLong().toBigInteger()
+            },
+        )
     }
 }

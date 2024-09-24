@@ -177,8 +177,7 @@ sealed class ArchNetworkRpc {
     }
 
     @Serializable(with = PubkeySerializer::class)
-    @JvmInline
-    value class Pubkey(val bytes: UByteArray) {
+    data class Pubkey(val bytes: UByteArray) {
         init {
             require(bytes.size == 32) {
                 "Pubkey must be 32 bytes"
@@ -206,6 +205,20 @@ sealed class ArchNetworkRpc {
 
         fun toContractAddress(): Address {
             return EvmAddress(Keys.toChecksumAddress(bytes.toHex()))
+        }
+
+        fun toHexString() = serialize().toHex(false)
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as Pubkey
+
+            return bytes.contentEquals(other.bytes)
+        }
+
+        override fun hashCode(): Int {
+            return bytes.hashCode()
         }
     }
 

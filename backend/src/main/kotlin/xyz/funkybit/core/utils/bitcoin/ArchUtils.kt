@@ -16,6 +16,8 @@ import org.jetbrains.exposed.dao.id.EntityID
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.ConfirmedBitcoinDeposit
+import xyz.funkybit.core.model.PubkeyAndIndex
 import xyz.funkybit.core.model.Settlement
 import xyz.funkybit.core.model.WalletAndSymbol
 import xyz.funkybit.core.model.bitcoin.ProgramInstruction
@@ -26,8 +28,8 @@ import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.ArchAccountType
 import xyz.funkybit.core.model.db.BitcoinUtxoEntity
 import xyz.funkybit.core.model.db.BitcoinUtxoId
-import xyz.funkybit.core.model.db.ConfirmedBitcoinDeposit
 import xyz.funkybit.core.model.db.CreateArchAccountBalanceIndexAssignment
+import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.SequencedArchWithdrawal
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TxHash
@@ -47,6 +49,8 @@ object ArchUtils {
     val logger = KotlinLogging.logger {}
 
     private val submitterPubkey = BitcoinClient.bitcoinConfig.submitterPubkey
+
+    var tokenAccountSizeThreshold = 10_000_000
 
     fun fundArchAccountCreation(
         ecKey: ECKey,
@@ -149,10 +153,10 @@ object ArchUtils {
                 isWritable = false,
             ),
         )
-        val tokenDepositsList = deposits.groupBy { it.archAccountEntity.rpcPubkey() }.map { (pubKey, tokenDeposits) ->
+        val tokenDepositsList = deposits.groupBy { it.pubkeyAndIndex.pubkey }.map { (pubKey, tokenDeposits) ->
             ProgramInstruction.TokenDeposits(
                 accountIndex = accountMetas.size.toUByte(),
-                deposits = tokenDeposits.map { ProgramInstruction.Adjustment(it.balanceIndex!!.toUInt(), it.depositEntity.amount.toLong().toULong()) },
+                deposits = tokenDeposits.map { ProgramInstruction.Adjustment(it.pubkeyAndIndex.addressIndex.toUInt(), it.depositEntity.amount.toLong().toULong()) },
             ).also {
                 accountMetas.add(
                     ArchNetworkRpc.AccountMeta(
@@ -222,11 +226,8 @@ object ArchUtils {
 
     private fun buildSettlementBatch(
         batchSettlement: Settlement.Batch,
-        indexMap: Map<WalletAndSymbol, Int>,
+        indexMap: Map<WalletAndSymbol, PubkeyAndIndex>,
     ): Pair<List<ArchNetworkRpc.AccountMeta>, List<ProgramInstruction.SettlementAdjustments>> {
-        val tokenAccountBySymbolId = ArchAccountEntity.findTokenAccountsForSymbols(
-            batchSettlement.tokenAdjustmentLists.map { it.symbolId },
-        ).associateBy { it.symbolGuid!!.value }
         val accountMetas = mutableListOf(
             ArchNetworkRpc.AccountMeta(
                 pubkey = submitterPubkey,
@@ -234,30 +235,37 @@ object ArchUtils {
                 isWritable = true,
             ),
         )
-        val settlements = batchSettlement.tokenAdjustmentLists.mapIndexed { index, tokenAdjustmentList ->
-            ProgramInstruction.SettlementAdjustments(
-                accountIndex = (index + 1).toUByte(),
-                increments = tokenAdjustmentList.increments.map {
-                    ProgramInstruction.Adjustment(
-                        addressIndex = indexMap.getValue(WalletAndSymbol(it.walletId, tokenAdjustmentList.symbolId)).toUInt(),
-                        amount = it.amount.toLong().toULong(),
+        var accountIndex = 1
+        val settlements = batchSettlement.tokenAdjustmentLists.flatMap { tokenAdjustmentList ->
+            // need to partition based on account pubkey since we might have multiple token accounts for same symbol
+            val incrementsMap = tokenAdjustmentList.increments.groupBy { indexMap.getValue(WalletAndSymbol(it.walletId, tokenAdjustmentList.symbolId)).pubkey.toHexString() }
+            val decrementsMap = tokenAdjustmentList.decrements.groupBy { indexMap.getValue(WalletAndSymbol(it.walletId, tokenAdjustmentList.symbolId)).pubkey.toHexString() }
+            incrementsMap.keys.plus(decrementsMap.keys).mapIndexed { index, pubKey ->
+                ProgramInstruction.SettlementAdjustments(
+                    accountIndex = accountIndex.toUByte(),
+                    increments = (incrementsMap[pubKey] ?: emptyList()).map {
+                        ProgramInstruction.Adjustment(
+                            addressIndex = indexMap.getValue(WalletAndSymbol(it.walletId, tokenAdjustmentList.symbolId)).addressIndex.toUInt(),
+                            amount = it.amount.toLong().toULong(),
+                        )
+                    },
+                    decrements = (decrementsMap[pubKey] ?: emptyList()).map {
+                        ProgramInstruction.Adjustment(
+                            addressIndex = indexMap.getValue(WalletAndSymbol(it.walletId, tokenAdjustmentList.symbolId)).addressIndex.toUInt(),
+                            amount = it.amount.toLong().toULong(),
+                        )
+                    },
+                    feeAmount = if (index == 0) tokenAdjustmentList.feeAmount.toLong().toULong() else 0u,
+                ).also {
+                    accountMetas.add(
+                        ArchNetworkRpc.AccountMeta(
+                            pubkey = ArchNetworkRpc.Pubkey.fromHexString(pubKey),
+                            isWritable = true,
+                            isSigner = false,
+                        ),
                     )
-                },
-                decrements = tokenAdjustmentList.decrements.map {
-                    ProgramInstruction.Adjustment(
-                        addressIndex = indexMap.getValue(WalletAndSymbol(it.walletId, tokenAdjustmentList.symbolId)).toUInt(),
-                        amount = it.amount.toLong().toULong(),
-                    )
-                },
-                feeAmount = tokenAdjustmentList.feeAmount.toLong().toULong(),
-            ).also {
-                accountMetas.add(
-                    ArchNetworkRpc.AccountMeta(
-                        pubkey = tokenAccountBySymbolId.getValue(tokenAdjustmentList.symbolId).rpcPubkey(),
-                        isWritable = true,
-                        isSigner = false,
-                    ),
-                )
+                    accountIndex++
+                }
             }
         }
         return Pair(accountMetas, settlements)
@@ -267,7 +275,7 @@ object ArchUtils {
     fun buildPrepareSettlementBatchInstruction(
         programPubkey: ArchNetworkRpc.Pubkey,
         batchSettlement: Settlement.Batch,
-        indexMap: Map<WalletAndSymbol, Int>,
+        indexMap: Map<WalletAndSymbol, PubkeyAndIndex>,
     ): Pair<ArchNetworkRpc.Instruction, String> {
         val (accountMetas, settlements) = buildSettlementBatch(batchSettlement, indexMap)
         return Pair(
@@ -284,7 +292,7 @@ object ArchUtils {
     fun buildSubmitSettlementBatchInstruction(
         programPubkey: ArchNetworkRpc.Pubkey,
         batchSettlement: Settlement.Batch,
-        indexMap: Map<WalletAndSymbol, Int>,
+        indexMap: Map<WalletAndSymbol, PubkeyAndIndex>,
     ): Pair<ArchNetworkRpc.Instruction, String> {
         val (accountMetas, settlements) = buildSettlementBatch(batchSettlement, indexMap)
         return Pair(
@@ -435,6 +443,12 @@ object ArchUtils {
         Borsh.decodeFromByteArray(ArchNetworkClient.readAccountInfo(pubkey).data.toByteArray())
 
     @OptIn(ExperimentalUnsignedTypes::class)
+    inline fun <reified T> getAccountStateAndSize(pubkey: ArchNetworkRpc.Pubkey): Pair<T, Int> {
+        val data = ArchNetworkClient.readAccountInfo(pubkey).data.toByteArray()
+        return Pair(Borsh.decodeFromByteArray(data), data.size)
+    }
+
+    @OptIn(ExperimentalUnsignedTypes::class)
     fun signAndSendProgramInstruction(programPubkey: ArchNetworkRpc.Pubkey, accountMetas: List<ArchNetworkRpc.AccountMeta>, programInstruction: ProgramInstruction): TxHash {
         return signAndSendInstruction(
             ArchNetworkRpc.Instruction(
@@ -474,31 +488,65 @@ object ArchUtils {
         return signAndSendInstructions(listOf(instruction), privateKey ?: BitcoinClient.bitcoinConfig.submitterPrivateKey)
     }
 
-    fun retrieveOrCreateBalanceIndexes(batchSettlement: Settlement.Batch): Map<WalletAndSymbol, Int>? {
-        val walletSymbolSet = batchSettlement.tokenAdjustmentLists.flatMap {
-            it.increments.map { inc -> WalletAndSymbol(inc.walletId, it.symbolId) } +
-                it.decrements.map { dec -> WalletAndSymbol(dec.walletId, it.symbolId) }
-        }.toSet()
-        val balanceIndexByWalletAndSymbol = ArchAccountBalanceIndexEntity.findForWalletsAndSymbols(
-            walletSymbolSet.map { it.walletId }.toSet().toList(),
-            batchSettlement.tokenAdjustmentLists.map { it.symbolId },
+    fun getConfirmedBitcoinDeposits(): List<ConfirmedBitcoinDeposit> {
+        val confirmedDeposits = DepositEntity.getConfirmedForUpdate(BitcoinClient.chainId)
+        val walletAndSymbols = confirmedDeposits.map { WalletAndSymbol(it.walletGuid.value, it.symbolGuid.value) }.toSet()
+        val walletsAndSymbolsWithAssignedIndex = retrieveOrCreateBalanceIndexes(walletAndSymbols, returnAssignedIndexes = true)!!
+        return confirmedDeposits.mapNotNull { deposit ->
+            val walletAndSymbol = WalletAndSymbol(deposit.walletGuid.value, deposit.symbolGuid.value)
+            walletsAndSymbolsWithAssignedIndex[walletAndSymbol]?.let {
+                ConfirmedBitcoinDeposit(deposit, it)
+            }
+        }
+    }
+
+    fun retrieveOrCreateBalanceIndexes(batchSettlement: Settlement.Batch): Map<WalletAndSymbol, PubkeyAndIndex>? {
+        return retrieveOrCreateBalanceIndexes(
+            batchSettlement.tokenAdjustmentLists.flatMap {
+                it.increments.map { inc -> WalletAndSymbol(inc.walletId, it.symbolId) } +
+                    it.decrements.map { dec -> WalletAndSymbol(dec.walletId, it.symbolId) }
+            }.toSet(),
         )
-        val missing = walletSymbolSet.subtract(balanceIndexByWalletAndSymbol.keys)
-        return if (missing.isNotEmpty()) {
-            val tokenAccount = ArchAccountEntity.findTokenAccountsForSymbols(missing.map { it.symbolId }.toSet().toList())
+    }
+
+    fun retrieveOrCreateBalanceIndexes(walletAndSymbols: Set<WalletAndSymbol>, returnAssignedIndexes: Boolean = false): Map<WalletAndSymbol, PubkeyAndIndex>? {
+        val balanceIndexByWalletAndSymbol = ArchAccountBalanceIndexEntity.findForWalletsAndSymbols(
+            walletAndSymbols.map { it.walletId }.toSet().toList(),
+            walletAndSymbols.map { it.symbolId }.toSet().toList(),
+        )
+        val missing = walletAndSymbols.subtract(balanceIndexByWalletAndSymbol.keys)
+        val result = if (missing.isNotEmpty()) {
+            val tokenAccount = missing.map { it.symbolId }.toSet().mapNotNull {
+                ArchAccountEntity.findTokenAccountForSymbolForNewIndex(it)
+            }
             ArchAccountBalanceIndexEntity.batchCreate(
-                missing.map { walletAndSymbol ->
-                    CreateArchAccountBalanceIndexAssignment(
-                        EntityID(walletAndSymbol.walletId, WalletTable),
-                        tokenAccount.find { it.symbolGuid?.value == walletAndSymbol.symbolId }!!.guid,
-                    )
+                missing.mapNotNull { walletAndSymbol ->
+                    tokenAccount.firstOrNull { it.symbolGuid?.value == walletAndSymbol.symbolId }?.guid?.let { tokenAccountGuid ->
+                        CreateArchAccountBalanceIndexAssignment(
+                            EntityID(walletAndSymbol.walletId, WalletTable),
+                            tokenAccountGuid,
+                        )
+                    }
                 },
             )
             null
-        } else if (walletSymbolSet.any { balanceIndexByWalletAndSymbol[it]?.status != ArchAccountBalanceIndexStatus.Assigned }) {
+        } else if (walletAndSymbols.any { balanceIndexByWalletAndSymbol[it]?.status != ArchAccountBalanceIndexStatus.Assigned }) {
             null
         } else {
-            walletSymbolSet.associateWith { balanceIndexByWalletAndSymbol[it]!!.addressIndex }
+            walletAndSymbols.associateWith { balanceIndexByWalletAndSymbol[it]!!.let { balanceIndex -> PubkeyAndIndex(balanceIndex.archAccount.rpcPubkey(), balanceIndex.addressIndex) } }
+        }
+
+        return if (result == null && returnAssignedIndexes) {
+            walletAndSymbols.mapNotNull {
+                val balanceIndex = balanceIndexByWalletAndSymbol[it]
+                if (balanceIndex?.status == ArchAccountBalanceIndexStatus.Assigned) {
+                    it to PubkeyAndIndex(balanceIndex.archAccount.rpcPubkey(), balanceIndex.addressIndex)
+                } else {
+                    null
+                }
+            }.toMap()
+        } else {
+            result
         }
     }
 }

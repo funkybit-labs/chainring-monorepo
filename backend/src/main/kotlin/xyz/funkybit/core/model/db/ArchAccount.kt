@@ -10,6 +10,7 @@ import org.bitcoinj.core.ECKey
 import org.http4k.format.KotlinxSerialization
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
@@ -42,6 +43,7 @@ enum class ArchAccountStatus {
     Created,
     Initializing,
     Complete,
+    Full,
     Failed,
     ;
 
@@ -88,7 +90,7 @@ object ArchAccountTable : GUIDTable<ArchAccountId>("arch_account", ::ArchAccount
         { value -> ArchAccountType.valueOf(value as String) },
         { PGEnum("ArchAccountType", it) },
     ).index()
-    val symbolGuid = reference("symbol_guid", SymbolTable).nullable().uniqueIndex()
+    val symbolGuid = reference("symbol_guid", SymbolTable).nullable().index()
     val setupState = jsonb<AccountSetupState>("setup_state", KotlinxSerialization.json).nullable()
     val status = customEnumeration(
         "status",
@@ -96,6 +98,7 @@ object ArchAccountTable : GUIDTable<ArchAccountId>("arch_account", ::ArchAccount
         { value -> ArchAccountStatus.valueOf(value as String) },
         { PGEnum("ArchAccountStatus", it) },
     )
+    val sequenceId = integer("sequence_id").autoIncrement()
 }
 
 class ArchAccountEntity(guid: EntityID<ArchAccountId>) : GUIDEntity<ArchAccountId>(guid) {
@@ -124,17 +127,18 @@ class ArchAccountEntity(guid: EntityID<ArchAccountId>) : GUIDEntity<ArchAccountI
             }.singleOrNull()
         }
 
-        fun findTokenAccountForSymbol(symbolEntity: SymbolEntity): ArchAccountEntity? {
+        fun findTokenAccountForSymbolForNewIndex(symbolId: SymbolId): ArchAccountEntity? {
+            return ArchAccountEntity.find {
+                ArchAccountTable.type.eq(ArchAccountType.TokenState) and
+                    ArchAccountTable.symbolGuid.eq(symbolId) and
+                    ArchAccountTable.status.inList(listOf(ArchAccountStatus.Full, ArchAccountStatus.Complete))
+            }.orderBy(ArchAccountTable.sequenceId to SortOrder.DESC).firstOrNull()
+        }
+
+        fun findTokenAccountsForSymbol(symbolEntity: SymbolEntity): List<ArchAccountEntity> {
             return ArchAccountEntity.find {
                 ArchAccountTable.type.eq(ArchAccountType.TokenState) and
                     ArchAccountTable.symbolGuid.eq(symbolEntity.id)
-            }.firstOrNull()
-        }
-
-        fun findTokenAccountsForSymbols(symbolIds: List<SymbolId>): List<ArchAccountEntity> {
-            return ArchAccountEntity.find {
-                ArchAccountTable.type.eq(ArchAccountType.TokenState) and
-                    ArchAccountTable.symbolGuid.inList(symbolIds)
             }.toList()
         }
 
@@ -148,6 +152,12 @@ class ArchAccountEntity(guid: EntityID<ArchAccountId>) : GUIDEntity<ArchAccountI
                 ArchAccountTable.type.eq(ArchAccountType.TokenState) and
                     ArchAccountTable.status.neq(ArchAccountStatus.Complete)
             }.toList()
+        }
+
+        fun getByPubkey(pubkey: ArchNetworkRpc.Pubkey): ArchAccountEntity? {
+            return ArchAccountEntity.find {
+                ArchAccountTable.publicKey.eq(pubkey.toHexString())
+            }.firstOrNull()
         }
     }
 
@@ -177,6 +187,11 @@ class ArchAccountEntity(guid: EntityID<ArchAccountId>) : GUIDEntity<ArchAccountI
     fun markAsInitializing(setupState: AccountSetupState) {
         this.status = ArchAccountStatus.Initializing
         this.setupState = setupState
+        this.updatedAt = Clock.System.now()
+    }
+
+    fun markAsFull() {
+        this.status = ArchAccountStatus.Full
         this.updatedAt = Clock.System.now()
     }
 
