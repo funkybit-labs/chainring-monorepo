@@ -19,17 +19,18 @@ import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import MarketPrice from 'components/Screens/HomeScreen/swap/MarketPrice'
 import { useWallets } from 'contexts/walletProvider'
+import ContractsRegistry from 'contractsRegistry'
 
 export function SwapWidget({
   markets,
-  exchangeContractAddress,
+  contracts,
   walletAddress,
   feeRates,
   onMarketChange,
   onSideChange
 }: {
   markets: Markets
-  exchangeContractAddress?: string
+  contracts?: ContractsRegistry
   walletAddress?: string
   feeRates: FeeRates
   onMarketChange: (m: Market) => void
@@ -45,8 +46,7 @@ export function SwapWidget({
   }
   return SwapInternals({
     markets,
-    exchangeContractAddress,
-    walletAddress,
+    contracts,
     feeRates,
     onMarketChange,
     onSideChange: onChangedSide,
@@ -134,9 +134,7 @@ export function SwapWidget({
                 </span>
                 <div className="flex flex-row items-baseline space-x-2 text-sm">
                   {depositAmount(
-                    exchangeContractAddress === undefined
-                      ? undefined
-                      : sr.topBalance,
+                    contracts === undefined ? undefined : sr.topBalance,
                     sr.topSymbol
                   )}
                 </div>
@@ -231,9 +229,7 @@ export function SwapWidget({
                 <span className="text-base text-darkBluishGray1">Buy</span>
                 <div className="flex flex-row space-x-2 align-middle text-sm">
                   {depositAmount(
-                    exchangeContractAddress === undefined
-                      ? undefined
-                      : sr.bottomBalance,
+                    contracts === undefined ? undefined : sr.bottomBalance,
                     sr.bottomSymbol
                   )}
                 </div>
@@ -315,9 +311,9 @@ export function SwapWidget({
             />
             <div className="flex w-full flex-col">
               {walletAddress &&
-              exchangeContractAddress &&
-              wallets.isConnected(sr.topSymbol.networkType) &&
-              wallets.isConnected(sr.bottomSymbol.networkType) ? (
+              contracts &&
+              (wallets.isConnected(sr.topSymbol.networkType) ||
+                wallets.isConnected(sr.bottomSymbol.networkType)) ? (
                 <>
                   {sr.noPriceFound && (
                     <span className="w-full text-center text-brightRed">

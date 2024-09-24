@@ -1,18 +1,16 @@
-import { Address, formatUnits, zeroAddress } from 'viem'
-import { BaseError as WagmiError, useConfig, useSignTypedData } from 'wagmi'
-import { ExchangeAbi } from 'contracts'
+import { formatUnits } from 'viem'
+import { BaseError as WagmiError } from 'wagmi'
 import React, { useState } from 'react'
-import { readContract } from 'wagmi/actions'
 import { Modal, ModalAsyncContent } from 'components/common/Modal'
 import AmountInput from 'components/common/AmountInput'
 import SubmitButton from 'components/common/SubmitButton'
-import { apiClient, evmAddress } from 'apiClient'
+import { apiClient } from 'apiClient'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { addressZero, getDomain, getWithdrawMessage } from 'utils/eip712'
 import useAmountInputState from 'hooks/useAmountInputState'
 import { withdrawalsQueryKey } from 'components/Screens/HomeScreen/balances/BalancesWidget'
 import { isErrorFromAlias } from '@zodios/core'
 import TradingSymbol from 'tradingSymbol'
+import { signWithdrawal } from 'utils/signingUtils'
 
 export default function WithdrawalModal({
   exchangeContractAddress,
@@ -29,30 +27,23 @@ export default function WithdrawalModal({
   close: () => void
   onClosed: () => void
 }) {
-  const config = useConfig()
-  const { signTypedDataAsync } = useSignTypedData()
-
   const availableBalanceQuery = useQuery({
     queryKey: ['availableBalance', symbol.name],
     queryFn: async function () {
-      return await readContract(config, {
-        abi: ExchangeAbi,
-        address: exchangeContractAddress as Address,
-        functionName: 'balances',
-        args: [
-          walletAddress as Address,
-          evmAddress(
-            symbol.contractAddress ? symbol.contractAddress : zeroAddress
-          )
-        ]
-      })
+      return apiClient
+        .getBalances()
+        .then(
+          (response) =>
+            response.balances.find((b) => b.symbol == symbol.name)?.available ||
+            0n
+        )
     }
   })
 
   const {
     inputValue: amountInputValue,
     setInputValue: setAmountInputValue,
-    valueInFundamentalUnits: amount
+    valueInFundamentalUnits: enteredAmount
   } = useAmountInputState({
     initialInputValue: '',
     decimals: symbol.decimals
@@ -69,44 +60,34 @@ export default function WithdrawalModal({
   const mutation = useMutation({
     mutationFn: async () => {
       try {
-        const nonce = Date.now()
         setSubmitPhase('waitingForApproval')
-        const signature = await signTypedDataAsync({
-          types: {
-            EIP712Domain: [
-              { name: 'name', type: 'string' },
-              { name: 'version', type: 'string' },
-              { name: 'chainId', type: 'uint256' },
-              { name: 'verifyingContract', type: 'address' }
-            ],
-            Withdraw: [
-              { name: 'sender', type: 'address' },
-              { name: 'token', type: 'address' },
-              { name: 'amount', type: 'uint256' },
-              { name: 'nonce', type: 'uint64' }
-            ]
-          },
-          domain: getDomain(exchangeContractAddress, config.state.chainId),
-          primaryType: 'Withdraw',
-          message: getWithdrawMessage(
-            walletAddress,
-            symbol.contractAddress ? symbol.contractAddress : addressZero,
-            withdrawAll && amount === availableBalanceQuery.data
-              ? BigInt(0)
-              : amount,
-            BigInt(nonce)
-          )
-        })
+
+        const timestamp = new Date()
+        const nonce = timestamp.getTime()
+        const amount =
+          withdrawAll && enteredAmount === availableBalanceQuery.data
+            ? BigInt(0)
+            : enteredAmount
+
+        const signature = await signWithdrawal(
+          symbol,
+          walletAddress,
+          exchangeContractAddress,
+          timestamp,
+          amount
+        )
+
+        if (signature === null) {
+          setSubmitPhase(null)
+          return { withdrawal: null }
+        }
 
         setSubmitPhase('submittingRequest')
         return await apiClient.createWithdrawal({
           symbol: symbol.name,
-          amount:
-            withdrawAll && amount === availableBalanceQuery.data
-              ? BigInt(0)
-              : amount,
-          nonce: nonce,
-          signature: signature
+          amount,
+          nonce,
+          signature
         })
       } catch (error) {
         setSubmitPhase(null)
@@ -120,9 +101,13 @@ export default function WithdrawalModal({
     onError: () => {
       setTimeout(mutation.reset, 3000)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: withdrawalsQueryKey })
-      close()
+    onSuccess: (result) => {
+      if (result.withdrawal) {
+        queryClient.invalidateQueries({ queryKey: withdrawalsQueryKey })
+        close()
+      } else {
+        mutation.reset()
+      }
     }
   })
 
@@ -131,7 +116,7 @@ export default function WithdrawalModal({
 
     try {
       if (availableBalanceQuery.status == 'success') {
-        return amount > 0 && amount <= availableBalanceQuery.data
+        return enteredAmount > 0 && enteredAmount <= availableBalanceQuery.data
       } else {
         return false
       }
@@ -174,7 +159,7 @@ export default function WithdrawalModal({
                 </div>
 
                 <p className="mb-2 mt-4 text-center text-sm text-darkBluishGray2">
-                  Wallet balance:{' '}
+                  Available balance:{' '}
                   {formatUnits(availableBalance, symbol.decimals)}
                 </p>
 

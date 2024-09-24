@@ -23,16 +23,17 @@ import {
 } from 'components/Screens/HomeScreen/OrdersAndTradesWidget/tradeRollup'
 import arrowRightIcon from 'assets/arrow-right.svg'
 import arrowDownIcon from 'assets/arrow-down.svg'
+import ContractsRegistry from 'contractsRegistry'
 
 type Tab = 'Orders' | 'Trade History'
 
 export default function OrdersAndTradesWidget({
   markets,
-  exchangeContractAddress,
+  contracts,
   walletAddress
 }: {
   markets: Markets
-  exchangeContractAddress?: string
+  contracts?: ContractsRegistry
   walletAddress?: string
 }) {
   const [orders, setOrders] = useState<Order[]>(() => [])
@@ -223,12 +224,12 @@ export default function OrdersAndTradesWidget({
           </table>
         </div>
 
-        {cancellingOrder && (
+        {cancellingOrder && contracts && (
           <CancelOrderModal
             isOpen={showCancelModal}
             order={cancellingOrder}
-            exchangeContractAddress={exchangeContractAddress!}
-            walletAddress={walletAddress!}
+            contracts={contracts}
+            markets={markets}
             close={() => setShowCancelModal(false)}
             onClosed={() => setCancellingOrder(null)}
           />
@@ -514,8 +515,7 @@ export default function OrdersAndTradesWidget({
             ))}
           </div>
           <div className="mt-4">
-            {walletAddress !== undefined &&
-            exchangeContractAddress !== undefined ? (
+            {walletAddress !== undefined && contracts !== undefined ? (
               (function () {
                 switch (selectedTab) {
                   case 'Orders':

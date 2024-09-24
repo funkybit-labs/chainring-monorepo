@@ -1,14 +1,7 @@
 import Markets, { Market } from 'markets'
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import TradingSymbol from 'tradingSymbol'
-import {
-  apiClient,
-  Balance,
-  evmAddress,
-  FeeRates,
-  Order,
-  OrderSide
-} from 'apiClient'
+import { apiClient, Balance, FeeRates, Order, OrderSide } from 'apiClient'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import {
   balancesTopic,
@@ -19,7 +12,7 @@ import {
   myOrdersTopic,
   Publishable
 } from 'websocketMessages'
-import { Address, formatUnits } from 'viem'
+import { formatUnits } from 'viem'
 import {
   calculateFee,
   calculateNotional,
@@ -31,11 +24,14 @@ import {
   scaledDecimalToBigint
 } from 'utils/pricesUtils'
 import { useMutation, UseMutationResult } from '@tanstack/react-query'
-import { addressZero, generateOrderNonce, getDomain } from 'utils/eip712'
+import { generateOrderNonce } from 'utils/eip712'
 import Decimal from 'decimal.js'
 import { isErrorFromAlias } from '@zodios/core'
 import useAmountInputState from 'hooks/useAmountInputState'
-import { useConfig, useSignTypedData, BaseError as WagmiError } from 'wagmi'
+import { useConfig, BaseError as WagmiError } from 'wagmi'
+import ContractsRegistry from 'contractsRegistry'
+import { useWallets } from 'contexts/walletProvider'
+import { signOrderCreation } from 'utils/signingUtils'
 
 export type SwapRender = {
   topBalance: Balance | undefined
@@ -43,7 +39,7 @@ export type SwapRender = {
   bottomBalance: Balance | undefined
   bottomSymbol: TradingSymbol
   mutation: UseMutationResult<
-    { orderId: string; requestStatus: 'Rejected' | 'Accepted' },
+    { orderId: string; requestStatus: 'Rejected' | 'Accepted' } | null,
     Error,
     void,
     unknown
@@ -81,8 +77,7 @@ export type SwapRender = {
 
 export function SwapInternals({
   markets,
-  exchangeContractAddress,
-  walletAddress,
+  contracts,
   feeRates,
   onMarketChange,
   onSideChange,
@@ -92,8 +87,7 @@ export function SwapInternals({
   Renderer
 }: {
   markets: Markets
-  exchangeContractAddress?: string
-  walletAddress?: string
+  contracts?: ContractsRegistry
   feeRates: FeeRates
   onMarketChange: (m: Market) => void
   onSideChange: (s: OrderSide) => void
@@ -114,6 +108,7 @@ export function SwapInternals({
   const [lastOrderId, setLastOrderId] = useState<string | undefined>()
   const [lastOrder, setLastOrder] = useState<Order>()
   const [percentage, setPercentage] = useState<number | null>(null)
+  const wallets = useWallets()
 
   useEffect(() => {
     const selectedMarket = window.sessionStorage.getItem(
@@ -148,7 +143,6 @@ export function SwapInternals({
   }, [topSymbol, bottomSymbol, balances])
 
   const config = useConfig()
-  const { signTypedDataAsync } = useSignTypedData()
 
   const [baseSymbol, quoteSymbol] = useMemo(() => {
     return [market.baseSymbol, market.quoteSymbol]
@@ -702,79 +696,23 @@ export function SwapInternals({
       setLastOrderId(undefined)
       try {
         const nonce = generateOrderNonce()
-        const signature = percentage
-          ? await signTypedDataAsync({
-              types: {
-                EIP712Domain: [
-                  { name: 'name', type: 'string' },
-                  { name: 'version', type: 'string' },
-                  { name: 'chainId', type: 'uint256' },
-                  { name: 'verifyingContract', type: 'address' }
-                ],
-                Order: [
-                  { name: 'sender', type: 'address' },
-                  { name: 'baseChainId', type: 'uint256' },
-                  { name: 'baseToken', type: 'address' },
-                  { name: 'quoteChainId', type: 'uint256' },
-                  { name: 'quoteToken', type: 'address' },
-                  { name: 'percentage', type: 'int256' },
-                  { name: 'price', type: 'uint256' },
-                  { name: 'nonce', type: 'int256' }
-                ]
-              },
-              domain: getDomain(exchangeContractAddress!, config.state.chainId),
-              primaryType: 'Order',
-              message: {
-                sender: walletAddress! as Address,
-                baseChainId: BigInt(baseSymbol.chainId),
-                baseToken: evmAddress(
-                  baseSymbol.contractAddress ?? addressZero
-                ),
-                quoteChainId: BigInt(quoteSymbol.chainId),
-                quoteToken: evmAddress(
-                  quoteSymbol.contractAddress ?? addressZero
-                ),
-                percentage: BigInt(percentage),
-                price: isLimitOrder ? limitPriceAsBigInt : 0n,
-                nonce: BigInt('0x' + nonce)
-              }
-            })
-          : await signTypedDataAsync({
-              types: {
-                EIP712Domain: [
-                  { name: 'name', type: 'string' },
-                  { name: 'version', type: 'string' },
-                  { name: 'chainId', type: 'uint256' },
-                  { name: 'verifyingContract', type: 'address' }
-                ],
-                Order: [
-                  { name: 'sender', type: 'address' },
-                  { name: 'baseChainId', type: 'uint256' },
-                  { name: 'baseToken', type: 'address' },
-                  { name: 'quoteChainId', type: 'uint256' },
-                  { name: 'quoteToken', type: 'address' },
-                  { name: 'amount', type: 'int256' },
-                  { name: 'price', type: 'uint256' },
-                  { name: 'nonce', type: 'int256' }
-                ]
-              },
-              domain: getDomain(exchangeContractAddress!, config.state.chainId),
-              primaryType: 'Order',
-              message: {
-                sender: walletAddress! as Address,
-                baseChainId: BigInt(baseSymbol.chainId),
-                baseToken: evmAddress(
-                  baseSymbol.contractAddress ?? addressZero
-                ),
-                quoteChainId: BigInt(quoteSymbol.chainId),
-                quoteToken: evmAddress(
-                  quoteSymbol.contractAddress ?? addressZero
-                ),
-                amount: side == 'Buy' ? baseAmount : -baseAmount,
-                price: isLimitOrder ? limitPriceAsBigInt : 0n,
-                nonce: BigInt('0x' + nonce)
-              }
-            })
+
+        const signature = await signOrderCreation(
+          wallets.primary!,
+          config.state.chainId,
+          nonce,
+          contracts!.exchange(config.state.chainId)!.address,
+          baseSymbol,
+          quoteSymbol,
+          side,
+          baseAmount,
+          limitPrice,
+          percentage
+        )
+
+        if (signature == null) {
+          return null
+        }
 
         let response
         if (isLimitOrder) {
@@ -840,12 +778,16 @@ export function SwapInternals({
         )
       }
     },
-    onSuccess: () => {
-      setTimeout(() => {
-        setLastOrder(undefined)
-        setLastOrderId(undefined)
+    onSuccess: (response) => {
+      if (response) {
+        setTimeout(() => {
+          setLastOrder(undefined)
+          setLastOrderId(undefined)
+          mutation.reset()
+        }, 3000)
+      } else {
         mutation.reset()
-      }, 3000)
+      }
     }
   })
 
@@ -854,6 +796,7 @@ export function SwapInternals({
   }, [notional, fee, market.minFee])
 
   const canSubmit = useMemo(() => {
+    if (!wallets.primary) return false
     if (mutation.isPending) return false
     if (baseAmount <= 0n) return false
 
@@ -873,7 +816,8 @@ export function SwapInternals({
     baseLimit,
     noPriceFound,
     fee,
-    amountTooLow
+    amountTooLow,
+    wallets.primary
   ])
 
   const [buyAmountInputValue, sellAmountInputValue] = useMemo(() => {

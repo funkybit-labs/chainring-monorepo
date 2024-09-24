@@ -11,6 +11,8 @@ import { DepositsTable } from 'components/Screens/HomeScreen/balances/DepositsTa
 import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import { useAuth } from 'contexts/auth'
+import ContractsRegistry from 'contractsRegistry'
+import { useWallets } from 'contexts/walletProvider'
 
 export const withdrawalsQueryKey = ['withdrawals']
 export const depositsQueryKey = ['deposits']
@@ -18,19 +20,18 @@ export const depositsQueryKey = ['deposits']
 type Tab = 'Available' | 'Deposits' | 'Withdrawals'
 
 export default function BalancesWidget({
-  walletAddress,
-  exchangeContractAddress,
+  contracts,
   symbols,
   chains,
   accountConfig
 }: {
-  walletAddress?: string
-  exchangeContractAddress?: string
+  contracts?: ContractsRegistry
   symbols: TradingSymbols
   chains: Chain[]
   accountConfig?: AccountConfigurationApiResponse
 }) {
   const { isAuthenticated } = useAuth()
+  const wallets = useWallets()
   const [selectedTab, setSelectedTab] = useState<Tab>('Available')
 
   const depositsQuery = useQuery({
@@ -56,7 +57,7 @@ export default function BalancesWidget({
   const pendingWithdrawalsCount = useMemo(() => {
     return isAuthenticated
       ? (withdrawalsQuery.data?.withdrawals || []).filter(
-          (w) => w.status == 'Pending'
+          (w) => w.status != 'Complete' && w.status != 'Failed'
         ).length
       : 0
   }, [withdrawalsQuery.data, isAuthenticated])
@@ -109,8 +110,7 @@ export default function BalancesWidget({
             ))}
           </div>
           <div className="mt-8">
-            {walletAddress !== undefined &&
-            exchangeContractAddress !== undefined ? (
+            {wallets.connected.length > 0 && contracts !== undefined ? (
               (function () {
                 if (
                   withdrawalsQuery.data === undefined ||
@@ -122,8 +122,7 @@ export default function BalancesWidget({
                     case 'Available':
                       return (
                         <BalancesTable
-                          walletAddress={walletAddress}
-                          exchangeContractAddress={exchangeContractAddress}
+                          contracts={contracts}
                           symbols={symbols}
                           accountConfig={accountConfig}
                         />
