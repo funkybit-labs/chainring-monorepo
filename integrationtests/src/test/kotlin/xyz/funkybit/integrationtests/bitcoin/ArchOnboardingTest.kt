@@ -12,6 +12,7 @@ import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.bitcoin.ArchAccountState
+import xyz.funkybit.core.model.bitcoin.BitcoinNetworkType
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.ArchAccountStatus
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
@@ -88,18 +89,17 @@ class ArchOnboardingTest {
 
         // wait for the program state account to be setup and verify owned by program and initial state
         val programStateEntity = waitForProgramStateAccount()
+        val bitcoinContract = transaction {
+            DeployedSmartContractEntity.validContracts(BitcoinClient.chainId).first()
+        }
         val programStateInfo = ArchNetworkClient.readAccountInfo(programStateEntity.rpcPubkey())
         assertFalse(programStateInfo.isExecutable)
         assertEquals(programStateInfo.owner.bytes.toHex(false), programEntity.publicKey)
         val programState = Borsh.decodeFromByteArray<ArchAccountState.Program>(programStateInfo.data.toByteArray())
         assertEquals(0, programState.version)
         assertEquals(BitcoinClient.bitcoinConfig.feeCollectionAddress, programState.feeAccount)
-        assertEquals("", programState.settlementBatchHash)
-        assertEquals("", programState.lastSettlementBatchHash)
-        assertEquals("", programState.lastWithdrawalBatchHash)
-        val bitcoinContract = transaction {
-            DeployedSmartContractEntity.validContracts(BitcoinClient.chainId).first()
-        }
+        assertEquals(bitcoinContract.proxyAddress, programState.programChangeAddress)
+        assertEquals(BitcoinNetworkType.Regtest, programState.networkType)
         assertEquals(ContractType.Exchange.name, bitcoinContract.name)
         assertTrue(bitcoinContract.proxyAddress is BitcoinAddress.Taproot)
         assertTrue((bitcoinContract.proxyAddress as BitcoinAddress.Taproot).testnet)
@@ -113,7 +113,7 @@ class ArchOnboardingTest {
         val tokenState = Borsh.decodeFromByteArray<ArchAccountState.Token>(tokenStateInfo.data.toByteArray())
         assertEquals(0, tokenState.version)
         assertEquals("BTC:0", tokenState.tokenId)
-        assertEquals(0u, tokenState.feeAccountIndex)
+        assertEquals(programStateEntity.rpcPubkey().toString(), tokenState.programStateAccount.toString())
         assertEquals(1, tokenState.balances.size)
         assertEquals(ArchAccountState.Balance(BitcoinClient.bitcoinConfig.feeCollectionAddress.value, 0u), tokenState.balances.first())
     }

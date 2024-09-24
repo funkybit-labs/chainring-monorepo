@@ -94,13 +94,20 @@ class ArchAccountBalanceIndexEntity(guid: EntityID<ArchAccountBalanceIndexId>) :
             }
         }
 
-        fun findAllForStatus(archAccountIndexStatus: ArchAccountBalanceIndexStatus): List<ArchAccountBalanceInfo> {
+        fun findAllForStatus(archAccountIndexStatus: ArchAccountBalanceIndexStatus, limit: Int? = null): List<ArchAccountBalanceInfo> {
             return ArchAccountBalanceIndexTable
                 .join(WalletTable, JoinType.INNER, WalletTable.guid, ArchAccountBalanceIndexTable.walletGuid)
                 .join(ArchAccountTable, JoinType.INNER, ArchAccountTable.guid, ArchAccountBalanceIndexTable.archAccountGuid)
                 .selectAll()
                 .where { ArchAccountBalanceIndexTable.status.eq(archAccountIndexStatus) }
                 .orderBy(ArchAccountBalanceIndexTable.createdAt to SortOrder.DESC)
+                .let {
+                    if (limit == null) {
+                        it
+                    } else {
+                        it.limit(limit)
+                    }
+                }
                 .map {
                     ArchAccountBalanceInfo(
                         entity = ArchAccountBalanceIndexEntity.wrapRow(it),

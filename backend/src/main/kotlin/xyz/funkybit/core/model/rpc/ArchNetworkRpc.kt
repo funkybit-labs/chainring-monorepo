@@ -176,7 +176,7 @@ sealed class ArchNetworkRpc {
         }
     }
 
-    @Serializable()
+    @Serializable(with = PubkeySerializer::class)
     @JvmInline
     value class Pubkey(val bytes: UByteArray) {
         init {
@@ -206,6 +206,32 @@ sealed class ArchNetworkRpc {
 
         fun toContractAddress(): Address {
             return EvmAddress(Keys.toChecksumAddress(bytes.toHex()))
+        }
+    }
+
+    @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
+    object PubkeySerializer : KSerializer<Pubkey> {
+        @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
+        override val descriptor: SerialDescriptor = buildSerialDescriptor("Pubkey", StructureKind.LIST)
+
+        @OptIn(InternalSerializationApi::class)
+        override fun serialize(encoder: Encoder, value: Pubkey) {
+            when (encoder) {
+                is com.funkatronics.kborsh.BorshEncoder -> {
+                    value.bytes.forEach { encoder.encodeByte(it.toByte()) }
+                }
+                else -> UByteArray::class.serializer().serialize(encoder, value.bytes)
+            }
+        }
+
+        @OptIn(InternalSerializationApi::class)
+        override fun deserialize(decoder: Decoder): Pubkey {
+            return when (decoder) {
+                is com.funkatronics.kborsh.BorshDecoder -> {
+                    Pubkey((0..31).map { decoder.decodeByte() }.toByteArray().toUByteArray())
+                }
+                else -> Pubkey(UByteArray::class.serializer().deserialize(decoder))
+            }
         }
     }
 

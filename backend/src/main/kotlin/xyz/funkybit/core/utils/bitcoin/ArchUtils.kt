@@ -171,7 +171,11 @@ object ArchUtils {
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)
-    fun buildWithdrawBatchInstruction(programBitcoinAddress: BitcoinAddress, programPubkey: ArchNetworkRpc.Pubkey, withdrawals: List<SequencedArchWithdrawal>): Pair<ArchNetworkRpc.Instruction, List<BitcoinUtxoEntity>> {
+    fun buildWithdrawBatchInstruction(
+        programBitcoinAddress: BitcoinAddress,
+        programPubkey: ArchNetworkRpc.Pubkey,
+        withdrawals: List<SequencedArchWithdrawal>,
+    ): Pair<ArchNetworkRpc.Instruction, List<BitcoinUtxoEntity>> {
         val accountMetas = mutableListOf(
             ArchNetworkRpc.AccountMeta(
                 pubkey = submitterPubkey,
@@ -181,11 +185,10 @@ object ArchUtils {
         )
         val totalAmount = withdrawals.sumOf { it.withdrawalEntity.chainAmount() }
         val selectedUtxos = UtxoSelectionService.selectUtxosForProgram(totalAmount, BitcoinClient.calculateFee(BitcoinClient.estimateVSize(withdrawals.size, withdrawals.size + 1)))
-        val txHex = buildWithdrawalTx(withdrawals.map { it.withdrawalEntity }, programBitcoinAddress, totalAmount, selectedUtxos)
+        val (txInputsHex, changeAmount) = buildWithdrawalInputs(withdrawals.map { it.withdrawalEntity }, programBitcoinAddress, totalAmount, selectedUtxos)
         val tokenWithdrawalsList = withdrawals.groupBy { it.archAccountEntity.rpcPubkey() }.map { (pubKey, tokenWithdrawals) ->
             ProgramInstruction.TokenWithdrawals(
                 accountIndex = accountMetas.size.toUByte(),
-                feeAddressIndex = 0u,
                 withdrawals = tokenWithdrawals.map {
                     ProgramInstruction.Withdrawal(
                         it.balanceIndex.toUInt(),
@@ -209,7 +212,8 @@ object ArchUtils {
                 accountMetas,
                 ProgramInstruction.WithdrawBatchParams(
                     tokenWithdrawalsList,
-                    txHex.toHexBytes(),
+                    changeAmount.toLong().toULong(),
+                    txInputsHex.toHexBytes(),
                 ).serialize(),
             ),
             selectedUtxos,
@@ -310,12 +314,12 @@ object ArchUtils {
         )
     }
 
-    private fun buildWithdrawalTx(
+    private fun buildWithdrawalInputs(
         withdrawals: List<WithdrawalEntity>,
         changeAddress: BitcoinAddress,
         totalAmount: BigInteger,
         utxos: List<BitcoinUtxoEntity>,
-    ): String {
+    ): Pair<String, BigInteger> {
         val params = BitcoinClient.getParams()
         val feeAmount = estimateWithdrawalTxFee(
             withdrawals.map { (it.wallet.address as BitcoinAddress) },
@@ -324,28 +328,7 @@ object ArchUtils {
         )
         val rawTx = Transaction(params)
         rawTx.setVersion(2)
-        withdrawals.forEach {
-            rawTx.addOutput(
-                TransactionOutput(
-                    params,
-                    rawTx,
-                    Coin.valueOf(it.chainAmount().toLong()),
-                    (it.wallet.address as BitcoinAddress).toBitcoinCoreAddress(params),
-                ),
-            )
-        }
         val changeAmount = BigInteger.ZERO.max(utxos.sumOf { it.amount } - totalAmount - feeAmount)
-        if (changeAmount > BitcoinClient.bitcoinConfig.changeDustThreshold) {
-            logger.debug { "Adding change output of  $changeAmount" }
-            rawTx.addOutput(
-                TransactionOutput(
-                    params,
-                    rawTx,
-                    Coin.valueOf(changeAmount.toLong()),
-                    changeAddress.toBitcoinCoreAddress(params),
-                ),
-            )
-        }
         utxos.forEach {
             logger.debug { "Adding input with value of ${it.amount}" }
             rawTx.addInput(
@@ -362,7 +345,14 @@ object ArchUtils {
                 ),
             )
         }
-        return rawTx.toHexString()
+        return Pair(
+            rawTx.toHexString(),
+            if (changeAmount > BitcoinClient.bitcoinConfig.changeDustThreshold) {
+                changeAmount
+            } else {
+                BigInteger.ONE
+            },
+        )
     }
 
     private fun estimateWithdrawalTxFee(

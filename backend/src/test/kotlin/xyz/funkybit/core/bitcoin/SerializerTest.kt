@@ -5,8 +5,10 @@ import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.bitcoinj.core.NetworkParameters
 import org.junit.jupiter.api.Test
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.bitcoin.BitcoinNetworkType
 import xyz.funkybit.core.model.bitcoin.ProgramInstruction
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.model.rpc.ArchRpcParams
@@ -39,6 +41,8 @@ class SerializerTest {
     fun `test instructions`() {
         val exchangeInstruction: ProgramInstruction = ProgramInstruction.InitProgramStateParams(
             BitcoinAddress.canonicalize("fee"),
+            BitcoinAddress.canonicalize("program"),
+            BitcoinNetworkType.fromNetworkParams(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!),
         )
 
         assertEquals(
@@ -47,7 +51,7 @@ class SerializerTest {
         )
 
         assertEquals(
-            "0003000000666565",
+            "00030000006665650700000070726f6772616d03",
             Borsh.encodeToByteArray(exchangeInstruction).toHex(false),
         )
 
@@ -59,7 +63,7 @@ class SerializerTest {
         )
 
         assertEquals(
-            "c7ff63e7a3a9e801320d6ca0de8821ad927d8f65dc7f06458243341d4df8a55001c7ff63e7a3a9e801320d6ca0de8821ad927d8f65dc7f06458243341d4df8a550010108000000000000000003000000666565",
+            "c7ff63e7a3a9e801320d6ca0de8821ad927d8f65dc7f06458243341d4df8a55001c7ff63e7a3a9e801320d6ca0de8821ad927d8f65dc7f06458243341d4df8a5500101140000000000000000030000006665650700000070726f6772616d03",
             instruction.serialize().toHex(false),
         )
     }

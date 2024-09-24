@@ -12,7 +12,9 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.serializer
+import org.bitcoinj.core.NetworkParameters
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 
 @Serializable(with = ProgramInstructionSerializer::class)
 sealed class ProgramInstruction {
@@ -20,6 +22,8 @@ sealed class ProgramInstruction {
     @Serializable
     data class InitProgramStateParams(
         val feeAccount: BitcoinAddress,
+        val programChangeAddress: BitcoinAddress,
+        val networkType: BitcoinNetworkType,
     ) : ProgramInstruction()
 
     @Serializable
@@ -65,13 +69,13 @@ sealed class ProgramInstruction {
     @Serializable
     data class TokenWithdrawals(
         val accountIndex: UByte,
-        val feeAddressIndex: UInt,
         val withdrawals: List<Withdrawal>,
     )
 
     @Serializable
     data class WithdrawBatchParams(
         val tokenWithdrawalsList: List<TokenWithdrawals>,
+        val changeAmount: ULong,
         val txHex: ByteArray,
     ) : ProgramInstruction()
 
@@ -98,6 +102,26 @@ sealed class ProgramInstruction {
 
     @OptIn(ExperimentalUnsignedTypes::class)
     fun serialize() = Borsh.encodeToByteArray(this).toUByteArray()
+}
+
+@Serializable
+enum class BitcoinNetworkType {
+    Bitcoin,
+    Testnet,
+    Signet,
+    Regtest,
+    ;
+
+    companion object {
+        fun fromNetworkParams(networkParams: NetworkParameters): BitcoinNetworkType {
+            return when (networkParams.id) {
+                NetworkParameters.ID_MAINNET -> Bitcoin
+                NetworkParameters.ID_TESTNET -> Testnet
+                NetworkParameters.ID_REGTEST -> Regtest
+                else -> Signet
+            }
+        }
+    }
 }
 
 object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
@@ -172,10 +196,13 @@ object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
 }
 
 sealed class ArchAccountState {
+
     @Serializable
     data class Program(
         val version: Short,
         val feeAccount: BitcoinAddress,
+        val programChangeAddress: BitcoinAddress,
+        val networkType: BitcoinNetworkType,
         val settlementBatchHash: String,
         val lastSettlementBatchHash: String,
         val lastWithdrawalBatchHash: String,
@@ -190,8 +217,8 @@ sealed class ArchAccountState {
     @Serializable
     data class Token(
         val version: Short,
+        val programStateAccount: ArchNetworkRpc.Pubkey,
         val tokenId: String,
-        val feeAccountIndex: UInt,
         val balances: List<Balance>,
     )
 }
