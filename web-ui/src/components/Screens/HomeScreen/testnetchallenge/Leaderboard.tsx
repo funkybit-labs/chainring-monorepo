@@ -31,6 +31,7 @@ import { Tooltip } from 'react-tooltip'
 import { accountConfigQueryKey } from 'components/Screens/HomeScreen'
 import TradingSymbol from 'tradingSymbol'
 import TradingSymbols from 'tradingSymbols'
+import Decimal from 'decimal.js'
 
 type EditMode = 'none' | 'name' | 'icon'
 
@@ -315,6 +316,7 @@ function CardCarousel({
 }
 
 export function Leaderboard({
+  pointsBalance,
   avatarUrl,
   nickName,
   inviteCode,
@@ -324,6 +326,7 @@ export function Leaderboard({
   onChangeTab,
   onWithdrawal
 }: {
+  pointsBalance: Decimal
   avatarUrl?: string
   nickName?: string
   inviteCode: string
@@ -548,7 +551,10 @@ export function Leaderboard({
                 )}
               </div>
               <div className="text-sm">
-                funky bits: <span className="text-statusOrange">23,500</span>
+                funky bits:{' '}
+                <span className="text-statusOrange">
+                  {pointsBalance.toFixed(0)}
+                </span>
               </div>
               <div className="flex flex-row pt-2">
                 <Button

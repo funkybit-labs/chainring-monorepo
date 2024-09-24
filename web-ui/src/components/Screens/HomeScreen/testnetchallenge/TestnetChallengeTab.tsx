@@ -95,18 +95,24 @@ export function TestnetChallengeTab({
     }
   })
 
-  const { testnetChallengeStatus, nickName, avatarUrl, inviteCode } =
-    useMemo(() => {
-      if (accountConfig) {
-        return {
-          testnetChallengeStatus: accountConfig.testnetChallengeStatus,
-          nickName: accountConfig.nickName ?? undefined,
-          avatarUrl: accountConfig.avatarUrl ?? undefined,
-          inviteCode: accountConfig.inviteCode
-        }
+  const {
+    testnetChallengeStatus,
+    nickName,
+    avatarUrl,
+    inviteCode,
+    pointsBalance
+  } = useMemo(() => {
+    if (accountConfig) {
+      return {
+        testnetChallengeStatus: accountConfig.testnetChallengeStatus,
+        nickName: accountConfig.nickName ?? undefined,
+        avatarUrl: accountConfig.avatarUrl ?? undefined,
+        inviteCode: accountConfig.inviteCode,
+        pointsBalance: accountConfig.pointsBalance
       }
-      return {}
-    }, [accountConfig])
+    }
+    return {}
+  }, [accountConfig])
 
   const accountRefreshRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -217,6 +223,7 @@ export function TestnetChallengeTab({
           <div className="grid h-full w-screen min-w-[1250px] grid-cols-1 gap-2 px-4 text-lg text-white narrow:grid-cols-3">
             {testnetChallengeStatus === 'Enrolled' ? (
               <Leaderboard
+                pointsBalance={pointsBalance}
                 avatarUrl={avatarUrl}
                 nickName={nickName}
                 inviteCode={inviteCode}

@@ -165,7 +165,8 @@ export const AccountConfigurationApiResponseSchema = z.object({
     }),
   nickName: z.string().nullable(),
   avatarUrl: z.string().nullable(),
-  inviteCode: z.string()
+  inviteCode: z.string(),
+  pointsBalance: decimal()
 })
 export type AccountConfigurationApiResponse = z.infer<
   typeof AccountConfigurationApiResponseSchema
