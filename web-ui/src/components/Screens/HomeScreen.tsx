@@ -1,7 +1,7 @@
 import { apiClient, Chain, noAuthApiClient, OrderSide } from 'apiClient'
 import BalancesWidget from 'components/Screens/HomeScreen/balances/BalancesWidget'
-import { Header, Tab } from 'components/Screens/Header'
-import React, { LegacyRef, useEffect, useMemo, useState } from 'react'
+import { Header, Tab, Widget } from 'components/Screens/Header'
+import React, { LegacyRef, useEffect, useMemo, useRef, useState } from 'react'
 import OrdersAndTradesWidget from 'components/Screens/HomeScreen/OrdersAndTradesWidget/OrdersAndTradesWidget'
 import TradingSymbols from 'tradingSymbols'
 import Markets, { Market } from 'markets'
@@ -43,6 +43,7 @@ function HomeScreenContent() {
     (window.sessionStorage.getItem('tab') as Tab | null) ??
       (TestnetChallengeEnabled ? 'Testnet Challenge' : 'Swap')
   )
+  const [scrollToWidget, setScrollToWidget] = useState<Widget>()
 
   const {
     exchangeContract,
@@ -116,10 +117,12 @@ function HomeScreenContent() {
     }
   }, [markets, selectedMarket])
 
-  const [homeScreenRef, { width }] = useMeasure()
-  const [pricesRef, { height: pricesMeasuredHeight }] = useMeasure()
-  const [balancesRef, { height: balancesMeasuredHeight }] = useMeasure()
-  const [swapRef, { height: swapMeasuredHeight }] = useMeasure()
+  const [homeScreenMeasureRef, { width }] = useMeasure()
+  const [pricesMeasureRef, { height: pricesMeasuredHeight }] = useMeasure()
+  const [balancesMeasureRef, { height: balancesMeasuredHeight }] = useMeasure()
+  const [swapMeasureRef, { height: swapMeasuredHeight }] = useMeasure()
+
+  const balancesRef = useRef<HTMLDivElement | null>(null)
 
   const defaultSide = useMemo(() => {
     if (selectedMarket) {
@@ -154,10 +157,23 @@ function HomeScreenContent() {
     )
   }, [accountConfigQuery.data])
 
-  function saveTab(tab: Tab) {
+  function saveTab(tab: Tab, widget?: Widget) {
     setTab(tab)
     window.sessionStorage.setItem('tab', tab)
+    if (widget) {
+      setScrollToWidget(widget)
+    }
   }
+
+  useEffect(() => {
+    if (scrollToWidget) {
+      switch (scrollToWidget) {
+        case 'Balances':
+          balancesRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }
+      setScrollToWidget(undefined)
+    }
+  }, [tab, scrollToWidget])
 
   return markets && marketsWithBackToBack && feeRates && selectedMarket ? (
     showAdmin ? (
@@ -176,7 +192,7 @@ function HomeScreenContent() {
           <div className="mx-4 flex min-h-screen justify-center overflow-auto py-24">
             <div
               className="my-auto laptop:max-w-[1800px]"
-              ref={homeScreenRef as LegacyRef<HTMLDivElement>}
+              ref={homeScreenMeasureRef as LegacyRef<HTMLDivElement>}
             >
               {tab === 'Swap' && (
                 <SwapModal
@@ -203,7 +219,7 @@ function HomeScreenContent() {
               {tab === 'Dashboard' && (
                 <div className="grid grid-cols-1 gap-4 laptop:grid-cols-3">
                   <div className="col-span-1 space-y-4 laptop:col-span-2">
-                    <div ref={pricesRef as LegacyRef<HTMLDivElement>}>
+                    <div ref={pricesMeasureRef as LegacyRef<HTMLDivElement>}>
                       <PricesWidget
                         side={defaultSide}
                         market={selectedMarket}
@@ -212,18 +228,22 @@ function HomeScreenContent() {
                     </div>
                     {symbols && width >= 1100 && (
                       <div ref={balancesRef as LegacyRef<HTMLDivElement>}>
-                        <BalancesWidget
-                          walletAddress={wallets.primary?.address}
-                          exchangeContractAddress={exchangeContract?.address}
-                          symbols={symbols}
-                          chains={chains}
-                          accountConfig={accountConfigQuery.data}
-                        />
+                        <div
+                          ref={balancesMeasureRef as LegacyRef<HTMLDivElement>}
+                        >
+                          <BalancesWidget
+                            walletAddress={wallets.primary?.address}
+                            exchangeContractAddress={exchangeContract?.address}
+                            symbols={symbols}
+                            chains={chains}
+                            accountConfig={accountConfigQuery.data}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
                   <div className="col-span-1 space-y-4">
-                    <div ref={swapRef as LegacyRef<HTMLDivElement>}>
+                    <div ref={swapMeasureRef as LegacyRef<HTMLDivElement>}>
                       <SwapWidget
                         markets={markets}
                         walletAddress={wallets.primary?.address}
@@ -252,12 +272,14 @@ function HomeScreenContent() {
                         side={overriddenSide ?? defaultSide}
                         height={500}
                       />
-                      <BalancesWidget
-                        walletAddress={wallets.primary?.address}
-                        exchangeContractAddress={exchangeContract?.address}
-                        symbols={symbols}
-                        chains={chains}
-                      />
+                      <div ref={balancesRef as LegacyRef<HTMLDivElement>}>
+                        <BalancesWidget
+                          walletAddress={wallets.primary?.address}
+                          exchangeContractAddress={exchangeContract?.address}
+                          symbols={symbols}
+                          chains={chains}
+                        />
+                      </div>
                     </div>
                   )}
                   <div className="col-span-1 space-y-4 laptop:col-span-3">
@@ -271,6 +293,7 @@ function HomeScreenContent() {
               )}
               {tab === 'Testnet Challenge' && symbols && (
                 <TestnetChallengeTab
+                  chains={chains}
                   symbols={symbols}
                   exchangeContract={exchangeContract}
                   accountConfig={accountConfigQuery.data}

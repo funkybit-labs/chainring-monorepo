@@ -17,6 +17,7 @@ import { useConfig } from 'wagmi'
 import { useAuth } from 'contexts/auth'
 
 export type Tab = 'Swap' | 'Limit' | 'Dashboard' | 'Testnet Challenge'
+export type Widget = 'Balances'
 
 export function Header({
   tab,
@@ -28,7 +29,7 @@ export function Header({
   tab: Tab
   markets: Markets
   isAdmin: boolean
-  onTabChange: (newTab: Tab) => void
+  onTabChange: (newTab: Tab, widget?: Widget) => void
   onShowAdmin: () => void
 }) {
   const { isAuthenticated } = useAuth()

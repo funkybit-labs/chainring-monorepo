@@ -505,7 +505,11 @@ const PointTypeSchema = z.enum([
   'DailyReward',
   'WeeklyReward',
   'OverallReward',
-  'ReferralBonus'
+  'ReferralBonus',
+  'EvmWalletConnected',
+  'EvmWithdrawalDeposit',
+  'BitcoinWalletConnected',
+  'BitcoinWithdrawalDeposit'
 ])
 
 const RewardCategorySchema = z.enum([
