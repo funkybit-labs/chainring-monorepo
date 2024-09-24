@@ -1,7 +1,9 @@
 import {
   AccountConfigurationApiResponse,
   AddressType,
-  apiClient
+  apiClient,
+  Balance,
+  Chain
 } from 'apiClient'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -9,7 +11,7 @@ import TradingSymbol from 'tradingSymbol'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import { useConfig } from 'wagmi'
 import TradingSymbols from 'tradingSymbols'
-import { useWallets } from 'contexts/walletProvider'
+import { ConnectedWallet, useWallets } from 'contexts/walletProvider'
 import ZeppelinSvg from 'assets/zeppelin.svg'
 import PointRightSvg from 'assets/point-right.svg'
 import StopHandSvg from 'assets/stop-hand.svg'
@@ -17,24 +19,48 @@ import ClockSvg from 'assets/clock.svg'
 import DiscoBall from 'components/Screens/HomeScreen/DiscoBall'
 import DepositModal from 'components/Screens/HomeScreen/DepositModal'
 import { Leaderboard } from 'components/Screens/HomeScreen/testnetchallenge/Leaderboard'
-import { Tab } from 'components/Screens/Header'
+import { Tab, Widget } from 'components/Screens/Header'
 import { accountConfigQueryKey } from 'components/Screens/HomeScreen'
+import { useWebsocketSubscription } from 'contexts/websocket'
+import { balancesTopic, Publishable } from 'websocketMessages'
+import WithdrawalModal from 'components/Screens/HomeScreen/WithdrawalModal'
 
 export const testnetChallengeInviteCodeKey = 'testnetChallengeInviteCode'
 export function TestnetChallengeTab({
+  chains,
   symbols,
   exchangeContract,
   accountConfig,
   onChangeTab
 }: {
+  chains: Chain[]
   symbols: TradingSymbols
   exchangeContract?: { name: string; address: string }
   accountConfig?: AccountConfigurationApiResponse
-  onChangeTab: (tab: Tab) => void
+  onChangeTab: (tab: Tab, widget?: Widget) => void
 }) {
   const evmConfig = useConfig()
   const queryClient = useQueryClient()
   const wallets = useWallets()
+
+  const [balances, setBalances] = useState<Balance[]>(() => [])
+  useWebsocketSubscription({
+    topics: useMemo(() => [balancesTopic], []),
+    handler: useCallback(
+      (message: Publishable) => {
+        if (message.type === 'Balances') {
+          setBalances(message.balances)
+          queryClient.invalidateQueries({ queryKey: accountConfigQueryKey })
+        }
+      },
+      [queryClient]
+    )
+  })
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
+  const [withdrawalWallet, setWithdrawalWallet] = useState<ConnectedWallet>()
+  const [withdrawalSymbol, setWithdrawalSymbol] = useState<TradingSymbol>()
+  const [withdrawalExchangeContract, setWithdrawalExchangeContract] =
+    useState<AddressType>()
 
   const [
     showTestnetChallengeDepositModal,
@@ -69,18 +95,24 @@ export function TestnetChallengeTab({
     }
   })
 
-  const { testnetChallengeStatus, nickName, avatarUrl, inviteCode } =
-    useMemo(() => {
-      if (accountConfig) {
-        return {
-          testnetChallengeStatus: accountConfig.testnetChallengeStatus,
-          nickName: accountConfig.nickName ?? undefined,
-          avatarUrl: accountConfig.avatarUrl ?? undefined,
-          inviteCode: accountConfig.inviteCode
-        }
+  const {
+    testnetChallengeStatus,
+    nickName,
+    avatarUrl,
+    inviteCode,
+    pointsBalance
+  } = useMemo(() => {
+    if (accountConfig) {
+      return {
+        testnetChallengeStatus: accountConfig.testnetChallengeStatus,
+        nickName: accountConfig.nickName ?? undefined,
+        avatarUrl: accountConfig.avatarUrl ?? undefined,
+        inviteCode: accountConfig.inviteCode,
+        pointsBalance: accountConfig.pointsBalance
       }
-      return {}
-    }, [accountConfig])
+    }
+    return {}
+  }, [accountConfig])
 
   const accountRefreshRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -157,6 +189,33 @@ export function TestnetChallengeTab({
     }
   }, [wallets, walletHasConnected, queryClient])
 
+  function onWithdrawal(symbol: TradingSymbol) {
+    if (wallets.isConnected(symbol.networkType)) {
+      setWithdrawalWallet(
+        wallets.connected.find(
+          (wallet) => wallet.networkType == symbol.networkType
+        )
+      )
+      setWithdrawalSymbol(symbol)
+
+      if (symbol.networkType === 'Bitcoin') {
+        const contractAddress = chains
+          .filter((chain) => chain.networkType === 'Bitcoin')[0]
+          .contracts.find((c) => c.name == 'Exchange')?.address
+
+        setWithdrawalExchangeContract(contractAddress)
+      } else if (symbol.networkType === 'Evm') {
+        const contractAddress = chains
+          .filter((chain) => chain.networkType === 'Evm')
+          .find((chain) => chain.id === symbol.chainId)!
+          .contracts.find((c) => c.name == 'Exchange')?.address
+
+        setWithdrawalExchangeContract(contractAddress)
+      }
+      setShowWithdrawalModal(true)
+    }
+  }
+
   return (
     <>
       <div className="flex h-[85vh] flex-col">
@@ -164,11 +223,15 @@ export function TestnetChallengeTab({
           <div className="grid h-full w-screen min-w-[1250px] grid-cols-1 gap-2 px-4 text-lg text-white narrow:grid-cols-3">
             {testnetChallengeStatus === 'Enrolled' ? (
               <Leaderboard
+                pointsBalance={pointsBalance}
                 avatarUrl={avatarUrl}
                 nickName={nickName}
                 inviteCode={inviteCode}
                 wallets={wallets}
+                balances={balances}
+                symbols={symbols}
                 onChangeTab={onChangeTab}
+                onWithdrawal={onWithdrawal}
               />
             ) : (
               <div className="col-span-1 laptop:col-span-3">
@@ -321,6 +384,27 @@ export function TestnetChallengeTab({
               message={
                 'You now have $10,000 of tUSDC in your wallet, click Submit to deposit it to funkybit.'
               }
+            />
+          )}
+        {withdrawalWallet?.address &&
+          withdrawalExchangeContract &&
+          withdrawalSymbol &&
+          (withdrawalSymbol.networkType === 'Bitcoin' ||
+            withdrawalSymbol?.chainId === evmConfig.state.chainId) && (
+            <WithdrawalModal
+              exchangeContractAddress={withdrawalExchangeContract}
+              walletAddress={withdrawalWallet.address}
+              symbol={withdrawalSymbol}
+              isOpen={showWithdrawalModal}
+              close={() => setShowWithdrawalModal(false)}
+              onClosed={() => {
+                setWithdrawalWallet(undefined)
+                setWithdrawalSymbol(undefined)
+                setWithdrawalExchangeContract(undefined)
+                queryClient.invalidateQueries({
+                  queryKey: accountConfigQueryKey
+                })
+              }}
             />
           )}
       </div>

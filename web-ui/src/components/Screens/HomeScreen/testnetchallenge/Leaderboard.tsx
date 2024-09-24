@@ -21,13 +21,17 @@ import {
   ApiErrorsSchema,
   LeaderboardType,
   Leaderboard as LB,
-  Card
+  Card,
+  Balance
 } from 'apiClient'
 import { Modal } from 'components/common/Modal'
-import { Tab } from 'components/Screens/Header'
+import { Tab, Widget } from 'components/Screens/Header'
 import { CopyToClipboard } from 'react-copy-to-clipboard'
 import { Tooltip } from 'react-tooltip'
 import { accountConfigQueryKey } from 'components/Screens/HomeScreen'
+import TradingSymbol from 'tradingSymbol'
+import TradingSymbols from 'tradingSymbols'
+import Decimal from 'decimal.js'
 
 type EditMode = 'none' | 'name' | 'icon'
 
@@ -144,10 +148,19 @@ function Board({
 
 function CardCarousel({
   cards,
-  onChangeTab
+  onChangeTab,
+  onCallToAction
 }: {
   cards: [Card, ...Card[]]
   onChangeTab: (tab: Tab) => void
+  onCallToAction: (
+    type:
+      | 'Enrolled'
+      | 'RecentPoints'
+      | 'BitcoinConnect'
+      | 'BitcoinWithdrawal'
+      | 'EvmWithdrawal'
+  ) => void
 }) {
   const [index, setIndex] = useState(0)
   const [prevIndex, setPrevIndex] = useState(-1)
@@ -279,11 +292,11 @@ function CardCarousel({
                   />
                   <div className="my-auto">
                     You can earn{' '}
-                    {card.type === 'BitcoinWithdrawal' ? ' 500 ' : ' 100 '}{' '}
+                    {card.type === 'BitcoinWithdrawal' ? ' 500 ' : ' 250 '}{' '}
                     funky bits by{' '}
                     <span
                       className="cursor-pointer underline"
-                      onClick={() => onChangeTab('Dashboard')}
+                      onClick={() => onCallToAction(card.type)}
                     >
                       withdrawing
                     </span>
@@ -303,17 +316,25 @@ function CardCarousel({
 }
 
 export function Leaderboard({
+  pointsBalance,
   avatarUrl,
   nickName,
   inviteCode,
   wallets,
-  onChangeTab
+  balances,
+  symbols,
+  onChangeTab,
+  onWithdrawal
 }: {
+  pointsBalance: Decimal
   avatarUrl?: string
   nickName?: string
   inviteCode: string
   wallets: Wallets
-  onChangeTab: (tab: Tab) => void
+  balances: Balance[]
+  symbols: TradingSymbols
+  onChangeTab: (tab: Tab, widget?: Widget) => void
+  onWithdrawal: (symbol: TradingSymbol) => void
 }) {
   const queryClient = useQueryClient()
 
@@ -466,6 +487,32 @@ export function Leaderboard({
     setTimeout(() => setCopyTooltipText('Copy to clipboard'), 2000)
   }
 
+  function onCallToAction(
+    type:
+      | 'Enrolled'
+      | 'RecentPoints'
+      | 'BitcoinConnect'
+      | 'BitcoinWithdrawal'
+      | 'EvmWithdrawal'
+  ) {
+    if (type === 'BitcoinWithdrawal') {
+      if (wallets.isConnected('Bitcoin')) {
+        onWithdrawal(symbols.native[0])
+      } else {
+        onChangeTab('Dashboard', 'Balances')
+      }
+    } else if (type === 'EvmWithdrawal') {
+      const evmSymbols = symbols.erc20.filter((s) =>
+        balances.some((b) => b.symbol === s.name && b.available > 0)
+      )
+      if (evmSymbols.length === 1 && wallets.isConnected('Evm')) {
+        onWithdrawal(evmSymbols[0])
+      } else {
+        onChangeTab('Dashboard', 'Balances')
+      }
+    }
+  }
+
   return (
     <>
       <div className="flex flex-col gap-8 p-2">
@@ -504,7 +551,10 @@ export function Leaderboard({
                 )}
               </div>
               <div className="text-sm">
-                funky bits: <span className="text-statusOrange">23,500</span>
+                funky bits:{' '}
+                <span className="text-statusOrange">
+                  {pointsBalance.toFixed(0)}
+                </span>
               </div>
               <div className="flex flex-row pt-2">
                 <Button
@@ -609,6 +659,7 @@ export function Leaderboard({
             <CardCarousel
               cards={[cardQuery.data[0], ...cardQuery.data.slice(1)]}
               onChangeTab={onChangeTab}
+              onCallToAction={onCallToAction}
             />
           )}
         </div>
