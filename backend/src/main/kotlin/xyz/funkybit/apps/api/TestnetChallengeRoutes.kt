@@ -27,8 +27,7 @@ import xyz.funkybit.apps.api.model.SetAvatarUrl
 import xyz.funkybit.apps.api.model.SetNickname
 import xyz.funkybit.apps.api.model.processingError
 import xyz.funkybit.apps.api.model.testnetChallengeDisqualifiedError
-import xyz.funkybit.core.blockchain.BlockchainClient
-import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderEntity
@@ -44,7 +43,7 @@ import xyz.funkybit.core.utils.IconUtils.resolveSymbolUrl
 import xyz.funkybit.core.utils.IconUtils.sanitizeImageUrl
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 
-class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
+class TestnetChallengeRoutes {
     private val logger = KotlinLogging.logger { }
 
     val enroll: ContractRoute = run {
@@ -72,31 +71,15 @@ class TestnetChallengeRoutes(blockchainClients: Collection<BlockchainClient>) {
                         return@transaction testnetChallengeDisqualifiedError("Disqualified due to prior deposit")
                     }
 
-                    val blockchainClient = blockchainClients.first { it.chainId == symbol.chainId.value }
-                    val amount = TestnetChallengeUtils.depositAmount
-
-                    val address = request.principal.address
-                    logger.debug { "Sending $amount ${symbol.name} to $address" }
-
-                    val amountInFundamentalUnits = amount.movePointRight(symbol.decimals.toInt()).toBigInteger()
-                    val tokenContractAddress = symbol.contractAddress as? EvmAddress
-                        ?: throw RuntimeException("Only ERC-20s supported for testnet challenge deposit symbol")
-
-                    val gasAmount = TestnetChallengeUtils.gasDepositAmount
-                    val gasSymbol = SymbolEntity.forChainAndContractAddress(symbol.chainId.value, null)
-                    val gasAmountInFundamentalUnits =
-                        gasAmount.movePointRight(gasSymbol.decimals.toInt()).toBigInteger()
-
-                    blockchainClient.sendNativeDepositTx(
-                        address,
-                        gasAmountInFundamentalUnits,
+                    val airDropperBlockchainClient = ChainManager.getAirdropperBlockchainClient(symbol.chainId.value)
+                    val txHash = airDropperBlockchainClient.testnetChallengeAirdrop(
+                        request.principal.address,
+                        tokenSymbol = symbol,
+                        tokenAmount = TestnetChallengeUtils.depositAmount,
+                        gasSymbol = SymbolEntity.forChainAndContractAddress(symbol.chainId.value, null),
+                        gasAmount = TestnetChallengeUtils.gasDepositAmount,
                     )
 
-                    val txHash = blockchainClient.sendMintERC20Tx(
-                        tokenContractAddress,
-                        address as EvmAddress,
-                        amountInFundamentalUnits,
-                    )
                     user.testnetChallengeStatus = TestnetChallengeStatus.PendingAirdrop
                     user.testnetAirdropTxHash = txHash.value
 

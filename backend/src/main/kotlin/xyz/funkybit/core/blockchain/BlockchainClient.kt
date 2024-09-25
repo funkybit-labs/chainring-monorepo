@@ -442,6 +442,20 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
             BigInteger.ZERO,
         )
 
+    fun sendTransferERC20Tx(
+        tokenContractAddress: EvmAddress,
+        receiver: EvmAddress,
+        amount: BigInteger,
+    ): TxHash =
+        sendTransaction(
+            tokenContractAddress,
+            MockERC20
+                .load(tokenContractAddress.value, web3j, transactionManager, gasProvider)
+                .transfer(receiver.value, amount)
+                .encodeFunctionCall(),
+            BigInteger.ZERO,
+        )
+
     fun getFeeAccountAddress(block: DefaultBlockParam): EvmAddress =
         EvmAddress(Keys.toChecksumAddress(exchangeContractCall(block, Exchange::feeAccount)))
 
@@ -470,4 +484,29 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         loadExchangeContract(exchangeContractAddress)
             .submitSettlementBatch(DefaultFunctionEncoder().encodeParameters(listOf(batchSettlement)).toHexBytes())
             .encodeFunctionCall()
+}
+
+class AirdropperBlockchainClient(config: BlockchainClientConfig) : BlockchainClient(config) {
+
+    fun testnetChallengeAirdrop(address: Address, tokenSymbol: SymbolEntity, tokenAmount: BigDecimal, gasSymbol: SymbolEntity, gasAmount: BigDecimal): TxHash {
+        logger.debug { "Sending $gasAmount ${gasSymbol.name} to $address" }
+
+        val gasAmountInFundamentalUnits = gasAmount.movePointRight(gasSymbol.decimals.toInt()).toBigInteger()
+        sendNativeDepositTx(
+            address,
+            gasAmountInFundamentalUnits,
+        )
+
+        logger.debug { "Sending $tokenAmount ${tokenSymbol.name} to $address" }
+
+        val amountInFundamentalUnits = tokenAmount.movePointRight(tokenSymbol.decimals.toInt()).toBigInteger()
+        val tokenContractAddress = tokenSymbol.contractAddress as? EvmAddress
+            ?: throw RuntimeException("Only ERC-20s supported for testnet challenge deposit symbol")
+
+        return sendTransferERC20Tx(
+            tokenContractAddress,
+            address as EvmAddress,
+            amountInFundamentalUnits,
+        )
+    }
 }

@@ -84,7 +84,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val orderRoutes = OrderRoutes(exchangeApiService)
     private val walletRoutes = WalletRoutes(sequencerClient)
     private val faucetRoutes = FaucetRoutes(faucetMode, ChainManager.getBlockchainClients())
-    private val testnetChallengeRoutes = TestnetChallengeRoutes(ChainManager.getBlockchainClients())
+    private val testnetChallengeRoutes = TestnetChallengeRoutes()
 
     private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
         .then(ServerFilters.Cors(corsPolicy))
