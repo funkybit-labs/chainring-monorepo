@@ -40,7 +40,7 @@ const Root = () => {
       <div className="flex h-screen items-center justify-center bg-darkBluishGray10 text-white">
         <div className="w-2/3 text-center ">
           <h1 className="text-3xl font-bold">
-            Uh-oh! funkybit isn&apos;t feeling so funky where you&apos;re at
+            Uh-oh! funkybit isn&apos;t feeling so funky where you&apos;re at...
           </h1>
           <p className="mt-4 text-lg">
             Whether you&apos;re tuning in from North Korea, the great state of
