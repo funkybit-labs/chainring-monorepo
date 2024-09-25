@@ -1,5 +1,5 @@
 import GithubIconSvg from 'assets/github-icon.svg'
-import MediumIconSvg from 'assets/medium-icon.svg'
+import DiscordIconSvg from 'assets/discord-icon.svg'
 import LinkedInIconSvg from 'assets/linkedin-icon.svg'
 import XIconSvg from 'assets/x-icon.svg'
 import { Button } from 'components/common/Button'
@@ -38,8 +38,8 @@ function GoalAchieved({ goalAchieved }: { goalAchieved?: UserGoal }) {
         +{goalAchieved?.reward?.toString() ?? ''} FB
       </div>
       <div className="text-center text-lg leading-6 text-white">
-        Thank you for subscribing to our {goalAchievedDescription}. Complete
-        more goals for more FB.
+        Thank you for following us on {goalAchievedDescription}. Complete more
+        goals for more FBs.
       </div>
       <Button className={'mt-2 p-1'} caption={() => 'Ok'} onClick={close} />
     </div>
@@ -116,8 +116,8 @@ function goalInfo(goalId: GoalId) {
   switch (goalId) {
     case 'GithubSubscription':
       return [GithubIconSvg, 'Github', 'https://github.com/funkybit-labs']
-    case 'MediumSubscription':
-      return [MediumIconSvg, 'Medium', 'https://funkybit-fun.medium.com/']
+    case 'DiscordSubscription':
+      return [DiscordIconSvg, 'Discord', 'https://discord.gg/ZMarUVW7']
     case 'LinkedinSubscription':
       return [
         LinkedInIconSvg,
@@ -184,8 +184,8 @@ function GoalRow({
                 {status === 'rewardReady'
                   ? 'Claim'
                   : status === 'achieved'
-                    ? 'Subscribed'
-                    : 'Subscribe'}
+                    ? 'Followed'
+                    : 'Follow'}
               </div>
             )}
             onClick={() => {
