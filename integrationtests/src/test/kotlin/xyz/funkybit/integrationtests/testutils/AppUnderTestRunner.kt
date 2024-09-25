@@ -153,7 +153,9 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                                     )
                                     ArchAccountTable.deleteAll()
                                 } else {
-                                    BitcoinUtxoAddressMonitorEntity.createIfNotExists(DeployedSmartContractEntity.programBitcoinAddress())
+                                    if (DeployedSmartContractEntity.validContracts(BitcoinClient.chainId).isNotEmpty()) {
+                                        BitcoinUtxoAddressMonitorEntity.createIfNotExists(DeployedSmartContractEntity.programBitcoinAddress())
+                                    }
                                 }
                                 WithdrawalEntity.findPending().forEach { it.update(WithdrawalStatus.Failed, "restarting test") }
                                 BlockTable.deleteAll()

@@ -52,7 +52,7 @@ class ArchDepositAndWithdrawalTest {
 
     @BeforeEach
     fun waitForSetup() {
-        Assumptions.assumeFalse(true)
+        Assumptions.assumeFalse(isTestEnvRun())
         waitForProgramAccount()
         waitForProgramStateAccount()
         waitForTokenStateAccount()
@@ -61,7 +61,6 @@ class ArchDepositAndWithdrawalTest {
 
     @Test
     fun testArchDepositsAndWithdrawals() {
-        Assumptions.assumeFalse(true)
         Assumptions.assumeFalse(isTestEnvRun())
 
         val airdropAmount = BigInteger("15000")
@@ -150,7 +149,6 @@ class ArchDepositAndWithdrawalTest {
 
     @Test
     fun `testArchDepositsAndWithdrawals - multiple token accounts`() {
-        Assumptions.assumeFalse(true)
         Assumptions.assumeFalse(isTestEnvRun())
         transaction {
             ArchAccountTable.deleteWhere {

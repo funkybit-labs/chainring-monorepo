@@ -24,22 +24,23 @@ object ArchContractsPublisher {
     val logger = KotlinLogging.logger {}
 
     fun updateContracts() {
-        transaction {
-            ContractType.entries.forEach { contractType ->
-                val deployedContract = DeployedSmartContractEntity
+        ContractType.entries.forEach { contractType ->
+            val deployedContract = transaction {
+                DeployedSmartContractEntity
                     .findLastDeployedContractByNameAndChain(contractType.name, BitcoinClient.chainId)
+            }
 
-                if (deployedContract == null) {
-                    logger.info { "Deploying arch contract: $contractType" }
-                    deployContract(contractType)
-                } else if (deployedContract.deprecated) {
-                    throw Exception("upgrades not currently supported on Arch.")
-                }
+            if (deployedContract == null) {
+                logger.info { "Deploying arch contract: $contractType" }
+                deployContract()
+            } else if (deployedContract.deprecated) {
+                logger.info { "Upgrading arch contract: $contractType" }
+                upgradeContract()
             }
         }
     }
 
-    private fun deployContract(contractType: ContractType) {
+    private fun deployContract() {
         var programAccount = getProgramAccount()
         while (programAccount?.status?.isFinal() != true) {
             try {
@@ -49,7 +50,7 @@ object ArchContractsPublisher {
             } catch (e: Exception) {
                 logger.error(e) { "Uncaught exception in deployment of arch contract" }
             }
-            Thread.sleep(2000)
+            Thread.sleep(1000)
             programAccount = getProgramAccount()
         }
 
@@ -57,17 +58,36 @@ object ArchContractsPublisher {
         while (programStateAccount?.status?.isFinal() != true) {
             try {
                 transaction {
-                    handleProgramStateSetup(programAccount, contractType)
+                    handleProgramStateSetup(programAccount)
                 }
             } catch (e: Exception) {
                 logger.error(e) { "Uncaught exception in deployment of arch contract" }
             }
-            Thread.sleep(2000)
+            Thread.sleep(1000)
             programStateAccount = getProgramStateAccount()
         }
     }
 
-    @OptIn(ExperimentalUnsignedTypes::class)
+    private fun upgradeContract() {
+        var programAccount = getProgramAccount()!!
+        if (programAccount.status == ArchAccountStatus.Complete) {
+            transaction {
+                initiateDeployProgramTxs(programAccount)
+            }
+        }
+        while (!programAccount.status.isFinal()) {
+            try {
+                transaction {
+                    handleProgramUpgrade()
+                }
+            } catch (e: Exception) {
+                logger.error(e) { "Uncaught exception in deployment of arch contract" }
+            }
+            Thread.sleep(1000)
+            programAccount = getProgramAccount()!!
+        }
+    }
+
     private fun handleProgramDeployment() {
         val programAccount = ArchAccountEntity.findProgramAccount() ?: ArchUtils.fundArchAccountCreation(ECKey(), ArchAccountType.Program)
         when (programAccount?.status) {
@@ -80,47 +100,7 @@ object ArchContractsPublisher {
             }
 
             ArchAccountStatus.Created -> {
-                val chunkSize = ArchNetworkClient.MAX_TX_SIZE - 187 // 187 is overhead signature, account meta, system program id etc
-                var chunkOffset = 0
-                val ecKey = programAccount.ecKey()
-                val pubkey = ArchNetworkRpc.Pubkey.fromECKey(ecKey)
-                javaClass.getResource("/exchangeprogram.so")?.readBytes()?.let {
-                    val txs = it.asSequence().chunked(chunkSize) { chunk ->
-                        logger.debug { "building extendBytesTransactions offset = $chunkOffset, size = ${chunk.size}" }
-                        val buffer = ByteBuffer.allocate(chunk.size + 8)
-                        buffer.order(ByteOrder.LITTLE_ENDIAN)
-                        buffer.putInt(chunkOffset)
-                        buffer.putInt(chunk.size)
-                        buffer.put(chunk.toByteArray())
-                        chunkOffset += chunk.size
-                        val message = ArchNetworkRpc.Message(
-                            signers = listOf(
-                                ArchNetworkRpc.Pubkey.fromECKey(ecKey),
-                            ),
-                            instructions = listOf(
-                                ArchNetworkRpc.extendBytesInstruction(pubkey, buffer.array()),
-                            ),
-                        )
-
-                        val signature = Schnorr.sign(message.hash(), ecKey.privKeyBytes)
-
-                        ArchNetworkRpc.RuntimeTransaction(
-                            version = 0,
-                            signatures = listOf(
-                                ArchNetworkRpc.Signature(signature.toUByteArray()),
-                            ),
-                            message = message,
-                        )
-                    }.toList()
-                    val txIds = txs.asSequence().chunked(50) { rtxs ->
-                        ArchNetworkClient.sendTransactions(rtxs).also {
-                            Thread.sleep(4000)
-                        }
-                    }.flatten().toList()
-                    programAccount.markAsInitializing(
-                        AccountSetupState.Program(txIds, 0, null),
-                    )
-                }
+                initiateDeployProgramTxs(programAccount)
             }
 
             ArchAccountStatus.Initializing -> {
@@ -141,7 +121,6 @@ object ArchContractsPublisher {
                     }
 
                     setupState.numProcessed == setupState.deploymentTxIds.size -> {
-                        Thread.sleep(2000)
                         sendMakeAccountExecutableTx(programAccount, setupState)
                     }
 
@@ -162,7 +141,6 @@ object ArchContractsPublisher {
                             index++
                         }
                         if (setupState.numProcessed == setupState.deploymentTxIds.size) {
-                            Thread.sleep(2000)
                             sendMakeAccountExecutableTx(programAccount, setupState)
                         } else {
                             programAccount.markAsInitializing(setupState)
@@ -175,7 +153,95 @@ object ArchContractsPublisher {
         }
     }
 
-    private fun handleProgramStateSetup(programAccount: ArchAccountEntity, contractType: ContractType) {
+    private fun handleProgramUpgrade() {
+        val programAccount = ArchAccountEntity.findProgramAccount()
+        when (programAccount?.status) {
+            ArchAccountStatus.Initializing -> {
+                val setupState = (programAccount.setupState as AccountSetupState.Program).copy()
+                when {
+                    setupState.numProcessed == setupState.deploymentTxIds.size -> {
+                        createDeployedContractEntity(programAccount)
+                        programAccount.markAsComplete()
+                    }
+
+                    else -> {
+                        var index = setupState.numProcessed
+                        while (index < setupState.deploymentTxIds.size && ArchUtils.handleTxStatusUpdate(
+                                setupState.deploymentTxIds[index],
+                                onError = {
+                                    programAccount.markAsFailed()
+                                    logger.debug { "Failed to process $index deployment txId" }
+                                },
+                                onProcessed = {
+                                    setupState.numProcessed++
+                                    logger.debug { "Processed $index deployment txId" }
+                                },
+                            )
+                        ) {
+                            index++
+                        }
+                        if (setupState.numProcessed == setupState.deploymentTxIds.size) {
+                            createDeployedContractEntity(programAccount)
+                            programAccount.markAsComplete()
+                        } else {
+                            programAccount.markAsInitializing(setupState)
+                        }
+                    }
+                }
+            }
+
+            else -> {}
+        }
+    }
+
+    @OptIn(ExperimentalUnsignedTypes::class)
+    fun initiateDeployProgramTxs(programAccount: ArchAccountEntity) {
+        val chunkSize = ArchNetworkClient.MAX_TX_SIZE - 187 // 187 is overhead signature, account meta, system program id etc
+        var chunkOffset = 0
+        val ecKey = programAccount.ecKey()
+        val pubkey = ArchNetworkRpc.Pubkey.fromECKey(ecKey)
+        javaClass.getResource("/exchangeprogram.so")?.readBytes()?.let {
+            val txs = it.asSequence().chunked(chunkSize) { chunk ->
+                logger.debug { "building extendBytesTransactions offset = $chunkOffset, size = ${chunk.size}" }
+                val buffer = ByteBuffer.allocate(chunk.size + 8)
+                buffer.order(ByteOrder.LITTLE_ENDIAN)
+                buffer.putInt(chunkOffset)
+                buffer.putInt(chunk.size)
+                buffer.put(chunk.toByteArray())
+                chunkOffset += chunk.size
+                val message = ArchNetworkRpc.Message(
+                    signers = listOf(
+                        ArchNetworkRpc.Pubkey.fromECKey(ecKey),
+                    ),
+                    instructions = listOf(
+                        ArchNetworkRpc.extendBytesInstruction(pubkey, buffer.array()),
+                    ),
+                )
+
+                val signature = Schnorr.sign(message.hash(), ecKey.privKeyBytes)
+
+                ArchNetworkRpc.RuntimeTransaction(
+                    version = 0,
+                    signatures = listOf(
+                        ArchNetworkRpc.Signature(signature.toUByteArray()),
+                    ),
+                    message = message,
+                )
+            }.toList()
+            val txIds = txs.asSequence().chunked(75) { rtxs ->
+                ArchNetworkClient.sendTransactions(rtxs).also {
+                    Thread.sleep(3000)
+                }
+            }.flatten().toList()
+            if (txIds.isNotEmpty()) {
+                programAccount.markAsInitializing(
+                    AccountSetupState.Program(txIds, 0, null),
+                )
+            }
+        }
+    }
+
+    private fun handleProgramStateSetup(programAccount: ArchAccountEntity) {
         val programStateAccount = ArchAccountEntity.findProgramStateAccount() ?: ArchUtils.fundArchAccountCreation(BitcoinClient.config.submitterEcKey, ArchAccountType.ProgramState)
         when (programStateAccount?.status) {
             ArchAccountStatus.Funded -> {
@@ -200,16 +266,7 @@ object ArchContractsPublisher {
                     },
                     onProcessed = {
                         logger.debug { "Initialized program state account ${programStateAccount.publicKey} " }
-                        // get the address of the program to use for deposits
-                        val address = ArchNetworkClient.getAccountAddress(programAccount.rpcPubkey())
-                        BitcoinUtxoAddressMonitorEntity.createIfNotExists(address)
-                        DeployedSmartContractEntity.create(
-                            name = contractType.name,
-                            chainId = BitcoinClient.chainId,
-                            implementationAddress = address,
-                            proxyAddress = address,
-                            version = 1,
-                        )
+                        createDeployedContractEntity(programAccount)
                         programStateAccount.markAsComplete()
                     },
                 )
@@ -217,6 +274,18 @@ object ArchContractsPublisher {
 
             else -> {}
         }
+    }
+
+    private fun createDeployedContractEntity(programAccount: ArchAccountEntity) {
+        val address = ArchNetworkClient.getAccountAddress(programAccount.rpcPubkey())
+        BitcoinUtxoAddressMonitorEntity.createIfNotExists(address)
+        DeployedSmartContractEntity.create(
+            name = ContractType.Exchange.name,
+            chainId = BitcoinClient.chainId,
+            implementationAddress = address,
+            proxyAddress = address,
+            version = 1,
+        )
     }
 
     private fun getProgramAccount() = transaction {

@@ -36,6 +36,8 @@ class BitcoinBlockProcessor(
 
     private var chainEntryExists: Boolean = false
 
+    private val lookbackBlockCount = 200
+
     fun stop() {
         workerThread?.let {
             it.interrupt()
@@ -68,8 +70,8 @@ class BitcoinBlockProcessor(
             val lastProcessed = getLastProcessedBlock()
             val currentBlockHeight = BitcoinClient.getBlockCount()
             Pair(
-                (lastProcessed?.number?.let { it.toLong() + 1L } ?: currentBlockHeight).rangeTo(currentBlockHeight),
-                lastProcessed?.hash ?: BitcoinClient.getBlockHash(currentBlockHeight - 1),
+                (lastProcessed?.number?.let { it.toLong() + 1L } ?: (currentBlockHeight - lookbackBlockCount)).rangeTo(currentBlockHeight),
+                lastProcessed?.hash ?: BitcoinClient.getBlockHash(currentBlockHeight - lookbackBlockCount - 1),
             )
         }
 
@@ -86,7 +88,9 @@ class BitcoinBlockProcessor(
                 nextBlockHash = processBlock(blockNumber, nextBlockHash)
                 lastProcessedHash = header.hash
             } else {
-                handleSwitchToNewBestChain(blockNumber)
+                transaction {
+                    handleSwitchToNewBestChain(blockNumber)
+                }
                 // this will delete blocks handled after the split point, so next run will start
                 // from block after the split point again.
                 return

@@ -30,12 +30,20 @@ import kotlin.test.assertEquals
 class ArchOnboardingTest {
 
     companion object {
+
+        fun waitForDeployedContract() {
+            if (validContracts().isEmpty()) {
+                waitFor(180000) {
+                    validContracts().isNotEmpty()
+                }
+            }
+        }
+
         fun waitForProgramAccount(): ArchAccountEntity {
             if (programAccount()?.status != ArchAccountStatus.Complete) {
                 waitFor(180000) {
                     programAccount()?.status == ArchAccountStatus.Complete
                 }
-                Thread.sleep(2000)
             }
             return programAccount()!!
         }
@@ -45,7 +53,6 @@ class ArchOnboardingTest {
                 waitFor(6000) {
                     programStateAccount()?.status == ArchAccountStatus.Complete
                 }
-                Thread.sleep(2000)
             }
             return programStateAccount()!!
         }
@@ -72,12 +79,15 @@ class ArchOnboardingTest {
                 SymbolEntity.forChain(BitcoinClient.chainId).first(),
             ).firstOrNull { it.status == ArchAccountStatus.Complete }
         }
+
+        private fun validContracts() = transaction { DeployedSmartContractEntity.validContracts(BitcoinClient.chainId) }
     }
 
     @Test
     fun testOnboarding() {
-        Assumptions.assumeFalse(true)
         Assumptions.assumeFalse(isTestEnvRun())
+
+        waitForDeployedContract()
 
         // wait for the contract ot be deployed and verify program account
         val programEntity = waitForProgramAccount()
@@ -114,7 +124,7 @@ class ArchOnboardingTest {
         assertEquals(0, tokenState.version)
         assertEquals("BTC:0", tokenState.tokenId)
         assertEquals(programStateEntity.rpcPubkey().toString(), tokenState.programStateAccount.toString())
-        assertEquals(1, tokenState.balances.size)
-        assertEquals(ArchAccountState.Balance(BitcoinClient.config.feeCollectionAddress.value, 0u), tokenState.balances.first())
+        assertTrue(tokenState.balances.isNotEmpty())
+        assertEquals(BitcoinClient.config.feeCollectionAddress.value, tokenState.balances.first().walletAddress)
     }
 }

@@ -25,6 +25,7 @@ import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitFo
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.OrderBaseTest
 import xyz.funkybit.integrationtests.testutils.getFeeAccountBalanceOnArch
+import xyz.funkybit.integrationtests.testutils.isTestEnvRun
 import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
 import xyz.funkybit.integrationtests.utils.MyExpectedTrade
@@ -51,7 +52,7 @@ class ArchSettlementTest : OrderBaseTest() {
 
     @BeforeEach
     fun waitForSetup() {
-        Assumptions.assumeFalse(true)
+        Assumptions.assumeFalse(isTestEnvRun())
         waitForProgramAccount()
         waitForProgramStateAccount()
         waitForTokenStateAccount()
@@ -63,7 +64,7 @@ class ArchSettlementTest : OrderBaseTest() {
 
     @Test
     fun `settlement success - market buy`() {
-        Assumptions.assumeFalse(true)
+        Assumptions.assumeFalse(isTestEnvRun())
         val market = btcbtcArchMarket!!
         val baseSymbol = btc
         val quoteSymbol = btcArch
@@ -242,7 +243,7 @@ class ArchSettlementTest : OrderBaseTest() {
 
     @Test
     fun `settlement success - market sell`() {
-        Assumptions.assumeFalse(true)
+        Assumptions.assumeFalse(isTestEnvRun())
         val market = btcbtcArchMarket!!
         val baseSymbol = btc
         val quoteSymbol = btcArch
@@ -421,7 +422,7 @@ class ArchSettlementTest : OrderBaseTest() {
 
     @Test
     fun `settlement success - market buy - multiple arch accounts`() {
-        Assumptions.assumeFalse(true)
+        Assumptions.assumeFalse(isTestEnvRun())
         val market = btcbtcArchMarket!!
         val baseSymbol = btc
         val quoteSymbol = btcArch
