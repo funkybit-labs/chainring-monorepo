@@ -84,7 +84,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
         val blockchainClients = ChainManager.blockchainConfigs.map {
             TestBlockchainClient(it)
         }
-        val fixtures = getFixtures(blockchainClients, ChainManager.bitcoinBlockchainClientConfig)
+        val fixtures = getFixtures(blockchainClients)
 
         context
             .root

@@ -41,12 +41,12 @@ export const evmAddress = (address: string): EvmAddressType => {
 export const AddressSchema = z.string().min(1)
 export type AddressType = z.infer<typeof AddressSchema>
 
-const DeployedContractSchema = z.object({
+const ContractSchema = z.object({
   name: z.string(),
   address: AddressSchema
 })
 
-export type DeployedContract = z.infer<typeof DeployedContractSchema>
+export type Contract = z.infer<typeof ContractSchema>
 
 const SymbolSchema = z.object({
   name: z.string(),
@@ -88,7 +88,7 @@ export type NetworkType = z.infer<typeof NetworkTypeSchema>
 const ChainSchema = z.object({
   id: z.number(),
   name: z.string(),
-  contracts: z.array(DeployedContractSchema),
+  contracts: z.array(ContractSchema),
   symbols: z.array(SymbolSchema),
   jsonRpcUrl: z.string(),
   blockExplorerNetName: z.string(),
@@ -377,6 +377,10 @@ export const BalanceSchema = z.object({
 })
 export type Balance = z.infer<typeof BalanceSchema>
 
+const GetBalancesApiResponseSchema = z.object({
+  balances: z.array(BalanceSchema)
+})
+
 const CreateDepositApiRequestSchema = z.object({
   symbol: z.string(),
   amount: z.coerce.bigint(),
@@ -664,6 +668,12 @@ export const apiClient = new Zodios(apiBaseUrl, [
     path: '/v1/withdrawals',
     alias: 'listWithdrawals',
     response: ListWithdrawalsApiResponseSchema
+  },
+  {
+    method: 'get',
+    path: '/v1/balances',
+    alias: 'getBalances',
+    response: GetBalancesApiResponseSchema
   },
   {
     method: 'post',

@@ -37,10 +37,10 @@ object BitcoinClient : JsonRpcClientBase(
 
     override val logger = KotlinLogging.logger {}
 
-    val bitcoinConfig = ChainManager.bitcoinBlockchainClientConfig
+    val config = ChainManager.bitcoinBlockchainClientConfig
     val chainId = ChainId(0u)
-    private val minFee = BigDecimal(bitcoinConfig.feeSettings.minValue)
-    private val maxFee = BigDecimal(bitcoinConfig.feeSettings.maxValue)
+    private val minFee = BigDecimal(config.feeSettings.minValue)
+    private val maxFee = BigDecimal(config.feeSettings.maxValue)
 
     val zeroCoinValue = Coin.valueOf(0)
 
@@ -50,7 +50,7 @@ object BitcoinClient : JsonRpcClientBase(
         return getValue(
             BitcoinRpcRequest(
                 "generatetoaddress",
-                BitcoinRpcParams(listOf(nBlocks, bitcoinConfig.faucetAddress)),
+                BitcoinRpcParams(listOf(nBlocks, config.faucetAddress)),
             ),
         )
     }
@@ -135,7 +135,7 @@ object BitcoinClient : JsonRpcClientBase(
     }
 
     fun estimateSmartFeeInSatPerVByte(): BigDecimal {
-        return estimateSmartFee(bitcoinConfig.feeSettings.blocks, bitcoinConfig.feeSettings.mode).feeRate?.let {
+        return estimateSmartFee(config.feeSettings.blocks, config.feeSettings.mode).feeRate?.let {
             maxFee.min(minFee.max(scaleToSatoshiPerVByte(it)))
         } ?: minFee
     }
@@ -177,7 +177,7 @@ object BitcoinClient : JsonRpcClientBase(
             ),
         )
         val changeAmount = BigInteger.ZERO.max(utxos.sumOf { it.amount } - amount - feeAmount)
-        if (changeAmount > bitcoinConfig.changeDustThreshold) {
+        if (changeAmount > config.changeDustThreshold) {
             rawTx.addOutput(
                 TransactionOutput(
                     params,

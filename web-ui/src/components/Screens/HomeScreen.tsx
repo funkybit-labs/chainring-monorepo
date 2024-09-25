@@ -15,10 +15,11 @@ import Spinner from 'components/common/Spinner'
 import { WebsocketProvider } from 'contexts/websocket'
 import { OrderBookWidget } from 'components/Screens/HomeScreen/OrderBookWidget'
 import Admin from 'components/Screens/Admin'
-import { ConnectedEvmWallet, useWallets } from 'contexts/walletProvider'
+import { useWallets } from 'contexts/walletProvider'
 import { TestnetChallengeTab } from 'components/Screens/HomeScreen/testnetchallenge/TestnetChallengeTab'
 import { TestnetChallengeEnabled } from 'testnetChallenge'
 import { useAuth } from 'contexts/auth'
+import ContractsRegistry from 'contractsRegistry'
 
 function WebsocketWrapper({ contents }: { contents: JSX.Element }) {
   const wallets = useWallets()
@@ -46,7 +47,7 @@ function HomeScreenContent() {
   const [scrollToWidget, setScrollToWidget] = useState<Widget>()
 
   const {
-    exchangeContract,
+    contracts,
     chains,
     markets,
     symbols,
@@ -54,32 +55,7 @@ function HomeScreenContent() {
     marketsWithBackToBack
   } = useMemo(() => {
     const config = configQuery.data
-    const connectedEvmWallet = wallets.connected.find(
-      (cw) => cw.networkType == 'Evm'
-    ) as ConnectedEvmWallet | undefined
-
-    const evmChainConfig = config?.chains
-      .filter((chain) => chain.networkType === 'Evm')
-      .find(
-        (chain) =>
-          chain.id === (connectedEvmWallet?.chainId ?? config.chains[0]?.id)
-      )
-
-    const bitcoinChainConfig = config?.chains.filter(
-      (chain) => chain.networkType === 'Bitcoin'
-    )[0]
-
-    const exchangeContract = (() => {
-      switch (wallets.primary?.networkType) {
-        case 'Evm':
-          return evmChainConfig
-        case 'Bitcoin':
-          return bitcoinChainConfig
-        case null:
-          return null
-      }
-    })()?.contracts?.find((c) => c.name == 'Exchange')
-
+    const contracts = config ? ContractsRegistry.fromConfig(config) : undefined
     const symbols = config ? TradingSymbols.fromConfig(config) : null
     const markets =
       config && symbols ? new Markets(config.markets, symbols, false) : null
@@ -88,18 +64,17 @@ function HomeScreenContent() {
       config && symbols ? new Markets(config.markets, symbols, true) : null
 
     const feeRates = config && config.feeRates
-
     const chains: Chain[] = config?.chains ?? []
 
     return {
-      exchangeContract,
+      contracts,
       chains,
       markets,
       symbols,
       feeRates,
       marketsWithBackToBack
     }
-  }, [configQuery.data, wallets.connected, wallets.primary])
+  }, [configQuery.data])
 
   useEffect(() => {
     if (markets !== null && selectedMarket == null) {
@@ -197,8 +172,7 @@ function HomeScreenContent() {
               {tab === 'Swap' && (
                 <SwapModal
                   markets={marketsWithBackToBack}
-                  walletAddress={wallets.primary?.address}
-                  exchangeContractAddress={exchangeContract?.address}
+                  contracts={contracts}
                   feeRates={feeRates}
                   accountConfig={accountConfigQuery.data}
                   onMarketChange={setSelectedMarket}
@@ -208,8 +182,7 @@ function HomeScreenContent() {
               {tab === 'Limit' && (
                 <LimitModal
                   markets={markets}
-                  walletAddress={wallets.primary?.address}
-                  exchangeContractAddress={exchangeContract?.address}
+                  contracts={contracts}
                   feeRates={feeRates}
                   accountConfig={accountConfigQuery.data}
                   onMarketChange={setSelectedMarket}
@@ -232,8 +205,7 @@ function HomeScreenContent() {
                           ref={balancesMeasureRef as LegacyRef<HTMLDivElement>}
                         >
                           <BalancesWidget
-                            walletAddress={wallets.primary?.address}
-                            exchangeContractAddress={exchangeContract?.address}
+                            contracts={contracts}
                             symbols={symbols}
                             chains={chains}
                             accountConfig={accountConfigQuery.data}
@@ -247,7 +219,7 @@ function HomeScreenContent() {
                       <SwapWidget
                         markets={markets}
                         walletAddress={wallets.primary?.address}
-                        exchangeContractAddress={exchangeContract?.address}
+                        contracts={contracts}
                         feeRates={feeRates}
                         onMarketChange={setSelectedMarket}
                         onSideChange={setSide}
@@ -274,8 +246,7 @@ function HomeScreenContent() {
                       />
                       <div ref={balancesRef as LegacyRef<HTMLDivElement>}>
                         <BalancesWidget
-                          walletAddress={wallets.primary?.address}
-                          exchangeContractAddress={exchangeContract?.address}
+                          contracts={contracts}
                           symbols={symbols}
                           chains={chains}
                         />
@@ -286,16 +257,15 @@ function HomeScreenContent() {
                     <OrdersAndTradesWidget
                       markets={markets}
                       walletAddress={wallets.primary?.address}
-                      exchangeContractAddress={exchangeContract?.address}
+                      contracts={contracts}
                     />
                   </div>
                 </div>
               )}
               {tab === 'Testnet Challenge' && symbols && (
                 <TestnetChallengeTab
-                  chains={chains}
                   symbols={symbols}
-                  exchangeContract={exchangeContract}
+                  contracts={contracts}
                   accountConfig={accountConfigQuery.data}
                   onChangeTab={saveTab}
                 />

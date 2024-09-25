@@ -221,12 +221,7 @@ class ExchangeApiService(
                         verifyingChainId = orderRequest.verifyingChainId,
                     )
                 is BitcoinAddress -> {
-                    verifyBitcoinSignature(
-                        walletAddress,
-                        orderRequest,
-                        baseSymbol,
-                        quoteSymbol,
-                    )
+                    verifyBitcoinSignature(walletAddress, orderRequest, baseSymbol, quoteSymbol)
                 }
             }
 
@@ -256,11 +251,22 @@ class ExchangeApiService(
                             batchOrdersRequest.marketId,
                             if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
                             BigInteger(1, orderRequest.nonce.toHexBytes()),
-                            orderRequest.signature,
+                            orderRequest.signature as EvmSignature,
                         ),
                         verifyingChainId = orderRequest.verifyingChainId,
                     )
-                is BitcoinAddress -> {} // TODO verify signature
+                is BitcoinAddress -> {
+                    val amount = orderRequest.amount.fromFundamentalUnits(baseSymbol.decimals).toPlainString()
+                    val message = "[funkybit] Please sign this message to authorize order cancellation. This action will not cost any gas fees." +
+                        if (orderRequest.side == OrderSide.Buy) {
+                            "\nSwap $amount ${quoteSymbol.displayName()} for ${baseSymbol.displayName()}"
+                        } else {
+                            "\nSwap $amount ${baseSymbol.displayName()} for ${quoteSymbol.displayName()}"
+                        } + "\nAddress: ${walletAddress.value}, Nonce: ${orderRequest.nonce}"
+                    if (!BitcoinSignatureVerification.verifyMessage(walletAddress, orderRequest.signature.value.replace(" ", "+"), message)) {
+                        throw RequestProcessingError(ReasonCode.SignatureNotValid, "Invalid signature")
+                    }
+                }
             }
 
             orderRequest.orderId
@@ -301,16 +307,16 @@ class ExchangeApiService(
 
     private fun verifyBitcoinSignature(bitcoinAddress: BitcoinAddress, orderRequest: CreateOrderApiRequest, baseSymbol: SymbolEntity, quoteSymbol: SymbolEntity) {
         val amount = when (orderRequest.amount) {
-            is OrderAmount.Fixed -> orderRequest.amount.fixedAmount().fromFundamentalUnits(baseSymbol.decimals)
+            is OrderAmount.Fixed -> orderRequest.amount.fixedAmount().fromFundamentalUnits(baseSymbol.decimals).toPlainString()
             is OrderAmount.Percent -> "${orderRequest.amount.percentage()}% of your "
         }
         val bitcoinOrderMessage = "[funkybit] Please sign this message to authorize a swap. This action will not cost any gas fees." +
             if (orderRequest.side == OrderSide.Buy) {
-                "\nSwap $amount ${quoteSymbol.name} for ${baseSymbol.name}"
+                "\nSwap $amount ${quoteSymbol.displayName()} for ${baseSymbol.displayName()}"
             } else {
-                "\nSwap $amount ${baseSymbol.name} for ${quoteSymbol.name}"
+                "\nSwap $amount ${baseSymbol.displayName()} for ${quoteSymbol.displayName()}"
             } + when (orderRequest) {
-                is CreateOrderApiRequest.Limit -> "\nPrice: ${orderRequest.price.toFundamentalUnits(quoteSymbol.decimals)}"
+                is CreateOrderApiRequest.Limit -> "\nPrice: ${orderRequest.price.toPlainString()}"
                 else -> "\nPrice: Market"
             } + "\nAddress: ${bitcoinAddress.value}, Nonce: ${orderRequest.nonce}"
         if (!BitcoinSignatureVerification.verifyMessage(bitcoinAddress, orderRequest.signature.value.replace(" ", "+"), bitcoinOrderMessage)) {

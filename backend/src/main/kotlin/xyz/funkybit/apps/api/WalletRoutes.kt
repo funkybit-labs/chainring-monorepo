@@ -202,12 +202,9 @@ class WalletRoutes(private val sequencerClient: SequencerClient) {
             timestamp = authorizationRequest.timestamp,
         )
 
-    private fun baseMessage(authorizedAddress: Address): String {
-        val networkType = when (authorizedAddress) {
-            is EvmAddress -> "EVM"
-            is BitcoinAddress -> "Bitcoin"
+    private fun baseMessage(authorizedAddress: Address): String =
+        when (authorizedAddress) {
+            is EvmAddress -> String.format(BASE_AUTHORIZE_MESSAGE, "EVM", authorizedAddress.toString().lowercase())
+            is BitcoinAddress -> String.format(BASE_AUTHORIZE_MESSAGE, "Bitcoin", authorizedAddress.toString())
         }
-
-        return String.format(BASE_AUTHORIZE_MESSAGE, networkType, authorizedAddress.toString().lowercase())
-    }
 }

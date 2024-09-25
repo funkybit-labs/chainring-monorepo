@@ -22,9 +22,11 @@ import TradingSymbol from 'tradingSymbol'
 import { ExpandableValue } from 'components/common/ExpandableValue'
 import { minBigInt } from 'utils'
 import { accountConfigQueryKey } from 'components/Screens/HomeScreen'
+import Wallet from 'sats-connect'
+import { request } from 'sats-connect'
 
 export default function DepositModal({
-  exchangeContractAddress,
+  depositAddress,
   walletAddress,
   symbol,
   testnetChallengeDepositLimit,
@@ -35,7 +37,7 @@ export default function DepositModal({
   title,
   message
 }: {
-  exchangeContractAddress: string
+  depositAddress: string
   walletAddress: string
   symbol: TradingSymbol
   testnetChallengeDepositLimit?: bigint
@@ -51,16 +53,27 @@ export default function DepositModal({
   const walletBalanceQuery = useQuery({
     queryKey: ['walletBalance', symbol.name],
     queryFn: async function () {
-      return symbol.contractAddress
-        ? await readContract(config, {
-            abi: ERC20Abi,
-            address: evmAddress(symbol.contractAddress),
-            functionName: 'balanceOf',
-            args: [walletAddress as Address]
-          })
-        : getBalance(config, {
-            address: walletAddress as Address
-          }).then((res) => res.value)
+      if (symbol.networkType === 'Bitcoin') {
+        return request('getBalance', undefined).then((result) => {
+          if (result.status == 'success') {
+            return BigInt(result.result.confirmed)
+          } else {
+            console.log(result.error)
+            throw Error('Failed to obtain balance')
+          }
+        })
+      } else {
+        return symbol.contractAddress
+          ? await readContract(config, {
+              abi: ERC20Abi,
+              address: evmAddress(symbol.contractAddress),
+              functionName: 'balanceOf',
+              args: [walletAddress as Address]
+            })
+          : getBalance(config, {
+              address: walletAddress as Address
+            }).then((res) => res.value)
+      }
     }
   })
 
@@ -88,54 +101,69 @@ export default function DepositModal({
     mutationFn: async () => {
       try {
         let depositHash: string
-        if (symbol.contractAddress) {
-          setSubmitPhase('checkingAllowanceAmount')
-          const allowance = await call(config, {
-            to: evmAddress(symbol.contractAddress),
-            chainId: symbol.chainId,
-            data: encodeFunctionData({
-              abi: ERC20Abi,
-              args: [
-                walletAddress as Address,
-                exchangeContractAddress as Address
-              ],
-              functionName: 'allowance'
-            })
-          })
-
-          const allowanceAmount = allowance.data ? BigInt(allowance.data) : 0n
-
-          if (allowanceAmount < amount) {
-            setSubmitPhase('waitingForAllowanceApproval')
-            const hash = await sendTransaction(config, {
+        if (symbol.networkType == 'Evm') {
+          if (symbol.contractAddress) {
+            setSubmitPhase('checkingAllowanceAmount')
+            const allowance = await call(config, {
               to: evmAddress(symbol.contractAddress),
               chainId: symbol.chainId,
               data: encodeFunctionData({
                 abi: ERC20Abi,
-                args: [exchangeContractAddress, amount],
-                functionName: 'approve'
-              } as EncodeFunctionDataParameters)
+                args: [walletAddress as Address, depositAddress as Address],
+                functionName: 'allowance'
+              })
             })
-            setSubmitPhase('waitingForAllowanceReceipt')
-            await waitForTransactionReceipt(config, { hash })
-          }
 
-          setSubmitPhase('waitingForDepositApproval')
-          depositHash = await sendTransaction(config, {
-            to: exchangeContractAddress as Address,
-            chainId: symbol.chainId,
-            data: encodeFunctionData({
-              abi: ExchangeAbi,
-              functionName: 'deposit',
-              args: [evmAddress(symbol.contractAddress!), amount]
+            const allowanceAmount = allowance.data ? BigInt(allowance.data) : 0n
+
+            if (allowanceAmount < amount) {
+              setSubmitPhase('waitingForAllowanceApproval')
+              const hash = await sendTransaction(config, {
+                to: evmAddress(symbol.contractAddress),
+                chainId: symbol.chainId,
+                data: encodeFunctionData({
+                  abi: ERC20Abi,
+                  args: [depositAddress, amount],
+                  functionName: 'approve'
+                } as EncodeFunctionDataParameters)
+              })
+              setSubmitPhase('waitingForAllowanceReceipt')
+              await waitForTransactionReceipt(config, { hash })
+            }
+
+            setSubmitPhase('waitingForDepositApproval')
+            depositHash = await sendTransaction(config, {
+              to: depositAddress as Address,
+              chainId: symbol.chainId,
+              data: encodeFunctionData({
+                abi: ExchangeAbi,
+                functionName: 'deposit',
+                args: [evmAddress(symbol.contractAddress!), amount]
+              })
             })
-          })
+          } else {
+            setSubmitPhase('waitingForDepositApproval')
+            depositHash = await sendTransaction(config, {
+              to: depositAddress as Address,
+              value: amount
+            })
+          }
         } else {
           setSubmitPhase('waitingForDepositApproval')
-          depositHash = await sendTransaction(config, {
-            to: exchangeContractAddress as Address,
-            value: amount
+          const response = await Wallet.request('sendTransfer', {
+            recipients: [
+              {
+                address: depositAddress,
+                amount: Number(amount)
+              }
+            ]
           })
+          if (response.status === 'success') {
+            depositHash = response.result.txid
+          } else {
+            console.log('sendTransfer failed with error', response.error)
+            throw Error('sendTransfer failed')
+          }
         }
 
         return await apiClient.createDeposit({

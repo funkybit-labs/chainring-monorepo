@@ -28,7 +28,6 @@ import xyz.funkybit.core.services.UtxoSelectionService
 import xyz.funkybit.core.utils.bitcoin.ArchUtils
 import xyz.funkybit.core.utils.bitcoin.fromSatoshi
 import xyz.funkybit.core.utils.fromFundamentalUnits
-import xyz.funkybit.core.utils.toFundamentalUnits
 import java.math.BigInteger
 
 class BitcoinWallet(
@@ -165,18 +164,21 @@ class BitcoinWallet(
 
     private fun sign(request: CreateOrderApiRequest): Signature {
         val (baseSymbol, quoteSymbol) = marketSymbols(request.marketId)
+        val baseSymbolName = baseSymbol.name.replace(Regex(":.*"), "")
+        val quoteSymbolName = quoteSymbol.name.replace(Regex(":.*"), "")
+
         val bitcoinAddress = BitcoinAddress.canonicalize(walletAddress.value)
         val amount = when (request.amount) {
-            is OrderAmount.Fixed -> request.amount.fixedAmount().fromFundamentalUnits(baseSymbol.decimals)
+            is OrderAmount.Fixed -> request.amount.fixedAmount().fromFundamentalUnits(baseSymbol.decimals).toPlainString()
             is OrderAmount.Percent -> "${request.amount.percentage()}% of your "
         }
         val bitcoinOrderMessage = "[funkybit] Please sign this message to authorize a swap. This action will not cost any gas fees." +
             if (request.side == OrderSide.Buy) {
-                "\nSwap $amount ${quoteSymbol.name} for ${baseSymbol.name}"
+                "\nSwap $amount $quoteSymbolName for $baseSymbolName"
             } else {
-                "\nSwap $amount ${baseSymbol.name} for ${quoteSymbol.name}"
+                "\nSwap $amount $baseSymbolName for $quoteSymbolName"
             } + when (request) {
-                is CreateOrderApiRequest.Limit -> "\nPrice: ${request.price.toFundamentalUnits(quoteSymbol.decimals)}"
+                is CreateOrderApiRequest.Limit -> "\nPrice: ${request.price.toPlainString()}"
                 else -> "\nPrice: Market"
             } + "\nAddress: ${bitcoinAddress.value}, Nonce: ${request.nonce}"
         logger.debug { "wallet - message to sign = [$bitcoinOrderMessage" }

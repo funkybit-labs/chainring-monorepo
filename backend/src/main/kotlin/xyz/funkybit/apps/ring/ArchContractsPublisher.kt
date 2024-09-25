@@ -176,7 +176,7 @@ object ArchContractsPublisher {
     }
 
     private fun handleProgramStateSetup(programAccount: ArchAccountEntity, contractType: ContractType) {
-        val programStateAccount = ArchAccountEntity.findProgramStateAccount() ?: ArchUtils.fundArchAccountCreation(BitcoinClient.bitcoinConfig.submitterEcKey, ArchAccountType.ProgramState)
+        val programStateAccount = ArchAccountEntity.findProgramStateAccount() ?: ArchUtils.fundArchAccountCreation(BitcoinClient.config.submitterEcKey, ArchAccountType.ProgramState)
         when (programStateAccount?.status) {
             ArchAccountStatus.Funded -> {
                 ArchUtils.sendCreateAccountTx(programStateAccount, programAccount.rpcPubkey())
@@ -250,7 +250,7 @@ object ArchContractsPublisher {
                 ),
             ),
             ProgramInstruction.InitProgramStateParams(
-                feeAccount = BitcoinClient.bitcoinConfig.feeCollectionAddress,
+                feeAccount = BitcoinClient.config.feeCollectionAddress,
                 programChangeAddress = ArchNetworkClient.getAccountAddress(programAccount.rpcPubkey()),
                 networkType = BitcoinNetworkType.fromNetworkParams(BitcoinClient.getParams()),
             ),
