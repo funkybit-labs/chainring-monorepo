@@ -27,12 +27,13 @@ import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalId
 import xyz.funkybit.core.model.db.WithdrawalStatus
 import xyz.funkybit.core.utils.bitcoin.ArchUtils
+import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForBlockProcessor
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForProgramAccount
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForProgramStateAccount
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForTokenStateAccount
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.getFeeAccountBalanceOnArch
-import xyz.funkybit.integrationtests.testutils.isTestEnvRun
+import xyz.funkybit.integrationtests.testutils.isBitcoinDisabled
 import xyz.funkybit.integrationtests.testutils.waitFor
 import xyz.funkybit.integrationtests.testutils.waitForBalance
 import xyz.funkybit.integrationtests.testutils.waitForTx
@@ -52,17 +53,17 @@ class ArchDepositAndWithdrawalTest {
 
     @BeforeEach
     fun waitForSetup() {
-        Assumptions.assumeFalse(true)
+        Assumptions.assumeFalse(isBitcoinDisabled())
         waitForProgramAccount()
         waitForProgramStateAccount()
         waitForTokenStateAccount()
+        waitForBlockProcessor()
         ArchUtils.tokenAccountSizeThreshold = 10_000_000
     }
 
     @Test
     fun testArchDepositsAndWithdrawals() {
-        Assumptions.assumeFalse(true)
-        Assumptions.assumeFalse(isTestEnvRun())
+        Assumptions.assumeFalse(isBitcoinDisabled())
 
         val airdropAmount = BigInteger("15000")
         val depositAmount = BigInteger("7000")
@@ -150,8 +151,7 @@ class ArchDepositAndWithdrawalTest {
 
     @Test
     fun `testArchDepositsAndWithdrawals - multiple token accounts`() {
-        Assumptions.assumeFalse(true)
-        Assumptions.assumeFalse(isTestEnvRun())
+        Assumptions.assumeFalse(isBitcoinDisabled())
         transaction {
             ArchAccountTable.deleteWhere {
                 symbolGuid.isNotNull() and status.eq(ArchAccountStatus.Full)

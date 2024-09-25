@@ -358,7 +358,7 @@ object ArchUtils {
             if (changeAmount > BitcoinClient.config.changeDustThreshold) {
                 changeAmount
             } else {
-                BigInteger.ONE
+                BigInteger.ZERO
             },
         )
     }

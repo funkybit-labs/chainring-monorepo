@@ -43,7 +43,6 @@ class ArchTokenStateSetupTask : RepeaterBaseTask(
                     ArchUtils.handleCreateAccountTxStatus(it)
                 }
                 if (it.status == ArchAccountStatus.Created) {
-                    Thread.sleep(2000)
                     initializeTokenStateAccount(it, programStateAccount)
                 }
                 if (it.status == ArchAccountStatus.Initializing) {

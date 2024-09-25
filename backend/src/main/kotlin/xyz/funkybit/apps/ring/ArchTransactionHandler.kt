@@ -172,7 +172,6 @@ class ArchTransactionHandler(
             assigningBalanceIndexUpdates.firstOrNull()?.entity?.archTransaction?.let { archTransaction ->
                 ArchNetworkClient.getProcessedTransaction(archTransaction.txHash!!)?.let { processedTx ->
                     if (processedTx.status == ArchNetworkRpc.Status.Processed) {
-                        Thread.sleep(2000)
                         archTransaction.markAsCompleted()
                         val assignments = assigningBalanceIndexUpdates.groupBy { it.archAccountAddress }.flatMap { (pubkey, updates) ->
                             val (tokenAccountState, size) = ArchUtils.getAccountStateAndSize<ArchAccountState.Token>(pubkey)
@@ -240,7 +239,6 @@ class ArchTransactionHandler(
             settlingDeposits.first().archTransaction?.let { archTransaction ->
                 ArchNetworkClient.getProcessedTransaction(archTransaction.txHash!!)?.let {
                     if (it.status == ArchNetworkRpc.Status.Processed) {
-                        Thread.sleep(2000)
                         archTransaction.markAsCompleted()
                         BalanceEntity.updateBalances(
                             settlingDeposits.map { deposit ->
@@ -285,7 +283,6 @@ class ArchTransactionHandler(
             val archTransaction = settlingWithdrawals.first().archTransaction!!
             ArchNetworkClient.getProcessedTransaction(archTransaction.txHash!!)?.let { processedTx ->
                 if (processedTx.status == ArchNetworkRpc.Status.Processed) {
-                    Thread.sleep(2000)
                     archTransaction.markAsCompleted()
                     if (processedTx.bitcoinTxIds.isNotEmpty()) {
                         val bitcoinTxId = processedTx.bitcoinTxIds.first()
@@ -561,7 +558,6 @@ class ArchTransactionHandler(
         val txHash = tx.txHash ?: return
         val processedTx = ArchNetworkClient.getProcessedTransaction(txHash) ?: return
         if (processedTx.status == ArchNetworkRpc.Status.Processed) {
-            Thread.sleep(2000)
             // invoke callbacks for transactions in this confirmed batch
             onComplete(processedTx, null)
             // mark batch as complete

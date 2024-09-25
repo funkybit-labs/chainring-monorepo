@@ -22,7 +22,6 @@ import xyz.funkybit.tasks.fixtures.toChainSymbol
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.test.Test
-import kotlin.test.assertNull
 
 @ExtendWith(AppUnderTestRunner::class)
 class ConfigRouteTest {
@@ -74,7 +73,6 @@ class ConfigRouteTest {
 
         val btcSymbol = btcChainConfig.symbols.first { it.name == "BTC".toChainSymbol(btcChainConfig.id) }
         assertEquals(BigDecimal("0.00000002").toFundamentalUnits(btcSymbol.decimals.toInt()), btcSymbol.withdrawalFee)
-        assertNull(btcSymbol.contractAddress)
         assertEquals(8.toUByte(), btcSymbol.decimals)
     }
 

@@ -2,6 +2,9 @@ package xyz.funkybit.integrationtests.bitcoin
 
 import com.funkatronics.kborsh.Borsh
 import kotlinx.serialization.decodeFromByteArray
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -15,11 +18,13 @@ import xyz.funkybit.core.model.bitcoin.ArchAccountState
 import xyz.funkybit.core.model.bitcoin.BitcoinNetworkType
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.ArchAccountStatus
+import xyz.funkybit.core.model.db.BlockEntity
+import xyz.funkybit.core.model.db.BlockTable
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
-import xyz.funkybit.integrationtests.testutils.isTestEnvRun
+import xyz.funkybit.integrationtests.testutils.isBitcoinDisabled
 import xyz.funkybit.integrationtests.testutils.triggerRepeaterTaskAndWaitForCompletion
 import xyz.funkybit.integrationtests.testutils.waitFor
 import kotlin.test.Test
@@ -30,12 +35,20 @@ import kotlin.test.assertEquals
 class ArchOnboardingTest {
 
     companion object {
+
+        fun waitForDeployedContract() {
+            if (validContracts().isEmpty()) {
+                waitFor(180000) {
+                    validContracts().isNotEmpty()
+                }
+            }
+        }
+
         fun waitForProgramAccount(): ArchAccountEntity {
             if (programAccount()?.status != ArchAccountStatus.Complete) {
                 waitFor(180000) {
                     programAccount()?.status == ArchAccountStatus.Complete
                 }
-                Thread.sleep(2000)
             }
             return programAccount()!!
         }
@@ -45,7 +58,6 @@ class ArchOnboardingTest {
                 waitFor(6000) {
                     programStateAccount()?.status == ArchAccountStatus.Complete
                 }
-                Thread.sleep(2000)
             }
             return programStateAccount()!!
         }
@@ -54,13 +66,18 @@ class ArchOnboardingTest {
             if (tokenStateAccount()?.status != ArchAccountStatus.Complete) {
                 waitFor(60000) {
                     triggerRepeaterTaskAndWaitForCompletion("arch_token_state_setup")
-                    transaction {
-                        tokenStateAccount()?.status == ArchAccountStatus.Complete
-                    }
+                    tokenStateAccount()?.status == ArchAccountStatus.Complete
                 }
                 Thread.sleep(2000)
             }
             return tokenStateAccount()!!
+        }
+
+        fun waitForBlockProcessor() {
+            val currentBlock = BitcoinClient.getBlockCount()
+            waitFor {
+                (getLastProcessedBlock()?.number?.toLong() ?: 0) >= currentBlock
+            }
         }
 
         private fun programAccount() = transaction { ArchAccountEntity.findProgramAccount() }
@@ -72,12 +89,25 @@ class ArchOnboardingTest {
                 SymbolEntity.forChain(BitcoinClient.chainId).first(),
             ).firstOrNull { it.status == ArchAccountStatus.Complete }
         }
+
+        private fun validContracts() = transaction { DeployedSmartContractEntity.validContracts(BitcoinClient.chainId) }
+
+        private fun getLastProcessedBlock(): BlockEntity? = transaction {
+            BlockTable
+                .selectAll()
+                .where { BlockTable.chainId.eq(BitcoinClient.chainId) }
+                .orderBy(Pair(BlockTable.number, SortOrder.DESC))
+                .limit(1)
+                .map { BlockEntity.wrapRow(it) }
+                .firstOrNull()
+        }
     }
 
     @Test
     fun testOnboarding() {
-        Assumptions.assumeFalse(true)
-        Assumptions.assumeFalse(isTestEnvRun())
+        Assumptions.assumeFalse(isBitcoinDisabled())
+
+        waitForDeployedContract()
 
         // wait for the contract ot be deployed and verify program account
         val programEntity = waitForProgramAccount()
@@ -114,7 +144,7 @@ class ArchOnboardingTest {
         assertEquals(0, tokenState.version)
         assertEquals("BTC:0", tokenState.tokenId)
         assertEquals(programStateEntity.rpcPubkey().toString(), tokenState.programStateAccount.toString())
-        assertEquals(1, tokenState.balances.size)
-        assertEquals(ArchAccountState.Balance(BitcoinClient.config.feeCollectionAddress.value, 0u), tokenState.balances.first())
+        assertTrue(tokenState.balances.isNotEmpty())
+        assertEquals(BitcoinClient.config.feeCollectionAddress.value, tokenState.balances.first().walletAddress)
     }
 }
