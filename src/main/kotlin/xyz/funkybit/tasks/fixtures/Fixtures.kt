@@ -177,6 +177,18 @@ fun getFixtures(chainringChainClients: List<BlockchainClient>, bitcoinBlockchain
                     SymbolId(client.chainId, "DAI") to BigDecimal("100000$index").toFundamentalUnits(18),
                 )
             }.flatMap { map -> map.entries }.associate(Map.Entry<SymbolId, BigInteger>::toPair)
+        ),
+        // airdropper
+        Fixtures.Wallet(
+            privateKeyHex = "0xc664badcbc1824995c98407e26667e35c648312061a2de44569851f79b0a5371",
+            address = EvmAddress("0x831703d43B7BaF132ff6a608022CA66Cd9A12aCc"),
+            balances = chainringChainClients.mapIndexed { index, client ->
+                mapOf(
+                    SymbolId(client.chainId, "BTC") to BigDecimal("100$index").toFundamentalUnits(18),
+                    SymbolId(client.chainId, "ETH") to BigDecimal("100$index").toFundamentalUnits(18),
+                    SymbolId(client.chainId, "USDC") to BigDecimal("100000$index").toFundamentalUnits(6),
+                )
+            }.flatMap { map -> map.entries }.associate(Map.Entry<SymbolId, BigInteger>::toPair)
         )
     )
 )

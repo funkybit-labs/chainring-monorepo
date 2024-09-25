@@ -19,6 +19,7 @@ data class BlockchainClientConfig(
     val blockExplorerUrl: String,
     val privateKeyHex: String,
     val submitterPrivateKeyHex: String,
+    val airDropperPrivateKeyHex: String,
     val feeAccountAddress: String,
     val pollingIntervalInMs: Long,
     val maxPollingAttempts: Long,
@@ -83,6 +84,11 @@ object ChainManager {
                 chainName,
                 "EVM_SUBMITTER_PRIVATE_KEY",
                 "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba",
+            ),
+            airDropperPrivateKeyHex = stringValue(
+                chainName,
+                "EVM_AIRDROPPER_PRIVATE_KEY",
+                "0xc664badcbc1824995c98407e26667e35c648312061a2de44569851f79b0a5371",
             ),
             feeAccountAddress = stringValue(
                 chainName,
@@ -156,6 +162,11 @@ object ChainManager {
     fun getBlockchainClient(chainId: ChainId, privateKeyHex: String) = BlockchainClient(
         blockchainClientsByChainId.getValue(chainId).config.copy(privateKeyHex = privateKeyHex),
     )
+
+    fun getAirdropperBlockchainClient(chainId: ChainId): AirdropperBlockchainClient {
+        val clientConfig = blockchainClientsByChainId.getValue(chainId).config
+        return AirdropperBlockchainClient(clientConfig.copy(privateKeyHex = clientConfig.airDropperPrivateKeyHex))
+    }
 
     fun getBlockchainClient(config: BlockchainClientConfig, privateKeyHex: String) = BlockchainClient(
         config.copy(privateKeyHex = privateKeyHex),
