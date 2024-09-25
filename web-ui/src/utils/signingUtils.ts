@@ -112,19 +112,23 @@ export async function signOrderCreation(
   percentage: number | null
 ): Promise<string | null> {
   if (wallet.networkType == 'Bitcoin') {
-    let formattedBaseAmount = formatUnits(amount, baseSymbol.decimals)
-
-    formattedBaseAmount = formattedBaseAmount.padEnd(
-      formattedBaseAmount.split('.')[0].length + baseSymbol.decimals + 1,
-      '0'
-    )
+    let formattedAmount
+    if (percentage) {
+      formattedAmount = `${percentage}% of your `
+    } else {
+      formattedAmount = formatUnits(amount, baseSymbol.decimals)
+      formattedAmount = formattedAmount.padEnd(
+        formattedAmount.split('.')[0].length + baseSymbol.decimals + 1,
+        '0'
+      )
+    }
 
     return await bitcoinSignMessage(
       wallet.address,
       `[funkybit] Please sign this message to authorize a swap. This action will not cost any gas fees.${
         side == 'Buy'
-          ? `\nSwap ${formattedBaseAmount} ${quoteSymbol.displayName()} for ${baseSymbol.displayName()}`
-          : `\nSwap ${formattedBaseAmount} ${baseSymbol.displayName()} for ${quoteSymbol.displayName()}`
+          ? `\nSwap ${formattedAmount} ${quoteSymbol.displayName()} for ${baseSymbol.displayName()}`
+          : `\nSwap ${formattedAmount} ${baseSymbol.displayName()} for ${quoteSymbol.displayName()}`
       }${limitPrice ? `\nPrice: ${limitPrice}` : `\nPrice: Market`}\nAddress: ${
         wallet.address
       }, Nonce: ${nonce}`

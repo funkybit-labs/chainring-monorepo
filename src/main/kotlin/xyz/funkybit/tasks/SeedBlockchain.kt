@@ -48,7 +48,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
     // seed the fee payer
     fixtures.chains.firstOrNull { it.id == BitcoinClient.chainId }?.let {
         // fund the fee payer
-        airdropBtcToAddress(BitcoinClient.config.feePayerAddress, BigInteger.valueOf(25000L))
+        airdropBtcToFeePayer()
     }
 
     val symbolEntities = transaction { SymbolEntity.all().toList() }
@@ -149,21 +149,24 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
     return symbolContractAddresses
 }
 
+private fun airdropBtcToFeePayer() {
+    try {
+        (0 .. 5).forEach { _ ->
+            BitcoinClient.sendToAddress(
+                BitcoinClient.config.feePayerAddress,
+                BigInteger("8000"),
+            )
+        }
+    } catch (e: Exception) {
+        println("failed to airdrop to fee payer")
+    }
+}
+
 private fun airdropBtcToAddress(address: BitcoinAddress, amount: BigInteger): TxHash? {
     try {
-        //        (0 .. 5).forEach { _ ->
-        //            BitcoinClient.sendToAddress(
-        //                BitcoinClient.bitcoinConfig.feePayerAddress,
-        //                BigInteger("8000"),
-        //            )
-        //        }
-        val balance = MempoolSpaceClient.getBalance(address).toBigInteger()
-        println("$address BTC balance is ${balance.fromFundamentalUnits(8).toPlainString()}")
-        if (balance < amount) {
-            val airdropAmount = maxOf(amount - balance, BigInteger.valueOf(5000L))
-            println("Air-dropping ${airdropAmount.fromFundamentalUnits(8).toPlainString()} BTC to $address")
-            return BitcoinClient.sendToAddress(address, airdropAmount).let { TxHash.fromDbModel(it) }
-        }
+        val airdropAmount = maxOf(amount, BigInteger.valueOf(5000L))
+        println("Air-dropping ${airdropAmount.fromFundamentalUnits(8).toPlainString()} BTC to $address")
+        return BitcoinClient.sendToAddress(address, airdropAmount).let { TxHash.fromDbModel(it) }
     } catch (e: Exception) {
         println("Failed to airdrop BTC to $address")
     }

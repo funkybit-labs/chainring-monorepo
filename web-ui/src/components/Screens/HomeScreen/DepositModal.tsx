@@ -149,6 +149,7 @@ export default function DepositModal({
             })
           }
         } else {
+          setSubmitPhase('waitingForDepositApproval')
           const response = await Wallet.request('sendTransfer', {
             recipients: [
               {
@@ -160,6 +161,7 @@ export default function DepositModal({
           if (response.status === 'success') {
             depositHash = response.result.txid
           } else {
+            console.log('sendTransfer failed with error', response.error)
             throw Error('sendTransfer failed')
           }
         }

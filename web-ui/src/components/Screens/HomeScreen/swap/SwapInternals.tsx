@@ -706,8 +706,8 @@ export function SwapInternals({
           quoteSymbol,
           side,
           baseAmount,
-          limitPrice,
-          percentage
+          isLimitOrder ? limitPrice : null,
+          isLimitOrder ? null : percentage
         )
 
         if (signature == null) {

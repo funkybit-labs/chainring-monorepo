@@ -18,7 +18,7 @@ class ArchChainWorker(
 
     fun start() {
         if (BitcoinClient.config.enabled) {
-            transaction { BitcoinUtxoAddressMonitorEntity.createIfNotExists(BitcoinClient.bitcoinConfig.feePayerAddress) }
+            transaction { BitcoinUtxoAddressMonitorEntity.createIfNotExists(BitcoinClient.config.feePayerAddress) }
             bitcoinBlockProcessor.start()
             val contractDeployerThread = thread(start = false, name = "arch_contract_deployer", isDaemon = false) {
                 ArchContractsPublisher.updateContracts()

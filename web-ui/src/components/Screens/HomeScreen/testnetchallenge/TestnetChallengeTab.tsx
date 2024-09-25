@@ -2,8 +2,7 @@ import {
   AccountConfigurationApiResponse,
   AddressType,
   apiClient,
-  Balance,
-  Chain
+  Balance
 } from 'apiClient'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -382,9 +381,7 @@ export function TestnetChallengeTab({
           )}
         {withdrawalWallet?.address &&
           withdrawalExchangeContract &&
-          withdrawalSymbol &&
-          (withdrawalSymbol.networkType === 'Bitcoin' ||
-            withdrawalSymbol?.chainId === evmConfig.state.chainId) && (
+          withdrawalSymbol && (
             <WithdrawalModal
               exchangeContractAddress={withdrawalExchangeContract}
               walletAddress={withdrawalWallet.address}
