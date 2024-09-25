@@ -1,5 +1,6 @@
 package xyz.funkybit.core.utils
 
+import io.github.oshai.kotlinlogging.KLogger
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
 import org.bouncycastle.util.encoders.Hex
@@ -11,6 +12,12 @@ import java.security.SecureRandom
 import kotlin.time.Duration
 
 val quietMode = System.getenv("QUIET_MODE")?.toBoolean() ?: false
+
+fun KLogger.verboseInfo(message: () -> Any) {
+    if (!quietMode) {
+        this.info(message)
+    }
+}
 
 fun humanReadable(duration: Duration): String {
     return humanReadableNanoseconds((duration.inWholeNanoseconds))
