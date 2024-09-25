@@ -521,13 +521,13 @@ class BackToBackOrderTest : OrderBaseTest() {
                 assertEquals(OrderSide.Buy, it.trades[1].side)
                 assertEquals(AssetAmount(btc2, bridgeOrderAmount.amount / outputPrice.setScale(18)).inFundamentalUnits, it.trades[1].amount)
                 assertEquals(outputPrice.setScale(18), it.trades[1].price)
-                assertEquals(BigInteger.ZERO, it.trades[1].feeAmount)
+                // this is dust amount
+                assertEquals(BigInteger.valueOf(4), it.trades[1].feeAmount)
                 assertEquals(eth2.name, it.trades[1].feeSymbol.value)
             }
             assertMyOrderUpdatedMessageReceived {
                 assertEquals(inputOrderAmount.inFundamentalUnits, it.order.amount)
-                // TODO - CHAIN-530 - when dust assets are swept into fee, this should change to Filled
-                assertEquals(it.order.status, OrderStatus.Partial)
+                assertEquals(it.order.status, OrderStatus.Filled)
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -548,7 +548,7 @@ class BackToBackOrderTest : OrderBaseTest() {
         }
 
         val takerOrders = takerApiClient.listOrders(emptyList(), market.id).orders
-        assertEquals(1, takerOrders.count { it.status == OrderStatus.Partial })
+        assertEquals(1, takerOrders.count { it.status == OrderStatus.Filled })
 
         assertEquals(2, makerApiClient.listOrders(listOf(OrderStatus.Filled, OrderStatus.Partial)).orders.size)
 
@@ -592,7 +592,6 @@ class BackToBackOrderTest : OrderBaseTest() {
         assertBalances(
             listOf(
                 ExpectedBalance(takerStartingInputBalance - inputOrderAmount),
-                ExpectedBalance(takerStartingBridgeBalance + notionalTrade1 - bridgeAmount - takerFee),
                 ExpectedBalance(takerStartingOutputBalance + outputAmount),
             ),
             takerApiClient.getBalances().balances,

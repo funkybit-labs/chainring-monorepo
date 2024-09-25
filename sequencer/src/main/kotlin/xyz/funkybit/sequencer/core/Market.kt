@@ -74,7 +74,7 @@ data class Market(
 
     private fun sumBaseQuoteAmountPair(a: Pair<BaseAmount, QuoteAmount>, b: Pair<BaseAmount, QuoteAmount>) = Pair(a.first + b.first, a.second + b.second)
 
-    fun applyOrderBatch(orderBatch: OrderBatch, feeRates: FeeRates, sweepDust: Boolean = false): AddOrdersResult {
+    fun applyOrderBatch(orderBatch: OrderBatch, feeRates: FeeRates): AddOrdersResult {
         val ordersChanged = mutableListOf<OrderChanged>()
         val ordersChangeRejected = mutableListOf<OrderChangeRejected>()
         val createdTrades = mutableListOf<TradeCreated>()
@@ -231,12 +231,16 @@ data class Market(
             buyer = account
             buyerFee = notionalFee(notional, feeRates.taker)
 
-            // remainingAvailable should only be non null for Market Buy with max (100%) and no quoteAsset already allocated to other orders in this market
-            if (remainingAvailable != null && takerOrder.type == Order.Type.MarketBuy && takerOrder.hasPercentage() && takerOrder.percentage == 100) {
+            // remainingAvailable should only be non null for Market Buy
+            if (remainingAvailable != null && takerOrder.type == Order.Type.MarketBuy) {
                 val dust = remainingAvailable - (notional + buyerFee)
                 // if the remaining after we apply this order is below the dust threshold, move the dust to the fee.
                 // otherwise don't apply (this can happen if there was not enough liquidity in this market to fill the market buy)
-                if (dust <= buyerFee) {
+                // the dust threshold is set as 2 units of the base asset at the price of the order (since both the
+                // notional and buyerFee could have been rounded down) + 1 unit (since our notional calculation could be
+                // rounded down too).
+                val dustThreshold = BigInteger.ONE.toQuoteAmount() + notional(BigInteger.TWO.toBaseAmount(), execution.price, baseDecimals, quoteDecimals)
+                if (dust <= dustThreshold) {
                     logger.debug { "Order ${takerOrder.guid}: Increasing buyer fee by $dust" }
                     buyerFee += dust
                 }

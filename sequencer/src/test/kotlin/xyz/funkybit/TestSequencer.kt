@@ -388,7 +388,7 @@ class TestSequencer {
                         sellOrderGuid = sell6Order.guid,
                         price = BigDecimal("17.70"),
                         amount = BigDecimal("0.2"),
-                        buyerFee = BigDecimal(if (percentage == 100) "0.070851408" else "0.0708"),
+                        buyerFee = BigDecimal("0.0708"),
                         sellerFee = BigDecimal("0.0354"),
                     ),
                 ),

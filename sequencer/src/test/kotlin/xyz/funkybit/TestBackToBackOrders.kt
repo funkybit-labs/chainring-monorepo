@@ -711,7 +711,7 @@ class TestBackToBackOrders {
             )
             // 100% of quote
             assertEquals(
-                BigDecimal("9.999999828").toFundamentalUnits(ethChain1.decimals).negate(),
+                BigDecimal("10.0").toFundamentalUnits(ethChain1.decimals).negate(),
                 response.balancesChangedList.first { it.account == taker.account.value && it.asset == ethChain1.name }.delta.toBigInteger(),
             )
 
@@ -740,7 +740,7 @@ class TestBackToBackOrders {
                     sellOrderGuid = makerSellOrder2Guid,
                     price = BigDecimal("18.00"),
                     amount = BigDecimal("0.54466230"),
-                    buyerFee = BigDecimal("0.196078428"),
+                    buyerFee = BigDecimal("0.1960786"),
                     sellerFee = BigDecimal("0.098039214"),
                 ),
                 0,
@@ -762,7 +762,7 @@ class TestBackToBackOrders {
 
         sequencer.withdrawal(taker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.51872600"))
         sequencer.withdrawal(taker, btcChain1, BigDecimal.ZERO, expectedAmount = null)
-        sequencer.withdrawal(taker, ethChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.000000172"))
+        sequencer.withdrawal(taker, ethChain1, BigDecimal.ZERO, expectedAmount = null)
 
         sequencer.withdrawal(maker, btcChain2, BigDecimal.ZERO, expectedAmount = BigDecimal("0.481274"))
         sequencer.withdrawal(maker, btcChain1, BigDecimal.ZERO, expectedAmount = BigDecimal("0.99455338"))
