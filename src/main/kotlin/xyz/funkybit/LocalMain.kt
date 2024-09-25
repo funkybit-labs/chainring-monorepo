@@ -3,14 +3,13 @@ package xyz.funkybit
 import xyz.funkybit.apps.api.ApiApp
 import xyz.funkybit.apps.ring.RingApp
 import xyz.funkybit.apps.telegrambot.BotApp
-import xyz.funkybit.tasks.blockchainClients
+import xyz.funkybit.tasks.evmClients
 import xyz.funkybit.tasks.fixtures.getFixtures
 import xyz.funkybit.tasks.migrateDatabase
 import xyz.funkybit.tasks.seedBlockchain
 import xyz.funkybit.tasks.seedDatabase
 import xyz.funkybit.tasks.seedSequencer
 import io.github.oshai.kotlinlogging.KotlinLogging
-import xyz.funkybit.core.blockchain.ChainManager
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
@@ -19,7 +18,7 @@ fun main(args: Array<String>) {
     when (args.firstOrNull()) {
         "db:migrate" -> migrateDatabase()
         "db:seed" -> {
-            val fixtures = getFixtures(blockchainClients, ChainManager.bitcoinBlockchainClientConfig)
+            val fixtures = getFixtures(evmClients)
             val symbolContractAddresses = seedBlockchain(fixtures)
             seedDatabase(fixtures, symbolContractAddresses)
             seedSequencer(fixtures)

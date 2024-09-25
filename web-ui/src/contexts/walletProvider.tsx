@@ -44,6 +44,7 @@ export const WalletContext = createContext<{
   isConnected: (networkType: NetworkType) => boolean
   connected: ConnectedWallet[]
   primary: ConnectedWallet | null
+  forNetwork: (networkType: NetworkType) => ConnectedWallet | null
 } | null>(null)
 
 function getGlobal(name: string) {
@@ -180,6 +181,10 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
     )
   }
 
+  function forNetwork(networkType: NetworkType): ConnectedWallet | null {
+    return connected.find((w) => w.networkType === networkType) || null
+  }
+
   const handleBitcoinConnectorEvent = useCallback(
     (event: BitcoinConnectorEvent) => {
       switch (event._kind) {
@@ -296,7 +301,8 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
         connect,
         isConnected,
         connected,
-        primary
+        primary,
+        forNetwork
       }}
     >
       <>{children}</>
@@ -321,6 +327,7 @@ export type Wallets = {
   isConnected: (networkType: NetworkType) => boolean
   connected: ConnectedWallet[]
   primary: ConnectedWallet | null
+  forNetwork: (networkType: NetworkType) => ConnectedWallet | null
 }
 
 export function useWallets(): Wallets {
@@ -331,12 +338,13 @@ export function useWallets(): Wallets {
     )
   }
 
-  const { connect, isConnected, connected, primary } = context
+  const { connect, isConnected, connected, primary, forNetwork } = context
 
   return {
     connect,
     isConnected,
     connected,
-    primary
+    primary,
+    forNetwork
   }
 }

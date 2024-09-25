@@ -48,7 +48,7 @@ object ArchUtils {
 
     val logger = KotlinLogging.logger {}
 
-    private val submitterPubkey = BitcoinClient.bitcoinConfig.submitterPubkey
+    private val submitterPubkey = BitcoinClient.config.submitterPubkey
 
     var tokenAccountSizeThreshold = 10_000_000
 
@@ -57,7 +57,7 @@ object ArchUtils {
         accountType: ArchAccountType,
         symbolEntity: SymbolEntity? = null,
     ): ArchAccountEntity? {
-        val config = BitcoinClient.bitcoinConfig
+        val config = BitcoinClient.config
 
         val accountAddress = ArchNetworkClient.getAccountAddress(ArchNetworkRpc.Pubkey.fromECKey(ecKey))
 
@@ -355,7 +355,7 @@ object ArchUtils {
         }
         return Pair(
             rawTx.toHexString(),
-            if (changeAmount > BitcoinClient.bitcoinConfig.changeDustThreshold) {
+            if (changeAmount > BitcoinClient.config.changeDustThreshold) {
                 changeAmount
             } else {
                 BigInteger.ONE
@@ -458,7 +458,7 @@ object ArchUtils {
                     programInstruction,
                 ).toUByteArray(),
             ),
-            BitcoinClient.bitcoinConfig.submitterPrivateKey,
+            BitcoinClient.config.submitterPrivateKey,
         )
     }
 
@@ -485,7 +485,7 @@ object ArchUtils {
     }
 
     fun signAndSendInstruction(instruction: ArchNetworkRpc.Instruction, privateKey: ByteArray? = null): TxHash {
-        return signAndSendInstructions(listOf(instruction), privateKey ?: BitcoinClient.bitcoinConfig.submitterPrivateKey)
+        return signAndSendInstructions(listOf(instruction), privateKey ?: BitcoinClient.config.submitterPrivateKey)
     }
 
     fun getConfirmedBitcoinDeposits(): List<ConfirmedBitcoinDeposit> {

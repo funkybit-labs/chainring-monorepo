@@ -75,7 +75,7 @@ class SettlementCoordinator(
 ) {
     private val marketMap = mutableMapOf<MarketId, MarketEntity>()
     private val symbolMap = mutableMapOf<SymbolId, SymbolEntity>()
-    private val chainIds = blockchainClients.map { it.chainId } + if (BitcoinClient.bitcoinConfig.enabled) listOf(BitcoinClient.chainId) else listOf()
+    private val chainIds = blockchainClients.map { it.chainId } + if (BitcoinClient.config.enabled) listOf(BitcoinClient.chainId) else listOf()
     private val blockchainClientsByChainId = blockchainClients.associateBy { it.chainId }
     private val advisoryLockKey = Long.MAX_VALUE
 

@@ -29,15 +29,14 @@ import { ConnectWallet } from 'components/Screens/HomeScreen/swap/ConnectWallet'
 import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import { TnChallengeDepositsLimitedTooltip } from 'components/common/TnChallengeDepositsLimitedTooltip'
 import { accountConfigQueryKey } from 'components/Screens/HomeScreen'
+import ContractsRegistry from 'contractsRegistry'
 
 export function BalancesTable({
-  walletAddress,
-  exchangeContractAddress,
+  contracts,
   symbols,
   accountConfig
 }: {
-  walletAddress?: string
-  exchangeContractAddress?: string
+  contracts?: ContractsRegistry
   symbols: TradingSymbols
   accountConfig?: AccountConfigurationApiResponse
 }) {
@@ -85,17 +84,22 @@ export function BalancesTable({
   }, [switchToEthChainId, switchToEthChain])
 
   function openDepositModal(symbol: TradingSymbol) {
-    if (symbol.networkType === 'Bitcoin') {
-      alert('Not implemented')
-    } else if (symbol.networkType === 'Evm') {
-      setWithdrawSymbol(null)
-      setDepositSymbol(symbol)
-      setShowDepositModal(true)
-      if (symbol.chainId != evmConfig.state.chainId) {
-        setSwitchToEthChainId(symbol.chainId)
-      }
+    setWithdrawSymbol(null)
+    setDepositSymbol(symbol)
+    setShowDepositModal(true)
+    if (
+      symbol.networkType === 'Evm' &&
+      symbol.chainId != evmConfig.state.chainId
+    ) {
+      setSwitchToEthChainId(symbol.chainId)
     }
   }
+
+  const depositAddress = useMemo(() => {
+    return depositSymbol && contracts
+      ? contracts.exchange(depositSymbol.chainId)?.address
+      : undefined
+  }, [depositSymbol, contracts])
 
   function openWithdrawModal(symbol: TradingSymbol) {
     setDepositSymbol(null)
@@ -105,6 +109,20 @@ export function BalancesTable({
       setSwitchToEthChainId(symbol.chainId)
     }
   }
+
+  const withdrawalSourceAddress = useMemo(() => {
+    return withdrawSymbol && contracts
+      ? contracts.exchange(withdrawSymbol.chainId)?.address
+      : undefined
+  }, [withdrawSymbol, contracts])
+
+  const walletAddress = useMemo(() => {
+    const symbol = depositSymbol || withdrawSymbol
+    return symbol && contracts
+      ? wallets.connected.find((w) => w.networkType == symbol.networkType)
+          ?.address
+      : undefined
+  }, [depositSymbol, withdrawSymbol, contracts, wallets])
 
   return (
     <>
@@ -166,11 +184,11 @@ export function BalancesTable({
         })}
       </div>
 
-      {depositSymbol && depositSymbol.chainId == evmConfig.state.chainId && (
+      {depositSymbol && depositAddress && walletAddress && (
         <DepositModal
           isOpen={showDepositModal}
-          exchangeContractAddress={exchangeContractAddress!}
-          walletAddress={walletAddress!}
+          depositAddress={depositAddress}
+          walletAddress={walletAddress}
           symbol={depositSymbol}
           testnetChallengeDepositLimit={
             accountConfig?.testnetChallengeDepositLimits[depositSymbol.name]
@@ -180,11 +198,11 @@ export function BalancesTable({
         />
       )}
 
-      {withdrawSymbol && withdrawSymbol.chainId == evmConfig.state.chainId && (
+      {withdrawSymbol && withdrawalSourceAddress && walletAddress && (
         <WithdrawalModal
           isOpen={showWithdrawalModal}
-          exchangeContractAddress={exchangeContractAddress!}
-          walletAddress={walletAddress!}
+          exchangeContractAddress={withdrawalSourceAddress}
+          walletAddress={walletAddress}
           symbol={withdrawSymbol}
           close={() => setShowWithdrawalModal(false)}
           onClosed={() => setWithdrawSymbol(null)}
