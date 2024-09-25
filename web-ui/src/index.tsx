@@ -5,7 +5,7 @@ import { initializeWagmiConfig, wagmiConfig } from 'wagmiConfig'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Spinner from 'components/common/Spinner'
 import React, { useEffect, useState } from 'react'
-import { useMaintenance } from 'apiClient'
+import { useAccessRestriction } from 'apiClient'
 import { WalletProvider } from 'contexts/walletProvider'
 import { testnetChallengeInviteCodeKey } from 'components/Screens/HomeScreen/testnetchallenge/TestnetChallengeTab'
 import { AuthProvider } from 'contexts/auth'
@@ -15,7 +15,7 @@ const root = createRoot(container)
 const queryClient = new QueryClient()
 
 const Root = () => {
-  const maintenance = useMaintenance()
+  const [maintenance, restricted] = useAccessRestriction()
   const [, setIsConfigInitialized] = useState(false)
 
   useEffect(() => {
@@ -34,6 +34,25 @@ const Root = () => {
 
     initConfig()
   }, [])
+
+  if (restricted) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-darkBluishGray10 text-white">
+        <div className="w-2/3 text-center ">
+          <h1 className="text-3xl font-bold">
+            Uh-oh! funkybit isn&apos;t feeling so funky where you&apos;re at
+          </h1>
+          <p className="mt-4 text-lg">
+            Whether you&apos;re tuning in from North Korea, the great state of
+            New York, or another place where fun is restricted — access is
+            currently unavailable. But hey, at least you&apos;ve got pizza
+            (unless you&apos;re in North Korea... then we&apos;re really sorry)!
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       {maintenance && (
