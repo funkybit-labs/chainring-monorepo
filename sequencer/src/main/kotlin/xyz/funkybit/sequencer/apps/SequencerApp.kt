@@ -665,6 +665,9 @@ class SequencerApp(
                         OrderSide.Buy -> Order.Type.MarketBuy
                     }
                     this.amount = quantityForSecondOrder.toIntegerValue()
+                    if (secondSide == OrderSide.Buy) {
+                        this.maxAvailable = assetReceivedFromFirstOrder.delta
+                    }
                 }
 
                 val secondOrderBatch = orderBatch {
@@ -675,7 +678,6 @@ class SequencerApp(
                     this.ordersToAdd.add(secondOrder)
                 }
 
-                // TODO - CHAIN-530: sweep any bridge asset dust amount when buying
                 val secondOrderResult = secondMarket.applyOrderBatch(
                     secondOrderBatch,
                     FeeRates(state.feeRates.maker, FeeRate.zero),
