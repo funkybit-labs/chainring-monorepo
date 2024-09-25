@@ -414,7 +414,7 @@ describe('rollupTrades', () => {
           buySymbol: BTC,
           aggregatedAmount: new SymbolAmount(20_000, DAI).asBigInt(),
           aggregatedPrice: new Decimal('0.00000999999999999975'),
-          priceDecimalPlaces: 6,
+          priceDecimalPlaces: 12,
           aggregatedFeeAmount: new SymbolAmount(20, DAI).asBigInt(),
           feeSymbol: DAI,
           settlementStatus: 'Completed',

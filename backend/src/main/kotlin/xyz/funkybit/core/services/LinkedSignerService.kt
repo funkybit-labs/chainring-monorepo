@@ -78,7 +78,7 @@ object LinkedSignerService {
     fun getLinkedSigner(walletAddress: Address, chainId: ChainId): Address? = linkedSignerByChain[chainId]?.get(walletAddress)
 
     fun createOrUpdateWalletLinkedSigner(walletAddress: EvmAddress, chainId: ChainId, linkedSignerAddress: EvmAddress) {
-        val walletEntity = WalletEntity.getOrCreateWithUser(walletAddress)
+        val walletEntity = WalletEntity.getOrCreateWithUser(walletAddress).first
         if (linkedSignerAddress == EvmAddress.zero) {
             WalletLinkedSignerEntity.findByWalletAndChain(walletEntity, chainId)?.delete()
         } else {

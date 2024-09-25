@@ -418,13 +418,11 @@ object SequencerResponseProcessorService {
     }
 
     private fun handleBalanceChanges(balanceChanges: List<xyz.funkybit.sequencer.proto.BalanceChange>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
-        logger.debug { "Calculating balance changes" }
         if (balanceChanges.isNotEmpty()) {
             val userWalletsMap = UserEntity.getWithWalletsBySequencerAccountIds(
                 balanceChanges.map { SequencerAccountId(it.account) }.toSet(),
             ).toMap().mapKeys { (user, _) -> user.sequencerId.value }
 
-            logger.debug { "updating balances" }
             val userIdsWithUpdatedBalances = mutableSetOf<UserId>()
             BalanceEntity.updateBalances(
                 balanceChanges.mapNotNull { change ->
@@ -443,13 +441,11 @@ object SequencerResponseProcessorService {
                 },
                 BalanceType.Available,
             )
-            logger.debug { "done updating balances" }
 
             userIdsWithUpdatedBalances.forEach {
                 broadcasterNotifications.add(BroadcasterNotification.walletBalances(it))
             }
         }
-        logger.debug { "Done calculating balance changes" }
     }
 
     private fun updateOrderBookSnapshot(ordersChanged: List<OrderChanged>, tradesWithTakerOrder: List<Pair<TradeEntity, OrderEntity>>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
@@ -457,17 +453,11 @@ object SequencerResponseProcessorService {
             .getOrdersMarkets(ordersChanged.map { it.guid })
             .sortedBy { it.guid }
 
-        logger.debug { "Got markets with order changes, calculating order book notifications" }
         marketsWithOrderChanges.forEach { market ->
-            logger.debug { "Market $market" }
             val prevSnapshot = OrderBookSnapshot.get(market)
-            logger.debug { "got old snapshot" }
             val newSnapshot = OrderBookSnapshot.calculate(market, tradesWithTakerOrder, prevSnapshot)
-            logger.debug { "calculated new snapshot" }
             val diff = newSnapshot.diff(prevSnapshot)
-            logger.debug { "calculated diff" }
             newSnapshot.save(market)
-            logger.debug { "saved new snapshot" }
             val seqNumber = KeyValueStore.incrementLong("WebsocketMsgSeqNumber:OrderBookDiff:${market.id.value.value}")
 
             broadcasterNotifications.add(
@@ -483,7 +473,6 @@ object SequencerResponseProcessorService {
                 ),
             )
         }
-        logger.debug { "Done calculating order book notifications" }
     }
 
     private fun updateOhlc(tradesWithTakerOrder: List<Pair<TradeEntity, OrderEntity>>, broadcasterNotifications: MutableList<BroadcasterNotification>) {
@@ -518,8 +507,6 @@ object SequencerResponseProcessorService {
                     )
                 }
             }
-
-        logger.debug { "Done calculating ohlc notifications" }
 
         val markets = MarketEntity.all().toList()
 

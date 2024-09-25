@@ -62,7 +62,7 @@ class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<Tele
                             EvmAddress.fromPrivateKey(
                                 privateKey,
                             ),
-                        ),
+                        ).first,
                         user,
                         privateKey.encrypt(),
                         isCurrent = true,
@@ -116,7 +116,7 @@ class TelegramBotUserEntity(guid: EntityID<TelegramBotUserId>) : GUIDEntity<Tele
     fun addWallet(privateKey: String): TelegramBotUserWalletEntity {
         return TelegramBotUserWalletEntity.create(
             // TODO do we really need to create a user here?
-            WalletEntity.getOrCreateWithUser(EvmAddress.fromPrivateKey(privateKey)),
+            WalletEntity.getOrCreateWithUser(EvmAddress.fromPrivateKey(privateKey)).first,
             this,
             privateKey.encrypt(),
             isCurrent = false,

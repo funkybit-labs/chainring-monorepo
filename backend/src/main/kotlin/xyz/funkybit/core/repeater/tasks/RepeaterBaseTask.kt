@@ -29,7 +29,6 @@ abstract class RepeaterBaseTask(
         if (isLockAcquired) {
             val startTime = Clock.System.now()
             try {
-                logger.debug { "Acquired lock for ${this.javaClass.simpleName}" }
                 runWithLock()
                 transaction {
                     notifyDbListener(REPEATER_APP_TASK_DONE_CHANNEL, name)
@@ -45,7 +44,6 @@ abstract class RepeaterBaseTask(
                 }
                 try {
                     lock.release()
-                    logger.debug { "Lock released for ${this.javaClass.simpleName}" }
                 } catch (t: Throwable) {
                     logger.warn(t) { "Could not release lock, retrying" }
                     try {

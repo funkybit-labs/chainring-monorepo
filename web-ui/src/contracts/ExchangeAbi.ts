@@ -666,6 +666,12 @@ export default [
                 "internalType": "address"
             },
             {
+                "name": "token",
+                "type": "address",
+                "indexed": false,
+                "internalType": "address"
+            },
+            {
                 "name": "tradeHashes",
                 "type": "bytes32[]",
                 "indexed": false,

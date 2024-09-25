@@ -4,6 +4,7 @@ import org.http4k.client.WebsocketClient
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
+import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.OHLCDuration
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
@@ -26,10 +27,11 @@ class PricesTest {
 
     private fun `test authenticated prices over websocket`(auth: String?) {
         val client = WebsocketClient.blocking(auth)
-        client.subscribeToPrices(MarketId("BTC/ETH"), duration = OHLCDuration.P15M)
+        val chainId = ChainManager.getBlockchainClients().first().chainId
+        client.subscribeToPrices(MarketId("BTC:$chainId/ETH:$chainId"), duration = OHLCDuration.P15M)
 
-        client.assertPricesMessageReceived(MarketId("BTC/ETH"), duration = OHLCDuration.P15M) { msg ->
-            assertEquals("BTC/ETH", msg.market.value)
+        client.assertPricesMessageReceived(MarketId("BTC:$chainId/ETH:$chainId"), duration = OHLCDuration.P15M) { msg ->
+            assertEquals("BTC:$chainId/ETH:$chainId", msg.market.value)
         }
 
         client.close()

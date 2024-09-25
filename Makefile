@@ -54,7 +54,7 @@ test:
 	./gradlew test
 
 run_backend:
-	./gradlew :run
+	QUIET_MODE=true ./gradlew :run
 
 run_sequencer:
 	SANDBOX_MODE=true ECO_MODE=true ./gradlew :sequencer:run

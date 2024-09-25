@@ -73,7 +73,7 @@ object DbTestHelpers {
 
     fun createWallet(address: Address = EvmAddress.generate(), user: UserEntity? = null): WalletEntity =
         if (user == null) {
-            WalletEntity.getOrCreateWithUser(address)
+            WalletEntity.getOrCreateWithUser(address).first
         } else {
             WalletEntity.createForUser(user, address)
         }

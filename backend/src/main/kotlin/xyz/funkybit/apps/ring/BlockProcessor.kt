@@ -28,6 +28,7 @@ import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.services.LinkedSignerService
 import xyz.funkybit.core.utils.rangeTo
+import xyz.funkybit.core.utils.verboseInfo
 import xyz.funkybit.sequencer.core.Asset
 import java.math.BigInteger
 import kotlin.concurrent.thread
@@ -69,7 +70,7 @@ class BlockProcessor(
                     }
 
                     for (blockNumber in blocksToProcess) {
-                        logger.info { "Processing block $blockNumber, chainId=$chainId" }
+                        logger.verboseInfo { "Processing block $blockNumber, chainId=$chainId" }
 
                         val blockFromRpcNode = blockchainClient.getBlock(blockNumber, withFullTxObjects = false)
                         val lastProcessedBlock = transaction { getLastProcessedBlock() }
@@ -96,7 +97,7 @@ class BlockProcessor(
     }
 
     private fun processBlock(blockFromRpcNode: EthBlock.Block) {
-        logger.info { "Storing block [number=${blockFromRpcNode.number},hash=${blockFromRpcNode.hash},parentHash=${blockFromRpcNode.parentHash}], chainId=$chainId" }
+        logger.verboseInfo { "Storing block [number=${blockFromRpcNode.number},hash=${blockFromRpcNode.hash},parentHash=${blockFromRpcNode.parentHash}], chainId=$chainId" }
         BlockEntity.create(blockFromRpcNode, chainId)
 
         val getLogsResult = blockchainClient.getExchangeContractLogs(blockFromRpcNode.number)
@@ -149,7 +150,7 @@ class BlockProcessor(
             val deposit = DepositEntity.findByTxHash(txHash)
             if (deposit == null) {
                 DepositEntity.createOrUpdate(
-                    wallet = WalletEntity.getOrCreateWithUser(EvmAddress(Keys.toChecksumAddress(depositEventResponse.from))),
+                    wallet = WalletEntity.getOrCreateWithUser(EvmAddress(Keys.toChecksumAddress(depositEventResponse.from))).first,
                     symbol = SymbolEntity.forChainAndContractAddress(
                         chainId,
                         EvmAddress(Keys.toChecksumAddress(depositEventResponse.token)).takeIf { it != EvmAddress.zero },

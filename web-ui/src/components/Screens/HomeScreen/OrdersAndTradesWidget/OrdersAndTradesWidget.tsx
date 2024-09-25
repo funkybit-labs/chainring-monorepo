@@ -168,8 +168,22 @@ export default function OrdersAndTradesWidget({
                       <SymbolAndChain
                         symbol={
                           order.side === 'Buy'
-                            ? secondMarket?.quoteSymbol ?? market.quoteSymbol
-                            : market.baseSymbol
+                            ? secondMarket // is a back-to-back?
+                              ? [
+                                  secondMarket.baseSymbol.name,
+                                  secondMarket.quoteSymbol.name
+                                ].includes(market.baseSymbol.name)
+                                ? market.quoteSymbol
+                                : market.baseSymbol
+                              : market.quoteSymbol
+                            : secondMarket
+                              ? [
+                                  secondMarket.baseSymbol.name,
+                                  secondMarket.quoteSymbol.name
+                                ].includes(market.baseSymbol.name)
+                                ? market.quoteSymbol
+                                : market.baseSymbol
+                              : market.baseSymbol
                         }
                       />
                     </td>
@@ -177,8 +191,22 @@ export default function OrdersAndTradesWidget({
                       <SymbolAndChain
                         symbol={
                           order.side === 'Buy'
-                            ? market.baseSymbol
-                            : secondMarket?.quoteSymbol ?? market.quoteSymbol
+                            ? secondMarket // is a back-to-back?
+                              ? [
+                                  secondMarket.baseSymbol.name,
+                                  secondMarket.quoteSymbol.name
+                                ].includes(market.baseSymbol.name)
+                                ? secondMarket.quoteSymbol
+                                : secondMarket.baseSymbol
+                              : market.quoteSymbol
+                            : secondMarket
+                              ? [
+                                  secondMarket.baseSymbol.name,
+                                  secondMarket.quoteSymbol.name
+                                ].includes(market.baseSymbol.name)
+                                ? secondMarket.quoteSymbol
+                                : secondMarket.baseSymbol
+                              : market.quoteSymbol
                         }
                       />
                     </td>

@@ -16,6 +16,7 @@ import xyz.funkybit.sequencer.core.toBigInteger
 import xyz.funkybit.sequencer.core.toDecimalValue
 import xyz.funkybit.sequencer.core.toIntegerValue
 import xyz.funkybit.sequencer.core.toMarketId
+import xyz.funkybit.sequencer.proto.IntegerValue
 import xyz.funkybit.sequencer.proto.Order
 import xyz.funkybit.sequencer.proto.OrderChanged
 import xyz.funkybit.sequencer.proto.OrderDisposition
@@ -109,7 +110,7 @@ class SequencerClient(clock: Clock) {
         orderGuid: Long,
         firstMarket: Market,
         secondMarket: Market,
-        amount: BigDecimal,
+        amount: IntegerValue,
         user: SequencerUser,
         orderType: Order.Type,
         percentage: Int? = null,
@@ -124,7 +125,7 @@ class SequencerClient(clock: Clock) {
                     this.wallet = user.wallet.value
                     this.order = order {
                         this.guid = orderGuid
-                        this.amount = amount.toFundamentalUnits(firstMarket.baseDecimals).toIntegerValue()
+                        this.amount = amount
                         this.type = orderType
                         percentage?.let { this.percentage = percentage }
                     }

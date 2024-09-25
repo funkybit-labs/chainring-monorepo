@@ -19,3 +19,4 @@ fun IntegerValue.fromFundamentalUnits(decimals: Int): BigDecimal {
 
 fun BigDecimal.inWei() = toFundamentalUnits(18)
 fun BigDecimal.inSats() = toFundamentalUnits(8)
+fun BigDecimal.inUsdc() = toFundamentalUnits(6)

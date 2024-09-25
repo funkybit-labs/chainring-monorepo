@@ -100,9 +100,11 @@ class ExchangeApiService(
         val userId = wallet.userGuid.value
         val walletAddress = wallet.address
         val market1 = getMarket(orderRequest.marketId)
-        val baseSymbol = getSymbolEntity(market1.baseSymbol)
         val market2 = getMarket(orderRequest.secondMarketId)
-        val quoteSymbol = getSymbolEntity(market2.quoteSymbol)
+        val firstLegDirection = if (listOf(market2.baseSymbol.value, market2.quoteSymbol.value).contains(market1.baseSymbol.value)) OrderSide.Buy else OrderSide.Sell
+        val secondLegDirection = if (listOf(market1.baseSymbol.value, market1.quoteSymbol.value).contains(market2.quoteSymbol.value)) OrderSide.Buy else OrderSide.Sell
+        val baseSymbol = getSymbolEntity(if (firstLegDirection == OrderSide.Buy) market1.quoteSymbol else market1.baseSymbol)
+        val quoteSymbol = getSymbolEntity(if (secondLegDirection == OrderSide.Buy) market2.baseSymbol else market2.quoteSymbol)
 
         when (walletAddress) {
             is EvmAddress ->
@@ -114,7 +116,7 @@ class ExchangeApiService(
                         baseToken = baseSymbol.contractAddress ?: EvmAddress.zero,
                         quoteChainId = quoteSymbol.chainId.value,
                         quoteToken = quoteSymbol.contractAddress ?: EvmAddress.zero,
-                        amount = if (orderRequest.side == OrderSide.Buy) orderRequest.amount else orderRequest.amount.negate(),
+                        amount = orderRequest.amount.negate(),
                         price = BigInteger.ZERO,
                         nonce = BigInteger(1, orderRequest.nonce.toHexBytes()),
                         signature = orderRequest.signature as EvmSignature,
