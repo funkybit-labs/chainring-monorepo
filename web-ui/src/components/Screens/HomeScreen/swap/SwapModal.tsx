@@ -29,19 +29,18 @@ import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import MarketPrice from 'components/Screens/HomeScreen/swap/MarketPrice'
 import { useWallets } from 'contexts/walletProvider'
 import { DepositButton } from 'components/Screens/HomeScreen/swap/DepositButton'
+import ContractsRegistry from 'contractsRegistry'
 
 export function SwapModal({
   markets,
-  exchangeContractAddress,
-  walletAddress,
+  contracts,
   feeRates,
   accountConfig,
   onMarketChange,
   onSideChange
 }: {
   markets: Markets
-  exchangeContractAddress?: string
-  walletAddress?: string
+  contracts?: ContractsRegistry
   feeRates: FeeRates
   accountConfig?: AccountConfigurationApiResponse
   onMarketChange: (m: Market) => void
@@ -62,6 +61,12 @@ export function SwapModal({
   const config = useConfig()
   const switchToEthChain = useSwitchToEthChain()
 
+  const depositAddress = useMemo(() => {
+    return depositSymbol && contracts
+      ? contracts.exchange(depositSymbol.chainId)?.address
+      : undefined
+  }, [depositSymbol, contracts])
+
   function openDepositModal(symbol: TradingSymbol) {
     setDepositSymbol(symbol)
     setShowDepositModal(true)
@@ -72,8 +77,7 @@ export function SwapModal({
 
   return SwapInternals({
     markets,
-    exchangeContractAddress,
-    walletAddress,
+    contracts,
     feeRates,
     onMarketChange,
     onSideChange: onChangedSide,
@@ -134,6 +138,12 @@ export function SwapModal({
         )
       }
 
+      const topSymbolExchangeContract =
+        contracts && contracts.exchange(sr.topSymbol.chainId)
+
+      const bottomSymbolExchangeContract =
+        contracts && contracts.exchange(sr.bottomSymbol.chainId)
+
       return (
         <>
           <div className="max-w-[680px] space-y-4 rounded-[20px] bg-darkBluishGray9 p-8 narrow:w-[680px]">
@@ -165,21 +175,22 @@ export function SwapModal({
                 </span>
                 <div className="flex flex-row items-baseline space-x-2 text-sm">
                   {depositAmount(
-                    exchangeContractAddress === undefined
+                    topSymbolExchangeContract === undefined
                       ? undefined
                       : sr.topBalance,
                     sr.topSymbol
                   )}
-                  {walletAddress && exchangeContractAddress && (
-                    <DepositButton
-                      testnetChallengeDepositLimit={
-                        accountConfig?.testnetChallengeDepositLimits[
-                          sr.topSymbol.name
-                        ]
-                      }
-                      onClick={() => openDepositModal(sr.topSymbol)}
-                    />
-                  )}
+                  {wallets.isConnected(sr.topSymbol.networkType) &&
+                    topSymbolExchangeContract && (
+                      <DepositButton
+                        testnetChallengeDepositLimit={
+                          accountConfig?.testnetChallengeDepositLimits[
+                            sr.topSymbol.name
+                          ]
+                        }
+                        onClick={() => openDepositModal(sr.topSymbol)}
+                      />
+                    )}
                 </div>
               </div>
               <div
@@ -245,7 +256,7 @@ export function SwapModal({
                   <span className="text-base text-darkBluishGray1">Buy</span>
                   <div className="flex flex-row space-x-2 align-middle text-sm">
                     {depositAmount(
-                      exchangeContractAddress === undefined
+                      bottomSymbolExchangeContract === undefined
                         ? undefined
                         : sr.bottomBalance,
                       sr.bottomSymbol
@@ -279,10 +290,10 @@ export function SwapModal({
               />
             </div>
             <div className="flex w-full flex-col">
-              {walletAddress &&
-              exchangeContractAddress &&
-              wallets.isConnected(sr.topSymbol.networkType) &&
-              wallets.isConnected(sr.bottomSymbol.networkType) ? (
+              {bottomSymbolExchangeContract &&
+              bottomSymbolExchangeContract &&
+              (wallets.isConnected(sr.topSymbol.networkType) ||
+                wallets.isConnected(sr.bottomSymbol.networkType)) ? (
                 <>
                   {sr.noPriceFound && (
                     <span className="w-full text-center text-brightRed">
@@ -329,21 +340,27 @@ export function SwapModal({
             </div>
           </div>
 
-          {depositSymbol && depositSymbol.chainId == config.state.chainId && (
-            <DepositModal
-              isOpen={showDepositModal}
-              exchangeContractAddress={exchangeContractAddress!}
-              walletAddress={walletAddress!}
-              symbol={depositSymbol}
-              testnetChallengeDepositLimit={
-                accountConfig?.testnetChallengeDepositLimits[depositSymbol.name]
-              }
-              close={() => setShowDepositModal(false)}
-              onClosed={() => {
-                setDepositSymbol(null)
-              }}
-            />
-          )}
+          {depositSymbol &&
+            depositSymbol.chainId == config.state.chainId &&
+            depositAddress && (
+              <DepositModal
+                isOpen={showDepositModal}
+                depositAddress={depositAddress}
+                walletAddress={
+                  wallets.forNetwork(depositSymbol.networkType)!.address
+                }
+                symbol={depositSymbol}
+                testnetChallengeDepositLimit={
+                  accountConfig?.testnetChallengeDepositLimits[
+                    depositSymbol.name
+                  ]
+                }
+                close={() => setShowDepositModal(false)}
+                onClosed={() => {
+                  setDepositSymbol(null)
+                }}
+              />
+            )}
         </>
       )
     }

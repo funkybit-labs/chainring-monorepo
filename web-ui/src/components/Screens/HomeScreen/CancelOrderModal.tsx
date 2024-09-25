@@ -2,58 +2,52 @@ import { Modal } from 'components/common/Modal'
 import SubmitButton from 'components/common/SubmitButton'
 import CancelButton from 'components/common/CancelButton'
 import { apiClient, CancelOrderRequest, Order } from 'apiClient'
-import { generateOrderNonce, getDomain } from 'utils/eip712'
+import { generateOrderNonce } from 'utils/eip712'
 import { useMutation } from '@tanstack/react-query'
 import { isErrorFromAlias } from '@zodios/core'
-import { BaseError as WagmiError, useConfig, useSignTypedData } from 'wagmi'
-import { Address } from 'viem'
+import { BaseError as WagmiError, useConfig } from 'wagmi'
+import ContractsRegistry from 'contractsRegistry'
+import { useWallets } from 'contexts/walletProvider'
+import { signOrderCancellation } from 'utils/signingUtils'
+import Markets from 'markets'
 
 export function CancelOrderModal({
   order,
-  exchangeContractAddress,
-  walletAddress,
+  contracts,
+  markets,
   isOpen,
   close,
   onClosed
 }: {
   order: Order
-  exchangeContractAddress: string
-  walletAddress: string
+  contracts: ContractsRegistry
+  markets: Markets
   isOpen: boolean
   close: () => void
   onClosed: () => void
 }) {
   const config = useConfig()
-  const { signTypedDataAsync } = useSignTypedData()
+  const wallets = useWallets()
 
   const cancelOrderMutation = useMutation({
     mutationFn: async () => {
       try {
+        const wallet = wallets.primary!
         const nonce = generateOrderNonce()
-        const signature = await signTypedDataAsync({
-          types: {
-            EIP712Domain: [
-              { name: 'name', type: 'string' },
-              { name: 'version', type: 'string' },
-              { name: 'chainId', type: 'uint256' },
-              { name: 'verifyingContract', type: 'address' }
-            ],
-            CancelOrder: [
-              { name: 'sender', type: 'address' },
-              { name: 'marketId', type: 'string' },
-              { name: 'amount', type: 'int256' },
-              { name: 'nonce', type: 'int256' }
-            ]
-          },
-          domain: getDomain(exchangeContractAddress!, config.state.chainId),
-          primaryType: 'CancelOrder',
-          message: {
-            sender: walletAddress! as Address,
-            marketId: order.marketId,
-            amount: order.side == 'Buy' ? order.amount : -order.amount,
-            nonce: BigInt('0x' + nonce)
-          }
-        })
+        const market = markets.getById(order.marketId)
+        const signature = await signOrderCancellation(
+          wallet,
+          config.state.chainId,
+          nonce,
+          contracts.exchange(config.state.chainId)!.address,
+          market,
+          order.side,
+          order.amount
+        )
+
+        if (signature == null) {
+          return null
+        }
 
         const payload: CancelOrderRequest = {
           orderId: order.id,
@@ -65,9 +59,11 @@ export function CancelOrderModal({
           verifyingChainId: config.state.chainId
         }
 
-        return await apiClient.cancelOrder(payload, {
-          params: { id: payload.orderId }
-        })
+        return await apiClient
+          .cancelOrder(payload, {
+            params: { id: payload.orderId }
+          })
+          .then(() => payload.orderId)
       } catch (error) {
         throw Error(
           isErrorFromAlias(apiClient.api, 'cancelOrder', error)
@@ -76,8 +72,12 @@ export function CancelOrderModal({
         )
       }
     },
-    onSuccess: () => {
-      close()
+    onSuccess: (response) => {
+      if (response == null) {
+        cancelOrderMutation.reset()
+      } else {
+        close()
+      }
     }
   })
 
@@ -109,7 +109,9 @@ export function CancelOrderModal({
           <div className="w-full flex-col">
             <SubmitButton
               disabled={
-                cancelOrderMutation.isPending || cancelOrderMutation.isSuccess
+                wallets.primary === null ||
+                cancelOrderMutation.isPending ||
+                cancelOrderMutation.isSuccess
               }
               onClick={onSubmit}
               error={cancelOrderMutation.error?.message}

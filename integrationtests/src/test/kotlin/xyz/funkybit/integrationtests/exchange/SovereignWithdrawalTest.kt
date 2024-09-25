@@ -16,7 +16,7 @@ import xyz.funkybit.integrationtests.utils.Wallet
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
 import xyz.funkybit.integrationtests.utils.blocking
 import xyz.funkybit.integrationtests.utils.subscribeToBalances
-import xyz.funkybit.tasks.blockchainClient
+import xyz.funkybit.tasks.evmClient
 import xyz.funkybit.tasks.fixtures.toChainSymbol
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -87,7 +87,7 @@ class SovereignWithdrawalTest {
             val walletBtcBalanceBeforeWithdrawal = wallet.getWalletBalance(btc).amount.toFundamentalUnits(btc.decimals)
             val btcWithdrawalAmount = BigDecimal("0.1")
             val btcWithdrawalTxHash = wallet.requestSovereignWithdrawalAndMine(btc.name, btcWithdrawalAmount.toFundamentalUnits(btc.decimals))
-            val btcWithdrawalGasCost = blockchainClient(wallet.currentChainId).gasUsed(btcWithdrawalTxHash)!!
+            val btcWithdrawalGasCost = evmClient(wallet.currentChainId).gasUsed(btcWithdrawalTxHash)!!
             waitForBalance(apiClient, wsClient, listOf())
 
             await
@@ -197,7 +197,7 @@ class SovereignWithdrawalTest {
             val walletBtcBalanceBeforeWithdrawal = wallet.getWalletBalance(btc).amount.toFundamentalUnits(btc.decimals)
             val exchangeBtcBalanceBeforeWithdrawal = wallet.getExchangeNativeBalance()
             val btcWithdrawalTxHash = wallet.requestSovereignWithdrawalAndMine(btc.name, BigInteger.ZERO)
-            val btcWithdrawalGasCost = blockchainClient(wallet.currentChainId).gasUsed(btcWithdrawalTxHash)!!
+            val btcWithdrawalGasCost = evmClient(wallet.currentChainId).gasUsed(btcWithdrawalTxHash)!!
             waitForBalance(apiClient, wsClient, listOf())
 
             await

@@ -29,19 +29,18 @@ import { useSwitchToEthChain } from 'utils/switchToEthChain'
 import MarketPrice from 'components/Screens/HomeScreen/swap/MarketPrice'
 import { useWallets } from 'contexts/walletProvider'
 import { DepositButton } from 'components/Screens/HomeScreen/swap/DepositButton'
+import ContractsRegistry from 'contractsRegistry'
 
 export function LimitModal({
   markets,
-  exchangeContractAddress,
-  walletAddress,
+  contracts,
   feeRates,
   accountConfig,
   onMarketChange,
   onSideChange
 }: {
   markets: Markets
-  exchangeContractAddress?: string
-  walletAddress?: string
+  contracts?: ContractsRegistry
   feeRates: FeeRates
   accountConfig?: AccountConfigurationApiResponse
   onMarketChange: (m: Market) => void
@@ -68,10 +67,15 @@ export function LimitModal({
     }
   }
 
+  const depositAddress = useMemo(() => {
+    return depositSymbol && contracts
+      ? contracts.exchange(depositSymbol.chainId)?.address
+      : undefined
+  }, [depositSymbol, contracts])
+
   return SwapInternals({
     markets,
-    exchangeContractAddress,
-    walletAddress,
+    contracts,
     feeRates,
     onMarketChange,
     onSideChange: onChangedSide,
@@ -148,21 +152,20 @@ export function LimitModal({
                 <span className="text-base text-darkBluishGray1">Sell</span>
                 <div className="flex flex-row items-baseline space-x-2 text-sm">
                   {depositAmount(
-                    exchangeContractAddress === undefined
-                      ? undefined
-                      : sr.topBalance,
+                    contracts === undefined ? undefined : sr.topBalance,
                     sr.topSymbol
                   )}
-                  {walletAddress && exchangeContractAddress && (
-                    <DepositButton
-                      onClick={() => openDepositModal(sr.topSymbol)}
-                      testnetChallengeDepositLimit={
-                        accountConfig?.testnetChallengeDepositLimits[
-                          sr.topSymbol.name
-                        ]
-                      }
-                    />
-                  )}
+                  {wallets.isConnected(sr.topSymbol.networkType) &&
+                    contracts && (
+                      <DepositButton
+                        onClick={() => openDepositModal(sr.topSymbol)}
+                        testnetChallengeDepositLimit={
+                          accountConfig?.testnetChallengeDepositLimits[
+                            sr.topSymbol.name
+                          ]
+                        }
+                      />
+                    )}
                 </div>
               </div>
               <div
@@ -276,9 +279,7 @@ export function LimitModal({
                 <span className="text-base text-darkBluishGray1">Buy</span>
                 <div className="flex flex-row space-x-2 align-middle text-sm">
                   {depositAmount(
-                    exchangeContractAddress === undefined
-                      ? undefined
-                      : sr.bottomBalance,
+                    contracts === undefined ? undefined : sr.bottomBalance,
                     sr.bottomSymbol
                   )}
                 </div>
@@ -361,10 +362,9 @@ export function LimitModal({
               onClick={() => setMarketPriceInverted(!marketPriceInverted)}
             />
             <div className="flex w-full flex-col">
-              {walletAddress &&
-              exchangeContractAddress &&
-              wallets.isConnected(sr.topSymbol.networkType) &&
-              wallets.isConnected(sr.bottomSymbol.networkType) ? (
+              {contracts &&
+              (wallets.isConnected(sr.topSymbol.networkType) ||
+                wallets.isConnected(sr.bottomSymbol.networkType)) ? (
                 <>
                   {sr.noPriceFound && (
                     <span className="w-full text-center text-brightRed">
@@ -411,21 +411,27 @@ export function LimitModal({
             </div>
           </div>
 
-          {depositSymbol && depositSymbol.chainId == config.state.chainId && (
-            <DepositModal
-              isOpen={showDepositModal}
-              exchangeContractAddress={exchangeContractAddress!}
-              walletAddress={walletAddress!}
-              symbol={depositSymbol}
-              testnetChallengeDepositLimit={
-                accountConfig?.testnetChallengeDepositLimits[depositSymbol.name]
-              }
-              close={() => setShowDepositModal(false)}
-              onClosed={() => {
-                setDepositSymbol(null)
-              }}
-            />
-          )}
+          {depositSymbol &&
+            depositSymbol.chainId == config.state.chainId &&
+            depositAddress && (
+              <DepositModal
+                isOpen={showDepositModal}
+                depositAddress={depositAddress}
+                walletAddress={
+                  wallets.forNetwork(depositSymbol.networkType)!.address
+                }
+                symbol={depositSymbol}
+                testnetChallengeDepositLimit={
+                  accountConfig?.testnetChallengeDepositLimits[
+                    depositSymbol.name
+                  ]
+                }
+                close={() => setShowDepositModal(false)}
+                onClosed={() => {
+                  setDepositSymbol(null)
+                }}
+              />
+            )}
         </>
       )
     }

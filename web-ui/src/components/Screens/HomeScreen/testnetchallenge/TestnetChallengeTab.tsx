@@ -2,8 +2,7 @@ import {
   AccountConfigurationApiResponse,
   AddressType,
   apiClient,
-  Balance,
-  Chain
+  Balance
 } from 'apiClient'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -24,18 +23,17 @@ import { accountConfigQueryKey } from 'components/Screens/HomeScreen'
 import { useWebsocketSubscription } from 'contexts/websocket'
 import { balancesTopic, Publishable } from 'websocketMessages'
 import WithdrawalModal from 'components/Screens/HomeScreen/WithdrawalModal'
+import ContractsRegistry from 'contractsRegistry'
 
 export const testnetChallengeInviteCodeKey = 'testnetChallengeInviteCode'
 export function TestnetChallengeTab({
-  chains,
   symbols,
-  exchangeContract,
+  contracts,
   accountConfig,
   onChangeTab
 }: {
-  chains: Chain[]
   symbols: TradingSymbols
-  exchangeContract?: { name: string; address: string }
+  contracts?: ContractsRegistry
   accountConfig?: AccountConfigurationApiResponse
   onChangeTab: (tab: Tab, widget?: Widget) => void
 }) {
@@ -190,31 +188,24 @@ export function TestnetChallengeTab({
   }, [wallets, walletHasConnected, queryClient])
 
   function onWithdrawal(symbol: TradingSymbol) {
-    if (wallets.isConnected(symbol.networkType)) {
+    const contract = contracts?.exchange(symbol.chainId)
+    if (wallets.isConnected(symbol.networkType) && contract) {
       setWithdrawalWallet(
         wallets.connected.find(
           (wallet) => wallet.networkType == symbol.networkType
         )
       )
       setWithdrawalSymbol(symbol)
-
-      if (symbol.networkType === 'Bitcoin') {
-        const contractAddress = chains
-          .filter((chain) => chain.networkType === 'Bitcoin')[0]
-          .contracts.find((c) => c.name == 'Exchange')?.address
-
-        setWithdrawalExchangeContract(contractAddress)
-      } else if (symbol.networkType === 'Evm') {
-        const contractAddress = chains
-          .filter((chain) => chain.networkType === 'Evm')
-          .find((chain) => chain.id === symbol.chainId)!
-          .contracts.find((c) => c.name == 'Exchange')?.address
-
-        setWithdrawalExchangeContract(contractAddress)
-      }
+      setWithdrawalExchangeContract(contract.address)
       setShowWithdrawalModal(true)
     }
   }
+
+  const depositAddress = useMemo(() => {
+    return testnetChallengeDepositSymbol && contracts
+      ? contracts.exchange(testnetChallengeDepositSymbol.chainId)?.address
+      : undefined
+  }, [testnetChallengeDepositSymbol, contracts])
 
   return (
     <>
@@ -358,14 +349,16 @@ export function TestnetChallengeTab({
         </div>
         {testnetChallengeDepositSymbol &&
           testnetChallengeDepositContract &&
-          exchangeContract &&
-          exchangeContract?.address &&
-          wallets.primary?.address &&
+          depositAddress &&
+          wallets.isConnected(testnetChallengeDepositSymbol.networkType) &&
           testnetChallengeDepositSymbol.chainId === evmConfig.state.chainId && (
             <DepositModal
               isOpen={showTestnetChallengeDepositModal}
-              exchangeContractAddress={exchangeContract.address}
-              walletAddress={wallets.primary.address}
+              depositAddress={depositAddress}
+              walletAddress={
+                wallets.forNetwork(testnetChallengeDepositSymbol.networkType)!
+                  .address
+              }
               symbol={testnetChallengeDepositSymbol}
               testnetChallengeDepositLimit={
                 accountConfig?.testnetChallengeDepositLimits[
@@ -388,9 +381,7 @@ export function TestnetChallengeTab({
           )}
         {withdrawalWallet?.address &&
           withdrawalExchangeContract &&
-          withdrawalSymbol &&
-          (withdrawalSymbol.networkType === 'Bitcoin' ||
-            withdrawalSymbol?.chainId === evmConfig.state.chainId) && (
+          withdrawalSymbol && (
             <WithdrawalModal
               exchangeContractAddress={withdrawalExchangeContract}
               walletAddress={withdrawalWallet.address}

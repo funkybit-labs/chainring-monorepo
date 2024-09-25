@@ -26,6 +26,7 @@ import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.db.BitcoinUtxoEntity
+import xyz.funkybit.core.utils.fromFundamentalUnits
 import java.time.Duration
 
 data class SymbolContractAddress(
@@ -33,12 +34,12 @@ data class SymbolContractAddress(
     val address: Address
 )
 
-val blockchainClients = ChainManager.blockchainConfigs.map {
+val evmClients = ChainManager.blockchainConfigs.map {
     FixturesBlockchainClient(it.copy(enableWeb3jLogging = false))
 }
-val blockchainClientsByChainId = blockchainClients.associateBy { it.chainId }
+val evmClientsByChainId = evmClients.associateBy { it.chainId }
 
-fun blockchainClient(chainId: ChainId) = blockchainClientsByChainId.getValue(chainId)
+fun evmClient(chainId: ChainId) = evmClientsByChainId.getValue(chainId)
 
 fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
     val db = Database.connect(DbConfig())
@@ -47,7 +48,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
     // seed the fee payer
     fixtures.chains.firstOrNull { it.id == BitcoinClient.chainId }?.let {
         // fund the fee payer
-        airdropToFeePayer()
+        airdropBtcToFeePayer()
     }
 
     val symbolEntities = transaction { SymbolEntity.all().toList() }
@@ -57,7 +58,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
             null
         } else {
             val contractAddress = symbolEntities.firstOrNull { it.id.value == symbol.id }?.contractAddress ?: run {
-                val contractAddress = blockchainClient(symbol.chainId).deployMockERC20(
+                val contractAddress = evmClient(symbol.chainId).deployMockERC20(
                     symbol.name.replace(Regex(":.*"), ""),
                     symbol.decimals.toBigInteger()
                 )
@@ -72,10 +73,20 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
     val txHashes = fixtures.wallets.flatMap { wallet ->
         wallet.balances.mapNotNull { (symbolId, balance) ->
             when (wallet.address) {
-                is BitcoinAddress -> null // TODO seed bitcoin wallets
+                is BitcoinAddress -> {
+                    if (balance == BigInteger.ZERO) {
+                        null
+                    } else {
+                        val symbol = fixtures.symbols.first { it.id == symbolId }
+                        println("Setting ${symbol.name} balance for ${wallet.address.value} to $balance")
+                        airdropBtcToAddress(wallet.address, balance)?.let { txHash ->
+                            Pair(BitcoinClient.chainId, txHash)
+                        }
+                    }
+                }
                 is EvmAddress -> {
                     val symbol = fixtures.symbols.first { it.id == symbolId }
-                    val blockchainClient = blockchainClient(symbol.chainId)
+                    val blockchainClient = evmClient(symbol.chainId)
 
                     println("Setting ${symbol.name} balance for ${wallet.address.value} to $balance")
 
@@ -127,24 +138,39 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
         .atMost(Duration.ofMillis(10000L))
         .until {
             txHashes.all { (chainId, txHash) ->
-                blockchainClient(chainId).getTransactionReceipt(txHash)?.isStatusOK ?: false
+                if (chainId == BitcoinClient.chainId) {
+                    (BitcoinClient.getRawTransaction(txHash.toDbModel())?.confirmations ?: 0) > 0
+                } else {
+                    evmClient(chainId).getTransactionReceipt(txHash)?.isStatusOK ?: false
+                }
             }
         }
 
     return symbolContractAddresses
 }
 
-private fun airdropToFeePayer() {
+private fun airdropBtcToFeePayer() {
     try {
         (0 .. 5).forEach { _ ->
             BitcoinClient.sendToAddress(
-                BitcoinClient.bitcoinConfig.feePayerAddress,
+                BitcoinClient.config.feePayerAddress,
                 BigInteger("8000"),
             )
         }
     } catch (e: Exception) {
         println("failed to airdrop to fee payer")
     }
+}
+
+private fun airdropBtcToAddress(address: BitcoinAddress, amount: BigInteger): TxHash? {
+    try {
+        val airdropAmount = maxOf(amount, BigInteger.valueOf(5000L))
+        println("Air-dropping ${airdropAmount.fromFundamentalUnits(8).toPlainString()} BTC to $address")
+        return BitcoinClient.sendToAddress(address, airdropAmount).let { TxHash.fromDbModel(it) }
+    } catch (e: Exception) {
+        println("Failed to airdrop BTC to $address")
+    }
+    return null
 }
 
 class FixturesBlockchainClient(config: BlockchainClientConfig) : BlockchainClient(config) {

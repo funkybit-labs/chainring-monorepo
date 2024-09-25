@@ -97,7 +97,7 @@ class ArchOnboardingTest {
         assertEquals(programStateInfo.owner.bytes.toHex(false), programEntity.publicKey)
         val programState = Borsh.decodeFromByteArray<ArchAccountState.Program>(programStateInfo.data.toByteArray())
         assertEquals(0, programState.version)
-        assertEquals(BitcoinClient.bitcoinConfig.feeCollectionAddress, programState.feeAccount)
+        assertEquals(BitcoinClient.config.feeCollectionAddress, programState.feeAccount)
         assertEquals(bitcoinContract.proxyAddress, programState.programChangeAddress)
         assertEquals(BitcoinNetworkType.Regtest, programState.networkType)
         assertEquals(ContractType.Exchange.name, bitcoinContract.name)
@@ -115,6 +115,6 @@ class ArchOnboardingTest {
         assertEquals("BTC:0", tokenState.tokenId)
         assertEquals(programStateEntity.rpcPubkey().toString(), tokenState.programStateAccount.toString())
         assertEquals(1, tokenState.balances.size)
-        assertEquals(ArchAccountState.Balance(BitcoinClient.bitcoinConfig.feeCollectionAddress.value, 0u), tokenState.balances.first())
+        assertEquals(ArchAccountState.Balance(BitcoinClient.config.feeCollectionAddress.value, 0u), tokenState.balances.first())
     }
 }

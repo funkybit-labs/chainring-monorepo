@@ -5,7 +5,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
-import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.Percentage
 import xyz.funkybit.core.model.Signature
 import xyz.funkybit.core.model.Symbol
@@ -130,7 +129,7 @@ data class CancelOrderApiRequest(
     val side: OrderSide,
     val amount: BigIntegerJson,
     val nonce: String,
-    val signature: EvmSignature,
+    val signature: Signature,
     val verifyingChainId: ChainId,
 )
 

@@ -35,7 +35,7 @@ export type ApiErrors = z.infer<typeof ApiErrorsSchema>
 
 const GoalIdSchema = z.enum([
   'GithubSubscription',
-  'MediumSubscription',
+  'DiscordSubscription',
   'LinkedinSubscription',
   'XSubscription'
 ])
