@@ -759,7 +759,59 @@ class SequencerApp(
                         },
                     )
                 } else {
-                    // TODO - CHAIN-531 - try to unwind first order
+                    logger.warn { "Second back-to-back leg failed with $secondOrderDisposition, trying to unwind" }
+                    val unwindOrder = order {
+                        this.guid = order.guid
+                        this.type = when (firstSide) {
+                            OrderSide.Sell -> Order.Type.MarketBuy
+                            OrderSide.Buy -> Order.Type.MarketSell
+                        }
+                        this.amount = when (firstSide) {
+                            OrderSide.Buy -> assetReceivedFromFirstOrder.delta
+                            OrderSide.Sell -> firstMarket.quantityForMarketBuy(
+                                assetReceivedFromFirstOrder.delta.toQuoteAmount(),
+                            ).toIntegerValue()
+                        }
+                    }
+
+                    val unwindOrderBatch = orderBatch {
+                        this.guid = request.guid
+                        this.account = account.value
+                        this.wallet = request.wallet
+                        this.marketId = firstMarket.id.value
+                        this.ordersToAdd.add(unwindOrder)
+                    }
+
+                    val unwindOrderResult = firstMarket.applyOrderBatch(
+                        unwindOrderBatch,
+                        FeeRates(state.feeRates.maker, FeeRate.zero),
+                    )
+                    val unwindOrderDisposition = unwindOrderResult.ordersChanged.firstOrNull()?.disposition
+
+                    if (unwindOrderDisposition == OrderDisposition.Filled || unwindOrderDisposition == OrderDisposition.PartiallyFilled) {
+                        applyBalanceAndConsumptionChanges(
+                            firstMarket.id,
+                            unwindOrderResult,
+                            accountsAndAssetsWithBalanceChanges,
+                            balanceChanges,
+                            accountsWithLimitChanges,
+                        )
+
+                        ordersChanged.addAll(unwindOrderResult.ordersChanged.filterNot { it.guid == order.guid })
+                        trades.addAll(unwindOrderResult.createdTrades)
+
+                        ordersChanged.add(
+                            orderChanged {
+                                this.guid = order.guid
+                                this.disposition = OrderDisposition.PartiallyFilled
+                                if (order.hasPercentage()) {
+                                    this.newQuantity = firstOrderQuantity.toIntegerValue()
+                                }
+                            },
+                        )
+                    } else {
+                        logger.warn { "Unable to execute unwind order after failed 2nd back-to-back leg: $unwindOrderDisposition" }
+                    }
                 }
             } else {
                 throw RuntimeException("Unexpectedly could not identify received asset after first back-to-back leg")
