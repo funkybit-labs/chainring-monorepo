@@ -26,6 +26,6 @@ value class TxHash(val value: String) {
         fun fromDbModel(txHash: xyz.funkybit.core.model.db.TxHash): TxHash = TxHash(txHash.value)
     }
 
-    // TODO: get rid of xyz.funkybit.core.model.db.TxHash class
+    // TODO: CHAIN-533 get rid of xyz.funkybit.core.model.db.TxHash class
     fun toDbModel() = xyz.funkybit.core.model.db.TxHash(value)
 }
