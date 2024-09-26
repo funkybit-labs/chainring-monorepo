@@ -244,6 +244,19 @@ function WalletProviderInternal({ children }: { children: React.ReactNode }) {
   // handle EVM wallet connect/disconnect events
   useEffect(() => {
     async function onConnected() {
+      // disconnect all wallets if the primary evm wallet address has changed
+      if (
+        primaryWallet &&
+        primaryWallet.networkType === 'Evm' &&
+        primaryWallet.address !== evmAccount.address
+      ) {
+        await disconnectWallet('Evm')
+
+        if (bitcoinAccount != null) {
+          await disconnectWallet('Bitcoin')
+        }
+      }
+
       switch (primaryWallet?.networkType) {
         case undefined:
         case null:
