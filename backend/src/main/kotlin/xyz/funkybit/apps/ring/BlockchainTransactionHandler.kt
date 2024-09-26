@@ -15,6 +15,7 @@ import xyz.funkybit.core.blockchain.BlockchainClientException
 import xyz.funkybit.core.blockchain.BlockchainServerException
 import xyz.funkybit.core.blockchain.DefaultBlockParam
 import xyz.funkybit.core.evm.EIP712Transaction
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.BalanceChange
 import xyz.funkybit.core.model.db.BalanceEntity
 import xyz.funkybit.core.model.db.BalanceType
@@ -27,7 +28,6 @@ import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ChainSettlementBatchEntity
 import xyz.funkybit.core.model.db.SettlementBatchStatus
 import xyz.funkybit.core.model.db.TradeEntity
-import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalId
 import xyz.funkybit.core.model.db.WithdrawalStatus

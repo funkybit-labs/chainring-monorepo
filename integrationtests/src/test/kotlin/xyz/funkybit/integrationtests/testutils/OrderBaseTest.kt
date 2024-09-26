@@ -14,6 +14,7 @@ import org.web3j.crypto.Credentials
 import xyz.funkybit.apps.api.model.Market
 import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.BlockchainTransactionStatus
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.ChainSettlementBatchEntity
@@ -28,7 +29,6 @@ import xyz.funkybit.core.model.db.SettlementStatus
 import xyz.funkybit.core.model.db.TradeEntity
 import xyz.funkybit.core.model.db.TradeId
 import xyz.funkybit.core.model.db.TradeTable
-import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.integrationtests.api.asBitcoinAddress
 import xyz.funkybit.integrationtests.api.asECKey
 import xyz.funkybit.integrationtests.api.asEcKeyPair
@@ -243,7 +243,7 @@ open class OrderBaseTest {
                 NetworkType.Bitcoin -> {
                     waitForTx(
                         bitcoinWallet!!.exchangeDepositAddress,
-                        TxHash(bitcoinWallet.depositNative(it.inFundamentalUnits).deposit.txHash.value),
+                        bitcoinWallet.depositNative(it.inFundamentalUnits).deposit.txHash,
                     )
                 }
             }

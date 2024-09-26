@@ -5,7 +5,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.decodeFromJsonElement
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import xyz.funkybit.core.model.BitcoinAddress
-import xyz.funkybit.core.model.db.TxHash
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.model.rpc.ArchRpcParams
 import xyz.funkybit.core.model.rpc.ArchRpcRequest

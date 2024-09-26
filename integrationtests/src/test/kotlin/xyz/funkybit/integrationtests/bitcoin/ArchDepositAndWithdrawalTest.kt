@@ -24,7 +24,6 @@ import xyz.funkybit.core.model.db.ArchAccountTable
 import xyz.funkybit.core.model.db.BitcoinUtxoEntity
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.SymbolEntity
-import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalId
 import xyz.funkybit.core.model.db.WithdrawalStatus
@@ -106,7 +105,7 @@ class ArchDepositAndWithdrawalTest {
         // verify total the program's balance
         val expectedProgramBalance =
             startingTotalDepositsAtExchange + depositAmount.toLong() - withdrawAmount.toLong() + withdrawal.fee.toLong() -
-                BitcoinClient.getNetworkFeeForTx(TxHash(withdrawal.txHash!!.value))
+                BitcoinClient.getNetworkFeeForTx(withdrawal.txHash!!)
 
         assertEquals(
             expectedProgramBalance,
@@ -116,7 +115,7 @@ class ArchDepositAndWithdrawalTest {
         // now do a 2nd deposit
         val deposit2Amount = BigInteger("2500")
         val pendingBtcDeposit2 = bitcoinWallet.depositNative(deposit2Amount).deposit
-        val deposit2TxId = TxHash(pendingBtcDeposit2.txHash.value)
+        val deposit2TxId = pendingBtcDeposit2.txHash
         waitForTx(bitcoinWallet.exchangeDepositAddress, deposit2TxId)
 
         assertEquals(
@@ -229,7 +228,7 @@ class ArchDepositAndWithdrawalTest {
         // verify total the program's balance
         val expectedProgramBalance =
             startingTotalDepositsAtExchange + depositAmount.toLong() * 2 - withdrawAmount.toLong() * 2 + withdrawal.fee.toLong() + withdrawal2.fee.toLong() -
-                BitcoinClient.getNetworkFeeForTx(TxHash(withdrawal.txHash!!.value))
+                BitcoinClient.getNetworkFeeForTx(withdrawal.txHash!!)
 
         assertEquals(
             expectedProgramBalance,
@@ -261,14 +260,14 @@ class ArchDepositAndWithdrawalTest {
             CreateDepositApiRequest(
                 symbol = Symbol(btc.name),
                 amount = apiChainDepositAmount.inFundamentalUnits,
-                txHash = xyz.funkybit.core.model.TxHash.fromDbModel(depositTxHash),
+                txHash = depositTxHash,
             ),
         ).deposit
 
         assertEquals(Deposit.Status.Pending, pendingBtcDeposit.status)
         assertAmount(apiChainDepositAmount, pendingBtcDeposit.amount)
 
-        waitForTx(bitcoinWallet.exchangeDepositAddress, TxHash(pendingBtcDeposit.txHash.value))
+        waitForTx(bitcoinWallet.exchangeDepositAddress, pendingBtcDeposit.txHash)
 
         waitForBalance(
             apiClient,
@@ -287,7 +286,7 @@ class ArchDepositAndWithdrawalTest {
             CreateDepositApiRequest(
                 symbol = Symbol(btc.name),
                 amount = apiChainDepositAmount.inFundamentalUnits,
-                txHash = xyz.funkybit.core.model.TxHash.fromDbModel(airdropTxHash),
+                txHash = airdropTxHash,
             ),
         ).deposit
         assertEquals(Deposit.Status.Pending, pendingInvalidBtcDeposit.status)
@@ -310,7 +309,7 @@ class ArchDepositAndWithdrawalTest {
 
         // now deposit to the exchange
         val pendingBtcDeposit = bitcoinWallet.depositNative(depositAmount).deposit
-        val depositTxId = TxHash(pendingBtcDeposit.txHash.value)
+        val depositTxId = pendingBtcDeposit.txHash
         waitForTx(bitcoinWallet.exchangeDepositAddress, depositTxId)
 
         val depositNetworkFee = BitcoinClient.getNetworkFeeForTx(depositTxId).toBigInteger()
@@ -380,7 +379,7 @@ class ArchDepositAndWithdrawalTest {
         )
 
         val withdrawal = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
-        waitForTx(bitcoinWallet.walletAddress, TxHash(withdrawal.txHash!!.value))
+        waitForTx(bitcoinWallet.walletAddress, withdrawal.txHash!!)
 
         // verify the wallet and fee account balance at the exchange
         assertEquals(

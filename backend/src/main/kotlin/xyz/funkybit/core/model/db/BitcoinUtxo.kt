@@ -11,6 +11,7 @@ import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.update
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.TxHash
 import java.math.BigInteger
 
 @Serializable

@@ -14,9 +14,9 @@ import org.bitcoinj.script.ScriptBuilder
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.SmartFeeMode
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.BitcoinUtxoEntity
 import xyz.funkybit.core.model.db.ChainId
-import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.rpc.BitcoinRpc
 import xyz.funkybit.core.model.rpc.BitcoinRpcParams
 import xyz.funkybit.core.model.rpc.BitcoinRpcRequest

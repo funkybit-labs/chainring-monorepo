@@ -13,8 +13,8 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.encodeCollection
 import xyz.funkybit.apps.api.model.BigDecimalJson
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.BitcoinUtxoId
-import xyz.funkybit.core.model.db.TxHash
 import java.util.*
 
 @Serializable

@@ -15,6 +15,7 @@ import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.Signature
 import xyz.funkybit.core.model.Symbol
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.bitcoin.ArchAccountState
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
 import xyz.funkybit.core.model.db.BitcoinUtxoAddressMonitorEntity
@@ -23,7 +24,6 @@ import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.SymbolEntity
-import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.services.UtxoSelectionService
 import xyz.funkybit.core.utils.bitcoin.ArchUtils
 import xyz.funkybit.core.utils.bitcoin.fromSatoshi
@@ -61,7 +61,7 @@ class BitcoinWallet(
             CreateDepositApiRequest(
                 symbol = Symbol(nativeSymbol.name),
                 amount = amount,
-                txHash = xyz.funkybit.core.model.TxHash.fromDbModel(sendNativeDepositTx(amount)),
+                txHash = sendNativeDepositTx(amount),
             ),
         )
     }

@@ -17,6 +17,7 @@ import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.PubkeyAndIndex
 import xyz.funkybit.core.model.Settlement
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.WalletAndSymbol
 import xyz.funkybit.core.model.bitcoin.ArchAccountState
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
@@ -41,7 +42,6 @@ import xyz.funkybit.core.model.db.SettlementStatus
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.SymbolId
 import xyz.funkybit.core.model.db.TradeEntity
-import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WalletId
 import xyz.funkybit.core.model.db.publishBroadcasterNotifications

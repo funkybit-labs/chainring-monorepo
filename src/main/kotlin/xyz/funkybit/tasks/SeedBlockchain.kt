@@ -139,7 +139,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
         .until {
             txHashes.all { (chainId, txHash) ->
                 if (chainId == BitcoinClient.chainId) {
-                    (BitcoinClient.getRawTransaction(txHash.toDbModel())?.confirmations ?: 0) > 0
+                    (BitcoinClient.getRawTransaction(txHash)?.confirmations ?: 0) > 0
                 } else {
                     evmClient(chainId).getTransactionReceipt(txHash)?.isStatusOK ?: false
                 }
@@ -166,7 +166,7 @@ private fun airdropBtcToAddress(address: BitcoinAddress, amount: BigInteger): Tx
     try {
         val airdropAmount = maxOf(amount, BigInteger.valueOf(5000L))
         println("Air-dropping ${airdropAmount.fromFundamentalUnits(8).toPlainString()} BTC to $address")
-        return BitcoinClient.sendToAddress(address, airdropAmount).let { TxHash.fromDbModel(it) }
+        return BitcoinClient.sendToAddress(address, airdropAmount)
     } catch (e: Exception) {
         println("Failed to airdrop BTC to $address")
     }

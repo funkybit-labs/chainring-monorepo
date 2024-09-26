@@ -4,11 +4,11 @@ import org.awaitility.kotlin.await
 import org.http4k.websocket.WsClient
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.model.SymbolInfo
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.bitcoin.ArchAccountState
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.BlockchainTransactionStatus
 import xyz.funkybit.core.model.db.SymbolEntity
-import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalId
 import xyz.funkybit.core.model.db.WithdrawalStatus

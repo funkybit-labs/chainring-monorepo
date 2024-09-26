@@ -16,9 +16,9 @@ import org.bitcoinj.core.ECKey
 import org.web3j.crypto.Keys
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.bitcoin.SystemInstruction
 import xyz.funkybit.core.model.db.BitcoinUtxoId
-import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.utils.doubleSha256FromHex
 import xyz.funkybit.core.utils.schnorr.Point
 import xyz.funkybit.core.utils.toHex
