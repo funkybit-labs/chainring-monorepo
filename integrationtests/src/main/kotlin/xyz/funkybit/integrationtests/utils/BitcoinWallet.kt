@@ -65,6 +65,7 @@ class BitcoinWallet(
             ),
         )
     }
+
     fun getExchangeBalance(symbol: SymbolInfo): AssetAmount =
         AssetAmount(
             symbol,
@@ -98,7 +99,7 @@ class BitcoinWallet(
                 )
             }
 
-    private fun sendNativeDepositTx(amount: BigInteger): TxHash {
+    fun sendNativeDepositTx(amount: BigInteger): TxHash {
         return transaction {
             val selectedUtxos = UtxoSelectionService.selectUtxos(
                 walletAddress,

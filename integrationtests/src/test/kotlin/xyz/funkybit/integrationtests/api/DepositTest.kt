@@ -18,12 +18,14 @@ import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.isTestEnvRun
+import xyz.funkybit.integrationtests.testutils.waitFor
 import xyz.funkybit.integrationtests.testutils.waitForBalance
 import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
 import xyz.funkybit.integrationtests.utils.Faucet
 import xyz.funkybit.integrationtests.utils.TestApiClient
 import xyz.funkybit.integrationtests.utils.Wallet
+import xyz.funkybit.integrationtests.utils.assertAmount
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
 import xyz.funkybit.integrationtests.utils.blocking
 import xyz.funkybit.integrationtests.utils.subscribeToBalances
@@ -275,6 +277,74 @@ class DepositTest {
         // verify that same deposit tx can be submitted again
         apiClient.createDeposit(CreateDepositApiRequest(Symbol(btc.name), amount.inFundamentalUnits, depositTxHash)).deposit.also {
             assertEquals(Deposit.Status.Pending, it.status)
+        }
+    }
+
+    @Test
+    fun `test on-chain deposit amount is the source of truth - EVM`() {
+        val apiClient = TestApiClient()
+        val wallet = Wallet(apiClient)
+        val wsClient = WebsocketClient.blocking(apiClient.authToken)
+        wsClient.subscribeToBalances()
+        wsClient.assertBalancesMessageReceived()
+
+        Faucet.fundAndMine(wallet.evmAddress, chainId = wallet.currentChainId)
+
+        val chain = apiClient.getConfiguration().evmChains[0]
+        val nativeToken = chain.symbols.first { it.name == "BTC:${chain.id}" }
+        val nativeOnChainDepositAmount = AssetAmount(nativeToken, "0.01")
+        val nativeApiDepositAmount = AssetAmount(nativeToken, "0.02")
+
+        val depositTxHash = wallet.sendDepositTx(nativeOnChainDepositAmount)
+
+        val pendingDeposit = apiClient.createDeposit(CreateDepositApiRequest(Symbol(nativeToken.name), nativeApiDepositAmount.inFundamentalUnits, depositTxHash)).deposit
+        assertEquals(Deposit.Status.Pending, pendingDeposit.status)
+        assertAmount(nativeApiDepositAmount, pendingDeposit.amount)
+
+        wallet.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+
+        waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(nativeOnChainDepositAmount)))
+
+        val nativeDeposit = apiClient.getDeposit(pendingDeposit.id).deposit
+        assertEquals(Deposit.Status.Complete, nativeDeposit.status)
+        assertAmount(nativeOnChainDepositAmount, nativeDeposit.amount)
+
+        val erc20Token = chain.symbols.first { it.name == "USDC:${chain.id}" }
+        val erc20OnChainDepositAmount = AssetAmount(erc20Token, "10")
+        val erc20ApiDepositAmount = AssetAmount(erc20Token, "20")
+        val mintTxHash = wallet.mintERC20AndMine(erc20OnChainDepositAmount).transactionHash.let(::TxHash)
+
+        val erc20DepositTxHash = wallet.sendDepositTx(erc20OnChainDepositAmount)
+
+        val pendingErc20Deposit = apiClient.createDeposit(CreateDepositApiRequest(Symbol(erc20Token.name), erc20ApiDepositAmount.inFundamentalUnits, erc20DepositTxHash)).deposit
+        assertEquals(Deposit.Status.Pending, pendingErc20Deposit.status)
+        assertAmount(erc20ApiDepositAmount, pendingErc20Deposit.amount)
+
+        wallet.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+
+        waitForBalance(
+            apiClient,
+            wsClient,
+            listOf(
+                ExpectedBalance(nativeOnChainDepositAmount),
+                ExpectedBalance(erc20OnChainDepositAmount),
+            ),
+        )
+
+        val erc20Deposit = apiClient.getDeposit(pendingErc20Deposit.id).deposit
+        assertEquals(Deposit.Status.Complete, erc20Deposit.status)
+        assertAmount(erc20OnChainDepositAmount, erc20Deposit.amount)
+
+        // also check that deposit is marked as failed when submitted transaction does not contain a transfer to exchange contract
+        val invalidTxHash = mintTxHash
+        val pendingInvalidDeposit = apiClient.createDeposit(CreateDepositApiRequest(Symbol(erc20Token.name), erc20ApiDepositAmount.inFundamentalUnits, invalidTxHash)).deposit
+        assertEquals(Deposit.Status.Pending, pendingInvalidDeposit.status)
+        assertAmount(erc20ApiDepositAmount, pendingInvalidDeposit.amount)
+
+        wallet.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+
+        waitFor {
+            apiClient.getDeposit(pendingInvalidDeposit.id).deposit.status == Deposit.Status.Failed
         }
     }
 }

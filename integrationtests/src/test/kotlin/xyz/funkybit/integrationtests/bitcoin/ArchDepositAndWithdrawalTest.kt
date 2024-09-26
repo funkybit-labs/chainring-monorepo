@@ -11,11 +11,13 @@ import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.extension.ExtendWith
+import xyz.funkybit.apps.api.model.CreateDepositApiRequest
 import xyz.funkybit.apps.api.model.Deposit
 import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.apps.api.model.Withdrawal
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.ArchAccountStatus
 import xyz.funkybit.core.model.db.ArchAccountTable
@@ -41,6 +43,7 @@ import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.BitcoinWallet
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
 import xyz.funkybit.integrationtests.utils.TestApiClient
+import xyz.funkybit.integrationtests.utils.assertAmount
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
 import xyz.funkybit.integrationtests.utils.blocking
 import xyz.funkybit.integrationtests.utils.subscribeToBalances
@@ -232,6 +235,66 @@ class ArchDepositAndWithdrawalTest {
             expectedProgramBalance,
             getBalance(bitcoinWallet.exchangeDepositAddress),
         )
+    }
+
+    @Test
+    fun `test on-chain deposit amount is the source of truth - Bitcoin`() {
+        Assumptions.assumeFalse(isBitcoinDisabled())
+
+        val apiClient = TestApiClient.withBitcoinWallet()
+        val bitcoinWallet = BitcoinWallet(apiClient)
+        val wsClient = WebsocketClient.blocking(apiClient.authToken)
+        wsClient.subscribeToBalances()
+        wsClient.assertBalancesMessageReceived()
+
+        val btc = bitcoinWallet.nativeSymbol
+        val airdropAmount = AssetAmount(btc, BigInteger("15000"))
+        val onChainDepositAmount = AssetAmount(btc, BigInteger("7000"))
+        val apiChainDepositAmount = AssetAmount(btc, BigInteger("14000"))
+
+        val airdropTxHash = bitcoinWallet.airdropNative(airdropAmount.inFundamentalUnits)
+        waitForTx(bitcoinWallet.walletAddress, airdropTxHash)
+        assertAmount(airdropAmount, bitcoinWallet.getWalletNativeBalance())
+
+        val depositTxHash = bitcoinWallet.sendNativeDepositTx(onChainDepositAmount.inFundamentalUnits)
+        val pendingBtcDeposit = apiClient.createDeposit(
+            CreateDepositApiRequest(
+                symbol = Symbol(btc.name),
+                amount = apiChainDepositAmount.inFundamentalUnits,
+                txHash = xyz.funkybit.core.model.TxHash.fromDbModel(depositTxHash),
+            ),
+        ).deposit
+
+        assertEquals(Deposit.Status.Pending, pendingBtcDeposit.status)
+        assertAmount(apiChainDepositAmount, pendingBtcDeposit.amount)
+
+        waitForTx(bitcoinWallet.exchangeDepositAddress, TxHash(pendingBtcDeposit.txHash.value))
+
+        waitForBalance(
+            apiClient,
+            wsClient,
+            listOf(
+                ExpectedBalance(onChainDepositAmount),
+            ),
+        )
+
+        val btcDeposit = apiClient.getDeposit(pendingBtcDeposit.id).deposit
+        Assertions.assertEquals(Deposit.Status.Complete, btcDeposit.status)
+        assertAmount(onChainDepositAmount, btcDeposit.amount)
+
+        // also check that deposit is marked as failed when submitted transaction does not contain a transfer to exchange program
+        val pendingInvalidBtcDeposit = apiClient.createDeposit(
+            CreateDepositApiRequest(
+                symbol = Symbol(btc.name),
+                amount = apiChainDepositAmount.inFundamentalUnits,
+                txHash = xyz.funkybit.core.model.TxHash.fromDbModel(airdropTxHash),
+            ),
+        ).deposit
+        assertEquals(Deposit.Status.Pending, pendingInvalidBtcDeposit.status)
+
+        waitFor {
+            apiClient.getDeposit(pendingInvalidBtcDeposit.id).deposit.status == Deposit.Status.Failed
+        }
     }
 
     private fun setupAndDepositToWallet(airdropAmount: BigInteger, depositAmount: BigInteger): Triple<TestApiClient, BitcoinWallet, WsClient> {

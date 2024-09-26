@@ -4,8 +4,13 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.TxHash
+import xyz.funkybit.core.model.rpc.BitcoinRpc
+import xyz.funkybit.core.utils.toSatoshi
+import java.math.BigInteger
 import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -59,14 +64,36 @@ class BitcoinDepositHandler(
 
     private fun refreshPendingDeposit(pendingDeposit: DepositEntity) {
         val tx = BitcoinClient.getRawTransaction(TxHash(pendingDeposit.transactionHash.value))
+
         if (pendingDeposit.blockNumber == null && tx?.confirmations == 1) {
             pendingDeposit.updateBlockNumber((BitcoinClient.getBlockCount() - 1).toBigInteger())
         }
+
         if (tx != null && (tx.confirmations ?: 0) >= numConfirmations) {
             logger.debug { "Marking transaction as confirmed ${tx.confirmations}" }
+
+            val onChainAmount = onChainDepositAmount(tx, pendingDeposit.wallet.address)
+            if (onChainAmount == null) {
+                pendingDeposit.markAsFailed("Invalid transaction", canBeResubmitted = false)
+                return
+            }
+
+            if (pendingDeposit.amount != onChainAmount) {
+                pendingDeposit.amount = onChainAmount
+            }
+
             pendingDeposit.markAsConfirmed()
         } else if (Clock.System.now() - pendingDeposit.createdAt > maxWaitTime) {
             pendingDeposit.markAsFailed("Deposit not confirmed within $maxWaitTime", canBeResubmitted = true)
         }
+    }
+
+    private fun onChainDepositAmount(tx: BitcoinRpc.Transaction, from: Address): BigInteger? {
+        return tx
+            .outputsMatchingWallets(setOf(DeployedSmartContractEntity.programBitcoinAddress().value))
+            .find { BitcoinClient.getSourceAddress(tx) == from }
+            ?.value
+            ?.toSatoshi()
+            ?.let(BigInteger::valueOf)
     }
 }

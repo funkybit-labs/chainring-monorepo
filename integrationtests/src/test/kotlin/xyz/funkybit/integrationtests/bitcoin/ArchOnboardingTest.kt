@@ -29,6 +29,7 @@ import xyz.funkybit.integrationtests.testutils.triggerRepeaterTaskAndWaitForComp
 import xyz.funkybit.integrationtests.testutils.waitFor
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.minutes
 
 @OptIn(ExperimentalUnsignedTypes::class)
 @ExtendWith(AppUnderTestRunner::class)
@@ -75,8 +76,9 @@ class ArchOnboardingTest {
 
         fun waitForBlockProcessor() {
             val currentBlock = BitcoinClient.getBlockCount()
-            waitFor {
-                (getLastProcessedBlock()?.number?.toLong() ?: 0) >= currentBlock
+            waitFor(5.minutes.inWholeMilliseconds) {
+                val lastProcessedBlock = (getLastProcessedBlock()?.number?.toLong() ?: 0)
+                lastProcessedBlock >= currentBlock
             }
         }
 
