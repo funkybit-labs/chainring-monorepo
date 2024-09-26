@@ -338,7 +338,8 @@ export const OrderSchema = z
           ['Filled', 'Cancelled', 'Expired', 'Failed', 'Rejected'].includes(
             data.status
           ) ||
-          (data.status == 'Partial' && data.type == 'market')
+          (data.status == 'Partial' &&
+            (data.type === 'market' || data.type === 'backToBackMarket'))
         )
       }
     }
