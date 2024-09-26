@@ -375,6 +375,20 @@ class TelegramMiniAppApiTest {
             assertEquals("20".crPoints(), it.checkInStreak.reward)
             assertEquals(3, it.checkInStreak.gameTickets)
         }
+
+        // one more streak reset
+        updateUser(telegramUserId) {
+            it.lastStreakDayGrantedAt = now - 2.days
+        }
+        apiClient.getUser().also {
+            assertEquals("150".crPoints(), it.balance)
+
+            assertEquals(20, it.gameTickets)
+
+            assertEquals(1, it.checkInStreak.days)
+            assertEquals("20".crPoints(), it.checkInStreak.reward)
+            assertEquals(3, it.checkInStreak.gameTickets)
+        }
     }
 
     @Test
