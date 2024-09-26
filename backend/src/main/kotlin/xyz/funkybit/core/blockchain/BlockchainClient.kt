@@ -486,13 +486,14 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
             .encodeFunctionCall()
 }
 
-class AirdropperBlockchainClient(config: BlockchainClientConfig) : BlockchainClient(config) {
+class AirdropperBlockchainClient(private val blockchainClient: BlockchainClient) {
+    val logger = KotlinLogging.logger {}
 
     fun testnetChallengeAirdrop(address: Address, tokenSymbol: SymbolEntity, tokenAmount: BigDecimal, gasSymbol: SymbolEntity, gasAmount: BigDecimal): TxHash {
         logger.debug { "Sending $gasAmount ${gasSymbol.name} to $address" }
 
         val gasAmountInFundamentalUnits = gasAmount.movePointRight(gasSymbol.decimals.toInt()).toBigInteger()
-        sendNativeDepositTx(
+        blockchainClient.sendNativeDepositTx(
             address,
             gasAmountInFundamentalUnits,
         )
@@ -503,10 +504,37 @@ class AirdropperBlockchainClient(config: BlockchainClientConfig) : BlockchainCli
         val tokenContractAddress = tokenSymbol.contractAddress as? EvmAddress
             ?: throw RuntimeException("Only ERC-20s supported for testnet challenge deposit symbol")
 
-        return sendTransferERC20Tx(
+        return blockchainClient.sendTransferERC20Tx(
             tokenContractAddress,
             address as EvmAddress,
             amountInFundamentalUnits,
         )
+    }
+}
+
+class FaucetBlockchainClient(private val blockchainClient: BlockchainClient) {
+    val logger = KotlinLogging.logger {}
+
+    fun faucetTransfer(symbol: SymbolEntity, address: EvmAddress): Pair<BigInteger, TxHash> {
+        val amount = BigDecimal("1")
+        logger.debug { "Sending $amount ${symbol.name} to ${address.value}" }
+
+        val amountInFundamentalUnits = amount.movePointRight(symbol.decimals.toInt()).toBigInteger()
+        val txHash = when (val tokenContractAddress = symbol.contractAddress) {
+            null -> blockchainClient.sendNativeDepositTx(
+                address,
+                amountInFundamentalUnits,
+            )
+
+            is EvmAddress -> blockchainClient.sendMintERC20Tx(
+                tokenContractAddress,
+                address,
+                amountInFundamentalUnits,
+            )
+
+            is BitcoinAddress -> TODO()
+        }
+
+        return amountInFundamentalUnits to txHash
     }
 }

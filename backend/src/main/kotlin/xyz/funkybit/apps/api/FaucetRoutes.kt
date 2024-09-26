@@ -17,8 +17,7 @@ import xyz.funkybit.apps.api.model.FaucetApiResponse
 import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.RequestProcessingError
 import xyz.funkybit.apps.api.model.errorResponse
-import xyz.funkybit.core.blockchain.BlockchainClient
-import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.TxHash
@@ -28,7 +27,7 @@ import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.utils.toFundamentalUnits
 import java.math.BigDecimal
 
-class FaucetRoutes(private val faucetMode: FaucetMode, blockchainClients: Collection<BlockchainClient>) {
+class FaucetRoutes(private val faucetMode: FaucetMode) {
     private val logger = KotlinLogging.logger { }
 
     val faucet: ContractRoute = run {
@@ -70,33 +69,15 @@ class FaucetRoutes(private val faucetMode: FaucetMode, blockchainClients: Collec
                 if (!eligible) {
                     errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.ProcessingError, "Faucet may only be used once per day."))
                 } else {
-                    when (val blockchainClient = blockchainClients.firstOrNull { it.chainId == symbol.chainId.value }) {
+                    when (val blockchainClient = ChainManager.getFaucetBlockchainClient(symbol.chainId.value)) {
                         null -> errorResponse(
                             Status.UNPROCESSABLE_ENTITY,
                             ApiError(ReasonCode.ChainNotSupported, "Chain not supported"),
                         )
 
                         else -> {
-                            val amount = BigDecimal("1")
-
-                            logger.debug { "Sending $amount ${symbol.name} to ${payload.address.value}" }
-
-                            val amountInFundamentalUnits = amount.movePointRight(symbol.decimals.toInt()).toBigInteger()
-                            val txHash = if (symbol.faucetSupported(faucetMode)) {
-                                when (val tokenContractAddress = symbol.contractAddress) {
-                                    null -> blockchainClient.sendNativeDepositTx(
-                                        payload.address,
-                                        amountInFundamentalUnits,
-                                    )
-
-                                    is EvmAddress -> blockchainClient.sendMintERC20Tx(
-                                        tokenContractAddress,
-                                        payload.address,
-                                        amountInFundamentalUnits,
-                                    )
-
-                                    is BitcoinAddress -> TODO()
-                                }
+                            val (amountInFundamentalUnits, txHash) = if (symbol.faucetSupported(faucetMode)) {
+                                blockchainClient.faucetTransfer(symbol, payload.address)
                             } else {
                                 throw RequestProcessingError(
                                     Status.UNPROCESSABLE_ENTITY,
@@ -110,7 +91,7 @@ class FaucetRoutes(private val faucetMode: FaucetMode, blockchainClients: Collec
 
                             Response(Status.OK).with(
                                 responseBody of FaucetApiResponse(
-                                    chainId = blockchainClient.chainId,
+                                    chainId = symbol.chainId.value,
                                     txHash = txHash,
                                     symbol = payload.symbol,
                                     amount = amountInFundamentalUnits,

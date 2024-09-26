@@ -243,6 +243,19 @@ fun getFixtures(evmClients: List<BlockchainClient>) = Fixtures(
                     SymbolId(client.chainId, "USDC") to BigDecimal("100000$index").toFundamentalUnits(6),
                 )
             }.flatMap { map -> map.entries }.associate(Map.Entry<SymbolId, BigInteger>::toPair)
+        ),
+        // faucet
+        Fixtures.Wallet(
+            privateKeyHex = "0x497a24f8d565f1776e7c943e1607d735181d1fc21007fb69dabac1e1e7a641a0",
+            address = EvmAddress("0x52617B854f7f98D54D121852689b4155033531Ab"),
+            balances = evmClients.mapIndexed { index, client ->
+                mapOf(
+                    SymbolId(client.chainId, "BTC") to BigDecimal("10$index").toFundamentalUnits(18),
+                    SymbolId(client.chainId, "ETH") to BigDecimal("100$index").toFundamentalUnits(18),
+                    SymbolId(client.chainId, "USDC") to BigDecimal("100000$index").toFundamentalUnits(6),
+                    SymbolId(client.chainId, "DAI") to BigDecimal("100000$index").toFundamentalUnits(18),
+                )
+            }.flatMap { map -> map.entries }.associate(Map.Entry<SymbolId, BigInteger>::toPair)
         )
     )
 )

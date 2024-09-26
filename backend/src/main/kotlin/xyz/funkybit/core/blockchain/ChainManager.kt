@@ -19,7 +19,8 @@ data class BlockchainClientConfig(
     val blockExplorerUrl: String,
     val privateKeyHex: String,
     val submitterPrivateKeyHex: String,
-    val airDropperPrivateKeyHex: String,
+    val airdropperPrivateKeyHex: String,
+    val faucetPrivateKeyHex: String,
     val feeAccountAddress: String,
     val pollingIntervalInMs: Long,
     val maxPollingAttempts: Long,
@@ -85,10 +86,15 @@ object ChainManager {
                 "EVM_SUBMITTER_PRIVATE_KEY",
                 "0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba",
             ),
-            airDropperPrivateKeyHex = stringValue(
+            airdropperPrivateKeyHex = stringValue(
                 chainName,
                 "EVM_AIRDROPPER_PRIVATE_KEY",
                 "0xc664badcbc1824995c98407e26667e35c648312061a2de44569851f79b0a5371",
+            ),
+            faucetPrivateKeyHex = stringValue(
+                chainName,
+                "EVM_FAUCET_PRIVATE_KEY",
+                "0x497a24f8d565f1776e7c943e1607d735181d1fc21007fb69dabac1e1e7a641a0",
             ),
             feeAccountAddress = stringValue(
                 chainName,
@@ -164,8 +170,19 @@ object ChainManager {
     )
 
     fun getAirdropperBlockchainClient(chainId: ChainId): AirdropperBlockchainClient {
-        val clientConfig = blockchainClientsByChainId.getValue(chainId).config
-        return AirdropperBlockchainClient(clientConfig.copy(privateKeyHex = clientConfig.airDropperPrivateKeyHex))
+        return blockchainClientsByChainId.getValue(chainId).let {
+            AirdropperBlockchainClient(
+                BlockchainClient(it.config.copy(privateKeyHex = it.config.airdropperPrivateKeyHex)),
+            )
+        }
+    }
+
+    fun getFaucetBlockchainClient(chainId: ChainId): FaucetBlockchainClient? {
+        return blockchainClientsByChainId[chainId]?.let {
+            FaucetBlockchainClient(
+                BlockchainClient(it.config.copy(privateKeyHex = it.config.faucetPrivateKeyHex)),
+            )
+        }
     }
 
     fun getBlockchainClient(config: BlockchainClientConfig, privateKeyHex: String) = BlockchainClient(
