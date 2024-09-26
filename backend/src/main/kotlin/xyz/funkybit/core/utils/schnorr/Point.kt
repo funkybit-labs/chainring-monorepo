@@ -12,6 +12,8 @@ class Point(x: BigInteger?, y: BigInteger?) {
     companion object {
         val p: BigInteger = BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16)
         val n: BigInteger = BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16)
+        private val pMinusTwo: BigInteger = p.subtract(BigInteger.TWO)
+        private val three: BigInteger = BigInteger.valueOf(3L)
 
         val G: Point = Point(
             BigInteger("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798", 16),
@@ -39,7 +41,7 @@ class Point(x: BigInteger?, y: BigInteger?) {
         }
 
         fun bytesFromPoint(point: Point): ByteArray {
-            return point.getX().toByteArrayNoSign(32)
+            return point.x.toByteArrayNoSign(32)
         }
 
         fun genPubKey(secKey: ByteArray?): ByteArray {
@@ -56,71 +58,85 @@ class Point(x: BigInteger?, y: BigInteger?) {
         }
 
         fun add(point1: Point?, point2: Point?): Point? {
-            if ((point1 != null && point2 != null && point1.isInfinity() && point2.isInfinity())) {
+            if ((point1 != null && point2 != null && point1.isInfinity && point2.isInfinity)) {
                 return infinityPoint()
             }
-            if (point1 == null || point1.isInfinity()) {
+            if (point1 == null || point1.isInfinity) {
                 return point2
             }
-            if (point2 == null || point2.isInfinity()) {
+            if (point2 == null || point2.isInfinity) {
                 return point1
             }
-            if (point1.getX() == point2.getX() && point1.getY() != point2.getY()) {
+            val x1 = point1.x
+            val y1 = point1.x
+            val x2 = point2.x
+            val y2 = point2.x
+
+            if (x1 == x2 && y1 != y2) {
                 return infinityPoint()
             }
 
-            val lam = if (point1.isEqual(point2)) {
-                val base: BigInteger = point2.getY().multiply(BigInteger.TWO)
-                BigInteger.valueOf(3L).multiply(point1.getX()).multiply(point1.getX())
-                    .multiply(base.modPow(p.subtract(BigInteger.TWO), p))
-                    .mod(p)
+            val lam = if (x1 == x2 && y1 == y2) {
+                val base: BigInteger = point2.y * BigInteger.TWO
+                (three * point1.x * point1.x * base.modPow(pMinusTwo, p)).mod(p)
             } else {
-                val base: BigInteger = point2.getX().subtract(point1.getX())
-                point2.getY().subtract(point1.getY())
-                    .multiply(base.modPow(p.subtract(BigInteger.TWO), p)).mod(p)
+                val base: BigInteger = point2.x - point1.x
+                ((point2.y - point1.y) * base.modPow(pMinusTwo, p)).mod(p)
             }
 
-            val x3: BigInteger = lam.multiply(lam).subtract(point1.getX()).subtract(point2.getX()).mod(p)
-            return Point(x3, lam.multiply(point1.getX().subtract(x3)).subtract(point1.getY()).mod(p))
+            val x3: BigInteger = ((lam * lam) - point1.x - point2.x).mod(p)
+            return Point(x3, ((lam * (point1.x - x3)) - point1.y).mod(p))
         }
     }
 
-    fun getX(): BigInteger {
-        return pair.first!!
-    }
+    val x: BigInteger
+        get() = pair.first!!
 
-    fun getY(): BigInteger {
-        return pair.second!!
-    }
+    val y: BigInteger
+        get() = pair.second!!
 
     private fun getPair(): Pair<BigInteger?, BigInteger?> {
         return pair
     }
 
-    fun isInfinity(): Boolean {
-        return pair.first == null || pair.second == null
-    }
+    val isInfinity: Boolean
+        get() = pair.first == null || pair.second == null
 
     fun add(point: Point?): Point? {
         return add(this, point)
     }
 
     fun mul(n: BigInteger): Point? {
-        return mul(this, n)
+        return mul(this, n, 4)
     }
+    fun double(p: Point?): Point? = add(p, p)
 
-    private fun mul(p: Point?, n: BigInteger): Point? {
-        var point = p
-        var r: Point? = null
-
-        for (i in 0..255) {
-            if (n.shiftRight(i).and(BigInteger.ONE) > BigInteger.ZERO) {
-                r = add(r, point)
-            }
-            point = add(point, point)
+    fun mul(p: Point, n: BigInteger, w: Int = 4): Point? {
+        // Precompute di * P for di from 0 to 2^w - 1
+        val precomputed: Array<Point?> = Array(1 shl w) { null }
+        precomputed[1] = p
+        for (i in 2 until (1 shl w)) {
+            precomputed[i] = add(precomputed[i - 1], p)
         }
 
-        return r
+        var q: Point? = null
+        val mask = BigInteger.valueOf((1 shl w) - 1L)
+        val length = (n.bitLength() + w - 1) / w
+
+        for (i in length - 1 downTo 0) {
+            // Double w times
+            repeat(w) {
+                q = double(q)
+            }
+
+            // Add precomputed value
+            val windowValue = (n shr (i * w)).and(mask).toInt()
+            if (windowValue > 0) {
+                q = add(q, precomputed[windowValue])
+            }
+        }
+
+        return q
     }
 
     private fun isEven(x: BigInteger): Boolean {
@@ -132,7 +148,7 @@ class Point(x: BigInteger?, y: BigInteger?) {
     }
 
     private fun hasEvenY(point: Point): Boolean {
-        return (!point.isInfinity() && isEven(point.getY()))
+        return (!point.isInfinity && isEven(point.y))
     }
 
     fun isEqual(point: Point): Boolean {

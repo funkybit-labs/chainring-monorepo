@@ -24,7 +24,7 @@ class TestSchnorr {
             assertEquals(pubKey.contentToString(), pubKeyActual.contentToString())
 
             val auxRand = auxRandHex!!.toHexBytes()
-            val sigActual = Schnorr.sign(msg, secKey, auxRand)
+            val sigActual = Schnorr.sign(msg, secKey, auxRand, true)
             assertEquals(sig.contentToString(), sigActual.contentToString())
         }
         val resultActual = Schnorr.verify(msg, pubKey, sig)
