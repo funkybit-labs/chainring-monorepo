@@ -48,7 +48,7 @@ object TelegramMiniAppCheckInStreak {
 
         val config = streakDailyRewards.find { it.day == streakDay } ?: streakDailyRewards.maxBy { it.day }
 
-        if (userEntity.checkInStreakDays != streakDay && userEntity.lastStreakDayGrantedAt != grantedAt) {
+        if (userEntity.lastStreakDayGrantedAt != grantedAt) {
             userEntity.checkInStreakDays = streakDay
             userEntity.lastStreakDayGrantedAt = now
             userEntity.gameTickets += config.gameTickets
