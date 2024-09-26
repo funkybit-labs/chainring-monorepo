@@ -31,7 +31,7 @@ object Schnorr {
     //    14. Return the signature sig.
     //
 
-    fun sign(m: ByteArray, sk: ByteArray, auxRand: ByteArray): ByteArray {
+    fun sign(m: ByteArray, sk: ByteArray, auxRand: ByteArray, verifySignature: Boolean = false): ByteArray {
         // 1. Let d' = int(sk)
         val d0 = BigInteger(1, sk)
 
@@ -73,7 +73,7 @@ object Schnorr {
         val sig = Point.bytesFromPoint(r) + (k + e * d).mod(Point.n).toByteArrayNoSign()
 
         // 13. If Verify(bytes(P), m, sig) (see below) returns failure, abort[14]
-        if (!verify(m, Point.bytesFromPoint(p), sig)) {
+        if (verifySignature && !verify(m, Point.bytesFromPoint(p), sig)) {
             throw Exception("The created signature does not pass verification")
         }
 
@@ -133,7 +133,7 @@ object Schnorr {
         // 7. Fail if not has_even_y(R).
         // 8. Fail if x(R) ≠ r.
         // 9.Return success if no failure occurred before reaching this point.
-        return !(r1 == null || !r1.hasEvenY() || r1.getX().compareTo(r) != 0)
+        return !(r1 == null || !r1.hasEvenY() || r1.x.compareTo(r) != 0)
     }
 
     private fun xorBytes(in1: ByteArray, in2: ByteArray): ByteArray {
