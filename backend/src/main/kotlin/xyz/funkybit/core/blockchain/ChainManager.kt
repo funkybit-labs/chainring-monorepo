@@ -170,13 +170,18 @@ object ChainManager {
     )
 
     fun getAirdropperBlockchainClient(chainId: ChainId): AirdropperBlockchainClient {
-        val clientConfig = blockchainClientsByChainId.getValue(chainId).config
-        return AirdropperBlockchainClient(clientConfig.copy(privateKeyHex = clientConfig.airdropperPrivateKeyHex))
+        return blockchainClientsByChainId.getValue(chainId).let {
+            AirdropperBlockchainClient(
+                BlockchainClient(it.config.copy(privateKeyHex = it.config.airdropperPrivateKeyHex)),
+            )
+        }
     }
 
     fun getFaucetBlockchainClient(chainId: ChainId): FaucetBlockchainClient? {
         return blockchainClientsByChainId[chainId]?.let {
-            FaucetBlockchainClient(it.config.copy(privateKeyHex = it.config.faucetPrivateKeyHex))
+            FaucetBlockchainClient(
+                BlockchainClient(it.config.copy(privateKeyHex = it.config.faucetPrivateKeyHex)),
+            )
         }
     }
 
