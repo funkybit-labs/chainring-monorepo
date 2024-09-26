@@ -15,6 +15,7 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import xyz.funkybit.core.model.EncryptedString
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.encrypt
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.utils.schnorr.Point

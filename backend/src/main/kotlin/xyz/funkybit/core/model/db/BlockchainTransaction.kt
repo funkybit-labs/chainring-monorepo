@@ -10,6 +10,7 @@ import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import xyz.funkybit.apps.api.model.BigIntegerJson
 import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.TxHash
 import java.math.BigInteger
 
 @JvmInline
@@ -28,10 +29,6 @@ enum class BlockchainTransactionStatus {
     Completed,
     Failed,
 }
-
-@Serializable
-@JvmInline
-value class TxHash(val value: String)
 
 @Serializable
 data class BlockchainTransactionData(

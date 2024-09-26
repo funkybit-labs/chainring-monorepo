@@ -22,10 +22,5 @@ value class TxHash(val value: String) {
         }
 
         fun generate() = TxHash("0x${generateHexString(64)}")
-
-        fun fromDbModel(txHash: xyz.funkybit.core.model.db.TxHash): TxHash = TxHash(txHash.value)
     }
-
-    // TODO: CHAIN-533 get rid of xyz.funkybit.core.model.db.TxHash class
-    fun toDbModel() = xyz.funkybit.core.model.db.TxHash(value)
 }

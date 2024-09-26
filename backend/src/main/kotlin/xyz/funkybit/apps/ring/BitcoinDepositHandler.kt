@@ -7,7 +7,6 @@ import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.DepositEntity
-import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.rpc.BitcoinRpc
 import xyz.funkybit.core.utils.toSatoshi
 import java.math.BigInteger
@@ -63,7 +62,7 @@ class BitcoinDepositHandler(
     }
 
     private fun refreshPendingDeposit(pendingDeposit: DepositEntity) {
-        val tx = BitcoinClient.getRawTransaction(TxHash(pendingDeposit.transactionHash.value))
+        val tx = BitcoinClient.getRawTransaction(pendingDeposit.transactionHash)
 
         if (pendingDeposit.blockNumber == null && tx?.confirmations == 1) {
             pendingDeposit.updateBlockNumber((BitcoinClient.getBlockCount() - 1).toBigInteger())

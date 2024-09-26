@@ -19,6 +19,7 @@ import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.ConfirmedBitcoinDeposit
 import xyz.funkybit.core.model.PubkeyAndIndex
 import xyz.funkybit.core.model.Settlement
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.WalletAndSymbol
 import xyz.funkybit.core.model.bitcoin.ProgramInstruction
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
@@ -32,7 +33,6 @@ import xyz.funkybit.core.model.db.CreateArchAccountBalanceIndexAssignment
 import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.SequencedArchWithdrawal
 import xyz.funkybit.core.model.db.SymbolEntity
-import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.db.WalletTable
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc

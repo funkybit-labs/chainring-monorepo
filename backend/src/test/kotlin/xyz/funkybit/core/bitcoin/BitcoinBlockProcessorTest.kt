@@ -13,6 +13,7 @@ import xyz.funkybit.apps.ring.BitcoinBlockProcessor
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.BitcoinUtxoAddressMonitorEntity
 import xyz.funkybit.core.model.db.BitcoinUtxoEntity
 import xyz.funkybit.core.model.db.BitcoinUtxoId
@@ -23,7 +24,6 @@ import xyz.funkybit.core.model.db.ChainEntity
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.DepositEntity
-import xyz.funkybit.core.model.db.TxHash
 import xyz.funkybit.core.model.rpc.BitcoinRpc
 import xyz.funkybit.core.utils.generateHexString
 import xyz.funkybit.testfixtures.DbTestHelpers.createChain
