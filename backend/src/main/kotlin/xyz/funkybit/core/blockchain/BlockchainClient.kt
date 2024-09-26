@@ -510,3 +510,5 @@ class AirdropperBlockchainClient(config: BlockchainClientConfig) : BlockchainCli
         )
     }
 }
+
+class FaucetBlockchainClient(config: BlockchainClientConfig) : BlockchainClient(config)

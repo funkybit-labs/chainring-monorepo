@@ -29,7 +29,6 @@ import xyz.funkybit.apps.api.middleware.HttpTransactionLogger
 import xyz.funkybit.apps.api.middleware.RequestProcessingExceptionHandler
 import xyz.funkybit.apps.api.middleware.Tracer
 import xyz.funkybit.apps.api.services.ExchangeApiService
-import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.db.DbConfig
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.services.LinkedSignerService
@@ -83,7 +82,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
     private val balanceRoutes = BalanceRoutes()
     private val orderRoutes = OrderRoutes(exchangeApiService)
     private val walletRoutes = WalletRoutes(sequencerClient)
-    private val faucetRoutes = FaucetRoutes(faucetMode, ChainManager.getBlockchainClients())
+    private val faucetRoutes = FaucetRoutes(faucetMode)
     private val testnetChallengeRoutes = TestnetChallengeRoutes()
 
     private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
