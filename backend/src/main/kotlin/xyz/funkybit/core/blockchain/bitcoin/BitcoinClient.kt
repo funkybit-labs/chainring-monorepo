@@ -263,4 +263,21 @@ object BitcoinClient : JsonRpcClientBase(
                 ).toLong()
         } ?: throw Exception("Tx not found")
     }
+
+    fun getSourceAddress(tx: BitcoinRpc.Transaction): BitcoinAddress? {
+        return try {
+            if (tx.txIns.isNotEmpty() && tx.txIns[0].txId != null && tx.txIns[0].outIndex != null) {
+                getRawTransaction(tx.txIns[0].txId!!)?.txOuts?.firstOrNull {
+                    it.index == tx.txIns[0].outIndex
+                }?.let {
+                    it.scriptPubKey.addresses?.firstOrNull() ?: it.scriptPubKey.address
+                }?.let(BitcoinAddress.Companion::canonicalize)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            logger.warn(e) { "Unable to get source address" }
+            null
+        }
+    }
 }

@@ -6,7 +6,11 @@ import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
+import org.web3j.protocol.core.methods.response.TransactionReceipt
+import xyz.funkybit.contracts.generated.Exchange
 import xyz.funkybit.core.blockchain.BlockchainClient
+import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.BalanceChange
 import xyz.funkybit.core.model.db.BalanceEntity
 import xyz.funkybit.core.model.db.BalanceType
@@ -20,6 +24,7 @@ import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.sequencer.core.Asset
+import xyz.funkybit.sequencer.proto.deposit
 import java.math.BigInteger
 import kotlin.concurrent.thread
 import kotlin.time.Duration
@@ -110,6 +115,17 @@ class BlockchainDepositHandler(
                     "0x1" -> {
                         val confirmationsReceived = confirmations(currentBlock, blockNumber)
                         if (confirmationsReceived >= numConfirmations) {
+                            val amountOnChain = onChainDepositAmount(receipt, from = pendingDeposit.wallet.address, tokenContractAddress = pendingDeposit.symbol.contractAddress)
+
+                            if (amountOnChain == null) {
+                                pendingDeposit.markAsFailed("Transaction receipt has no deposit")
+                                return
+                            }
+
+                            if (pendingDeposit.amount != amountOnChain) {
+                                pendingDeposit.amount = amountOnChain
+                            }
+
                             BalanceEntity.updateBalances(
                                 listOf(BalanceChange.Delta(pendingDeposit.wallet.id.value, pendingDeposit.symbol.guid.value, pendingDeposit.amount)),
                                 BalanceType.Exchange,
@@ -154,5 +170,15 @@ class BlockchainDepositHandler(
 
     private fun confirmations(currentBlock: BigInteger, startingBlock: BigInteger): Int {
         return (currentBlock - startingBlock).toLong().toInt() + 1
+    }
+
+    private fun onChainDepositAmount(receipt: TransactionReceipt, from: Address, tokenContractAddress: Address?): BigInteger? {
+        return Exchange
+            .getDepositEvents(receipt)
+            .find {
+                EvmAddress.canonicalize(it.from) == from &&
+                    EvmAddress.canonicalize(it.token) == (tokenContractAddress ?: EvmAddress.zero)
+            }
+            ?.amount
     }
 }

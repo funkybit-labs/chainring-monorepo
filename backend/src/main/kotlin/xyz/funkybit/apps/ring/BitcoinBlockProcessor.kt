@@ -6,7 +6,6 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
-import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.BitcoinUtxoAddressMonitorEntity
@@ -141,10 +140,10 @@ class BitcoinBlockProcessor(
             (block.transactions ?: listOf()).forEach { tx ->
 
                 // check if any unspent utxos we currently know about are in the inputs - they are being spent
-                utxosSpent.addAll(inputsMatchingUnspentUtxos(tx, unspentUtxos))
+                utxosSpent.addAll(tx.inputsMatchingUnspentUtxos(unspentUtxos))
 
                 // now check the outputs for any addresses for addresses we are monitoring
-                outputsMatchingWallets(tx, addresses).forEach { txOut ->
+                tx.outputsMatchingWallets(addresses).forEach { txOut ->
                     val address = BitcoinAddress.canonicalize(
                         txOut.scriptPubKey.address ?: txOut.scriptPubKey.addresses!!.toSet().intersect(addresses).first(),
                     )
@@ -187,8 +186,8 @@ class BitcoinBlockProcessor(
                 // this will only catch deposits if they were not added via the API endpoint which they should be
                 // Furthermore this may not work reliably since for hierarchical wallets, the source of the UTXO may
                 // be some child address now necessarily the wallet address registered with us
-                getSourceAddress(tx)?.let { sourceAddress ->
-                    WalletEntity.findByAddress(Address.auto(sourceAddress))?.let {
+                BitcoinClient.getSourceAddress(tx)?.let { sourceAddress ->
+                    WalletEntity.findByAddress(sourceAddress)?.let {
                         DepositEntity.createOrUpdate(
                             wallet = it,
                             symbol = SymbolEntity.forChainAndContractAddress(chainId, null),
@@ -201,46 +200,6 @@ class BitcoinBlockProcessor(
             }
         }
     }
-
-    private fun getSourceAddress(tx: BitcoinRpc.Transaction): String? {
-        return try {
-            if (tx.txIns.isNotEmpty() && tx.txIns[0].txId != null && tx.txIns[0].outIndex != null) {
-                BitcoinClient.getRawTransaction(tx.txIns[0].txId!!)?.txOuts?.firstOrNull {
-                    it.index == tx.txIns[0].outIndex
-                }?.let {
-                    it.scriptPubKey.addresses?.firstOrNull() ?: it.scriptPubKey.address
-                }
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            logger.warn(e) { "Unable to get source address" }
-            null
-        }
-    }
-
-    private fun inputsMatchingUnspentUtxos(tx: BitcoinRpc.Transaction, unspentUtxos: Set<BitcoinUtxoId>) =
-        tx.txIns.mapNotNull { txIn ->
-            if (txIn.txId != null && txIn.outIndex != null) {
-                BitcoinUtxoId.fromTxHashAndVout(
-                    txIn.txId,
-                    txIn.outIndex,
-                )
-            } else {
-                null
-            }
-        }.filter {
-            unspentUtxos.contains(it)
-        }
-
-    private fun outputsMatchingWallets(tx: BitcoinRpc.Transaction, addresses: Set<String>) =
-        tx.txOuts.filter { txOut ->
-            (
-                txOut.scriptPubKey.addresses != null &&
-                    txOut.scriptPubKey.addresses.toSet().intersect(addresses).isNotEmpty()
-                ) ||
-                (txOut.scriptPubKey.address != null && addresses.contains(txOut.scriptPubKey.address))
-        }
 
     private fun getLastProcessedBlock(): BlockEntity? =
         BlockTable

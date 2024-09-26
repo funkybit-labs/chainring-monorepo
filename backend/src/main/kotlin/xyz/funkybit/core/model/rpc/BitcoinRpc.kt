@@ -13,6 +13,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.encodeCollection
 import xyz.funkybit.apps.api.model.BigDecimalJson
+import xyz.funkybit.core.model.db.BitcoinUtxoId
 import xyz.funkybit.core.model.db.TxHash
 import java.util.*
 
@@ -100,7 +101,30 @@ sealed class BitcoinRpc {
         val txOuts: List<TxOut>,
         val hex: String,
         val confirmations: Int?,
-    )
+    ) {
+        fun outputsMatchingWallets(addresses: Set<String>) =
+            txOuts.filter { txOut ->
+                (
+                    txOut.scriptPubKey.addresses != null &&
+                        txOut.scriptPubKey.addresses.toSet().intersect(addresses).isNotEmpty()
+                    ) ||
+                    (txOut.scriptPubKey.address != null && addresses.contains(txOut.scriptPubKey.address))
+            }
+
+        fun inputsMatchingUnspentUtxos(unspentUtxos: Set<BitcoinUtxoId>) =
+            txIns.mapNotNull { txIn ->
+                if (txIn.txId != null && txIn.outIndex != null) {
+                    BitcoinUtxoId.fromTxHashAndVout(
+                        txIn.txId,
+                        txIn.outIndex,
+                    )
+                } else {
+                    null
+                }
+            }.filter {
+                unspentUtxos.contains(it)
+            }
+    }
 
     @Serializable
     data class Block(
