@@ -71,7 +71,12 @@ class ArchTransactionHandler(
 
     fun start() {
         logger.debug { "Starting batch transaction handler for $chainId" }
-        archWorkerThread = thread(start = true, name = "arch-transaction-handler-$chainId", isDaemon = true) {
+        startArchWorker()
+        startBitcoinWorker()
+    }
+
+    private fun startArchWorker() {
+        archWorkerThread = thread(start = false, name = "arch-transaction-handler-$chainId", isDaemon = true) {
             logger.debug { "Arch Transaction handler thread starting" }
             transaction {
                 programAccount = ArchAccountEntity.findProgramAccount()!!
@@ -132,9 +137,17 @@ class ArchTransactionHandler(
                     Thread.sleep(failurePollingInterval.inWholeMilliseconds)
                 }
             }
+        }.also { thread ->
+            thread.uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, throwable ->
+                logger.error(throwable) { "Uncaught exception in ${thread.name} thread" }
+                startArchWorker()
+            }
+            thread.start()
         }
+    }
 
-        bitcoinWorkerThread = thread(start = true, name = "bitcoin-transaction-handler", isDaemon = true) {
+    private fun startBitcoinWorker() {
+        bitcoinWorkerThread = thread(start = false, name = "bitcoin-transaction-handler", isDaemon = true) {
             logger.debug { "Bitcoin Transaction handler thread starting" }
 
             while (true) {
@@ -151,6 +164,12 @@ class ArchTransactionHandler(
                     Thread.sleep(failurePollingInterval.inWholeMilliseconds)
                 }
             }
+        }.also { thread ->
+            thread.uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, throwable ->
+                logger.error(throwable) { "Uncaught exception in ${thread.name} thread" }
+                startBitcoinWorker()
+            }
+            thread.start()
         }
     }
 

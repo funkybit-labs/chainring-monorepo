@@ -62,7 +62,11 @@ class BlockchainTransactionHandler(
 
     fun start() {
         logger.debug { "Starting batch transaction handler for $chainId" }
-        workerThread = thread(start = true, name = "batch-transaction-handler-$chainId", isDaemon = true) {
+        startWorker()
+    }
+
+    private fun startWorker() {
+        workerThread = thread(start = false, name = "batch-transaction-handler-$chainId", isDaemon = true) {
             logger.debug { "Batch Transaction handler thread starting" }
             dbTransaction {
                 BlockchainNonceEntity.clear(blockchainClient.submitterAddress, chainId)
@@ -130,6 +134,12 @@ class BlockchainTransactionHandler(
                     Thread.sleep(failurePollingIntervalInMs)
                 }
             }
+        }.also { thread ->
+            thread.uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, throwable ->
+                logger.error(throwable) { "Unhandled exception in ${thread.name} thread" }
+                startWorker()
+            }
+            thread.start()
         }
     }
 
