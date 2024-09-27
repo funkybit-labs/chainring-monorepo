@@ -49,6 +49,7 @@ import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class ArchTransactionHandler(
     private val sequencerClient: SequencerClient,
@@ -140,6 +141,7 @@ class ArchTransactionHandler(
         }.also { thread ->
             thread.uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, throwable ->
                 logger.error(throwable) { "Uncaught exception in ${thread.name} thread" }
+                Thread.sleep(5.seconds.inWholeMilliseconds)
                 startArchWorker()
             }
             thread.start()
@@ -167,6 +169,7 @@ class ArchTransactionHandler(
         }.also { thread ->
             thread.uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, throwable ->
                 logger.error(throwable) { "Uncaught exception in ${thread.name} thread" }
+                Thread.sleep(5.seconds.inWholeMilliseconds)
                 startBitcoinWorker()
             }
             thread.start()
