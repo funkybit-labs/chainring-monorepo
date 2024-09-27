@@ -49,6 +49,7 @@ import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class ArchTransactionHandler(
     private val sequencerClient: SequencerClient,
@@ -71,7 +72,12 @@ class ArchTransactionHandler(
 
     fun start() {
         logger.debug { "Starting batch transaction handler for $chainId" }
-        archWorkerThread = thread(start = true, name = "arch-transaction-handler-$chainId", isDaemon = true) {
+        startArchWorker()
+        startBitcoinWorker()
+    }
+
+    private fun startArchWorker() {
+        archWorkerThread = thread(start = false, name = "arch-transaction-handler-$chainId", isDaemon = true) {
             logger.debug { "Arch Transaction handler thread starting" }
             transaction {
                 programAccount = ArchAccountEntity.findProgramAccount()!!
@@ -132,9 +138,18 @@ class ArchTransactionHandler(
                     Thread.sleep(failurePollingInterval.inWholeMilliseconds)
                 }
             }
+        }.also { thread ->
+            thread.uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, throwable ->
+                logger.error(throwable) { "Uncaught exception in ${thread.name} thread" }
+                Thread.sleep(5.seconds.inWholeMilliseconds)
+                startArchWorker()
+            }
+            thread.start()
         }
+    }
 
-        bitcoinWorkerThread = thread(start = true, name = "bitcoin-transaction-handler", isDaemon = true) {
+    private fun startBitcoinWorker() {
+        bitcoinWorkerThread = thread(start = false, name = "bitcoin-transaction-handler", isDaemon = true) {
             logger.debug { "Bitcoin Transaction handler thread starting" }
 
             while (true) {
@@ -151,6 +166,13 @@ class ArchTransactionHandler(
                     Thread.sleep(failurePollingInterval.inWholeMilliseconds)
                 }
             }
+        }.also { thread ->
+            thread.uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, throwable ->
+                logger.error(throwable) { "Uncaught exception in ${thread.name} thread" }
+                Thread.sleep(5.seconds.inWholeMilliseconds)
+                startBitcoinWorker()
+            }
+            thread.start()
         }
     }
 
