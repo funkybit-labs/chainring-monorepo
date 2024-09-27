@@ -1,8 +1,9 @@
 package xyz.funkybit.tasks.fixtures
 
-import xyz.funkybit.core.blockchain.BitcoinBlockchainClientConfig
 import xyz.funkybit.core.blockchain.BlockchainClient
+import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
@@ -75,15 +76,15 @@ fun getFixtures(evmClients: List<BlockchainClient>) = Fixtures(
             it.config.blockExplorerUrl,
             NetworkType.Evm
         )
-    } + if (BitcoinClient.config.enabled) {
+    } + if (bitcoinConfig.enabled) {
         listOf(
             Fixtures.Chain(
-                BitcoinClient.chainId,
+                bitcoinConfig.chainId,
                 "Bitcoin",
                 BitcoinAddress.canonicalize("bcrt1qj2w49gms5vm0ea7vhj028p355eyped59vjgufd"),
                 BitcoinClient.url,
-                BitcoinClient.config.blockExplorerNetName,
-                BitcoinClient.config.blockExplorerUrl,
+                bitcoinConfig.blockExplorerNetName,
+                bitcoinConfig.blockExplorerUrl,
                 NetworkType.Bitcoin
             )
         )
@@ -125,12 +126,12 @@ fun getFixtures(evmClients: List<BlockchainClient>) = Fixtures(
                 withdrawalFee = BigDecimal("1")
             )
         )
-    }.flatten() + if (BitcoinClient.config.enabled) {
+    }.flatten() + if (bitcoinConfig.enabled) {
         listOf(
             Fixtures.Symbol(
-                name = "BTC".toChainSymbol(BitcoinClient.chainId),
+                name = "BTC".toChainSymbol(bitcoinConfig.chainId),
                 description = "Bitcoin",
-                chainId = BitcoinClient.chainId,
+                chainId = bitcoinConfig.chainId,
                 isNative = true,
                 decimals = 8,
                 withdrawalFee = BigDecimal("0.00000002")
@@ -176,11 +177,11 @@ fun getFixtures(evmClients: List<BlockchainClient>) = Fixtures(
             lastPrice = "17.525".toBigDecimal(),
             BigDecimal("0.00001")
         ),
-    ) else emptyList()) + if (BitcoinClient.config.enabled) {
+    ) else emptyList()) + if (bitcoinConfig.enabled) {
         listOf(
                 Fixtures.Market(
                     baseSymbol = SymbolId(evmClients[0].chainId, "BTC"),
-                    quoteSymbol = SymbolId(BitcoinClient.chainId, "BTC"),
+                    quoteSymbol = SymbolId(bitcoinConfig.chainId, "BTC"),
                     tickSize = "0.001".toBigDecimal(),
                     lastPrice = "1.0005".toBigDecimal(),
                     BigDecimal("0.00000001")
@@ -229,7 +230,7 @@ fun getFixtures(evmClients: List<BlockchainClient>) = Fixtures(
             privateKeyHex = "0x80a90a34f3ee81dd90ac44f706a4dbc7c0a7ca35d0ab698149b92f8a13388cdd",
             address = BitcoinAddress.canonicalize("2MxLtfRKbHshBsqmPn5qSniiqMD7e1jDyJK"),
             balances = mapOf(
-                SymbolId(BitcoinClient.chainId, "BTC") to if (BitcoinClient.config.enabled) BigDecimal("0.2").toFundamentalUnits(8) else BigInteger.ZERO,
+                SymbolId(bitcoinConfig.chainId, "BTC") to if (bitcoinConfig.enabled) BigDecimal("0.2").toFundamentalUnits(8) else BigInteger.ZERO,
             )
         ),
         // airdropper

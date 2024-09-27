@@ -14,7 +14,8 @@ import org.bitcoinj.core.TransactionOutput
 import org.bitcoinj.script.ScriptBuilder
 import org.jetbrains.exposed.dao.id.EntityID
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.ConfirmedBitcoinDeposit
 import xyz.funkybit.core.model.PubkeyAndIndex
@@ -36,7 +37,7 @@ import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.WalletTable
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
-import xyz.funkybit.core.services.UtxoSelectionService
+import xyz.funkybit.core.services.UtxoManager
 import xyz.funkybit.core.utils.schnorr.Schnorr
 import xyz.funkybit.core.utils.sha256
 import xyz.funkybit.core.utils.toHex
@@ -48,7 +49,8 @@ object ArchUtils {
 
     val logger = KotlinLogging.logger {}
 
-    private val submitterPubkey = BitcoinClient.config.submitterPubkey
+    private val submitterPubkey = bitcoinConfig.submitterPubkey
+    private val zeroCoinValue = Coin.valueOf(0)
 
     var tokenAccountSizeThreshold = 10_000_000
 
@@ -57,30 +59,29 @@ object ArchUtils {
         accountType: ArchAccountType,
         symbolEntity: SymbolEntity? = null,
     ): ArchAccountEntity? {
-        val config = BitcoinClient.config
-
         val accountAddress = ArchNetworkClient.getAccountAddress(ArchNetworkRpc.Pubkey.fromECKey(ecKey))
 
         val rentAmount = BigInteger("1500")
 
         return try {
-            val selectedUtxos = UtxoSelectionService.selectUtxos(
-                config.feePayerAddress,
+            val selectedUtxos = UtxoManager.selectUtxos(
+                bitcoinConfig.feePayerAddress,
                 rentAmount,
-                BitcoinClient.calculateFee(BitcoinClient.estimateVSize(1, 2)),
+                MempoolSpaceClient.calculateFee(MempoolSpaceClient.estimateVSize(1, 2)),
             )
 
-            val onboardingTx = BitcoinClient.buildAndSignDepositTx(
+            val onboardingTx = buildAndSignDepositTx(
                 accountAddress,
                 rentAmount,
                 selectedUtxos,
-                config.feePayerEcKey,
+                bitcoinConfig.feePayerEcKey,
             )
 
-            val txId = BitcoinClient.sendRawTransaction(onboardingTx.toHexString())
-            UtxoSelectionService.reserveUtxos(selectedUtxos, txId.value)
+            val txId = MempoolSpaceClient.sendTransaction(onboardingTx.toHexString())
+            UtxoManager.reserveUtxos(selectedUtxos, txId.value)
             ArchAccountEntity.create(BitcoinUtxoId.fromTxHashAndVout(txId, 0), ecKey, accountType, symbolEntity)
         } catch (e: Exception) {
+            UtxoManager.refreshUtxos(bitcoinConfig.feePayerAddress)
             logger.warn { "Unable to onboard state UTXO: ${e.message}" }
             null
         }
@@ -188,7 +189,7 @@ object ArchUtils {
             ),
         )
         val totalAmount = withdrawals.sumOf { it.withdrawalEntity.chainAmount() }
-        val selectedUtxos = UtxoSelectionService.selectUtxosForProgram(totalAmount, BitcoinClient.calculateFee(BitcoinClient.estimateVSize(withdrawals.size, withdrawals.size + 1)))
+        val selectedUtxos = UtxoManager.selectUtxos(programBitcoinAddress, totalAmount, MempoolSpaceClient.calculateFee(MempoolSpaceClient.estimateVSize(withdrawals.size, withdrawals.size + 1)))
         val (txInputsHex, changeAmount) = buildWithdrawalInputs(withdrawals.map { it.withdrawalEntity }, programBitcoinAddress, totalAmount, selectedUtxos)
         val tokenWithdrawalsList = withdrawals.groupBy { it.archAccountEntity.rpcPubkey() }.map { (pubKey, tokenWithdrawals) ->
             ProgramInstruction.TokenWithdrawals(
@@ -328,7 +329,7 @@ object ArchUtils {
         totalAmount: BigInteger,
         utxos: List<BitcoinUtxoEntity>,
     ): Pair<String, BigInteger> {
-        val params = BitcoinClient.getParams()
+        val params = bitcoinConfig.params
         val feeAmount = estimateWithdrawalTxFee(
             withdrawals.map { (it.wallet.address as BitcoinAddress) },
             changeAddress,
@@ -355,7 +356,7 @@ object ArchUtils {
         }
         return Pair(
             rawTx.toHexString(),
-            if (changeAmount > BitcoinClient.config.changeDustThreshold) {
+            if (changeAmount > bitcoinConfig.changeDustThreshold) {
                 changeAmount
             } else {
                 BigInteger.ZERO
@@ -369,7 +370,7 @@ object ArchUtils {
         utxos: List<BitcoinUtxoEntity>,
     ): BigInteger {
         val ecKey = ECKey()
-        val params = BitcoinClient.getParams()
+        val params = bitcoinConfig.params
         val rawTx = Transaction(params)
         rawTx.setVersion(2)
         destinationAddresses.forEach {
@@ -377,7 +378,7 @@ object ArchUtils {
                 TransactionOutput(
                     params,
                     rawTx,
-                    BitcoinClient.zeroCoinValue,
+                    zeroCoinValue,
                     it.toBitcoinCoreAddress(params),
                 ),
             )
@@ -386,7 +387,7 @@ object ArchUtils {
             TransactionOutput(
                 params,
                 rawTx,
-                BitcoinClient.zeroCoinValue,
+                zeroCoinValue,
                 changeAddress.toBitcoinCoreAddress(params),
             ),
         )
@@ -405,7 +406,7 @@ object ArchUtils {
             )
         }
         logger.debug { "estimated virtual size for withdraw tx = ${rawTx.vsize}" }
-        return BitcoinClient.calculateFee(rawTx.vsize)
+        return MempoolSpaceClient.calculateFee(rawTx.vsize)
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)
@@ -458,7 +459,7 @@ object ArchUtils {
                     programInstruction,
                 ).toUByteArray(),
             ),
-            BitcoinClient.config.submitterPrivateKey,
+            bitcoinConfig.submitterPrivateKey,
         )
     }
 
@@ -485,11 +486,11 @@ object ArchUtils {
     }
 
     fun signAndSendInstruction(instruction: ArchNetworkRpc.Instruction, privateKey: ByteArray? = null): TxHash {
-        return signAndSendInstructions(listOf(instruction), privateKey ?: BitcoinClient.config.submitterPrivateKey)
+        return signAndSendInstructions(listOf(instruction), privateKey ?: bitcoinConfig.submitterPrivateKey)
     }
 
     fun getConfirmedBitcoinDeposits(): List<ConfirmedBitcoinDeposit> {
-        val confirmedDeposits = DepositEntity.getConfirmedForUpdate(BitcoinClient.chainId)
+        val confirmedDeposits = DepositEntity.getConfirmedForUpdate(bitcoinConfig.chainId)
         val walletAndSymbols = confirmedDeposits.map { WalletAndSymbol(it.walletGuid.value, it.symbolGuid.value) }.toSet()
         val walletsAndSymbolsWithAssignedIndex = retrieveOrCreateBalanceIndexes(walletAndSymbols, returnAssignedIndexes = true)!!
         return confirmedDeposits.mapNotNull { deposit ->
@@ -548,6 +549,93 @@ object ArchUtils {
         } else {
             result
         }
+    }
+
+    fun buildAndSignDepositTx(
+        accountAddress: BitcoinAddress,
+        amount: BigInteger,
+        utxos: List<BitcoinUtxoEntity>,
+        ecKey: ECKey,
+    ): Transaction {
+        val params = bitcoinConfig.params
+        val feeAmount = estimateDepositTxFee(ecKey, accountAddress, utxos)
+        val rawTx = Transaction(params)
+        rawTx.setVersion(2)
+        rawTx.addOutput(
+            TransactionOutput(
+                params,
+                rawTx,
+                Coin.valueOf(amount.toLong()),
+                accountAddress.toBitcoinCoreAddress(params),
+            ),
+        )
+        val changeAmount = BigInteger.ZERO.max(utxos.sumOf { it.amount } - amount - feeAmount)
+        if (changeAmount > bitcoinConfig.changeDustThreshold) {
+            rawTx.addOutput(
+                TransactionOutput(
+                    params,
+                    rawTx,
+                    Coin.valueOf(changeAmount.toLong()),
+                    BitcoinAddress.fromKey(params, ecKey).toBitcoinCoreAddress(params),
+                ),
+            )
+        }
+        utxos.forEach {
+            rawTx.addSignedInput(
+                TransactionOutPoint(
+                    params,
+                    it.vout(),
+                    Sha256Hash.wrap(it.txId().value),
+                ),
+                ScriptBuilder.createP2WPKHOutputScript(ecKey),
+                Coin.valueOf(it.amount.toLong()),
+                ecKey,
+                Transaction.SigHash.NONE,
+                true,
+            )
+        }
+        return rawTx
+    }
+
+    private fun estimateDepositTxFee(
+        ecKey: ECKey,
+        accountAddress: BitcoinAddress,
+        utxos: List<BitcoinUtxoEntity>,
+    ): BigInteger {
+        val params = bitcoinConfig.params
+        val rawTx = Transaction(params)
+        rawTx.setVersion(2)
+        rawTx.addOutput(
+            TransactionOutput(
+                params,
+                rawTx,
+                zeroCoinValue,
+                accountAddress.toBitcoinCoreAddress(params),
+            ),
+        )
+        rawTx.addOutput(
+            TransactionOutput(
+                params,
+                rawTx,
+                zeroCoinValue,
+                BitcoinAddress.fromKey(params, ecKey).toBitcoinCoreAddress(params),
+            ),
+        )
+        utxos.forEach {
+            rawTx.addSignedInput(
+                TransactionOutPoint(
+                    params,
+                    it.vout(),
+                    Sha256Hash.wrap(it.txId().value),
+                ),
+                ScriptBuilder.createP2WPKHOutputScript(ecKey),
+                Coin.valueOf(it.amount.toLong()),
+                ecKey,
+                Transaction.SigHash.NONE,
+                true,
+            )
+        }
+        return MempoolSpaceClient.calculateFee(rawTx.vsize)
     }
 }
 

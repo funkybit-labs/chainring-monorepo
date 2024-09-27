@@ -13,7 +13,7 @@ import org.junit.jupiter.params.provider.Arguments
 import org.web3j.crypto.Credentials
 import xyz.funkybit.apps.api.model.Market
 import xyz.funkybit.apps.api.model.SymbolInfo
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.BlockchainTransactionStatus
 import xyz.funkybit.core.model.db.ChainId
@@ -94,7 +94,7 @@ open class OrderBaseTest {
             btcUsdcMarket = config.markets.first { it.id.value == "BTC:$chain1/USDC:$chain1" }
             btc2Usdc2Market = config.markets.first { it.id.value == "BTC:$chain2/USDC:$chain2" }
             btcbtc2Market = config.markets.first { it.id.value == "BTC:$chain1/BTC:$chain2" }
-            btcbtcArchMarket = config.markets.firstOrNull { it.id.value == "BTC:$chain1/BTC:${BitcoinClient.chainId}" }
+            btcbtcArchMarket = config.markets.firstOrNull { it.id.value == "BTC:$chain1/BTC:${bitcoinConfig.chainId}" }
             symbols = config.chains.flatMap { it.symbols }.associateBy { it.name }
             btc = symbols.getValue("BTC:$chain1")
             btc2 = symbols.getValue("BTC:$chain2")

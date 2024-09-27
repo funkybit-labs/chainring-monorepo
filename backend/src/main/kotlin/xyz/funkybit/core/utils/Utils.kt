@@ -5,6 +5,9 @@ import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
 import org.bouncycastle.util.encoders.Hex
 import org.jetbrains.exposed.sql.transactions.TransactionManager
+import org.jetbrains.exposed.sql.transactions.transaction
+import xyz.funkybit.core.db.notifyDbListener
+import xyz.funkybit.core.repeater.REPEATER_APP_TASK_CTL_CHANNEL
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.security.MessageDigest
@@ -142,3 +145,9 @@ fun doubleSha256FromHex(b: ByteArray?) = sha256(sha256(b).toHex(false).toByteArr
 
 fun List<BigInteger>.sum() = this.reduce { a, b -> a + b }
 fun List<BigDecimal>.sum() = this.reduce { a, b -> a + b }
+
+fun triggerRepeaterTask(taskName: String, taskArgs: List<String> = emptyList()) {
+    transaction {
+        notifyDbListener(REPEATER_APP_TASK_CTL_CHANNEL, (listOf(taskName) + taskArgs).joinToString(":"))
+    }
+}

@@ -16,7 +16,7 @@ import xyz.funkybit.apps.ring.RingAppConfig
 import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.db.DbConfig
 import xyz.funkybit.core.db.notifyDbListener
 import xyz.funkybit.core.model.MarketMinFee
@@ -61,6 +61,7 @@ import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppGameReactionTimeT
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserRewardTable
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserTable
 import xyz.funkybit.core.utils.toFundamentalUnits
+import xyz.funkybit.integrationtests.utils.BitcoinMiner
 import xyz.funkybit.integrationtests.utils.TestApiClient
 import xyz.funkybit.integrationtests.utils.TestBlockchainClient
 import xyz.funkybit.sequencer.apps.GatewayApp
@@ -120,6 +121,8 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                             it.setAutoMining(true)
                         }
 
+                        BitcoinMiner.start()
+
                         if (!isTestEnvRun()) {
                             deleteAll()
                             sequencerApp.start()
@@ -134,27 +137,37 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                                         blockchainClient.chainId,
                                     )?.deprecated = true
                                 }
-                                val programAccount = ArchAccountEntity.findProgramAccount()
-                                val onChainAccount = try {
-                                    programAccount?.let { ArchNetworkClient.readAccountInfo(it.rpcPubkey()) }
-                                } catch (e: Exception) {
-                                    null
-                                }
-                                ArchAccountBalanceIndexTable.deleteAll()
-                                if (
-                                    programAccount?.status != ArchAccountStatus.Complete ||
-                                    ArchAccountEntity.findProgramStateAccount()?.status != ArchAccountStatus.Complete ||
-                                    onChainAccount == null ||
-                                    !onChainAccount.data.toByteArray().contentEquals(javaClass.getResource("/exchangeprogram.so")!!.readBytes())
-                                ) {
-                                    DeployedSmartContractEntity.deleteDeployedContractByNameAndChain(
-                                        ContractType.Exchange.name,
-                                        BitcoinClient.chainId,
-                                    )
-                                    ArchAccountTable.deleteAll()
-                                } else {
-                                    if (DeployedSmartContractEntity.validContracts(BitcoinClient.chainId).isNotEmpty()) {
-                                        BitcoinUtxoAddressMonitorEntity.createIfNotExists(DeployedSmartContractEntity.programBitcoinAddress())
+                                if (isBitcoinEnabled()) {
+                                    val programAccount = ArchAccountEntity.findProgramAccount()
+                                    val onChainAccount = try {
+                                        programAccount?.let { ArchNetworkClient.readAccountInfo(it.rpcPubkey()) }
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                    ArchAccountBalanceIndexTable.deleteAll()
+                                    if (
+                                        programAccount?.status != ArchAccountStatus.Complete ||
+                                        ArchAccountEntity.findProgramStateAccount()?.status != ArchAccountStatus.Complete ||
+                                        onChainAccount == null ||
+                                        !onChainAccount.data.toByteArray()
+                                            .contentEquals(javaClass.getResource("/exchangeprogram.so")!!.readBytes())
+                                    ) {
+                                        DeployedSmartContractEntity.deleteDeployedContractByNameAndChain(
+                                            ContractType.Exchange.name,
+                                            bitcoinConfig.chainId,
+                                        )
+                                        ArchAccountTable.deleteAll()
+                                    } else {
+                                        if (DeployedSmartContractEntity.validContracts(bitcoinConfig.chainId)
+                                                .isNotEmpty()
+                                        ) {
+                                            BitcoinUtxoAddressMonitorEntity.createIfNotExists(
+                                                DeployedSmartContractEntity.programBitcoinAddress(),
+                                                allowMempoolTxs = false,
+                                                skipTxIds = listOf(programAccount.utxoId.txId().value),
+                                                isDepositAddress = true,
+                                            )
+                                        }
                                     }
                                 }
                                 WithdrawalEntity.findPending().forEach { it.update(WithdrawalStatus.Failed, "restarting test") }
@@ -181,6 +194,24 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                         val symbolContractAddresses = seedBlockchain(fixtures)
                         seedDatabase(fixtures, symbolContractAddresses)
 
+                        if (isBitcoinEnabled() && isWaitForArchDeploymentEnabled()) {
+                            try {
+                                await
+                                    .pollInSameThread()
+                                    .pollDelay(Duration.ofMillis(1000))
+                                    .pollInterval(Duration.ofMillis(1000))
+                                    .atMost(Duration.ofMillis(90000L))
+                                    .until {
+                                        transaction {
+                                            DeployedSmartContractEntity.validContracts(bitcoinConfig.chainId)
+                                                .map { it.name } == listOf(ContractType.Exchange.name)
+                                        }
+                                    }
+                            } catch (e: Exception) {
+                                logger.error { "failed waiting for arch deployment" }
+                            }
+                        }
+
                         // during tests blocks will be mined manually
                         blockchainClients.forEach {
                             it.setAutoMining(false)
@@ -196,6 +227,8 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                             sequencerApp.stop()
                             gatewayApp.stop()
                         }
+
+                        BitcoinMiner.stop()
 
                         // revert back to interval mining for `test` env to work normally
                         blockchainClients.forEach {
@@ -299,3 +332,8 @@ fun isTestEnvRun(): Boolean =
 
 fun isBitcoinDisabled(): Boolean =
     (getenv("BITCOIN_NETWORK_ENABLED") ?: "true") == "false"
+
+fun isBitcoinEnabled() = !isBitcoinDisabled()
+
+fun isWaitForArchDeploymentEnabled(): Boolean =
+    (getenv("WAIT_FOR_ARCH_DEPLOYMENT") ?: "false") == "true"

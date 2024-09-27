@@ -9,7 +9,8 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient.MAX_INSTRUCTION_SIZE
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.bitcoin.ArchAccountState
@@ -38,10 +39,11 @@ import xyz.funkybit.core.model.db.publishBroadcasterNotifications
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.sequencer.toSequencerId
-import xyz.funkybit.core.services.UtxoSelectionService
+import xyz.funkybit.core.services.UtxoManager
 import xyz.funkybit.core.utils.bitcoin.ArchUtils
 import xyz.funkybit.core.utils.bitcoin.BitcoinInsufficientFundsException
 import xyz.funkybit.core.utils.toHex
+import xyz.funkybit.core.utils.triggerRepeaterTask
 import xyz.funkybit.core.utils.tryAcquireAdvisoryLock
 import xyz.funkybit.sequencer.core.Asset
 import xyz.funkybit.sequencer.proto.SequencerError
@@ -53,7 +55,6 @@ import kotlin.time.Duration.Companion.seconds
 
 class ArchTransactionHandler(
     private val sequencerClient: SequencerClient,
-    private val confirmationThreshold: Int = System.getenv("BITCOIN_TX_HANDLER_CONFIRMATION_THRESHOLD")?.toIntOrNull() ?: 1,
     private val pollingInterval: Duration = (System.getenv("ARCH_TX_HANDLER_ACTIVE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 1000L).milliseconds,
     private val failurePollingInterval: Duration = (System.getenv("ARCH_TX_HANDLER_FAILURE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 3000L).milliseconds,
     private val batchMinWithdrawals: Int = System.getenv("ARCH_WITHDRAWAL_SETTLEMENT_BATCH_MIN_WITHDRAWALS")?.toIntOrNull() ?: 1,
@@ -61,7 +62,7 @@ class ArchTransactionHandler(
     private val maxWaitTime: Duration = System.getenv("BITCOIN_TRANSACTION_HANDLER_MAX_WAIT_TIME_HOURS")?.toLongOrNull()?.hours ?: 48.hours,
 
 ) {
-    private val chainId = BitcoinClient.chainId
+    private val chainId = bitcoinConfig.chainId
     private var archWorkerThread: Thread? = null
     private var bitcoinWorkerThread: Thread? = null
     val logger = KotlinLogging.logger {}
@@ -287,6 +288,7 @@ class ArchTransactionHandler(
                 transaction.flush()
                 DepositEntity.updateToSettling(confirmedDepositsWithAssignedIndex.map { it.depositEntity }, transaction)
                 submitToArch(transaction, instruction)
+                initiateProgramUtxoRefresh()
                 true
             } else {
                 false
@@ -300,7 +302,6 @@ class ArchTransactionHandler(
             return false
         }
         val settlingWithdrawals = WithdrawalEntity.findSettlingOnArch()
-        logger.debug { "processWithdrawalBatch count = ${settlingWithdrawals.size}" }
         return if (settlingWithdrawals.isNotEmpty()) {
             val archTransaction = settlingWithdrawals.first().archTransaction!!
             ArchNetworkClient.getProcessedTransaction(archTransaction.txHash!!)?.let { processedTx ->
@@ -334,13 +335,14 @@ class ArchTransactionHandler(
         return if (settlingWithdrawals.isNotEmpty()) {
             settlingWithdrawals.groupBy { it.blockchainTransactionGuid!! }.forEach { (blockchainTransactionGuid, withdrawals) ->
                 val blockchainTransaction = BlockchainTransactionEntity[blockchainTransactionGuid]
-                val bitcoinTx = BitcoinClient.getRawTransaction(blockchainTransaction.txHash!!)
+                val bitcoinTx = MempoolSpaceClient.getTransaction(blockchainTransaction.txHash!!)
                 if (bitcoinTx != null) {
-                    if ((bitcoinTx.confirmations ?: 0) >= confirmationThreshold) {
+                    if (bitcoinTx.status.confirmed) {
                         blockchainTransaction.markAsCompleted()
                         withdrawals.forEach { withdrawal ->
                             onWithdrawalCompleteOnBitcoin(withdrawal, null)
                         }
+                        initiateProgramUtxoRefresh()
                     }
                 } else {
                     withdrawals.forEach { withdrawal ->
@@ -374,9 +376,11 @@ class ArchTransactionHandler(
                             tx = inProgressBatch.preparationTx,
                         ) { _, error ->
                             if (error == null) {
-                                val onChainBatchHash = getOnChainBatchHash()
+                                val onChainBatchHash = getOnChainBatchHash(retryIfEmpty = true)
                                 if (onChainBatchHash != inProgressBatch.preparationTx.batchHash) {
-                                    inProgressBatch.markAsFailed("Batch hash mismatch for settlement batch ${inProgressBatch.guid.value}, on chain value: $onChainBatchHash, db value: ${inProgressBatch.preparationTx.batchHash}")
+                                    val errorMsg = "Batch hash mismatch for settlement batch ${inProgressBatch.guid.value}, on chain value: $onChainBatchHash, db value: ${inProgressBatch.preparationTx.batchHash}"
+                                    logger.error { errorMsg }
+                                    inProgressBatch.markAsFailed(errorMsg)
                                 } else {
                                     inProgressBatch.markAsPrepared()
                                 }
@@ -443,8 +447,20 @@ class ArchTransactionHandler(
 
     private fun batchInProgressOnChain() = getOnChainBatchHash().isNotEmpty()
 
-    private fun getOnChainBatchHash(): String {
-        return ArchUtils.getAccountState<ArchAccountState.Program>(programStateAccount.rpcPubkey()).settlementBatchHash
+    private fun getOnChainBatchHash(retryIfEmpty: Boolean = false): String {
+        val batchHash = ArchUtils.getAccountState<ArchAccountState.Program>(programStateAccount.rpcPubkey()).settlementBatchHash
+        if (batchHash.isEmpty() && retryIfEmpty) {
+            (1..3).forEach { i ->
+                logger.debug { "got an empty batch hash - retry $i" }
+                ArchUtils.getAccountState<ArchAccountState.Program>(programStateAccount.rpcPubkey()).settlementBatchHash.let {
+                    if (it.isNotEmpty()) {
+                        return it
+                    }
+                    Thread.sleep(500)
+                }
+            }
+        }
+        return batchHash
     }
 
     private fun sendToSequencer(deposit: DepositEntity) {
@@ -507,6 +523,11 @@ class ArchTransactionHandler(
                 )
             } catch (e: BitcoinInsufficientFundsException) {
                 logger.warn(e) { "There are not enough funds to process a withdrawal batch of ${sequencedWithdrawals.size}" }
+                try {
+                    initiateProgramUtxoRefresh()
+                } catch (e: Exception) {
+                    logger.warn(e) { "failed to refresh program utxos" }
+                }
                 if (sequencedWithdrawals.size == 1) {
                     return false
                 }
@@ -534,10 +555,14 @@ class ArchTransactionHandler(
             transaction.flush()
             WithdrawalEntity.updateToSettlingOnArch(sequencedWithdrawals.map { it.withdrawalEntity }, transaction)
             submitToArch(transaction, instruction)
-            UtxoSelectionService.reserveUtxos(selectedUtxos, transaction.txHash?.value ?: "")
+            UtxoManager.reserveUtxos(selectedUtxos, transaction.txHash?.value ?: "")
 
             return true
         }
+    }
+
+    private fun initiateProgramUtxoRefresh() {
+        triggerRepeaterTask("program_utxo_refresher")
     }
 
     private fun onWithdrawalCompleteOnBitcoin(withdrawalEntity: WithdrawalEntity, error: String? = null) {

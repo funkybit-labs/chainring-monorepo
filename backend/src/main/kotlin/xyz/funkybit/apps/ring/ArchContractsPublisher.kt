@@ -5,7 +5,7 @@ import org.bitcoinj.core.ECKey
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.bitcoin.BitcoinNetworkType
 import xyz.funkybit.core.model.bitcoin.ProgramInstruction
 import xyz.funkybit.core.model.db.AccountSetupState
@@ -27,7 +27,7 @@ object ArchContractsPublisher {
         ContractType.entries.forEach { contractType ->
             val deployedContract = transaction {
                 DeployedSmartContractEntity
-                    .findLastDeployedContractByNameAndChain(contractType.name, BitcoinClient.chainId)
+                    .findLastDeployedContractByNameAndChain(contractType.name, bitcoinConfig.chainId)
             }
 
             if (deployedContract == null) {
@@ -230,7 +230,7 @@ object ArchContractsPublisher {
             }.toList()
             val txIds = txs.asSequence().chunked(75) { rtxs ->
                 ArchNetworkClient.sendTransactions(rtxs).also {
-                    Thread.sleep(3000)
+                    Thread.sleep(2000)
                 }
             }.flatten().toList()
             if (txIds.isNotEmpty()) {
@@ -242,7 +242,7 @@ object ArchContractsPublisher {
     }
 
     private fun handleProgramStateSetup(programAccount: ArchAccountEntity) {
-        val programStateAccount = ArchAccountEntity.findProgramStateAccount() ?: ArchUtils.fundArchAccountCreation(BitcoinClient.config.submitterEcKey, ArchAccountType.ProgramState)
+        val programStateAccount = ArchAccountEntity.findProgramStateAccount() ?: ArchUtils.fundArchAccountCreation(bitcoinConfig.submitterEcKey, ArchAccountType.ProgramState)
         when (programStateAccount?.status) {
             ArchAccountStatus.Funded -> {
                 ArchUtils.sendCreateAccountTx(programStateAccount, programAccount.rpcPubkey())
@@ -278,10 +278,15 @@ object ArchContractsPublisher {
 
     private fun createDeployedContractEntity(programAccount: ArchAccountEntity) {
         val address = ArchNetworkClient.getAccountAddress(programAccount.rpcPubkey())
-        BitcoinUtxoAddressMonitorEntity.createIfNotExists(address)
+        BitcoinUtxoAddressMonitorEntity.createIfNotExists(
+            address,
+            allowMempoolTxs = false,
+            skipTxIds = listOf(programAccount.utxoId.txId().value),
+            isDepositAddress = true,
+        )
         DeployedSmartContractEntity.create(
             name = ContractType.Exchange.name,
-            chainId = BitcoinClient.chainId,
+            chainId = bitcoinConfig.chainId,
             implementationAddress = address,
             proxyAddress = address,
             version = 1,
@@ -319,9 +324,9 @@ object ArchContractsPublisher {
                 ),
             ),
             ProgramInstruction.InitProgramStateParams(
-                feeAccount = BitcoinClient.config.feeCollectionAddress,
+                feeAccount = bitcoinConfig.feeCollectionAddress,
                 programChangeAddress = ArchNetworkClient.getAccountAddress(programAccount.rpcPubkey()),
-                networkType = BitcoinNetworkType.fromNetworkParams(BitcoinClient.getParams()),
+                networkType = BitcoinNetworkType.fromNetworkParams(bitcoinConfig.params),
             ),
         ).also {
             transaction {

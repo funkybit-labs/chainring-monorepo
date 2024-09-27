@@ -106,6 +106,7 @@ sealed class DefaultBlockParam {
 
 open class BlockchainClient(val config: BlockchainClientConfig) {
     protected val web3jService: HttpService = httpService(config.url, config.enableWeb3jLogging)
+    protected val web3jServiceNoLogging: HttpService = httpService(config.url, logging = false)
     protected val web3j: Web3j = Web3j.build(
         web3jService,
         config.pollingIntervalInMs,

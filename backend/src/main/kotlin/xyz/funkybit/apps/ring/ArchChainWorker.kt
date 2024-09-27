@@ -2,7 +2,7 @@ package xyz.funkybit.apps.ring
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.sql.transactions.transaction
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.db.BitcoinUtxoAddressMonitorEntity
 import xyz.funkybit.core.sequencer.SequencerClient
 import kotlin.concurrent.thread
@@ -15,13 +15,11 @@ class ArchChainWorker(
 
     private val depositHandler = BitcoinDepositHandler()
     private val blockchainTransactionHandler = ArchTransactionHandler(sequencerClient)
-    private val bitcoinBlockProcessor = BitcoinBlockProcessor()
     private var contractDeployerThread: Thread? = null
 
     fun start() {
-        if (BitcoinClient.config.enabled) {
-            transaction { BitcoinUtxoAddressMonitorEntity.createIfNotExists(BitcoinClient.config.feePayerAddress) }
-            bitcoinBlockProcessor.start()
+        if (bitcoinConfig.enabled) {
+            transaction { BitcoinUtxoAddressMonitorEntity.createIfNotExists(bitcoinConfig.feePayerAddress) }
             startContractDeployer()
         }
     }
@@ -44,7 +42,6 @@ class ArchChainWorker(
     fun stop() {
         depositHandler.stop()
         blockchainTransactionHandler.stop()
-        bitcoinBlockProcessor.stop()
         contractDeployerThread?.also {
             it.interrupt()
             it.join()

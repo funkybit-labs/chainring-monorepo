@@ -6,7 +6,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.PubkeyAndIndex
 import xyz.funkybit.core.model.Settlement
@@ -44,8 +44,8 @@ class ArchUtilsTest : TestWithDb() {
             val chain = createChain(ChainId(0UL), "test-chain")
             btc = createNativeSymbol("BTC", chain.id.value, decimals = 8U)
             rune = createNativeSymbol("RUNE", chain.id.value, decimals = 8U)
-            wallet1 = createWallet(BitcoinAddress.fromKey(BitcoinClient.getParams(), ECKey()))
-            wallet2 = createWallet(BitcoinAddress.fromKey(BitcoinClient.getParams(), ECKey()))
+            wallet1 = createWallet(BitcoinAddress.fromKey(bitcoinConfig.params, ECKey()))
+            wallet2 = createWallet(BitcoinAddress.fromKey(bitcoinConfig.params, ECKey()))
             btcTokenAccount = ArchAccountEntity.create(BitcoinUtxoId("hash:1"), ECKey(), ArchAccountType.TokenState, btc).also {
                 it.status = ArchAccountStatus.Complete
             }

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.bitcoin.ArchAccountState
 import xyz.funkybit.core.model.bitcoin.BitcoinNetworkType
@@ -29,7 +29,6 @@ import xyz.funkybit.integrationtests.testutils.triggerRepeaterTaskAndWaitForComp
 import xyz.funkybit.integrationtests.testutils.waitFor
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.time.Duration.Companion.minutes
 
 @OptIn(ExperimentalUnsignedTypes::class)
 @ExtendWith(AppUnderTestRunner::class)
@@ -56,7 +55,7 @@ class ArchOnboardingTest {
 
         fun waitForProgramStateAccount(): ArchAccountEntity {
             if (programStateAccount()?.status != ArchAccountStatus.Complete) {
-                waitFor(6000) {
+                waitFor(60000) {
                     programStateAccount()?.status == ArchAccountStatus.Complete
                 }
             }
@@ -74,30 +73,22 @@ class ArchOnboardingTest {
             return tokenStateAccount()!!
         }
 
-        fun waitForBlockProcessor() {
-            val currentBlock = BitcoinClient.getBlockCount()
-            waitFor(5.minutes.inWholeMilliseconds) {
-                val lastProcessedBlock = (getLastProcessedBlock()?.number?.toLong() ?: 0)
-                lastProcessedBlock >= currentBlock
-            }
-        }
-
         private fun programAccount() = transaction { ArchAccountEntity.findProgramAccount() }
 
         private fun programStateAccount() = transaction { ArchAccountEntity.findProgramStateAccount() }
 
         private fun tokenStateAccount() = transaction {
             ArchAccountEntity.findTokenAccountsForSymbol(
-                SymbolEntity.forChain(BitcoinClient.chainId).first(),
+                SymbolEntity.forChain(bitcoinConfig.chainId).first(),
             ).firstOrNull { it.status == ArchAccountStatus.Complete }
         }
 
-        private fun validContracts() = transaction { DeployedSmartContractEntity.validContracts(BitcoinClient.chainId) }
+        private fun validContracts() = transaction { DeployedSmartContractEntity.validContracts(bitcoinConfig.chainId) }
 
         private fun getLastProcessedBlock(): BlockEntity? = transaction {
             BlockTable
                 .selectAll()
-                .where { BlockTable.chainId.eq(BitcoinClient.chainId) }
+                .where { BlockTable.chainId.eq(bitcoinConfig.chainId) }
                 .orderBy(Pair(BlockTable.number, SortOrder.DESC))
                 .limit(1)
                 .map { BlockEntity.wrapRow(it) }
@@ -122,14 +113,14 @@ class ArchOnboardingTest {
         // wait for the program state account to be setup and verify owned by program and initial state
         val programStateEntity = waitForProgramStateAccount()
         val bitcoinContract = transaction {
-            DeployedSmartContractEntity.validContracts(BitcoinClient.chainId).first()
+            DeployedSmartContractEntity.validContracts(bitcoinConfig.chainId).first()
         }
         val programStateInfo = ArchNetworkClient.readAccountInfo(programStateEntity.rpcPubkey())
         assertFalse(programStateInfo.isExecutable)
         assertEquals(programStateInfo.owner.bytes.toHex(false), programEntity.publicKey)
         val programState = Borsh.decodeFromByteArray<ArchAccountState.Program>(programStateInfo.data.toByteArray())
         assertEquals(0, programState.version)
-        assertEquals(BitcoinClient.config.feeCollectionAddress, programState.feeAccount)
+        assertEquals(bitcoinConfig.feeCollectionAddress, programState.feeAccount)
         assertEquals(bitcoinContract.proxyAddress, programState.programChangeAddress)
         assertEquals(BitcoinNetworkType.Regtest, programState.networkType)
         assertEquals(ContractType.Exchange.name, bitcoinContract.name)
@@ -147,6 +138,6 @@ class ArchOnboardingTest {
         assertEquals("BTC:0", tokenState.tokenId)
         assertEquals(programStateEntity.rpcPubkey().toString(), tokenState.programStateAccount.toString())
         assertTrue(tokenState.balances.isNotEmpty())
-        assertEquals(BitcoinClient.config.feeCollectionAddress.value, tokenState.balances.first().walletAddress)
+        assertEquals(bitcoinConfig.feeCollectionAddress.value, tokenState.balances.first().walletAddress)
     }
 }

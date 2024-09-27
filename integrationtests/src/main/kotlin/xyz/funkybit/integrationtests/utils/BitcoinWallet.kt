@@ -12,6 +12,7 @@ import xyz.funkybit.apps.api.model.OrderAmount
 import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.Signature
 import xyz.funkybit.core.model.Symbol
@@ -24,7 +25,7 @@ import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.SymbolEntity
-import xyz.funkybit.core.services.UtxoSelectionService
+import xyz.funkybit.core.services.UtxoManager
 import xyz.funkybit.core.utils.bitcoin.ArchUtils
 import xyz.funkybit.core.utils.bitcoin.fromSatoshi
 import xyz.funkybit.core.utils.fromFundamentalUnits
@@ -101,21 +102,21 @@ class BitcoinWallet(
 
     fun sendNativeDepositTx(amount: BigInteger): TxHash {
         return transaction {
-            val selectedUtxos = UtxoSelectionService.selectUtxos(
+            val selectedUtxos = UtxoManager.selectUtxos(
                 walletAddress,
                 amount,
-                BitcoinClient.calculateFee(BitcoinClient.estimateVSize(1, 2)),
+                MempoolSpaceClient.calculateFee(MempoolSpaceClient.estimateVSize(1, 2)),
             )
 
-            val depositTx = BitcoinClient.buildAndSignDepositTx(
+            val depositTx = ArchUtils.buildAndSignDepositTx(
                 exchangeDepositAddress,
                 amount,
                 selectedUtxos,
                 keyPair.ecKey,
             )
 
-            BitcoinClient.sendRawTransaction(depositTx.toHexString()).also { txId ->
-                UtxoSelectionService.reserveUtxos(selectedUtxos, txId.value)
+            MempoolSpaceClient.sendTransaction(depositTx.toHexString()).also { txId ->
+                UtxoManager.reserveUtxos(selectedUtxos, txId.value)
             }
         }
     }
@@ -126,8 +127,6 @@ class BitcoinWallet(
             amount,
         )
     }
-
-    private fun getRawTx(txId: TxHash) = BitcoinClient.getRawTransaction(txId)
 
     fun signWithdraw(symbol: String, amount: BigInteger): CreateWithdrawalApiRequest {
         val nonce = System.currentTimeMillis()

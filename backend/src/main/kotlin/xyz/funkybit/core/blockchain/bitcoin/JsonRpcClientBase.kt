@@ -58,10 +58,12 @@ open class JsonRpcClientBase(val url: String, interceptor: Interceptor? = null) 
 
     open val mediaType = "text/plain".toMediaTypeOrNull()
 
-    fun call(requestString: String, logResponseBody: Boolean = true): JsonElement {
+    fun call(requestString: String, logResponseBody: Boolean = true, noLog: Boolean = false): JsonElement {
         val body = requestString.toRequestBody(mediaType)
 
-        logger.debug { "Sending -> ${abbreviateString(requestString)}" }
+        if (!noLog) {
+            logger.debug { "Sending -> ${abbreviateString(requestString)}" }
+        }
         val httpRequest = Request.Builder()
             .url(url)
             .post(body)
@@ -72,10 +74,12 @@ open class JsonRpcClientBase(val url: String, interceptor: Interceptor? = null) 
             throw Exception("send error: ${e.message}")
         }
         val httpResponseBody = httpResponse.body?.string() ?: ""
-        if (logResponseBody || httpResponse.code >= 400) {
-            logger.debug { "Received(${httpResponse.code}) <- ${abbreviateString(httpResponseBody)}" }
-        } else {
-            logger.debug { "Received(${httpResponse.code}) <- (...elided...)" }
+        if (!noLog) {
+            if (logResponseBody || httpResponse.code >= 400) {
+                logger.debug { "Received(${httpResponse.code}) <- ${abbreviateString(httpResponseBody)}" }
+            } else {
+                logger.debug { "Received(${httpResponse.code}) <- (...elided...)" }
+            }
         }
         return when (httpResponse.code) {
             in 200..204 -> {

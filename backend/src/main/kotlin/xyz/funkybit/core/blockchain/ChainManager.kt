@@ -1,12 +1,7 @@
 package xyz.funkybit.core.blockchain
 
-import org.bitcoinj.core.ECKey
-import org.bitcoinj.core.NetworkParameters
 import xyz.funkybit.core.model.Address
-import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.db.ChainId
-import xyz.funkybit.core.model.rpc.ArchNetworkRpc
-import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -44,32 +39,10 @@ data class FeeEstimationSettings(
     val maxValue: Int,
 )
 
-data class BitcoinBlockchainClientConfig(
-    val enabled: Boolean,
-    val url: String,
-    val net: String,
-    val enableBasicAuth: Boolean,
-    val user: String,
-    val password: String,
-    val feeSettings: FeeEstimationSettings,
-    val blockExplorerNetName: String,
-    val blockExplorerUrl: String,
-    val faucetAddress: BitcoinAddress?,
-    val submitterPrivateKey: ByteArray,
-    val feePayerPrivateKey: ByteArray,
-    val changeDustThreshold: BigInteger,
-    val feeCollectionAddress: BitcoinAddress,
-) {
-    val params: NetworkParameters = NetworkParameters.fromID(net)!!
-    val submitterEcKey: ECKey = ECKey.fromPrivate(submitterPrivateKey)
-    val submitterPubkey = ArchNetworkRpc.Pubkey.fromECKey(ECKey.fromPrivate(submitterPrivateKey))
-    val feePayerEcKey: ECKey = ECKey.fromPrivate(feePayerPrivateKey)
-    val feePayerAddress = BitcoinAddress.fromKey(params, feePayerEcKey)
-}
-
 object ChainManager {
 
     private val chainNames = (System.getenv("EVM_CHAINS") ?: "localhost:8545,localhost:8546").split(",").map { it.trim() }
+
     val blockchainConfigs = chainNames.map { chainName ->
         BlockchainClientConfig(
             name = chainName,
@@ -131,27 +104,6 @@ object ChainManager {
             sovereignWithdrawalDelaySeconds = bigIntegerValue(chainName, "SOVEREIGN_WITHDRAWAL_DELAY_SECONDS", "604800"),
         )
     }
-    val bitcoinBlockchainClientConfig = BitcoinBlockchainClientConfig(
-        enabled = (System.getenv("BITCOIN_NETWORK_ENABLED") ?: "true").toBoolean(),
-        url = System.getenv("BITCOIN_NETWORK_RPC_URL") ?: "http://bitcoin-node.dev.aws.archnetwork.xyz:18443/wallet/testwallet",
-        user = System.getenv("BITCOIN_NETWORK_RPC_USER") ?: "bitcoin",
-        password = System.getenv("BITCOIN_NETWORK_RPC_PASSWORD") ?: "428bae8f3c94f8c39c50757fc89c39bc7e6ebc70ebf8f618",
-//        url = System.getenv("BITCOIN_NETWORK_RPC_URL") ?: "http://localhost:18443",
-//        user = System.getenv("BITCOIN_NETWORK_RPC_USER") ?: "user",
-//        password = System.getenv("BITCOIN_NETWORK_RPC_PASSWORD") ?: "password",
-        net = System.getenv("BITCOIN_NETWORK_NAME") ?: "org.bitcoin.regtest",
-        enableBasicAuth = (System.getenv("BITCOIN_NETWORK_ENABLE_BASIC_AUTH") ?: "true").toBoolean(),
-        feeSettings = FeeEstimationSettings(1, SmartFeeMode.CONSERVATIVE, 5, 50),
-        blockExplorerNetName = System.getenv("BLOCK_EXPLORER_NET_NAME_BITCOIN") ?: "Bitcoin Network",
-        blockExplorerUrl = System.getenv("BLOCK_EXPLORER_URL_BITCOIN") ?: "https://mempool.dev.aws.archnetwork.xyz",
-//        blockExplorerUrl = System.getenv("BLOCK_EXPLORER_URL_BITCOIN") ?: "http://localhost:1080",
-        faucetAddress = BitcoinAddress.canonicalize("bcrt1q3nyukkpkg6yj0y5tj6nj80dh67m30p963mzxy7"),
-        submitterPrivateKey = (System.getenv("BITCOIN_SUBMITTER_PRIVATE_KEY") ?: "0x7ebc626d01c2d916c61dffee4ed2501f579009ad362360d82fcc30e3d8746cec").toHexBytes(),
-        feePayerPrivateKey = (System.getenv("BITCOIN_FEE_PAYER_PRIVATE_KEY") ?: "cec2c679ef0d11820c75b17174a8635d7aa1ce740b0bf32d80967c3bf7b3676d").toHexBytes(),
-        changeDustThreshold = BigInteger(System.getenv("BITCOIN_CHANGE_DUST_THRESHOLD") ?: "300"),
-        feeCollectionAddress = BitcoinAddress.canonicalize(System.getenv("BITCOIN_FEE_ACCOUNT_ADDRESS") ?: "bcrt1q5jdpyt2x5utsqgaazdf6jr4cc7yeaec0me0e4u"),
-        /* privKey for bcrt1q5jdpyt2x5utsqgaazdf6jr4cc7yeaec0me0e4u = 0x63fe5172a2b186b8015fb60d9c314eb9017a8465ed169d5e5ff41ed8fa8d9a4a */
-    )
 
     private val blockchainClientsByChainId: Map<ChainId, BlockchainClient> by lazy {
         blockchainConfigs.associate {

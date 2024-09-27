@@ -11,7 +11,7 @@ import xyz.funkybit.apps.api.model.websocket.MyTradesUpdated
 import xyz.funkybit.core.blockchain.BlockchainClient
 import xyz.funkybit.core.blockchain.DefaultBlockParam
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.evm.ECHelper.sha3
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EvmAddress
@@ -75,7 +75,7 @@ class SettlementCoordinator(
 ) {
     private val marketMap = mutableMapOf<MarketId, MarketEntity>()
     private val symbolMap = mutableMapOf<SymbolId, SymbolEntity>()
-    private val chainIds = blockchainClients.map { it.chainId } + if (BitcoinClient.config.enabled) listOf(BitcoinClient.chainId) else listOf()
+    private val chainIds = blockchainClients.map { it.chainId } + if (bitcoinConfig.enabled) listOf(bitcoinConfig.chainId) else listOf()
     private val blockchainClientsByChainId = blockchainClients.associateBy { it.chainId }
     private val advisoryLockKey = Long.MAX_VALUE
 
