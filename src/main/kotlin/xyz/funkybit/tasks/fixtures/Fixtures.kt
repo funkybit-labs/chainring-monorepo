@@ -1,7 +1,6 @@
 package xyz.funkybit.tasks.fixtures
 
-import xyz.funkybit.core.blockchain.BlockchainClient
-import xyz.funkybit.core.blockchain.ChainManager
+import xyz.funkybit.core.blockchain.evm.EvmClient
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.Address
@@ -61,7 +60,7 @@ data class Fixtures(
 
 fun String.toChainSymbol(chainId: ChainId) = "$this:$chainId"
 
-fun getFixtures(evmClients: List<BlockchainClient>) = Fixtures(
+fun getFixtures(evmClients: List<EvmClient>) = Fixtures(
     feeRates = FeeRates.fromPercents(
         maker = System.getenv("MAKER_FEE_RATE")?.toBigDecimalOrNull() ?: BigDecimal("0.01"),
         taker = System.getenv("TAKER_FEE_RATE")?.toBigDecimalOrNull() ?: BigDecimal("0.02")

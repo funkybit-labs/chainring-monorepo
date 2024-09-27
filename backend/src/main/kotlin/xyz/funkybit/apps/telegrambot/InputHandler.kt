@@ -12,7 +12,7 @@ import xyz.funkybit.apps.telegrambot.model.Output
 import xyz.funkybit.apps.telegrambot.model.OutputMessage
 import xyz.funkybit.apps.telegrambot.model.SwapEstimateError
 import xyz.funkybit.apps.telegrambot.model.estimateSwap
-import xyz.funkybit.core.blockchain.ChainManager
+import xyz.funkybit.core.blockchain.evm.EvmChainManager
 import xyz.funkybit.core.model.db.DepositStatus
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderStatus
@@ -91,8 +91,8 @@ class InputHandler(
                         deleteTransientMessages(user)
                         val amount = BigDecimal("0.1").setScale(symbol.decimals)
 
-                        val txHash = ChainManager
-                            .getBlockchainClient(symbol.chainId.value)
+                        val txHash = EvmChainManager
+                            .getEvmClient(symbol.chainId.value)
                             .sendNativeDepositTx(currentWallet.evmAddress, amount.toFundamentalUnits(symbol.decimals))
 
                         send(OutputMessage.airdropRequested(user, symbol, amount))

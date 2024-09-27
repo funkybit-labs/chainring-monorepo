@@ -46,7 +46,7 @@ class FaucetTest {
                 .pollInterval(Duration.ofMillis(100))
                 .atMost(Duration.ofMillis(10000L))
                 .untilAsserted {
-                    wallet.currentBlockchainClient().mine()
+                    wallet.currentEvmClient().mine()
                     val nativeBalanceAfter = wallet.getWalletNativeBalance()
                     assertEquals(BigInteger("1000000000000000000"), nativeBalanceAfter - nativeBalanceBefore)
                 }
@@ -82,7 +82,7 @@ class FaucetTest {
                 .pollInterval(Duration.ofMillis(100))
                 .atMost(Duration.ofMillis(10000L))
                 .untilAsserted {
-                    wallet.currentBlockchainClient().mine()
+                    wallet.currentEvmClient().mine()
                     val balanceAfter = wallet.getWalletERC20Balance(erc20Symbol)
                     assertEquals(BigInteger("1000000000000000000"), balanceAfter - balanceBefore)
                 }

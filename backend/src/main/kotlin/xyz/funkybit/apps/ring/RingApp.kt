@@ -2,7 +2,7 @@ package xyz.funkybit.apps.ring
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import xyz.funkybit.apps.api.BaseApp
-import xyz.funkybit.core.blockchain.ChainManager
+import xyz.funkybit.core.blockchain.evm.EvmChainManager
 import xyz.funkybit.core.db.DbConfig
 import xyz.funkybit.core.db.migrations
 import xyz.funkybit.core.db.upgrade
@@ -16,12 +16,12 @@ data class RingAppConfig(
 
 class RingApp(config: RingAppConfig = RingAppConfig()) : BaseApp(config.dbConfig) {
     override val logger = KotlinLogging.logger {}
-    private val blockchainClients = ChainManager.getBlockchainClients()
+    private val evmClients = EvmChainManager.getEvmClients()
     private val sequencerClient = SequencerClient()
 
-    private val chainWorkers = blockchainClients.map { ChainWorker(it, sequencerClient) }
+    private val evmChainWorkers = evmClients.map { EvmChainWorker(it, sequencerClient) }
     private val archChainWorker = ArchChainWorker(sequencerClient)
-    private val settlementCoordinator = SettlementCoordinator(blockchainClients, sequencerClient)
+    private val settlementCoordinator = SettlementCoordinator(evmClients, sequencerClient)
 
     private val repeater = Repeater(db, config.repeaterAutomaticTaskScheduling)
 
@@ -31,7 +31,7 @@ class RingApp(config: RingAppConfig = RingAppConfig()) : BaseApp(config.dbConfig
 
         db.upgrade(migrations, logger)
 
-        chainWorkers.forEach(ChainWorker::start)
+        evmChainWorkers.forEach(EvmChainWorker::start)
         archChainWorker.start()
         settlementCoordinator.start()
         repeater.start()
@@ -44,7 +44,7 @@ class RingApp(config: RingAppConfig = RingAppConfig()) : BaseApp(config.dbConfig
 
         repeater.stop()
         settlementCoordinator.stop()
-        chainWorkers.forEach(ChainWorker::stop)
+        evmChainWorkers.forEach(EvmChainWorker::stop)
         archChainWorker.stop()
 
         super.stop()

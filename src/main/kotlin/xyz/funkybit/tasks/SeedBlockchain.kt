@@ -1,9 +1,9 @@
 package xyz.funkybit.tasks
 
 import xyz.funkybit.contracts.generated.MockERC20
-import xyz.funkybit.core.blockchain.BlockchainClient
-import xyz.funkybit.core.blockchain.BlockchainClientConfig
-import xyz.funkybit.core.blockchain.ChainManager
+import xyz.funkybit.core.blockchain.evm.EvmClient
+import xyz.funkybit.core.blockchain.evm.EvmClientConfig
+import xyz.funkybit.core.blockchain.evm.EvmChainManager
 import xyz.funkybit.core.db.DbConfig
 import xyz.funkybit.core.db.connect
 import xyz.funkybit.core.model.EvmAddress
@@ -27,7 +27,6 @@ import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
 import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
-import xyz.funkybit.core.model.db.BitcoinUtxoEntity
 import xyz.funkybit.core.utils.fromFundamentalUnits
 import java.time.Duration
 
@@ -36,8 +35,8 @@ data class SymbolContractAddress(
     val address: Address
 )
 
-val evmClients = ChainManager.blockchainConfigs.map {
-    FixturesBlockchainClient(it.copy(enableWeb3jLogging = false))
+val evmClients = EvmChainManager.evmClientConfigs.map {
+    FixturesEvmClient(it.copy(enableWeb3jLogging = false))
 }
 val evmClientsByChainId = evmClients.associateBy { it.chainId }
 
@@ -88,12 +87,12 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
                 }
                 is EvmAddress -> {
                     val symbol = fixtures.symbols.first { it.id == symbolId }
-                    val blockchainClient = evmClient(symbol.chainId)
+                    val evmClient = evmClient(symbol.chainId)
 
                     println("Setting ${symbol.name} balance for ${wallet.address.value} to $balance")
 
                     if (symbol.isNative) {
-                        blockchainClient.setNativeBalance(wallet.address, balance)
+                        evmClient.setNativeBalance(wallet.address, balance)
                         null
                     } else {
                         val symbolContractAddress = symbolContractAddresses.first { it.symbolId == symbolId }.address
@@ -101,12 +100,12 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
                             is BitcoinAddress -> null // TODO get bitcoin token balance
                             is EvmAddress -> {
                                 val currentBalance =
-                                    blockchainClient.getERC20Balance(symbolContractAddress, wallet.address)
+                                    evmClient.getERC20Balance(symbolContractAddress, wallet.address)
 
                                 if (currentBalance < balance) {
                                     Pair(
                                         symbol.chainId,
-                                        blockchainClient.sendMintERC20Tx(
+                                        evmClient.sendMintERC20Tx(
                                             symbolContractAddress,
                                             wallet.address,
                                             balance - currentBalance
@@ -115,7 +114,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
                                 } else if (currentBalance > balance) {
                                     Pair(
                                         symbol.chainId,
-                                        blockchainClient.asyncBurnERC20(
+                                        evmClient.asyncBurnERC20(
                                             symbolContractAddress,
                                             wallet.address,
                                             currentBalance - balance
@@ -175,7 +174,7 @@ private fun airdropBtcToAddress(address: BitcoinAddress, amount: BigInteger): Tx
     return null
 }
 
-class FixturesBlockchainClient(config: BlockchainClientConfig) : BlockchainClient(config) {
+class FixturesEvmClient(config: EvmClientConfig) : EvmClient(config) {
     fun deployMockERC20(tokenName: String, decimals: BigInteger): EvmAddress {
         val contract = MockERC20.deploy(
             web3j,

@@ -11,9 +11,9 @@ import org.web3j.tx.RawTransactionManager
 import org.web3j.utils.Numeric
 import xyz.funkybit.contracts.generated.Exchange
 import xyz.funkybit.contracts.generated.MockERC20
-import xyz.funkybit.core.blockchain.BlockchainClient
-import xyz.funkybit.core.blockchain.BlockchainClientConfig
 import xyz.funkybit.core.blockchain.ContractType
+import xyz.funkybit.core.blockchain.evm.EvmClient
+import xyz.funkybit.core.blockchain.evm.EvmClientConfig
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.TxHash
 import java.math.BigInteger
@@ -22,7 +22,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
 
-class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : BlockchainClient(blockchainConfig) {
+class TestEvmClient(evmConfig: EvmClientConfig) : EvmClient(evmConfig) {
     fun loadERC20Mock(address: String) = MockERC20.load(address, web3j, transactionManager, gasProvider)
     fun loadExchange(address: String) = Exchange.load(address, web3j, transactionManager, gasProvider)
 

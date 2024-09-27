@@ -17,12 +17,12 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
-import xyz.funkybit.core.evm.EIP712Transaction
-import xyz.funkybit.core.evm.TokenAddressAndChain
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.Signature
+import xyz.funkybit.core.model.evm.EIP712Transaction
+import xyz.funkybit.core.model.evm.TokenAddressAndChain
 import java.math.BigDecimal
 import java.math.BigInteger
 

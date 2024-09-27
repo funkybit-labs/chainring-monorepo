@@ -13,7 +13,7 @@ import org.web3j.protocol.core.methods.response.Log
 import org.web3j.tx.Contract
 import xyz.funkybit.apps.api.model.Withdrawal
 import xyz.funkybit.contracts.generated.Exchange
-import xyz.funkybit.core.blockchain.BlockchainClient
+import xyz.funkybit.core.blockchain.evm.EvmClient
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.TxHash
@@ -33,15 +33,15 @@ import xyz.funkybit.sequencer.core.Asset
 import java.math.BigInteger
 import kotlin.concurrent.thread
 
-class BlockProcessor(
-    private val blockchainClient: BlockchainClient,
+class EvmBlockProcessor(
+    private val evmClient: EvmClient,
     private val sequencerClient: SequencerClient,
     private val pollingIntervalInMs: Long =
-        System.getenv("BLOCKCHAIN_BLOCK_PROCESSOR_POLLING_INTERVAL_MS")?.toLongOrNull()
+        System.getenv("EVM_BLOCK_PROCESSOR_POLLING_INTERVAL_MS")?.toLongOrNull()
             ?: 1000L,
 ) {
     val logger = KotlinLogging.logger {}
-    private val chainId = blockchainClient.chainId
+    private val chainId = evmClient.chainId
     private var workerThread: Thread? = null
 
     fun stop() {
@@ -58,12 +58,12 @@ class BlockProcessor(
             while (true) {
                 try {
                     val blocksToProcess = transaction {
-                        if (ChainEntity.findById(blockchainClient.chainId) != null) {
+                        if (ChainEntity.findById(evmClient.chainId) != null) {
                             (
                                 getLastProcessedBlock()?.number?.let { it + BigInteger.ONE }
                                     ?: DepositEntity.maxBlockNumber(chainId)?.let { it + BigInteger.ONE }
-                                    ?: blockchainClient.getBlockNumber()
-                                ).rangeTo(blockchainClient.getBlockNumber())
+                                    ?: evmClient.getBlockNumber()
+                                ).rangeTo(evmClient.getBlockNumber())
                         } else {
                             listOf()
                         }
@@ -72,7 +72,7 @@ class BlockProcessor(
                     for (blockNumber in blocksToProcess) {
                         logger.verboseInfo { "Processing block $blockNumber, chainId=$chainId" }
 
-                        val blockFromRpcNode = blockchainClient.getBlock(blockNumber, withFullTxObjects = false)
+                        val blockFromRpcNode = evmClient.getBlock(blockNumber, withFullTxObjects = false)
                         val lastProcessedBlock = transaction { getLastProcessedBlock() }
                         if (lastProcessedBlock == null || blockFromRpcNode.parentHash == lastProcessedBlock.hash) {
                             transaction {
@@ -100,7 +100,7 @@ class BlockProcessor(
         logger.verboseInfo { "Storing block [number=${blockFromRpcNode.number},hash=${blockFromRpcNode.hash},parentHash=${blockFromRpcNode.parentHash}], chainId=$chainId" }
         BlockEntity.create(blockFromRpcNode, chainId)
 
-        val getLogsResult = blockchainClient.getExchangeContractLogs(blockFromRpcNode.number)
+        val getLogsResult = evmClient.getExchangeContractLogs(blockFromRpcNode.number)
 
         if (getLogsResult.hasError()) {
             throw RuntimeException("Failed to get logs, block=${blockFromRpcNode.number}, chainId=$chainId, error code: ${getLogsResult.error.code}, error message: ${getLogsResult.error.message}")
@@ -113,7 +113,7 @@ class BlockProcessor(
     }
 
     private val blocksNumberToCheckOnForkDetected =
-        BigInteger.valueOf((System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toIntOrNull() ?: BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS) + 1L)
+        BigInteger.valueOf((System.getenv("EVM_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toIntOrNull() ?: EvmDepositHandler.DEFAULT_NUM_CONFIRMATIONS) + 1L)
 
     private fun handleFork(blockFromRpcNode: EthBlock.Block, lastProcessedBlock: BlockEntity) {
         logger.info { "Fork detected: for block [height=${blockFromRpcNode.number},hash=${blockFromRpcNode.hash},parentHash=${blockFromRpcNode.parentHash}] latest block found in db is [height=${lastProcessedBlock.number},hash=${lastProcessedBlock.guid.value},parentHash=${lastProcessedBlock.parentGuid.value}]. Looking for split point starting at ${blockFromRpcNode.number}, chainId=$chainId" }
@@ -124,7 +124,7 @@ class BlockProcessor(
                 chainId,
             )
             .filter { processedBlock ->
-                processedBlock.hash != blockchainClient.getBlock(processedBlock.number, withFullTxObjects = false).hash
+                processedBlock.hash != evmClient.getBlock(processedBlock.number, withFullTxObjects = false).hash
             }
 
         val blockNumbersToRollback = blocksToRollback.map { it.number }

@@ -17,7 +17,7 @@ import xyz.funkybit.apps.api.model.FaucetApiResponse
 import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.RequestProcessingError
 import xyz.funkybit.apps.api.model.errorResponse
-import xyz.funkybit.core.blockchain.ChainManager
+import xyz.funkybit.core.blockchain.Faucet
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.TxHash
@@ -69,36 +69,27 @@ class FaucetRoutes(private val faucetMode: FaucetMode) {
                 if (!eligible) {
                     errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.ProcessingError, "Faucet may only be used once per day."))
                 } else {
-                    when (val blockchainClient = ChainManager.getFaucetBlockchainClient(symbol.chainId.value)) {
-                        null -> errorResponse(
+                    val (amountInFundamentalUnits, txHash) = if (symbol.faucetSupported(faucetMode)) {
+                        Faucet.transfer(symbol, payload.address)
+                    } else {
+                        throw RequestProcessingError(
                             Status.UNPROCESSABLE_ENTITY,
-                            ApiError(ReasonCode.ChainNotSupported, "Chain not supported"),
+                            ApiError(ReasonCode.ProcessingError, "Faucet is disabled"),
                         )
-
-                        else -> {
-                            val (amountInFundamentalUnits, txHash) = if (symbol.faucetSupported(faucetMode)) {
-                                blockchainClient.faucetTransfer(symbol, payload.address)
-                            } else {
-                                throw RequestProcessingError(
-                                    Status.UNPROCESSABLE_ENTITY,
-                                    ApiError(ReasonCode.ProcessingError, "Native faucet is disabled"),
-                                )
-                            }
-
-                            transaction {
-                                FaucetDripEntity.create(symbol, walletAddress, sourceAddress)
-                            }
-
-                            Response(Status.OK).with(
-                                responseBody of FaucetApiResponse(
-                                    chainId = symbol.chainId.value,
-                                    txHash = txHash,
-                                    symbol = payload.symbol,
-                                    amount = amountInFundamentalUnits,
-                                ),
-                            )
-                        }
                     }
+
+                    transaction {
+                        FaucetDripEntity.create(symbol, walletAddress, sourceAddress)
+                    }
+
+                    Response(Status.OK).with(
+                        responseBody of FaucetApiResponse(
+                            chainId = symbol.chainId.value,
+                            txHash = txHash,
+                            symbol = payload.symbol,
+                            amount = amountInFundamentalUnits,
+                        ),
+                    )
                 }
             }
         }

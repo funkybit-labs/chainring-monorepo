@@ -1,4 +1,4 @@
-package xyz.funkybit.core.blockchain
+package xyz.funkybit.core.blockchain.evm
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.future.await
@@ -37,7 +37,7 @@ import xyz.funkybit.contracts.generated.ERC20
 import xyz.funkybit.contracts.generated.Exchange
 import xyz.funkybit.contracts.generated.MockERC20
 import xyz.funkybit.contracts.generated.UUPSUpgradeable
-import xyz.funkybit.core.evm.EvmSettlement
+import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
@@ -45,6 +45,7 @@ import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.SymbolEntity
+import xyz.funkybit.core.model.evm.EvmSettlement
 import xyz.funkybit.core.model.toEvmSignature
 import xyz.funkybit.core.utils.fromFundamentalUnits
 import xyz.funkybit.core.utils.quietMode
@@ -53,13 +54,30 @@ import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.jvm.optionals.getOrNull
+import kotlin.time.Duration
 
-enum class ContractType {
-    Exchange,
-}
+data class EvmClientConfig(
+    val name: String,
+    val url: String,
+    val blockExplorerNetName: String,
+    val blockExplorerUrl: String,
+    val privateKeyHex: String,
+    val submitterPrivateKeyHex: String,
+    val airdropperPrivateKeyHex: String,
+    val faucetPrivateKeyHex: String,
+    val feeAccountAddress: String,
+    val pollingIntervalInMs: Long,
+    val maxPollingAttempts: Long,
+    val contractCreationLimit: BigInteger,
+    val contractInvocationLimit: BigInteger,
+    val defaultMaxPriorityFeePerGasInWei: BigInteger,
+    val enableWeb3jLogging: Boolean,
+    val maxRpcNodeEventualConsistencyTolerance: Duration,
+    val sovereignWithdrawalDelaySeconds: BigInteger,
+)
 
-class BlockchainServerException(message: String) : Exception(message)
-class BlockchainClientException(message: String) : Exception(message)
+class EvmServerException(message: String) : Exception(message)
+class EvmClientException(message: String) : Exception(message)
 
 open class TransactionManagerWithNonceOverride(
     web3j: Web3j,
@@ -104,7 +122,7 @@ sealed class DefaultBlockParam {
     }
 }
 
-open class BlockchainClient(val config: BlockchainClientConfig) {
+open class EvmClient(val config: EvmClientConfig) {
     protected val web3jService: HttpService = httpService(config.url, config.enableWeb3jLogging)
     protected val web3jServiceNoLogging: HttpService = httpService(config.url, logging = false)
     protected val web3j: Web3j = Web3j.build(
@@ -243,7 +261,9 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
         logger.debug { "Deployment complete for $contractType" }
         setContractAddress(contractType, proxyAddress)
 
-        val contractSovereignWithdrawalDelay = getSovereignWithdrawalDelay(DefaultBlockParam.Latest)
+        val contractSovereignWithdrawalDelay = getSovereignWithdrawalDelay(
+            DefaultBlockParam.Latest,
+        )
         if (contractSovereignWithdrawalDelay != config.sovereignWithdrawalDelaySeconds) {
             logger.debug { "Updating sovereign withdrawal delay value from $contractSovereignWithdrawalDelay to ${config.sovereignWithdrawalDelaySeconds}" }
 
@@ -346,7 +366,12 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
             .send()
 
     fun getExchangeContractLogs(block: BigInteger): EthLog =
-        getLogs(DefaultBlockParam.BlockNumber(block), getContractAddress(ContractType.Exchange))
+        getLogs(
+            DefaultBlockParam.BlockNumber(block),
+            getContractAddress(
+                ContractType.Exchange,
+            ),
+        )
 
     fun getTxManager(nonceOverride: BigInteger): TransactionManagerWithNonceOverride {
         return TransactionManagerWithNonceOverride(web3j, submitterCredentials, nonceOverride)
@@ -487,14 +512,14 @@ open class BlockchainClient(val config: BlockchainClientConfig) {
             .encodeFunctionCall()
 }
 
-class AirdropperBlockchainClient(private val blockchainClient: BlockchainClient) {
+class AirdropperEvmClient(private val evmClient: EvmClient) {
     val logger = KotlinLogging.logger {}
 
     fun testnetChallengeAirdrop(address: Address, tokenSymbol: SymbolEntity, tokenAmount: BigDecimal, gasSymbol: SymbolEntity, gasAmount: BigDecimal): TxHash {
         logger.debug { "Sending $gasAmount ${gasSymbol.name} to $address" }
 
         val gasAmountInFundamentalUnits = gasAmount.movePointRight(gasSymbol.decimals.toInt()).toBigInteger()
-        blockchainClient.sendNativeDepositTx(
+        evmClient.sendNativeDepositTx(
             address,
             gasAmountInFundamentalUnits,
         )
@@ -505,37 +530,10 @@ class AirdropperBlockchainClient(private val blockchainClient: BlockchainClient)
         val tokenContractAddress = tokenSymbol.contractAddress as? EvmAddress
             ?: throw RuntimeException("Only ERC-20s supported for testnet challenge deposit symbol")
 
-        return blockchainClient.sendTransferERC20Tx(
+        return evmClient.sendTransferERC20Tx(
             tokenContractAddress,
             address as EvmAddress,
             amountInFundamentalUnits,
         )
-    }
-}
-
-class FaucetBlockchainClient(private val blockchainClient: BlockchainClient) {
-    val logger = KotlinLogging.logger {}
-
-    fun faucetTransfer(symbol: SymbolEntity, address: EvmAddress): Pair<BigInteger, TxHash> {
-        val amount = BigDecimal("1")
-        logger.debug { "Sending $amount ${symbol.name} to ${address.value}" }
-
-        val amountInFundamentalUnits = amount.movePointRight(symbol.decimals.toInt()).toBigInteger()
-        val txHash = when (val tokenContractAddress = symbol.contractAddress) {
-            null -> blockchainClient.sendNativeDepositTx(
-                address,
-                amountInFundamentalUnits,
-            )
-
-            is EvmAddress -> blockchainClient.sendMintERC20Tx(
-                tokenContractAddress,
-                address,
-                amountInFundamentalUnits,
-            )
-
-            is BitcoinAddress -> TODO()
-        }
-
-        return amountInFundamentalUnits to txHash
     }
 }

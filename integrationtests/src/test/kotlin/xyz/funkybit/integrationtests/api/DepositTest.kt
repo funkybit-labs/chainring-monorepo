@@ -12,7 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.web3j.utils.Numeric
 import xyz.funkybit.apps.api.model.CreateDepositApiRequest
 import xyz.funkybit.apps.api.model.Deposit
-import xyz.funkybit.apps.ring.BlockchainDepositHandler
+import xyz.funkybit.apps.ring.EvmDepositHandler
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.DepositEntity
@@ -79,7 +79,7 @@ class DepositTest {
 
             // test idempotence
             assertEquals(pendingBtcDeposit, apiClient.createDeposit(CreateDepositApiRequest(Symbol(btc.name), btcDepositAmount.inFundamentalUnits, btcDepositTxHash)).deposit)
-            wallet.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+            wallet.currentEvmClient().mine(EvmDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
 
             waitForBalance(
                 apiClient,
@@ -93,7 +93,7 @@ class DepositTest {
             assertEquals(Deposit.Status.Complete, btcDeposit.status)
             assertEquals(listOf(btcDeposit), apiClient.listDeposits().deposits.filter { it.symbol.value == btc.name })
 
-            val depositGasCost = wallet.currentBlockchainClient().getTransactionReceipt(btcDepositTxHash).let { receipt ->
+            val depositGasCost = wallet.currentEvmClient().getTransactionReceipt(btcDepositTxHash).let { receipt ->
                 assertNotNull(receipt)
                 AssetAmount(btc, receipt.gasUsed * Numeric.decodeQuantity(receipt.effectiveGasPrice))
             }
@@ -108,7 +108,7 @@ class DepositTest {
 
             assertEquals(listOf(pendingUsdcDeposit, btcDeposit), apiClient.listDeposits().deposits.filter { symbolFilterList.contains(it.symbol.value) })
 
-            wallet.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+            wallet.currentEvmClient().mine(EvmDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
 
             waitForBalance(
                 apiClient,
@@ -192,7 +192,7 @@ class DepositTest {
         val chain = apiClient.getConfiguration().evmChains[0]
         val btc = chain.symbols.first { it.name == "BTC:${chain.id}" }
 
-        val chainClient = Faucet.blockchainClient(chain.id)
+        val chainClient = Faucet.evmClient(chain.id)
         val snapshotId = chainClient.snapshot().id
 
         val deposit1TxHash = wallet.sendNativeDepositTx(AssetAmount(btc, "0.01").inFundamentalUnits)
@@ -214,7 +214,7 @@ class DepositTest {
         chainClient.mine()
 
         val deposit2TxHash = wallet.sendNativeDepositTx(AssetAmount(btc, "0.02").inFundamentalUnits)
-        chainClient.mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+        chainClient.mine(EvmDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
 
         await
             .withAlias("Waiting for deposit 2 to be completed")
@@ -246,7 +246,7 @@ class DepositTest {
         val btc = chain.symbols.first { it.name == "BTC:${chain.id}" }
         val amount = AssetAmount(btc, "0.01")
 
-        val chainClient = Faucet.blockchainClient(chain.id)
+        val chainClient = Faucet.evmClient(chain.id)
 
         val depositTxHash = wallet.sendNativeDepositTx(amount.inFundamentalUnits)
         apiClient.createDeposit(CreateDepositApiRequest(Symbol(btc.name), amount.inFundamentalUnits, depositTxHash)).deposit.also {
@@ -301,7 +301,7 @@ class DepositTest {
         assertEquals(Deposit.Status.Pending, pendingDeposit.status)
         assertAmount(nativeApiDepositAmount, pendingDeposit.amount)
 
-        wallet.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+        wallet.currentEvmClient().mine(EvmDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
 
         waitForBalance(apiClient, wsClient, listOf(ExpectedBalance(nativeOnChainDepositAmount)))
 
@@ -320,7 +320,7 @@ class DepositTest {
         assertEquals(Deposit.Status.Pending, pendingErc20Deposit.status)
         assertAmount(erc20ApiDepositAmount, pendingErc20Deposit.amount)
 
-        wallet.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+        wallet.currentEvmClient().mine(EvmDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
 
         waitForBalance(
             apiClient,
@@ -341,7 +341,7 @@ class DepositTest {
         assertEquals(Deposit.Status.Pending, pendingInvalidDeposit.status)
         assertAmount(erc20ApiDepositAmount, pendingInvalidDeposit.amount)
 
-        wallet.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+        wallet.currentEvmClient().mine(EvmDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
 
         waitFor {
             apiClient.getDeposit(pendingInvalidDeposit.id).deposit.status == Deposit.Status.Failed

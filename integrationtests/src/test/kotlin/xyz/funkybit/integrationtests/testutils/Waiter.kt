@@ -8,7 +8,7 @@ import org.awaitility.kotlin.await
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInList
 import org.jetbrains.exposed.sql.transactions.transaction
-import xyz.funkybit.core.blockchain.ChainManager
+import xyz.funkybit.core.blockchain.evm.EvmChainManager
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.TxHash
@@ -95,10 +95,10 @@ fun waitForActivityToComplete() {
                                 val chainId = it.chainId.value
                                 val transactionData = when (chainId.networkType()) {
                                     NetworkType.Evm -> {
-                                        val blockchainClient = ChainManager.getBlockchainClient(chainId)
+                                        val evmClient = EvmChainManager.getEvmClient(chainId)
                                         BlockchainTransactionData(
-                                            blockchainClient.encodeRollbackBatchFunctionCall(),
-                                            blockchainClient.exchangeContractAddress,
+                                            evmClient.encodeRollbackBatchFunctionCall(),
+                                            evmClient.exchangeContractAddress,
                                             BigInteger.ZERO,
                                         )
                                     }

@@ -9,11 +9,9 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import xyz.funkybit.apps.api.model.OrderAmount
-import xyz.funkybit.core.blockchain.BlockchainClient
-import xyz.funkybit.core.blockchain.ChainManager
-import xyz.funkybit.core.evm.EIP712Helper
-import xyz.funkybit.core.evm.EIP712Transaction
-import xyz.funkybit.core.evm.TokenAddressAndChain
+import xyz.funkybit.core.blockchain.evm.EIP712Helper
+import xyz.funkybit.core.blockchain.evm.EvmChainManager
+import xyz.funkybit.core.blockchain.evm.EvmClient
 import xyz.funkybit.core.model.EncryptedString
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
@@ -30,6 +28,8 @@ import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WalletTable
+import xyz.funkybit.core.model.evm.EIP712Transaction
+import xyz.funkybit.core.model.evm.TokenAddressAndChain
 import xyz.funkybit.core.utils.fromFundamentalUnits
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.core.utils.toHexBytes
@@ -103,38 +103,38 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
     fun onChainBalances(symbols: List<SymbolEntity>): List<Pair<SymbolEntity, BigDecimal>> =
         runBlocking {
             symbols.map { symbol ->
-                Pair(symbol, ChainManager.getBlockchainClient(symbol.chainId.value).asyncGetBalance(evmAddress, symbol))
+                Pair(symbol, EvmChainManager.getEvmClient(symbol.chainId.value).asyncGetBalance(evmAddress, symbol))
             }
         }
 
     fun onChainBalance(symbol: SymbolEntity): BigDecimal =
-        ChainManager
-            .getBlockchainClient(symbol.chainId.value)
+        EvmChainManager
+            .getEvmClient(symbol.chainId.value)
             .getBalance(evmAddress, symbol)
 
-    fun blockchainClient(chainId: ChainId): BlockchainClient =
-        ChainManager
-            .getBlockchainClient(chainId, privateKeyHex = encryptedPrivateKey.decrypt())
+    fun evmClient(chainId: ChainId): EvmClient =
+        EvmChainManager
+            .getEvmClient(chainId, privateKeyHex = encryptedPrivateKey.decrypt())
 
     fun deposit(amount: BigDecimal, symbol: SymbolEntity): TxHash? {
-        val blockchainClient = blockchainClient(symbol.chainId.value)
+        val evmClient = evmClient(symbol.chainId.value)
         val exchangeContractAddress = DeployedSmartContractEntity.latestExchangeContractAddress(
-            blockchainClient.chainId,
+            evmClient.chainId,
         ) as? EvmAddress
         val bigIntAmount = amount.toFundamentalUnits(symbol.decimals)
         val tokenAddress = symbol.contractAddress as? EvmAddress
         return exchangeContractAddress?.let {
             if (tokenAddress != null) {
                 runBlocking {
-                    val allowanceTxReceipt = blockchainClient
+                    val allowanceTxReceipt = evmClient
                         .loadERC20(tokenAddress)
                         .approve(exchangeContractAddress.toString(), bigIntAmount)
                         .sendAsync()
                         .await()
                     if (allowanceTxReceipt.isStatusOK) {
-                        blockchainClient.sendTransaction(
+                        evmClient.sendTransaction(
                             exchangeContractAddress,
-                            blockchainClient
+                            evmClient
                                 .loadExchangeContract(exchangeContractAddress)
                                 .deposit(tokenAddress.value, bigIntAmount).encodeFunctionCall(),
                             BigInteger.ZERO,
@@ -144,15 +144,15 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
                     }
                 }
             } else {
-                blockchainClient.sendNativeDepositTx(exchangeContractAddress, bigIntAmount)
+                evmClient.sendNativeDepositTx(exchangeContractAddress, bigIntAmount)
             }
         }
     }
 
     fun signWithdrawal(amount: BigDecimal, symbol: SymbolEntity, nonce: Long): EvmSignature {
-        val blockchainClient = blockchainClient(symbol.chainId.value)
+        val evmClient = evmClient(symbol.chainId.value)
         val exchangeContractAddress = DeployedSmartContractEntity.latestExchangeContractAddress(
-            blockchainClient.chainId,
+            evmClient.chainId,
         )!!
         val bigIntAmount = amount.toFundamentalUnits(symbol.decimals)
         val tx = EIP712Transaction.WithdrawTx(
@@ -163,13 +163,13 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
             bigIntAmount == BigInteger.ZERO,
             EvmSignature.emptySignature(),
         )
-        return blockchainClient.signData(EIP712Helper.computeHash(tx, blockchainClient.chainId, exchangeContractAddress))
+        return evmClient.signData(EIP712Helper.computeHash(tx, evmClient.chainId, exchangeContractAddress))
     }
 
     fun signOrder(market: MarketEntity, side: OrderSide, amount: OrderAmount, nonce: String): Pair<EvmSignature, ChainId> {
-        val blockchainClient = blockchainClient(market.baseSymbol.chainId.value)
+        val evmClient = evmClient(market.baseSymbol.chainId.value)
         val exchangeContractAddress = DeployedSmartContractEntity.latestExchangeContractAddress(
-            blockchainClient.chainId,
+            evmClient.chainId,
         )!!
 
         val tx = EIP712Transaction.Order(
@@ -184,23 +184,23 @@ class TelegramBotUserWalletEntity(guid: EntityID<TelegramBotUserWalletId>) : GUI
             EvmSignature.emptySignature(),
         )
 
-        blockchainClient.signData(
+        evmClient.signData(
             EIP712Helper.computeHash(
                 tx,
-                blockchainClient.chainId,
+                evmClient.chainId,
                 exchangeContractAddress,
             ),
         )
 
         return Pair(
-            blockchainClient.signData(
+            evmClient.signData(
                 EIP712Helper.computeHash(
                     tx,
-                    blockchainClient.chainId,
+                    evmClient.chainId,
                     exchangeContractAddress,
                 ),
             ),
-            blockchainClient.chainId,
+            evmClient.chainId,
         )
     }
 }

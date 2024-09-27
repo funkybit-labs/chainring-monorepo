@@ -27,7 +27,7 @@ import xyz.funkybit.apps.api.model.SetAvatarUrl
 import xyz.funkybit.apps.api.model.SetNickname
 import xyz.funkybit.apps.api.model.processingError
 import xyz.funkybit.apps.api.model.testnetChallengeDisqualifiedError
-import xyz.funkybit.core.blockchain.ChainManager
+import xyz.funkybit.core.blockchain.evm.EvmChainManager
 import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.NetworkType
 import xyz.funkybit.core.model.db.OrderEntity
@@ -71,8 +71,8 @@ class TestnetChallengeRoutes {
                         return@transaction testnetChallengeDisqualifiedError("Disqualified due to prior deposit")
                     }
 
-                    val airDropperBlockchainClient = ChainManager.getAirdropperBlockchainClient(symbol.chainId.value)
-                    val txHash = airDropperBlockchainClient.testnetChallengeAirdrop(
+                    val airDropperEvmClient = EvmChainManager.getAirdropperEvmClient(symbol.chainId.value)
+                    val txHash = airDropperEvmClient.testnetChallengeAirdrop(
                         request.principal.address,
                         tokenSymbol = symbol,
                         tokenAmount = TestnetChallengeUtils.depositAmount,

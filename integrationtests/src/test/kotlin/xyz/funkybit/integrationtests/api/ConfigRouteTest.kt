@@ -7,9 +7,9 @@ import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.apps.api.FaucetMode
 import xyz.funkybit.apps.api.model.FeeRates
 import xyz.funkybit.apps.api.model.SymbolInfo
-import xyz.funkybit.core.blockchain.BlockchainClient
-import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.ContractType
+import xyz.funkybit.core.blockchain.evm.EvmChainManager
+import xyz.funkybit.core.blockchain.evm.EvmClient
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.model.db.NetworkType
@@ -31,8 +31,8 @@ class ConfigRouteTest {
 
         val config = apiClient.getConfiguration()
         assertEquals(config.evmChains.size, 2)
-        ChainManager.blockchainConfigs.forEach { clientConfig ->
-            val client = BlockchainClient(clientConfig)
+        EvmChainManager.evmClientConfigs.forEach { clientConfig ->
+            val client = EvmClient(clientConfig)
             val chainConfig = config.chains.first { it.id == client.chainId }
             assertEquals(chainConfig.contracts.size, 1)
             assertEquals(chainConfig.contracts[0].name, ContractType.Exchange.name)

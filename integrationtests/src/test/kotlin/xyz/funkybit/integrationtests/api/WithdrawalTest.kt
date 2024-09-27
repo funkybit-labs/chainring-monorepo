@@ -8,10 +8,10 @@ import org.web3j.utils.Numeric
 import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.websocket.SubscriptionTopic
-import xyz.funkybit.core.evm.EIP712Transaction
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalStatus
+import xyz.funkybit.core.model.evm.EIP712Transaction
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.waitForBalance

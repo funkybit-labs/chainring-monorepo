@@ -13,10 +13,10 @@ import xyz.funkybit.apps.api.ApiAppConfig
 import xyz.funkybit.apps.api.TestRoutes
 import xyz.funkybit.apps.ring.RingApp
 import xyz.funkybit.apps.ring.RingAppConfig
-import xyz.funkybit.core.blockchain.ChainManager
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
+import xyz.funkybit.core.blockchain.evm.EvmChainManager
 import xyz.funkybit.core.db.DbConfig
 import xyz.funkybit.core.db.notifyDbListener
 import xyz.funkybit.core.model.MarketMinFee
@@ -63,7 +63,7 @@ import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserTable
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.integrationtests.utils.BitcoinMiner
 import xyz.funkybit.integrationtests.utils.TestApiClient
-import xyz.funkybit.integrationtests.utils.TestBlockchainClient
+import xyz.funkybit.integrationtests.utils.TestEvmClient
 import xyz.funkybit.sequencer.apps.GatewayApp
 import xyz.funkybit.sequencer.apps.GatewayConfig
 import xyz.funkybit.sequencer.apps.SequencerApp
@@ -82,10 +82,10 @@ import kotlin.time.Duration.Companion.seconds
 class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
     @OptIn(ExperimentalUnsignedTypes::class)
     override fun beforeAll(context: ExtensionContext) {
-        val blockchainClients = ChainManager.blockchainConfigs.map {
-            TestBlockchainClient(it)
+        val evmClients = EvmChainManager.evmClientConfigs.map {
+            TestEvmClient(it)
         }
-        val fixtures = getFixtures(blockchainClients)
+        val fixtures = getFixtures(evmClients)
 
         context
             .root
@@ -117,7 +117,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                         migrateDatabase()
 
                         // activate auto mining to speed up blockchain seeding
-                        blockchainClients.forEach {
+                        evmClients.forEach {
                             it.setAutoMining(true)
                         }
 
@@ -131,10 +131,10 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                             transaction {
                                 BitcoinUtxoTable.deleteAll()
                                 BitcoinUtxoAddressMonitorTable.deleteAll()
-                                blockchainClients.forEach { blockchainClient ->
+                                evmClients.forEach { evmClient ->
                                     DeployedSmartContractEntity.findLastDeployedContractByNameAndChain(
                                         ContractType.Exchange.name,
-                                        blockchainClient.chainId,
+                                        evmClient.chainId,
                                     )?.deprecated = true
                                 }
                                 if (isBitcoinEnabled()) {
@@ -177,7 +177,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                             apiApp.start()
                         }
                         // wait for contracts to load
-                        blockchainClients.forEach { blockchainClient ->
+                        evmClients.forEach { evmClient ->
                             await
                                 .pollInSameThread()
                                 .pollDelay(Duration.ofMillis(100))
@@ -185,8 +185,10 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                                 .atMost(Duration.ofMillis(30000L))
                                 .until {
                                     transaction {
-                                        DeployedSmartContractEntity.validContracts(blockchainClient.chainId)
-                                            .map { it.name } == listOf(ContractType.Exchange.name)
+                                        DeployedSmartContractEntity.validContracts(evmClient.chainId)
+                                            .map { it.name } == listOf(
+                                            ContractType.Exchange.name,
+                                        )
                                     }
                                 }
                         }
@@ -204,7 +206,9 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                                     .until {
                                         transaction {
                                             DeployedSmartContractEntity.validContracts(bitcoinConfig.chainId)
-                                                .map { it.name } == listOf(ContractType.Exchange.name)
+                                                .map { it.name } == listOf(
+                                                ContractType.Exchange.name,
+                                            )
                                         }
                                     }
                             } catch (e: Exception) {
@@ -213,7 +217,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                         }
 
                         // during tests blocks will be mined manually
-                        blockchainClients.forEach {
+                        evmClients.forEach {
                             it.setAutoMining(false)
                             it.setIntervalMining(60.minutes)
                         }
@@ -231,7 +235,7 @@ class AppUnderTestRunner : BeforeAllCallback, BeforeEachCallback {
                         BitcoinMiner.stop()
 
                         // revert back to interval mining for `test` env to work normally
-                        blockchainClients.forEach {
+                        evmClients.forEach {
                             it.setIntervalMining(1.seconds)
                         }
                     }

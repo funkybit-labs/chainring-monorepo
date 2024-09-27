@@ -1,8 +1,8 @@
 package xyz.funkybit.integrationtests.utils
 
 import org.web3j.protocol.core.methods.response.TransactionReceipt
-import xyz.funkybit.apps.ring.BlockchainDepositHandler
-import xyz.funkybit.core.blockchain.ChainManager
+import xyz.funkybit.apps.ring.EvmDepositHandler
+import xyz.funkybit.core.blockchain.evm.EvmChainManager
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.utils.toFundamentalUnits
@@ -10,16 +10,16 @@ import java.math.BigDecimal
 import java.math.BigInteger
 
 object Faucet {
-    private val blockchainClients = ChainManager.blockchainConfigs.map {
-        TestBlockchainClient(it)
+    private val evmClients = EvmChainManager.evmClientConfigs.map {
+        TestEvmClient(it)
     }
 
-    private val blockchainClientsByChainId = blockchainClients.associateBy { it.chainId }
+    private val evmClientsByChainId = evmClients.associateBy { it.chainId }
 
     fun fundAndMine(address: EvmAddress, amount: BigInteger? = null, chainId: ChainId? = null): TransactionReceipt {
-        return blockchainClient(chainId).let { client ->
+        return evmClient(chainId).let { client ->
             val txHash = client.sendNativeDepositTx(address, amount ?: BigDecimal("0.05").toFundamentalUnits(18))
-            repeat(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS) {
+            repeat(EvmDepositHandler.DEFAULT_NUM_CONFIRMATIONS) {
                 client.mine()
             }
             client.getTransactionReceipt(txHash)!!
@@ -27,7 +27,7 @@ object Faucet {
     }
 
     fun fundAndWaitForTxReceipt(address: EvmAddress, amount: BigInteger? = null, chainId: ChainId? = null): TransactionReceipt {
-        return blockchainClient(chainId).let { client ->
+        return evmClient(chainId).let { client ->
             val txHash = client.sendNativeDepositTx(address, amount ?: BigDecimal("0.05").toFundamentalUnits(18))
             client.waitForTransactionReceipt(txHash)
         }
@@ -35,12 +35,12 @@ object Faucet {
 
     fun mine(numberOfBlocks: Int = 1, chainId: ChainId? = null) {
         if (chainId != null) {
-            blockchainClient(chainId).mine(numberOfBlocks)
+            evmClient(chainId).mine(numberOfBlocks)
         } else {
-            blockchainClients.forEach { it.mine(numberOfBlocks) }
+            evmClients.forEach { it.mine(numberOfBlocks) }
         }
     }
 
-    fun blockchainClient(chainId: ChainId?) =
-        chainId?.let { blockchainClientsByChainId.getValue(chainId) } ?: blockchainClients.first()
+    fun evmClient(chainId: ChainId?) =
+        chainId?.let { evmClientsByChainId.getValue(chainId) } ?: evmClients.first()
 }

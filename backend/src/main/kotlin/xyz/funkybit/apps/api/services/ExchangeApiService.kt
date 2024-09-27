@@ -24,10 +24,8 @@ import xyz.funkybit.apps.api.model.RequestProcessingError
 import xyz.funkybit.apps.api.model.RequestStatus
 import xyz.funkybit.apps.api.model.Withdrawal
 import xyz.funkybit.apps.api.model.WithdrawalApiResponse
-import xyz.funkybit.core.evm.ECHelper
-import xyz.funkybit.core.evm.EIP712Helper
-import xyz.funkybit.core.evm.EIP712Transaction
-import xyz.funkybit.core.evm.TokenAddressAndChain
+import xyz.funkybit.core.blockchain.evm.ECHelper
+import xyz.funkybit.core.blockchain.evm.EIP712Helper
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
@@ -47,6 +45,8 @@ import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.model.db.UserId
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WithdrawalEntity
+import xyz.funkybit.core.model.evm.EIP712Transaction
+import xyz.funkybit.core.model.evm.TokenAddressAndChain
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.services.LinkedSignerService

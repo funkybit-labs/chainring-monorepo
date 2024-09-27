@@ -8,11 +8,15 @@ import org.web3j.crypto.StructuredDataEncoder
 import xyz.funkybit.apps.api.AuthorizeWalletAddressMessage
 import xyz.funkybit.apps.api.middleware.SignInMessage
 import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
-import xyz.funkybit.core.blockchain.checksumAddress
+import xyz.funkybit.core.blockchain.evm.ECHelper
+import xyz.funkybit.core.blockchain.evm.EIP712Helper
+import xyz.funkybit.core.blockchain.evm.checksumAddress
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.db.ChainId
+import xyz.funkybit.core.model.evm.EIP712Transaction
+import xyz.funkybit.core.model.evm.TokenAddressAndChain
 import java.math.BigInteger
 import kotlin.test.assertTrue
 

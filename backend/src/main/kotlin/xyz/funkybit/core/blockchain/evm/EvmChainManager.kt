@@ -1,50 +1,14 @@
-package xyz.funkybit.core.blockchain
+package xyz.funkybit.core.blockchain.evm
 
-import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.db.ChainId
 import java.math.BigInteger
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 
-data class BlockchainClientConfig(
-    val name: String,
-    val url: String,
-    val blockExplorerNetName: String,
-    val blockExplorerUrl: String,
-    val privateKeyHex: String,
-    val submitterPrivateKeyHex: String,
-    val airdropperPrivateKeyHex: String,
-    val faucetPrivateKeyHex: String,
-    val feeAccountAddress: String,
-    val pollingIntervalInMs: Long,
-    val maxPollingAttempts: Long,
-    val contractCreationLimit: BigInteger,
-    val contractInvocationLimit: BigInteger,
-    val defaultMaxPriorityFeePerGasInWei: BigInteger,
-    val enableWeb3jLogging: Boolean,
-    val maxRpcNodeEventualConsistencyTolerance: Duration,
-    val sovereignWithdrawalDelaySeconds: BigInteger,
-)
-
-enum class SmartFeeMode {
-    ECONOMICAL,
-    CONSERVATIVE,
-}
-
-data class FeeEstimationSettings(
-    val blocks: Int,
-    val mode: SmartFeeMode,
-    val minValue: Int,
-    val maxValue: Int,
-)
-
-object ChainManager {
-
+object EvmChainManager {
     private val chainNames = (System.getenv("EVM_CHAINS") ?: "localhost:8545,localhost:8546").split(",").map { it.trim() }
-
-    val blockchainConfigs = chainNames.map { chainName ->
-        BlockchainClientConfig(
+    val evmClientConfigs = chainNames.map { chainName ->
+        EvmClientConfig(
             name = chainName,
             url = System.getenv("EVM_NETWORK_URL_$chainName") ?: "http://$chainName",
             blockExplorerNetName = System.getenv("BLOCK_EXPLORER_NET_NAME_$chainName") ?: "funkybit $chainName",
@@ -105,44 +69,39 @@ object ChainManager {
         )
     }
 
-    private val blockchainClientsByChainId: Map<ChainId, BlockchainClient> by lazy {
-        blockchainConfigs.associate {
-            val blockchainClient = BlockchainClient(it)
-            blockchainClient.chainId to blockchainClient
+    private val evmClientsByChainId: Map<ChainId, EvmClient> by lazy {
+        evmClientConfigs.associate {
+            val evmClient = EvmClient(it)
+            evmClient.chainId to evmClient
         }
     }
 
-    fun getBlockchainClients() = blockchainClientsByChainId.values.toList()
+    fun getEvmClients() = evmClientsByChainId.values.toList()
 
-    fun getBlockchainClient(chainId: ChainId): BlockchainClient =
-        blockchainClientsByChainId.getValue(chainId)
+    fun getEvmClient(chainId: ChainId): EvmClient =
+        evmClientsByChainId.getValue(chainId)
 
-    fun getBlockchainClient(chainId: ChainId, privateKeyHex: String) = BlockchainClient(
-        blockchainClientsByChainId.getValue(chainId).config.copy(privateKeyHex = privateKeyHex),
+    fun getEvmClient(chainId: ChainId, privateKeyHex: String) = EvmClient(
+        evmClientsByChainId.getValue(chainId).config.copy(privateKeyHex = privateKeyHex),
     )
 
-    fun getAirdropperBlockchainClient(chainId: ChainId): AirdropperBlockchainClient {
-        return blockchainClientsByChainId.getValue(chainId).let {
-            AirdropperBlockchainClient(
-                BlockchainClient(it.config.copy(privateKeyHex = it.config.airdropperPrivateKeyHex)),
+    fun getAirdropperEvmClient(chainId: ChainId): AirdropperEvmClient {
+        return evmClientsByChainId.getValue(chainId).let {
+            AirdropperEvmClient(
+                EvmClient(it.config.copy(privateKeyHex = it.config.airdropperPrivateKeyHex)),
             )
         }
     }
 
-    fun getFaucetBlockchainClient(chainId: ChainId): FaucetBlockchainClient? {
-        return blockchainClientsByChainId[chainId]?.let {
-            FaucetBlockchainClient(
-                BlockchainClient(it.config.copy(privateKeyHex = it.config.faucetPrivateKeyHex)),
-            )
+    fun getFaucetEvmClient(chainId: ChainId): EvmClient? {
+        return evmClientsByChainId[chainId]?.let {
+            EvmClient(it.config.copy(privateKeyHex = it.config.faucetPrivateKeyHex))
         }
     }
 
-    fun getBlockchainClient(config: BlockchainClientConfig, privateKeyHex: String) = BlockchainClient(
+    fun getEvmClient(config: EvmClientConfig, privateKeyHex: String) = EvmClient(
         config.copy(privateKeyHex = privateKeyHex),
     )
-
-    fun getContractAddress(chainId: ChainId, contractType: ContractType): Address =
-        blockchainClientsByChainId.getValue(chainId).getContractAddress(contractType)
 
     private fun stringValue(chainName: String, paramName: String, defaultValue: String): String {
         return System.getenv(

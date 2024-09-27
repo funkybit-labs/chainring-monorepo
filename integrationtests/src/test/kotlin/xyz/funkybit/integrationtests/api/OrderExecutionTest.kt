@@ -27,7 +27,7 @@ import xyz.funkybit.core.utils.generateOrderNonce
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.OrderBaseTest
 import xyz.funkybit.integrationtests.utils.AssetAmount
-import xyz.funkybit.integrationtests.utils.ExchangeContractManager
+import xyz.funkybit.integrationtests.utils.EvmExchangeContractManager
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
 import xyz.funkybit.integrationtests.utils.MyExpectedTrade
 import xyz.funkybit.integrationtests.utils.assertAmount
@@ -71,9 +71,9 @@ class OrderExecutionTest : OrderBaseTest() {
             Triple(btc2Eth2Market, btc2, eth2)
         }
 
-        val exchangeContractManager = ExchangeContractManager()
+        val evmExchangeContractManager = EvmExchangeContractManager()
 
-        val initialFeeAccountBalance = exchangeContractManager.getFeeBalance(quoteSymbol)
+        val initialFeeAccountBalance = evmExchangeContractManager.getFeeBalance(quoteSymbol)
 
         val (takerApiClient, takerWallet, takerWsClient) = setupTrader(
             market.id,
@@ -674,7 +674,7 @@ class OrderExecutionTest : OrderBaseTest() {
         // verify that fees have settled correctly on chain
         assertEquals(
             makerFee + takerFee + makerFee2 + takerFee2,
-            exchangeContractManager.getFeeBalance(quoteSymbol) - initialFeeAccountBalance,
+            evmExchangeContractManager.getFeeBalance(quoteSymbol) - initialFeeAccountBalance,
         )
     }
 
@@ -899,9 +899,9 @@ class OrderExecutionTest : OrderBaseTest() {
         val baseSymbol = btc
         val quoteSymbol = btc2
 
-        val exchangeContractManager = ExchangeContractManager()
+        val evmExchangeContractManager = EvmExchangeContractManager()
 
-        val initialFeeAccountBalance = exchangeContractManager.getFeeBalance(quoteSymbol)
+        val initialFeeAccountBalance = evmExchangeContractManager.getFeeBalance(quoteSymbol)
 
         val (takerApiClient, takerWallet, takerWsClient) = setupTrader(
             market.id,
@@ -1208,7 +1208,7 @@ class OrderExecutionTest : OrderBaseTest() {
         // verify that fees have settled correctly on chain
         assertEquals(
             makerFee + takerFee + makerFee2 + takerFee2,
-            exchangeContractManager.getFeeBalance(quoteSymbol) - initialFeeAccountBalance,
+            evmExchangeContractManager.getFeeBalance(quoteSymbol) - initialFeeAccountBalance,
         )
 
         takerApiClient.cancelOpenOrders()

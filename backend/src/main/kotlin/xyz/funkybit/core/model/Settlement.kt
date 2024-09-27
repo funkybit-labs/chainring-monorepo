@@ -2,9 +2,9 @@ package xyz.funkybit.core.model
 
 import kotlinx.serialization.Serializable
 import xyz.funkybit.apps.api.model.BigIntegerJson
-import xyz.funkybit.core.evm.EvmSettlement
 import xyz.funkybit.core.model.db.SymbolId
 import xyz.funkybit.core.model.db.WalletId
+import xyz.funkybit.core.model.evm.EvmSettlement
 import xyz.funkybit.core.utils.toHexBytes
 
 sealed class Settlement {
