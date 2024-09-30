@@ -29,6 +29,10 @@ variable "blocked_country_codes" {
   description = "Naughty list."
 }
 
+variable "blocked_country_response_code" {
+  description = "code to return to blocked viewer"
+}
+
 variable "ip_dos_rate_limit" {
   description = "How many requests per IP address."
 }

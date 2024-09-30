@@ -87,7 +87,12 @@ resource "aws_wafv2_web_acl" "WafWebAcl" {
     priority = 3
 
     action {
-      block {}
+      block {
+        custom_response {
+          response_code = var.blocked_country_response_code
+        }
+      }
+
     }
     statement {
       geo_match_statement {
