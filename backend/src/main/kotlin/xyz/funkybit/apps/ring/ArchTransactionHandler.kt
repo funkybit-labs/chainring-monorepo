@@ -257,19 +257,24 @@ class ArchTransactionHandler(
     private fun processDepositBatch(): Boolean {
         val programPubkey = programAccount.rpcPubkey()
         val settlingDeposits = DepositEntity.getSettlingForUpdate(chainId)
-        return if (settlingDeposits.isNotEmpty()) {
-            // handle settling deposits
-            settlingDeposits.first().archTransaction?.let { archTransaction ->
+        if (settlingDeposits.isNotEmpty()) {
+            settlingDeposits.forEach(::sendToSequencer)
+        }
+
+        val sentToArchDeposits = DepositEntity.getSentToArchForUpdate(chainId)
+        return if (sentToArchDeposits.isNotEmpty()) {
+            // handle deposits sent to arch
+            sentToArchDeposits.first().archTransaction?.let { archTransaction ->
                 ArchNetworkClient.getProcessedTransaction(archTransaction.txHash!!)?.let {
                     if (it.status == ArchNetworkRpc.Status.Processed) {
                         archTransaction.markAsCompleted()
                         BalanceEntity.updateBalances(
-                            settlingDeposits.map { deposit ->
+                            sentToArchDeposits.map { deposit ->
                                 BalanceChange.Delta(deposit.wallet.id.value, deposit.symbol.guid.value, deposit.amount)
                             },
                             BalanceType.Exchange,
                         )
-                        settlingDeposits.forEach(::sendToSequencer)
+                        DepositEntity.updateToSettling(sentToArchDeposits)
                     }
                 }
             }
@@ -286,7 +291,7 @@ class ArchTransactionHandler(
                     batchHash = null,
                 )
                 transaction.flush()
-                DepositEntity.updateToSettling(confirmedDepositsWithAssignedIndex.map { it.depositEntity }, transaction)
+                DepositEntity.updateToSentToArch(confirmedDepositsWithAssignedIndex.map { it.depositEntity }, transaction)
                 submitToArch(transaction, instruction)
                 initiateProgramUtxoRefresh()
                 true

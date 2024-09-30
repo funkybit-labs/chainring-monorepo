@@ -39,6 +39,7 @@ enum class DepositStatus {
     Complete,
     Failed,
     Settling,
+    SentToArch,
     ;
 
     fun isFinal(): Boolean {
@@ -98,9 +99,18 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
         fun getSettlingForUpdate(chainId: ChainId): List<DepositEntity> =
             getForUpdate(chainId, DepositStatus.Settling)
 
-        fun updateToSettling(depositEntities: List<DepositEntity>, blockchainTransactionEntity: BlockchainTransactionEntity) {
+        fun getSentToArchForUpdate(chainId: ChainId): List<DepositEntity> =
+            getForUpdate(chainId, DepositStatus.SentToArch)
+
+        fun updateToSentToArch(depositEntities: List<DepositEntity>, blockchainTransactionEntity: BlockchainTransactionEntity) {
             DepositTable.update({ DepositTable.guid.inList(depositEntities.map { it.guid }) }) {
                 it[archTransactionGuid] = blockchainTransactionEntity.guid
+                it[status] = DepositStatus.SentToArch
+            }
+        }
+
+        fun updateToSettling(depositEntities: List<DepositEntity>) {
+            DepositTable.update({ DepositTable.guid.inList(depositEntities.map { it.guid }) }) {
                 it[status] = DepositStatus.Settling
             }
         }
