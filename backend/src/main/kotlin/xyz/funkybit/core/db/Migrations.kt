@@ -93,6 +93,7 @@ import xyz.funkybit.core.model.db.migrations.V91_TestnetChallengeRewardTypes
 import xyz.funkybit.core.model.db.migrations.V92_DepositWithdrawalTimestamps
 import xyz.funkybit.core.model.db.migrations.V93_AddBitcoinUtxoTable
 import xyz.funkybit.core.model.db.migrations.V94_UpdateArchAccountTable
+import xyz.funkybit.core.model.db.migrations.V95_AddIndexToBroadcasterJobTable
 import xyz.funkybit.core.model.db.migrations.V9_SymbolTable
 
 val migrations = listOf(
@@ -190,4 +191,5 @@ val migrations = listOf(
     V92_DepositWithdrawalTimestamps(),
     V93_AddBitcoinUtxoTable(),
     V94_UpdateArchAccountTable(),
+    V95_AddIndexToBroadcasterJobTable(),
 )

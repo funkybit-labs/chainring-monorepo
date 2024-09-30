@@ -61,7 +61,7 @@ value class BroadcasterJobId(override val value: String) : EntityId {
 }
 
 object BroadcasterJobTable : GUIDTable<BroadcasterJobId>("broadcaster_job", ::BroadcasterJobId) {
-    val createdAt = timestamp("created_at")
+    val createdAt = timestamp("created_at").index()
     val createdBy = varchar("created_by", 10485760)
     val notificationData = jsonb<List<BroadcasterNotification>>("notification_data", KotlinxSerialization.json)
 }
