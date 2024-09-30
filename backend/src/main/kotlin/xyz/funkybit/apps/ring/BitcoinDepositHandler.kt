@@ -3,12 +3,11 @@ package xyz.funkybit.apps.ring
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
-import xyz.funkybit.core.model.Address
+import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceApi
+import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.DepositEntity
-import xyz.funkybit.core.model.rpc.BitcoinRpc
-import xyz.funkybit.core.utils.toSatoshi
 import java.math.BigInteger
 import kotlin.concurrent.thread
 import kotlin.time.Duration
@@ -23,7 +22,7 @@ class BitcoinDepositHandler(
         const val DEFAULT_NUM_CONFIRMATIONS: Int = 1
     }
 
-    private val chainId = BitcoinClient.chainId
+    private val chainId = bitcoinConfig.chainId
     private var workerThread: Thread? = null
     val logger = KotlinLogging.logger {}
 
@@ -43,7 +42,7 @@ class BitcoinDepositHandler(
                 try {
                     Thread.sleep(pollingIntervalInMs)
                     transaction {
-                        refreshPendingDeposits()
+                        refreshPendingDeposits(MempoolSpaceClient.getCurrentBlock())
                     }
                 } catch (ie: InterruptedException) {
                     logger.warn { "Exiting deposit confirmation handler thread" }
@@ -55,24 +54,23 @@ class BitcoinDepositHandler(
         }
     }
 
-    private fun refreshPendingDeposits() {
+    private fun refreshPendingDeposits(currentBlockHeight: Long) {
         DepositEntity.getPendingForUpdate(chainId).forEach {
-            refreshPendingDeposit(it)
+            refreshPendingDeposit(it, currentBlockHeight)
         }
     }
 
-    private fun refreshPendingDeposit(pendingDeposit: DepositEntity) {
-        val tx = BitcoinClient.getRawTransaction(pendingDeposit.transactionHash)
-
-        if (pendingDeposit.blockNumber == null && tx?.confirmations == 1) {
-            pendingDeposit.updateBlockNumber((BitcoinClient.getBlockCount() - 1).toBigInteger())
+    private fun refreshPendingDeposit(pendingDeposit: DepositEntity, currentBlockHeight: Long) {
+        val tx = MempoolSpaceClient.getTransaction(pendingDeposit.transactionHash)
+        if (pendingDeposit.blockNumber == null && tx?.status?.confirmed == true && tx.status.blockHeight != null) {
+            pendingDeposit.updateBlockNumber(tx.status.blockHeight.toBigInteger())
         }
 
-        if (tx != null && (tx.confirmations ?: 0) >= numConfirmations) {
-            logger.debug { "Marking transaction as confirmed ${tx.confirmations}" }
+        if (tx != null && tx.status.confirmed && currentBlockHeight - tx.status.blockHeight!! + 1 >= numConfirmations) {
+            logger.debug { "Marking transaction ${tx.txId} as confirmed" }
 
-            val onChainAmount = onChainDepositAmount(tx, pendingDeposit.wallet.address)
-            if (onChainAmount == null) {
+            val onChainAmount = onChainDepositAmount(tx)
+            if (onChainAmount == BigInteger.ZERO) {
                 pendingDeposit.markAsFailed("Invalid transaction", canBeResubmitted = false)
                 return
             }
@@ -81,18 +79,16 @@ class BitcoinDepositHandler(
                 pendingDeposit.amount = onChainAmount
             }
 
+            pendingDeposit.updateBlockNumber((tx.status.blockHeight ?: 0).toBigInteger())
             pendingDeposit.markAsConfirmed()
         } else if (Clock.System.now() - pendingDeposit.createdAt > maxWaitTime) {
             pendingDeposit.markAsFailed("Deposit not confirmed within $maxWaitTime", canBeResubmitted = true)
         }
     }
 
-    private fun onChainDepositAmount(tx: BitcoinRpc.Transaction, from: Address): BigInteger? {
+    private fun onChainDepositAmount(tx: MempoolSpaceApi.Transaction): BigInteger {
         return tx
-            .outputsMatchingWallets(setOf(DeployedSmartContractEntity.programBitcoinAddress().value))
-            .find { BitcoinClient.getSourceAddress(tx) == from }
-            ?.value
-            ?.toSatoshi()
-            ?.let(BigInteger::valueOf)
+            .outputsMatchingWallet(DeployedSmartContractEntity.programBitcoinAddress())
+            .sumOf { it.value }
     }
 }

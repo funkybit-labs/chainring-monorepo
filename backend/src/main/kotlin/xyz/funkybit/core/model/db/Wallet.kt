@@ -93,6 +93,14 @@ class WalletEntity(guid: EntityID<WalletId>) : GUIDEntity<WalletId>(guid) {
             }.firstOrNull()
         }
 
+        fun findByAddresses(addresses: List<Address>): WalletEntity? {
+            return WalletEntity.find {
+                WalletTable.address.inList(
+                    addresses.map { address -> address.canonicalize().toString() },
+                )
+            }.firstOrNull()
+        }
+
         fun getBySequencerId(sequencerId: SequencerWalletId): WalletEntity? {
             return WalletEntity.find {
                 WalletTable.sequencerId.eq(sequencerId.value)

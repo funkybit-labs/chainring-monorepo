@@ -10,7 +10,6 @@ import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.model.rpc.ArchRpcParams
 import xyz.funkybit.core.model.rpc.ArchRpcRequest
 
-@OptIn(ExperimentalUnsignedTypes::class)
 object ArchNetworkClient : JsonRpcClientBase(
     System.getenv("ARCH_NETWORK_RPC_URL") ?: "http://localhost:9002",
     null,
@@ -21,15 +20,6 @@ object ArchNetworkClient : JsonRpcClientBase(
 
     override val logger = KotlinLogging.logger {}
     override val mediaType = "application/json".toMediaTypeOrNull()
-
-    fun getProgram(programId: String): UByteArray {
-        return getValue(
-            ArchRpcRequest(
-                "get_program",
-                ArchRpcParams(programId),
-            ),
-        )
-    }
 
     fun getAccountAddress(pubKey: ArchNetworkRpc.Pubkey): BitcoinAddress {
         return getValue(

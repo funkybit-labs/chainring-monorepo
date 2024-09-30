@@ -51,7 +51,7 @@ import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.apps.api.model.OrdersApiResponse
 import xyz.funkybit.apps.api.model.SetNickname
 import xyz.funkybit.apps.api.model.WithdrawalApiResponse
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.evm.ECHelper
 import xyz.funkybit.core.evm.EIP712Helper
 import xyz.funkybit.core.model.Address
@@ -101,7 +101,7 @@ sealed class WalletKeyPair {
             fun generate(): Bitcoin = Bitcoin(ECKey())
         }
 
-        override fun address(): BitcoinAddress = BitcoinAddress.fromKey(BitcoinClient.getParams(), ecKey)
+        override fun address(): BitcoinAddress = BitcoinAddress.fromKey(bitcoinConfig.params, ecKey)
     }
 
     fun sign(signInMessage: SignInMessage): String =

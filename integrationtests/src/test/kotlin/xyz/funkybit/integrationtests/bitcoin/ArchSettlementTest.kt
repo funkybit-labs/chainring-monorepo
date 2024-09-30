@@ -19,7 +19,6 @@ import xyz.funkybit.core.model.db.OrderStatus
 import xyz.funkybit.core.model.db.SettlementStatus
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.utils.bitcoin.ArchUtils
-import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForBlockProcessor
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForProgramAccount
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForProgramStateAccount
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForTokenStateAccount
@@ -56,7 +55,6 @@ class ArchSettlementTest : OrderBaseTest() {
         waitForProgramAccount()
         waitForProgramStateAccount()
         waitForTokenStateAccount()
-        waitForBlockProcessor()
         val config = TestApiClient.getConfiguration()
         val bitcoinChain = config.bitcoinChain
         btcArch = bitcoinChain.symbols.first()

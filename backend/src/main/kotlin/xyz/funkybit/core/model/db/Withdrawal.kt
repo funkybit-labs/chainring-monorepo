@@ -16,7 +16,7 @@ import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
 import org.jetbrains.exposed.sql.transactions.TransactionManager
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.evm.EIP712Transaction
 import xyz.funkybit.core.evm.TokenAddressAndChain
 import xyz.funkybit.core.model.BitcoinAddress
@@ -178,7 +178,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 .selectAll()
                 .where {
                     WithdrawalTable.status.eq(WithdrawalStatus.Settling) and
-                        SymbolTable.chainId.eq(BitcoinClient.chainId) and
+                        SymbolTable.chainId.eq(bitcoinConfig.chainId) and
                         WithdrawalTable.archTransactionGuid.isNotNull() and
                         WithdrawalTable.blockchainTransactionGuid.isNull()
                 }
@@ -192,7 +192,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 .selectAll()
                 .where {
                     WithdrawalTable.status.eq(WithdrawalStatus.Settling) and
-                        SymbolTable.chainId.eq(BitcoinClient.chainId) and
+                        SymbolTable.chainId.eq(bitcoinConfig.chainId) and
                         WithdrawalTable.blockchainTransactionGuid.isNotNull()
                 }
                 .map { WithdrawalEntity.wrapRow(it) }

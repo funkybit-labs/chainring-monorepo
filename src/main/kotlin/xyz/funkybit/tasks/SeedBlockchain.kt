@@ -23,6 +23,8 @@ import org.web3j.protocol.core.Request
 import org.web3j.protocol.core.methods.response.VoidResponse
 import org.web3j.utils.Numeric
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.db.BitcoinUtxoEntity
@@ -46,7 +48,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
     TransactionManager.defaultDatabase = db
 
     // seed the fee payer
-    fixtures.chains.firstOrNull { it.id == BitcoinClient.chainId }?.let {
+    fixtures.chains.firstOrNull { it.id == bitcoinConfig.chainId }?.let {
         // fund the fee payer
         airdropBtcToFeePayer()
     }
@@ -80,7 +82,7 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
                         val symbol = fixtures.symbols.first { it.id == symbolId }
                         println("Setting ${symbol.name} balance for ${wallet.address.value} to $balance")
                         airdropBtcToAddress(wallet.address, balance)?.let { txHash ->
-                            Pair(BitcoinClient.chainId, txHash)
+                            Pair(bitcoinConfig.chainId, txHash)
                         }
                     }
                 }
@@ -138,8 +140,8 @@ fun seedBlockchain(fixtures: Fixtures): List<SymbolContractAddress> {
         .atMost(Duration.ofMillis(10000L))
         .until {
             txHashes.all { (chainId, txHash) ->
-                if (chainId == BitcoinClient.chainId) {
-                    (BitcoinClient.getRawTransaction(txHash)?.confirmations ?: 0) > 0
+                if (chainId == bitcoinConfig.chainId) {
+                    MempoolSpaceClient.getTransaction(txHash)?.status?.confirmed == true
                 } else {
                     evmClient(chainId).getTransactionReceipt(txHash)?.isStatusOK ?: false
                 }
@@ -153,7 +155,7 @@ private fun airdropBtcToFeePayer() {
     try {
         (0 .. 5).forEach { _ ->
             BitcoinClient.sendToAddress(
-                BitcoinClient.config.feePayerAddress,
+                bitcoinConfig.feePayerAddress,
                 BigInteger("8000"),
             )
         }

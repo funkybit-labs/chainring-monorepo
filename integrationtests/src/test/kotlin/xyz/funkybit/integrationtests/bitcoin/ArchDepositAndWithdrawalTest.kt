@@ -15,23 +15,23 @@ import xyz.funkybit.apps.api.model.CreateDepositApiRequest
 import xyz.funkybit.apps.api.model.Deposit
 import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.apps.api.model.Withdrawal
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.Symbol
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.ArchAccountStatus
 import xyz.funkybit.core.model.db.ArchAccountTable
 import xyz.funkybit.core.model.db.BitcoinUtxoEntity
-import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalId
 import xyz.funkybit.core.model.db.WithdrawalStatus
 import xyz.funkybit.core.utils.bitcoin.ArchUtils
-import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForBlockProcessor
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForProgramAccount
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForProgramStateAccount
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForTokenStateAccount
+import xyz.funkybit.integrationtests.bitcoin.UtxoSelectionTest.Companion.validateUtxoAndMempoolBalancces
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.getFeeAccountBalanceOnArch
 import xyz.funkybit.integrationtests.testutils.isBitcoinDisabled
@@ -59,7 +59,6 @@ class ArchDepositAndWithdrawalTest {
         waitForProgramAccount()
         waitForProgramStateAccount()
         waitForTokenStateAccount()
-        waitForBlockProcessor()
         ArchUtils.tokenAccountSizeThreshold = 10_000_000
     }
 
@@ -70,18 +69,11 @@ class ArchDepositAndWithdrawalTest {
         val airdropAmount = BigInteger("15000")
         val depositAmount = BigInteger("7000")
 
-        val startingTotalDepositsAtExchange = transaction {
-            getBalance(DeployedSmartContractEntity.programBitcoinAddress())
-        }
-
         val (apiClient, bitcoinWallet, wsClient) = setupAndDepositToWallet(airdropAmount, depositAmount)
         val btc = bitcoinWallet.nativeSymbol
         val wallet1BalanceAfterDeposit = getBalance(bitcoinWallet.walletAddress).toBigInteger()
 
-        assertEquals(
-            getBalance(bitcoinWallet.exchangeDepositAddress),
-            startingTotalDepositsAtExchange + depositAmount.toLong(),
-        )
+        val exchangeBalanceAfterDeposit = getBalance(bitcoinWallet.exchangeDepositAddress)
 
         val startingFeeAccountBalance = getFeeAccountBalanceOnArch(btc)
         val withdrawAmount = BigInteger("3000")
@@ -90,6 +82,7 @@ class ArchDepositAndWithdrawalTest {
         waitForWithdrawal(apiClient, bitcoinWallet, wsClient, btc, pendingBtcWithdrawal, depositAmount, withdrawAmount)
 
         val withdrawal = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
+        waitForTx(bitcoinWallet.walletAddress, TxHash(withdrawal.txHash!!.value), bitcoinWallet.exchangeDepositAddress)
         assertEquals(
             startingFeeAccountBalance.inFundamentalUnits + withdrawal.fee,
             getFeeAccountBalanceOnArch(btc).inFundamentalUnits,
@@ -104,8 +97,8 @@ class ArchDepositAndWithdrawalTest {
 
         // verify total the program's balance
         val expectedProgramBalance =
-            startingTotalDepositsAtExchange + depositAmount.toLong() - withdrawAmount.toLong() + withdrawal.fee.toLong() -
-                BitcoinClient.getNetworkFeeForTx(withdrawal.txHash!!)
+            exchangeBalanceAfterDeposit - withdrawAmount.toLong() + withdrawal.fee.toLong() -
+                MempoolSpaceClient.getNetworkFeeForTx(withdrawal.txHash!!)
 
         assertEquals(
             expectedProgramBalance,
@@ -116,7 +109,7 @@ class ArchDepositAndWithdrawalTest {
         val deposit2Amount = BigInteger("2500")
         val pendingBtcDeposit2 = bitcoinWallet.depositNative(deposit2Amount).deposit
         val deposit2TxId = pendingBtcDeposit2.txHash
-        waitForTx(bitcoinWallet.exchangeDepositAddress, deposit2TxId)
+        waitForTx(bitcoinWallet.exchangeDepositAddress, deposit2TxId, bitcoinWallet.walletAddress)
 
         assertEquals(
             getBalance(bitcoinWallet.exchangeDepositAddress),
@@ -143,12 +136,15 @@ class ArchDepositAndWithdrawalTest {
             getBalance(bitcoinWallet.exchangeDepositAddress),
         )
 
-        val deposit2NetworkFee = BitcoinClient.getNetworkFeeForTx(deposit2TxId).toBigInteger()
+        val deposit2NetworkFee = MempoolSpaceClient.getNetworkFeeForTx(deposit2TxId).toBigInteger()
         expectedWalletBalance = expectedWalletBalance - deposit2Amount - deposit2NetworkFee
         assertEquals(
             getBalance(bitcoinWallet.walletAddress),
             expectedWalletBalance.toLong(),
         )
+
+        validateUtxoAndMempoolBalancces(bitcoinWallet.walletAddress)
+        validateUtxoAndMempoolBalancces(bitcoinWallet.exchangeDepositAddress, true)
     }
 
     @Test
@@ -163,15 +159,12 @@ class ArchDepositAndWithdrawalTest {
         val airdropAmount = BigInteger("15000")
         val depositAmount = BigInteger("7000")
 
-        val startingTotalDepositsAtExchange = transaction {
-            getBalance(DeployedSmartContractEntity.programBitcoinAddress())
-        }
-
         ArchUtils.tokenAccountSizeThreshold = 50
 
         val (apiClient, bitcoinWallet, wsClient) = setupAndDepositToWallet(airdropAmount, depositAmount)
         val btc = bitcoinWallet.nativeSymbol
         val wallet1BalanceAfterDeposit = getBalance(bitcoinWallet.walletAddress).toBigInteger()
+        val exchangeBalanceAfterDeposit = getBalance(bitcoinWallet.exchangeDepositAddress)
 
         transaction {
             assertEquals(
@@ -192,7 +185,7 @@ class ArchDepositAndWithdrawalTest {
 
         assertEquals(
             getBalance(bitcoinWallet.exchangeDepositAddress),
-            startingTotalDepositsAtExchange + depositAmount.toLong() * 2,
+            exchangeBalanceAfterDeposit + depositAmount.toLong(),
         )
 
         val startingFeeAccountBalance = getFeeAccountBalanceOnArch(btc)
@@ -206,6 +199,7 @@ class ArchDepositAndWithdrawalTest {
 
         val withdrawal = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
         val withdrawal2 = apiClient2.getWithdrawal(pendingBtcWithdrawal2.id).withdrawal
+        waitForTx(bitcoinWallet.walletAddress, TxHash(withdrawal2.txHash!!.value), bitcoinWallet.exchangeDepositAddress)
         // should be in same batch
         assertEquals(withdrawal.txHash, withdrawal2.txHash)
         assertEquals(
@@ -227,13 +221,16 @@ class ArchDepositAndWithdrawalTest {
 
         // verify total the program's balance
         val expectedProgramBalance =
-            startingTotalDepositsAtExchange + depositAmount.toLong() * 2 - withdrawAmount.toLong() * 2 + withdrawal.fee.toLong() + withdrawal2.fee.toLong() -
-                BitcoinClient.getNetworkFeeForTx(withdrawal.txHash!!)
+            exchangeBalanceAfterDeposit + depositAmount.toLong() - withdrawAmount.toLong() * 2 + withdrawal.fee.toLong() + withdrawal2.fee.toLong() -
+                MempoolSpaceClient.getNetworkFeeForTx(withdrawal.txHash!!)
 
         assertEquals(
             expectedProgramBalance,
             getBalance(bitcoinWallet.exchangeDepositAddress),
         )
+
+        validateUtxoAndMempoolBalancces(bitcoinWallet.walletAddress)
+        validateUtxoAndMempoolBalancces(bitcoinWallet.exchangeDepositAddress, true)
     }
 
     @Test
@@ -294,6 +291,8 @@ class ArchDepositAndWithdrawalTest {
         waitFor {
             apiClient.getDeposit(pendingInvalidBtcDeposit.id).deposit.status == Deposit.Status.Failed
         }
+
+        validateUtxoAndMempoolBalancces(bitcoinWallet.exchangeDepositAddress, true)
     }
 
     private fun setupAndDepositToWallet(airdropAmount: BigInteger, depositAmount: BigInteger): Triple<TestApiClient, BitcoinWallet, WsClient> {
@@ -310,9 +309,9 @@ class ArchDepositAndWithdrawalTest {
         // now deposit to the exchange
         val pendingBtcDeposit = bitcoinWallet.depositNative(depositAmount).deposit
         val depositTxId = pendingBtcDeposit.txHash
-        waitForTx(bitcoinWallet.exchangeDepositAddress, depositTxId)
+        waitForTx(bitcoinWallet.exchangeDepositAddress, depositTxId, bitcoinWallet.walletAddress)
 
-        val depositNetworkFee = BitcoinClient.getNetworkFeeForTx(depositTxId).toBigInteger()
+        val depositNetworkFee = MempoolSpaceClient.getNetworkFeeForTx(depositTxId).toBigInteger()
         val expectedWalletBalance = airdropAmount - depositAmount - depositNetworkFee
         assertEquals(
             getBalance(bitcoinWallet.walletAddress),

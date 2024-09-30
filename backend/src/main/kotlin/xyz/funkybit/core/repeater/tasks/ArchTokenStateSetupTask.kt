@@ -4,7 +4,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.bitcoinj.core.ECKey
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.ring.ArchContractsPublisher
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.bitcoin.ProgramInstruction
 import xyz.funkybit.core.model.db.AccountSetupState
 import xyz.funkybit.core.model.db.ArchAccountEntity
@@ -68,7 +68,7 @@ class ArchTokenStateSetupTask : RepeaterBaseTask(
     private fun getProgramPubkey() = ArchAccountEntity.findProgramAccount()!!.rpcPubkey()
 
     private fun findSymbolsWithNoAccount(): List<SymbolEntity> {
-        val allSymbols = SymbolEntity.forChain(BitcoinClient.chainId)
+        val allSymbols = SymbolEntity.forChain(bitcoinConfig.chainId)
         val symbolsWithTokenState = ArchAccountEntity.findAllTokenAccounts().filterNot { it.status == ArchAccountStatus.Full }.map { it.symbolGuid }.toSet()
         return allSymbols.filterNot { symbolsWithTokenState.contains(it.guid) }
     }

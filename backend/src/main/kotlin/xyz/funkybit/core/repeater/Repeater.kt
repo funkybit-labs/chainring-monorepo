@@ -6,6 +6,7 @@ import xyz.funkybit.core.repeater.tasks.ArchTokenStateSetupTask
 import xyz.funkybit.core.repeater.tasks.BroadcasterJobsCleanupTask
 import xyz.funkybit.core.repeater.tasks.GasMonitorTask
 import xyz.funkybit.core.repeater.tasks.PriceFeedManagerTask
+import xyz.funkybit.core.repeater.tasks.ProgramUtxoRefresherTask
 import xyz.funkybit.core.repeater.tasks.ReferralPointsTask
 import xyz.funkybit.core.repeater.tasks.TestnetChallengeLeaderboardTask
 import xyz.funkybit.core.repeater.tasks.TestnetChallengeMonitorTask
@@ -28,6 +29,7 @@ class Repeater(db: Database, private val automaticTaskScheduling: Boolean = true
         TestnetChallengeLeaderboardTask(),
         TestnetChallengeReferralPointsTask(),
         BroadcasterJobsCleanupTask(),
+        ProgramUtxoRefresherTask(),
     ).associateBy { it.name }
 
     private val timer = ScheduledThreadPoolExecutor(8)

@@ -7,7 +7,7 @@ import org.web3j.crypto.Credentials
 import org.web3j.crypto.StructuredDataEncoder
 import xyz.funkybit.apps.api.AuthorizeWalletAddressMessage
 import xyz.funkybit.apps.api.middleware.SignInMessage
-import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
+import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.blockchain.checksumAddress
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
@@ -57,7 +57,7 @@ class EIP712HelperTest {
 
     @Test
     fun `test authorize message serialization`() {
-        val bitcoinAddress = BitcoinAddress.fromKey(BitcoinClient.getParams(), ECKey())
+        val bitcoinAddress = BitcoinAddress.fromKey(bitcoinConfig.params, ECKey())
         val message =
             "[funkybit] Please sign this message to authorize Bitcoin wallet ${bitcoinAddress.value}. This action will not cost any gas fees."
 

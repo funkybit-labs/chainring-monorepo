@@ -47,7 +47,7 @@ class TestBlockchainClient(blockchainConfig: BlockchainClientConfig) : Blockchai
         Request(
             "anvil_mine",
             listOf(numberOfBlocks),
-            web3jService,
+            web3jServiceNoLogging,
             VoidResponse::class.java,
         ).send()
     }

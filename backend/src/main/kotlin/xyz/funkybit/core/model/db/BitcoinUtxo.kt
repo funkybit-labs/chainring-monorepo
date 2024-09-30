@@ -6,7 +6,6 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.update
@@ -44,8 +43,7 @@ object BitcoinUtxoTable : GUIDTable<BitcoinUtxoId>("bitcoin_utxo", ::BitcoinUtxo
     val addressGuid = reference("address_guid", BitcoinUtxoAddressMonitorTable).index()
     val createdAt = timestamp("created_at")
     val updatedAt = timestamp("updated_at").nullable()
-    val createdByBlockGuid = reference("created_by_block_guid", BlockTable).index()
-    val spentByBlockGuid = reference("spent_by_block_guid", BlockTable).nullable().index()
+    val spentByTxId = varchar("spent_by_tx_id", 10485760).nullable()
     val amount = decimal("amount", 30, 0)
     val status = customEnumeration(
         "status",
@@ -58,10 +56,9 @@ object BitcoinUtxoTable : GUIDTable<BitcoinUtxoId>("bitcoin_utxo", ::BitcoinUtxo
 
 class BitcoinUtxoEntity(guid: EntityID<BitcoinUtxoId>) : GUIDEntity<BitcoinUtxoId>(guid) {
     companion object : EntityClass<BitcoinUtxoId, BitcoinUtxoEntity>(BitcoinUtxoTable) {
-        fun create(bitcoinUtxoId: BitcoinUtxoId, address: BitcoinAddress, blockEntity: BlockEntity, amount: Long): BitcoinUtxoEntity {
-            return BitcoinUtxoEntity.new(bitcoinUtxoId) {
+        fun createIfNotExist(bitcoinUtxoId: BitcoinUtxoId, address: BitcoinAddress, amount: Long): BitcoinUtxoEntity {
+            return BitcoinUtxoEntity.findById(bitcoinUtxoId) ?: new(bitcoinUtxoId) {
                 this.addressGuid = EntityID(BitcoinUtxoAddressMonitorId(address.value), BitcoinUtxoAddressMonitorTable)
-                this.createdByBlockGuid = blockEntity.guid
                 this.amount = amount.toBigInteger()
                 this.createdAt = Clock.System.now()
                 this.status = BitcoinUtxoStatus.Unspent
@@ -75,9 +72,11 @@ class BitcoinUtxoEntity(guid: EntityID<BitcoinUtxoId>) : GUIDEntity<BitcoinUtxoI
             }.toList()
         }
 
-        fun findAllReservedOrUnspent(): List<BitcoinUtxoEntity> {
+        fun findSpentForAddressAndTxId(address: BitcoinAddress, spentByTxId: TxHash): List<BitcoinUtxoEntity> {
             return BitcoinUtxoEntity.find {
-                BitcoinUtxoTable.status.inList(listOf(BitcoinUtxoStatus.Unspent, BitcoinUtxoStatus.Reserved))
+                BitcoinUtxoTable.addressGuid.eq(BitcoinUtxoAddressMonitorId(address.value)) and
+                    BitcoinUtxoTable.status.eq(BitcoinUtxoStatus.Spent) and
+                    BitcoinUtxoTable.spentByTxId.eq(spentByTxId.value)
             }.toList()
         }
 
@@ -115,23 +114,13 @@ class BitcoinUtxoEntity(guid: EntityID<BitcoinUtxoId>) : GUIDEntity<BitcoinUtxoI
             }
         }
 
-        fun spend(utxoIds: List<BitcoinUtxoId>, blockEntity: BlockEntity) {
+        fun spend(utxoIds: List<BitcoinUtxoId>, spentByTxId: TxHash) {
             val now = Clock.System.now()
             BitcoinUtxoTable.update({ BitcoinUtxoTable.guid.inList(utxoIds) }) {
                 it[this.status] = BitcoinUtxoStatus.Spent
-                it[this.spentByBlockGuid] = blockEntity.guid
+                it[this.spentByTxId] = spentByTxId.value
                 it[this.updatedAt] = now
             }
-        }
-
-        fun rollback(blockEntity: BlockEntity) {
-            val now = Clock.System.now()
-            BitcoinUtxoTable.update({ BitcoinUtxoTable.spentByBlockGuid.eq(blockEntity.guid) }) {
-                it[this.status] = BitcoinUtxoStatus.Unspent
-                it[this.spentByBlockGuid] = null
-                it[this.updatedAt] = now
-            }
-            BitcoinUtxoTable.deleteWhere { createdByBlockGuid.eq(blockEntity.guid) }
         }
     }
 
@@ -139,10 +128,7 @@ class BitcoinUtxoEntity(guid: EntityID<BitcoinUtxoId>) : GUIDEntity<BitcoinUtxoI
     fun vout() = guid.value.vout()
 
     var addressGuid by BitcoinUtxoTable.addressGuid
-
-    var createdByBlockGuid by BitcoinUtxoTable.createdByBlockGuid
-
-    var spentByBlockGuid by BitcoinUtxoTable.spentByBlockGuid
+    var spentByTxId by BitcoinUtxoTable.spentByTxId
 
     var amount by BitcoinUtxoTable.amount.transform(
         toReal = { it.toBigInteger() },
