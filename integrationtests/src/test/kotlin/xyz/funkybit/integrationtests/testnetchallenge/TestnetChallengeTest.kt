@@ -19,14 +19,13 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import xyz.funkybit.apps.api.Examples.withdrawal
 import xyz.funkybit.apps.api.FaucetMode
 import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.Card
 import xyz.funkybit.apps.api.model.CreateDepositApiRequest
 import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.toSymbolInfo
-import xyz.funkybit.apps.ring.BlockchainDepositHandler
+import xyz.funkybit.apps.ring.EvmDepositHandler
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.db.OrderSide
@@ -97,7 +96,7 @@ class TestnetChallengeTest : OrderBaseTest() {
             assertNull(it.avatarUrl)
             assertTrue(it.testnetChallengeDepositLimits.isEmpty())
         }
-        trader.w.currentBlockchainClient().mine()
+        trader.w.currentEvmClient().mine()
 
         await.pollInSameThread().atMost(
             Duration.ofSeconds(5),
@@ -121,14 +120,14 @@ class TestnetChallengeTest : OrderBaseTest() {
         val depositSymbol = Symbol(depositSymbolEntity.name)
         val usdcDepositAmount = AssetAmount(depositSymbolEntity.toSymbolInfo(FaucetMode.AllSymbols), "10000")
         val usdcDepositTxHash = trader.w.sendDepositTx(usdcDepositAmount)
-        trader.w.currentBlockchainClient().mine()
+        trader.w.currentEvmClient().mine()
         trader.a.createDeposit(CreateDepositApiRequest(depositSymbol, usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
 
         trader.a.getAccountConfiguration().let {
             assertEquals(TestnetChallengeStatus.PendingDepositConfirmation, it.testnetChallengeStatus)
             assertTrue(it.testnetChallengeDepositLimits.isEmpty())
         }
-        trader.w.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+        trader.w.currentEvmClient().mine(EvmDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
 
         waitForBalance(
             trader.a,
@@ -308,9 +307,9 @@ class TestnetChallengeTest : OrderBaseTest() {
         // deposit 50 USDC back and check that USDC deposit is now limited to the withdrawn amount - the deposited amount
         val usdcDepositAmount = AssetAmount(usdc, "50")
         var usdcDepositTxHash = trader.w.sendDepositTx(usdcDepositAmount)
-        trader.w.currentBlockchainClient().mine()
+        trader.w.currentEvmClient().mine()
         trader.a.createDeposit(CreateDepositApiRequest(Symbol(usdc.name), usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
-        trader.w.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+        trader.w.currentEvmClient().mine(EvmDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
         trader.a.getAccountConfiguration().let {
             assertEquals(TestnetChallengeStatus.Enrolled, it.testnetChallengeStatus)
             assertFalse(it.testnetChallengeDepositLimits.isEmpty())
@@ -322,9 +321,9 @@ class TestnetChallengeTest : OrderBaseTest() {
 
         // deposit another 50 USDC and check that USDC deposit limit is 0
         usdcDepositTxHash = trader.w.sendDepositTx(usdcDepositAmount)
-        trader.w.currentBlockchainClient().mine()
+        trader.w.currentEvmClient().mine()
         trader.a.createDeposit(CreateDepositApiRequest(Symbol(usdc.name), usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
-        trader.w.currentBlockchainClient().mine(BlockchainDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+        trader.w.currentEvmClient().mine(EvmDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
         trader.a.getAccountConfiguration().let {
             assertEquals(TestnetChallengeStatus.Enrolled, it.testnetChallengeStatus)
             assertFalse(it.testnetChallengeDepositLimits.isEmpty())
@@ -367,7 +366,7 @@ class TestnetChallengeTest : OrderBaseTest() {
         val depositSymbol = transaction { TestnetChallengeUtils.depositSymbol() }
         val usdcDepositAmount = AssetAmount(depositSymbol.toSymbolInfo(FaucetMode.AllSymbols), "10000")
         val usdcDepositTxHash = trader.w.sendDepositTx(usdcDepositAmount)
-        trader.w.currentBlockchainClient().mine()
+        trader.w.currentEvmClient().mine()
         trader.a.createDeposit(CreateDepositApiRequest(Symbol(depositSymbol.name), usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
 
         // prior deposit leads to disqualification

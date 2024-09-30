@@ -1,4 +1,4 @@
-package xyz.funkybit.core.evm
+package xyz.funkybit.core.blockchain.evm
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.web3j.crypto.Credentials

@@ -1,11 +1,15 @@
-package xyz.funkybit.core.evm
+package xyz.funkybit.core.model.evm
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 import org.web3j.abi.DefaultFunctionEncoder
+import org.web3j.abi.datatypes.DynamicBytes
 import org.web3j.abi.datatypes.DynamicStruct
+import org.web3j.abi.datatypes.StaticStruct
+import org.web3j.abi.datatypes.generated.Uint256
+import org.web3j.abi.datatypes.generated.Uint64
 import org.web3j.crypto.StructuredData
 import xyz.funkybit.apps.api.model.BigIntegerJson
 import xyz.funkybit.apps.api.model.OrderAmount
@@ -15,10 +19,6 @@ import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.MarketId
 import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigInteger
-
-fun serializeTx(txType: ExchangeTransactions.TransactionType, struct: DynamicStruct): ByteArray {
-    return listOf(txType.ordinal.toByte()).toByteArray() + DefaultFunctionEncoder().encodeParameters(listOf(struct)).toHexBytes()
-}
 
 enum class EIP712TransactionType {
     Withdraw,
@@ -71,11 +71,31 @@ sealed class EIP712Transaction {
             return message
         }
 
-        override fun getTxData(sequence: Long): ByteArray {
-            return serializeTx(
-                if (withdrawAll) ExchangeTransactions.TransactionType.WithdrawAll else ExchangeTransactions.TransactionType.Withdraw,
-                ExchangeTransactions.WithdrawWithSignature(ExchangeTransactions.Withdraw(sequence, sender.toString(), token.address.toString(), amount, nonce.toBigInteger(), fee), signature.toByteArray()),
+        private object Abi {
+            enum class TransactionType {
+                Withdraw,
+                WithdrawAll,
+            }
+
+            class Withdraw(sequence: Long, sender: String, token: String, amount: BigInteger, nonce: BigInteger, fee: BigInteger) : StaticStruct(
+                Uint256(sequence),
+                org.web3j.abi.datatypes.Address(160, sender),
+                org.web3j.abi.datatypes.Address(160, token),
+                Uint256(amount),
+                Uint64(nonce),
+                Uint256(fee),
             )
+
+            class WithdrawWithSignature(tx: Withdraw, signature: ByteArray) : DynamicStruct(
+                tx,
+                DynamicBytes(signature),
+            )
+        }
+
+        override fun getTxData(sequence: Long): ByteArray {
+            val txType = if (withdrawAll) Abi.TransactionType.WithdrawAll else Abi.TransactionType.Withdraw
+            val struct = Abi.WithdrawWithSignature(Abi.Withdraw(sequence, sender.toString(), token.address.toString(), amount, nonce.toBigInteger(), fee), signature.toByteArray())
+            return listOf(txType.ordinal.toByte()).toByteArray() + DefaultFunctionEncoder().encodeParameters(listOf(struct)).toHexBytes()
         }
     }
 

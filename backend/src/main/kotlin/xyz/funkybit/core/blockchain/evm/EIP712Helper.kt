@@ -1,4 +1,4 @@
-package xyz.funkybit.core.evm
+package xyz.funkybit.core.blockchain.evm
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.web3j.crypto.StructuredData
@@ -7,6 +7,7 @@ import xyz.funkybit.apps.api.AuthorizeWalletAddressMessage
 import xyz.funkybit.apps.api.middleware.SignInMessage
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.db.ChainId
+import xyz.funkybit.core.model.evm.EIP712Transaction
 
 object EIP712Helper {
     val logger = KotlinLogging.logger {}

@@ -10,7 +10,7 @@ import xyz.funkybit.apps.api.model.websocket.MyOrderUpdated
 import xyz.funkybit.apps.api.model.websocket.MyTradesCreated
 import xyz.funkybit.apps.api.model.websocket.OrderBook
 import xyz.funkybit.apps.api.model.websocket.OrderBookDiff
-import xyz.funkybit.core.evm.ECHelper
+import xyz.funkybit.core.blockchain.evm.ECHelper
 import xyz.funkybit.core.model.FeeRate
 import xyz.funkybit.core.model.SequencerAccountId
 import xyz.funkybit.core.model.Signature

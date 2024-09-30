@@ -10,8 +10,8 @@ import xyz.funkybit.apps.api.model.AuthorizeWalletApiRequest
 import xyz.funkybit.apps.api.model.Balance
 import xyz.funkybit.apps.api.model.SymbolInfo
 import xyz.funkybit.apps.api.model.websocket.Limits
-import xyz.funkybit.core.evm.ECHelper
-import xyz.funkybit.core.evm.EIP712Helper
+import xyz.funkybit.core.blockchain.evm.ECHelper
+import xyz.funkybit.core.blockchain.evm.EIP712Helper
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature

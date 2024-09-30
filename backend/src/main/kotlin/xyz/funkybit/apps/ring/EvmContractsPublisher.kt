@@ -2,19 +2,19 @@ package xyz.funkybit.apps.ring
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.sql.transactions.transaction
-import xyz.funkybit.core.blockchain.BlockchainClient
 import xyz.funkybit.core.blockchain.ContractType
+import xyz.funkybit.core.blockchain.evm.EvmClient
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 
-class ContractsPublisher(val blockchainClient: BlockchainClient) {
+class EvmContractsPublisher(val evmClient: EvmClient) {
     val logger = KotlinLogging.logger {}
 
     fun updateContracts() {
         transaction {
             ContractType.entries.forEach { contractType ->
                 val deployedContract = DeployedSmartContractEntity
-                    .findLastDeployedContractByNameAndChain(contractType.name, blockchainClient.chainId)
+                    .findLastDeployedContractByNameAndChain(contractType.name, evmClient.chainId)
 
                 if (deployedContract == null) {
                     logger.info { "Deploying contract: $contractType" }
@@ -29,7 +29,7 @@ class ContractsPublisher(val blockchainClient: BlockchainClient) {
                 } else {
                     deployedContract.proxyAddress.let {
                         if (it is EvmAddress) {
-                            blockchainClient.setContractAddress(contractType, it)
+                            evmClient.setContractAddress(contractType, it)
                         }
                     }
                 }
@@ -38,13 +38,13 @@ class ContractsPublisher(val blockchainClient: BlockchainClient) {
     }
 
     private fun deployOrUpgradeWithProxy(contractType: ContractType, existingProxyAddress: EvmAddress?) {
-        blockchainClient.deployOrUpgradeWithProxy(
+        evmClient.deployOrUpgradeWithProxy(
             contractType,
             existingProxyAddress,
         ).also {
             DeployedSmartContractEntity.create(
                 name = contractType.name,
-                chainId = blockchainClient.chainId,
+                chainId = evmClient.chainId,
                 implementationAddress = it.implementationAddress,
                 proxyAddress = it.proxyAddress,
                 version = it.version,

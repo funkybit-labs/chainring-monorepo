@@ -3,12 +3,11 @@ package xyz.funkybit.apps.telegrambot
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import xyz.funkybit.apps.api.BaseApp
 import xyz.funkybit.apps.api.services.ExchangeApiService
 import xyz.funkybit.apps.telegrambot.model.Input
 import xyz.funkybit.apps.telegrambot.model.Output
-import xyz.funkybit.core.blockchain.ChainManager
+import xyz.funkybit.core.blockchain.evm.EvmChainManager
 import xyz.funkybit.core.db.DbConfig
 import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.DepositStatus
@@ -117,8 +116,8 @@ class BotApp : BaseApp(dbConfig = DbConfig()) {
         fun refresh(user: TelegramBotUserEntity) {
             when (val sessionState = user.sessionState) {
                 is SessionState.AirdropPending -> {
-                    val txReceipt = ChainManager
-                        .getBlockchainClient(sessionState.symbol.chainId.value)
+                    val txReceipt = EvmChainManager
+                        .getEvmClient(sessionState.symbol.chainId.value)
                         .getTransactionReceipt(sessionState.txHash)
 
                     if (txReceipt != null) {

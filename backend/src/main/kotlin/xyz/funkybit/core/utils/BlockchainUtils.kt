@@ -1,7 +1,7 @@
 package xyz.funkybit.core.utils
 
 import org.web3j.tx.exceptions.ContractCallException
-import xyz.funkybit.core.blockchain.DefaultBlockParam
+import xyz.funkybit.core.blockchain.evm.DefaultBlockParam
 
 object BlockchainUtils {
     fun <A> getAsOfBlockOrLater(blockNumber: DefaultBlockParam.BlockNumber, query: (blockParam: DefaultBlockParam) -> A): A {

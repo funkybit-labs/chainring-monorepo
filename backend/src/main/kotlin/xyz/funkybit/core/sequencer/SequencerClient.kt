@@ -5,7 +5,7 @@ import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
 import xyz.funkybit.apps.api.middleware.ServerSpans
 import xyz.funkybit.apps.api.middleware.Tracer
-import xyz.funkybit.core.evm.ECHelper
+import xyz.funkybit.core.blockchain.evm.ECHelper
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress

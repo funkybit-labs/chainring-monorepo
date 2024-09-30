@@ -1,4 +1,4 @@
-package xyz.funkybit.core.evm
+package xyz.funkybit.core.model.evm
 
 import org.web3j.abi.Utils
 import org.web3j.abi.datatypes.Address

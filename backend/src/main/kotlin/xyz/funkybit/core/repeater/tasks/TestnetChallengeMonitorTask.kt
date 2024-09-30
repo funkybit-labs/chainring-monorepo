@@ -2,7 +2,7 @@ package xyz.funkybit.core.repeater.tasks
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.sql.transactions.transaction
-import xyz.funkybit.core.blockchain.ChainManager
+import xyz.funkybit.core.blockchain.evm.EvmChainManager
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.model.db.UserEntity
 import xyz.funkybit.core.utils.TestnetChallengeUtils
@@ -14,15 +14,15 @@ class TestnetChallengeMonitorTask : RepeaterBaseTask(
     override val name: String = "testnet_challenge_monitor"
 
     val logger = KotlinLogging.logger {}
-    val blockchainClient by lazy {
-        transaction { ChainManager.getBlockchainClient(TestnetChallengeUtils.depositSymbol().chainId.value) }
+    val evmClient by lazy {
+        transaction { EvmChainManager.getEvmClient(TestnetChallengeUtils.depositSymbol().chainId.value) }
     }
 
     override fun runWithLock() {
         transaction {
             UserEntity.findWithTestnetChallengeStatus(TestnetChallengeStatus.PendingAirdrop).forEach { user ->
                 user.testnetAirdropTxHash?.let {
-                    blockchainClient.getTransactionReceipt(it)?.let { receipt ->
+                    evmClient.getTransactionReceipt(it)?.let { receipt ->
                         when (receipt.status) {
                             "0x1" -> {
                                 user.testnetChallengeStatus = TestnetChallengeStatus.PendingDeposit

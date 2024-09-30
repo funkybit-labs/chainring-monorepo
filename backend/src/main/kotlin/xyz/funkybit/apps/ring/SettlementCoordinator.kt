@@ -8,11 +8,11 @@ import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.web3j.abi.DefaultFunctionEncoder
 import xyz.funkybit.apps.api.model.websocket.MyTradesUpdated
-import xyz.funkybit.core.blockchain.BlockchainClient
-import xyz.funkybit.core.blockchain.DefaultBlockParam
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
-import xyz.funkybit.core.evm.ECHelper.sha3
+import xyz.funkybit.core.blockchain.evm.DefaultBlockParam
+import xyz.funkybit.core.blockchain.evm.ECHelper.sha3
+import xyz.funkybit.core.blockchain.evm.EvmClient
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.PubkeyAndIndex
@@ -65,7 +65,7 @@ class ChainNotReadyForSettlementException() : Exception("chain not ready for set
 class BatchSizeExceedsChainLimitException(val numTrades: Int) : Exception("batch size exceeds chain limit")
 
 class SettlementCoordinator(
-    blockchainClients: List<BlockchainClient>,
+    evmClients: List<EvmClient>,
     private val sequencerClient: SequencerClient,
     private val activePollingIntervalInMs: Long = System.getenv("SETTLEMENT_COORDINATOR_ACTIVE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 100L,
     private val inactivePollingIntervalInMs: Long = System.getenv("SETTLEMENT_COORDINATOR_INACTIVE_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
@@ -75,8 +75,8 @@ class SettlementCoordinator(
 ) {
     private val marketMap = mutableMapOf<MarketId, MarketEntity>()
     private val symbolMap = mutableMapOf<SymbolId, SymbolEntity>()
-    private val chainIds = blockchainClients.map { it.chainId } + if (bitcoinConfig.enabled) listOf(bitcoinConfig.chainId) else listOf()
-    private val blockchainClientsByChainId = blockchainClients.associateBy { it.chainId }
+    private val chainIds = evmClients.map { it.chainId } + if (bitcoinConfig.enabled) listOf(bitcoinConfig.chainId) else listOf()
+    private val evmClientsByChainId = evmClients.associateBy { it.chainId }
     private val advisoryLockKey = Long.MAX_VALUE
 
     private var workerThread: Thread? = null
@@ -282,10 +282,10 @@ class SettlementCoordinator(
             val chainId = it.chainId.value
             val transactionData = when (chainId.networkType()) {
                 NetworkType.Evm -> {
-                    val blockchainClient = blockchainClientsByChainId.getValue(chainId)
+                    val evmClient = evmClientsByChainId.getValue(chainId)
                     BlockchainTransactionData(
-                        blockchainClient.encodeRollbackBatchFunctionCall(),
-                        blockchainClient.exchangeContractAddress,
+                        evmClient.encodeRollbackBatchFunctionCall(),
+                        evmClient.exchangeContractAddress,
                         BigInteger.ZERO,
                     )
                 }
@@ -473,14 +473,14 @@ class SettlementCoordinator(
     }
 
     private fun createEvmBlockchainTransactionData(chainId: ChainId, batchSettlement: Settlement.Batch, isSubmit: Boolean = false): BlockchainTransactionData {
-        val blockchainClient = blockchainClientsByChainId.getValue(chainId)
+        val evmClient = evmClientsByChainId.getValue(chainId)
         return BlockchainTransactionData(
             data = if (isSubmit) {
-                blockchainClient.encodeSubmitSettlementBatchFunctionCall(batchSettlement.toEvm())
+                evmClient.encodeSubmitSettlementBatchFunctionCall(batchSettlement.toEvm())
             } else {
-                blockchainClient.encodePrepareSettlementBatchFunctionCall(batchSettlement.toEvm())
+                evmClient.encodePrepareSettlementBatchFunctionCall(batchSettlement.toEvm())
             },
-            to = blockchainClient.exchangeContractAddress,
+            to = evmClient.exchangeContractAddress,
             value = BigInteger.ZERO,
         )
     }
@@ -598,7 +598,7 @@ class SettlementCoordinator(
         val finalExchangeBalances = when (chainId.networkType()) {
             NetworkType.Evm -> {
                 val getBalances: (DefaultBlockParam) -> Map<Address, Map<Address, BigInteger>> = { blockParam ->
-                    blockchainClientsByChainId.getValue(chainId).getExchangeBalances(
+                    evmClientsByChainId.getValue(chainId).getExchangeBalances(
                         chainWallets.map { it.address },
                         symbolIds.map { symbolMap.getValue(it).contractAddress ?: EvmAddress.zero },
                         blockParam,

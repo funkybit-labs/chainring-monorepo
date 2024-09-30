@@ -3,7 +3,6 @@ package xyz.funkybit.integrationtests.bitcoin
 import com.funkatronics.kborsh.Borsh
 import kotlinx.serialization.decodeFromByteArray
 import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertFalse

@@ -2,7 +2,7 @@ package xyz.funkybit.core.repeater.tasks
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.sql.transactions.transaction
-import xyz.funkybit.core.blockchain.ChainManager
+import xyz.funkybit.core.blockchain.evm.EvmChainManager
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.KeyValueStore
 import java.math.BigInteger
@@ -22,7 +22,7 @@ class GasMonitorTask : RepeaterBaseTask(
     }
 
     override fun runWithLock() {
-        ChainManager.getBlockchainClients().forEach {
+        EvmChainManager.getEvmClients().forEach {
             // set minimum amount to be equivalent to minimum gas units (or 100,000,000 if not specified) at the max
             // priority fee, as this scales well with the actual gas needed
             val minimumGas = (minimumGasUnitsOverride ?: BigInteger.valueOf(100_000_000L)) * it.gasProvider.getMaxPriorityFeePerGas(null)

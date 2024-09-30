@@ -8,7 +8,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import org.web3j.protocol.core.methods.response.TransactionReceipt
 import xyz.funkybit.contracts.generated.Exchange
-import xyz.funkybit.core.blockchain.BlockchainClient
+import xyz.funkybit.core.blockchain.evm.EvmClient
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.BalanceChange
@@ -24,25 +24,24 @@ import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.sequencer.core.Asset
-import xyz.funkybit.sequencer.proto.deposit
 import java.math.BigInteger
 import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 
-class BlockchainDepositHandler(
-    private val blockchainClient: BlockchainClient,
+class EvmDepositHandler(
+    private val evmClient: EvmClient,
     private val sequencerClient: SequencerClient,
-    private val numConfirmations: Int = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toIntOrNull() ?: DEFAULT_NUM_CONFIRMATIONS,
-    private val pollingIntervalInMs: Long = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
-    private val receiptMaxWaitTime: Duration = System.getenv("BLOCKCHAIN_DEPOSIT_HANDLER_RECEIPT_MAX_WAIT_TIME_MS")?.toLongOrNull()?.milliseconds ?: 10.minutes,
+    private val numConfirmations: Int = System.getenv("EVM_DEPOSIT_HANDLER_NUM_CONFIRMATIONS")?.toIntOrNull() ?: DEFAULT_NUM_CONFIRMATIONS,
+    private val pollingIntervalInMs: Long = System.getenv("EVM_DEPOSIT_HANDLER_POLLING_INTERVAL_MS")?.toLongOrNull() ?: 500L,
+    private val receiptMaxWaitTime: Duration = System.getenv("EVM_DEPOSIT_HANDLER_RECEIPT_MAX_WAIT_TIME_MS")?.toLongOrNull()?.milliseconds ?: 10.minutes,
 ) {
     companion object {
         const val DEFAULT_NUM_CONFIRMATIONS: Int = 2
     }
 
-    private val chainId = blockchainClient.chainId
+    private val chainId = evmClient.chainId
     private var workerThread: Thread? = null
     val logger = KotlinLogging.logger {}
 
@@ -79,7 +78,7 @@ class BlockchainDepositHandler(
         val confirmedDeposits = DepositEntity.getConfirmedForUpdate(chainId)
 
         if (pendingDeposits.isNotEmpty()) {
-            val currentBlock = blockchainClient.getBlockNumber()
+            val currentBlock = evmClient.getBlockNumber()
 
             // handle pending deposits - if we hit required confirmations, invoke callback
             pendingDeposits.forEach {
@@ -104,7 +103,7 @@ class BlockchainDepositHandler(
     }
 
     private fun refreshPendingDeposit(pendingDeposit: DepositEntity, currentBlock: BigInteger) {
-        val receipt = blockchainClient.getTransactionReceipt(pendingDeposit.transactionHash.value)
+        val receipt = evmClient.getTransactionReceipt(pendingDeposit.transactionHash.value)
         if (receipt == null) {
             if (Clock.System.now() - pendingDeposit.createdAt > receiptMaxWaitTime) {
                 pendingDeposit.markAsFailed("Transaction receipt not found", canBeResubmitted = true)
