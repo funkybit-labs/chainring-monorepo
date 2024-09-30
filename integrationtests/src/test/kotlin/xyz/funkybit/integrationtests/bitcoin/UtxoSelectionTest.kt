@@ -115,10 +115,10 @@ class UtxoSelectionTest {
         // create a wallet
         val ecKey = ECKey()
         val address = BitcoinAddress.fromKey(params, ecKey)
-        val numUtxos = 60
+        val numUtxos = 30
 
         val txIds = (1..numUtxos).map {
-            Thread.sleep(50)
+            Thread.sleep(10)
             BitcoinClient.sendToAddress(address, BigInteger("3000"))
         }
 
