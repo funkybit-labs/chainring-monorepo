@@ -3,10 +3,13 @@ package xyz.funkybit.core.model.db
 import de.fxlae.typeid.TypeId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import org.http4k.format.KotlinxSerialization
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.json.jsonb
 import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import org.jetbrains.exposed.sql.transactions.TransactionManager
@@ -44,7 +47,7 @@ fun publishBroadcasterNotifications(notifications: List<BroadcasterNotification>
         logger.debug { "Scheduling broadcaster notifications: $notifications" }
         TransactionManager.current().notifyDbListener(
             "broadcaster_ctl",
-            BroadcasterJobEntity.create(notifications).value,
+            BroadcasterJobEntity.create(BroadcasterJobId.generate(), notifications, Clock.System.now()).value,
         )
     }
 }
@@ -58,20 +61,23 @@ value class BroadcasterJobId(override val value: String) : EntityId {
 }
 
 object BroadcasterJobTable : GUIDTable<BroadcasterJobId>("broadcaster_job", ::BroadcasterJobId) {
-    val createdAt = timestamp("created_at")
+    val createdAt = timestamp("created_at").index()
     val createdBy = varchar("created_by", 10485760)
     val notificationData = jsonb<List<BroadcasterNotification>>("notification_data", KotlinxSerialization.json)
 }
 
 class BroadcasterJobEntity(guid: EntityID<BroadcasterJobId>) : GUIDEntity<BroadcasterJobId>(guid) {
     companion object : EntityClass<BroadcasterJobId, BroadcasterJobEntity>(BroadcasterJobTable) {
-        fun create(notifications: List<BroadcasterNotification>): BroadcasterJobId {
-            return BroadcasterJobEntity.new(BroadcasterJobId.generate()) {
-                this.createdAt = Clock.System.now()
+        fun create(id: BroadcasterJobId, notifications: List<BroadcasterNotification>, currentTime: Instant): BroadcasterJobId {
+            return BroadcasterJobEntity.new(id) {
+                this.createdAt = currentTime
                 this.createdBy = "system"
                 this.notificationData = notifications
             }.guid.value
         }
+
+        fun deleteOlderThan(timestamp: Instant): Int =
+            BroadcasterJobTable.deleteWhere { createdAt.less(timestamp) }
     }
 
     var createdAt by BroadcasterJobTable.createdAt
