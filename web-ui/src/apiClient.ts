@@ -1017,20 +1017,30 @@ export const noAuthApiClient = new Zodios(apiBaseUrl, [
   }
 ])
 
-export function useMaintenance() {
+export function useAccessRestriction() {
   const [maintenance, setMaintenance] = useState(false)
+  const [restricted, setRestricted] = useState(false)
 
   useEffect(() => {
     const id = apiClient.axios.interceptors.response.use(
       (response) => {
         setMaintenance(false)
+        setRestricted(false)
         return response
       },
       (error) => {
-        if (error.response.status == 418) {
+        if (error.response.status === 418) {
           setMaintenance(true)
-        } else if (maintenance) {
-          setMaintenance(false)
+        } else if (error.response.status === 451) {
+          // (Unavailable For Legal Reasons)
+          setRestricted(true)
+        } else {
+          if (maintenance) {
+            setMaintenance(false)
+          }
+          if (restricted) {
+            setRestricted(false)
+          }
         }
         return Promise.reject(error)
       }
@@ -1039,5 +1049,5 @@ export function useMaintenance() {
       apiClient.axios.interceptors.response.eject(id)
     }
   })
-  return maintenance
+  return [maintenance, restricted]
 }
