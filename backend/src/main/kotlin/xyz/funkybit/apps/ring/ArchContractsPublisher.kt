@@ -230,7 +230,7 @@ object ArchContractsPublisher {
             }.toList()
             val txIds = txs.asSequence().chunked(75) { rtxs ->
                 ArchNetworkClient.sendTransactions(rtxs).also {
-                    Thread.sleep(2000)
+                    Thread.sleep(3000)
                 }
             }.flatten().toList()
             if (txIds.isNotEmpty()) {

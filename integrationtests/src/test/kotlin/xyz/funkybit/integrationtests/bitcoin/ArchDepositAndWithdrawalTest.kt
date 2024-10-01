@@ -23,11 +23,17 @@ import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.ArchAccountStatus
 import xyz.funkybit.core.model.db.ArchAccountTable
 import xyz.funkybit.core.model.db.BitcoinUtxoEntity
+import xyz.funkybit.core.model.db.DepositEntity
+import xyz.funkybit.core.model.db.DepositStatus
+import xyz.funkybit.core.model.db.DepositTable
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalId
 import xyz.funkybit.core.model.db.WithdrawalStatus
+import xyz.funkybit.core.model.db.WithdrawalTable
+import xyz.funkybit.core.services.UtxoManager
 import xyz.funkybit.core.utils.bitcoin.ArchUtils
+import xyz.funkybit.core.utils.sum
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForProgramAccount
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForProgramStateAccount
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForTokenStateAccount
@@ -231,6 +237,98 @@ class ArchDepositAndWithdrawalTest {
 
         validateUtxoAndMempoolBalancces(bitcoinWallet.walletAddress)
         validateUtxoAndMempoolBalancces(bitcoinWallet.exchangeDepositAddress, true)
+    }
+
+    @Test
+    fun `testArchDepositsAndWithdrawal - multiple wallets`() {
+        Assumptions.assumeFalse(isBitcoinDisabled())
+
+        val airdropAmount = BigInteger("15000")
+        val depositAmount = BigInteger("7000")
+
+        val bitcoinWallets = (0..24).map {
+            BitcoinWallet(TestApiClient.withBitcoinWallet())
+        }
+
+        val btc = bitcoinWallets.last().nativeSymbol
+        val txIds = bitcoinWallets.map { it.airdropNative(airdropAmount) }
+        waitForTx(bitcoinWallets.last().walletAddress, txIds.last())
+        bitcoinWallets.forEachIndexed { index, wallet ->
+            waitForTx(wallet.walletAddress, txIds[index])
+            assertEquals(wallet.getWalletNativeBalance(), airdropAmount)
+        }
+        val exchangeDepositAddress = bitcoinWallets.first().exchangeDepositAddress
+        transaction { UtxoManager.refreshUtxos(exchangeDepositAddress) }
+        val startingProgramBalance = getBalance(exchangeDepositAddress)
+
+        val pendingBtcDeposits = bitcoinWallets.map { wallet ->
+            val depositTxHash = wallet.sendNativeDepositTx(depositAmount)
+            val pendingBtcDeposit = wallet.apiClient.createDeposit(
+                CreateDepositApiRequest(
+                    symbol = Symbol(btc.name),
+                    amount = depositAmount,
+                    txHash = depositTxHash,
+                ),
+            ).deposit
+
+            assertEquals(Deposit.Status.Pending, pendingBtcDeposit.status)
+            assertEquals(depositAmount, pendingBtcDeposit.amount)
+            pendingBtcDeposit
+        }
+
+        waitFor(atMost = 40000) {
+            transaction {
+                DepositEntity.find { DepositTable.status.eq(DepositStatus.Complete) }.count().toInt() == pendingBtcDeposits.count()
+            }
+        }
+
+        bitcoinWallets.forEach { wallet ->
+            val btcBalance = wallet.apiClient.getBalances().balances.first { it.symbol.value == btc.name }
+            assertEquals(depositAmount, btcBalance.available)
+            assertEquals(depositAmount, btcBalance.total)
+            assertEquals(depositAmount, wallet.getExchangeBalance(btc).inFundamentalUnits)
+        }
+
+        pendingBtcDeposits.forEach {
+            waitForTx(exchangeDepositAddress, it.txHash)
+        }
+
+        var expectedProgramBalance = startingProgramBalance + depositAmount.toLong() * pendingBtcDeposits.size
+        assertEquals(expectedProgramBalance, getBalance(exchangeDepositAddress))
+
+        val withdrawAmount = BigInteger("3000")
+        val pendingBtcWithdrawals = bitcoinWallets.map { wallet ->
+            wallet.apiClient.createWithdrawal(wallet.signWithdraw(btc.name, withdrawAmount)).withdrawal
+        }
+        waitFor(atMost = 90000) {
+            transaction {
+                WithdrawalEntity.find { WithdrawalTable.status.eq(WithdrawalStatus.Complete) }.count().toInt() == pendingBtcWithdrawals.count()
+            }
+        }
+
+        val txHashes = bitcoinWallets.mapIndexedNotNull { index, wallet ->
+            wallet.apiClient.getWithdrawal(pendingBtcWithdrawals[index].id).withdrawal.txHash?.also {
+                waitForTx(bitcoinWallets[index].walletAddress, it, exchangeDepositAddress)
+            }
+        }.toSet()
+
+        val totalWithdrawAmount = bitcoinWallets.mapIndexed { index, wallet ->
+            val withdrawal = wallet.apiClient.getWithdrawal(pendingBtcWithdrawals[index].id).withdrawal
+            withdrawal.amount - withdrawal.fee
+        }.sum().toLong()
+
+        val expectedAmount = depositAmount - withdrawAmount
+        bitcoinWallets.forEach { wallet ->
+            val btcBalance = wallet.apiClient.getBalances().balances.first { it.symbol.value == btc.name }
+            assertEquals(expectedAmount, btcBalance.available)
+            assertEquals(expectedAmount, btcBalance.total)
+            assertEquals(expectedAmount, wallet.getExchangeBalance(btc).inFundamentalUnits)
+        }
+
+        val totalNetworkFee = txHashes.sumOf { MempoolSpaceClient.getNetworkFeeForTx(it) }
+        expectedProgramBalance -= totalNetworkFee + totalWithdrawAmount
+
+        assertEquals(expectedProgramBalance, getBalance(exchangeDepositAddress))
     }
 
     @Test

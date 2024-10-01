@@ -12,10 +12,12 @@ import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient.MAX_INSTRUCTION_SI
 import xyz.funkybit.core.blockchain.bitcoin.MempoolSpaceClient
 import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.ConfirmedBitcoinDeposit
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.bitcoin.ArchAccountState
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexStatus
+import xyz.funkybit.core.model.db.ArchAccountBalanceInfo
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.BalanceChange
 import xyz.funkybit.core.model.db.BalanceEntity
@@ -223,10 +225,8 @@ class ArchTransactionHandler(
             }
             true
         } else {
-            val pendingBalanceIndexUpdates = ArchAccountBalanceIndexEntity.findAllForStatus(ArchAccountBalanceIndexStatus.Pending)
-            if (pendingBalanceIndexUpdates.isNotEmpty()) {
-                logger.debug { "Initiating ${pendingBalanceIndexUpdates.size} index updates" }
-                val instruction = ArchUtils.buildInitTokenBalanceIndexBatchInstruction(programPubkey, pendingBalanceIndexUpdates)
+            val (pendingBalanceIndexUpdates, instruction) = createNextBalanceIndexBatch(programPubkey)
+            if (instruction != null) {
                 val transaction = BlockchainTransactionEntity.create(
                     chainId = chainId,
                     transactionData = BlockchainTransactionData(instruction.serialize().toHex(), programPubkey.toContractAddress()),
@@ -280,11 +280,8 @@ class ArchTransactionHandler(
             }
             true
         } else {
-            val confirmedDepositsWithAssignedIndex = ArchUtils.getConfirmedBitcoinDeposits()
-
-            if (confirmedDepositsWithAssignedIndex.isNotEmpty()) {
-                logger.debug { "Handling ${confirmedDepositsWithAssignedIndex.size} confirmed deposits" }
-                val instruction = ArchUtils.buildDepositBatchInstruction(programPubkey, confirmedDepositsWithAssignedIndex)
+            val (confirmedDepositsWithAssignedIndex, instruction) = createNextDepositBatch(programPubkey)
+            if (instruction != null) {
                 val transaction = BlockchainTransactionEntity.create(
                     chainId = chainId,
                     transactionData = BlockchainTransactionData(instruction.serialize().toHex(), programPubkey.toContractAddress()),
@@ -503,7 +500,9 @@ class ArchTransactionHandler(
     }
 
     private fun createNextWithdrawalBatch(programBitcoinAddress: BitcoinAddress, programPubkey: ArchNetworkRpc.Pubkey): Boolean {
-        var limit = 10
+        // TODO / HACK - Arch has a bug where a serialized bitcoin tx with ins / outs must be less than 255 bytes.
+        // Setting limit to 2 withdrawals for now - set higher once arch fixes bug
+        var limit = 2
 
         while (true) {
             val sequencedWithdrawals =
@@ -563,6 +562,50 @@ class ArchTransactionHandler(
             UtxoManager.reserveUtxos(selectedUtxos, transaction.txHash?.value ?: "")
 
             return true
+        }
+    }
+
+    private fun createNextBalanceIndexBatch(programPubkey: ArchNetworkRpc.Pubkey): Pair<List<ArchAccountBalanceInfo>, ArchNetworkRpc.Instruction?> {
+        var limit = 20
+
+        while (true) {
+            val pendingBalanceIndexUpdates =
+                ArchAccountBalanceIndexEntity.findAllForStatus(ArchAccountBalanceIndexStatus.Pending, limit = limit)
+            if (pendingBalanceIndexUpdates.isNotEmpty()) {
+                val instruction = ArchUtils.buildInitTokenBalanceIndexBatchInstruction(programPubkey, pendingBalanceIndexUpdates)
+                val serializedInstruction = instruction.serialize()
+                logger.debug { "in createNextBalanceIndexBatch - batch size = ${pendingBalanceIndexUpdates.size}, serialized size=${serializedInstruction.size}" }
+                if (serializedInstruction.size > MAX_INSTRUCTION_SIZE) {
+                    limit -= 2
+                    continue
+                } else {
+                    logger.debug { "Initiating ${pendingBalanceIndexUpdates.size} index updates" }
+                    return Pair(pendingBalanceIndexUpdates, instruction)
+                }
+            }
+            return Pair(listOf(), null)
+        }
+    }
+
+    private fun createNextDepositBatch(programPubkey: ArchNetworkRpc.Pubkey): Pair<List<ConfirmedBitcoinDeposit>, ArchNetworkRpc.Instruction?> {
+        var limit = 70
+
+        while (true) {
+            val confirmedDepositsWithAssignedIndex = ArchUtils.getConfirmedBitcoinDeposits(limit)
+
+            if (confirmedDepositsWithAssignedIndex.isNotEmpty()) {
+                val instruction = ArchUtils.buildDepositBatchInstruction(programPubkey, confirmedDepositsWithAssignedIndex)
+                val serializedInstruction = instruction.serialize()
+                logger.debug { "in createNextDepositBatch - batch size = ${confirmedDepositsWithAssignedIndex.size}, serialized size=${serializedInstruction.size}" }
+                if (serializedInstruction.size > MAX_INSTRUCTION_SIZE) {
+                    limit = maxOf(1, limit - 5)
+                    continue
+                } else {
+                    logger.debug { "Handling ${confirmedDepositsWithAssignedIndex.size} confirmed deposits" }
+                    return Pair(confirmedDepositsWithAssignedIndex, instruction)
+                }
+            }
+            return Pair(listOf(), null)
         }
     }
 

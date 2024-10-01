@@ -93,8 +93,8 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
         fun getPendingForUpdate(chainId: ChainId): List<DepositEntity> =
             getForUpdate(chainId, DepositStatus.Pending)
 
-        fun getConfirmedForUpdate(chainId: ChainId): List<DepositEntity> =
-            getForUpdate(chainId, DepositStatus.Confirmed)
+        fun getConfirmedForUpdate(chainId: ChainId, limit: Int? = null): List<DepositEntity> =
+            getForUpdate(chainId, DepositStatus.Confirmed, limit = limit)
 
         fun getSettlingForUpdate(chainId: ChainId): List<DepositEntity> =
             getForUpdate(chainId, DepositStatus.Settling)
@@ -115,12 +115,19 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
             }
         }
 
-        private fun getForUpdate(chainId: ChainId, status: DepositStatus): List<DepositEntity> =
+        private fun getForUpdate(chainId: ChainId, status: DepositStatus, limit: Int? = null): List<DepositEntity> =
             DepositTable
                 .join(SymbolTable, JoinType.INNER, SymbolTable.guid, DepositTable.symbolGuid)
                 .select(DepositTable.columns)
                 .where { SymbolTable.chainId.eq(chainId) and DepositTable.status.eq(status) }
                 .forUpdate(ForUpdateOption.PostgreSQL.ForUpdate(mode = null, DepositTable))
+                .let {
+                    if (limit == null) {
+                        it
+                    } else {
+                        it.limit(limit)
+                    }
+                }
                 .let { DepositEntity.wrapRows(it) }
                 .toList()
 
