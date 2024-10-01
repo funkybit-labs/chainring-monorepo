@@ -73,13 +73,14 @@ resource "aws_iam_role_policy" "garp_execution_role_policy" {
       ],
       "Resource": "*"
     },
-   {
+    {
       "Effect": "Allow",
       "Action": [
           "secretsmanager:GetSecretValue"
       ],
       "Resource": [
         "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*",
+        "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!db-*",
         "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:slack-error-reporter-token-*"
       ]
     }

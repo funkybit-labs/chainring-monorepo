@@ -206,11 +206,32 @@ module "bastion" {
 
 
 module "rds" {
-  source         = "../modules/rds"
+  source         = "../modules/rds_aurora_cluster"
   name_prefix    = local.name_prefix
   subnet_id_1    = module.vpc.private_subnet_id_1
   subnet_id_2    = module.vpc.private_subnet_id_2
   instance_class = "db.r5.large"
+  security_groups = [
+    module.api.security_group_id, module.bastion.security_group.id, module.sequencer.security_group_id,
+    module.telegrambot.security_group_id, module.ring.security_group_id
+  ]
+  vpc         = module.vpc.vpc
+  aws_region  = var.aws_region
+  ci_role_arn = data.terraform_remote_state.shared.outputs.ci_role_arn
+
+  enable_advanced_monitoring          = true
+  enable_performance_insights         = true
+  performance_insights_retention_days = 7
+}
+
+
+module "rds_instance" {
+  source            = "../modules/rds_instance"
+  name_prefix       = local.name_prefix
+  subnet_id_1       = module.vpc.private_subnet_id_1
+  subnet_id_2       = module.vpc.private_subnet_id_2
+  instance_class    = "db.r5d.large"
+  allocated_storage = 1024
   security_groups = [
     module.api.security_group_id, module.bastion.security_group.id, module.sequencer.security_group_id,
     module.telegrambot.security_group_id, module.ring.security_group_id
