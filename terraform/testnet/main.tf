@@ -113,6 +113,7 @@ module "waf" {
   ipv6_blacklist_addresses = local.ipv6blacklist
   ipv6_whitelist_addresses = local.ipv6whitelist
   blocked_country_codes    = var.blocked_country_codes
+  blocked_country_response_code = var.blocked_country_response_code
   ip_dos_rate_limit        = var.ip_dos_rate_limit
 }
 

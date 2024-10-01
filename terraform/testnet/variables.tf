@@ -41,6 +41,10 @@ variable "blocked_country_codes" {
   ]
 }
 
+variable "blocked_country_response_code" {
+  default = 451
+}
+
 variable "ip_dos_rate_limit" {
   default = 5000
 }
