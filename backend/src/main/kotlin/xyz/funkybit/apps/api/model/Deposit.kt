@@ -37,7 +37,7 @@ data class Deposit(
                 Symbol(entity.symbol.name),
                 entity.amount,
                 when (entity.status) {
-                    DepositStatus.Pending, DepositStatus.Confirmed, DepositStatus.Settling, DepositStatus.SentToSequencer -> Status.Pending
+                    DepositStatus.Pending, DepositStatus.Confirmed, DepositStatus.Settling, DepositStatus.SentToSequencer, DepositStatus.SentToArch -> Status.Pending
                     DepositStatus.Complete -> Status.Complete
                     DepositStatus.Failed -> Status.Failed
                 },
