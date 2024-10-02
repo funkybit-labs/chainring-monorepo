@@ -205,7 +205,7 @@ class AdminRoutes(
                         symbol.addToWallets = payload.addToWallets
                         symbol.iconUrl = url
                         symbol.updatedAt = Clock.System.now()
-                        symbol.updatedBy = request.principal.toString()
+                        symbol.updatedBy = request.principal.address.toString()
                         originalData
                     }
                     if (originalData.withdrawalFee != payload.withdrawalFee) {
