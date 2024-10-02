@@ -10,8 +10,8 @@ import kotlin.concurrent.thread
 class PriceFeed(marketIds: List<MarketId>, private val sleepTimeMs: Long, val onPriceUpdate: (Map<MarketId, Double>) -> Unit) {
     private val rawBaseAndQuoteByMarket = marketIds.associateWith {
         Pair(
-            it.baseSymbol().replace(Regex(":.*$"), ""),
-            it.quoteSymbol().replace(Regex(":.*$"), ""),
+            it.baseSymbol().replace(Regex(":.*$"), "").replace(Regex("^t"), ""),
+            it.quoteSymbol().replace(Regex(":.*$"), "").replace(Regex("^t"), ""),
         )
     }
     private val baseSymbols = rawBaseAndQuoteByMarket.values.map { it.first }.toSet()
