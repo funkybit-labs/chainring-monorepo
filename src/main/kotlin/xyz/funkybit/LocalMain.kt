@@ -10,6 +10,7 @@ import xyz.funkybit.tasks.seedBlockchain
 import xyz.funkybit.tasks.seedDatabase
 import xyz.funkybit.tasks.seedSequencer
 import io.github.oshai.kotlinlogging.KotlinLogging
+import xyz.funkybit.utils.BitcoinMiner
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
@@ -30,6 +31,7 @@ fun main(args: Array<String>) {
                 RingApp().start()
                 ApiApp().start()
                 BotApp().start()
+                BitcoinMiner.start()
             } catch (e: Throwable) {
                 logger.error(e) { "Failed to start" }
                 exitProcess(1)

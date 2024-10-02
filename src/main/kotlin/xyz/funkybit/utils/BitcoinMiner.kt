@@ -1,4 +1,4 @@
-package xyz.funkybit.integrationtests.utils
+package xyz.funkybit.utils
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
