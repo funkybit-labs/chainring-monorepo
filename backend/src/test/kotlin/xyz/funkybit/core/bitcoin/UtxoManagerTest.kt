@@ -311,7 +311,7 @@ class UtxoManagerTest : TestWithDb() {
             ),
         )
 
-        every { MempoolSpaceClient.getTransactions(feePayerAddress, txId4) } returns listOf()
+        every { MempoolSpaceClient.getTransactions(feePayerAddress, txId1) } returns listOf()
 
         transaction {
             UtxoManager.refreshUtxos(feePayerAddress)

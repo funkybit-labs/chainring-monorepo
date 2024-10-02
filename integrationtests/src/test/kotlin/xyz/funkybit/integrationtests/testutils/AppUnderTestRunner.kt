@@ -61,7 +61,6 @@ import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppGameReactionTimeT
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserRewardTable
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserTable
 import xyz.funkybit.core.utils.toFundamentalUnits
-import xyz.funkybit.integrationtests.utils.BitcoinMiner
 import xyz.funkybit.integrationtests.utils.TestApiClient
 import xyz.funkybit.integrationtests.utils.TestEvmClient
 import xyz.funkybit.sequencer.apps.GatewayApp
@@ -73,6 +72,7 @@ import xyz.funkybit.tasks.fixtures.getFixtures
 import xyz.funkybit.tasks.migrateDatabase
 import xyz.funkybit.tasks.seedBlockchain
 import xyz.funkybit.tasks.seedDatabase
+import xyz.funkybit.utils.BitcoinMiner
 import java.lang.System.getenv
 import java.time.Duration
 import kotlin.time.Duration.Companion.minutes
