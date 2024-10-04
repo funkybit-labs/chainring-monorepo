@@ -47,7 +47,7 @@ class TestEvmClient(evmConfig: EvmClientConfig) : EvmClient(evmConfig) {
         Request(
             "anvil_mine",
             listOf(numberOfBlocks),
-            web3jServiceNoLogging,
+            web3jService,
             VoidResponse::class.java,
         ).send()
     }

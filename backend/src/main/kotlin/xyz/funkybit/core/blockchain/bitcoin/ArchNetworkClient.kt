@@ -12,13 +12,13 @@ import xyz.funkybit.core.model.rpc.ArchRpcRequest
 
 object ArchNetworkClient : JsonRpcClientBase(
     System.getenv("ARCH_NETWORK_RPC_URL") ?: "http://localhost:9002",
+    KotlinLogging.logger {},
     null,
 ) {
 
     const val MAX_TX_SIZE = 1024
     const val MAX_INSTRUCTION_SIZE = MAX_TX_SIZE - 103 // version (4), 1 signer (33), 1 signature (65), 1 byte for instruction count
 
-    override val logger = KotlinLogging.logger {}
     override val mediaType = "application/json".toMediaTypeOrNull()
 
     fun getAccountAddress(pubKey: ArchNetworkRpc.Pubkey): BitcoinAddress {
@@ -73,8 +73,8 @@ object ArchNetworkClient : JsonRpcClientBase(
         )
     }
 
-    inline fun <reified T> getValue(request: ArchRpcRequest, logResponseBody: Boolean = true): T {
-        val jsonElement = call(json.encodeToString(request), logResponseBody)
+    inline fun <reified T> getValue(request: ArchRpcRequest): T {
+        val jsonElement = call(json.encodeToString(request))
         return json.decodeFromJsonElement(jsonElement)
     }
 }

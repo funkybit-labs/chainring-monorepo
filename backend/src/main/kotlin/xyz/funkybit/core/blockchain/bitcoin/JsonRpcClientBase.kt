@@ -1,6 +1,6 @@
 package xyz.funkybit.core.blockchain.bitcoin
 
-import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.oshai.kotlinlogging.KLogger
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -11,10 +11,11 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import okhttp3.Credentials
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import xyz.funkybit.core.utils.HttpClient
+import xyz.funkybit.core.utils.withLogging
 
 class BasicAuthInterceptor(user: String, password: String) : Interceptor {
     private val credentials: String
@@ -39,9 +40,7 @@ data class JsonRpcError(
 
 class JsonRpcException(val error: JsonRpcError) : Exception(error.message)
 
-open class JsonRpcClientBase(val url: String, interceptor: Interceptor? = null) {
-    open val logger = KotlinLogging.logger {}
-
+open class JsonRpcClientBase(val url: String, val logger: KLogger, interceptor: Interceptor? = null) {
     @OptIn(ExperimentalSerializationApi::class)
     val json = Json {
         ignoreUnknownKeys = true
@@ -50,7 +49,9 @@ open class JsonRpcClientBase(val url: String, interceptor: Interceptor? = null) 
         explicitNulls = false
     }
 
-    val httpClient = OkHttpClient.Builder()
+    private val httpClient = HttpClient
+        .newBuilder()
+        .withLogging(logger)
         .let { builder ->
             interceptor?.let { builder.addInterceptor(it) } ?: builder
         }
@@ -58,12 +59,9 @@ open class JsonRpcClientBase(val url: String, interceptor: Interceptor? = null) 
 
     open val mediaType = "text/plain".toMediaTypeOrNull()
 
-    fun call(requestString: String, logResponseBody: Boolean = true, noLog: Boolean = false): JsonElement {
+    fun call(requestString: String): JsonElement {
         val body = requestString.toRequestBody(mediaType)
 
-        if (!noLog) {
-            logger.debug { "Sending -> ${abbreviateString(requestString)}" }
-        }
         val httpRequest = Request.Builder()
             .url(url)
             .post(body)
@@ -74,13 +72,6 @@ open class JsonRpcClientBase(val url: String, interceptor: Interceptor? = null) 
             throw Exception("send error: ${e.message}")
         }
         val httpResponseBody = httpResponse.body?.string() ?: ""
-        if (!noLog) {
-            if (logResponseBody || httpResponse.code >= 400) {
-                logger.debug { "Received(${httpResponse.code}) <- ${abbreviateString(httpResponseBody)}" }
-            } else {
-                logger.debug { "Received(${httpResponse.code}) <- (...elided...)" }
-            }
-        }
         return when (httpResponse.code) {
             in 200..204 -> {
                 when (val jsonBody = json.parseToJsonElement(httpResponseBody)) {
@@ -105,19 +96,6 @@ open class JsonRpcClientBase(val url: String, interceptor: Interceptor? = null) 
                 }
                 throw Exception("Got an error (${httpResponse.code}) - $httpResponseBody")
             }
-        }
-    }
-
-    inline fun <reified T> getValue(requestString: String, logResponseBody: Boolean = true): T {
-        val jsonElement = call(requestString, logResponseBody)
-        return json.decodeFromJsonElement(jsonElement)
-    }
-
-    private fun abbreviateString(value: String): String {
-        return if (value.length < 4096) {
-            value
-        } else {
-            "${value.substring(0, 2048)} ... ${value.substring(value.length - 2048, value.length)}"
         }
     }
 }

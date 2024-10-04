@@ -34,12 +34,12 @@ abstract class RepeaterBaseTask(
                     notifyDbListener(REPEATER_APP_TASK_DONE_CHANNEL, name)
                 }
             } catch (t: Throwable) {
-                logger.error(t) { "Error running ${this.javaClass.simpleName}" }
+                logger.error(t) { "Error running repeater task $name" }
             } finally {
                 maxPlannedExecutionTime?.let { maxExecutionTime ->
                     val executionTime = Clock.System.now() - startTime
                     if (executionTime > maxExecutionTime) {
-                        logger.error { "The execution time of ${this.javaClass.simpleName} ($executionTime) has exceeded the maximum planned time ($maxExecutionTime). Please consider optimizing it." }
+                        logger.error { "The execution time of repeater task $name ($executionTime) has exceeded the maximum planned time ($maxExecutionTime). Please consider optimizing it." }
                     }
                 }
                 try {
@@ -54,7 +54,7 @@ abstract class RepeaterBaseTask(
                 }
             }
         } else {
-            logger.warn { "Could not acquire lock for ${this.javaClass.simpleName}, skipping" }
+            logger.warn { "Could not acquire lock for repeater task $name, skipping" }
         }
     }
 

@@ -1,6 +1,7 @@
 package xyz.funkybit.core.repeater
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.apache.commons.lang3.concurrent.BasicThreadFactory
 import org.jetbrains.exposed.sql.Database
 import xyz.funkybit.core.repeater.tasks.ArchTokenStateSetupTask
 import xyz.funkybit.core.repeater.tasks.BroadcasterJobsCleanupTask
@@ -32,7 +33,7 @@ class Repeater(db: Database, private val automaticTaskScheduling: Boolean = true
         ProgramUtxoRefresherTask(),
     ).associateBy { it.name }
 
-    private val timer = ScheduledThreadPoolExecutor(8)
+    private val timer = ScheduledThreadPoolExecutor(8, BasicThreadFactory.Builder().namingPattern("repeater-pool-%d").build())
 
     private val pgListener = PgListener(db, "repeater_app_task-listener", REPEATER_APP_TASK_CTL_CHANNEL, {}) { notification ->
         var repeaterTaskName = notification.parameter

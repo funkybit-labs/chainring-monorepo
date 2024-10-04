@@ -5,6 +5,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.blockchain.evm.EvmChainManager
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.KeyValueStore
+import xyz.funkybit.core.utils.HttpClient
 import java.math.BigInteger
 import kotlin.time.Duration.Companion.seconds
 
@@ -22,26 +23,31 @@ class GasMonitorTask : RepeaterBaseTask(
     }
 
     override fun runWithLock() {
-        EvmChainManager.getEvmClients().forEach {
-            // set minimum amount to be equivalent to minimum gas units (or 100,000,000 if not specified) at the max
-            // priority fee, as this scales well with the actual gas needed
-            val minimumGas = (minimumGasUnitsOverride ?: BigInteger.valueOf(100_000_000L)) * it.gasProvider.getMaxPriorityFeePerGas(null)
-            val availableGas = it.getNativeBalance(it.submitterAddress)
+        try {
+            HttpClient.setQuietModeForThread(true)
+            EvmChainManager.getEvmClients().forEach {
+                // set minimum amount to be equivalent to minimum gas units (or 100,000,000 if not specified) at the max
+                // priority fee, as this scales well with the actual gas needed
+                val minimumGas = (minimumGasUnitsOverride ?: BigInteger.valueOf(100_000_000L)) * it.gasProvider.getMaxPriorityFeePerGas(null)
+                val availableGas = it.getNativeBalance(it.submitterAddress)
 
-            transaction {
-                if (availableGas < minimumGas) {
-                    if (!isWarned(it.chainId)) {
-                        logger.error {
-                            "Low gas alert for submitter ${it.submitterAddress} on ${it.chainId}: only $availableGas available, need a minimum of $minimumGas"
+                transaction {
+                    if (availableGas < minimumGas) {
+                        if (!isWarned(it.chainId)) {
+                            logger.error {
+                                "Low gas alert for submitter ${it.submitterAddress} on ${it.chainId}: only $availableGas available, need a minimum of $minimumGas"
+                            }
+                            setWarned(it.chainId, true)
                         }
-                        setWarned(it.chainId, true)
+                    } else {
+                        setWarned(it.chainId, false)
                     }
-                } else {
-                    setWarned(it.chainId, false)
                 }
             }
+            minimumGasUnitsOverride = null
+        } finally {
+            HttpClient.setQuietModeForThread(false)
         }
-        minimumGasUnitsOverride = null
     }
 
     private fun isWarned(chainId: ChainId): Boolean =
