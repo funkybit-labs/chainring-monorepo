@@ -46,7 +46,7 @@ class DepositRoutes(private val exchangeApiService: ExchangeApiService) {
                 requestBody to CreateDepositApiRequest(
                     symbol = Symbol("USDC"),
                     amount = BigInteger.valueOf(1000),
-                    txHash = TxHash.emptyHash(),
+                    txHash = TxHash.emptyHash,
                 ),
             )
             returning(

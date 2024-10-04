@@ -58,7 +58,7 @@ class ArchSettlementTest : OrderBaseTest() {
         val config = TestApiClient.getConfiguration()
         val bitcoinChain = config.bitcoinChain
         btcArch = bitcoinChain.symbols.first()
-        ArchUtils.tokenAccountSizeThreshold = 10_000_000
+        ArchUtils.walletsPerTokenAccountThreshold = 100_000
     }
 
     @Test
@@ -432,7 +432,7 @@ class ArchSettlementTest : OrderBaseTest() {
             }
         }
 
-        ArchUtils.tokenAccountSizeThreshold = 50
+        ArchUtils.walletsPerTokenAccountThreshold = 1
 
         val (takerApiClient, takerEvmWallet, takerWsClient, takerBitcoinWallet) = setupTrader(
             market.id,
@@ -459,7 +459,7 @@ class ArchSettlementTest : OrderBaseTest() {
             assertEquals(2, ArchAccountEntity.findTokenAccountsForSymbol(SymbolEntity.forName(btcArch.name)).size)
         }
 
-        ArchUtils.tokenAccountSizeThreshold = 10_000_000
+        ArchUtils.walletsPerTokenAccountThreshold = 100_000
 
         val (makerApiClient, makerEvmWallet, makerWsClient, makerBitcoinWallet) = setupTrader(
             market.id,

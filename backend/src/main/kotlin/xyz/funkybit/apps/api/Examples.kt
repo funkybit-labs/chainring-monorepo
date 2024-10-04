@@ -161,7 +161,7 @@ object Examples {
         status = WithdrawalStatus.Pending,
         error = null,
         createdAt = Clock.System.now(),
-        txHash = TxHash.emptyHash(),
+        txHash = TxHash.emptyHash,
         fee = BigInteger("20"),
     )
 
@@ -172,7 +172,7 @@ object Examples {
         status = Deposit.Status.Pending,
         error = null,
         createdAt = Clock.System.now(),
-        txHash = TxHash.emptyHash(),
+        txHash = TxHash.emptyHash,
     )
 
     val getOrderBookApiResponse = GetOrderBookApiResponse(

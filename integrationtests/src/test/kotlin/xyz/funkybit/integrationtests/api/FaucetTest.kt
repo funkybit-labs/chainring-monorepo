@@ -36,7 +36,7 @@ class FaucetTest {
                 assertEquals(nativeSymbol, it.symbol)
                 assertEquals(BigInteger("1000000000000000000"), it.amount)
                 assertEquals(chain.id, it.chainId)
-                assertNotEquals(TxHash.emptyHash(), it.txHash)
+                assertNotEquals(TxHash.emptyHash, it.txHash)
             }
 
             await
@@ -72,7 +72,7 @@ class FaucetTest {
                 assertEquals(erc20Symbol, it.symbol)
                 assertEquals(BigInteger("1000000000000000000"), it.amount)
                 assertEquals(chain.id, it.chainId)
-                assertNotEquals(TxHash.emptyHash(), it.txHash)
+                assertNotEquals(TxHash.emptyHash, it.txHash)
             }
 
             await

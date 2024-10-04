@@ -14,6 +14,7 @@ import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.ConfirmedBitcoinDeposit
 import xyz.funkybit.core.model.EvmAddress
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.bitcoin.ArchAccountState
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexEntity
 import xyz.funkybit.core.model.db.ArchAccountBalanceIndexStatus
@@ -199,10 +200,10 @@ class ArchTransactionHandler(
                     if (processedTx.status == ArchNetworkRpc.Status.Processed) {
                         archTransaction.markAsCompleted()
                         val assignments = assigningBalanceIndexUpdates.groupBy { it.archAccountAddress }.flatMap { (pubkey, updates) ->
-                            val (tokenAccountState, size) = ArchUtils.getAccountStateAndSize<ArchAccountState.Token>(pubkey)
+                            val tokenAccountState = ArchUtils.getAccountState<ArchAccountState.Token>(pubkey)
                             val balances = tokenAccountState.balances.reversed()
                             updates.map { update ->
-                                val index = balances.indexOfFirst { it.walletAddress == update.walletAddress.value }
+                                val index = balances.indexOfFirst { it.walletAddress == update.walletAddress }
                                 if (index == -1) {
                                     // throw an error since we did not find it
                                     throw Exception("Did not find an index for wallet ${update.walletAddress.value}")
@@ -213,7 +214,7 @@ class ArchTransactionHandler(
                                 )
                             }.also {
                                 ArchAccountEntity.getByPubkey(pubkey)?.let {
-                                    if (size > getTokenAccountSizeThreshold()) {
+                                    if (tokenAccountState.balances.size > getWalletsPerTokenAccountThreshold()) {
                                         it.markAsFull()
                                     }
                                 }
@@ -242,10 +243,8 @@ class ArchTransactionHandler(
         }
     }
 
-    private fun getTokenAccountSizeThreshold(): Int {
-        // this threshold is below the 10MB limit (10485760), once we cross this threshold
-        // we initiate the creation of a new token account that new balances will be assigned to
-        return ArchUtils.tokenAccountSizeThreshold
+    private fun getWalletsPerTokenAccountThreshold(): Int {
+        return ArchUtils.walletsPerTokenAccountThreshold
     }
 
     private fun settlementBatchInProgress(chainId: ChainId) =
@@ -379,7 +378,7 @@ class ArchTransactionHandler(
                         ) { _, error ->
                             if (error == null) {
                                 val onChainBatchHash = getOnChainBatchHash(retryIfEmpty = true)
-                                if (onChainBatchHash != inProgressBatch.preparationTx.batchHash) {
+                                if (onChainBatchHash.value != inProgressBatch.preparationTx.batchHash) {
                                     val errorMsg = "Batch hash mismatch for settlement batch ${inProgressBatch.guid.value}, on chain value: $onChainBatchHash, db value: ${inProgressBatch.preparationTx.batchHash}"
                                     logger.error { errorMsg }
                                     inProgressBatch.markAsFailed(errorMsg)
@@ -447,15 +446,15 @@ class ArchTransactionHandler(
         }
     }
 
-    private fun batchInProgressOnChain() = getOnChainBatchHash().isNotEmpty()
+    private fun batchInProgressOnChain() = getOnChainBatchHash() != TxHash.emptyHashArch
 
-    private fun getOnChainBatchHash(retryIfEmpty: Boolean = false): String {
+    private fun getOnChainBatchHash(retryIfEmpty: Boolean = false): TxHash {
         val batchHash = ArchUtils.getAccountState<ArchAccountState.Program>(programStateAccount.rpcPubkey()).settlementBatchHash
-        if (batchHash.isEmpty() && retryIfEmpty) {
+        if (batchHash == TxHash.emptyHashArch && retryIfEmpty) {
             (1..3).forEach { i ->
                 logger.debug { "got an empty batch hash - retry $i" }
                 ArchUtils.getAccountState<ArchAccountState.Program>(programStateAccount.rpcPubkey()).settlementBatchHash.let {
-                    if (it.isNotEmpty()) {
+                    if (it != TxHash.emptyHashArch) {
                         return it
                     }
                     Thread.sleep(500)

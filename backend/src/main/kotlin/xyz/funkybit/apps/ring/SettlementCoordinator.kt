@@ -519,6 +519,7 @@ class SettlementCoordinator(
 
     private fun completeSettlement(trades: List<TradeEntity>, chainBlockNumbers: Map<ChainId, BigInteger?>) {
         val broadcasterNotifications = mutableListOf<BroadcasterNotification>()
+        val archTokenAccountMap = mutableMapOf<ArchNetworkRpc.Pubkey, ByteArray>()
 
         trades.forEach { tradeEntity ->
             val executions = tradeEntity.executions
@@ -566,10 +567,10 @@ class SettlementCoordinator(
                 val baseSymbolChainId = symbolMap.getValue(market.baseSymbolGuid.value).chainId.value
                 val quoteSymbolChainId = symbolMap.getValue(market.quoteSymbolGuid.value).chainId.value
                 if (baseSymbolChainId == quoteSymbolChainId) {
-                    updateBalances(wallets, symbols, baseSymbolChainId, chainBlockNumbers[baseSymbolChainId])
+                    updateBalances(wallets, symbols, baseSymbolChainId, chainBlockNumbers[baseSymbolChainId], archTokenAccountMap)
                 } else {
-                    updateBalances(wallets, listOf(market.baseSymbolGuid.value), baseSymbolChainId, chainBlockNumbers[baseSymbolChainId])
-                    updateBalances(wallets, listOf(market.quoteSymbolGuid.value), quoteSymbolChainId, chainBlockNumbers[quoteSymbolChainId])
+                    updateBalances(wallets, listOf(market.baseSymbolGuid.value), baseSymbolChainId, chainBlockNumbers[baseSymbolChainId], archTokenAccountMap)
+                    updateBalances(wallets, listOf(market.quoteSymbolGuid.value), quoteSymbolChainId, chainBlockNumbers[quoteSymbolChainId], archTokenAccountMap)
                 }
 
                 wallets.forEach { wallet ->
@@ -593,7 +594,7 @@ class SettlementCoordinator(
         publishBroadcasterNotifications(broadcasterNotifications)
     }
 
-    private fun updateBalances(wallets: List<WalletEntity>, symbolIds: List<SymbolId>, chainId: ChainId, blockNumber: BigInteger?) {
+    private fun updateBalances(wallets: List<WalletEntity>, symbolIds: List<SymbolId>, chainId: ChainId, blockNumber: BigInteger?, archTokenAccountMap: MutableMap<ArchNetworkRpc.Pubkey, ByteArray>) {
         val chainWallets = wallets.map { if (it.networkType == chainId.networkType()) it else it.authorizedWallet(chainId.networkType())!! }
         val finalExchangeBalances = when (chainId.networkType()) {
             NetworkType.Evm -> {
@@ -613,9 +614,10 @@ class SettlementCoordinator(
                 chainWallets.associate { wallet ->
                     wallet.address to symbolIds.associate {
                         val entry = balanceIndexes[WalletAndSymbol(wallet.id.value, it)]!!
-                        EvmAddress.zero as Address to ArchUtils.getAccountState<ArchAccountState.Token>(
-                            entry.archAccount.rpcPubkey(),
-                        ).balances[entry.addressIndex].balance.toLong().toBigInteger()
+                        EvmAddress.zero as Address to ArchAccountState.Token.getBalanceAtIndex(
+                            archTokenAccountMap.getOrPut(entry.archAccount.rpcPubkey()) { ArchUtils.getAccountData(entry.archAccount.rpcPubkey()) },
+                            entry.addressIndex,
+                        ).balance.toLong().toBigInteger()
                     }
                 }.also {
                     logger.debug { "Arch balances are $it" }

@@ -84,7 +84,7 @@ class BitcoinWallet(
                 val tokenAccountPubKey = archAccountBalanceIndexEntity.archAccount.rpcPubkey()
                 val addressIndex = archAccountBalanceIndexEntity.addressIndex
                 val tokenState = ArchUtils.getAccountState<ArchAccountState.Token>(tokenAccountPubKey)
-                assert(tokenState.balances[addressIndex].walletAddress == walletAddress.value)
+                assert(tokenState.balances[addressIndex].walletAddress == walletAddress)
                 tokenState.balances[addressIndex].balance.toLong().toBigInteger()
             } ?: BigInteger.ZERO
         }
