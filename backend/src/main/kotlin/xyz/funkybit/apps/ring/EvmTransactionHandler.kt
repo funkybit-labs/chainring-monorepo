@@ -525,7 +525,7 @@ class EvmTransactionHandler(
     private fun submitToBlockchain(tx: BlockchainTransactionEntity) {
         val submitterNonce = BlockchainNonceEntity.getOrCreateForUpdate(evmClient.submitterAddress, chainId)
         try {
-            val nonce = submitterNonce.nonce?.let { it + BigInteger.ONE } ?: getConsistentNonce(submitterNonce.key)
+            val nonce = submitterNonce.nonce?.let { it + BigInteger.ONE } ?: evmClient.getConsistentNonce(submitterNonce.key)
             logger.debug { "sending Tx with nonce $nonce" }
             val txHash = sendPendingTransaction(tx.transactionData, nonce)
             submitterNonce.nonce = nonce
@@ -541,7 +541,7 @@ class EvmTransactionHandler(
     private fun rollbackOnChain() {
         try {
             val submitterNonce = BlockchainNonceEntity.getOrCreateForUpdate(evmClient.submitterAddress, chainId)
-            val nonce = submitterNonce.nonce?.let { it + BigInteger.ONE } ?: getConsistentNonce(submitterNonce.key)
+            val nonce = submitterNonce.nonce?.let { it + BigInteger.ONE } ?: evmClient.getConsistentNonce(submitterNonce.key)
             sendPendingTransaction(
                 BlockchainTransactionData(
                     evmClient.encodeRollbackBatchFunctionCall(),
@@ -590,7 +590,7 @@ class EvmTransactionHandler(
 
     private fun getTxHash(transactionData: BlockchainTransactionData): TxHash {
         val submitterNonce = BlockchainNonceEntity.getOrCreateForUpdate(evmClient.submitterAddress, chainId)
-        val nonce = getConsistentNonce(submitterNonce.key)
+        val nonce = evmClient.getConsistentNonce(submitterNonce.key)
 
         val txManager = evmClient.getTxManager(nonce)
         val gasProvider = evmClient.gasProvider
@@ -621,22 +621,6 @@ class EvmTransactionHandler(
         return receipt.gasUsed?.let { gasUsed ->
             (gasUsed * Numeric.decodeQuantity(receipt.effectiveGasPrice))
         }
-    }
-
-    private fun getConsistentNonce(address: String): BigInteger {
-        // this logic handles the fact that all RPC nodes may not be in sync, so we try to get a consistent nonce
-        // by making multiple calls until we get a consistent value. Subsequently, we keep track of it ourselves.
-        var isConsistent = false
-        var candidateNonce: BigInteger? = null
-        while (!isConsistent) {
-            candidateNonce = evmClient.getNonce(address)
-            isConsistent = (1..2).map { evmClient.getNonce(address) }.all { it == candidateNonce }
-            if (!isConsistent) {
-                logger.error { "Got inconsistent nonces, retrying" }
-                Thread.sleep(100)
-            }
-        }
-        return candidateNonce!!
     }
 
     private fun createNextWithdrawalBatch(): Boolean {
