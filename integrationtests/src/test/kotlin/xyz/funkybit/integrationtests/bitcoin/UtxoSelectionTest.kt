@@ -122,7 +122,9 @@ class UtxoSelectionTest {
             BitcoinClient.sendToAddress(address, BigInteger("3000"))
         }
 
-        waitForTx(address, txIds.last())
+        txIds.forEach {
+            waitForTx(address, it)
+        }
         val initialUnspentUtxos = transaction {
             UtxoManager.getAllUnspent(address)
         }

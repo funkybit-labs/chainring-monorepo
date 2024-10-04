@@ -489,8 +489,8 @@ object ArchUtils {
         return signAndSendInstructions(listOf(instruction), privateKey ?: bitcoinConfig.submitterPrivateKey)
     }
 
-    fun getConfirmedBitcoinDeposits(): List<ConfirmedBitcoinDeposit> {
-        val confirmedDeposits = DepositEntity.getConfirmedForUpdate(bitcoinConfig.chainId)
+    fun getConfirmedBitcoinDeposits(limit: Int): List<ConfirmedBitcoinDeposit> {
+        val confirmedDeposits = DepositEntity.getConfirmedForUpdate(bitcoinConfig.chainId, limit = limit)
         val walletAndSymbols = confirmedDeposits.map { WalletAndSymbol(it.walletGuid.value, it.symbolGuid.value) }.toSet()
         val walletsAndSymbolsWithAssignedIndex = retrieveOrCreateBalanceIndexes(walletAndSymbols, returnAssignedIndexes = true)!!
         return confirmedDeposits.mapNotNull { deposit ->
