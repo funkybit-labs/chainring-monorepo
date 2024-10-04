@@ -18,13 +18,16 @@ import org.http4k.lens.int
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.middleware.principal
 import xyz.funkybit.apps.api.middleware.signedTokenSecurity
+import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.Card
 import xyz.funkybit.apps.api.model.Enroll
 import xyz.funkybit.apps.api.model.Leaderboard
 import xyz.funkybit.apps.api.model.LeaderboardEntry
+import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.RequestProcessingError
 import xyz.funkybit.apps.api.model.SetAvatarUrl
 import xyz.funkybit.apps.api.model.SetNickname
+import xyz.funkybit.apps.api.model.errorResponse
 import xyz.funkybit.apps.api.model.processingError
 import xyz.funkybit.apps.api.model.testnetChallengeDisqualifiedError
 import xyz.funkybit.core.blockchain.evm.EvmChainManager
@@ -80,15 +83,19 @@ class TestnetChallengeRoutes {
                         gasAmount = TestnetChallengeUtils.gasDepositAmount,
                     )
 
-                    user.testnetChallengeStatus = TestnetChallengeStatus.PendingAirdrop
-                    user.testnetAirdropTxHash = txHash.value
+                    if (txHash != null) {
+                        user.testnetChallengeStatus = TestnetChallengeStatus.PendingAirdrop
+                        user.testnetAirdropTxHash = txHash.value
 
-                    body.inviteCode?.let {
-                        UserEntity.findByInviteCode(body.inviteCode)?.let { invitor ->
-                            if (user.guid != invitor.guid) {
-                                user.invitedBy = invitor.guid
+                        body.inviteCode?.let {
+                            UserEntity.findByInviteCode(body.inviteCode)?.let { invitor ->
+                                if (user.guid != invitor.guid) {
+                                    user.invitedBy = invitor.guid
+                                }
                             }
                         }
+                    } else {
+                        return@transaction errorResponse(Status.UNPROCESSABLE_ENTITY, ApiError(ReasonCode.UnexpectedError, "Enrollment failed"))
                     }
                 }
                 Response(Status.OK)

@@ -43,12 +43,14 @@ import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.EvmSignature
 import xyz.funkybit.core.model.TxHash
+import xyz.funkybit.core.model.db.BlockchainNonceEntity
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.evm.EvmSettlement
 import xyz.funkybit.core.model.toEvmSignature
 import xyz.funkybit.core.utils.fromFundamentalUnits
 import xyz.funkybit.core.utils.quietMode
+import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.core.utils.toHexBytes
 import java.math.BigDecimal
@@ -146,6 +148,9 @@ open class EvmClient(val config: EvmClientConfig) {
 
     protected val submitterCredentials = Credentials.create(config.submitterPrivateKeyHex)
     val submitterAddress: EvmAddress = submitterCredentials.checksumAddress()
+
+    private val airdropperCredentials: Credentials = Credentials.create(config.airdropperPrivateKeyHex)
+    val airdropperAddress: EvmAddress = airdropperCredentials.checksumAddress()
 
     val gasProvider = GasProvider(
         contractCreationLimit = config.contractCreationLimit,
@@ -381,6 +386,22 @@ open class EvmClient(val config: EvmClientConfig) {
         return web3j.ethGetTransactionCount(address, DefaultBlockParameterName.PENDING).send().transactionCount
     }
 
+    fun getConsistentNonce(address: String): BigInteger {
+        // this logic handles the fact that all RPC nodes may not be in sync, so we try to get a consistent nonce
+        // by making multiple calls until we get a consistent value. Subsequently, we keep track of it ourselves.
+        var isConsistent = false
+        var candidateNonce: BigInteger? = null
+        while (!isConsistent) {
+            candidateNonce = getNonce(address)
+            isConsistent = (1..2).map { getNonce(address) }.all { it == candidateNonce }
+            if (!isConsistent) {
+                logger.error { "Got inconsistent nonces, retrying" }
+                Thread.sleep(100)
+            }
+        }
+        return candidateNonce!!
+    }
+
     fun extractRevertReasonFromSimulation(data: String, blockNumber: BigInteger): String? {
         val response = web3j.ethCall(
             Transaction.createEthCallTransaction(
@@ -433,17 +454,27 @@ open class EvmClient(val config: EvmClientConfig) {
     suspend fun asyncGetERC20Balance(erc20Address: EvmAddress, walletAddress: EvmAddress): BigInteger =
         loadERC20(erc20Address).balanceOf(walletAddress.value).sendAsync().await()
 
-    fun sendTransaction(address: Address, data: String, amount: BigInteger): TxHash =
-        transactionManager.sendTransaction(
+    fun sendTransaction(address: Address, data: String, amount: BigInteger, nonceOverride: BigInteger? = null): TxHash {
+        val txManager = nonceOverride
+            ?.let { TransactionManagerWithNonceOverride(web3j, credentials, nonceOverride) }
+            ?: transactionManager
+
+        return txManager.sendTransaction(
             web3j.ethGasPrice().send().gasPrice,
             gasProvider.gasLimit,
             address.toString(),
             data,
             amount,
         ).transactionHash.let { TxHash(it) }
+    }
 
-    fun sendNativeDepositTx(address: Address, amount: BigInteger): TxHash =
-        sendTransaction(address, "", amount)
+    fun sendNativeDepositTx(address: Address, amount: BigInteger, nonceOverride: BigInteger? = null): TxHash =
+        sendTransaction(
+            address = address,
+            data = "",
+            amount = amount,
+            nonceOverride = nonceOverride,
+        )
 
     fun batchHash(block: DefaultBlockParam): String =
         exchangeContractCall(block, Exchange::batchHash).toHex(false)
@@ -458,28 +489,32 @@ open class EvmClient(val config: EvmClientConfig) {
         tokenContractAddress: EvmAddress,
         receiver: EvmAddress,
         amount: BigInteger,
+        nonceOverride: BigInteger? = null,
     ): TxHash =
         sendTransaction(
-            tokenContractAddress,
-            MockERC20
+            address = tokenContractAddress,
+            data = MockERC20
                 .load(tokenContractAddress.value, web3j, transactionManager, gasProvider)
                 .mint(receiver.value, amount)
                 .encodeFunctionCall(),
-            BigInteger.ZERO,
+            amount = BigInteger.ZERO,
+            nonceOverride = nonceOverride,
         )
 
     fun sendTransferERC20Tx(
         tokenContractAddress: EvmAddress,
         receiver: EvmAddress,
         amount: BigInteger,
+        nonceOverride: BigInteger? = null,
     ): TxHash =
         sendTransaction(
-            tokenContractAddress,
-            MockERC20
+            address = tokenContractAddress,
+            data = MockERC20
                 .load(tokenContractAddress.value, web3j, transactionManager, gasProvider)
                 .transfer(receiver.value, amount)
                 .encodeFunctionCall(),
-            BigInteger.ZERO,
+            amount = BigInteger.ZERO,
+            nonceOverride = nonceOverride,
         )
 
     fun getFeeAccountAddress(block: DefaultBlockParam): EvmAddress =
@@ -515,25 +550,39 @@ open class EvmClient(val config: EvmClientConfig) {
 class AirdropperEvmClient(private val evmClient: EvmClient) {
     val logger = KotlinLogging.logger {}
 
-    fun testnetChallengeAirdrop(address: Address, tokenSymbol: SymbolEntity, tokenAmount: BigDecimal, gasSymbol: SymbolEntity, gasAmount: BigDecimal): TxHash {
-        logger.debug { "Sending $gasAmount ${gasSymbol.name} to $address" }
+    fun testnetChallengeAirdrop(address: Address, tokenSymbol: SymbolEntity, tokenAmount: BigDecimal, gasSymbol: SymbolEntity, gasAmount: BigDecimal): TxHash? {
+        val airdropperNonce = BlockchainNonceEntity.getOrCreateForUpdate(evmClient.airdropperAddress, evmClient.chainId)
+        var nonce = airdropperNonce.nonce?.let { it + BigInteger.ONE } ?: evmClient.getConsistentNonce(airdropperNonce.key)
 
-        val gasAmountInFundamentalUnits = gasAmount.movePointRight(gasSymbol.decimals.toInt()).toBigInteger()
-        evmClient.sendNativeDepositTx(
-            address,
-            gasAmountInFundamentalUnits,
-        )
+        try {
+            logger.debug { "Sending $gasAmount ${gasSymbol.name} to $address" }
+            val gasAmountInFundamentalUnits = gasAmount.toFundamentalUnits(gasSymbol.decimals)
+            evmClient.sendNativeDepositTx(
+                address = address,
+                amount = gasAmountInFundamentalUnits,
+                nonceOverride = nonce,
+            )
 
-        logger.debug { "Sending $tokenAmount ${tokenSymbol.name} to $address" }
+            logger.debug { "Sending $tokenAmount ${tokenSymbol.name} to $address" }
+            val amountInFundamentalUnits = tokenAmount.toFundamentalUnits(tokenSymbol.decimals)
+            val tokenContractAddress = tokenSymbol.contractAddress as? EvmAddress
+                ?: throw RuntimeException("Only ERC-20s supported for testnet challenge deposit symbol")
+            nonce += BigInteger.ONE
+            val txHash = evmClient.sendTransferERC20Tx(
+                tokenContractAddress = tokenContractAddress,
+                receiver = address as EvmAddress,
+                amount = amountInFundamentalUnits,
+                nonceOverride = nonce,
+            )
 
-        val amountInFundamentalUnits = tokenAmount.movePointRight(tokenSymbol.decimals.toInt()).toBigInteger()
-        val tokenContractAddress = tokenSymbol.contractAddress as? EvmAddress
-            ?: throw RuntimeException("Only ERC-20s supported for testnet challenge deposit symbol")
+            airdropperNonce.nonce = nonce
 
-        return evmClient.sendTransferERC20Tx(
-            tokenContractAddress,
-            address as EvmAddress,
-            amountInFundamentalUnits,
-        )
+            return txHash
+        } catch (e: Exception) {
+            logger.error(e) { "Error during testnet challenge airdrop, resetting nonce." }
+            airdropperNonce.nonce = null
+
+            return null
+        }
     }
 }
