@@ -27,11 +27,13 @@ import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.sequencer.toSequencerId
 import xyz.funkybit.core.services.LinkedSignerService
+import xyz.funkybit.core.utils.HttpClient
 import xyz.funkybit.core.utils.rangeTo
-import xyz.funkybit.core.utils.verboseInfo
 import xyz.funkybit.sequencer.core.Asset
 import java.math.BigInteger
 import kotlin.concurrent.thread
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 class EvmBlockProcessor(
     private val evmClient: EvmClient,
@@ -39,6 +41,9 @@ class EvmBlockProcessor(
     private val pollingIntervalInMs: Long =
         System.getenv("EVM_BLOCK_PROCESSOR_POLLING_INTERVAL_MS")?.toLongOrNull()
             ?: 1000L,
+    private val statusReportInterval: Duration =
+        System.getenv("EVM_BLOCK_PROCESSOR_STATUS_REPORT_INTERVAL_MINUTES")?.toInt()?.minutes
+            ?: 1.minutes,
 ) {
     val logger = KotlinLogging.logger {}
     private val chainId = evmClient.chainId
@@ -55,6 +60,10 @@ class EvmBlockProcessor(
         logger.debug { "Starting block processor, chainId=$chainId" }
 
         workerThread = thread(start = true, name = "block-processor-$chainId", isDaemon = true) {
+            HttpClient.setQuietModeForThread(true)
+            var processedBlocksCount = 0L
+            var statusReportedAt = Clock.System.now()
+
             while (true) {
                 try {
                     val blocksToProcess = transaction {
@@ -70,8 +79,6 @@ class EvmBlockProcessor(
                     }
 
                     for (blockNumber in blocksToProcess) {
-                        logger.verboseInfo { "Processing block $blockNumber, chainId=$chainId" }
-
                         val blockFromRpcNode = evmClient.getBlock(blockNumber, withFullTxObjects = false)
                         val lastProcessedBlock = transaction { getLastProcessedBlock() }
                         if (lastProcessedBlock == null || blockFromRpcNode.parentHash == lastProcessedBlock.hash) {
@@ -83,6 +90,12 @@ class EvmBlockProcessor(
                                 handleFork(blockFromRpcNode, lastProcessedBlock)
                             }
                             break
+                        }
+                        processedBlocksCount += 1
+                        val now = Clock.System.now()
+                        if (now - statusReportedAt > statusReportInterval) {
+                            statusReportedAt = now
+                            logger.info { "Processed $processedBlocksCount blocks, latest block number: $blockNumber" }
                         }
                     }
                     Thread.sleep(pollingIntervalInMs)
@@ -97,7 +110,6 @@ class EvmBlockProcessor(
     }
 
     private fun processBlock(blockFromRpcNode: EthBlock.Block) {
-        logger.verboseInfo { "Storing block [number=${blockFromRpcNode.number},hash=${blockFromRpcNode.hash},parentHash=${blockFromRpcNode.parentHash}], chainId=$chainId" }
         BlockEntity.create(blockFromRpcNode, chainId)
 
         val getLogsResult = evmClient.getExchangeContractLogs(blockFromRpcNode.number)

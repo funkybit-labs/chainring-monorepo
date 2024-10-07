@@ -44,7 +44,7 @@ object UtxoManager {
     }
 
     private fun refresh(walletAddress: BitcoinAddress, addressInfo: BitcoinUtxoAddressMonitorEntity): Long? {
-        logger.debug { "updating utxos for $walletAddress lastSeenBlockHeight=${addressInfo.lastSeenBlockHeight}" }
+        logger.info { "updating utxos for $walletAddress lastSeenBlockHeight=${addressInfo.lastSeenBlockHeight}" }
 
         // mempool pagination is a little odd
         // when the address/{addr}/txs endpoint for an address is called with no after-txid query param it will return
@@ -100,7 +100,7 @@ object UtxoManager {
         }
         spentUtxoMap.forEach { (txId, spentUtxos) ->
             if (spentUtxos.isNotEmpty()) {
-                logger.debug { "spending $spentUtxos by $txId" }
+                logger.info { "spending $spentUtxos by $txId" }
                 BitcoinUtxoEntity.spend(spentUtxos, txId)
             }
         }

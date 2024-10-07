@@ -3,6 +3,7 @@ package xyz.funkybit.utils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import xyz.funkybit.core.blockchain.bitcoin.BitcoinClient
 import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
+import xyz.funkybit.core.utils.HttpClient
 import kotlin.concurrent.thread
 
 object BitcoinMiner {
@@ -16,6 +17,8 @@ object BitcoinMiner {
         }
 
         miningThread = thread(start = true, name = "bitcoin mining", isDaemon = true) {
+            HttpClient.setQuietModeForThread(true)
+
             while (true) {
                 try {
                     BitcoinClient.mine(1)

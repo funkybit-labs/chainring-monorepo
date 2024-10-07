@@ -7,13 +7,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import xyz.funkybit.apps.api.model.BigIntegerJson
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.TxHash
+import xyz.funkybit.core.utils.HttpClient
+import xyz.funkybit.core.utils.withLogging
 
 sealed class MempoolSpaceApi {
     @Serializable
@@ -89,9 +90,9 @@ sealed class MempoolSpaceApi {
 }
 
 object MempoolSpaceClient {
-
-    val apiServerRootUrl = System.getenv("MEMPOOL_SPACE_API_URL") ?: "http://localhost:1080/api"
-    val httpClient = OkHttpClient.Builder().build()
+    val logger = KotlinLogging.logger {}
+    private val apiServerRootUrl = System.getenv("MEMPOOL_SPACE_API_URL") ?: "http://localhost:1080/api"
+    private val httpClient = HttpClient.newBuilder().withLogging(logger).build()
 
     @OptIn(ExperimentalSerializationApi::class)
     val json = Json {
@@ -100,7 +101,6 @@ object MempoolSpaceClient {
         isLenient = true
         explicitNulls = false
     }
-    val logger = KotlinLogging.logger {}
 
     private val mediaType = "text/plain".toMediaTypeOrNull()
 
@@ -108,7 +108,6 @@ object MempoolSpaceClient {
     private val maxFee = bitcoinConfig.feeSettings.maxValue.toBigInteger()
 
     private fun execute(request: Request): Response {
-        logger.debug { "Request -> ${request.method} ${request.url}" }
         return httpClient.newCall(request).execute()
     }
 
@@ -159,7 +158,7 @@ object MempoolSpaceClient {
         return stats.chainStats.fundedTxoSum + stats.mempoolStats.fundedTxoSum - stats.chainStats.spentTxoSum - stats.mempoolStats.spentTxoSum
     }
 
-    fun getRecommendedFees(): MempoolSpaceApi.RecommendedFees {
+    private fun getRecommendedFees(): MempoolSpaceApi.RecommendedFees {
         return execute(
             Request.Builder()
                 .url("$apiServerRootUrl/fees/recommended".toHttpUrl().newBuilder().build())
@@ -186,7 +185,6 @@ object MempoolSpaceClient {
 
     private inline fun <reified T> Response.toPayload(): T {
         val bodyString = body?.string()
-        logger.debug { "Response($code) <- $bodyString" }
         if (!isSuccessful) {
             logger.warn { "API call failed with code=$code, body=$bodyString" }
             throw Exception(bodyString ?: "Unknown Error")

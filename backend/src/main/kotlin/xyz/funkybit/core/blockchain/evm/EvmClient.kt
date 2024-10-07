@@ -4,15 +4,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import okhttp3.MediaType
-import okhttp3.OkHttpClient
-import okhttp3.ResponseBody.Companion.toResponseBody
-import okio.Buffer
 import org.web3j.abi.DefaultFunctionEncoder
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.ECKeyPair
@@ -48,11 +39,12 @@ import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.evm.EvmSettlement
 import xyz.funkybit.core.model.toEvmSignature
+import xyz.funkybit.core.utils.HttpClient
 import xyz.funkybit.core.utils.fromFundamentalUnits
-import xyz.funkybit.core.utils.quietMode
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.core.utils.toHexBytes
+import xyz.funkybit.core.utils.withLogging
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.jvm.optionals.getOrNull
@@ -125,8 +117,11 @@ sealed class DefaultBlockParam {
 }
 
 open class EvmClient(val config: EvmClientConfig) {
-    protected val web3jService: HttpService = httpService(config.url, config.enableWeb3jLogging)
-    protected val web3jServiceNoLogging: HttpService = httpService(config.url, logging = false)
+    protected val logger = KotlinLogging.logger {}
+    protected val web3jService: HttpService = HttpService(
+        config.url,
+        HttpClient.newBuilder().withLogging(logger).build(),
+    )
     protected val web3j: Web3j = Web3j.build(
         web3jService,
         config.pollingIntervalInMs,
@@ -160,50 +155,6 @@ open class EvmClient(val config: EvmClientConfig) {
         web3j = web3j,
     )
     private val contractMap = mutableMapOf<ContractType, Address>()
-
-    companion object {
-        val logger = KotlinLogging.logger {}
-        fun httpService(url: String, logging: Boolean): HttpService {
-            val builder = OkHttpClient.Builder()
-
-            fun shouldLogRpcInvocation(requestBody: String, responseBody: String): Boolean =
-                !quietMode && runCatching {
-                    val rpcMethod = Json.parseToJsonElement(requestBody).jsonObject["method"]?.jsonPrimitive?.contentOrNull
-                    val rpcResult = Json.parseToJsonElement(responseBody).jsonObject["result"]
-                    // filter out periodic calls for event logs unless they contain any results
-                    if (rpcMethod == "eth_getFilterChanges" && rpcResult?.jsonArray?.isEmpty() == true) {
-                        return false
-                    } else {
-                        return true
-                    }
-                }.getOrDefault(true)
-
-            if (logging) {
-                builder.addInterceptor {
-                    val request = it.request()
-
-                    // making a copy of request body since it can be consumed only once
-                    val requestBodyCopy = request.newBuilder().build().body?.let { body ->
-                        val requestBuffer = Buffer()
-                        body.writeTo(requestBuffer)
-                        requestBuffer.readUtf8()
-                    } ?: ""
-
-                    val response = it.proceed(request)
-                    val contentType: MediaType? = response.body?.contentType()
-                    val responseBody = response.body?.string()
-
-                    if (shouldLogRpcInvocation(requestBodyCopy, responseBody ?: "")) {
-                        logger.debug { "RPC call: url=${request.url}, request=$requestBodyCopy, response code=${response.code}, response body=$responseBody" }
-                    }
-
-                    // making a copy of response body since it can be consumed only once
-                    response.newBuilder().body(responseBody?.toResponseBody(contentType)).build()
-                }
-            }
-            return HttpService(url, builder.build())
-        }
-    }
 
     data class DeployedContract(
         val proxyAddress: EvmAddress,
@@ -443,7 +394,7 @@ open class EvmClient(val config: EvmClientConfig) {
             ).fromFundamentalUnits(symbol.decimals)
 
     fun getNativeBalance(address: EvmAddress): BigInteger =
-        runBlocking { asyncGetNativeBalance(address) }
+        web3j.ethGetBalance(address.value, DefaultBlockParameter.valueOf("latest")).send().balance
 
     suspend fun asyncGetNativeBalance(address: EvmAddress): BigInteger =
         web3j.ethGetBalance(address.value, DefaultBlockParameter.valueOf("latest")).sendAsync().await().balance

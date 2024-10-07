@@ -12,6 +12,7 @@ import java.math.BigInteger
 
 object BitcoinClient : JsonRpcClientBase(
     System.getenv("BITCOIN_NETWORK_RPC_URL") ?: "http://localhost:18443/wallet/testwallet",
+    KotlinLogging.logger {},
     if ((System.getenv("BITCOIN_NETWORK_ENABLE_BASIC_AUTH") ?: "true").toBoolean()) {
         BasicAuthInterceptor(
             System.getenv("BITCOIN_NETWORK_RPC_USER") ?: "user",
@@ -22,7 +23,6 @@ object BitcoinClient : JsonRpcClientBase(
     },
 ) {
 
-    override val logger = KotlinLogging.logger {}
     private val faucetAddress = BitcoinAddress.canonicalize(System.getenv("BITCOIN_FAUCET_ADDRESS") ?: "bcrt1q3nyukkpkg6yj0y5tj6nj80dh67m30p963mzxy7")
 
     fun mine(nBlocks: Int): List<String> {
@@ -32,7 +32,6 @@ object BitcoinClient : JsonRpcClientBase(
                     "generatetoaddress",
                     BitcoinRpcParams(listOf(nBlocks, faucetAddress)),
                 ),
-                noLog = true,
             )
         } catch (e: Exception) {
             listOf()
@@ -50,8 +49,8 @@ object BitcoinClient : JsonRpcClientBase(
         }
     }
 
-    inline fun <reified T> getValue(request: BitcoinRpcRequest, logResponseBody: Boolean = true, noLog: Boolean = false): T {
-        val jsonElement = call(json.encodeToString(request), logResponseBody, noLog)
+    inline fun <reified T> getValue(request: BitcoinRpcRequest): T {
+        val jsonElement = call(json.encodeToString(request))
         return json.decodeFromJsonElement(jsonElement)
     }
 }
