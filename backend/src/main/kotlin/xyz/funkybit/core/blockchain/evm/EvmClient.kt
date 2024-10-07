@@ -76,8 +76,9 @@ class EvmClientException(message: String) : Exception(message)
 open class TransactionManagerWithNonceOverride(
     web3j: Web3j,
     val credentials: Credentials,
+    val chainId: Long,
     private val nonceOverride: BigInteger,
-) : RawTransactionManager(web3j, credentials) {
+) : RawTransactionManager(web3j, credentials, chainId) {
     override fun getNonce(): BigInteger =
         nonceOverride
 }
@@ -330,7 +331,7 @@ open class EvmClient(val config: EvmClientConfig) {
         )
 
     fun getTxManager(nonceOverride: BigInteger): TransactionManagerWithNonceOverride {
-        return TransactionManagerWithNonceOverride(web3j, submitterCredentials, nonceOverride)
+        return TransactionManagerWithNonceOverride(web3j, submitterCredentials, chainId.value.toLong(), nonceOverride)
     }
 
     fun getNonce(address: String): BigInteger {
@@ -407,7 +408,7 @@ open class EvmClient(val config: EvmClientConfig) {
 
     fun sendTransaction(address: Address, data: String, amount: BigInteger, nonceOverride: BigInteger? = null): TxHash {
         val txManager = nonceOverride
-            ?.let { TransactionManagerWithNonceOverride(web3j, credentials, nonceOverride) }
+            ?.let { TransactionManagerWithNonceOverride(web3j, credentials, chainId.value.toLong(), nonceOverride) }
             ?: transactionManager
 
         return txManager.sendTransaction(
