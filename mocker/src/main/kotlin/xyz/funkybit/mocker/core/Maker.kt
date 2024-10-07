@@ -247,7 +247,10 @@ class Maker(
         val (baseInventory, quoteInventory) = when (liquidityPlacement) {
             is LiquidityPlacement.Absolute -> {
                 val baseInventory = minOf(balances.getOrDefault(marketId.baseSymbol(), BigInteger.ZERO), liquidityPlacement.amount)
-                val quoteInventory = minOf(balances.getOrDefault(marketId.quoteSymbol(), BigInteger.ZERO), (liquidityPlacement.amount.toBigDecimal() * curPrice).toBigInteger())
+                val quoteInventory = minOf(
+                    balances.getOrDefault(marketId.quoteSymbol(), BigInteger.ZERO),
+                    (liquidityPlacement.amount.toBigDecimal() * curPrice).movePointLeft(market.baseDecimals).movePointRight(market.quoteDecimals).toBigInteger()
+                )
                 baseInventory to quoteInventory
             }
             is LiquidityPlacement.Relative -> {
