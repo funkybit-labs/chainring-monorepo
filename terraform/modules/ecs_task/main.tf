@@ -172,10 +172,9 @@ resource "aws_ecs_task_definition" "task" {
         logConfiguration = {
           logDriver = "awslogs"
           options = {
-            "awslogs-group" : "firelens-container",
+            "awslogs-group" : "ecs-logs-${var.name_prefix}",
             "awslogs-region" : var.aws_region,
-            "awslogs-create-group" : "true",
-            "awslogs-stream-prefix" : "${var.name_prefix}-${var.task_name}",
+            "awslogs-stream-prefix" : var.task_name,
             "mode" : "non-blocking"
           }
         }

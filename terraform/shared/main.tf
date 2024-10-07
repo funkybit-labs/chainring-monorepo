@@ -201,3 +201,23 @@ resource "aws_s3_bucket_policy" "bucket_policy" {
     ]
   })
 }
+
+resource "aws_cloudwatch_log_group" "test_log_group" {
+  name              = "ecs-logs-test"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "demo_group" {
+  name              = "ecs-logs-demo"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "testnet_group" {
+  name              = "ecs-logs-testnet"
+  retention_in_days = 14
+}
+
+resource "aws_cloudwatch_log_group" "prod_log_group" {
+  name              = "ecs-logs-prod"
+  retention_in_days = 14
+}
