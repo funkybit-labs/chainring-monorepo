@@ -16,7 +16,7 @@ object ArchNetworkClient : JsonRpcClientBase(
     null,
 ) {
 
-    const val MAX_TX_SIZE = 1024
+    const val MAX_TX_SIZE = 2048
     const val MAX_INSTRUCTION_SIZE = MAX_TX_SIZE - 103 // version (4), 1 signer (33), 1 signature (65), 1 byte for instruction count
 
     override val mediaType = "application/json".toMediaTypeOrNull()

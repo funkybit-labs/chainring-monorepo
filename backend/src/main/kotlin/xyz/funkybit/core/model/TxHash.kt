@@ -17,9 +17,9 @@ value class TxHash(val value: String) {
     }
 
     companion object {
-        fun emptyHash(): TxHash {
-            return TxHash(ByteArray(32).toHex())
-        }
+        val emptyHash: TxHash = TxHash(ByteArray(32).toHex())
+
+        val emptyHashArch: TxHash = TxHash(ByteArray(32).toHex(add0x = false))
 
         fun generate() = TxHash("0x${generateHexString(64)}")
     }

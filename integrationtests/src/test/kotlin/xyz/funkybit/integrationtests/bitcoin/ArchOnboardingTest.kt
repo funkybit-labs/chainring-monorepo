@@ -137,6 +137,6 @@ class ArchOnboardingTest {
         assertEquals("BTC:0", tokenState.tokenId)
         assertEquals(programStateEntity.rpcPubkey().toString(), tokenState.programStateAccount.toString())
         assertTrue(tokenState.balances.isNotEmpty())
-        assertEquals(bitcoinConfig.feeCollectionAddress.value, tokenState.balances.first().walletAddress)
+        assertEquals(bitcoinConfig.feeCollectionAddress, tokenState.balances.first().walletAddress)
     }
 }

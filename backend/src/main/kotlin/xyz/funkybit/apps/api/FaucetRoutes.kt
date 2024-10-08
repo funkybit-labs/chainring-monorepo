@@ -48,7 +48,7 @@ class FaucetRoutes(private val faucetMode: FaucetMode) {
                 Status.OK,
                 responseBody to FaucetApiResponse(
                     chainId = ChainId.empty,
-                    txHash = TxHash.emptyHash(),
+                    txHash = TxHash.emptyHash,
                     symbol = Symbol("USDC"),
                     amount = BigDecimal("0.1").toFundamentalUnits(18),
                 ),

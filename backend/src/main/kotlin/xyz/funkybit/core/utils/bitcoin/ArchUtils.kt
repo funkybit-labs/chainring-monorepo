@@ -52,7 +52,7 @@ object ArchUtils {
     private val submitterPubkey = bitcoinConfig.submitterPubkey
     private val zeroCoinValue = Coin.valueOf(0)
 
-    var tokenAccountSizeThreshold = 10_000_000
+    var walletsPerTokenAccountThreshold: Int = System.getenv("ARCH_WALLETS_PER_TOKEN_ACCOUNT_THRESHOLD")?.toIntOrNull() ?: 100_000
 
     fun fundArchAccountCreation(
         ecKey: ECKey,
@@ -440,14 +440,11 @@ object ArchUtils {
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)
-    inline fun <reified T> getAccountState(pubkey: ArchNetworkRpc.Pubkey): T =
-        Borsh.decodeFromByteArray(ArchNetworkClient.readAccountInfo(pubkey).data.toByteArray())
+    fun getAccountData(pubkey: ArchNetworkRpc.Pubkey) = ArchNetworkClient.readAccountInfo(pubkey).data.toByteArray()
 
     @OptIn(ExperimentalUnsignedTypes::class)
-    inline fun <reified T> getAccountStateAndSize(pubkey: ArchNetworkRpc.Pubkey): Pair<T, Int> {
-        val data = ArchNetworkClient.readAccountInfo(pubkey).data.toByteArray()
-        return Pair(Borsh.decodeFromByteArray(data), data.size)
-    }
+    inline fun <reified T> getAccountState(pubkey: ArchNetworkRpc.Pubkey): T =
+        Borsh.decodeFromByteArray(ArchNetworkClient.readAccountInfo(pubkey).data.toByteArray())
 
     @OptIn(ExperimentalUnsignedTypes::class)
     fun signAndSendProgramInstruction(programPubkey: ArchNetworkRpc.Pubkey, accountMetas: List<ArchNetworkRpc.AccountMeta>, programInstruction: ProgramInstruction): TxHash {

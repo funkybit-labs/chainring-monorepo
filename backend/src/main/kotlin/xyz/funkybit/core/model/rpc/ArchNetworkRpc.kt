@@ -18,7 +18,6 @@ import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.bitcoin.SystemInstruction
-import xyz.funkybit.core.model.db.BitcoinUtxoId
 import xyz.funkybit.core.utils.doubleSha256FromHex
 import xyz.funkybit.core.utils.schnorr.Point
 import xyz.funkybit.core.utils.toHex
@@ -165,8 +164,6 @@ sealed class ArchNetworkRpc {
         val txId: TxHash,
         val vout: Int,
     ) {
-        fun toUtxoId() = BitcoinUtxoId.fromTxHashAndVout(txId, vout)
-
         fun serialize(): ByteArray {
             val buffer = ByteBuffer.allocate(36)
             buffer.order(ByteOrder.LITTLE_ENDIAN)

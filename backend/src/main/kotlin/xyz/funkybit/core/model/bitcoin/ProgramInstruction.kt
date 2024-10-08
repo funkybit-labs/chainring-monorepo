@@ -5,6 +5,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.buildSerialDescriptor
@@ -14,7 +15,9 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.serializer
 import org.bitcoinj.core.NetworkParameters
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
+import xyz.funkybit.core.utils.toHex
 
 @Serializable(with = ProgramInstructionSerializer::class)
 sealed class ProgramInstruction {
@@ -106,7 +109,7 @@ sealed class ProgramInstruction {
 
 @Serializable
 enum class BitcoinNetworkType {
-    Bitcoin,
+    Mainnet,
     Testnet,
     Signet,
     Regtest,
@@ -115,9 +118,18 @@ enum class BitcoinNetworkType {
     companion object {
         fun fromNetworkParams(networkParams: NetworkParameters): BitcoinNetworkType {
             return when (networkParams.id) {
-                NetworkParameters.ID_MAINNET -> Bitcoin
+                NetworkParameters.ID_MAINNET -> Mainnet
                 NetworkParameters.ID_TESTNET -> Testnet
                 NetworkParameters.ID_REGTEST -> Regtest
+                else -> Signet
+            }
+        }
+
+        fun fromByte(ordinal: Int): BitcoinNetworkType {
+            return when (ordinal) {
+                0 -> Mainnet
+                1 -> Testnet
+                3 -> Regtest
                 else -> Signet
             }
         }
@@ -197,28 +209,129 @@ object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
 
 sealed class ArchAccountState {
 
-    @Serializable
+    companion object {
+
+        private const val MAX_ADDRESS_LENGTH = 92
+        private const val BYTE_ZERO = 0.toByte()
+
+        fun deserializeAddress(bytes: ByteArray): BitcoinAddress {
+            return BitcoinAddress.canonicalize(deserializePaddedString(bytes, MAX_ADDRESS_LENGTH))
+        }
+
+        fun deserializePaddedString(bytes: ByteArray, maxLength: Int): String {
+            val position = bytes.indexOfFirst { it == BYTE_ZERO }
+            return String(bytes.slice(0 until minOf(if (position == -1) maxLength else position, maxLength)).toByteArray())
+        }
+    }
+
+    @Serializable(with = ProgramSerializer::class)
     data class Program(
-        val version: Short,
+        val version: Int,
         val feeAccount: BitcoinAddress,
         val programChangeAddress: BitcoinAddress,
         val networkType: BitcoinNetworkType,
-        val settlementBatchHash: String,
-        val lastSettlementBatchHash: String,
-        val lastWithdrawalBatchHash: String,
+        val settlementBatchHash: TxHash,
+        val lastSettlementBatchHash: TxHash,
+        val lastWithdrawalBatchHash: TxHash,
     )
 
-    @Serializable
+    object ProgramSerializer : KSerializer<Program> {
+
+        @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
+        override val descriptor: SerialDescriptor = buildSerialDescriptor("Program", StructureKind.LIST)
+
+        override fun serialize(encoder: Encoder, value: Program) {
+            throw Exception("not required")
+        }
+
+        override fun deserialize(decoder: Decoder): Program {
+            return when (decoder) {
+                is com.funkatronics.kborsh.BorshDecoder -> {
+                    Program(
+                        version = decoder.decodeInt(),
+                        feeAccount = deserializeAddress((0 until MAX_ADDRESS_LENGTH).map { decoder.decodeByte() }.toByteArray()),
+                        programChangeAddress = deserializeAddress((0 until MAX_ADDRESS_LENGTH).map { decoder.decodeByte() }.toByteArray()),
+                        networkType = BitcoinNetworkType.fromByte(decoder.decodeByte().toInt()),
+                        settlementBatchHash = TxHash(((0 until 32).map { decoder.decodeByte() }.toByteArray()).toHex(false)),
+                        lastSettlementBatchHash = TxHash(((0 until 32).map { decoder.decodeByte() }.toByteArray()).toHex(false)),
+                        lastWithdrawalBatchHash = TxHash(((0 until 32).map { decoder.decodeByte() }.toByteArray()).toHex(false)),
+                    )
+                }
+                else -> throw Exception("not required")
+            }
+        }
+    }
+
+    @Serializable(with = BalanceSerializer::class)
     data class Balance(
-        val walletAddress: String,
+        val walletAddress: BitcoinAddress,
         val balance: ULong,
     )
 
-    @Serializable
+    object BalanceSerializer : KSerializer<Balance> {
+
+        @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
+        override val descriptor: SerialDescriptor = buildSerialDescriptor("Balance", StructureKind.LIST)
+
+        override fun serialize(encoder: Encoder, value: Balance) {
+            throw Exception("not required")
+        }
+
+        override fun deserialize(decoder: Decoder): Balance {
+            return when (decoder) {
+                is com.funkatronics.kborsh.BorshDecoder -> {
+                    Balance(
+                        walletAddress = deserializeAddress((0 until MAX_ADDRESS_LENGTH).map { decoder.decodeByte() }.toByteArray()),
+                        balance = decoder.decodeLong().toULong(),
+                    )
+                }
+                else -> throw Exception("not required")
+            }
+        }
+    }
+
+    @Serializable(with = TokenSerializer::class)
     data class Token(
-        val version: Short,
+        val version: Int,
         val programStateAccount: ArchNetworkRpc.Pubkey,
         val tokenId: String,
         val balances: List<Balance>,
-    )
+    ) {
+        companion object {
+            private const val TOKEN_STATE_HEADER_SIZE = 4 + 32 + 32 + 4
+            private const val BALANCE_SIZE = MAX_ADDRESS_LENGTH + 8
+
+            fun getBalanceAtIndex(data: ByteArray, balanceIndex: Int): Balance {
+                val offset = TOKEN_STATE_HEADER_SIZE + balanceIndex * BALANCE_SIZE
+                return Borsh.decodeFromByteArray<Balance>(data.slice(offset until offset + BALANCE_SIZE).toByteArray())
+            }
+        }
+    }
+
+    object TokenSerializer : KSerializer<Token> {
+
+        @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
+        override val descriptor: SerialDescriptor = buildSerialDescriptor("Token", StructureKind.LIST)
+
+        override fun serialize(encoder: Encoder, value: Token) {
+            throw Exception("not required")
+        }
+
+        @OptIn(InternalSerializationApi::class)
+        override fun deserialize(decoder: Decoder): Token {
+            return when (decoder) {
+                is com.funkatronics.kborsh.BorshDecoder -> {
+                    Token(
+                        version = decoder.decodeInt(),
+                        programStateAccount = ArchNetworkRpc.Pubkey::class.serializer().deserialize(decoder),
+                        tokenId = deserializePaddedString((0 until 32).map { decoder.decodeByte() }.toByteArray(), 32),
+                        balances = (0 until decoder.decodeInt()).map {
+                            Balance::class.serializer().deserialize(decoder)
+                        },
+                    )
+                }
+                else -> throw Exception("not required")
+            }
+        }
+    }
 }

@@ -65,7 +65,7 @@ class ArchDepositAndWithdrawalTest {
         waitForProgramAccount()
         waitForProgramStateAccount()
         waitForTokenStateAccount()
-        ArchUtils.tokenAccountSizeThreshold = 10_000_000
+        ArchUtils.walletsPerTokenAccountThreshold = 100_000
     }
 
     @Test
@@ -165,7 +165,7 @@ class ArchDepositAndWithdrawalTest {
         val airdropAmount = BigInteger("15000")
         val depositAmount = BigInteger("7000")
 
-        ArchUtils.tokenAccountSizeThreshold = 50
+        ArchUtils.walletsPerTokenAccountThreshold = 1
 
         val (apiClient, bitcoinWallet, wsClient) = setupAndDepositToWallet(airdropAmount, depositAmount)
         val btc = bitcoinWallet.nativeSymbol
@@ -184,7 +184,7 @@ class ArchDepositAndWithdrawalTest {
         transaction {
             assertEquals(2, ArchAccountEntity.findTokenAccountsForSymbol(SymbolEntity.forName(btc.name)).size)
         }
-        ArchUtils.tokenAccountSizeThreshold = 10_000_000
+        ArchUtils.walletsPerTokenAccountThreshold = 100_000
 
         val (apiClient2, bitcoinWallet2, wsClient2) = setupAndDepositToWallet(airdropAmount, depositAmount)
         val wallet2BalanceAfterDeposit = getBalance(bitcoinWallet2.walletAddress).toBigInteger()
