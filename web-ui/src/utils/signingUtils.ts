@@ -203,7 +203,7 @@ export async function signOrderCreation(
             baseToken: evmAddress(baseSymbol.contractAddress ?? addressZero),
             quoteChainId: BigInt(quoteSymbol.chainId),
             quoteToken: evmAddress(quoteSymbol.contractAddress ?? addressZero),
-            amount: side == 'Buy' ? amount : -amount,
+            amount: amount,
             price: limitPriceAsBigInt,
             nonce: BigInt('0x' + nonce)
           }
