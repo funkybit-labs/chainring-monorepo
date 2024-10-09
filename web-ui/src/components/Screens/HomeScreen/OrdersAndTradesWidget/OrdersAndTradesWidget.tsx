@@ -198,7 +198,7 @@ export default function OrdersAndTradesWidget({
                                 ].includes(market.baseSymbol.name)
                                 ? secondMarket.quoteSymbol
                                 : secondMarket.baseSymbol
-                              : market.quoteSymbol
+                              : market.baseSymbol
                             : secondMarket
                               ? [
                                   secondMarket.baseSymbol.name,
