@@ -1,6 +1,6 @@
 environment:
   backend:
-    DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
+    DB_HOST: demo-db-instance.cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     EVM_CHAINS: Bitlayer,Botanix
     EVM_NETWORK_URL_Bitlayer: http://demo-anvil.funkybit.fun:8545
     EVM_NETWORK_URL_Botanix: http://demo-anvil2.funkybit.fun:8545
@@ -34,11 +34,11 @@ environment:
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
   garp:
     QUEUE_HOME: "/data/queues/demo"
-    DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
+    DB_HOST: demo-db-instance.cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     JAVA_TOOL_OPTIONS: "-Xlog:gc+metaspace,gc+heap,gc:stdout:time,tags"
     SLACK_ERROR_REPORTING_CHANNEL_ID: C073ZA2VASW
   telegrambot:
-    DB_HOST: demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
+    DB_HOST: demo-db-instance.cpwwaa4iqa1s.us-east-2.rds.amazonaws.com
     API_URL: http://demo-api.funkybit.fun:9000
     EVM_CHAINS: Bitlayer,Botanix
     EVM_NETWORK_URL_Bitlayer: http://demo-anvil.funkybit.fun:8545
@@ -84,7 +84,7 @@ services:
     is_essential: "true"
     environment: backend
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-cd9ad9b5-fbfb-4c83-8722-1058b4da13d5-Zww9oL
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!db-40417519-31ce-4055-9c64-1b7355f624af-jM5XEG
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
       TELEGRAM_BOT_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:demo/api/TELEGRAM_BOT_TOKEN-sKtZqG
   ring:
@@ -93,7 +93,7 @@ services:
     no_rolling_upgrade: "true"
     environment: backend
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-cd9ad9b5-fbfb-4c83-8722-1058b4da13d5-Zww9oL
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!db-40417519-31ce-4055-9c64-1b7355f624af-jM5XEG
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   telegrambot:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
@@ -101,7 +101,7 @@ services:
     environment: telegrambot
     no_rolling_upgrade: "true"
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-cd9ad9b5-fbfb-4c83-8722-1058b4da13d5-Zww9oL
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!db-40417519-31ce-4055-9c64-1b7355f624af-jM5XEG
       TELEGRAM_BOT_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:demo/telegrambot/TELEGRAM_BOT_TOKEN-p8R0DM
   anvil:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/anvil
@@ -135,7 +135,7 @@ services:
     no_rolling_upgrade: "true"
     environment: garp
     secrets:
-      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-cd9ad9b5-fbfb-4c83-8722-1058b4da13d5-Zww9oL
+      DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!db-40417519-31ce-4055-9c64-1b7355f624af-jM5XEG
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
   mocker:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/mocker

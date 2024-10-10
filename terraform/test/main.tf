@@ -149,7 +149,7 @@ module "bastion" {
 }
 
 module "rds" {
-  source         = "../modules/rds"
+  source         = "../modules/rds_aurora_cluster"
   name_prefix    = local.name_prefix
   subnet_id_1    = module.vpc.private_subnet_id_1
   subnet_id_2    = module.vpc.private_subnet_id_2

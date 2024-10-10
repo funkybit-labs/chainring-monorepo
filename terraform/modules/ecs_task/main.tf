@@ -31,43 +31,57 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
   role = aws_iam_role.ecs_task_execution_role.id
   policy = jsonencode({
     Version = "2012-10-17",
-    Statement = flatten([[
-      {
-        Effect = "Allow",
-        Action = [
-          "ecr:GetAuthorizationToken",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ],
-        Resource = "*"
-      },
-      {
-        Effect = "Allow",
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ],
-        Resource = [
-          "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:${var.name_prefix}/${var.task_name}/*",
-          "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:slack-error-reporter-token-*"
-        ]
-      },
-      {
-        Effect = "Allow",
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ],
-        Resource = [
-          "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*"
-        ],
-        Condition = {
-          "StringEquals" : { "aws:ResourceTag/Name" : "${var.name_prefix}-db-cluster" }
+    Statement = flatten([
+      [
+        {
+          Effect = "Allow",
+          Action = [
+            "ecr:GetAuthorizationToken",
+            "ecr:BatchCheckLayerAvailability",
+            "ecr:GetDownloadUrlForLayer",
+            "ecr:BatchGetImage",
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          Resource = "*"
+        },
+        {
+          Effect = "Allow",
+          Action = [
+            "secretsmanager:GetSecretValue"
+          ],
+          Resource = [
+            "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:${var.name_prefix}/${var.task_name}/*",
+            "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:slack-error-reporter-token-*"
+          ]
+        },
+        {
+          Effect = "Allow",
+          Action = [
+            "secretsmanager:GetSecretValue"
+          ],
+          Resource = [
+            "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!cluster-*"
+          ],
+          Condition = {
+            "StringEquals" : { "aws:ResourceTag/Name" : "${var.name_prefix}-db-cluster" }
+          }
+        },
+        {
+          Effect = "Allow",
+          Action = [
+            "secretsmanager:GetSecretValue"
+          ],
+          Resource = [
+            "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:rds!db-*"
+          ],
+          Condition = {
+            "StringEquals" : { "aws:ResourceTag/Name" : "${var.name_prefix}-db-instance" }
+          }
         }
-      }
-      ], (var.icons_bucket == {} ? [] : [
+      ],
+      (var.icons_bucket == {} ? [] : [
         {
           Action = [
             "s3:GetObject",
@@ -77,8 +91,9 @@ resource "aws_iam_role_policy" "ecs_execution_role_policy" {
           Effect   = "Allow",
           Resource = var.icons_bucket.arn
         }
-      ]
-    )])
+        ]
+      )
+    ])
   })
 }
 
