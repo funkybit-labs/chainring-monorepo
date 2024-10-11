@@ -28,6 +28,7 @@ object BitcoinMiner {
                     return@thread
                 } catch (e: Exception) {
                     logger.error(e) { "Unhandled exception in bitcoin mining thread" }
+                    Thread.sleep(1000)
                 }
             }
         }
