@@ -95,6 +95,7 @@ object DbTestHelpers {
             this.createdBy = "system"
             this.marketGuid = market.guid
             this.walletGuid = wallet.guid
+            this.userGuid = wallet.userGuid
             this.status = status
             this.side = side
             this.type = type

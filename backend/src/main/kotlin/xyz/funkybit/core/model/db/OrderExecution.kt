@@ -51,6 +51,7 @@ object OrderExecutionTable : GUIDTable<ExecutionId>("order_execution", ::Executi
         { value -> OrderSide.valueOf(value as String) },
         { PGEnum("OrderSide", it) },
     )
+    val userGuid = reference("user_guid", UserTable).index()
 }
 
 class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId>(guid) {
@@ -95,6 +96,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             this.feeSymbol = feeSymbol
             this.marketGuid = marketEntity?.guid
             this.side = side
+            this.userGuid = orderEntity.wallet.userGuid
         }
 
         fun findForOrder(orderEntity: OrderEntity): List<OrderExecutionEntity> {
@@ -118,46 +120,36 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
         fun listLatestForUser(userId: EntityID<UserId>, maxSequencerResponses: Int): List<OrderExecutionEntity> {
             val sequencerResponseNumbers = TradeTable
                 .join(OrderExecutionTable, JoinType.INNER, TradeTable.guid, OrderExecutionTable.tradeGuid)
-                .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
-                .innerJoin(WalletTable)
                 .select(TradeTable.responseSequence)
                 .withDistinct(true)
                 .where {
-                    WalletTable.userGuid.eq(userId)
+                    OrderExecutionTable.userGuid.eq(userId)
                 }
                 .orderBy(TradeTable.responseSequence, SortOrder.DESC)
                 .limit(maxSequencerResponses)
                 .mapNotNull { it[TradeTable.responseSequence] }
 
             return OrderExecutionTable
-                .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
-                .innerJoin(WalletTable)
                 .join(TradeTable, JoinType.INNER, TradeTable.guid, OrderExecutionTable.tradeGuid)
                 .select(OrderExecutionTable.columns)
                 .where {
-                    WalletTable.userGuid.eq(userId)
+                    OrderExecutionTable.userGuid.eq(userId)
                         .and(TradeTable.responseSequence.inList(sequencerResponseNumbers))
                 }
                 .orderBy(Pair(TradeTable.responseSequence, SortOrder.DESC), Pair(TradeTable.sequenceId, SortOrder.ASC))
-                .map {
-                    OrderExecutionEntity.wrapRow(it)
-                }.toList()
+                .map(Companion::wrapRow).toList()
         }
 
         fun listForUser(userId: EntityID<UserId>, beforeTimestamp: Instant, limit: Int): List<OrderExecutionEntity> {
             return OrderExecutionTable
-                .join(OrderTable, JoinType.INNER, OrderTable.guid, OrderExecutionTable.orderGuid)
-                .innerJoin(WalletTable)
                 .join(TradeTable, JoinType.INNER, TradeTable.guid, OrderExecutionTable.tradeGuid)
                 .select(OrderExecutionTable.columns)
                 .where {
-                    WalletTable.userGuid.eq(userId) and OrderExecutionTable.timestamp.less(beforeTimestamp)
+                    OrderExecutionTable.userGuid.eq(userId) and OrderExecutionTable.timestamp.less(beforeTimestamp)
                 }
                 .orderBy(Pair(OrderExecutionTable.timestamp, SortOrder.DESC))
                 .limit(limit)
-                .map {
-                    OrderExecutionEntity.wrapRow(it)
-                }.toList()
+                .map(Companion::wrapRow).toList()
         }
     }
 
@@ -181,4 +173,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
     var marketGuid by OrderExecutionTable.marketGuid
     var market by MarketEntity optionalReferencedOn OrderExecutionTable.marketGuid
     var side by OrderExecutionTable.side
+
+    var userGuid by OrderExecutionTable.userGuid
+    var user by UserEntity referencedOn OrderExecutionTable.userGuid
 }
