@@ -68,6 +68,7 @@ class EvmDepositHandler(
                     return@thread
                 } catch (e: Exception) {
                     logger.error(e) { "Unhandled exception handling pending deposits" }
+                    Thread.sleep(pollingIntervalInMs)
                 }
             }
         }

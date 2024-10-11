@@ -104,6 +104,7 @@ class EvmBlockProcessor(
                     return@thread
                 } catch (e: Exception) {
                     logger.error(e) { "Unhandled exception in block processor, chainId=$chainId" }
+                    Thread.sleep(pollingIntervalInMs)
                 }
             }
         }
