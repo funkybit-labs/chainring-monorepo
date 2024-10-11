@@ -19,7 +19,7 @@ environment:
     MAKER_FEE_RATE: "0.0005"
     TAKER_FEE_RATE: "0.001"
     ENABLE_TEST_ROUTES: "false"
-    FAUCET_MODE: OnlyERC20
+    FAUCET_MODE: "Off"
     BITCOIN_NETWORK_ENABLED: "false"
     BITCOIN_FEE_ACCOUNT_ADDRESS: "tb1qz7spnnw5njkqv96kv58emw49pl784qwgn3tflm"
     MEMPOOL_SPACE_API_URL: https://mempool.space/testnet4/api

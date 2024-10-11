@@ -241,7 +241,10 @@ export function TestnetChallengeTab({
                           </div>
                           <div className="animate-fall self-start">
                             <button
-                              className="my-2 rounded-xl bg-darkBluishGray8 px-4 py-2 text-lg"
+                              className="my-2 rounded-xl bg-darkBluishGray8 px-4 py-2 text-lg transition-colors duration-300 ease-in-out hover:bg-blue5 disabled:text-neutralGray"
+                              disabled={
+                                testnetChallengeEnrollMutation.isPending
+                              }
                               onClick={() => {
                                 if (wallets.connected.length === 0) {
                                   setEnrollWhenConnected(true)
@@ -302,7 +305,7 @@ export function TestnetChallengeTab({
                             </div>
                             <div>
                               <button
-                                className="rounded-xl bg-darkBluishGray8 px-4 py-2 text-lg"
+                                className="rounded-xl bg-darkBluishGray8 px-4 py-2 text-lg transition-colors duration-300 ease-in-out hover:bg-blue5"
                                 onClick={() => triggerDepositModal()}
                               >
                                 Deposit
