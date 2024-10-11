@@ -317,6 +317,7 @@ object SequencerResponseProcessorService {
                         feeSymbol = Symbol(tradeMarket.quoteSymbol.name),
                         side = side,
                         marketEntity = tradeMarket,
+                        responseSequence = responseSequence,
                     )
 
                     execution.refresh(flush = true)
