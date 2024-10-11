@@ -220,6 +220,7 @@ class OrderExecutionEntityTest : TestWithDb() {
                         feeSymbol = Symbol("ETH"),
                         marketEntity = order1.market,
                         side = order1.side,
+                        responseSequence = trade.responseSequence!!,
                     )
                     OrderExecutionEntity.create(
                         now,
@@ -235,6 +236,7 @@ class OrderExecutionEntityTest : TestWithDb() {
                         feeSymbol = Symbol("ETH"),
                         marketEntity = order1.market,
                         side = order2.side,
+                        responseSequence = trade.responseSequence!!,
                     )
                 }
             }

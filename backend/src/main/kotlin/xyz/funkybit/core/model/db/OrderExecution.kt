@@ -44,7 +44,7 @@ object OrderExecutionTable : GUIDTable<ExecutionId>("order_execution", ::Executi
     ).index()
     val feeAmount = decimal("fee_amount", 30, 0)
     val feeSymbol = varchar("fee_symbol", 10485760)
-    val marketGuid = reference("market_guid", MarketTable).nullable()
+    val marketGuid = reference("market_guid", MarketTable)
     val side = customEnumeration(
         "side",
         "OrderSide",
@@ -52,6 +52,18 @@ object OrderExecutionTable : GUIDTable<ExecutionId>("order_execution", ::Executi
         { PGEnum("OrderSide", it) },
     )
     val userGuid = reference("user_guid", UserTable).index()
+    val responseSequence = long("response_sequence").index()
+
+    init {
+        OrderTable.index(
+            customIndexName = "order_execution_user_guid_timestamp_index",
+            columns = arrayOf(userGuid, timestamp),
+        )
+        OrderTable.index(
+            customIndexName = "order_execution_user_guid_response_sequence_index",
+            columns = arrayOf(userGuid, responseSequence),
+        )
+    }
 }
 
 class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId>(guid) {
@@ -59,7 +71,7 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
         return Trade(
             id = this.trade.guid.value,
             orderId = this.orderGuid.value,
-            marketId = this.marketGuid?.value ?: this.order.marketGuid.value,
+            marketId = this.marketGuid.value,
             executionRole = this.role,
             counterOrderId = this.counterOrderGuid.value,
             timestamp = this.timestamp,
@@ -83,7 +95,8 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             feeAmount: BigInteger,
             feeSymbol: Symbol,
             side: OrderSide,
-            marketEntity: MarketEntity? = null,
+            marketEntity: MarketEntity,
+            responseSequence: Long,
         ) = OrderExecutionEntity.new(ExecutionId.generate()) {
             val now = Clock.System.now()
             this.createdAt = now
@@ -94,9 +107,10 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
             this.role = role
             this.feeAmount = feeAmount
             this.feeSymbol = feeSymbol
-            this.marketGuid = marketEntity?.guid
+            this.marketGuid = marketEntity.guid
             this.side = side
             this.userGuid = orderEntity.wallet.userGuid
+            this.responseSequence = responseSequence
         }
 
         fun findForOrder(orderEntity: OrderEntity): List<OrderExecutionEntity> {
@@ -171,9 +185,10 @@ class OrderExecutionEntity(guid: EntityID<ExecutionId>) : GUIDEntity<ExecutionId
     )
 
     var marketGuid by OrderExecutionTable.marketGuid
-    var market by MarketEntity optionalReferencedOn OrderExecutionTable.marketGuid
+    var market by MarketEntity referencedOn OrderExecutionTable.marketGuid
     var side by OrderExecutionTable.side
 
     var userGuid by OrderExecutionTable.userGuid
     var user by UserEntity referencedOn OrderExecutionTable.userGuid
+    var responseSequence by OrderExecutionTable.responseSequence
 }

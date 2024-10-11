@@ -158,7 +158,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                         role = execution.role,
                         feeAmount = execution.feeAmount,
                         feeSymbol = execution.feeSymbol,
-                        marketId = execution.market?.guid?.value ?: this.marketGuid.value,
+                        marketId = execution.market.guid.value,
                     )
                 },
                 timing = Order.Timing(
@@ -186,7 +186,7 @@ class OrderEntity(guid: EntityID<OrderId>) : GUIDEntity<OrderId>(guid) {
                         role = execution.role,
                         feeAmount = execution.feeAmount,
                         feeSymbol = execution.feeSymbol,
-                        marketId = execution.market?.guid?.value ?: this.marketGuid.value,
+                        marketId = execution.market.guid.value,
                     )
                 },
                 timing = Order.Timing(

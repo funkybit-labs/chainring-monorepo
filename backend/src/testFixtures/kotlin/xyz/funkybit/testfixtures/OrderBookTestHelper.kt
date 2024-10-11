@@ -97,6 +97,8 @@ object OrderBookTestHelper {
                             feeAmount = BigInteger.ZERO,
                             feeSymbol = Symbol(order.market.quoteSymbol.name),
                             side = order.side,
+                            marketEntity = tradeMarket,
+                            responseSequence = tradeEntity.responseSequence!!,
                         )
                     }
 

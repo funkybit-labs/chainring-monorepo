@@ -27,6 +27,17 @@ class V98_AddUserGuidToOrderAndExecution : Migration() {
                 );
                 ALTER TABLE order_execution ADD CONSTRAINT fk_order_execution_user_guid__guid FOREIGN KEY (user_guid) REFERENCES "user"(guid);
                 ALTER TABLE order_execution ALTER COLUMN user_guid SET NOT NULL;
+                CREATE INDEX order_execution_user_guid_timestamp_index ON "order_execution" (user_guid, timestamp);
+                
+                ALTER TABLE order_execution ALTER COLUMN market_guid SET NOT NULL;
+                
+                ALTER TABLE order_execution ADD COLUMN response_sequence bigint;
+                UPDATE order_execution SET response_sequence = (
+                    SELECT response_sequence FROM trade WHERE trade.guid = order_execution.trade_guid
+                );
+                ALTER TABLE order_execution ALTER COLUMN response_sequence SET NOT NULL;
+                
+                CREATE INDEX order_execution_user_guid_response_sequence_index ON "order_execution" (user_guid, response_sequence);
                 """.trimIndent(),
             )
         }
