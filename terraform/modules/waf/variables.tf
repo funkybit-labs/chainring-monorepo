@@ -36,3 +36,7 @@ variable "blocked_country_response_code" {
 variable "ip_dos_rate_limit" {
   description = "How many requests per IP address."
 }
+
+variable "ip_dos_rate_limit_response_code" {
+  description = "Response code to return"
+}
