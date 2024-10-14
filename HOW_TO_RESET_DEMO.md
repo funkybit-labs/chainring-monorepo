@@ -41,34 +41,35 @@ ssh -L 5556:demo-db-cluster.cluster-cpwwaa4iqa1s.us-east-2.rds.amazonaws.com:543
 
 and then truncate db tables using favourite SQL editor. In this way OHLC records will be preserved.
 ```
--- truncate table telegram_bot_user_wallet CASCADE;
--- truncate table telegram_bot_user CASCADE;
--- truncate table broadcaster_job CASCADE;
--- truncate table order_execution CASCADE;
--- truncate table trade CASCADE;
--- truncate table "order" CASCADE;
--- truncate table order_book_snapshot;
--- truncate table chain_settlement_batch CASCADE;
--- truncate table settlement_batch CASCADE;
--- truncate table deposit CASCADE;
--- truncate table withdrawal CASCADE;
--- truncate table blockchain_transaction CASCADE;
--- truncate table blockchain_nonce CASCADE;
--- truncate table balance_log CASCADE;
--- truncate table balance CASCADE;
--- truncate table wallet CASCADE;
--- truncate table deployed_smart_contract CASCADE;
--- truncate table faucet_drip;
--- truncate table block;
--- truncate table "limit";
--- truncate table telegram_mini_app_user_reward;
--- truncate table telegram_mini_app_game_reaction_time;
--- truncate table telegram_mini_app_user cascade;
--- truncate table wallet_linked_signer;
--- truncate table bitcoin_wallet_state;
--- truncate table arch_state_utxo_log;
--- truncate table arch_state_utxo;
--- delete from key_value_store where key = 'LastProcessedOutputIndex';
+TRUNCATE TABLE telegram_bot_user_wallet CASCADE;
+TRUNCATE TABLE telegram_bot_user CASCADE;
+TRUNCATE TABLE broadcaster_job CASCADE;
+TRUNCATE TABLE order_execution CASCADE;
+TRUNCATE TABLE trade CASCADE;
+TRUNCATE TABLE "order" CASCADE;
+TRUNCATE TABLE order_book_snapshot;
+TRUNCATE TABLE chain_settlement_batch CASCADE;
+TRUNCATE TABLE settlement_batch CASCADE;
+TRUNCATE TABLE deposit CASCADE;
+TRUNCATE TABLE withdrawal CASCADE;
+TRUNCATE TABLE blockchain_transaction CASCADE;
+TRUNCATE TABLE blockchain_nonce CASCADE;
+TRUNCATE TABLE balance_log CASCADE;
+TRUNCATE TABLE balance CASCADE;
+TRUNCATE TABLE wallet CASCADE;
+TRUNCATE TABLE deployed_smart_contract CASCADE;
+TRUNCATE TABLE faucet_drip;
+TRUNCATE TABLE block;
+TRUNCATE TABLE "limit";
+TRUNCATE TABLE telegram_mini_app_user_reward;
+TRUNCATE TABLE telegram_mini_app_game_reaction_time;
+TRUNCATE TABLE telegram_mini_app_user cascade;
+TRUNCATE TABLE wallet_linked_signer;
+TRUNCATE TABLE arch_account CASCADE;
+TRUNCATE TABLE arch_account_balance_index CASCADE;
+TRUNCATE TABLE bitcoin_utxo CASCADE;
+TRUNCATE TABLE bitcoin_utxo_address_monitor CASCADE;
+DELETE FROM key_value_store WHERE key = 'LastProcessedOutputIndex';
 ```
 
 ## Reset anvil (if necessary)
