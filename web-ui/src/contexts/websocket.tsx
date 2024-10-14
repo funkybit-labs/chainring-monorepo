@@ -121,9 +121,6 @@ export function WebsocketProvider({
     }
 
     async function connect(refreshAuth: boolean = false) {
-      // don't do anything until we know for sure that wallet is connected
-      if (wallets.connected.length == 0) return
-
       if (connecting) return
       connecting = true
 
