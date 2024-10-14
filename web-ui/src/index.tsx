@@ -15,7 +15,7 @@ const root = createRoot(container)
 const queryClient = new QueryClient()
 
 const Root = () => {
-  const [maintenance, restricted] = useAccessRestriction()
+  const [maintenance, restricted, rateLimited] = useAccessRestriction()
   const [, setIsConfigInitialized] = useState(false)
 
   useEffect(() => {
@@ -60,6 +60,13 @@ const Root = () => {
           <span className="animate-bounce">
             funkybit is currently undergoing maintenance, we&apos;ll be back
             soon.
+          </span>
+        </div>
+      )}
+      {rateLimited && (
+        <div className="fixed z-[100] flex w-full flex-row place-items-center justify-center bg-red p-0 text-white opacity-80">
+          <span className="animate-bounce">
+            You&apos;ve hit the rate limit! Please slow down and try again soon.
           </span>
         </div>
       )}
