@@ -103,18 +103,18 @@ module "web" {
 }
 
 module "waf" {
-  source     = "../modules/waf"
-  aws_region = var.aws_region
-  aws_lb_arn = module.alb.lb_arn
-  #aws_lb_arn               = module.alb.https_listener_arn
-  short_env_name                = local.name_prefix
-  ipv4_blacklist_addresses      = local.ipv4blacklist
-  ipv4_whitelist_addresses      = local.ipv4whitelist
-  ipv6_blacklist_addresses      = local.ipv6blacklist
-  ipv6_whitelist_addresses      = local.ipv6whitelist
-  blocked_country_codes         = var.blocked_country_codes
-  blocked_country_response_code = var.blocked_country_response_code
-  ip_dos_rate_limit             = var.ip_dos_rate_limit
+  source                          = "../modules/waf"
+  aws_region                      = var.aws_region
+  aws_lb_arn                      = module.alb.lb_arn
+  short_env_name                  = local.name_prefix
+  ipv4_blacklist_addresses        = local.ipv4blacklist
+  ipv4_whitelist_addresses        = local.ipv4whitelist
+  ipv6_blacklist_addresses        = local.ipv6blacklist
+  ipv6_whitelist_addresses        = local.ipv6whitelist
+  blocked_country_codes           = var.blocked_country_codes
+  blocked_country_response_code   = var.blocked_country_response_code
+  ip_dos_rate_limit               = var.ip_dos_rate_limit
+  ip_dos_rate_limit_response_code = var.ip_dos_rate_limit_response_code
 }
 
 module "telegram_mini_app" {

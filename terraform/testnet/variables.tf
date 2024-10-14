@@ -42,11 +42,15 @@ variable "blocked_country_codes" {
 }
 
 variable "blocked_country_response_code" {
-  default = 451
+  default = 451 # Unavailable For Legal Reasons
 }
 
 variable "ip_dos_rate_limit" {
   default = 5000
+}
+
+variable "ip_dos_rate_limit_response_code" {
+  default = 429 # Too many requests
 }
 
 

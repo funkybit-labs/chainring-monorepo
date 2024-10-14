@@ -5,6 +5,7 @@ import { loadAuthToken } from 'contexts/auth'
 import Decimal from 'decimal.js'
 import { useEffect, useState } from 'react'
 import { FEE_RATE_PIPS_MAX_VALUE } from 'utils'
+import { AxiosInstance } from 'axios'
 
 export const apiBaseUrl = import.meta.env.ENV_API_URL
 
@@ -1017,37 +1018,47 @@ export const noAuthApiClient = new Zodios(apiBaseUrl, [
   }
 ])
 
-export function useAccessRestriction() {
-  const [maintenance, setMaintenance] = useState(false)
-  const [restricted, setRestricted] = useState(false)
+export type AccessRestriction =
+  | 'none'
+  | 'underMaintenance'
+  | 'geoBlocked'
+  | 'requestLimitExceeded'
+export function useAccessRestriction(): AccessRestriction {
+  const [restriction, setRestriction] = useState<AccessRestriction>('none')
 
   useEffect(() => {
-    const id = apiClient.axios.interceptors.response.use(
-      (response) => {
-        setMaintenance(false)
-        setRestricted(false)
-        return response
-      },
-      (error) => {
-        if (error.response.status === 418) {
-          setMaintenance(true)
-        } else if (error.response.status === 451) {
-          // (Unavailable For Legal Reasons)
-          setRestricted(true)
-        } else {
-          if (maintenance) {
-            setMaintenance(false)
-          }
-          if (restricted) {
-            setRestricted(false)
-          }
-        }
-        return Promise.reject(error)
+    const handleResponseCode = (status: number) => {
+      if (status === 418) {
+        setRestriction('underMaintenance')
+      } else if (status === 451) {
+        setRestriction('geoBlocked')
+      } else if (status === 429) {
+        setRestriction('requestLimitExceeded')
+      } else {
+        setRestriction('none')
       }
-    )
-    return () => {
-      apiClient.axios.interceptors.response.eject(id)
     }
-  })
-  return [maintenance, restricted]
+
+    const setupInterceptors = (client: { axios: AxiosInstance }) => {
+      return client.axios.interceptors.response.use(
+        (response) => {
+          handleResponseCode(response.status)
+          return response
+        },
+        (error) => {
+          handleResponseCode(error.response?.status || 0)
+          return Promise.reject(error)
+        }
+      )
+    }
+
+    const id1 = setupInterceptors(apiClient)
+    const id2 = setupInterceptors(noAuthApiClient)
+
+    return () => {
+      apiClient.axios.interceptors.response.eject(id1)
+      apiClient.axios.interceptors.response.eject(id2)
+    }
+  }, [])
+  return restriction
 }
