@@ -15,7 +15,7 @@ const root = createRoot(container)
 const queryClient = new QueryClient()
 
 const Root = () => {
-  const [maintenance, restricted, rateLimited] = useAccessRestriction()
+  const accessRestriction = useAccessRestriction()
   const [, setIsConfigInitialized] = useState(false)
 
   useEffect(() => {
@@ -35,7 +35,7 @@ const Root = () => {
     initConfig()
   }, [])
 
-  if (restricted) {
+  if (accessRestriction == 'geoBlocked') {
     return (
       <div className="flex h-screen items-center justify-center bg-darkBluishGray10 text-white">
         <div className="w-2/3 text-center ">
@@ -55,7 +55,7 @@ const Root = () => {
 
   return (
     <>
-      {maintenance && (
+      {accessRestriction == 'underMaintenance' && (
         <div className="fixed z-[100] flex w-full flex-row place-items-center justify-center bg-red p-0 text-white opacity-80">
           <span className="animate-bounce">
             funkybit is currently undergoing maintenance, we&apos;ll be back
@@ -63,7 +63,7 @@ const Root = () => {
           </span>
         </div>
       )}
-      {rateLimited && (
+      {accessRestriction == 'requestLimitExceeded' && (
         <div className="fixed z-[100] flex w-full flex-row place-items-center justify-center bg-red p-0 text-white opacity-80">
           <span className="animate-bounce">
             You&apos;ve hit the rate limit! Please slow down and try again soon.

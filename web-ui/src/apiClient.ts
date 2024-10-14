@@ -1018,16 +1018,25 @@ export const noAuthApiClient = new Zodios(apiBaseUrl, [
   }
 ])
 
-export function useAccessRestriction() {
-  const [maintenance, setMaintenance] = useState(false)
-  const [restricted, setRestricted] = useState(false)
-  const [rateLimited, setRateLimited] = useState(false)
+export type AccessRestriction =
+  | 'none'
+  | 'underMaintenance'
+  | 'geoBlocked'
+  | 'requestLimitExceeded'
+export function useAccessRestriction(): AccessRestriction {
+  const [restriction, setRestriction] = useState<AccessRestriction>('none')
 
   useEffect(() => {
     const handleResponseCode = (status: number) => {
-      setMaintenance(status === 418)
-      setRestricted(status === 451)
-      setRateLimited(status === 429)
+      if (status === 418) {
+        setRestriction('underMaintenance')
+      } else if (status === 451) {
+        setRestriction('geoBlocked')
+      } else if (status === 429) {
+        setRestriction('requestLimitExceeded')
+      } else {
+        setRestriction('none')
+      }
     }
 
     const setupInterceptors = (client: { axios: AxiosInstance }) => {
@@ -1051,5 +1060,5 @@ export function useAccessRestriction() {
       apiClient.axios.interceptors.response.eject(id2)
     }
   }, [])
-  return [maintenance, restricted, rateLimited]
+  return restriction
 }
