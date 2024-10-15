@@ -13,6 +13,7 @@ data class WalletAndSymbol(
 data class PubkeyAndIndex(
     val pubkey: ArchNetworkRpc.Pubkey,
     val addressIndex: Int,
+    val address: BitcoinAddress,
 )
 
 data class ConfirmedBitcoinDeposit(

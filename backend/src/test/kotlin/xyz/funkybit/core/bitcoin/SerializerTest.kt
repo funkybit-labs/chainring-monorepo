@@ -18,6 +18,7 @@ import xyz.funkybit.core.model.rpc.BitcoinRpcParams
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.core.utils.toHexBytes
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalUnsignedTypes::class)
 class SerializerTest {
@@ -68,6 +69,23 @@ class SerializerTest {
             "c7ff63e7a3a9e801320d6ca0de8821ad927d8f65dc7f06458243341d4df8a55001c7ff63e7a3a9e801320d6ca0de8821ad927d8f65dc7f06458243341d4df8a5500101140000000000000000030000006665650700000070726f6772616d03",
             instruction.serialize().toHex(false),
         )
+
+        val walletAddress = BitcoinAddress.canonicalize("bcrt1q3nyukkpkg6yj0y5tj6nj80dh67m30p963mzxy7")
+
+        val addressIndex = ProgramInstruction.AddressIndex(
+            index = 100u,
+            last4 = ProgramInstruction.WalletLast4.fromWalletAddress(walletAddress),
+        )
+        assertEquals(
+            "640000007a787937",
+            Borsh.encodeToByteArray(addressIndex).toHex(false),
+        )
+        val deserialized = Borsh.decodeFromByteArray<ProgramInstruction.AddressIndex>(Borsh.encodeToByteArray(addressIndex))
+        assertEquals(
+            addressIndex.index,
+            deserialized.index,
+        )
+        assertTrue(addressIndex.last4.value.contentEquals(deserialized.last4.value))
     }
 
     @Test
