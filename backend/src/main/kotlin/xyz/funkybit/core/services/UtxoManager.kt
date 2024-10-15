@@ -23,6 +23,10 @@ object UtxoManager {
         return BitcoinUtxoEntity.findUnspentByAddress(address)
     }
 
+    fun getUnspentTotal(address: BitcoinAddress): BigInteger {
+        return BitcoinUtxoEntity.findUnspentTotal(address)
+    }
+
     fun selectUtxos(address: BitcoinAddress, amount: BigInteger, fee: BigInteger): List<BitcoinUtxoEntity> {
         return inputsSelector.selectInputs(
             amount,
