@@ -4,8 +4,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.apache.commons.lang3.concurrent.BasicThreadFactory
 import org.jetbrains.exposed.sql.Database
 import xyz.funkybit.core.repeater.tasks.ArchTokenStateSetupTask
+import xyz.funkybit.core.repeater.tasks.BalancesMonitorTask
 import xyz.funkybit.core.repeater.tasks.BroadcasterJobsCleanupTask
-import xyz.funkybit.core.repeater.tasks.GasMonitorTask
 import xyz.funkybit.core.repeater.tasks.PriceFeedManagerTask
 import xyz.funkybit.core.repeater.tasks.ProgramUtxoRefresherTask
 import xyz.funkybit.core.repeater.tasks.ReferralPointsTask
@@ -22,7 +22,7 @@ class Repeater(db: Database, private val automaticTaskScheduling: Boolean = true
     private val logger = KotlinLogging.logger {}
 
     private val tasks = listOf(
-        GasMonitorTask(),
+        BalancesMonitorTask(),
         ReferralPointsTask(),
         ArchTokenStateSetupTask(),
         TestnetChallengeMonitorTask(),
