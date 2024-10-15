@@ -122,10 +122,10 @@ class ArchUtilsTest : TestWithDb() {
         transaction {
             assertEquals(
                 mapOf(
-                    WalletAndSymbol(wallet1.id.value, btc.id.value) to PubkeyAndIndex(btcTokenAccount.rpcPubkey(), 100),
-                    WalletAndSymbol(wallet1.id.value, rune.id.value) to PubkeyAndIndex(runeTokenAccount.rpcPubkey(), 101),
-                    WalletAndSymbol(wallet2.id.value, btc.id.value) to PubkeyAndIndex(btcTokenAccount.rpcPubkey(), 200),
-                    WalletAndSymbol(wallet2.id.value, rune.id.value) to PubkeyAndIndex(runeTokenAccount.rpcPubkey(), 201),
+                    WalletAndSymbol(wallet1.id.value, btc.id.value) to PubkeyAndIndex(btcTokenAccount.rpcPubkey(), 100, wallet1.address as BitcoinAddress),
+                    WalletAndSymbol(wallet1.id.value, rune.id.value) to PubkeyAndIndex(runeTokenAccount.rpcPubkey(), 101, wallet1.address as BitcoinAddress),
+                    WalletAndSymbol(wallet2.id.value, btc.id.value) to PubkeyAndIndex(btcTokenAccount.rpcPubkey(), 200, wallet2.address as BitcoinAddress),
+                    WalletAndSymbol(wallet2.id.value, rune.id.value) to PubkeyAndIndex(runeTokenAccount.rpcPubkey(), 201, wallet2.address as BitcoinAddress),
                 ),
                 ArchUtils.retrieveOrCreateBalanceIndexes(
                     getSettlementBatch(),

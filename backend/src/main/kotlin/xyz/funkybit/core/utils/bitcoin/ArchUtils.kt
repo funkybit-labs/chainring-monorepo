@@ -157,7 +157,15 @@ object ArchUtils {
         val tokenDepositsList = deposits.groupBy { it.pubkeyAndIndex.pubkey }.map { (pubKey, tokenDeposits) ->
             ProgramInstruction.TokenDeposits(
                 accountIndex = accountMetas.size.toUByte(),
-                deposits = tokenDeposits.map { ProgramInstruction.Adjustment(it.pubkeyAndIndex.addressIndex.toUInt(), it.depositEntity.amount.toLong().toULong()) },
+                deposits = tokenDeposits.map {
+                    ProgramInstruction.Adjustment(
+                        ProgramInstruction.AddressIndex(
+                            it.pubkeyAndIndex.addressIndex.toUInt(),
+                            ProgramInstruction.WalletLast4.fromWalletAddress(it.pubkeyAndIndex.address),
+                        ),
+                        it.depositEntity.amount.toLong().toULong(),
+                    )
+                },
             ).also {
                 accountMetas.add(
                     ArchNetworkRpc.AccountMeta(
@@ -196,7 +204,10 @@ object ArchUtils {
                 accountIndex = accountMetas.size.toUByte(),
                 withdrawals = tokenWithdrawals.map {
                     ProgramInstruction.Withdrawal(
-                        it.balanceIndex.toUInt(),
+                        ProgramInstruction.AddressIndex(
+                            it.balanceIndex.toUInt(),
+                            ProgramInstruction.WalletLast4.fromWalletAddress(it.address),
+                        ),
                         it.withdrawalEntity.resolvedAmount().toLong().toULong(),
                         it.withdrawalEntity.fee.toLong().toULong(),
                     )
@@ -245,14 +256,22 @@ object ArchUtils {
                 ProgramInstruction.SettlementAdjustments(
                     accountIndex = accountIndex.toUByte(),
                     increments = (incrementsMap[pubKey] ?: emptyList()).map {
+                        val entry = indexMap.getValue(WalletAndSymbol(it.walletId, tokenAdjustmentList.symbolId))
                         ProgramInstruction.Adjustment(
-                            addressIndex = indexMap.getValue(WalletAndSymbol(it.walletId, tokenAdjustmentList.symbolId)).addressIndex.toUInt(),
+                            addressIndex = ProgramInstruction.AddressIndex(
+                                entry.addressIndex.toUInt(),
+                                ProgramInstruction.WalletLast4.fromWalletAddress(entry.address),
+                            ),
                             amount = it.amount.toLong().toULong(),
                         )
                     },
                     decrements = (decrementsMap[pubKey] ?: emptyList()).map {
+                        val entry = indexMap.getValue(WalletAndSymbol(it.walletId, tokenAdjustmentList.symbolId))
                         ProgramInstruction.Adjustment(
-                            addressIndex = indexMap.getValue(WalletAndSymbol(it.walletId, tokenAdjustmentList.symbolId)).addressIndex.toUInt(),
+                            addressIndex = ProgramInstruction.AddressIndex(
+                                entry.addressIndex.toUInt(),
+                                ProgramInstruction.WalletLast4.fromWalletAddress(entry.address),
+                            ),
                             amount = it.amount.toLong().toULong(),
                         )
                     },
@@ -508,11 +527,11 @@ object ArchUtils {
     }
 
     fun retrieveOrCreateBalanceIndexes(walletAndSymbols: Set<WalletAndSymbol>, returnAssignedIndexes: Boolean = false): Map<WalletAndSymbol, PubkeyAndIndex>? {
-        val balanceIndexByWalletAndSymbol = ArchAccountBalanceIndexEntity.findForWalletsAndSymbols(
+        val balanceIndexAndAddressByWalletAndSymbol = ArchAccountBalanceIndexEntity.findForWalletsAndSymbols(
             walletAndSymbols.map { it.walletId }.toSet().toList(),
             walletAndSymbols.map { it.symbolId }.toSet().toList(),
         )
-        val missing = walletAndSymbols.subtract(balanceIndexByWalletAndSymbol.keys)
+        val missing = walletAndSymbols.subtract(balanceIndexAndAddressByWalletAndSymbol.keys)
         val result = if (missing.isNotEmpty()) {
             val tokenAccount = missing.map { it.symbolId }.toSet().mapNotNull {
                 ArchAccountEntity.findTokenAccountForSymbolForNewIndex(it)
@@ -528,17 +547,29 @@ object ArchUtils {
                 },
             )
             null
-        } else if (walletAndSymbols.any { balanceIndexByWalletAndSymbol[it]?.status != ArchAccountBalanceIndexStatus.Assigned }) {
+        } else if (walletAndSymbols.any { balanceIndexAndAddressByWalletAndSymbol[it]?.first?.status != ArchAccountBalanceIndexStatus.Assigned }) {
             null
         } else {
-            walletAndSymbols.associateWith { balanceIndexByWalletAndSymbol[it]!!.let { balanceIndex -> PubkeyAndIndex(balanceIndex.archAccount.rpcPubkey(), balanceIndex.addressIndex) } }
+            walletAndSymbols.associateWith {
+                balanceIndexAndAddressByWalletAndSymbol[it]!!.let { (balanceIndex, address) ->
+                    PubkeyAndIndex(
+                        balanceIndex.archAccount.rpcPubkey(),
+                        balanceIndex.addressIndex,
+                        address,
+                    )
+                }
+            }
         }
 
         return if (result == null && returnAssignedIndexes) {
             walletAndSymbols.mapNotNull {
-                val balanceIndex = balanceIndexByWalletAndSymbol[it]
-                if (balanceIndex?.status == ArchAccountBalanceIndexStatus.Assigned) {
-                    it to PubkeyAndIndex(balanceIndex.archAccount.rpcPubkey(), balanceIndex.addressIndex)
+                val balanceIndexAndAddress = balanceIndexAndAddressByWalletAndSymbol[it]
+                if (balanceIndexAndAddress?.first?.status == ArchAccountBalanceIndexStatus.Assigned) {
+                    it to PubkeyAndIndex(
+                        balanceIndexAndAddress.first.archAccount.rpcPubkey(),
+                        balanceIndexAndAddress.first.addressIndex,
+                        balanceIndexAndAddress.second,
+                    )
                 } else {
                     null
                 }

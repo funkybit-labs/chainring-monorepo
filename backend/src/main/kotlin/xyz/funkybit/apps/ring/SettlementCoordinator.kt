@@ -613,7 +613,7 @@ class SettlementCoordinator(
                 val balanceIndexes = ArchAccountBalanceIndexEntity.findForWalletsAndSymbols(chainWallets.map { it.id.value }, symbolIds)
                 chainWallets.associate { wallet ->
                     wallet.address to symbolIds.associate {
-                        val entry = balanceIndexes[WalletAndSymbol(wallet.id.value, it)]!!
+                        val entry = balanceIndexes[WalletAndSymbol(wallet.id.value, it)]!!.first
                         EvmAddress.zero as Address to ArchAccountState.Token.getBalanceAtIndex(
                             archTokenAccountMap.getOrPut(entry.archAccount.rpcPubkey()) { ArchUtils.getAccountData(entry.archAccount.rpcPubkey()) },
                             entry.addressIndex,

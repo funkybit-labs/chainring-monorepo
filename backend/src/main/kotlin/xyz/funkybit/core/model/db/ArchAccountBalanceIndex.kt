@@ -128,8 +128,14 @@ class ArchAccountBalanceIndexEntity(guid: EntityID<ArchAccountBalanceIndexId>) :
                 }.firstOrNull()
         }
 
-        fun findForWalletsAndSymbols(walletIds: List<WalletId>, symbolIds: List<SymbolId>): Map<WalletAndSymbol, ArchAccountBalanceIndexEntity> {
+        fun findForWalletsAndSymbols(walletIds: List<WalletId>, symbolIds: List<SymbolId>): Map<WalletAndSymbol, Pair<ArchAccountBalanceIndexEntity, BitcoinAddress>> {
             return ArchAccountBalanceIndexTable
+                .join(
+                    WalletTable,
+                    JoinType.INNER,
+                    ArchAccountBalanceIndexTable.walletGuid,
+                    WalletTable.guid,
+                )
                 .join(
                     ArchAccountTable,
                     JoinType.INNER,
@@ -142,7 +148,7 @@ class ArchAccountBalanceIndexEntity(guid: EntityID<ArchAccountBalanceIndexId>) :
                     WalletAndSymbol(
                         it[ArchAccountBalanceIndexTable.walletGuid].value,
                         it[ArchAccountTable.symbolGuid]!!.value,
-                    ) to wrapRow(it)
+                    ) to Pair(ArchAccountBalanceIndexEntity.wrapRow(it), BitcoinAddress.canonicalize(it[WalletTable.address]))
                 }
         }
 

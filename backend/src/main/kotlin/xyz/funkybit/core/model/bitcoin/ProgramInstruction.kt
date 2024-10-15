@@ -22,6 +22,20 @@ import xyz.funkybit.core.utils.toHex
 @Serializable(with = ProgramInstructionSerializer::class)
 sealed class ProgramInstruction {
 
+    @JvmInline
+    @Serializable(with = WalletLast4Serializer::class)
+    value class WalletLast4(val value: ByteArray) {
+        init {
+            require(value.size == 4) { "Invalid wallet last 4 - size is ${value.size}" }
+        }
+
+        companion object {
+            fun fromWalletAddress(address: BitcoinAddress): WalletLast4 {
+                return WalletLast4(address.value.toByteArray().takeLast(4).toByteArray())
+            }
+        }
+    }
+
     @Serializable
     data class InitProgramStateParams(
         val feeAccount: BitcoinAddress,
@@ -47,8 +61,14 @@ sealed class ProgramInstruction {
 
     @Serializable
     data class Adjustment(
-        val addressIndex: UInt,
+        val addressIndex: AddressIndex,
         val amount: ULong,
+    )
+
+    @Serializable
+    data class AddressIndex(
+        val index: UInt,
+        val last4: WalletLast4,
     )
 
     @Serializable
@@ -64,7 +84,7 @@ sealed class ProgramInstruction {
 
     @Serializable
     data class Withdrawal(
-        val addressIndex: UInt,
+        val addressIndex: AddressIndex,
         val amount: ULong,
         val feeAmount: ULong,
     )
@@ -136,6 +156,30 @@ enum class BitcoinNetworkType {
     }
 }
 
+object WalletLast4Serializer : KSerializer<ProgramInstruction.WalletLast4> {
+
+    @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
+    override val descriptor: SerialDescriptor = buildSerialDescriptor("WalletLast4", StructureKind.LIST)
+
+    override fun serialize(encoder: Encoder, value: ProgramInstruction.WalletLast4) {
+        when (encoder) {
+            is com.funkatronics.kborsh.BorshEncoder -> {
+                (0 until 4).forEach { encoder.encodeByte(value.value[it]) }
+            }
+            else -> throw Exception("not required")
+        }
+    }
+
+    override fun deserialize(decoder: Decoder): ProgramInstruction.WalletLast4 {
+        return when (decoder) {
+            is com.funkatronics.kborsh.BorshDecoder -> {
+                ProgramInstruction.WalletLast4((0 until 4).map { decoder.decodeByte() }.toByteArray())
+            }
+            else -> throw Exception("not required")
+        }
+    }
+}
+
 object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
 
     private const val INIT_PROGRAM_STATE: Byte = 0
@@ -148,7 +192,7 @@ object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
     private const val ROLLBACK_SETTLEMENT_BATCH: Byte = 7
 
     @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
-    override val descriptor: SerialDescriptor = buildSerialDescriptor("Pubkey", StructureKind.LIST)
+    override val descriptor: SerialDescriptor = buildSerialDescriptor("ProgramInstruction", StructureKind.LIST)
 
     @OptIn(InternalSerializationApi::class)
     override fun serialize(encoder: Encoder, value: ProgramInstruction) {

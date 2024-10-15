@@ -96,6 +96,7 @@ data class SequencedArchWithdrawal(
     val withdrawalEntity: WithdrawalEntity,
     val archAccountEntity: ArchAccountEntity,
     val balanceIndex: Int,
+    val address: BitcoinAddress,
 )
 
 class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(guid) {
@@ -201,6 +202,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
 
         fun findSequencedArchWithdrawals(limit: Int, maxResponseSequence: Long?): List<SequencedArchWithdrawal> {
             return WithdrawalTable
+                .join(WalletTable, JoinType.INNER, WithdrawalTable.walletGuid, WalletTable.guid)
                 .join(ArchAccountTable, JoinType.INNER, WithdrawalTable.symbolGuid, ArchAccountTable.symbolGuid)
                 .join(ArchAccountBalanceIndexTable, JoinType.INNER, ArchAccountTable.guid, ArchAccountBalanceIndexTable.archAccountGuid, additionalConstraint = { ArchAccountBalanceIndexTable.walletGuid.eq(WithdrawalTable.walletGuid) })
                 .selectAll()
@@ -216,6 +218,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                         withdrawalEntity = WithdrawalEntity.wrapRow(it),
                         archAccountEntity = ArchAccountEntity.wrapRow(it),
                         balanceIndex = it[ArchAccountBalanceIndexTable.addressIndex],
+                        address = BitcoinAddress.canonicalize(it[WalletTable.address]),
                     )
                 }
         }
