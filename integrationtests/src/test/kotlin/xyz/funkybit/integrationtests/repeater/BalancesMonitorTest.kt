@@ -73,7 +73,7 @@ class BalancesMonitorTest {
         assertEquals(true, logMessages.isEmpty(), "expected no logs but got $logMessages")
 
         // but if the gas recovers
-        triggerRepeaterTaskAndWaitForCompletion("balances_monitor")
+        triggerRepeaterTaskAndWaitForCompletion("balances_monitor", taskArgs = listOf("testnet_challenge", "100"))
 
         // then it should warn again
         triggerRepeaterTaskAndWaitForCompletion("balances_monitor", taskArgs = listOf("testnet_challenge", "200000"))

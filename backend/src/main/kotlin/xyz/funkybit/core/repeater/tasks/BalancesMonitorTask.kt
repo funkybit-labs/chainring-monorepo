@@ -15,8 +15,8 @@ import java.math.BigInteger
 import kotlin.time.Duration.Companion.minutes
 
 data class BalancesMonitorConfig(
-    val testnetChallengeEnabled: Boolean = System.getenv("TESTNET_CHALLENGE_ENABLED")?.toBoolean() ?: true,
-    val bitcoinNetworkEnabled: Boolean = System.getenv("BITCOIN_NETWORK_ENABLED")?.toBoolean() ?: true,
+    val testnetChallengeMinEnrollments: BigInteger = System.getenv("TESTNET_CHALLENGE_MIN_ENROLLMENTS_THRESHOLD")?.toBigInteger() ?: 1_000.toBigInteger(),
+    val bitcoinNetworkFeePayerMinGas: BigInteger = System.getenv("BITCOIN_NETWORK_FEE_PAYER_MIN_GAS_THRESHOLD")?.toBigInteger() ?: 10_000_000.toBigInteger(),
 )
 
 class BalancesMonitorTask(val config: BalancesMonitorConfig = BalancesMonitorConfig()) : RepeaterBaseTask(
@@ -44,7 +44,7 @@ class BalancesMonitorTask(val config: BalancesMonitorConfig = BalancesMonitorCon
                 }
 
                 "testnet_challenge" -> {
-                    checkTestnetChallengeAirropperBalance(minEnrollments = args.value)
+                    checkTestnetChallengeAirdropperBalance(minEnrollments = args.value)
                 }
 
                 "bitcoin_fee_payer" -> {
@@ -54,11 +54,11 @@ class BalancesMonitorTask(val config: BalancesMonitorConfig = BalancesMonitorCon
                 else -> {
                     checkSubmittersGas()
 
-                    if (config.testnetChallengeEnabled) {
-                        checkTestnetChallengeAirropperBalance()
+                    if (TestnetChallengeUtils.enabled) {
+                        checkTestnetChallengeAirdropperBalance()
                     }
 
-                    if (config.bitcoinNetworkEnabled) {
+                    if (bitcoinConfig.enabled) {
                         checkBitcoinFeePayerGas()
                     }
                 }
@@ -69,7 +69,7 @@ class BalancesMonitorTask(val config: BalancesMonitorConfig = BalancesMonitorCon
         }
     }
 
-    private fun checkBitcoinFeePayerGas(minimumGas: BigInteger = BigInteger.valueOf(100_000)) {
+    private fun checkBitcoinFeePayerGas(minimumGas: BigInteger = config.bitcoinNetworkFeePayerMinGas) {
         val availableGas = transaction { UtxoManager.getUnspentTotal(bitcoinConfig.feePayerAddress) }
 
         handleLowBalanceWarning(availableGas, minimumGas, notificationKey = "${0}:bitcoin_fee_payer_gas") {
@@ -90,7 +90,7 @@ class BalancesMonitorTask(val config: BalancesMonitorConfig = BalancesMonitorCon
         }
     }
 
-    private fun checkTestnetChallengeAirropperBalance(minEnrollments: BigInteger = 100.toBigInteger()) {
+    private fun checkTestnetChallengeAirdropperBalance(minEnrollments: BigInteger = config.testnetChallengeMinEnrollments) {
         val depositSymbol = transaction { TestnetChallengeUtils.depositSymbol() }
         val gasSymbol = transaction { SymbolEntity.forChainAndContractAddress(depositSymbol.chainId.value, null) }
         val chainId = depositSymbol.chainId.value
@@ -98,8 +98,7 @@ class BalancesMonitorTask(val config: BalancesMonitorConfig = BalancesMonitorCon
         val evmClient = EvmChainManager.getEvmClient(chainId)
 
         // check gas balance
-        val minimumGas =
-            (minEnrollments.toBigDecimal() * TestnetChallengeUtils.gasDepositAmount).toFundamentalUnits(gasSymbol.decimals)
+        val minimumGas = (minEnrollments.toBigDecimal() * TestnetChallengeUtils.gasDepositAmount).toFundamentalUnits(gasSymbol.decimals)
         val availableGas = evmClient.getNativeBalance(evmClient.airdropperAddress)
         handleLowBalanceWarning(availableGas, minimumGas, notificationKey = "$chainId:testnet_challenge_gas") {
             "Low gas alert for airdropper testnet challenge ${evmClient.airdropperAddress} on $chainId: only $availableGas available, need a minimum of $minimumGas"
