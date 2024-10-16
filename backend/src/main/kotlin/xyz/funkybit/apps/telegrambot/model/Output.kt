@@ -44,6 +44,14 @@ sealed class Output {
 }
 
 object OutputMessage {
+
+    fun comingSoon(recipient: TelegramBotUserEntity): Output.SendMessage {
+        return Output.SendMessage(
+            recipient = recipient.telegramUserId,
+            text = "Trading options coming soon, stay tuned!",
+        )
+    }
+
     fun mainMenu(
         recipient: TelegramBotUserEntity,
         currentWallet: EvmAddress,
