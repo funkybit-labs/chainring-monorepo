@@ -18,6 +18,7 @@ class V99_AddArchRollbackTransactionToWithdrawal : Migration() {
         Sequenced,
         Settling,
         Complete,
+        PendingRollback,
         RollingBack,
         Failed,
     }

@@ -42,6 +42,7 @@ enum class WithdrawalStatus {
     Sequenced,
     Settling,
     Complete,
+    PendingRollback,
     RollingBack,
     Failed,
     ;
@@ -205,7 +206,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 .toList()
         }
 
-        fun findNeedsToInitiateRollbackOnArch(): List<ArchWithdrawalInfo> {
+        fun findPendingRollbackOnArch(): List<ArchWithdrawalInfo> {
             return WithdrawalTable
                 .join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid)
                 .join(WalletTable, JoinType.INNER, WithdrawalTable.walletGuid, WalletTable.guid)
@@ -213,9 +214,8 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 .join(ArchAccountBalanceIndexTable, JoinType.INNER, ArchAccountTable.guid, ArchAccountBalanceIndexTable.archAccountGuid, additionalConstraint = { ArchAccountBalanceIndexTable.walletGuid.eq(WithdrawalTable.walletGuid) })
                 .selectAll()
                 .where {
-                    WithdrawalTable.status.eq(WithdrawalStatus.RollingBack) and
-                        SymbolTable.chainId.eq(bitcoinConfig.chainId) and
-                        WithdrawalTable.archRollbackTransactionGuid.isNull()
+                    WithdrawalTable.status.eq(WithdrawalStatus.PendingRollback) and
+                        SymbolTable.chainId.eq(bitcoinConfig.chainId)
                 }
                 .orderBy(Pair(WithdrawalTable.sequenceId, SortOrder.ASC))
                 .map {
@@ -245,8 +245,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 .selectAll()
                 .where {
                     WithdrawalTable.status.eq(WithdrawalStatus.RollingBack) and
-                        SymbolTable.chainId.eq(bitcoinConfig.chainId) and
-                        WithdrawalTable.archRollbackTransactionGuid.isNotNull()
+                        SymbolTable.chainId.eq(bitcoinConfig.chainId)
                 }
                 .map { WithdrawalEntity.wrapRow(it) }
                 .toList()

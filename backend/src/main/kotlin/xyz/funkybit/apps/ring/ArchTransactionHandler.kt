@@ -371,7 +371,7 @@ class ArchTransactionHandler(
                 } else {
                     withdrawals.forEach { withdrawal ->
                         if (Clock.System.now() - (withdrawal.updatedAt ?: withdrawal.createdAt) > maxWaitTime) {
-                            withdrawal.status = WithdrawalStatus.RollingBack
+                            withdrawal.status = WithdrawalStatus.PendingRollback
                         }
                     }
                 }
@@ -586,7 +586,7 @@ class ArchTransactionHandler(
     }
 
     private fun createNextRollbackWithdrawalBatch(programPubkey: ArchNetworkRpc.Pubkey): Boolean {
-        val failedWithdrawalsToRollback = WithdrawalEntity.findNeedsToInitiateRollbackOnArch()
+        val failedWithdrawalsToRollback = WithdrawalEntity.findPendingRollbackOnArch()
         if (failedWithdrawalsToRollback.isEmpty()) {
             return false
         }
