@@ -134,7 +134,7 @@ fun signAuthorizeBitcoinWalletRequest(
     chainId: ChainId = ChainId(1337U),
     timestamp: Instant = Clock.System.now(),
 ): AuthorizeWalletApiRequest {
-    val message = "[funkybit] Please sign this message to authorize Bitcoin wallet ${authorizedAddress.value.lowercase()}. This action will not cost any gas fees."
+    val message = "[funkybit] Please sign this message to authorize Bitcoin wallet ${authorizedAddress.value}. This action will not cost any gas fees."
     val signature: EvmSignature = ECHelper.signData(
         Credentials.create(ecKeyPair),
         EIP712Helper.computeHash(

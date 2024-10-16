@@ -130,7 +130,7 @@ class BitcoinWallet(
 
     fun signWithdraw(symbol: String, amount: BigInteger): CreateWithdrawalApiRequest {
         val nonce = System.currentTimeMillis()
-        val message = "[funkybit] Please sign this message to authorize withdrawal of ${amount.fromSatoshi().toPlainString()} ${symbol.replace(Regex(":.*"), "")} from the exchange to your wallet."
+        val message = "[funkybit] Please sign this message to authorize withdrawal of ${amount.fromSatoshi().toPlainString()} $symbol from the exchange to your wallet."
         val bitcoinLinkAddressMessage = "$message\nAddress: ${walletAddress.value}, Timestamp: ${Instant.fromEpochMilliseconds(nonce)}"
         val signature = keyPair.ecKey.signMessage(bitcoinLinkAddressMessage)
         return CreateWithdrawalApiRequest(
@@ -164,13 +164,13 @@ class BitcoinWallet(
 
     private fun sign(request: CreateOrderApiRequest): Signature {
         val (baseSymbol, quoteSymbol) = marketSymbols(request.marketId)
-        val baseSymbolName = baseSymbol.name.replace(Regex(":.*"), "")
-        val quoteSymbolName = quoteSymbol.name.replace(Regex(":.*"), "")
+        val baseSymbolName = baseSymbol.name
+        val quoteSymbolName = quoteSymbol.name
 
         val bitcoinAddress = BitcoinAddress.canonicalize(walletAddress.value)
         val amount = when (request.amount) {
             is OrderAmount.Fixed -> request.amount.fixedAmount().fromFundamentalUnits(baseSymbol.decimals).toPlainString()
-            is OrderAmount.Percent -> "${request.amount.percentage()}% of your "
+            is OrderAmount.Percent -> "${request.amount.percentage()}% of your"
         }
         val bitcoinOrderMessage = "[funkybit] Please sign this message to authorize a swap. This action will not cost any gas fees." +
             if (request.side == OrderSide.Buy) {

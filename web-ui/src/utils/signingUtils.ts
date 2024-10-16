@@ -68,7 +68,9 @@ export async function signWithdrawal(
 
     return await bitcoinSignMessage(
       walletAddress,
-      `[funkybit] Please sign this message to authorize withdrawal of ${formattedAmount} ${symbol.displayName()} from the exchange to your wallet.\nAddress: ${walletAddress}, Timestamp: ${timestamp.toISOString()}`
+      `[funkybit] Please sign this message to authorize withdrawal of ${formattedAmount} ${
+        symbol.name
+      } from the exchange to your wallet.\nAddress: ${walletAddress}, Timestamp: ${timestamp.toISOString()}`
     )
   } else {
     const nonce = BigInt(timestamp.getTime())
@@ -114,9 +116,12 @@ export async function signOrderCreation(
   if (wallet.networkType == 'Bitcoin') {
     let formattedAmount
     if (percentage) {
-      formattedAmount = `${percentage}% of your `
+      formattedAmount = `${percentage}% of your`
     } else {
-      formattedAmount = formatUnits(amount, baseSymbol.decimals)
+      formattedAmount = formatUnits(
+        amount < 0 ? -amount : amount,
+        baseSymbol.decimals
+      )
       formattedAmount = formattedAmount.padEnd(
         formattedAmount.split('.')[0].length + baseSymbol.decimals + 1,
         '0'
@@ -127,8 +132,8 @@ export async function signOrderCreation(
       wallet.address,
       `[funkybit] Please sign this message to authorize a swap. This action will not cost any gas fees.${
         side == 'Buy'
-          ? `\nSwap ${formattedAmount} ${quoteSymbol.displayName()} for ${baseSymbol.displayName()}`
-          : `\nSwap ${formattedAmount} ${baseSymbol.displayName()} for ${quoteSymbol.displayName()}`
+          ? `\nSwap ${formattedAmount} ${quoteSymbol.name} for ${baseSymbol.name}`
+          : `\nSwap ${formattedAmount} ${baseSymbol.name} for ${quoteSymbol.name}`
       }${limitPrice ? `\nPrice: ${limitPrice}` : `\nPrice: Market`}\nAddress: ${
         wallet.address
       }, Nonce: ${nonce}`
@@ -152,7 +157,7 @@ export async function signOrderCreation(
               { name: 'chainId', type: 'uint256' },
               { name: 'verifyingContract', type: 'address' }
             ],
-            Order: [
+            PercentageOrder: [
               { name: 'sender', type: 'address' },
               { name: 'baseChainId', type: 'uint256' },
               { name: 'baseToken', type: 'address' },
@@ -164,7 +169,7 @@ export async function signOrderCreation(
             ]
           },
           domain: getDomain(exchangeContractAddress, chainId),
-          primaryType: 'Order',
+          primaryType: 'PercentageOrder',
           message: {
             sender: wallet.address as Address,
             baseChainId: BigInt(baseSymbol.chainId),
@@ -232,8 +237,8 @@ export async function signOrderCancellation(
       wallet.address,
       `[funkybit] Please sign this message to authorize order cancellation. This action will not cost any gas fees.${
         side == 'Buy'
-          ? `\nSwap ${formattedBaseAmount} ${market.quoteSymbol.displayName()} for ${market.baseSymbol.displayName()}`
-          : `\nSwap ${formattedBaseAmount} ${market.baseSymbol.displayName()} for ${market.quoteSymbol.displayName()}`
+          ? `\nSwap ${formattedBaseAmount} ${market.quoteSymbol.name} for ${market.baseSymbol.name}`
+          : `\nSwap ${formattedBaseAmount} ${market.baseSymbol.name} for ${market.quoteSymbol.name}`
       }\nAddress: ${wallet.address}, Nonce: ${nonce}`
     )
   } else {
