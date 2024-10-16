@@ -39,6 +39,10 @@ object UtxoManager {
         BitcoinUtxoEntity.reserve(utxos, reservedBy)
     }
 
+    fun releaseUtxos(reservedBy: String) {
+        BitcoinUtxoEntity.release(reservedBy)
+    }
+
     fun refreshUtxos(address: BitcoinAddress) {
         val bitcoinAddressMonitor = BitcoinUtxoAddressMonitorEntity.createIfNotExists(address)
 

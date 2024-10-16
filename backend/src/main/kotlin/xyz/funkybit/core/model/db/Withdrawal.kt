@@ -42,6 +42,7 @@ enum class WithdrawalStatus {
     Sequenced,
     Settling,
     Complete,
+    RollingBack,
     Failed,
     ;
 
@@ -80,6 +81,10 @@ object WithdrawalTable : GUIDTable<WithdrawalId>("withdrawal", ::WithdrawalId) {
         "arch_tx_guid",
         BlockchainTransactionTable,
     ).nullable()
+    val archRollbackTransactionGuid = reference(
+        "arch_rollback_tx_guid",
+        BlockchainTransactionTable,
+    ).nullable()
 
     init {
         check("tx_when_settling") {
@@ -92,7 +97,7 @@ object WithdrawalTable : GUIDTable<WithdrawalId>("withdrawal", ::WithdrawalId) {
     }
 }
 
-data class SequencedArchWithdrawal(
+data class ArchWithdrawalInfo(
     val withdrawalEntity: WithdrawalEntity,
     val archAccountEntity: ArchAccountEntity,
     val balanceIndex: Int,
@@ -200,7 +205,54 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 .toList()
         }
 
-        fun findSequencedArchWithdrawals(limit: Int, maxResponseSequence: Long?): List<SequencedArchWithdrawal> {
+        fun findNeedsToInitiateRollbackOnArch(): List<ArchWithdrawalInfo> {
+            return WithdrawalTable
+                .join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid)
+                .join(WalletTable, JoinType.INNER, WithdrawalTable.walletGuid, WalletTable.guid)
+                .join(ArchAccountTable, JoinType.INNER, WithdrawalTable.symbolGuid, ArchAccountTable.symbolGuid)
+                .join(ArchAccountBalanceIndexTable, JoinType.INNER, ArchAccountTable.guid, ArchAccountBalanceIndexTable.archAccountGuid, additionalConstraint = { ArchAccountBalanceIndexTable.walletGuid.eq(WithdrawalTable.walletGuid) })
+                .selectAll()
+                .where {
+                    WithdrawalTable.status.eq(WithdrawalStatus.RollingBack) and
+                        SymbolTable.chainId.eq(bitcoinConfig.chainId) and
+                        WithdrawalTable.archRollbackTransactionGuid.isNull()
+                }
+                .orderBy(Pair(WithdrawalTable.sequenceId, SortOrder.ASC))
+                .map {
+                    ArchWithdrawalInfo(
+                        withdrawalEntity = WithdrawalEntity.wrapRow(it),
+                        archAccountEntity = ArchAccountEntity.wrapRow(it),
+                        balanceIndex = it[ArchAccountBalanceIndexTable.addressIndex],
+                        address = BitcoinAddress.canonicalize(it[WalletTable.address]),
+                    )
+                }
+        }
+
+        fun updateToRollingBackOnArch(withdrawals: List<WithdrawalEntity>, archTransactionEntity: BlockchainTransactionEntity) {
+            BatchUpdateStatement(WithdrawalTable).apply {
+                withdrawals.forEach {
+                    addBatch(it.id)
+                    this[WithdrawalTable.status] = WithdrawalStatus.RollingBack
+                    this[WithdrawalTable.archRollbackTransactionGuid] = archTransactionEntity.guid.value
+                }
+                execute(TransactionManager.current())
+            }
+        }
+
+        fun findRollingBackOnArch(): List<WithdrawalEntity> {
+            return WithdrawalTable
+                .join(SymbolTable, JoinType.INNER, WithdrawalTable.symbolGuid, SymbolTable.guid)
+                .selectAll()
+                .where {
+                    WithdrawalTable.status.eq(WithdrawalStatus.RollingBack) and
+                        SymbolTable.chainId.eq(bitcoinConfig.chainId) and
+                        WithdrawalTable.archRollbackTransactionGuid.isNotNull()
+                }
+                .map { WithdrawalEntity.wrapRow(it) }
+                .toList()
+        }
+
+        fun findSequencedArchWithdrawals(limit: Int, maxResponseSequence: Long?): List<ArchWithdrawalInfo> {
             return WithdrawalTable
                 .join(WalletTable, JoinType.INNER, WithdrawalTable.walletGuid, WalletTable.guid)
                 .join(ArchAccountTable, JoinType.INNER, WithdrawalTable.symbolGuid, ArchAccountTable.symbolGuid)
@@ -214,7 +266,7 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                 .orderBy(Pair(WithdrawalTable.sequenceId, SortOrder.ASC))
                 .limit(limit)
                 .map {
-                    SequencedArchWithdrawal(
+                    ArchWithdrawalInfo(
                         withdrawalEntity = WithdrawalEntity.wrapRow(it),
                         archAccountEntity = ArchAccountEntity.wrapRow(it),
                         balanceIndex = it[ArchAccountBalanceIndexTable.addressIndex],
@@ -336,6 +388,9 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
 
     var archTransactionGuid by WithdrawalTable.archTransactionGuid
     var archTransaction by BlockchainTransactionEntity optionalReferencedOn WithdrawalTable.archTransactionGuid
+
+    var archRollbackTransactionGuid by WithdrawalTable.archRollbackTransactionGuid
+    var archRollbackTransaction by BlockchainTransactionEntity optionalReferencedOn WithdrawalTable.archRollbackTransactionGuid
 
     var sequenceId by WithdrawalTable.sequenceId
     var transactionData by WithdrawalTable.transactionData

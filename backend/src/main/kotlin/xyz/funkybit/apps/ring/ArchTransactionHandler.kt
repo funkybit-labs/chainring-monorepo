@@ -104,6 +104,7 @@ class ArchTransactionHandler(
                         if (tryAcquireAdvisoryLock(chainId.value.toLong())) {
                             processBalanceIndexBatch()
                             processDepositBatch()
+                            processFailedWithdrawalsBatch()
                         }
                     }
                     if (withdrawalBatchInProgress) {
@@ -297,6 +298,28 @@ class ArchTransactionHandler(
         }
     }
 
+    private fun processFailedWithdrawalsBatch(): Boolean {
+        val programPubkey = programAccount.rpcPubkey()
+
+        val rollingBackOnArchWithdrawals = WithdrawalEntity.findRollingBackOnArch()
+        return if (rollingBackOnArchWithdrawals.isNotEmpty()) {
+            // handle withdrawal rollback sent to arch
+            rollingBackOnArchWithdrawals.first().archTransaction?.let { archTransaction ->
+                ArchNetworkClient.getProcessedTransaction(archTransaction.txHash!!)?.let {
+                    if (it.status == ArchNetworkRpc.Status.Processed) {
+                        archTransaction.markAsCompleted()
+                        rollingBackOnArchWithdrawals.forEach { withdrawalEntity ->
+                            onWithdrawalCompleteOnBitcoin(withdrawalEntity, "failed to confirm on bitcoin network")
+                        }
+                    }
+                }
+            }
+            true
+        } else {
+            createNextRollbackWithdrawalBatch(programPubkey)
+        }
+    }
+
     private fun processWithdrawalBatch(): Boolean {
         val programPubkey = programAccount.rpcPubkey()
         if (settlementBatchInProgress(chainId)) {
@@ -348,9 +371,7 @@ class ArchTransactionHandler(
                 } else {
                     withdrawals.forEach { withdrawal ->
                         if (Clock.System.now() - (withdrawal.updatedAt ?: withdrawal.createdAt) > maxWaitTime) {
-                            // TODO: CHAIN-510 - need to rollback here - both Arch and sequencer - rollback on arch is similar
-                            // to doing a batch deposit to put balances back which should update sequencer on completion
-                            withdrawal.status = WithdrawalStatus.Failed
+                            withdrawal.status = WithdrawalStatus.RollingBack
                         }
                     }
                 }
@@ -562,6 +583,34 @@ class ArchTransactionHandler(
 
             return true
         }
+    }
+
+    private fun createNextRollbackWithdrawalBatch(programPubkey: ArchNetworkRpc.Pubkey): Boolean {
+        val failedWithdrawalsToRollback = WithdrawalEntity.findNeedsToInitiateRollbackOnArch()
+        if (failedWithdrawalsToRollback.isEmpty()) {
+            return false
+        }
+
+        val instruction = ArchUtils.buildRollbackWithdrawBatchInstruction(
+            programPubkey,
+            failedWithdrawalsToRollback,
+        )
+        val transaction = BlockchainTransactionEntity.create(
+            chainId = chainId,
+            transactionData = BlockchainTransactionData(
+                instruction.serialize().toHex(),
+                programPubkey.toContractAddress(),
+            ),
+            batchHash = null,
+        )
+        transaction.flush()
+        WithdrawalEntity.updateToRollingBackOnArch(failedWithdrawalsToRollback.map { it.withdrawalEntity }, transaction)
+        failedWithdrawalsToRollback.mapNotNull { it.withdrawalEntity.archTransaction?.txHash }.toSet().forEach {
+            UtxoManager.releaseUtxos(it.value)
+        }
+        submitToArch(transaction, instruction)
+
+        return true
     }
 
     private fun createNextBalanceIndexBatch(programPubkey: ArchNetworkRpc.Pubkey): Pair<List<ArchAccountBalanceInfo>, ArchNetworkRpc.Instruction?> {

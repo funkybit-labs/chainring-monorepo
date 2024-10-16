@@ -1,5 +1,6 @@
 package xyz.funkybit.integrationtests.bitcoin
 
+import kotlinx.datetime.Clock
 import org.http4k.client.WebsocketClient
 import org.http4k.websocket.WsClient
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -37,9 +38,10 @@ import xyz.funkybit.core.utils.sum
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForProgramAccount
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForProgramStateAccount
 import xyz.funkybit.integrationtests.bitcoin.ArchOnboardingTest.Companion.waitForTokenStateAccount
-import xyz.funkybit.integrationtests.bitcoin.UtxoSelectionTest.Companion.validateUtxoAndMempoolBalancces
+import xyz.funkybit.integrationtests.bitcoin.UtxoSelectionTest.Companion.validateUtxoAndMempoolBalances
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.getFeeAccountBalanceOnArch
+import xyz.funkybit.integrationtests.testutils.getWalletBalanceOnArch
 import xyz.funkybit.integrationtests.testutils.isBitcoinDisabled
 import xyz.funkybit.integrationtests.testutils.waitFor
 import xyz.funkybit.integrationtests.testutils.waitForBalance
@@ -52,9 +54,11 @@ import xyz.funkybit.integrationtests.utils.assertAmount
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
 import xyz.funkybit.integrationtests.utils.blocking
 import xyz.funkybit.integrationtests.utils.subscribeToBalances
+import xyz.funkybit.utils.BitcoinMiner
 import java.math.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.days
 
 @ExtendWith(AppUnderTestRunner::class)
 class ArchDepositAndWithdrawalTest {
@@ -66,6 +70,7 @@ class ArchDepositAndWithdrawalTest {
         waitForProgramStateAccount()
         waitForTokenStateAccount()
         ArchUtils.walletsPerTokenAccountThreshold = 100_000
+        BitcoinMiner.resume()
     }
 
     @Test
@@ -149,8 +154,8 @@ class ArchDepositAndWithdrawalTest {
             expectedWalletBalance.toLong(),
         )
 
-        validateUtxoAndMempoolBalancces(bitcoinWallet.walletAddress)
-        validateUtxoAndMempoolBalancces(bitcoinWallet.exchangeDepositAddress, true)
+        validateUtxoAndMempoolBalances(bitcoinWallet.walletAddress)
+        validateUtxoAndMempoolBalances(bitcoinWallet.exchangeDepositAddress, true)
     }
 
     @Test
@@ -235,8 +240,8 @@ class ArchDepositAndWithdrawalTest {
             getBalance(bitcoinWallet.exchangeDepositAddress),
         )
 
-        validateUtxoAndMempoolBalancces(bitcoinWallet.walletAddress)
-        validateUtxoAndMempoolBalancces(bitcoinWallet.exchangeDepositAddress, true)
+        validateUtxoAndMempoolBalances(bitcoinWallet.walletAddress)
+        validateUtxoAndMempoolBalances(bitcoinWallet.exchangeDepositAddress, true)
     }
 
     @Test
@@ -390,7 +395,84 @@ class ArchDepositAndWithdrawalTest {
             apiClient.getDeposit(pendingInvalidBtcDeposit.id).deposit.status == Deposit.Status.Failed
         }
 
-        validateUtxoAndMempoolBalancces(bitcoinWallet.exchangeDepositAddress, true)
+        validateUtxoAndMempoolBalances(bitcoinWallet.exchangeDepositAddress, true)
+    }
+
+    @Test
+    fun `test withdrawal rollback`() {
+        Assumptions.assumeFalse(isBitcoinDisabled())
+
+        val airdropAmount = BigInteger("15000")
+        val depositAmount = BigInteger("7000")
+
+        val (apiClient, bitcoinWallet, wsClient) = setupAndDepositToWallet(airdropAmount, depositAmount)
+        val btc = bitcoinWallet.nativeSymbol
+        val exchangeUtxoBalanceAfterDeposit = getBalance(bitcoinWallet.exchangeDepositAddress)
+
+        val startingFeeAccountBalance = getFeeAccountBalanceOnArch(btc)
+
+        val withdrawAmount = BigInteger("3000")
+
+        // should pause bitcoin block mining
+        BitcoinMiner.pause()
+        val pendingBtcWithdrawal = initiateWithdrawal(apiClient, bitcoinWallet, wsClient, btc, depositAmount, withdrawAmount)
+        // wait for bitcoin tx to be filled in
+        waitFor {
+            transaction { WithdrawalEntity[pendingBtcWithdrawal.id].blockchainTransactionGuid != null }
+        }
+        val withdrawal = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
+        assertEquals(WithdrawalStatus.Settling, withdrawal.status)
+        // check fee account and wallet balances on arch
+        assertEquals(
+            startingFeeAccountBalance.inFundamentalUnits + withdrawal.fee,
+            getFeeAccountBalanceOnArch(btc).inFundamentalUnits,
+        )
+        assertEquals(
+            depositAmount - withdrawAmount,
+            getWalletBalanceOnArch(btc, bitcoinWallet.walletAddress).inFundamentalUnits,
+        )
+
+        // check balances over API - the total won't be adjusted till we have 1 confirm
+        val btcBalances = apiClient.getBalances().balances.first { it.symbol.value == btc.name }
+        assertEquals(depositAmount - withdrawAmount, btcBalances.available)
+        assertEquals(depositAmount, btcBalances.total)
+
+        // adjust the hash and move updated at back - simulates tx being evicted from mempool
+        transaction {
+            WithdrawalEntity[pendingBtcWithdrawal.id].let {
+                it.blockchainTransaction!!.txHash = TxHash.emptyHashArch
+                it.updatedAt = Clock.System.now().minus(3.days)
+            }
+        }
+        // Wait for rollback tx to be created
+        waitFor {
+            transaction { WithdrawalEntity[pendingBtcWithdrawal.id].archRollbackTransactionGuid != null }
+        }
+
+        // wait for withdrawal to go to failed
+        waitFor {
+            apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal.status == WithdrawalStatus.Failed
+        }
+
+        // make sure on chain amounts are rolled back
+        assertEquals(
+            startingFeeAccountBalance.inFundamentalUnits,
+            getFeeAccountBalanceOnArch(btc).inFundamentalUnits,
+        )
+        assertEquals(
+            depositAmount,
+            getWalletBalanceOnArch(btc, bitcoinWallet.walletAddress).inFundamentalUnits,
+        )
+
+        // and available balance in sequencer should be rolled back
+        waitFor {
+            apiClient.getBalances().balances.first { it.symbol.value == btc.name }.available == depositAmount
+        }
+
+        // also check utxos
+        assertEquals(exchangeUtxoBalanceAfterDeposit, getBalance(bitcoinWallet.exchangeDepositAddress))
+
+        BitcoinMiner.resume()
     }
 
     private fun setupAndDepositToWallet(airdropAmount: BigInteger, depositAmount: BigInteger): Triple<TestApiClient, BitcoinWallet, WsClient> {

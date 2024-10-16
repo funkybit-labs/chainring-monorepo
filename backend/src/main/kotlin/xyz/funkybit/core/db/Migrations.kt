@@ -97,6 +97,7 @@ import xyz.funkybit.core.model.db.migrations.V95_AddIndexToBroadcasterJobTable
 import xyz.funkybit.core.model.db.migrations.V96_UpdateBitcoinUtxoTable
 import xyz.funkybit.core.model.db.migrations.V97_AddSentToArchStatusToDeposit
 import xyz.funkybit.core.model.db.migrations.V98_AddUserGuidToOrderAndExecution
+import xyz.funkybit.core.model.db.migrations.V99_AddArchRollbackTransactionToWithdrawal
 import xyz.funkybit.core.model.db.migrations.V9_SymbolTable
 
 val migrations = listOf(
@@ -198,4 +199,5 @@ val migrations = listOf(
     V96_UpdateBitcoinUtxoTable(),
     V97_AddSentToArchStatusToDeposit(),
     V98_AddUserGuidToOrderAndExecution(),
+    V99_AddArchRollbackTransactionToWithdrawal(),
 )

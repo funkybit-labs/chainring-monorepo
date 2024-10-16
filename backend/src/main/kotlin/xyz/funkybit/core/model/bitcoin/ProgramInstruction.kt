@@ -123,6 +123,11 @@ sealed class ProgramInstruction {
     @Serializable
     data object RollbackSettlement : ProgramInstruction()
 
+    @Serializable
+    data class RollbackWithdrawBatchParams(
+        val tokenWithdrawalsList: List<TokenWithdrawals>,
+    ) : ProgramInstruction()
+
     @OptIn(ExperimentalUnsignedTypes::class)
     fun serialize() = Borsh.encodeToByteArray(this).toUByteArray()
 }
@@ -190,6 +195,7 @@ object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
     private const val PREPARE_SETTLEMENT_BATCH: Byte = 5
     private const val SUBMIT_SETTLEMENT_BATCH: Byte = 6
     private const val ROLLBACK_SETTLEMENT_BATCH: Byte = 7
+    private const val ROLLBACK_WITHDRAW_BATCH: Byte = 8
 
     @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
     override val descriptor: SerialDescriptor = buildSerialDescriptor("ProgramInstruction", StructureKind.LIST)
@@ -229,6 +235,10 @@ object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
                     }
                     is ProgramInstruction.RollbackSettlement -> {
                         encoder.encodeByte(ROLLBACK_SETTLEMENT_BATCH)
+                    }
+                    is ProgramInstruction.RollbackWithdrawBatchParams -> {
+                        encoder.encodeByte(ROLLBACK_WITHDRAW_BATCH)
+                        ProgramInstruction.RollbackWithdrawBatchParams::class.serializer().serialize(encoder, value)
                     }
                 }
             }
