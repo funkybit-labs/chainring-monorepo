@@ -33,7 +33,7 @@ class UtxoSelectionTest {
     companion object {
         val params = bitcoinConfig.params
 
-        fun validateUtxoAndMempoolBalancces(address: BitcoinAddress, isProgramAddress: Boolean = false) {
+        fun validateUtxoAndMempoolBalances(address: BitcoinAddress, isProgramAddress: Boolean = false) {
             transaction {
                 assertEquals(BitcoinUtxoEntity.findUnspentTotal(address).toLong(), MempoolSpaceClient.getBalance(address) - if (isProgramAddress) 1500 else 0)
             }
@@ -105,7 +105,7 @@ class UtxoSelectionTest {
         assertEquals(BitcoinUtxoId.fromTxHashAndVout(txId3, transferVout), transferToUnspentUtxos[0].guid.value)
         assertEquals(BigInteger("3000"), transferToUnspentUtxos[0].amount)
 
-        validateUtxoAndMempoolBalancces(address)
+        validateUtxoAndMempoolBalances(address)
     }
 
     @Test
@@ -159,7 +159,7 @@ class UtxoSelectionTest {
         assertEquals(BitcoinUtxoId.fromTxHashAndVout(txId3, transferVout), transferToUnspentUtxos[0].guid.value)
         assertEquals(transferAmount, transferToUnspentUtxos[0].amount)
 
-        validateUtxoAndMempoolBalancces(address)
+        validateUtxoAndMempoolBalances(address)
     }
 
     private fun buildTransferTx(ecKey: ECKey, toAddress: BitcoinAddress, amount: BigInteger, changeAddress: BitcoinAddress, feeAmount: BigInteger, utxos: List<BitcoinUtxoEntity>): Transaction {

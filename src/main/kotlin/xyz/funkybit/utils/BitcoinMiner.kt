@@ -10,6 +10,7 @@ object BitcoinMiner {
 
     val logger = KotlinLogging.logger {}
     private var miningThread: Thread? = null
+    private var paused = false
 
     fun start() {
         if (!bitcoinConfig.enabled || miningThread != null) {
@@ -21,7 +22,9 @@ object BitcoinMiner {
 
             while (true) {
                 try {
-                    BitcoinClient.mine(1)
+                    if (!paused) {
+                        BitcoinClient.mine(1)
+                    }
                     Thread.sleep(1000)
                 } catch (ie: InterruptedException) {
                     logger.warn { "Exiting bitcoin mining thread thread" }
@@ -40,5 +43,13 @@ object BitcoinMiner {
             it.join(1000)
         }
         miningThread = null
+    }
+
+    fun pause() {
+        paused = true
+    }
+
+    fun resume() {
+        paused = false
     }
 }
