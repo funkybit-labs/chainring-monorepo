@@ -1,5 +1,6 @@
 package xyz.funkybit.core.db
 
+import xyz.funkybit.core.model.db.migrations.V100_AddDiscordUserIdToUser
 import xyz.funkybit.core.model.db.migrations.V10_WithdrawalTable
 import xyz.funkybit.core.model.db.migrations.V11_NonNullableDeployedContractProxyAddress
 import xyz.funkybit.core.model.db.migrations.V12_BigDecimalPrice
@@ -98,7 +99,6 @@ import xyz.funkybit.core.model.db.migrations.V96_UpdateBitcoinUtxoTable
 import xyz.funkybit.core.model.db.migrations.V97_AddSentToArchStatusToDeposit
 import xyz.funkybit.core.model.db.migrations.V98_AddUserGuidToOrderAndExecution
 import xyz.funkybit.core.model.db.migrations.V99_AddArchRollbackTransactionToWithdrawal
-import xyz.funkybit.core.model.db.migrations.V100_AddDiscordUserIdToUser
 import xyz.funkybit.core.model.db.migrations.V9_SymbolTable
 
 val migrations = listOf(
