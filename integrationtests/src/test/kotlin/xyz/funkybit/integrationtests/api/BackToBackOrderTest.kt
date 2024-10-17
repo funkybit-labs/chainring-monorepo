@@ -441,7 +441,6 @@ class BackToBackOrderTest : OrderBaseTest() {
         val makerStartingBridgeBalance = makerWallet.getExchangeBalance(bridgeSymbol)
         val makerStartingOutputBalance = makerWallet.getExchangeBalance(outputSymbol)
         val takerStartingInputBalance = takerWallet.getExchangeBalance(inputSymbol)
-        val takerStartingBridgeBalance = takerWallet.getExchangeBalance(bridgeSymbol)
         val takerStartingOutputBalance = takerWallet.getExchangeBalance(outputSymbol)
 
         val bridgePrice = BigDecimal("20.0").setScale(18)
@@ -579,7 +578,6 @@ class BackToBackOrderTest : OrderBaseTest() {
 
         val makerFeeTrade1 = notionalTrade1 * BigDecimal("0.01")
         val makerFeeTrade2 = AssetAmount(bridgeSymbol, notionalTrade2.amount) * BigDecimal("0.01")
-        val takerFee = AssetAmount(bridgeSymbol, notionalTrade1.amount) * BigDecimal("0.02")
 
         assertBalances(
             listOf(

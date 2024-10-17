@@ -95,7 +95,7 @@ class ArchTransactionHandler(
                 }
             }
 
-            var settlementBatchInProgress = false
+            var settlementBatchInProgress: Boolean
             var withdrawalBatchInProgress = false
 
             while (true) {

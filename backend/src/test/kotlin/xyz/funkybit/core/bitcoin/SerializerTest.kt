@@ -111,7 +111,7 @@ class SerializerTest {
             ),
             t.balances,
         )
-        t.balances.forEachIndexed { index, balance ->
+        t.balances.forEachIndexed { index, _ ->
             assertEquals(
                 ArchAccountState.Token.getBalanceAtIndex(tokenStateBytes.toHexBytes(), index),
                 t.balances[index],

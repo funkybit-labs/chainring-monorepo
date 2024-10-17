@@ -23,6 +23,7 @@ import java.math.BigInteger
 enum class EIP712TransactionType {
     Withdraw,
     Order,
+    PercentageOrder,
     Trade,
     CancelOrder,
 }
@@ -114,7 +115,10 @@ sealed class EIP712Transaction {
     ) : EIP712Transaction() {
 
         override fun getTransactionType(): EIP712TransactionType {
-            return EIP712TransactionType.Order
+            return when (amount) {
+                is OrderAmount.Fixed -> EIP712TransactionType.Order
+                is OrderAmount.Percent -> EIP712TransactionType.PercentageOrder
+            }
         }
 
         override fun getModel(): List<StructuredData.Entry> = listOf(

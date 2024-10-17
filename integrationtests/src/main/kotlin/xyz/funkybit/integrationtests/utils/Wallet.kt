@@ -266,7 +266,7 @@ class Wallet(
     override fun signOrder(request: CreateOrderApiRequest.BackToBackMarket): CreateOrderApiRequest.BackToBackMarket {
         val market1Symbols = marketSymbols(request.marketId)
         val market2Symbols = marketSymbols(request.secondMarketId)
-        val(inputSymbol, bridgeSymbol, outputSymbol) = if (listOf(market2Symbols.first.name, market2Symbols.second.name).contains(market1Symbols.first.name)) {
+        val(inputSymbol, _, outputSymbol) = if (listOf(market2Symbols.first.name, market2Symbols.second.name).contains(market1Symbols.first.name)) {
             if (market2Symbols.first.name == market1Symbols.first.name) {
                 Triple(market1Symbols.second, market1Symbols.first, market2Symbols.second)
             } else {

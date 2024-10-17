@@ -261,9 +261,9 @@ class ExchangeApiService(
                     val amount = orderRequest.amount.fromFundamentalUnits(baseSymbol.decimals).toPlainString()
                     val message = "[funkybit] Please sign this message to authorize order cancellation. This action will not cost any gas fees." +
                         if (orderRequest.side == OrderSide.Buy) {
-                            "\nSwap $amount ${quoteSymbol.displayName()} for ${baseSymbol.displayName()}"
+                            "\nSwap $amount ${quoteSymbol.name} for ${baseSymbol.name}"
                         } else {
-                            "\nSwap $amount ${baseSymbol.displayName()} for ${quoteSymbol.displayName()}"
+                            "\nSwap $amount ${baseSymbol.name} for ${quoteSymbol.name}"
                         } + "\nAddress: ${walletAddress.value}, Nonce: ${orderRequest.nonce}"
                     if (!BitcoinSignatureVerification.verifyMessage(walletAddress, orderRequest.signature.value.replace(" ", "+"), message)) {
                         throw RequestProcessingError(ReasonCode.SignatureNotValid, "Invalid signature")
@@ -310,13 +310,13 @@ class ExchangeApiService(
     private fun verifyBitcoinSignature(bitcoinAddress: BitcoinAddress, orderRequest: CreateOrderApiRequest, baseSymbol: SymbolEntity, quoteSymbol: SymbolEntity) {
         val amount = when (orderRequest.amount) {
             is OrderAmount.Fixed -> orderRequest.amount.fixedAmount().fromFundamentalUnits(baseSymbol.decimals).toPlainString()
-            is OrderAmount.Percent -> "${orderRequest.amount.percentage()}% of your "
+            is OrderAmount.Percent -> "${orderRequest.amount.percentage()}% of your"
         }
         val bitcoinOrderMessage = "[funkybit] Please sign this message to authorize a swap. This action will not cost any gas fees." +
             if (orderRequest.side == OrderSide.Buy) {
-                "\nSwap $amount ${quoteSymbol.displayName()} for ${baseSymbol.displayName()}"
+                "\nSwap $amount ${quoteSymbol.name} for ${baseSymbol.name}"
             } else {
-                "\nSwap $amount ${baseSymbol.displayName()} for ${quoteSymbol.displayName()}"
+                "\nSwap $amount ${baseSymbol.name} for ${quoteSymbol.name}"
             } + when (orderRequest) {
                 is CreateOrderApiRequest.Limit -> "\nPrice: ${orderRequest.price.toPlainString()}"
                 else -> "\nPrice: Market"
@@ -357,7 +357,7 @@ class ExchangeApiService(
                 val bitcoinWithdrawalMessage = String.format(
                     "[funkybit] Please sign this message to authorize withdrawal of %s %s from the exchange to your wallet.",
                     apiRequest.amount.fromSatoshi().toPlainString(),
-                    symbol.displayName(),
+                    symbol.name,
                 ) + "\nAddress: ${bitcoinAddress.value}, Timestamp: ${Instant.fromEpochMilliseconds(apiRequest.nonce)}"
                 if (!BitcoinSignatureVerification.verifyMessage(bitcoinAddress, apiRequest.signature.value.replace(" ", "+"), bitcoinWithdrawalMessage)) {
                     throw RequestProcessingError(ReasonCode.SignatureNotValid, "Invalid signature")
