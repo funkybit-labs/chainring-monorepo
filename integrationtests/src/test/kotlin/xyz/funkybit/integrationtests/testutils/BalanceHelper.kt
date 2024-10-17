@@ -4,6 +4,7 @@ import org.awaitility.kotlin.await
 import org.http4k.websocket.WsClient
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.model.SymbolInfo
+import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.bitcoin.ArchAccountState
 import xyz.funkybit.core.model.db.ArchAccountEntity
@@ -19,6 +20,7 @@ import xyz.funkybit.integrationtests.utils.Faucet
 import xyz.funkybit.integrationtests.utils.TestApiClient
 import xyz.funkybit.integrationtests.utils.assertBalances
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
+import java.math.BigInteger
 import java.time.Duration
 
 fun waitForBalance(apiClient: TestApiClient, wsClient: WsClient, expectedBalances: List<ExpectedBalance>) {
@@ -67,6 +69,19 @@ fun getFeeAccountBalanceOnArch(symbol: SymbolInfo): AssetAmount {
             ArchAccountEntity.findTokenAccountsForSymbol(symbolEntity).sumOf {
                 val tokenState = ArchUtils.getAccountState<ArchAccountState.Token>(it.rpcPubkey())
                 tokenState.balances[0].balance.toLong().toBigInteger()
+            },
+        )
+    }
+}
+
+fun getWalletBalanceOnArch(symbol: SymbolInfo, walletAddress: BitcoinAddress): AssetAmount {
+    return transaction {
+        val symbolEntity = SymbolEntity.forName(symbol.name)
+        AssetAmount(
+            symbol,
+            ArchAccountEntity.findTokenAccountsForSymbol(symbolEntity).sumOf {
+                val tokenState = ArchUtils.getAccountState<ArchAccountState.Token>(it.rpcPubkey())
+                tokenState.balances.firstOrNull { b -> b.walletAddress == walletAddress }?.balance?.toLong()?.toBigInteger() ?: BigInteger.ZERO
             },
         )
     }

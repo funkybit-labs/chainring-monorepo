@@ -28,11 +28,11 @@ import xyz.funkybit.core.model.db.ArchAccountBalanceIndexStatus
 import xyz.funkybit.core.model.db.ArchAccountBalanceInfo
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.ArchAccountType
+import xyz.funkybit.core.model.db.ArchWithdrawalInfo
 import xyz.funkybit.core.model.db.BitcoinUtxoEntity
 import xyz.funkybit.core.model.db.BitcoinUtxoId
 import xyz.funkybit.core.model.db.CreateArchAccountBalanceIndexAssignment
 import xyz.funkybit.core.model.db.DepositEntity
-import xyz.funkybit.core.model.db.SequencedArchWithdrawal
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.WalletTable
 import xyz.funkybit.core.model.db.WithdrawalEntity
@@ -187,7 +187,7 @@ object ArchUtils {
     fun buildWithdrawBatchInstruction(
         programBitcoinAddress: BitcoinAddress,
         programPubkey: ArchNetworkRpc.Pubkey,
-        withdrawals: List<SequencedArchWithdrawal>,
+        withdrawals: List<ArchWithdrawalInfo>,
     ): Pair<ArchNetworkRpc.Instruction, List<BitcoinUtxoEntity>> {
         val accountMetas = mutableListOf(
             ArchNetworkRpc.AccountMeta(
@@ -233,6 +233,50 @@ object ArchUtils {
                 ).serialize(),
             ),
             selectedUtxos,
+        )
+    }
+
+    @OptIn(ExperimentalUnsignedTypes::class)
+    fun buildRollbackWithdrawBatchInstruction(
+        programPubkey: ArchNetworkRpc.Pubkey,
+        withdrawals: List<ArchWithdrawalInfo>,
+    ): ArchNetworkRpc.Instruction {
+        val accountMetas = mutableListOf(
+            ArchNetworkRpc.AccountMeta(
+                pubkey = submitterPubkey,
+                isSigner = true,
+                isWritable = true,
+            ),
+        )
+        val tokenWithdrawalsList = withdrawals.groupBy { it.archAccountEntity.rpcPubkey() }.map { (pubKey, tokenWithdrawals) ->
+            ProgramInstruction.TokenWithdrawals(
+                accountIndex = accountMetas.size.toUByte(),
+                withdrawals = tokenWithdrawals.map {
+                    ProgramInstruction.Withdrawal(
+                        ProgramInstruction.AddressIndex(
+                            it.balanceIndex.toUInt(),
+                            ProgramInstruction.WalletLast4.fromWalletAddress(it.address),
+                        ),
+                        it.withdrawalEntity.resolvedAmount().toLong().toULong(),
+                        it.withdrawalEntity.fee.toLong().toULong(),
+                    )
+                },
+            ).also {
+                accountMetas.add(
+                    ArchNetworkRpc.AccountMeta(
+                        pubkey = pubKey,
+                        isWritable = true,
+                        isSigner = false,
+                    ),
+                )
+            }
+        }
+        return ArchNetworkRpc.Instruction(
+            programPubkey,
+            accountMetas,
+            ProgramInstruction.RollbackWithdrawBatchParams(
+                tokenWithdrawalsList,
+            ).serialize(),
         )
     }
 

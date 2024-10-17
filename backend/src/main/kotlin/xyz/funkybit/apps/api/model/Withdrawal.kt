@@ -40,7 +40,10 @@ data class Withdrawal(
                 id = entity.id.value,
                 symbol = Symbol(entity.symbol.name),
                 amount = entity.actualAmount ?: entity.amount,
-                status = entity.status,
+                status = when (entity.status) {
+                    WithdrawalStatus.RollingBack, WithdrawalStatus.PendingRollback -> WithdrawalStatus.Settling
+                    else -> entity.status
+                },
                 error = entity.error,
                 createdAt = entity.createdAt,
                 txHash = entity.blockchainTransaction?.txHash?.let { TxHash(it.value) },
