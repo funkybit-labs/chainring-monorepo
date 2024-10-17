@@ -87,6 +87,7 @@ services:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-cd9ad9b5-fbfb-4c83-8722-1058b4da13d5-Zww9oL
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
       TELEGRAM_BOT_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:demo/api/TELEGRAM_BOT_TOKEN-sKtZqG
+      SENTRY_DSN: arn:aws:secretsmanager:us-east-2:851725450525:secret:demo/api/SENTRY_DSN-RSybZw
   ring:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
     count: 1
@@ -95,6 +96,7 @@ services:
     secrets:
       DB_CREDENTIALS: arn:aws:secretsmanager:us-east-2:851725450525:secret:rds!cluster-cd9ad9b5-fbfb-4c83-8722-1058b4da13d5-Zww9oL
       SLACK_ERROR_REPORTING_APP_TOKEN: arn:aws:secretsmanager:us-east-2:851725450525:secret:slack-error-reporter-token-74wImX
+      SENTRY_DSN: arn:aws:secretsmanager:us-east-2:851725450525:secret:demo/ring/SENTRY_DSN-SPHPI4
   telegrambot:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
     count: 1

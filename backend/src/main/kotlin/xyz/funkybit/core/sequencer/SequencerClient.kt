@@ -3,6 +3,7 @@ package xyz.funkybit.core.sequencer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
+import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTelemetry
 import xyz.funkybit.apps.api.middleware.ServerSpans
 import xyz.funkybit.apps.api.middleware.Tracer
 import xyz.funkybit.core.blockchain.evm.ECHelper
@@ -25,6 +26,7 @@ import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.UserId
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WithdrawalId
+import xyz.funkybit.core.telemetry.openTelemetry
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.core.utils.toHexBytes
 import xyz.funkybit.sequencer.core.Asset
@@ -140,7 +142,10 @@ open class SequencerClient {
         (System.getenv("SEQUENCER_PORT") ?: "5337").toInt(),
     ).usePlaintext().build()
 
+    private val grpcTelemetry = GrpcTelemetry.create(openTelemetry)
+
     protected val stub = GatewayGrpcKt.GatewayCoroutineStub(channel)
+        .withInterceptors(grpcTelemetry.newClientInterceptor())
 
     suspend fun orderBatch(
         marketId: MarketId,

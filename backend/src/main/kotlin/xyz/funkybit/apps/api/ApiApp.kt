@@ -13,6 +13,7 @@ import org.http4k.core.Uri
 import org.http4k.core.then
 import org.http4k.filter.AllowAll
 import org.http4k.filter.CorsPolicy
+import org.http4k.filter.OpenTelemetryTracing
 import org.http4k.filter.OriginPolicy
 import org.http4k.filter.ServerFilters
 import org.http4k.filter.ZipkinTraces
@@ -32,6 +33,7 @@ import xyz.funkybit.apps.api.services.ExchangeApiService
 import xyz.funkybit.core.db.DbConfig
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.services.LinkedSignerService
+import xyz.funkybit.core.telemetry.openTelemetry
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import xyz.funkybit.core.websocket.Broadcaster
 import java.time.Duration.ofSeconds
@@ -87,6 +89,7 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
 
     private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
         .then(ServerFilters.Cors(corsPolicy))
+        .then(ServerFilters.OpenTelemetryTracing(openTelemetry))
         .then(
             ServerFilters.RequestTracing(
                 startReportFn = { _, z: ZipkinTraces ->

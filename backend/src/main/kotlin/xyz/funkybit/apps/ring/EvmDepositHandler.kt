@@ -21,6 +21,7 @@ import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.sequencer.SequencerClient
 import xyz.funkybit.core.sequencer.toSequencerId
+import xyz.funkybit.core.telemetry.rootSpan
 import xyz.funkybit.core.utils.TestnetChallengeUtils
 import xyz.funkybit.core.utils.toFundamentalUnits
 import xyz.funkybit.sequencer.core.Asset
@@ -82,22 +83,33 @@ class EvmDepositHandler(
             val currentBlock = evmClient.getBlockNumber()
 
             // handle pending deposits - if we hit required confirmations, invoke callback
-            pendingDeposits.forEach {
-                refreshPendingDeposit(it, currentBlock)
+            pendingDeposits.forEach { pendingDeposit ->
+                rootSpan("EvmDepositHandler.refreshPendingDeposit") {
+                    refreshPendingDeposit(pendingDeposit, currentBlock)
+                }
             }
         }
 
         if (confirmedDeposits.isNotEmpty()) {
-            confirmedDeposits.forEach(::sendToSequencer)
-            if (TestnetChallengeUtils.enabled) {
-                confirmedDeposits.forEach { deposit ->
-                    if (listOf(TestnetChallengeStatus.PendingDeposit, TestnetChallengeStatus.PendingDepositConfirmation).contains(deposit.wallet.user.testnetChallengeStatus) &&
-                        deposit.symbol.name == TestnetChallengeUtils.depositSymbolName &&
-                        deposit.amount == TestnetChallengeUtils.depositAmount.toFundamentalUnits(TestnetChallengeUtils.depositSymbol().decimals)
-                    ) {
-                        deposit.wallet.user.testnetChallengeStatus = TestnetChallengeStatus.Enrolled
-                        TestnetChallengePNLEntity.initializeForUser(deposit.wallet.user)
-                    }
+            rootSpan("EvmDepositHandler.processConfirmedDeposits") {
+                processConfirmedDeposits(confirmedDeposits)
+            }
+        }
+    }
+
+    private fun processConfirmedDeposits(confirmedDeposits: List<DepositEntity>) {
+        confirmedDeposits.forEach(::sendToSequencer)
+        if (TestnetChallengeUtils.enabled) {
+            confirmedDeposits.forEach { deposit ->
+                if (listOf(
+                        TestnetChallengeStatus.PendingDeposit,
+                        TestnetChallengeStatus.PendingDepositConfirmation,
+                    ).contains(deposit.wallet.user.testnetChallengeStatus) &&
+                    deposit.symbol.name == TestnetChallengeUtils.depositSymbolName &&
+                    deposit.amount == TestnetChallengeUtils.depositAmount.toFundamentalUnits(TestnetChallengeUtils.depositSymbol().decimals)
+                ) {
+                    deposit.wallet.user.testnetChallengeStatus = TestnetChallengeStatus.Enrolled
+                    TestnetChallengePNLEntity.initializeForUser(deposit.wallet.user)
                 }
             }
         }

@@ -5,8 +5,9 @@ import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
+import xyz.funkybit.core.telemetry.withTracing
 
-private val defaultHttpClient = OkHttpClient.Builder().build()
+private val defaultHttpClient = OkHttpClient.Builder().withTracing().build()
 
 object HttpClient {
     private val quietMode = ThreadLocal.withInitial { false }

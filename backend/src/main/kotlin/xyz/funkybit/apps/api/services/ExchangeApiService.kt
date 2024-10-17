@@ -1,6 +1,7 @@
 package xyz.funkybit.apps.api.services
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.sentry.kotlin.SentryContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Instant
 import org.jetbrains.exposed.dao.id.EntityID
@@ -133,7 +134,7 @@ class ExchangeApiService(
             }
         }
 
-        val response = runBlocking {
+        val response = runBlocking(SentryContext()) {
             sequencerClient.backToBackOrder(
                 listOf(market1.id, market2.id),
                 userId.toSequencerId(),
@@ -274,7 +275,7 @@ class ExchangeApiService(
             orderRequest.orderId
         }
 
-        val response = runBlocking {
+        val response = runBlocking(SentryContext()) {
             sequencerClient.orderBatch(market.id, userId.toSequencerId(), walletAddress.toSequencerId(), ordersToAdd, ordersToCancel)
         }
 
@@ -378,7 +379,7 @@ class ExchangeApiService(
             }
         }
 
-        runBlocking {
+        runBlocking(SentryContext()) {
             sequencerClient.withdraw(
                 userId.toSequencerId(),
                 Asset(symbol.name),
@@ -437,7 +438,7 @@ class ExchangeApiService(
                 .map { Pair(it, it.wallet) }
         }
         if (openOrders.isNotEmpty()) {
-            runBlocking {
+            runBlocking(SentryContext()) {
                 openOrders
                     .groupBy(
                         keySelector = { (order, wallet) -> Pair(order.marketGuid, wallet.address) },
