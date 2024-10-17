@@ -1,6 +1,7 @@
 package xyz.funkybit.apps.api.middleware
 
 import io.github.oshai.kotlinlogging.KLogger
+import io.sentry.Sentry
 import org.http4k.core.Filter
 import org.http4k.core.Status.Companion.INTERNAL_SERVER_ERROR
 import xyz.funkybit.apps.api.model.ApiError
@@ -19,6 +20,7 @@ object RequestProcessingExceptionHandler {
                     when (e) {
                         is RequestProcessingError -> errorResponse(e.httpStatus, e.error)
                         else -> {
+                            Sentry.captureException(e)
                             logger.error(e) { "Exception during request processing. Request: ${request.method.name} ${request.uri}" }
                             errorResponse(
                                 INTERNAL_SERVER_ERROR,

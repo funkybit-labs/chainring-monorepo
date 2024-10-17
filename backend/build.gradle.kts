@@ -49,6 +49,13 @@ dependencies {
     implementation("org.apache.logging.log4j:log4j-layout-template-json:$log4j2Version")
     implementation("org.apache.logging.log4j:log4j-slf4j2-impl:$log4j2Version")
 
+    // Tracing
+    implementation("org.http4k:http4k-opentelemetry:$http4kVersion")
+    implementation("io.sentry:sentry-opentelemetry-core:7.15.0")
+    implementation("io.sentry:sentry-kotlin-extensions:7.15.0")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api:2.7.0-alpha")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-grpc-1.6:2.7.0-alpha")
+
     // for REST services
     implementation("org.http4k:http4k-core:$http4kVersion")
     implementation("org.http4k:http4k-realtime-core:$http4kVersion")
