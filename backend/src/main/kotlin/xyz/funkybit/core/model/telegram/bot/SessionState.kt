@@ -21,6 +21,10 @@ sealed class SessionState {
     data object Initial : SessionState()
 
     @Serializable
+    @SerialName("ComingSoon")
+    data object ComingSoon : SessionState()
+
+    @Serializable
     @SerialName("MainMenu")
     data object MainMenu : SessionState()
 

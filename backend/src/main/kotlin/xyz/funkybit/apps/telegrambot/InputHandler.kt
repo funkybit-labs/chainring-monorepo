@@ -43,13 +43,17 @@ class InputHandler(
                 when (input) {
                     is Input.Start -> {
                         deleteTransientMessages(user)
-                        sendMainMenu(currentWallet, symbols)
-                        user.updateSessionState(SessionState.MainMenu)
+                        sendComingSoon(user)
+                        user.updateSessionState(SessionState.ComingSoon)
                     }
                     else -> {
                         sendInvalidCommand(user)
                     }
                 }
+            }
+
+            is SessionState.ComingSoon -> {
+                sendInvalidCommand(user)
             }
 
             is SessionState.MainMenu -> {
@@ -616,6 +620,10 @@ class InputHandler(
     private fun sendInvalidCommand(user: TelegramBotUserEntity) {
         sendTransient(OutputMessage.invalidCommand(user))
     }
+
+    private fun sendComingSoon(user: TelegramBotUserEntity) = send(
+        OutputMessage.comingSoon(user),
+    )
 
     private fun sendMainMenu(wallet: TelegramBotUserWalletEntity, symbols: List<SymbolEntity>) =
         send(
