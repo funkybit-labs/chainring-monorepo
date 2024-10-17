@@ -24,7 +24,7 @@ object TestnetChallengeUtils {
     fun inviteCode() = (0..10).map { Random.nextInt(65, 91).toChar() }.joinToString("")
     fun depositSymbol() = SymbolEntity.forName(depositSymbolName)
     val depositAmount = System.getenv("TESTNET_CHALLENGE_DEPOSIT_AMOUNT")?.toBigDecimal() ?: BigDecimal.valueOf(10000L)
-    val gasDepositAmount = System.getenv("TESTNET_CHALLENGE_GAS_AMOUNT")?.toBigDecimal() ?: BigDecimal.valueOf(0.01)
+    val gasDepositAmount = System.getenv("TESTNET_CHALLENGE_GAS_AMOUNT")?.toBigDecimal() ?: BigDecimal.valueOf(0.02)
 
     fun depositLimits(user: UserEntity): List<TestnetChallengeDepositLimit> {
         if (user.testnetChallengeStatus != TestnetChallengeStatus.Enrolled) {
