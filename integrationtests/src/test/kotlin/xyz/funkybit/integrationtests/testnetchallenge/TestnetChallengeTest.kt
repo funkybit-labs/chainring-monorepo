@@ -183,7 +183,7 @@ class TestnetChallengeTest : OrderBaseTest() {
 
         // cards
         var cards = trader.a.getCards()
-        assertEquals(4, cards.size)
+        assertEquals(5, cards.size)
         assertEquals(
             setOf(
                 Card.Enrolled,
@@ -194,6 +194,7 @@ class TestnetChallengeTest : OrderBaseTest() {
                     pointType = TestnetChallengeUserRewardType.EvmWalletConnected,
                     category = null,
                 ),
+                Card.LinkDiscord,
             ),
             cards.toSet(),
         )
@@ -204,7 +205,7 @@ class TestnetChallengeTest : OrderBaseTest() {
             assertMyLimitOrderCreatedMessageReceived(response)
         }
         cards = trader.a.getCards()
-        assertEquals(3, cards.size)
+        assertEquals(4, cards.size)
         assertEquals(
             setOf(
                 Card.BitcoinConnect,
@@ -214,6 +215,7 @@ class TestnetChallengeTest : OrderBaseTest() {
                     pointType = TestnetChallengeUserRewardType.EvmWalletConnected,
                     category = null,
                 ),
+                Card.LinkDiscord,
             ),
             cards.toSet(),
         )
@@ -229,7 +231,7 @@ class TestnetChallengeTest : OrderBaseTest() {
             ),
         )
         cards = trader.a.getCards()
-        assertEquals(4, cards.size)
+        assertEquals(5, cards.size)
         assertEquals(
             setOf(
                 Card.BitcoinWithdrawal,
@@ -244,6 +246,7 @@ class TestnetChallengeTest : OrderBaseTest() {
                     pointType = TestnetChallengeUserRewardType.BitcoinWalletConnected,
                     category = null,
                 ),
+                Card.LinkDiscord,
             ),
             cards.toSet(),
         )
@@ -254,7 +257,7 @@ class TestnetChallengeTest : OrderBaseTest() {
         val usdcWithdrawal = trader.a.createWithdrawal(trader.w.signWithdraw(usdc.name, usdcWithdrawalAmount.inFundamentalUnits)).withdrawal
 
         cards = trader.a.getCards()
-        assertEquals(3, cards.size)
+        assertEquals(4, cards.size)
         assertEquals(
             setOf(
                 Card.BitcoinWithdrawal,
@@ -268,6 +271,7 @@ class TestnetChallengeTest : OrderBaseTest() {
                     pointType = TestnetChallengeUserRewardType.BitcoinWalletConnected,
                     category = null,
                 ),
+                Card.LinkDiscord,
             ),
             cards.toSet(),
         )
@@ -281,7 +285,7 @@ class TestnetChallengeTest : OrderBaseTest() {
         }
 
         cards = trader.a.getCards()
-        assertEquals(4, cards.size)
+        assertEquals(5, cards.size)
         assertEquals(
             setOf(
                 Card.BitcoinWithdrawal,
@@ -300,6 +304,7 @@ class TestnetChallengeTest : OrderBaseTest() {
                     pointType = TestnetChallengeUserRewardType.EvmWithdrawalDeposit,
                     category = null,
                 ),
+                Card.LinkDiscord,
             ),
             cards.toSet(),
         )
