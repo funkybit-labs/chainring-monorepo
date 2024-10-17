@@ -11,8 +11,8 @@ on:
 
 # execute jobs sequentially per branch, needed to keep correct order of deployments
 concurrency:
-  group: ${{ github.ref_name }}
-  cancel-in-progress: ${{ github.ref_name != 'main' }}
+  group: deploy-testnet
+  cancel-in-progress: false
 
 jobs:
   deploy_backend:
