@@ -72,11 +72,11 @@ import java.util.Base64
 
 val apiServerRootUrl = System.getenv("API_URL") ?: "http://localhost:9000"
 val httpClient = OkHttpClient.Builder()
-    .dispatcher(Dispatcher()
-        .apply {
+    .dispatcher(
+        Dispatcher().apply {
             maxRequests = 1000
             maxRequestsPerHost = 1000
-        }
+        },
     ).build()
 val applicationJson = "application/json".toMediaType()
 
