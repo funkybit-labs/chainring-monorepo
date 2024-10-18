@@ -37,7 +37,6 @@ import xyz.funkybit.core.model.db.WalletTable
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.services.UtxoManager
-import xyz.funkybit.core.utils.schnorr.Schnorr
 import xyz.funkybit.core.utils.sha256
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.core.utils.toHexBytes
@@ -104,7 +103,7 @@ object ArchUtils {
                     )
                 } ?: listOf()
                 ),
-            ecKey.privKeyBytes,
+            ecKey,
         )
         account.markAsCreating(creationTxId)
     }
@@ -127,7 +126,7 @@ object ArchUtils {
 
     fun handleTxStatusUpdate(txId: TxHash, onError: () -> Unit, onProcessed: () -> Unit): Boolean {
         return ArchNetworkClient.getProcessedTransaction(txId)?.let {
-            when (it.status) {
+            when (it.statusInfo.status) {
                 ArchNetworkRpc.Status.Processed -> {
                     logger.debug { "$txId Processed" }
                     onProcessed()
@@ -518,25 +517,30 @@ object ArchUtils {
                     programInstruction,
                 ).toUByteArray(),
             ),
-            bitcoinConfig.submitterPrivateKey,
+            bitcoinConfig.submitterEcKey,
         )
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)
-    fun signAndSendInstructions(instructions: List<ArchNetworkRpc.Instruction>, privateKey: ByteArray): TxHash {
+    fun signAndSendInstructions(instructions: List<ArchNetworkRpc.Instruction>, privateKey: ECKey): TxHash {
         val message = ArchNetworkRpc.Message(
             signers = listOf(
-                ArchNetworkRpc.Pubkey.fromECKey(ECKey.fromPrivate(privateKey)),
+                ArchNetworkRpc.Pubkey.fromECKey(privateKey),
             ),
             instructions = instructions,
         )
 
-        val signature = Schnorr.sign(message.hash(), privateKey)
+        val signature = BitcoinSignatureGeneration.signMessage(
+            BitcoinAddress.taprootFromKey(bitcoinConfig.params, privateKey),
+            message.hash(),
+            privateKey,
+            Transaction.SigHash.ALL,
+        )
 
         val runtimeTransaction = ArchNetworkRpc.RuntimeTransaction(
             version = 0,
             signatures = listOf(
-                ArchNetworkRpc.Signature(signature.toUByteArray()),
+                ArchNetworkRpc.Signature(signature.slice(2..<signature.lastIndex).toByteArray().toUByteArray()),
             ),
             message = message,
         )
@@ -544,8 +548,8 @@ object ArchUtils {
         return ArchNetworkClient.sendTransaction(runtimeTransaction)
     }
 
-    fun signAndSendInstruction(instruction: ArchNetworkRpc.Instruction, privateKey: ByteArray? = null): TxHash {
-        return signAndSendInstructions(listOf(instruction), privateKey ?: bitcoinConfig.submitterPrivateKey)
+    fun signAndSendInstruction(instruction: ArchNetworkRpc.Instruction, privateKey: ECKey? = null): TxHash {
+        return signAndSendInstructions(listOf(instruction), privateKey ?: bitcoinConfig.submitterEcKey)
     }
 
     fun getConfirmedBitcoinDeposits(limit: Int): List<ConfirmedBitcoinDeposit> {

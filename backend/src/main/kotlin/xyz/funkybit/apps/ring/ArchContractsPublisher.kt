@@ -2,10 +2,12 @@ package xyz.funkybit.apps.ring
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.bitcoinj.core.ECKey
+import org.bitcoinj.core.Transaction
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.core.blockchain.ContractType
 import xyz.funkybit.core.blockchain.bitcoin.ArchNetworkClient
 import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
+import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.bitcoin.BitcoinNetworkType
 import xyz.funkybit.core.model.bitcoin.ProgramInstruction
 import xyz.funkybit.core.model.db.AccountSetupState
@@ -16,7 +18,7 @@ import xyz.funkybit.core.model.db.BitcoinUtxoAddressMonitorEntity
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import xyz.funkybit.core.utils.bitcoin.ArchUtils
-import xyz.funkybit.core.utils.schnorr.Schnorr
+import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureGeneration
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -200,6 +202,7 @@ object ArchContractsPublisher {
         var chunkOffset = 0
         val ecKey = programAccount.ecKey()
         val pubkey = ArchNetworkRpc.Pubkey.fromECKey(ecKey)
+        val bitcoinAddress = BitcoinAddress.taprootFromKey(bitcoinConfig.params, ecKey)
         javaClass.getResource("/exchangeprogram.so")?.readBytes()?.let {
             val txs = it.asSequence().chunked(chunkSize) { chunk ->
                 logger.debug { "building extendBytesTransactions offset = $chunkOffset, size = ${chunk.size}" }
@@ -218,12 +221,17 @@ object ArchContractsPublisher {
                     ),
                 )
 
-                val signature = Schnorr.sign(message.hash(), ecKey.privKeyBytes)
+                val signature = BitcoinSignatureGeneration.signMessage(
+                    bitcoinAddress,
+                    message.hash(),
+                    ecKey,
+                    Transaction.SigHash.ALL,
+                )
 
                 ArchNetworkRpc.RuntimeTransaction(
                     version = 0,
                     signatures = listOf(
-                        ArchNetworkRpc.Signature(signature.toUByteArray()),
+                        ArchNetworkRpc.Signature(signature.slice(2..<signature.lastIndex).toByteArray().toUByteArray()),
                     ),
                     message = message,
                 )
@@ -306,7 +314,7 @@ object ArchContractsPublisher {
             ArchNetworkRpc.makeAccountExecutableInstruction(
                 ArchNetworkRpc.Pubkey.fromECKey(account.ecKey()),
             ),
-            account.ecKey().privKeyBytes,
+            account.ecKey(),
         )
         setupState.executableTxId = executableTxId
         logger.debug { "setting executable id ${setupState.executableTxId} ${setupState.numProcessed}" }

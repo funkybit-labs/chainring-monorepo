@@ -1,9 +1,15 @@
 package xyz.funkybit.core.bitcoin
 
+import org.bitcoinj.core.ECKey
+import org.bitcoinj.core.NetworkParameters
+import org.bitcoinj.core.Transaction
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import xyz.funkybit.core.model.BitcoinAddress
+import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureGeneration
 import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureVerification
+import xyz.funkybit.core.utils.toHexBytes
+import java.util.*
 
 class SignatureVerification {
 
@@ -80,6 +86,51 @@ class SignatureVerification {
             BitcoinSignatureVerification.verifyMessage(
                 BitcoinAddress.canonicalize(address),
                 signature,
+                messageToSign,
+            ),
+        )
+    }
+
+    @Test
+    fun `test signing and verify - segwit`() {
+        val ecKey = ECKey()
+        val messageToSign = "[funkybit] Please sign this message to verify your ownership of this wallet address. This action will not cost any gas fees.\nAddress: bc1pyu06hqa927kff4v2kgdct7vew69w6wn7yphtz4emqj0qyrjgfrusvy6fz9, Timestamp: 2024-08-19T20:22:52.523Z"
+        val bitcoinAddress = BitcoinAddress.fromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, ecKey)
+        val signature = BitcoinSignatureGeneration.signMessage(bitcoinAddress, messageToSign.toByteArray(), ecKey)
+        assertTrue(
+            BitcoinSignatureVerification.verifyMessage(
+                bitcoinAddress,
+                Base64.getEncoder().encodeToString(signature),
+                messageToSign,
+            ),
+        )
+    }
+
+    @Test
+    fun `test signing and verify - taproot`() {
+        val ecKey = ECKey.fromPrivate("0c495259affa406cd5880b0da06fc0db1f0cab3293e380cfd8f333929f756ceb".toHexBytes())
+        val messageToSign = "[funkybit] Please sign this message to verify your ownership of this wallet address. This action will not cost any gas fees.\nAddress: bc1pyu06hqa927kff4v2kgdct7vew69w6wn7yphtz4emqj0qyrjgfrusvy6fz9, Timestamp: 2024-08-19T20:22:52.523Z"
+        val bitcoinAddress = BitcoinAddress.taprootFromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, ecKey)
+        val signature = BitcoinSignatureGeneration.signMessage(bitcoinAddress, messageToSign.toByteArray(), ecKey)
+        assertTrue(
+            BitcoinSignatureVerification.verifyMessage(
+                bitcoinAddress,
+                Base64.getEncoder().encodeToString(signature),
+                messageToSign,
+            ),
+        )
+    }
+
+    @Test
+    fun `test signing and verify - taproot - sighash all`() {
+        val ecKey = ECKey.fromPrivate("0c495259affa406cd5880b0da06fc0db1f0cab3293e380cfd8f333929f756ceb".toHexBytes())
+        val messageToSign = "[funkybit] Please sign this message to verify your ownership of this wallet address. This action will not cost any gas fees.\nAddress: bc1pyu06hqa927kff4v2kgdct7vew69w6wn7yphtz4emqj0qyrjgfrusvy6fz9, Timestamp: 2024-08-19T20:22:52.523Z"
+        val bitcoinAddress = BitcoinAddress.taprootFromKey(NetworkParameters.fromID(NetworkParameters.ID_REGTEST)!!, ecKey)
+        val signature = BitcoinSignatureGeneration.signMessage(bitcoinAddress, messageToSign.toByteArray(), ecKey, Transaction.SigHash.ALL)
+        assertTrue(
+            BitcoinSignatureVerification.verifyMessage(
+                bitcoinAddress,
+                Base64.getEncoder().encodeToString(signature),
                 messageToSign,
             ),
         )

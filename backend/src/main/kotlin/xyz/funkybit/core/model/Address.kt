@@ -11,14 +11,17 @@ import org.bitcoinj.core.Base58
 import org.bitcoinj.core.Bech32
 import org.bitcoinj.core.ECKey
 import org.bitcoinj.core.NetworkParameters
+import org.bitcoinj.core.SegwitAddress
 import org.bitcoinj.core.Utils
 import org.bitcoinj.script.Script
 import org.bitcoinj.script.ScriptOpCodes
 import org.web3j.crypto.Credentials
 import org.web3j.crypto.Keys
-import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureVerification.opPushData
-import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureVerification.padZeroHexN
+import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureUtils.opPushData
+import xyz.funkybit.core.utils.bitcoin.BitcoinSignatureUtils.padZeroHexN
+import xyz.funkybit.core.utils.bitcoin.TaprootUtils
 import xyz.funkybit.core.utils.generateHexString
+import xyz.funkybit.core.utils.schnorr.Point
 
 object AddressSerializer : KSerializer<Address> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Address", PrimitiveKind.STRING)
@@ -56,6 +59,21 @@ sealed class BitcoinAddress(val value: String) : Address() {
                 SegWit(value, true)
             } else {
                 throw Exception("Not a segwit address")
+            }
+        }
+
+        fun taprootFromKey(params: NetworkParameters, key: ECKey): Taproot {
+            val value = SegwitAddress.fromProgram(
+                params,
+                1,
+                TaprootUtils.tweakPubkey(Point.genPubKey(key.privKeyBytes)),
+            ).toBech32()
+            return if (value.startsWith("bc1p")) {
+                Taproot(value, false)
+            } else if (value.startsWith("tb1p") || value.startsWith("bcrt1p")) {
+                Taproot(value, true)
+            } else {
+                throw Exception("Not a taproot address")
             }
         }
     }
