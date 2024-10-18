@@ -73,6 +73,7 @@ class Taker(
                     submitOrder(markets.random())
                 } catch (e: Exception) {
                     logger.warn(e) { "$id: error while submitting order" }
+                    Thread.sleep(100)
                 }
             }
         }
