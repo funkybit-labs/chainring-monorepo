@@ -508,6 +508,10 @@ const EvmWithdrawalCardSchema = z.object({
   type: z.literal('EvmWithdrawal')
 })
 
+const LinkDiscordCardSchema = z.object({
+  type: z.literal('LinkDiscord')
+})
+
 const PointTypeSchema = z.enum([
   'DailyReward',
   'WeeklyReward',
@@ -542,7 +546,8 @@ const CardSchema = z.discriminatedUnion('type', [
   RecentPointsCardSchema,
   BitcoinConnectCardSchema,
   BitcoinWithdrawalCardSchema,
-  EvmWithdrawalCardSchema
+  EvmWithdrawalCardSchema,
+  LinkDiscordCardSchema
 ])
 
 export type Card = z.infer<typeof CardSchema>
@@ -970,6 +975,25 @@ export const apiClient = new Zodios(apiBaseUrl, [
     alias: 'testnetChallengeGetCards',
     parameters: [],
     response: z.array(CardSchema),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'post',
+    path: '/v1/testnet-challenge/discord/:code',
+    alias: 'testnetChallengeCompleteDiscordLinking',
+    parameters: [
+      {
+        name: 'code',
+        type: 'Path',
+        schema: z.string()
+      }
+    ],
+    response: z.undefined(),
     errors: [
       {
         status: 'default',

@@ -15,6 +15,7 @@ import org.http4k.format.KotlinxSerialization.auto
 import org.http4k.lens.Path
 import org.http4k.lens.Query
 import org.http4k.lens.int
+import org.http4k.lens.string
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.middleware.principal
 import xyz.funkybit.apps.api.middleware.signedTokenSecurity
@@ -42,6 +43,7 @@ import xyz.funkybit.core.model.db.TestnetChallengeUserRewardEntity
 import xyz.funkybit.core.model.db.UserEntity
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WithdrawalEntity
+import xyz.funkybit.core.utils.DiscordClient
 import xyz.funkybit.core.utils.IconUtils.resolveSymbolUrl
 import xyz.funkybit.core.utils.IconUtils.sanitizeImageUrl
 import xyz.funkybit.core.utils.TestnetChallengeUtils
@@ -229,6 +231,10 @@ class TestnetChallengeRoutes {
                         ),
                     )
                 }
+                if (request.principal.user.discordUserId == null) {
+                    // have they linked their discord account?
+                    cards.add(Card.LinkDiscord)
+                }
                 // have they ever connected a bitcoin wallet?
                 if (WalletEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Bitcoin)) {
                     if (!WithdrawalEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Bitcoin)) {
@@ -242,6 +248,32 @@ class TestnetChallengeRoutes {
                 }
             }
             Response(Status.OK).with(responseBody of cards.toList())
+        }
+    }
+
+    private val discordLinkCodePathParam =
+        Path.string().of("code", "Discord linking code")
+
+    val completeDiscordLinking: ContractRoute = run {
+        "testnet-challenge/discord" / discordLinkCodePathParam meta {
+            operationId = "testnet-challenge-complete-discord-link"
+            summary = "Complete Discord Linking"
+            tags += listOf(Tag("testnet-challenge"))
+            security = signedTokenSecurity
+            returning(
+                Status.OK,
+            )
+        } bindContract Method.POST to { code ->
+            { request ->
+                val(accessToken, refreshToken) = DiscordClient.exchangeCodeForTokens(code)
+                val discordUserId = DiscordClient.getDiscordUserId(accessToken)
+                transaction {
+                    request.principal.user.discordAccessToken = accessToken
+                    request.principal.user.discordRefreshToken = refreshToken
+                    request.principal.user.discordUserId = discordUserId
+                }
+                Response(Status.OK)
+            }
         }
     }
 }

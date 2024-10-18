@@ -60,4 +60,8 @@ sealed class Card {
     @Serializable
     @SerialName("EvmWithdrawal")
     data object EvmWithdrawal : Card()
+
+    @Serializable
+    @SerialName("LinkDiscord")
+    data object LinkDiscord : Card()
 }

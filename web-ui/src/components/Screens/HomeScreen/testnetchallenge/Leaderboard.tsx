@@ -7,6 +7,7 @@ import CelebrationSvg from 'assets/disco-ball.svg'
 import BtcSvg from 'assets/btc.svg'
 import LightBulbSvg from 'assets/lightbulb.svg'
 import CopySvg from 'assets/copy.svg'
+import DiscordSvg from 'assets/discord-icon.svg'
 import React, {
   ChangeEvent,
   Fragment,
@@ -38,6 +39,8 @@ type EditMode = 'none' | 'name' | 'icon'
 const rowsPerPage = 20
 
 export const webInviteBaseUrl = import.meta.env.ENV_WEB_URL + '/invite'
+const discordClientId = import.meta.env.ENV_DISCORD_CLIENT_ID
+const discordCallback = import.meta.env.ENV_WEB_URL + '/discord-callback'
 
 function Board({
   type,
@@ -146,6 +149,14 @@ function Board({
   )
 }
 
+type CTA =
+  | 'Enrolled'
+  | 'RecentPoints'
+  | 'BitcoinConnect'
+  | 'BitcoinWithdrawal'
+  | 'EvmWithdrawal'
+  | 'LinkDiscord'
+
 function CardCarousel({
   cards,
   onChangeTab,
@@ -153,14 +164,7 @@ function CardCarousel({
 }: {
   cards: [Card, ...Card[]]
   onChangeTab: (tab: Tab) => void
-  onCallToAction: (
-    type:
-      | 'Enrolled'
-      | 'RecentPoints'
-      | 'BitcoinConnect'
-      | 'BitcoinWithdrawal'
-      | 'EvmWithdrawal'
-  ) => void
+  onCallToAction: (type: CTA) => void
 }) {
   const [index, setIndex] = useState(0)
   const [prevIndex, setPrevIndex] = useState(-1)
@@ -192,6 +196,31 @@ function CardCarousel({
                     : 'hidden'
               )}
             >
+              {card.type === 'LinkDiscord' && (
+                <>
+                  <img
+                    src={DiscordSvg}
+                    alt={'discord'}
+                    className="mx-4 my-auto size-12"
+                  />
+                  <div className="my-auto">
+                    <span
+                      className="cursor-pointer underline"
+                      onClick={() => {
+                        window.open(
+                          `https://discord.com/api/oauth2/authorize?client_id=${discordClientId}&redirect_uri=${encodeURIComponent(
+                            discordCallback
+                          )}&response_type=code&scope=identify`,
+                          '_self'
+                        )
+                      }}
+                    >
+                      Link
+                    </span>{' '}
+                    your Discord account to earn more points!
+                  </div>
+                </>
+              )}
               {card.type === 'Enrolled' && (
                 <>
                   <img
@@ -278,6 +307,12 @@ function CardCarousel({
                     )}
                     {card.pointType === 'ReferralBonus' && (
                       <>from your referrals! Keep up the good work!</>
+                    )}
+                    {card.pointType === 'EvmWalletConnected' && (
+                      <>for connecting your EVM wallet.</>
+                    )}
+                    {card.pointType === 'BitcoinWalletConnected' && (
+                      <>for connecting your Bitcoin wallet.</>
                     )}
                   </div>
                 </>
@@ -395,6 +430,30 @@ export function Leaderboard({
   const [avatarSaveError, setAvatarSaveError] = useState('')
   const [nicknameSaveError, setNicknameSaveError] = useState('')
 
+  const completeDiscordLinking = useMutation({
+    mutationFn: (code: string) => {
+      return apiClient.testnetChallengeCompleteDiscordLinking(undefined, {
+        params: { code }
+      })
+    },
+    onSuccess: () => {
+      window.location.href = '/'
+    },
+    onError: () => {
+      alert('Unable to link your discord account')
+      window.location.href = '/'
+    }
+  })
+
+  useEffect(() => {
+    if (window.location.pathname.includes('/discord-callback')) {
+      const code = window.location.search.replace('?code=', '')
+      if (code) {
+        completeDiscordLinking.mutate(code)
+      }
+    }
+  }, [completeDiscordLinking])
+
   const onSelectIconFile = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) {
       setSelectedAvatarFile(undefined)
@@ -487,14 +546,7 @@ export function Leaderboard({
     setTimeout(() => setCopyTooltipText('Copy to clipboard'), 2000)
   }
 
-  function onCallToAction(
-    type:
-      | 'Enrolled'
-      | 'RecentPoints'
-      | 'BitcoinConnect'
-      | 'BitcoinWithdrawal'
-      | 'EvmWithdrawal'
-  ) {
+  function onCallToAction(type: CTA) {
     if (type === 'BitcoinWithdrawal') {
       if (wallets.isConnected('Bitcoin')) {
         onWithdrawal(symbols.native[0])
