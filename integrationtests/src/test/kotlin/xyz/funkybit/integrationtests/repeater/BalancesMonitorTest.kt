@@ -58,7 +58,7 @@ class BalancesMonitorTest {
         triggerRepeaterTaskAndWaitForCompletion("balances_monitor", taskArgs = listOf("testnet_challenge", "500000"))
         assert(
             logMessages.any {
-                it.message.contains(Regex("Low gas alert for airdropper testnet challenge .* on 1337: only .* available, need a minimum of 5000000000000000000000"))
+                it.message.contains(Regex("Low gas alert for airdropper testnet challenge .* on 1337: only .* available, need a minimum of 10000000000000000000000"))
             },
         )
         assert(
@@ -79,7 +79,7 @@ class BalancesMonitorTest {
         triggerRepeaterTaskAndWaitForCompletion("balances_monitor", taskArgs = listOf("testnet_challenge", "200000"))
         assert(
             logMessages.any {
-                it.message.contains(Regex("Low gas alert for airdropper testnet challenge .* on 1337: only .* available, need a minimum of 2000000000000000000000"))
+                it.message.contains(Regex("Low gas alert for airdropper testnet challenge .* on 1337: only .* available, need a minimum of 4000000000000000000000"))
             },
         )
         assert(
