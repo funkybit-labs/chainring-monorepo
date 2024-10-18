@@ -1,6 +1,5 @@
 package xyz.funkybit.core.utils.bitcoin
 
-import com.funkatronics.kborsh.Borsh
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
@@ -348,7 +347,7 @@ object ArchUtils {
                 accountMetas,
                 ProgramInstruction.PrepareSettlementBatchParams(settlements).serialize(),
             ),
-            sha256(Borsh.encodeToByteArray(ProgramInstruction.PrepareSettlementBatchParams(settlements))).toHex(false),
+            sha256(ArchProgramBinaryFormat.encodeToByteArray(ProgramInstruction.PrepareSettlementBatchParams(settlements))).toHex(false),
         )
     }
 
@@ -365,7 +364,7 @@ object ArchUtils {
                 accountMetas,
                 ProgramInstruction.SubmitSettlementBatchParams(settlements).serialize(),
             ),
-            sha256(Borsh.encodeToByteArray(ProgramInstruction.PrepareSettlementBatchParams(settlements))).toHex(false),
+            sha256(ArchProgramBinaryFormat.encodeToByteArray(ProgramInstruction.PrepareSettlementBatchParams(settlements))).toHex(false),
         )
     }
 
@@ -507,7 +506,7 @@ object ArchUtils {
 
     @OptIn(ExperimentalUnsignedTypes::class)
     inline fun <reified T> getAccountState(pubkey: ArchNetworkRpc.Pubkey): T =
-        Borsh.decodeFromByteArray(ArchNetworkClient.readAccountInfo(pubkey).data.toByteArray())
+        ArchProgramBinaryFormat.decodeFromByteArray(ArchNetworkClient.readAccountInfo(pubkey).data.toByteArray())
 
     @OptIn(ExperimentalUnsignedTypes::class)
     fun signAndSendProgramInstruction(programPubkey: ArchNetworkRpc.Pubkey, accountMetas: List<ArchNetworkRpc.AccountMeta>, programInstruction: ProgramInstruction): TxHash {
@@ -515,7 +514,7 @@ object ArchUtils {
             ArchNetworkRpc.Instruction(
                 programPubkey,
                 accountMetas,
-                Borsh.encodeToByteArray(
+                ArchProgramBinaryFormat.encodeToByteArray(
                     programInstruction,
                 ).toUByteArray(),
             ),

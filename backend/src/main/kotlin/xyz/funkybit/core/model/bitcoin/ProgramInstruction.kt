@@ -1,6 +1,5 @@
 package xyz.funkybit.core.model.bitcoin
 
-import com.funkatronics.kborsh.Borsh
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -17,6 +16,9 @@ import org.bitcoinj.core.NetworkParameters
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.rpc.ArchNetworkRpc
+import xyz.funkybit.core.utils.bitcoin.ArchProgramBinaryDecoder
+import xyz.funkybit.core.utils.bitcoin.ArchProgramBinaryEncoder
+import xyz.funkybit.core.utils.bitcoin.ArchProgramBinaryFormat
 import xyz.funkybit.core.utils.toHex
 
 @Serializable(with = ProgramInstructionSerializer::class)
@@ -129,7 +131,7 @@ sealed class ProgramInstruction {
     ) : ProgramInstruction()
 
     @OptIn(ExperimentalUnsignedTypes::class)
-    fun serialize() = Borsh.encodeToByteArray(this).toUByteArray()
+    fun serialize() = ArchProgramBinaryFormat.encodeToByteArray(this).toUByteArray()
 }
 
 @Serializable
@@ -168,7 +170,7 @@ object WalletLast4Serializer : KSerializer<ProgramInstruction.WalletLast4> {
 
     override fun serialize(encoder: Encoder, value: ProgramInstruction.WalletLast4) {
         when (encoder) {
-            is com.funkatronics.kborsh.BorshEncoder -> {
+            is ArchProgramBinaryEncoder -> {
                 (0 until 4).forEach { encoder.encodeByte(value.value[it]) }
             }
             else -> throw Exception("not required")
@@ -177,7 +179,7 @@ object WalletLast4Serializer : KSerializer<ProgramInstruction.WalletLast4> {
 
     override fun deserialize(decoder: Decoder): ProgramInstruction.WalletLast4 {
         return when (decoder) {
-            is com.funkatronics.kborsh.BorshDecoder -> {
+            is ArchProgramBinaryDecoder -> {
                 ProgramInstruction.WalletLast4((0 until 4).map { decoder.decodeByte() }.toByteArray())
             }
             else -> throw Exception("not required")
@@ -203,7 +205,7 @@ object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
     @OptIn(InternalSerializationApi::class)
     override fun serialize(encoder: Encoder, value: ProgramInstruction) {
         when (encoder) {
-            is com.funkatronics.kborsh.BorshEncoder -> {
+            is ArchProgramBinaryEncoder -> {
                 when (value) {
                     is ProgramInstruction.InitProgramStateParams -> {
                         encoder.encodeByte(INIT_PROGRAM_STATE)
@@ -249,7 +251,7 @@ object ProgramInstructionSerializer : KSerializer<ProgramInstruction> {
     @OptIn(InternalSerializationApi::class)
     override fun deserialize(decoder: Decoder): ProgramInstruction {
         return when (decoder) {
-            is com.funkatronics.kborsh.BorshDecoder -> {
+            is ArchProgramBinaryDecoder -> {
                 when (val code = decoder.decodeByte()) {
                     INIT_PROGRAM_STATE -> ProgramInstruction.InitProgramStateParams::class.serializer().deserialize(decoder)
                     INIT_TOKEN_STATE -> ProgramInstruction.InitTokenStateParams::class.serializer().deserialize(decoder)
@@ -300,7 +302,7 @@ sealed class ArchAccountState {
 
         override fun deserialize(decoder: Decoder): Program {
             return when (decoder) {
-                is com.funkatronics.kborsh.BorshDecoder -> {
+                is ArchProgramBinaryDecoder -> {
                     Program(
                         version = decoder.decodeInt(),
                         feeAccount = deserializeAddress((0 until MAX_ADDRESS_LENGTH).map { decoder.decodeByte() }.toByteArray()),
@@ -333,7 +335,7 @@ sealed class ArchAccountState {
 
         override fun deserialize(decoder: Decoder): Balance {
             return when (decoder) {
-                is com.funkatronics.kborsh.BorshDecoder -> {
+                is ArchProgramBinaryDecoder -> {
                     Balance(
                         walletAddress = deserializeAddress((0 until MAX_ADDRESS_LENGTH).map { decoder.decodeByte() }.toByteArray()),
                         balance = decoder.decodeLong().toULong(),
@@ -357,7 +359,7 @@ sealed class ArchAccountState {
 
             fun getBalanceAtIndex(data: ByteArray, balanceIndex: Int): Balance {
                 val offset = TOKEN_STATE_HEADER_SIZE + balanceIndex * BALANCE_SIZE
-                return Borsh.decodeFromByteArray<Balance>(data.slice(offset until offset + BALANCE_SIZE).toByteArray())
+                return ArchProgramBinaryFormat.decodeFromByteArray<Balance>(data.slice(offset until offset + BALANCE_SIZE).toByteArray())
             }
         }
     }
@@ -374,7 +376,7 @@ sealed class ArchAccountState {
         @OptIn(InternalSerializationApi::class)
         override fun deserialize(decoder: Decoder): Token {
             return when (decoder) {
-                is com.funkatronics.kborsh.BorshDecoder -> {
+                is ArchProgramBinaryDecoder -> {
                     Token(
                         version = decoder.decodeInt(),
                         programStateAccount = ArchNetworkRpc.Pubkey::class.serializer().deserialize(decoder),

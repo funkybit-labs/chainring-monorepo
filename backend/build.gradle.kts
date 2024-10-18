@@ -66,8 +66,6 @@ dependencies {
     implementation("org.http4k:http4k-client-okhttp:$http4kVersion")
     implementation("org.http4k:http4k-client-websocket:$http4kVersion")
 
-    implementation("io.github.funkatronics:kborsh:0.1.0")
-
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     implementation("io.arrow-kt:arrow-core:1.2.1")

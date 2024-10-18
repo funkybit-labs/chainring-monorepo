@@ -1,6 +1,5 @@
 package xyz.funkybit.integrationtests.bitcoin
 
-import com.funkatronics.kborsh.Borsh
 import kotlinx.serialization.decodeFromByteArray
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.selectAll
@@ -21,6 +20,7 @@ import xyz.funkybit.core.model.db.BlockEntity
 import xyz.funkybit.core.model.db.BlockTable
 import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.SymbolEntity
+import xyz.funkybit.core.utils.bitcoin.ArchProgramBinaryFormat
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.isBitcoinDisabled
@@ -117,7 +117,7 @@ class ArchOnboardingTest {
         val programStateInfo = ArchNetworkClient.readAccountInfo(programStateEntity.rpcPubkey())
         assertFalse(programStateInfo.isExecutable)
         assertEquals(programStateInfo.owner.bytes.toHex(false), programEntity.publicKey)
-        val programState = Borsh.decodeFromByteArray<ArchAccountState.Program>(programStateInfo.data.toByteArray())
+        val programState = ArchProgramBinaryFormat.decodeFromByteArray<ArchAccountState.Program>(programStateInfo.data.toByteArray())
         assertEquals(0, programState.version)
         assertEquals(bitcoinConfig.feeCollectionAddress, programState.feeAccount)
         assertEquals(bitcoinContract.proxyAddress, programState.programChangeAddress)
@@ -132,7 +132,7 @@ class ArchOnboardingTest {
         val tokenStateInfo = ArchNetworkClient.readAccountInfo(tokenStateEntity.rpcPubkey())
         assertFalse(tokenStateInfo.isExecutable)
         assertEquals(tokenStateInfo.owner.bytes.toHex(false), programEntity.publicKey)
-        val tokenState = Borsh.decodeFromByteArray<ArchAccountState.Token>(tokenStateInfo.data.toByteArray())
+        val tokenState = ArchProgramBinaryFormat.decodeFromByteArray<ArchAccountState.Token>(tokenStateInfo.data.toByteArray())
         assertEquals(0, tokenState.version)
         assertEquals("BTC:0", tokenState.tokenId)
         assertEquals(programStateEntity.rpcPubkey().toString(), tokenState.programStateAccount.toString())
