@@ -18,8 +18,8 @@ import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.bitcoin.SystemInstruction
-import xyz.funkybit.core.utils.bitcoin.ArchProgramBinaryDecoder
-import xyz.funkybit.core.utils.bitcoin.ArchProgramBinaryEncoder
+import xyz.funkybit.core.utils.bitcoin.ExchangeProgramProtocolDecoder
+import xyz.funkybit.core.utils.bitcoin.ExchangeProgramProtocolEncoder
 import xyz.funkybit.core.utils.doubleSha256FromHex
 import xyz.funkybit.core.utils.schnorr.Point
 import xyz.funkybit.core.utils.toHex
@@ -229,7 +229,7 @@ sealed class ArchNetworkRpc {
         @OptIn(InternalSerializationApi::class)
         override fun serialize(encoder: Encoder, value: Pubkey) {
             when (encoder) {
-                is ArchProgramBinaryEncoder -> {
+                is ExchangeProgramProtocolEncoder -> {
                     value.bytes.forEach { encoder.encodeByte(it.toByte()) }
                 }
                 else -> UByteArray::class.serializer().serialize(encoder, value.bytes)
@@ -239,7 +239,7 @@ sealed class ArchNetworkRpc {
         @OptIn(InternalSerializationApi::class)
         override fun deserialize(decoder: Decoder): Pubkey {
             return when (decoder) {
-                is ArchProgramBinaryDecoder -> {
+                is ExchangeProgramProtocolDecoder -> {
                     Pubkey((0..31).map { decoder.decodeByte() }.toByteArray().toUByteArray())
                 }
                 else -> Pubkey(UByteArray::class.serializer().deserialize(decoder))

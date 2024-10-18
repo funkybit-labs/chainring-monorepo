@@ -226,9 +226,9 @@ object ArchUtils {
                 programPubkey,
                 accountMetas,
                 ProgramInstruction.WithdrawBatchParams(
-                    tokenWithdrawalsList,
-                    changeAmount.toLong().toULong(),
                     txInputsHex.toHexBytes(),
+                    changeAmount.toLong().toULong(),
+                    tokenWithdrawalsList,
                 ).serialize(),
             ),
             selectedUtxos,
@@ -347,7 +347,7 @@ object ArchUtils {
                 accountMetas,
                 ProgramInstruction.PrepareSettlementBatchParams(settlements).serialize(),
             ),
-            sha256(ArchProgramBinaryFormat.encodeToByteArray(ProgramInstruction.PrepareSettlementBatchParams(settlements))).toHex(false),
+            sha256(ExchangeProgramProtocolFormat.encodeToByteArray(ProgramInstruction.PrepareSettlementBatchParams(settlements))).toHex(false),
         )
     }
 
@@ -364,7 +364,7 @@ object ArchUtils {
                 accountMetas,
                 ProgramInstruction.SubmitSettlementBatchParams(settlements).serialize(),
             ),
-            sha256(ArchProgramBinaryFormat.encodeToByteArray(ProgramInstruction.PrepareSettlementBatchParams(settlements))).toHex(false),
+            sha256(ExchangeProgramProtocolFormat.encodeToByteArray(ProgramInstruction.PrepareSettlementBatchParams(settlements))).toHex(false),
         )
     }
 
@@ -506,7 +506,7 @@ object ArchUtils {
 
     @OptIn(ExperimentalUnsignedTypes::class)
     inline fun <reified T> getAccountState(pubkey: ArchNetworkRpc.Pubkey): T =
-        ArchProgramBinaryFormat.decodeFromByteArray(ArchNetworkClient.readAccountInfo(pubkey).data.toByteArray())
+        ExchangeProgramProtocolFormat.decodeFromByteArray(ArchNetworkClient.readAccountInfo(pubkey).data.toByteArray())
 
     @OptIn(ExperimentalUnsignedTypes::class)
     fun signAndSendProgramInstruction(programPubkey: ArchNetworkRpc.Pubkey, accountMetas: List<ArchNetworkRpc.AccountMeta>, programInstruction: ProgramInstruction): TxHash {
@@ -514,7 +514,7 @@ object ArchUtils {
             ArchNetworkRpc.Instruction(
                 programPubkey,
                 accountMetas,
-                ArchProgramBinaryFormat.encodeToByteArray(
+                ExchangeProgramProtocolFormat.encodeToByteArray(
                     programInstruction,
                 ).toUByteArray(),
             ),

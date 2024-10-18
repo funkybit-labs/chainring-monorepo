@@ -13,16 +13,16 @@ import kotlinx.serialization.modules.EmptySerializersModule
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-sealed class ArchProgramBinaryFormat : BinaryFormat {
-    companion object Default : ArchProgramBinaryFormat()
+sealed class ExchangeProgramProtocolFormat : BinaryFormat {
+    companion object Default : ExchangeProgramProtocolFormat()
 
     override val serializersModule = EmptySerializersModule()
 
     override fun <T> decodeFromByteArray(deserializer: DeserializationStrategy<T>, bytes: ByteArray): T =
-        ArchProgramBinaryDecoder(bytes).decodeSerializableValue(deserializer)
+        ExchangeProgramProtocolDecoder(bytes).decodeSerializableValue(deserializer)
 
     override fun <T> encodeToByteArray(serializer: SerializationStrategy<T>, value: T): ByteArray =
-        ArchProgramBinaryEncoder()
+        ExchangeProgramProtocolEncoder()
             .apply {
                 encodeSerializableValue(serializer, value)
             }
@@ -30,7 +30,7 @@ sealed class ArchProgramBinaryFormat : BinaryFormat {
 }
 
 @OptIn(ExperimentalSerializationApi::class)
-class ArchProgramBinaryDecoder(val bytes: ByteArray) : AbstractDecoder() {
+class ExchangeProgramProtocolDecoder(val bytes: ByteArray) : AbstractDecoder() {
     private val byteBuffer = ByteBuffer.wrap(bytes).apply {
         order(ByteOrder.LITTLE_ENDIAN)
     }
@@ -61,7 +61,7 @@ class ArchProgramBinaryDecoder(val bytes: ByteArray) : AbstractDecoder() {
 }
 
 @OptIn(ExperimentalSerializationApi::class)
-class ArchProgramBinaryEncoder : AbstractEncoder() {
+class ExchangeProgramProtocolEncoder : AbstractEncoder() {
     private val bytes = mutableListOf<Byte>()
     private val nanException = SerializationException("Invalid Input: cannot encode NaN")
 
