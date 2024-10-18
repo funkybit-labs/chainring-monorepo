@@ -267,13 +267,41 @@ sealed class ArchNetworkRpc {
         Failed,
     }
 
+    @Serializable(with = StatusInfoSerializer::class)
+    data class StatusInfo(
+        val status: Status,
+        val error: String?,
+    )
+
+    @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
+    object StatusInfoSerializer : KSerializer<StatusInfo> {
+        @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
+        override val descriptor: SerialDescriptor = buildSerialDescriptor("StatusInfo", StructureKind.OBJECT)
+
+        override fun serialize(encoder: Encoder, value: StatusInfo) {
+            throw Exception("Not implemented")
+        }
+
+        @OptIn(InternalSerializationApi::class)
+        override fun deserialize(decoder: Decoder): StatusInfo {
+            val status = String::class.serializer().deserialize(decoder)
+            return when {
+                status == "Processing" -> StatusInfo(Status.Processing, null)
+                status == "Processed" -> StatusInfo(Status.Processed, null)
+                status.startsWith("Failed(") -> StatusInfo(Status.Failed, status.substring(7, status.lastIndex - 1))
+                else -> throw Exception("unrecognized status $status")
+            }
+        }
+    }
+
     @Serializable
     data class ProcessedTransaction(
         @SerialName("runtime_transaction")
         val runtimeTransaction: RuntimeTransaction,
-        val status: Status,
-        @SerialName("bitcoin_txids")
-        val bitcoinTxIds: List<TxHash>,
+        @SerialName("status")
+        val statusInfo: StatusInfo,
+        @SerialName("bitcoin_txid")
+        val bitcoinTxId: TxHash?,
     )
 
     companion object {

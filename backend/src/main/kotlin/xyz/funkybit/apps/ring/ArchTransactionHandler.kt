@@ -197,8 +197,8 @@ class ArchTransactionHandler(
         val assigningBalanceIndexUpdates = ArchAccountBalanceIndexEntity.findAllForStatus(ArchAccountBalanceIndexStatus.Assigning)
         return if (assigningBalanceIndexUpdates.isNotEmpty()) {
             assigningBalanceIndexUpdates.firstOrNull()?.entity?.archTransaction?.let { archTransaction ->
-                ArchNetworkClient.getProcessedTransaction(archTransaction.txHash!!)?.let { processedTx ->
-                    if (processedTx.status == ArchNetworkRpc.Status.Processed) {
+                refreshSubmittedTransaction(archTransaction) { _, error ->
+                    if (error == null) {
                         archTransaction.markAsCompleted()
                         val assignments = assigningBalanceIndexUpdates.groupBy { it.archAccountAddress }.flatMap { (pubkey, updates) ->
                             val tokenAccountState = ArchUtils.getAccountState<ArchAccountState.Token>(pubkey)
@@ -222,6 +222,8 @@ class ArchTransactionHandler(
                             }
                         }
                         ArchAccountBalanceIndexEntity.updateToAssigned(assignments)
+                    } else {
+                        // TODO CHAIN-523 - handle errors here
                     }
                 }
             }
@@ -265,8 +267,8 @@ class ArchTransactionHandler(
         return if (sentToArchDeposits.isNotEmpty()) {
             // handle deposits sent to arch
             sentToArchDeposits.first().archTransaction?.let { archTransaction ->
-                ArchNetworkClient.getProcessedTransaction(archTransaction.txHash!!)?.let {
-                    if (it.status == ArchNetworkRpc.Status.Processed) {
+                refreshSubmittedTransaction(archTransaction) { _, error ->
+                    if (error == null) {
                         archTransaction.markAsCompleted()
                         BalanceEntity.updateBalances(
                             sentToArchDeposits.map { deposit ->
@@ -275,6 +277,8 @@ class ArchTransactionHandler(
                             BalanceType.Exchange,
                         )
                         DepositEntity.updateToSettling(sentToArchDeposits)
+                    } else {
+                        // TODO CHAIN-523 - handle errors here
                     }
                 }
             }
@@ -304,13 +308,15 @@ class ArchTransactionHandler(
         val rollingBackOnArchWithdrawals = WithdrawalEntity.findRollingBackOnArch()
         return if (rollingBackOnArchWithdrawals.isNotEmpty()) {
             // handle withdrawal rollback sent to arch
-            rollingBackOnArchWithdrawals.first().archTransaction?.let { archTransaction ->
-                ArchNetworkClient.getProcessedTransaction(archTransaction.txHash!!)?.let {
-                    if (it.status == ArchNetworkRpc.Status.Processed) {
-                        archTransaction.markAsCompleted()
+            rollingBackOnArchWithdrawals.first().archRollbackTransaction?.let { archRollbackTransaction ->
+                refreshSubmittedTransaction(archRollbackTransaction) { _, error ->
+                    if (error == null) {
+                        archRollbackTransaction.markAsCompleted()
                         rollingBackOnArchWithdrawals.forEach { withdrawalEntity ->
                             onWithdrawalCompleteOnBitcoin(withdrawalEntity, "failed to confirm on bitcoin network")
                         }
+                    } else {
+                        // TODO CHAIN-523 - handle errors here
                     }
                 }
             }
@@ -328,16 +334,15 @@ class ArchTransactionHandler(
         val settlingWithdrawals = WithdrawalEntity.findSettlingOnArch()
         return if (settlingWithdrawals.isNotEmpty()) {
             val archTransaction = settlingWithdrawals.first().archTransaction!!
-            ArchNetworkClient.getProcessedTransaction(archTransaction.txHash!!)?.let { processedTx ->
-                if (processedTx.status == ArchNetworkRpc.Status.Processed) {
+            refreshSubmittedTransaction(archTransaction) { processedTx, error ->
+                if (error == null) {
                     archTransaction.markAsCompleted()
-                    if (processedTx.bitcoinTxIds.isNotEmpty()) {
-                        val bitcoinTxId = processedTx.bitcoinTxIds.first()
+                    if (processedTx.bitcoinTxId != null) {
                         val transaction = BlockchainTransactionEntity.create(
                             chainId = chainId,
                             transactionData = BlockchainTransactionData("", EvmAddress.zero),
                             batchHash = null,
-                            txHash = bitcoinTxId,
+                            txHash = processedTx.bitcoinTxId,
                         )
                         transaction.flush()
                         WithdrawalEntity.updateToSettling(settlingWithdrawals, transaction, emptyMap())
@@ -345,6 +350,10 @@ class ArchTransactionHandler(
                         settlingWithdrawals.forEach {
                             onWithdrawalCompleteOnBitcoin(it, "No bitcoin transaction returned")
                         }
+                    }
+                } else {
+                    settlingWithdrawals.forEach {
+                        onWithdrawalCompleteOnBitcoin(it, error)
                     }
                 }
             }
@@ -520,9 +529,7 @@ class ArchTransactionHandler(
     }
 
     private fun createNextWithdrawalBatch(programBitcoinAddress: BitcoinAddress, programPubkey: ArchNetworkRpc.Pubkey): Boolean {
-        // TODO / HACK - Arch has a bug where a serialized bitcoin tx with ins / outs must be less than 255 bytes.
-        // Setting limit to 2 withdrawals for now - set higher once arch fixes bug
-        var limit = 2
+        var limit = 15
 
         while (true) {
             val sequencedWithdrawals =
@@ -614,7 +621,7 @@ class ArchTransactionHandler(
     }
 
     private fun createNextBalanceIndexBatch(programPubkey: ArchNetworkRpc.Pubkey): Pair<List<ArchAccountBalanceInfo>, ArchNetworkRpc.Instruction?> {
-        var limit = 20
+        var limit = 100
 
         while (true) {
             val pendingBalanceIndexUpdates =
@@ -636,7 +643,7 @@ class ArchTransactionHandler(
     }
 
     private fun createNextDepositBatch(programPubkey: ArchNetworkRpc.Pubkey): Pair<List<ConfirmedBitcoinDeposit>, ArchNetworkRpc.Instruction?> {
-        var limit = 70
+        var limit = 100
 
         while (true) {
             val confirmedDepositsWithAssignedIndex = ArchUtils.getConfirmedBitcoinDeposits(limit)
@@ -700,11 +707,17 @@ class ArchTransactionHandler(
     private fun refreshSubmittedTransaction(tx: BlockchainTransactionEntity, onComplete: (ArchNetworkRpc.ProcessedTransaction, String?) -> Unit) {
         val txHash = tx.txHash ?: return
         val processedTx = ArchNetworkClient.getProcessedTransaction(txHash) ?: return
-        if (processedTx.status == ArchNetworkRpc.Status.Processed) {
-            // invoke callbacks for transactions in this confirmed batch
-            onComplete(processedTx, null)
-            // mark batch as complete
-            tx.markAsCompleted()
+        when (processedTx.statusInfo.status) {
+            ArchNetworkRpc.Status.Processed -> {
+                onComplete(processedTx, null)
+                tx.markAsCompleted()
+            }
+            ArchNetworkRpc.Status.Failed -> {
+                val error = processedTx.statusInfo.error ?: "Unknown Error"
+                onComplete(processedTx, error)
+                tx.markAsFailed(error)
+            }
+            else -> {}
         }
         // TODO error handling once Arch returns errors
     }
