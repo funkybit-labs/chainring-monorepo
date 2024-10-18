@@ -9,6 +9,9 @@ import xyz.funkybit.core.model.TxHash
 import xyz.funkybit.core.model.bitcoin.ArchAccountState
 import xyz.funkybit.core.model.db.ArchAccountEntity
 import xyz.funkybit.core.model.db.BlockchainTransactionStatus
+import xyz.funkybit.core.model.db.DepositEntity
+import xyz.funkybit.core.model.db.DepositId
+import xyz.funkybit.core.model.db.DepositStatus
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalId
@@ -57,6 +60,14 @@ fun waitForFinalizedWithdrawal(id: WithdrawalId, expectedStatus: WithdrawalStatu
         Faucet.mine()
         transaction {
             WithdrawalEntity[id].status == expectedStatus
+        }
+    }
+}
+
+fun waitForFinalizedDeposit(id: DepositId, expectedStatus: DepositStatus) {
+    waitFor {
+        transaction {
+            DepositEntity[id].status == expectedStatus
         }
     }
 }

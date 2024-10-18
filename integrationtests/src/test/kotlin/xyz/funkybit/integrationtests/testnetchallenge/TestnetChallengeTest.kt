@@ -28,6 +28,7 @@ import xyz.funkybit.apps.api.model.toSymbolInfo
 import xyz.funkybit.apps.ring.EvmDepositHandler
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.TxHash
+import xyz.funkybit.core.model.db.DepositStatus
 import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
 import xyz.funkybit.core.model.db.TestnetChallengePNLType
@@ -45,6 +46,7 @@ import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.OrderBaseTest
 import xyz.funkybit.integrationtests.testutils.triggerRepeaterTaskAndWaitForCompletion
 import xyz.funkybit.integrationtests.testutils.waitForBalance
+import xyz.funkybit.integrationtests.testutils.waitForFinalizedDeposit
 import xyz.funkybit.integrationtests.testutils.waitForFinalizedWithdrawal
 import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.ExpectedBalance
@@ -308,8 +310,9 @@ class TestnetChallengeTest : OrderBaseTest() {
         val usdcDepositAmount = AssetAmount(usdc, "50")
         var usdcDepositTxHash = trader.w.sendDepositTx(usdcDepositAmount)
         trader.w.currentEvmClient().mine()
-        trader.a.createDeposit(CreateDepositApiRequest(Symbol(usdc.name), usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
+        var deposit = trader.a.createDeposit(CreateDepositApiRequest(Symbol(usdc.name), usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
         trader.w.currentEvmClient().mine(EvmDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+        waitForFinalizedDeposit(deposit.id, DepositStatus.Complete)
         trader.a.getAccountConfiguration().let {
             assertEquals(TestnetChallengeStatus.Enrolled, it.testnetChallengeStatus)
             assertFalse(it.testnetChallengeDepositLimits.isEmpty())
@@ -319,15 +322,18 @@ class TestnetChallengeTest : OrderBaseTest() {
             )
         }
 
-        // deposit another 50 USDC and check that USDC deposit limit is 0
-        usdcDepositTxHash = trader.w.sendDepositTx(usdcDepositAmount)
+        // due to the withdrawal fee they actually only have 49 USDC left
+        val withdrawalFee = AssetAmount(usdc, usdc.withdrawalFee)
+        // deposit 49 USDC and check that USDC deposit limit is 1
+        usdcDepositTxHash = trader.w.sendDepositTx(usdcDepositAmount - withdrawalFee)
         trader.w.currentEvmClient().mine()
-        trader.a.createDeposit(CreateDepositApiRequest(Symbol(usdc.name), usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
+        deposit = trader.a.createDeposit(CreateDepositApiRequest(Symbol(usdc.name), usdcDepositAmount.inFundamentalUnits, usdcDepositTxHash)).deposit
         trader.w.currentEvmClient().mine(EvmDepositHandler.DEFAULT_NUM_CONFIRMATIONS)
+        waitForFinalizedDeposit(deposit.id, DepositStatus.Complete)
         trader.a.getAccountConfiguration().let {
             assertEquals(TestnetChallengeStatus.Enrolled, it.testnetChallengeStatus)
             assertFalse(it.testnetChallengeDepositLimits.isEmpty())
-            assertTrue(it.testnetChallengeDepositLimits.all { dl -> dl.limit == BigInteger.ZERO })
+            assertTrue(it.testnetChallengeDepositLimits.all { dl -> if (dl.symbol.value == usdc.name) dl.limit == withdrawalFee.inFundamentalUnits else dl.limit == BigInteger.ZERO })
         }
     }
 

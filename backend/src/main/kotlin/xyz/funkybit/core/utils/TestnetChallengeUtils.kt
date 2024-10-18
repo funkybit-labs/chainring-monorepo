@@ -41,7 +41,7 @@ object TestnetChallengeUtils {
             .innerJoin(SymbolTable)
             .select(SymbolTable.guid, withdrawalAmountsSumColumn)
             .where { WalletTable.userGuid.eq(user.guid) }
-            .andWhere { WithdrawalTable.status.neq(WithdrawalStatus.Failed) }
+            .andWhere { WithdrawalTable.status.eq(WithdrawalStatus.Complete) }
             .groupBy(SymbolTable.guid)
             .associateBy(
                 keySelector = { it[SymbolTable.guid] },
