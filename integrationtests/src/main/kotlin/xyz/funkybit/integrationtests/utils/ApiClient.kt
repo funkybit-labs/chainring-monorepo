@@ -7,6 +7,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import okhttp3.Dispatcher
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
@@ -70,7 +71,13 @@ import java.net.HttpURLConnection
 import java.util.Base64
 
 val apiServerRootUrl = System.getenv("API_URL") ?: "http://localhost:9000"
-val httpClient = OkHttpClient.Builder().build()
+val httpClient = OkHttpClient.Builder()
+    .dispatcher(Dispatcher()
+        .apply {
+            maxRequests = 1000
+            maxRequestsPerHost = 1000
+        }
+    ).build()
 val applicationJson = "application/json".toMediaType()
 
 class AbnormalApiResponseException(val response: Response) : Exception()
