@@ -3,7 +3,6 @@ package xyz.funkybit.sequencer.apps
 import io.github.oshai.kotlinlogging.KotlinLogging
 import net.openhft.chronicle.queue.ExcerptTailer
 import net.openhft.chronicle.queue.TailerDirection
-import net.openhft.chronicle.queue.TailerState
 import net.openhft.chronicle.queue.impl.RollingChronicleQueue
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.OrderSide
@@ -986,13 +985,14 @@ class SequencerApp(
             var requestsProcessedSinceStarted: Long = 0
 
             val outputAppender = outputQueue.acquireAppender()
-            var tailerPrevState = inputTailer.state()
+            var inputTailerPrevCycle = inputTailer.cycle()
             while (!stop) {
-                val tailerState = inputTailer.state()
-                if (tailerState == TailerState.END_OF_CYCLE && tailerState != tailerPrevState) {
+                val inputTailerCurrentCycle = inputTailer.cycle()
+                if (inputTailerCurrentCycle > inputTailerPrevCycle) {
                     checkpointsQueue?.let {
                         saveCheckpoint(it, inputTailer.cycle())
                     }
+                    inputTailerPrevCycle = inputTailerCurrentCycle
                 }
 
                 inputTailer.readingDocument().use { dc ->
@@ -1039,8 +1039,6 @@ class SequencerApp(
                         }
                     }
                 }
-
-                tailerPrevState = tailerState
 
                 if (ecoMode) {
                     Thread.sleep(10)
