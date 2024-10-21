@@ -395,7 +395,7 @@ class TestSequencerCheckpoints {
             }
 
             assertQueueFilesCount(inputQueue, 2)
-            assertCheckpointsCount(checkpointsQueue, 1)
+            assertCheckpointsCount(checkpointsQueue, 2)
             assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 11)
 
             currentTime.addAndGet(60.seconds.inWholeMilliseconds)
@@ -419,7 +419,7 @@ class TestSequencerCheckpoints {
                 ).success,
             )
 
-            assertCheckpointsCount(checkpointsQueue, 2)
+            assertCheckpointsCount(checkpointsQueue, 3)
 
             // now move the cycle without the checkpoint queue being set
             currentTime.addAndGet(60.seconds.inWholeMilliseconds)
@@ -448,7 +448,7 @@ class TestSequencerCheckpoints {
             sequencerApp.start()
 
             assertQueueFilesCount(inputQueue, 4)
-            assertCheckpointsCount(checkpointsQueue, 2)
+            assertCheckpointsCount(checkpointsQueue, 3)
             assertOutputQueueContainsNoDuplicates(outputQueue, expectedMessagesCount = 13)
 
             assertTrue(
