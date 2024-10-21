@@ -16,7 +16,7 @@ object SentryUtils {
             logger.debug { "Initializing Sentry" }
             Sentry.init { options: SentryOptions ->
                 options.dsn = System.getenv("SENTRY_DSN")
-                options.tracesSampleRate = System.getenv("TRACES_SAMPLE_RATE").toDoubleOrNull() ?: 1.0
+                options.tracesSampleRate = System.getenv("TRACES_SAMPLE_RATE")?.toDoubleOrNull() ?: 1.0
                 options.environment = System.getenv("ENV_NAME")
                 options.instrumenter = Instrumenter.OTEL
                 options.addEventProcessor(OpenTelemetryLinkErrorEventProcessor())

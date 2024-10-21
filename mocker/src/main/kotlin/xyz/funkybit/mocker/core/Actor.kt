@@ -18,7 +18,6 @@ import xyz.funkybit.core.utils.TraceRecorder
 import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.Wallet
 import java.math.BigInteger
-import org.web3j.crypto.ECKeyPair
 import io.github.oshai.kotlinlogging.KLogger
 import kotlinx.serialization.json.Json
 import okhttp3.Response
@@ -49,6 +48,7 @@ abstract class Actor(
     private lateinit var chainIdBySymbol: Map<String, ChainId>
     private val faucetPossible = (System.getenv("FAUCET_POSSIBLE") ?: "0") == "1"
     private val noFaucetNativeDepositRatio = (System.getenv("NO_FAUCET_NATIVE_DEPOSIT_RATIO") ?: "0.5").toBigDecimal()
+    protected val subscribeToAllTopics = System.getenv("WEB_SOCKET_ALL_TOPICS").toBoolean()
 
     open fun start() {
         logger.info { "$id: starting" }
@@ -115,7 +115,9 @@ abstract class Actor(
         })
     }
 
-    protected open fun onWebsocketConnected(webSocket: WebSocket) {}
+    protected open fun onWebsocketConnected(webSocket: WebSocket) {
+        logger.debug { "$id: websocket connected" }
+    }
     protected abstract fun handleWebsocketMessage(message: Publishable)
 
     private fun depositNoFaucet() {
