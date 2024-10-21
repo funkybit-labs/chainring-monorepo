@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.apps.api.FaucetMode
@@ -44,6 +45,7 @@ import xyz.funkybit.integrationtests.api.asEcKeyPair
 import xyz.funkybit.integrationtests.api.asEvmAddress
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
 import xyz.funkybit.integrationtests.testutils.OrderBaseTest
+import xyz.funkybit.integrationtests.testutils.isTestEnvRun
 import xyz.funkybit.integrationtests.testutils.triggerRepeaterTaskAndWaitForCompletion
 import xyz.funkybit.integrationtests.testutils.waitForBalance
 import xyz.funkybit.integrationtests.testutils.waitForFinalizedDeposit
@@ -401,6 +403,8 @@ class TestnetChallengeTest : OrderBaseTest() {
 
     @Test
     fun `test points distribution - daily`() {
+        Assumptions.assumeFalse(isTestEnvRun()) // cannot simulate time and last update in test env
+
         val apiClient = enrollInTestnetChallenge()
 
         // evm wallet connected
@@ -429,6 +433,7 @@ class TestnetChallengeTest : OrderBaseTest() {
 
     @Test
     fun `test points distribution - weekly`() {
+        Assumptions.assumeFalse(isTestEnvRun()) // cannot simulate time and last update in test env
         val apiClient = enrollInTestnetChallenge()
 
         // evm wallet connected
