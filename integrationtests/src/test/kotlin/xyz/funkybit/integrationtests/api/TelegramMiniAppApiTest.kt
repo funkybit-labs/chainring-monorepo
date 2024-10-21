@@ -30,6 +30,7 @@ import xyz.funkybit.integrationtests.utils.assertError
 import xyz.funkybit.integrationtests.utils.empty
 import java.math.BigDecimal
 import java.net.HttpURLConnection.HTTP_UNAUTHORIZED
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlin.random.Random
 import kotlin.test.Test
@@ -90,21 +91,21 @@ class TelegramMiniAppApiTest {
     @Test
     fun simultaneousSignup() {
         (1..20).forEach {
-            var succeeded = 0
+            val succeeded = AtomicInteger(0)
             val userId = Random.nextLong()
             val thread1 = thread(start = false) {
                 TelegramMiniAppApiClient(TelegramUserId(userId)).signUp()
-                succeeded += 1
+                succeeded.incrementAndGet()
             }
             val thread2 = thread(start = false) {
                 TelegramMiniAppApiClient(TelegramUserId(userId)).signUp()
-                succeeded += 1
+                succeeded.incrementAndGet()
             }
             thread1.start()
             thread2.start()
             thread1.join()
             thread2.join()
-            assertEquals(2, succeeded)
+            assertEquals(2, succeeded.get())
         }
     }
 
