@@ -95,6 +95,18 @@ resource "aws_wafv2_web_acl" "WafWebAcl" {
       block {
         custom_response {
           response_code = var.blocked_country_response_code
+          response_header {
+            name  = "Access-Control-Allow-Headers"
+            value = "Content-Type, Authorization"
+          }
+          response_header {
+            name  = "Access-Control-Allow-Methods"
+            value = "DELETE, GET, PATCH, POST, PUT"
+          }
+          response_header {
+            name  = "Access-Control-Allow-Origin"
+            value = "*"
+          }
         }
       }
 
@@ -122,6 +134,18 @@ resource "aws_wafv2_web_acl" "WafWebAcl" {
         custom_response {
           response_code            = var.ip_dos_rate_limit_response_code
           custom_response_body_key = "RateLimitExceededBody" # Reference to the custom response body
+          response_header {
+            name  = "Access-Control-Allow-Headers"
+            value = "Content-Type, Authorization"
+          }
+          response_header {
+            name  = "Access-Control-Allow-Methods"
+            value = "DELETE, GET, PATCH, POST, PUT"
+          }
+          response_header {
+            name  = "Access-Control-Allow-Origin"
+            value = "*"
+          }
         }
       }
     }
