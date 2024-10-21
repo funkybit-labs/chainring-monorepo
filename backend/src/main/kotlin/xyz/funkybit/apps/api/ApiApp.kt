@@ -5,6 +5,7 @@ import org.http4k.contract.contract
 import org.http4k.contract.openapi.ApiInfo
 import org.http4k.contract.openapi.v3.ApiServer
 import org.http4k.contract.openapi.v3.OpenApi3
+import org.http4k.core.Filter
 import org.http4k.core.Method
 import org.http4k.core.RequestContexts
 import org.http4k.core.Response
@@ -89,7 +90,17 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
 
     private val httpHandler = ServerFilters.InitialiseRequestContext(requestContexts)
         .then(ServerFilters.Cors(corsPolicy))
-        .then(ServerFilters.OpenTelemetryTracing(openTelemetry))
+        .then(
+            Filter { next ->
+                { request ->
+                    if (request.uri.path != "/health") {
+                        ServerFilters.OpenTelemetryTracing(openTelemetry).then(next)(request)
+                    } else {
+                        next(request)
+                    }
+                }
+            },
+        )
         .then(
             ServerFilters.RequestTracing(
                 startReportFn = { _, z: ZipkinTraces ->
