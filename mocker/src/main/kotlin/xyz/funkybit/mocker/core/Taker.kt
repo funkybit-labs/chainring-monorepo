@@ -54,13 +54,16 @@ class Taker(
     private var stopping = false
 
     override val websocketSubscriptionTopics: List<SubscriptionTopic> =
-        marketIds
-            .map { SubscriptionTopic.Prices(it, OHLCDuration.P5M) } +
-            listOf(
-                SubscriptionTopic.MyTrades,
-                SubscriptionTopic.MyOrders,
-                SubscriptionTopic.Balances
-            )
+        marketIds.map { SubscriptionTopic.Prices(it, OHLCDuration.P5M) } +
+                listOf(
+                    SubscriptionTopic.MyTrades,
+                    SubscriptionTopic.MyOrders,
+                    SubscriptionTopic.Balances
+                ) +
+                if (subscribeToAllTopics) {
+                    marketIds.map { SubscriptionTopic.OrderBook(it) } + listOf(SubscriptionTopic.Limits)
+                } else emptyList()
+
 
     override fun onStarted() {
         actorThread = thread(start = true, name = "tkr-actor-$id", isDaemon = false) {
@@ -88,6 +91,7 @@ class Taker(
     }
 
     override fun onWebsocketConnected(webSocket: WebSocket) {
+        super.onWebsocketConnected(webSocket)
         listenerInitialized = true
     }
 
