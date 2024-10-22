@@ -5,8 +5,8 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import xyz.funkybit.apps.api.model.MarketLimits
 import xyz.funkybit.apps.api.model.websocket.MarketTradesCreated
-import xyz.funkybit.apps.api.model.websocket.MyOrderCreated
-import xyz.funkybit.apps.api.model.websocket.MyOrderUpdated
+import xyz.funkybit.apps.api.model.websocket.MyOrdersCreated
+import xyz.funkybit.apps.api.model.websocket.MyOrdersUpdated
 import xyz.funkybit.apps.api.model.websocket.MyTradesCreated
 import xyz.funkybit.apps.api.model.websocket.OrderBook
 import xyz.funkybit.apps.api.model.websocket.OrderBookDiff
@@ -226,7 +226,7 @@ object SequencerResponseProcessorService {
             val createdOrders = OrderEntity.listOrdersWithExecutions(createAssignments.map { it.orderId }).map { it.toOrderResponse() }
 
             publishBroadcasterNotifications(
-                createdOrders.map { BroadcasterNotification(MyOrderCreated(it), wallet.userGuid.value) },
+                listOf(BroadcasterNotification(MyOrdersCreated(createdOrders), wallet.userGuid.value)),
             )
         }
     }
@@ -254,7 +254,7 @@ object SequencerResponseProcessorService {
         val createdOrder = OrderEntity.listOrdersWithExecutions(listOf(createAssignment.orderId)).map { it.toOrderResponse() }.first()
 
         publishBroadcasterNotifications(
-            listOf(BroadcasterNotification(MyOrderCreated(createdOrder), wallet.userGuid.value)),
+            listOf(BroadcasterNotification(MyOrdersCreated(listOf(createdOrder)), wallet.userGuid.value)),
         )
     }
 
@@ -374,7 +374,7 @@ object SequencerResponseProcessorService {
             }
         }.toMap()
 
-        OrderEntity.listWithExecutionsForSequencerOrderIds(orderChangedMap.keys.toList()).forEach { (orderToUpdate, executions) ->
+        OrderEntity.listWithExecutionsForSequencerOrderIds(orderChangedMap.keys.toList()).map { (orderToUpdate, executions) ->
             val orderChanged = orderChangedMap.getValue(orderToUpdate.sequencerOrderId!!.value)
 
             when (orderChanged.disposition) {
@@ -409,13 +409,17 @@ object SequencerResponseProcessorService {
 
             orderToUpdate.updatedAt = timestamp
 
-            broadcasterNotifications.add(
-                BroadcasterNotification(
-                    MyOrderUpdated(orderToUpdate.toOrderResponse(executions)),
-                    recipient = orderToUpdate.wallet.userGuid.value,
-                ),
-            )
+            orderToUpdate.wallet.userGuid.value to orderToUpdate.toOrderResponse(executions)
         }
+            .groupBy { it.first }
+            .forEach { (userGuid, updates) ->
+                broadcasterNotifications.add(
+                    BroadcasterNotification(
+                        MyOrdersUpdated(updates.map { it.second }),
+                        recipient = userGuid,
+                    ),
+                )
+            }
     }
 
     private fun handleBalanceChanges(balanceChanges: List<xyz.funkybit.sequencer.proto.BalanceChange>, broadcasterNotifications: MutableList<BroadcasterNotification>) {

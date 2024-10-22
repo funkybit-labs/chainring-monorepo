@@ -34,9 +34,9 @@ import xyz.funkybit.integrationtests.utils.assertAmount
 import xyz.funkybit.integrationtests.utils.assertBalances
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
 import xyz.funkybit.integrationtests.utils.assertLimitsMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyLimitOrderCreatedMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyMarketOrderCreatedMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyOrderUpdatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyLimitOrdersCreatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyMarketOrdersCreatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyOrdersUpdatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyTradesCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyTradesUpdatedMessageReceived
 import xyz.funkybit.integrationtests.utils.ofAsset
@@ -110,7 +110,7 @@ class ArchSettlementTest : OrderBaseTest() {
             makerBitcoinWallet,
         )
         makerWsClient.apply {
-            assertMyLimitOrderCreatedMessageReceived(limitSellOrderApiResponse)
+            assertMyLimitOrdersCreatedMessageReceived(limitSellOrderApiResponse)
             assertLimitsMessageReceived(market, base = BigDecimal("0.59997"), quote = BigDecimal("0"))
         }
 
@@ -123,7 +123,7 @@ class ArchSettlementTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyMarketOrderCreatedMessageReceived(marketBuyOrderApiResponse)
+            assertMyMarketOrdersCreatedMessageReceived(marketBuyOrderApiResponse)
             assertMyTradesCreatedMessageReceived(
                 listOf(
                     MyExpectedTrade(
@@ -135,12 +135,15 @@ class ArchSettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                Assertions.assertEquals(OrderStatus.Filled, msg.order.status)
-                Assertions.assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.00003"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "0.999"), msg.order.executions[0].price)
-                Assertions.assertEquals(ExecutionRole.Taker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                Assertions.assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    Assertions.assertEquals(OrderStatus.Filled, order.status)
+                    Assertions.assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.00003"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "0.999"), order.executions[0].price)
+                    Assertions.assertEquals(ExecutionRole.Taker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -162,12 +165,15 @@ class ArchSettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                Assertions.assertEquals(OrderStatus.Filled, msg.order.status)
-                Assertions.assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.00003"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "0.999"), msg.order.executions[0].price)
-                Assertions.assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                Assertions.assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    Assertions.assertEquals(OrderStatus.Filled, order.status)
+                    Assertions.assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.00003"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "0.999"), order.executions[0].price)
+                    Assertions.assertEquals(ExecutionRole.Maker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -289,7 +295,7 @@ class ArchSettlementTest : OrderBaseTest() {
             makerEvmWallet,
         )
         makerWsClient.apply {
-            assertMyLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
+            assertMyLimitOrdersCreatedMessageReceived(limitBuyOrderApiResponse)
             assertLimitsMessageReceived(market, base = BigDecimal("0"), quote = BigDecimal("0.00001974"))
         }
 
@@ -302,7 +308,7 @@ class ArchSettlementTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
+            assertMyMarketOrdersCreatedMessageReceived(marketSellOrderApiResponse)
             assertMyTradesCreatedMessageReceived(
                 listOf(
                     MyExpectedTrade(
@@ -314,12 +320,15 @@ class ArchSettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                Assertions.assertEquals(OrderStatus.Filled, msg.order.status)
-                Assertions.assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.00003"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "0.999"), msg.order.executions[0].price)
-                Assertions.assertEquals(ExecutionRole.Taker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                Assertions.assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    Assertions.assertEquals(OrderStatus.Filled, order.status)
+                    Assertions.assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.00003"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "0.999"), order.executions[0].price)
+                    Assertions.assertEquals(ExecutionRole.Taker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -341,12 +350,15 @@ class ArchSettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                Assertions.assertEquals(OrderStatus.Filled, msg.order.status)
-                Assertions.assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.00003"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "0.999"), msg.order.executions[0].price)
-                Assertions.assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                Assertions.assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    Assertions.assertEquals(OrderStatus.Filled, order.status)
+                    Assertions.assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.00003"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "0.999"), order.executions[0].price)
+                    Assertions.assertEquals(ExecutionRole.Maker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -491,7 +503,7 @@ class ArchSettlementTest : OrderBaseTest() {
             makerBitcoinWallet,
         )
         makerWsClient.apply {
-            assertMyLimitOrderCreatedMessageReceived(limitSellOrderApiResponse)
+            assertMyLimitOrdersCreatedMessageReceived(limitSellOrderApiResponse)
             assertLimitsMessageReceived(market, base = BigDecimal("0.59997"), quote = BigDecimal("0"))
         }
 
@@ -504,7 +516,7 @@ class ArchSettlementTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyMarketOrderCreatedMessageReceived(marketBuyOrderApiResponse)
+            assertMyMarketOrdersCreatedMessageReceived(marketBuyOrderApiResponse)
             assertMyTradesCreatedMessageReceived(
                 listOf(
                     MyExpectedTrade(
@@ -516,12 +528,15 @@ class ArchSettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                Assertions.assertEquals(OrderStatus.Filled, msg.order.status)
-                Assertions.assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.00003"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "0.999"), msg.order.executions[0].price)
-                Assertions.assertEquals(ExecutionRole.Taker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                Assertions.assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    Assertions.assertEquals(OrderStatus.Filled, order.status)
+                    Assertions.assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.00003"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "0.999"), order.executions[0].price)
+                    Assertions.assertEquals(ExecutionRole.Taker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -543,12 +558,15 @@ class ArchSettlementTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                Assertions.assertEquals(OrderStatus.Filled, msg.order.status)
-                Assertions.assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.00003"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "0.999"), msg.order.executions[0].price)
-                Assertions.assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                Assertions.assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    Assertions.assertEquals(OrderStatus.Filled, order.status)
+                    Assertions.assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.00003"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "0.999"), order.executions[0].price)
+                    Assertions.assertEquals(ExecutionRole.Maker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(

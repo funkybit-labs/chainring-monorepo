@@ -249,15 +249,15 @@ data class Balances(
 ) : Publishable()
 
 @Serializable
-@SerialName("MyOrderCreated")
-data class MyOrderCreated(
-    val order: Order,
+@SerialName("MyOrdersCreated")
+data class MyOrdersCreated(
+    val orders: List<Order>,
 ) : Publishable()
 
 @Serializable
-@SerialName("MyOrderUpdated")
-data class MyOrderUpdated(
-    val order: Order,
+@SerialName("MyOrdersUpdated")
+data class MyOrdersUpdated(
+    val orders: List<Order>,
 ) : Publishable()
 
 @Serializable

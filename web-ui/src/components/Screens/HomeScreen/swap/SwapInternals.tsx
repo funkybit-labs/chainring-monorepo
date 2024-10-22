@@ -293,8 +293,8 @@ export function SwapInternals({
           }
         } else if (message.type === 'Balances') {
           setBalances(message.balances)
-        } else if (message.type === 'MyOrderUpdated') {
-          setLastOrder(message.order)
+        } else if (message.type === 'MyOrdersUpdated') {
+          setLastOrder(message.orders[0])
         }
       },
       [market, markets, quoteSymbol, baseSymbol]

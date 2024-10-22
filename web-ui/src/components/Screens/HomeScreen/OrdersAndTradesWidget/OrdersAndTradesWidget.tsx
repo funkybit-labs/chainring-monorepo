@@ -51,20 +51,21 @@ export default function OrdersAndTradesWidget({
       (message: Publishable) => {
         if (message.type === 'MyOrders') {
           setOrders(message.orders)
-        } else if (message.type === 'MyOrderCreated') {
+        } else if (message.type === 'MyOrdersCreated') {
           setOrders(
             produce((draft) => {
-              draft.unshift(message.order)
+              message.orders.forEach((order) => draft.unshift(order))
             })
           )
-        } else if (message.type === 'MyOrderUpdated') {
+        } else if (message.type === 'MyOrdersUpdated') {
           setOrders(
             produce((draft) => {
-              const updatedOrder = message.order
-              const index = draft.findIndex(
-                (order) => order.id === updatedOrder.id
-              )
-              if (index !== -1) draft[index] = updatedOrder
+              message.orders.forEach((updatedOrder) => {
+                const index = draft.findIndex(
+                  (order) => order.id === updatedOrder.id
+                )
+                if (index !== -1) draft[index] = updatedOrder
+              })
             })
           )
         } else if (message.type === 'MyTrades') {

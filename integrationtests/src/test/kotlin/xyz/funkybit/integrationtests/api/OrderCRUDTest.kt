@@ -34,10 +34,10 @@ import xyz.funkybit.integrationtests.utils.Wallet
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
 import xyz.funkybit.integrationtests.utils.assertError
 import xyz.funkybit.integrationtests.utils.assertLimitsMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyLimitOrderCreatedMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyOrderCreatedMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyOrderUpdatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyLimitOrdersCreatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyOrdersCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyOrdersMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyOrdersUpdatedMessageReceived
 import xyz.funkybit.integrationtests.utils.blocking
 import xyz.funkybit.integrationtests.utils.inFundamentalUnits
 import xyz.funkybit.integrationtests.utils.subscribeToBalances
@@ -112,7 +112,7 @@ class OrderCRUDTest : OrderBaseTest() {
         )
 
         // client is notified over websocket
-        wsClient.assertMyLimitOrderCreatedMessageReceived(createLimitOrderResponse)
+        wsClient.assertMyLimitOrdersCreatedMessageReceived(createLimitOrderResponse)
         wsClient
             .assertLimitsMessageReceived(
                 listOfNotNull(
@@ -143,9 +143,11 @@ class OrderCRUDTest : OrderBaseTest() {
 
         // cancel order is idempotent
         apiClient.cancelOrder(createLimitOrderResponse, wallet)
-        wsClient.assertMyOrderUpdatedMessageReceived { msg ->
-            assertEquals(createLimitOrderResponse.orderId, msg.order.id)
-            assertEquals(OrderStatus.Cancelled, msg.order.status)
+        wsClient.assertMyOrdersUpdatedMessageReceived { msg ->
+            msg.orders.first().let { order ->
+                assertEquals(createLimitOrderResponse.orderId, order.id)
+                assertEquals(OrderStatus.Cancelled, order.status)
+            }
         }
         wsClient
             .assertLimitsMessageReceived(
@@ -206,7 +208,7 @@ class OrderCRUDTest : OrderBaseTest() {
         assertEquals(expectedClientOrderId, createLimitOrderResponse.clientOrderId)
 
         // client is notified over websocket
-        wsClient.assertMyLimitOrderCreatedMessageReceived(createLimitOrderResponse)
+        wsClient.assertMyLimitOrdersCreatedMessageReceived(createLimitOrderResponse)
         wsClient.assertLimitsMessageReceived()
         wsClient.close()
 
@@ -257,10 +259,13 @@ class OrderCRUDTest : OrderBaseTest() {
             price = BigDecimal("2"),
             wallet,
         )
-        wsClient.assertMyLimitOrderCreatedMessageReceived(createTooSmallOrderResponse)
-        wsClient.assertMyOrderUpdatedMessageReceived { msg ->
-            assertEquals(createTooSmallOrderResponse.orderId, msg.order.id)
-            assertEquals(OrderStatus.Rejected, msg.order.status)
+        wsClient.assertMyLimitOrdersCreatedMessageReceived(createTooSmallOrderResponse)
+        wsClient.assertMyOrdersUpdatedMessageReceived { msg ->
+            assertEquals(1, msg.orders.size)
+            msg.orders.first().let { order ->
+                assertEquals(createTooSmallOrderResponse.orderId, order.id)
+                assertEquals(OrderStatus.Rejected, order.status)
+            }
         }
 
         // operation on non-existent order
@@ -341,7 +346,7 @@ class OrderCRUDTest : OrderBaseTest() {
         )
 
         wsClient.apply {
-            assertMyLimitOrderCreatedMessageReceived(createLimitOrderResponse2)
+            assertMyLimitOrdersCreatedMessageReceived(createLimitOrderResponse2)
         }
 
         // try updating and cancelling an order not created by this user - signature should fail
@@ -359,9 +364,12 @@ class OrderCRUDTest : OrderBaseTest() {
         // try update cancelled order
         apiClient.cancelOrder(createLimitOrderResponse2, wallet)
         wsClient.apply {
-            assertMyOrderUpdatedMessageReceived { msg ->
-                assertEquals(createLimitOrderResponse2.orderId, msg.order.id)
-                assertEquals(OrderStatus.Cancelled, msg.order.status)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(createLimitOrderResponse2.orderId, order.id)
+                    assertEquals(OrderStatus.Cancelled, order.status)
+                }
             }
         }
 
@@ -446,16 +454,17 @@ class OrderCRUDTest : OrderBaseTest() {
                 price = BigDecimal("2"),
                 wallet,
             )
-            wsClient.assertMyOrderCreatedMessageReceived()
+            wsClient.assertMyOrdersCreatedMessageReceived()
             wsClient.assertLimitsMessageReceived()
         }
         assertEquals(10, apiClient.listOrders(listOf(OrderStatus.Open, OrderStatus.Partial, OrderStatus.Filled), usdcDaiMarket.id).orders.size)
 
         apiClient.cancelOpenOrders()
 
-        repeat(times = 10) {
-            wsClient.assertMyOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Cancelled, msg.order.status)
+        wsClient.assertMyOrdersUpdatedMessageReceived { msg ->
+            assertEquals(10, msg.orders.size)
+            msg.orders.forEach { order ->
+                assertEquals(OrderStatus.Cancelled, order.status)
             }
         }
         wsClient.assertLimitsMessageReceived()
@@ -490,7 +499,7 @@ class OrderCRUDTest : OrderBaseTest() {
             price = BigDecimal("2"),
             wallet,
         )
-        wsClient.assertMyOrderCreatedMessageReceived()
+        wsClient.assertMyOrdersCreatedMessageReceived()
 
         // create and cancel 120 orders
         repeat(times = 120) {
@@ -501,9 +510,9 @@ class OrderCRUDTest : OrderBaseTest() {
                 price = BigDecimal("2"),
                 wallet,
             )
-            wsClient.assertMyOrderCreatedMessageReceived()
+            wsClient.assertMyOrdersCreatedMessageReceived()
             apiClient.cancelOrder(order, wallet)
-            wsClient.assertMyOrderUpdatedMessageReceived()
+            wsClient.assertMyOrdersUpdatedMessageReceived()
         }
         wsClient.close()
 

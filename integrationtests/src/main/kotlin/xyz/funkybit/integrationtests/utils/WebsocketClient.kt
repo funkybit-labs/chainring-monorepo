@@ -19,9 +19,9 @@ import xyz.funkybit.apps.api.model.websocket.Balances
 import xyz.funkybit.apps.api.model.websocket.IncomingWSMessage
 import xyz.funkybit.apps.api.model.websocket.Limits
 import xyz.funkybit.apps.api.model.websocket.MarketTradesCreated
-import xyz.funkybit.apps.api.model.websocket.MyOrderCreated
-import xyz.funkybit.apps.api.model.websocket.MyOrderUpdated
 import xyz.funkybit.apps.api.model.websocket.MyOrders
+import xyz.funkybit.apps.api.model.websocket.MyOrdersCreated
+import xyz.funkybit.apps.api.model.websocket.MyOrdersUpdated
 import xyz.funkybit.apps.api.model.websocket.MyTrades
 import xyz.funkybit.apps.api.model.websocket.MyTradesCreated
 import xyz.funkybit.apps.api.model.websocket.MyTradesUpdated
@@ -129,42 +129,51 @@ inline fun <reified M : Publishable> assertContainsMessage(messages: List<Outgoi
 fun WsClient.assertMyOrdersMessageReceived(assertions: (MyOrders) -> Unit = {}): MyOrders =
     assertMessageReceived<MyOrders>(SubscriptionTopic.MyOrders, assertions)
 
-fun WsClient.assertMyOrderCreatedMessageReceived(assertions: (MyOrderCreated) -> Unit = {}): MyOrderCreated =
-    assertMessageReceived<MyOrderCreated>(SubscriptionTopic.MyOrders, assertions)
+fun WsClient.assertMyOrdersCreatedMessageReceived(assertions: (MyOrdersCreated) -> Unit = {}): MyOrdersCreated =
+    assertMessageReceived<MyOrdersCreated>(SubscriptionTopic.MyOrders, assertions)
 
-fun WsClient.assertMyLimitOrderCreatedMessageReceived(expected: CreateOrderApiResponse): MyOrderCreated =
-    assertMessageReceived<MyOrderCreated>(SubscriptionTopic.MyOrders) { msg ->
-        assertIs<Order.Limit>(msg.order)
-        assertEquals(expected.orderId, msg.order.id)
-        assertEquals(expected.order.amount.fixedAmount(), msg.order.amount)
-        assertEquals(expected.order.side, msg.order.side)
-        assertEquals(expected.order.marketId, msg.order.marketId)
-        assertEquals(0, (expected.order as CreateOrderApiRequest.Limit).price.compareTo((msg.order as Order.Limit).price))
-        assertNotNull(msg.order.timing.createdAt)
-        transaction {
-            val orderEntity = OrderEntity[expected.orderId]
-            assertEquals(BigInteger(expected.order.nonce, 16), BigInteger(orderEntity.nonce, 16))
-            assertEquals(expected.order.signature.value, orderEntity.signature)
+fun WsClient.assertMyLimitOrdersCreatedMessageReceived(expected: CreateOrderApiResponse): MyOrdersCreated =
+    assertMessageReceived<MyOrdersCreated>(SubscriptionTopic.MyOrders) { msg ->
+        assertEquals(1, msg.orders.size)
+        msg.orders.first().let { order ->
+            assertIs<Order.Limit>(order)
+            assertEquals(expected.orderId, order.id)
+            assertEquals(expected.order.amount.fixedAmount(), order.amount)
+            assertEquals(expected.order.side, order.side)
+            assertEquals(expected.order.marketId, order.marketId)
+            assertEquals(
+                0,
+                (expected.order as CreateOrderApiRequest.Limit).price.compareTo(order.price),
+            )
+            assertNotNull(order.timing.createdAt)
+            transaction {
+                val orderEntity = OrderEntity[expected.orderId]
+                assertEquals(BigInteger(expected.order.nonce, 16), BigInteger(orderEntity.nonce, 16))
+                assertEquals(expected.order.signature.value, orderEntity.signature)
+            }
         }
     }
 
-fun WsClient.assertMyMarketOrderCreatedMessageReceived(expected: CreateOrderApiResponse): MyOrderCreated =
-    assertMessageReceived<MyOrderCreated>(SubscriptionTopic.MyOrders) { msg ->
-        assertIs<Order.Market>(msg.order)
-        assertEquals(expected.orderId, msg.order.id)
-        assertEquals(expected.order.amount.fixedAmount(), msg.order.amount)
-        assertEquals(expected.order.side, msg.order.side)
-        assertEquals(expected.order.marketId, msg.order.marketId)
-        assertNotNull(msg.order.timing.createdAt)
-        transaction {
-            val orderEntity = OrderEntity[expected.orderId]
-            assertEquals(BigInteger(expected.order.nonce, 16), BigInteger(orderEntity.nonce, 16))
-            assertEquals(expected.order.signature.value, orderEntity.signature)
+fun WsClient.assertMyMarketOrdersCreatedMessageReceived(expected: CreateOrderApiResponse): MyOrdersCreated =
+    assertMessageReceived<MyOrdersCreated>(SubscriptionTopic.MyOrders) { msg ->
+        assertEquals(1, msg.orders.size)
+        msg.orders.first().let { order ->
+            assertIs<Order.Market>(order)
+            assertEquals(expected.orderId, order.id)
+            assertEquals(expected.order.amount.fixedAmount(), order.amount)
+            assertEquals(expected.order.side, order.side)
+            assertEquals(expected.order.marketId, order.marketId)
+            assertNotNull(order.timing.createdAt)
+            transaction {
+                val orderEntity = OrderEntity[expected.orderId]
+                assertEquals(BigInteger(expected.order.nonce, 16), BigInteger(orderEntity.nonce, 16))
+                assertEquals(expected.order.signature.value, orderEntity.signature)
+            }
         }
     }
 
-fun WsClient.assertMyOrderUpdatedMessageReceived(assertions: (MyOrderUpdated) -> Unit = {}): MyOrderUpdated =
-    assertMessageReceived<MyOrderUpdated>(SubscriptionTopic.MyOrders, assertions)
+fun WsClient.assertMyOrdersUpdatedMessageReceived(assertions: (MyOrdersUpdated) -> Unit = {}): MyOrdersUpdated =
+    assertMessageReceived<MyOrdersUpdated>(SubscriptionTopic.MyOrders, assertions)
 
 fun WsClient.assertMyTradesMessageReceived(assertions: (MyTrades) -> Unit = {}): MyTrades =
     assertMessageReceived<MyTrades>(SubscriptionTopic.MyTrades, assertions)
