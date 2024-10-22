@@ -3,6 +3,10 @@ package xyz.funkybit.sequencer.apps.services
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import org.jetbrains.exposed.dao.entityCache
+import org.jetbrains.exposed.dao.id.EntityID
+import org.jetbrains.exposed.sql.statements.StatementType
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import xyz.funkybit.apps.api.model.MarketLimits
 import xyz.funkybit.apps.api.model.websocket.MarketTradesCreated
 import xyz.funkybit.apps.api.model.websocket.MyOrdersCreated
@@ -35,6 +39,7 @@ import xyz.funkybit.core.model.db.OrderExecutionEntity
 import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.OrderSide
 import xyz.funkybit.core.model.db.OrderStatus
+import xyz.funkybit.core.model.db.OrderTable
 import xyz.funkybit.core.model.db.OrderType
 import xyz.funkybit.core.model.db.SymbolEntity
 import xyz.funkybit.core.model.db.TradeEntity
@@ -365,57 +370,73 @@ object SequencerResponseProcessorService {
 
     private fun handleChangedOrders(changedOrders: List<OrderChanged>, timestamp: Instant, broadcasterNotifications: MutableList<BroadcasterNotification>) {
         // update all orders that have changed
-        val orderChangedMap = changedOrders.mapNotNull { orderChanged ->
-            if (orderChanged.disposition != OrderDisposition.Accepted) {
-                logger.debug { "order updated for ${orderChanged.guid}, disposition ${orderChanged.disposition}" }
-                orderChanged.guid to orderChanged
-            } else {
-                null
+        val ordersChanged = changedOrders
+            .filter { it.disposition != OrderDisposition.Accepted }
+            .onEach { logger.debug { "order updated for ${it.guid}, disposition ${it.disposition}" } }
+
+        if (ordersChanged.isEmpty()) return
+
+        val batchSqlUpdateParams = ordersChanged.map { orderChanged ->
+            val sequencerOrderId: Long = orderChanged.guid
+            val status: OrderStatus? = when (orderChanged.disposition) {
+                OrderDisposition.Accepted -> OrderStatus.Open
+                OrderDisposition.Filled -> OrderStatus.Filled
+                OrderDisposition.PartiallyFilled -> OrderStatus.Partial
+                OrderDisposition.Failed, OrderDisposition.UNRECOGNIZED -> OrderStatus.Failed
+                OrderDisposition.Canceled -> OrderStatus.Cancelled
+                OrderDisposition.Rejected -> OrderStatus.Rejected
+                else -> null
             }
-        }.toMap()
-
-        OrderEntity.listWithExecutionsForSequencerOrderIds(orderChangedMap.keys.toList()).map { (orderToUpdate, executions) ->
-            val orderChanged = orderChangedMap.getValue(orderToUpdate.sequencerOrderId!!.value)
-
-            when (orderChanged.disposition) {
-                OrderDisposition.Accepted -> {
-                    orderToUpdate.status = OrderStatus.Open
-                }
-                OrderDisposition.Filled -> {
-                    orderToUpdate.status = OrderStatus.Filled
-                }
-                OrderDisposition.PartiallyFilled -> {
-                    orderToUpdate.status = OrderStatus.Partial
-                }
-                OrderDisposition.Failed, OrderDisposition.UNRECOGNIZED -> {
-                    orderToUpdate.status = OrderStatus.Failed
-                }
-                OrderDisposition.Canceled -> {
-                    orderToUpdate.status = OrderStatus.Cancelled
-                }
-                OrderDisposition.Rejected -> {
-                    orderToUpdate.status = OrderStatus.Rejected
-                }
-                OrderDisposition.AutoReduced -> {
-                    orderToUpdate.autoReduced = true
-                }
-                null -> {}
+            val autoReduced: Boolean? = when (orderChanged.disposition) {
+                OrderDisposition.AutoReduced -> true
+                else -> null
             }
+            val newQuantity: BigInteger? = orderChanged.newQuantityOrNull?.toBigInteger()
 
-            orderChanged.newQuantityOrNull?.also { newQuantity ->
-                orderToUpdate.originalAmount = orderToUpdate.amount
-                orderToUpdate.amount = newQuantity.toBigInteger()
-            }
-
-            orderToUpdate.updatedAt = timestamp
-
-            orderToUpdate.wallet.userGuid.value to orderToUpdate.toOrderResponse(executions)
+            "($sequencerOrderId, ${status?.let { "'${it.name}'" }}, $autoReduced, $newQuantity)"
         }
-            .groupBy { it.first }
-            .forEach { (userGuid, updates) ->
+
+        // Exposed BatchUpdateStatement does not support expressions, this means we can't refer to the current value without
+        // loading it first from the database. Therefore, executing batch update as native query.
+        TransactionManager.current().exec(
+            """
+                UPDATE "${OrderTable.tableName}" AS t
+                SET 
+                    ${OrderTable.status.name}         = COALESCE(v.status::OrderStatus, t.${OrderTable.status.name}),
+                    ${OrderTable.autoReduced.name}    = COALESCE(v.auto_reduced::boolean, t.${OrderTable.autoReduced.name}),
+                    ${OrderTable.originalAmount.name} = CASE 
+                                                            WHEN v.new_amount is not null THEN t.${OrderTable.amount.name}
+                                                            ELSE t.${OrderTable.originalAmount.name}
+                                                        END,
+                    ${OrderTable.amount.name}         = COALESCE(v.new_amount::numeric, t.${OrderTable.amount.name}),
+                    ${OrderTable.updatedAt.name}      = '$timestamp'
+                FROM (
+                    VALUES
+                        ${batchSqlUpdateParams.joinToString(",\n")}
+                ) AS v(sequencer_order_id, status, auto_reduced, new_amount)
+                WHERE t.${OrderTable.sequencerOrderId.name} = v.sequencer_order_id
+                RETURNING t.${OrderTable.guid.name}
+            """.trimIndent(),
+            // instruct exposed to expect result set
+            explicitStatementType = StatementType.SELECT,
+        ) { rs ->
+            // remove all entities updated directly in the database from the entity cache
+            val entityCache = TransactionManager.current().entityCache
+            while (rs.next()) {
+                val entityId = EntityID(OrderId(rs.getString(1)), OrderTable)
+                entityCache.find(OrderEntity, entityId)?.let {
+                    entityCache.remove(OrderTable, it)
+                }
+            }
+        }
+
+        OrderEntity.listWithExecutionsForSequencerOrderIds(ordersChanged.map { it.guid })
+            .groupBy { it.first.wallet.userGuid.value }
+            .mapValues { (_, orders) -> orders.map { it.first.toOrderResponse(it.second) } }
+            .forEach { (userGuid, orderResponses) ->
                 broadcasterNotifications.add(
                     BroadcasterNotification(
-                        MyOrdersUpdated(updates.map { it.second }),
+                        MyOrdersUpdated(orderResponses),
                         recipient = userGuid,
                     ),
                 )
