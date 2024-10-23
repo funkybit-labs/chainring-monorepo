@@ -25,6 +25,7 @@ enum class ReasonCode {
     WithdrawalNotFound,
     DepositNotFound,
     MarketNotFound,
+    BatchSizeExceeded,
 
     SignatureNotValid,
     UnexpectedError,

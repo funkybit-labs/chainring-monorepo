@@ -25,6 +25,7 @@ import xyz.funkybit.apps.api.model.CreateOrderApiRequest
 import xyz.funkybit.apps.api.model.CreateOrderApiResponse
 import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.apps.api.model.OrdersApiResponse
+import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.RequestStatus
 import xyz.funkybit.apps.api.model.errorResponse
 import xyz.funkybit.apps.api.model.orderNotFoundError
@@ -39,7 +40,10 @@ import xyz.funkybit.core.model.db.OrderId
 import xyz.funkybit.core.model.db.OrderStatus
 import xyz.funkybit.core.model.db.toOrderResponse
 
-class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
+class OrderRoutes(
+    private val exchangeApiService: ExchangeApiService,
+    private val maxBatchSize: Int = System.getenv("BATCH_ORDERS_MAX_SIZE")?.toIntOrNull() ?: 100,
+) {
     private val logger = KotlinLogging.logger {}
 
     private val orderIdPathParam = Path.map(::OrderId, OrderId::value).of("orderId", "Order Id")
@@ -236,9 +240,15 @@ class OrderRoutes(private val exchangeApiService: ExchangeApiService) {
         } bindContract Method.POST to { request ->
             transaction {
                 val wallet = request.principal
+                val batchOrdersRequest = requestBody(request)
+
+                val totalOrders = batchOrdersRequest.createOrders.size + batchOrdersRequest.cancelOrders.size
+                if (totalOrders > maxBatchSize) {
+                    return@transaction processingError(ReasonCode.BatchSizeExceeded, "Batch size exceeds the maximum limit of $maxBatchSize orders.")
+                }
 
                 Response(Status.OK).with(
-                    responseBody of exchangeApiService.orderBatch(wallet, requestBody(request)),
+                    responseBody of exchangeApiService.orderBatch(wallet, batchOrdersRequest),
                 )
             }
         }

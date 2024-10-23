@@ -6,12 +6,14 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
+import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.BatchOrdersApiRequest
 import xyz.funkybit.apps.api.model.CancelOrderApiRequest
 import xyz.funkybit.apps.api.model.CreateOrderApiRequest
 import xyz.funkybit.apps.api.model.MarketLimits
 import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.apps.api.model.OrderAmount
+import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.RequestStatus
 import xyz.funkybit.apps.api.model.websocket.OHLC
 import xyz.funkybit.apps.api.model.websocket.OrderBook
@@ -33,6 +35,7 @@ import xyz.funkybit.integrationtests.utils.MyExpectedTrade
 import xyz.funkybit.integrationtests.utils.assertAmount
 import xyz.funkybit.integrationtests.utils.assertBalances
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
+import xyz.funkybit.integrationtests.utils.assertError
 import xyz.funkybit.integrationtests.utils.assertFee
 import xyz.funkybit.integrationtests.utils.assertLimitsMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyLimitOrdersCreatedMessageReceived
@@ -45,6 +48,7 @@ import xyz.funkybit.integrationtests.utils.assertMyTradesMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyTradesUpdatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertOrderBookMessageReceived
 import xyz.funkybit.integrationtests.utils.assertPricesMessageReceived
+import xyz.funkybit.integrationtests.utils.assertSuccess
 import xyz.funkybit.integrationtests.utils.blocking
 import xyz.funkybit.integrationtests.utils.ofAsset
 import xyz.funkybit.integrationtests.utils.subscribeToLimits
@@ -1042,6 +1046,141 @@ class OrderExecutionTest : OrderBaseTest() {
 
         makerWsClient.close()
         takerWsClient.close()
+    }
+
+    @Test
+    fun `batch orders combined max size`() {
+        val (market, baseSymbol, quoteSymbol) = Triple(btcUsdcMarket, btc, usdc)
+
+        val (makerApiClient, makerWallet, makerWsClient) = setupTrader(
+            market.id,
+            airdrops = listOf(
+                AssetAmount(baseSymbol, "0.5"),
+                AssetAmount(quoteSymbol, "500"),
+            ),
+            deposits = listOf(
+                AssetAmount(baseSymbol, "0.2"),
+                AssetAmount(quoteSymbol, "500"),
+            ),
+            subscribeToOrderBook = false,
+        )
+
+        // can batch 100 create orders
+        makerApiClient.tryBatchOrders(
+            BatchOrdersApiRequest(
+                marketId = market.id,
+                createOrders = (1..100).map {
+                    makerWallet.signOrder(
+                        CreateOrderApiRequest.Limit(
+                            nonce = generateOrderNonce(),
+                            marketId = market.id,
+                            side = OrderSide.Sell,
+                            amount = OrderAmount.Fixed(AssetAmount(baseSymbol, BigDecimal(it).movePointLeft(5)).inFundamentalUnits),
+                            price = BigDecimal("68400.000"),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    )
+                },
+                cancelOrders = emptyList(),
+            ),
+        ).assertSuccess()
+
+        // fail on 101 create order
+        makerApiClient.tryBatchOrders(
+            BatchOrdersApiRequest(
+                marketId = market.id,
+                createOrders = (1..101).map {
+                    makerWallet.signOrder(
+                        CreateOrderApiRequest.Limit(
+                            nonce = generateOrderNonce(),
+                            marketId = market.id,
+                            side = OrderSide.Sell,
+                            amount = OrderAmount.Fixed(AssetAmount(baseSymbol, BigDecimal(it).movePointLeft(5)).inFundamentalUnits),
+                            price = BigDecimal("68400.000"),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    )
+                },
+                cancelOrders = emptyList(),
+            ),
+        ).assertError(ApiError(ReasonCode.BatchSizeExceeded, "Batch size exceeds the maximum limit of 100 orders."))
+
+        // can batch 100 cancel orders
+        makerApiClient.tryBatchOrders(
+            BatchOrdersApiRequest(
+                marketId = market.id,
+                createOrders = emptyList(),
+                cancelOrders = (1..100).map {
+                    makerWallet.signCancelOrder(
+                        CancelOrderApiRequest(
+                            orderId = OrderId.generate(),
+                            marketId = market.id,
+                            amount = BigInteger.ZERO,
+                            side = OrderSide.Buy,
+                            nonce = generateOrderNonce(),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    )
+                },
+            ),
+        ).assertSuccess()
+
+        // fail to batch 101 cancel orders
+        makerApiClient.tryBatchOrders(
+            BatchOrdersApiRequest(
+                marketId = market.id,
+                createOrders = emptyList(),
+                cancelOrders = (1..101).map {
+                    makerWallet.signCancelOrder(
+                        CancelOrderApiRequest(
+                            orderId = OrderId.generate(),
+                            marketId = market.id,
+                            amount = BigInteger.ZERO,
+                            side = OrderSide.Buy,
+                            nonce = generateOrderNonce(),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    )
+                },
+            ),
+        ).assertError(ApiError(ReasonCode.BatchSizeExceeded, "Batch size exceeds the maximum limit of 100 orders."))
+
+        // max batch size counts for both create and cancel orders
+        makerApiClient.tryBatchOrders(
+            BatchOrdersApiRequest(
+                marketId = market.id,
+                createOrders = (1..51).map {
+                    makerWallet.signOrder(
+                        CreateOrderApiRequest.Limit(
+                            nonce = generateOrderNonce(),
+                            marketId = market.id,
+                            side = OrderSide.Sell,
+                            amount = OrderAmount.Fixed(AssetAmount(baseSymbol, BigDecimal(it).movePointLeft(5)).inFundamentalUnits),
+                            price = BigDecimal("68400.000"),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    )
+                },
+                cancelOrders = (1..51).map {
+                    makerWallet.signCancelOrder(
+                        CancelOrderApiRequest(
+                            orderId = OrderId.generate(),
+                            marketId = market.id,
+                            amount = BigInteger.ZERO,
+                            side = OrderSide.Buy,
+                            nonce = generateOrderNonce(),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    )
+                },
+            ),
+        ).assertError(ApiError(ReasonCode.BatchSizeExceeded, "Batch size exceeds the maximum limit of 100 orders."))
     }
 
     @Test
