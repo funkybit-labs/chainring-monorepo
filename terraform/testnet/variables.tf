@@ -37,7 +37,27 @@ data "aws_acm_certificate" "funkybit_fun" {
 
 variable "blocked_country_codes" {
   default = [
-    "KP", # North Korea
+    "KP", # Korea, Democratic People's Republic of
+    "CU", # Cuba
+    "RU", # Russian Federation
+    "SY", # Syrian Arab Republic
+    "IR", # Iran, Islamic Republic of
+    "AF", # Afghanistan
+    "BY", # Belarus
+    "MM", # Burma (Myanmar)
+    "CF", # Central African Republic
+    "CD", # Congo, Democratic Republic of
+    "ET", # Ethiopia
+    "IQ", # Iraq
+    "LB", # Lebanon
+    "LY", # Libya
+    "ML", # Mali
+    "NI", # Nicaragua
+    "SO", # Somalia
+    "SD", # Sudan
+    "SS", # South Sudan
+    "VE", # Venezuela, Bolivarian Republic of
+    "YE", # Yemen
   ]
 }
 
