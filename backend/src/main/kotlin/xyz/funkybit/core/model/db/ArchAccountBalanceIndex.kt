@@ -159,6 +159,12 @@ class ArchAccountBalanceIndexEntity(guid: EntityID<ArchAccountBalanceIndexId>) :
             }
         }
 
+        fun updateToPending(archAccountBalanceIndexEntities: List<ArchAccountBalanceIndexEntity>) {
+            ArchAccountBalanceIndexTable.update({ ArchAccountBalanceIndexTable.guid.inList(archAccountBalanceIndexEntities.map { it.guid }) }) {
+                it[status] = ArchAccountBalanceIndexStatus.Pending
+            }
+        }
+
         fun updateToAssigned(updateAssignments: List<UpdateArchAccountBalanceIndexAssignment>) {
             BatchUpdateStatement(ArchAccountBalanceIndexTable).apply {
                 updateAssignments.forEach {

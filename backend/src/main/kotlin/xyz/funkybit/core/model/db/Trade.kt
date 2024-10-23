@@ -107,6 +107,13 @@ class TradeEntity(guid: EntityID<TradeId>) : GUIDEntity<TradeId>(guid) {
             }
         }
 
+        fun markAsFailedSettlingByGuid(tradeGuids: Set<EntityID<TradeId>>, error: String) {
+            TradeTable.update({ TradeTable.guid.inList(tradeGuids) }) {
+                it[this.settlementStatus] = SettlementStatus.FailedSettling
+                it[this.error] = error
+            }
+        }
+
         fun markAsSettling(tradeGuids: List<TradeId>, settlementBatch: SettlementBatchEntity) {
             TradeTable.update({ TradeTable.guid.inList(tradeGuids) }) {
                 it[this.settlementStatus] = SettlementStatus.Settling

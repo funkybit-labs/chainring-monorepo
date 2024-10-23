@@ -3,6 +3,7 @@ package xyz.funkybit.core.model.db
 import de.fxlae.typeid.TypeId
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.http4k.format.KotlinxSerialization.json
 import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
@@ -11,6 +12,7 @@ import org.jetbrains.exposed.sql.kotlin.datetime.timestamp
 import xyz.funkybit.apps.api.model.BigIntegerJson
 import xyz.funkybit.core.model.Address
 import xyz.funkybit.core.model.TxHash
+import xyz.funkybit.core.model.rpc.ArchNetworkRpc
 import java.math.BigInteger
 
 @JvmInline
@@ -125,6 +127,7 @@ class BlockchainTransactionEntity(guid: EntityID<BlockchainTransactionId>) : GUI
         this.updatedAt = Clock.System.now()
         this.updatedBy = "system"
     }
+    fun archAccounts() = Json.decodeFromString<ArchNetworkRpc.Instruction>(this.transactionData.data).accounts
 
     var createdAt by BlockchainTransactionTable.createdAt
     var createdBy by BlockchainTransactionTable.createdBy

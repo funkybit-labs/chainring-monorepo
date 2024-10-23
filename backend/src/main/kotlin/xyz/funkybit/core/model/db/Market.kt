@@ -25,6 +25,8 @@ value class MarketId(override val value: String) : EntityId {
 
     fun baseSymbol() = baseAndQuoteSymbols().first
     fun quoteSymbol() = baseAndQuoteSymbols().second
+
+    fun hasSymbol(symbol: String) = baseAndQuoteSymbols().let { it.first == symbol || it.second == symbol }
 }
 
 object MarketTable : GUIDTable<MarketId>("market", ::MarketId) {

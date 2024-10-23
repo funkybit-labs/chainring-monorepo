@@ -280,6 +280,24 @@ sealed class ArchAccountState {
         }
     }
 
+    @Serializable
+    enum class EventType(val value: UByte) {
+        FailedSettlement(0.toByte().toUByte()),
+        FailedWithdrawal(1.toByte().toUByte()),
+        Unknown(2.toByte().toUByte()),
+    }
+
+    @Serializable
+    data class Event(
+        val eventType: UByte,
+        val accountIndex: UByte,
+        val addressIndex: UInt,
+        val requestedAmount: ULong,
+        val feeAmount: ULong,
+        val balance: ULong,
+        val errorCode: UInt,
+    )
+
     @Serializable(with = ProgramSerializer::class)
     data class Program(
         val version: Int,
@@ -289,6 +307,7 @@ sealed class ArchAccountState {
         val settlementBatchHash: TxHash,
         val lastSettlementBatchHash: TxHash,
         val lastWithdrawalBatchHash: TxHash,
+        val events: List<Event>,
     )
 
     object ProgramSerializer : KSerializer<Program> {
@@ -311,6 +330,9 @@ sealed class ArchAccountState {
                         settlementBatchHash = TxHash(((0 until 32).map { decoder.decodeByte() }.toByteArray()).toHex(false)),
                         lastSettlementBatchHash = TxHash(((0 until 32).map { decoder.decodeByte() }.toByteArray()).toHex(false)),
                         lastWithdrawalBatchHash = TxHash(((0 until 32).map { decoder.decodeByte() }.toByteArray()).toHex(false)),
+                        events = (0 until decoder.decodeShort()).map {
+                            Event.serializer().deserialize(decoder)
+                        },
                     )
                 }
                 else -> throw Exception("not required")

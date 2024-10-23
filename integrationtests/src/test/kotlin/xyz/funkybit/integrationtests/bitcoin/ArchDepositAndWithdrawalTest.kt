@@ -45,6 +45,7 @@ import xyz.funkybit.integrationtests.testutils.getWalletBalanceOnArch
 import xyz.funkybit.integrationtests.testutils.isBitcoinDisabled
 import xyz.funkybit.integrationtests.testutils.waitFor
 import xyz.funkybit.integrationtests.testutils.waitForBalance
+import xyz.funkybit.integrationtests.testutils.waitForFinalizedWithdrawal
 import xyz.funkybit.integrationtests.testutils.waitForTx
 import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.BitcoinWallet
@@ -62,6 +63,67 @@ import kotlin.time.Duration.Companion.days
 
 @ExtendWith(AppUnderTestRunner::class)
 class ArchDepositAndWithdrawalTest {
+
+    companion object {
+        fun initiateWithdrawal(apiClient: TestApiClient, bitcoinWallet: BitcoinWallet, wsClient: WsClient, btc: SymbolInfo, depositAmount: BigInteger, withdrawAmount: BigInteger): Withdrawal {
+            return apiClient.createWithdrawal(bitcoinWallet.signWithdraw(btc.name, withdrawAmount)).withdrawal.also { pendingBtcWithdrawal ->
+                Assertions.assertEquals(WithdrawalStatus.Pending, pendingBtcWithdrawal.status)
+                Assertions.assertEquals(
+                    listOf(pendingBtcWithdrawal.id),
+                    apiClient.listWithdrawals().withdrawals.filter { it.symbol.value == btc.name }.map { it.id },
+                )
+
+                waitForBalance(
+                    apiClient,
+                    wsClient,
+                    listOf(
+                        ExpectedBalance(
+                            btc,
+                            total = AssetAmount(bitcoinWallet.nativeSymbol, depositAmount),
+                            available = AssetAmount(bitcoinWallet.nativeSymbol, depositAmount - withdrawAmount),
+                        ),
+                    ),
+                )
+            }
+        }
+
+        fun waitForWithdrawal(apiClient: TestApiClient, bitcoinWallet: BitcoinWallet, wsClient: WsClient, btc: SymbolInfo, pendingBtcWithdrawal: Withdrawal, depositAmount: BigInteger, withdrawAmount: BigInteger) {
+            waitForCompletedWithdrawal(pendingBtcWithdrawal.id, WithdrawalStatus.Complete)
+
+            val btcWithdrawal = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
+            Assertions.assertEquals(WithdrawalStatus.Complete, btcWithdrawal.status)
+            Assertions.assertEquals(
+                listOf(btcWithdrawal.id),
+                apiClient.listWithdrawals().withdrawals.filter { it.symbol.value == btc.name }.map { it.id },
+            )
+            Assertions.assertEquals(btc.withdrawalFee, btcWithdrawal.fee)
+
+            waitForBalance(
+                apiClient,
+                wsClient,
+                listOf(
+                    ExpectedBalance(AssetAmount(bitcoinWallet.nativeSymbol, depositAmount - withdrawAmount)),
+                ),
+            )
+
+            val withdrawal = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
+            waitForTx(bitcoinWallet.walletAddress, withdrawal.txHash!!)
+
+            // verify the wallet and fee account balance at the exchange
+            assertEquals(
+                depositAmount - withdrawAmount,
+                bitcoinWallet.getExchangeBalance(btc).inFundamentalUnits,
+            )
+        }
+
+        private fun waitForCompletedWithdrawal(id: WithdrawalId, expectedStatus: WithdrawalStatus) {
+            waitFor {
+                transaction {
+                    WithdrawalEntity[id].status == expectedStatus
+                }
+            }
+        }
+    }
 
     @BeforeEach
     fun waitForSetup() {
@@ -337,6 +399,167 @@ class ArchDepositAndWithdrawalTest {
     }
 
     @Test
+    fun `test failed withdrawals`() {
+        Assumptions.assumeFalse(isBitcoinDisabled())
+
+        val airdropAmount = BigInteger("20000")
+        val depositAmount = BigInteger("12000")
+
+        val bitcoinWallets = (0..4).map {
+            BitcoinWallet(TestApiClient.withBitcoinWallet())
+        }
+
+        val btc = bitcoinWallets.last().nativeSymbol
+        val txIds = bitcoinWallets.map { it.airdropNative(airdropAmount) }
+        waitForTx(bitcoinWallets.last().walletAddress, txIds.last())
+        bitcoinWallets.forEachIndexed { index, wallet ->
+            waitForTx(wallet.walletAddress, txIds[index])
+            assertEquals(wallet.getWalletNativeBalance(), airdropAmount)
+        }
+        val exchangeDepositAddress = bitcoinWallets.first().exchangeDepositAddress
+        transaction { UtxoManager.refreshUtxos(exchangeDepositAddress) }
+        val startingProgramBalance = getBalance(exchangeDepositAddress)
+
+        val pendingBtcDeposits = bitcoinWallets.map { wallet ->
+            val depositTxHash = wallet.sendNativeDepositTx(depositAmount)
+            val pendingBtcDeposit = wallet.apiClient.createDeposit(
+                CreateDepositApiRequest(
+                    symbol = Symbol(btc.name),
+                    amount = depositAmount,
+                    txHash = depositTxHash,
+                ),
+            ).deposit
+
+            assertEquals(Deposit.Status.Pending, pendingBtcDeposit.status)
+            assertEquals(depositAmount, pendingBtcDeposit.amount)
+            pendingBtcDeposit
+        }
+
+        waitFor(atMost = 40000) {
+            transaction {
+                DepositEntity.find { DepositTable.status.eq(DepositStatus.Complete) }.count().toInt() == pendingBtcDeposits.count()
+            }
+        }
+
+        bitcoinWallets.forEach { wallet ->
+            val btcBalance = wallet.apiClient.getBalances().balances.first { it.symbol.value == btc.name }
+            assertEquals(depositAmount, btcBalance.available)
+            assertEquals(depositAmount, btcBalance.total)
+            assertEquals(depositAmount, wallet.getExchangeBalance(btc).inFundamentalUnits)
+        }
+
+        pendingBtcDeposits.forEach {
+            waitForTx(exchangeDepositAddress, it.txHash)
+        }
+
+        var expectedProgramBalance = startingProgramBalance + depositAmount.toLong() * pendingBtcDeposits.size
+        assertEquals(expectedProgramBalance, getBalance(exchangeDepositAddress))
+
+        val withdrawAmount = BigInteger("5000")
+        val pendingBtcWithdrawals = bitcoinWallets.map { wallet ->
+            wallet.apiClient.createWithdrawal(wallet.signWithdraw(btc.name, withdrawAmount)).withdrawal
+        }
+        waitFor(atMost = 40000) {
+            transaction {
+                WithdrawalEntity.find { WithdrawalTable.status.eq(WithdrawalStatus.Complete) }.count().toInt() == pendingBtcWithdrawals.count()
+            }
+        }
+
+        val txHashes = bitcoinWallets.mapIndexedNotNull { index, wallet ->
+            wallet.apiClient.getWithdrawal(pendingBtcWithdrawals[index].id).withdrawal.txHash?.also {
+                waitForTx(bitcoinWallets[index].walletAddress, it, exchangeDepositAddress)
+            }
+        }.toSet()
+
+        val totalWithdrawAmount = bitcoinWallets.mapIndexed { index, wallet ->
+            val withdrawal = wallet.apiClient.getWithdrawal(pendingBtcWithdrawals[index].id).withdrawal
+            withdrawal.amount - withdrawal.fee
+        }.sum().toLong()
+
+        // now retrigger withdrawals to program so on chain balance does not match sequencer
+        transaction {
+            WithdrawalEntity[pendingBtcWithdrawals[2].id].let {
+                it.status = WithdrawalStatus.Sequenced
+                it.blockchainTransactionGuid = null
+            }
+            WithdrawalEntity[pendingBtcWithdrawals[3].id].let {
+                it.status = WithdrawalStatus.Sequenced
+                it.blockchainTransactionGuid = null
+            }
+        }
+
+        waitForFinalizedWithdrawal(pendingBtcWithdrawals[2].id, WithdrawalStatus.Complete)
+        waitForFinalizedWithdrawal(pendingBtcWithdrawals[3].id, WithdrawalStatus.Complete)
+
+        val txHashesResend = bitcoinWallets.mapIndexedNotNull { index, wallet ->
+            if (index == 2 || index == 3) {
+                wallet.apiClient.getWithdrawal(pendingBtcWithdrawals[index].id).withdrawal.txHash?.also {
+                    waitForTx(bitcoinWallets[index].walletAddress, it, exchangeDepositAddress)
+                }
+            } else {
+                null
+            }
+        }.toSet()
+
+        val totalWithdrawAmountResend = bitcoinWallets.mapIndexed { index, wallet ->
+            val withdrawal = wallet.apiClient.getWithdrawal(pendingBtcWithdrawals[index].id).withdrawal
+            if (index == 2 || index == 3) {
+                withdrawal.amount - withdrawal.fee
+            } else {
+                BigInteger.ZERO
+            }
+        }.sum().toLong()
+
+        val pendingBtcWithdrawals2 = bitcoinWallets.map { wallet ->
+            wallet.apiClient.createWithdrawal(wallet.signWithdraw(btc.name, withdrawAmount)).withdrawal
+        }
+        waitFor(atMost = 40000) {
+            transaction {
+                WithdrawalEntity.find { WithdrawalTable.status.inList(listOf(WithdrawalStatus.Complete, WithdrawalStatus.Failed)) }.count().toInt() == pendingBtcWithdrawals2.count() + pendingBtcWithdrawals.count()
+            }
+        }
+
+        val txHashes2 = bitcoinWallets.mapIndexedNotNull { index, wallet ->
+            wallet.apiClient.getWithdrawal(pendingBtcWithdrawals2[index].id).withdrawal.txHash?.also {
+                waitForTx(bitcoinWallets[index].walletAddress, it, exchangeDepositAddress)
+            }
+        }.toSet()
+
+        val totalWithdrawAmount2 = bitcoinWallets.mapIndexed { index, wallet ->
+            val withdrawal = wallet.apiClient.getWithdrawal(pendingBtcWithdrawals2[index].id).withdrawal
+            if (index != 2 && index != 3) {
+                assertEquals(WithdrawalStatus.Complete, withdrawal.status)
+                withdrawal.amount - withdrawal.fee
+            } else {
+                assertEquals(WithdrawalStatus.Failed, withdrawal.status)
+                assertEquals("Insufficient Balance", withdrawal.error)
+                BigInteger.ZERO
+            }
+        }.sum().toLong()
+
+        val expectedAmount = depositAmount - withdrawAmount - withdrawAmount
+        val expectedFailedAmount = depositAmount - withdrawAmount
+        bitcoinWallets.forEachIndexed { index, wallet ->
+            val btcBalance = wallet.apiClient.getBalances().balances.first { it.symbol.value == btc.name }
+            if (index != 2 && index != 3) {
+                assertEquals(expectedAmount, btcBalance.available)
+            } else {
+                assertEquals(expectedFailedAmount, btcBalance.available)
+            }
+            assertEquals(expectedAmount, btcBalance.total)
+            assertEquals(expectedAmount, wallet.getExchangeBalance(btc).inFundamentalUnits)
+        }
+
+        val totalNetworkFee = txHashes.sumOf { MempoolSpaceClient.getNetworkFeeForTx(it) } +
+            txHashes2.sumOf { MempoolSpaceClient.getNetworkFeeForTx(it) } +
+            txHashesResend.sumOf { MempoolSpaceClient.getNetworkFeeForTx(it) }
+
+        expectedProgramBalance -= totalNetworkFee + totalWithdrawAmount + totalWithdrawAmount2 + totalWithdrawAmountResend
+
+        assertEquals(expectedProgramBalance, getBalance(exchangeDepositAddress))
+    }
+
+    @Test
     fun `test on-chain deposit amount is the source of truth - Bitcoin`() {
         Assumptions.assumeFalse(isBitcoinDisabled())
 
@@ -514,65 +737,6 @@ class ArchDepositAndWithdrawalTest {
         )
 
         return Triple(apiClient, bitcoinWallet, wsClient)
-    }
-
-    private fun initiateWithdrawal(apiClient: TestApiClient, bitcoinWallet: BitcoinWallet, wsClient: WsClient, btc: SymbolInfo, depositAmount: BigInteger, withdrawAmount: BigInteger): Withdrawal {
-        return apiClient.createWithdrawal(bitcoinWallet.signWithdraw(btc.name, withdrawAmount)).withdrawal.also { pendingBtcWithdrawal ->
-            Assertions.assertEquals(WithdrawalStatus.Pending, pendingBtcWithdrawal.status)
-            Assertions.assertEquals(
-                listOf(pendingBtcWithdrawal.id),
-                apiClient.listWithdrawals().withdrawals.filter { it.symbol.value == btc.name }.map { it.id },
-            )
-
-            waitForBalance(
-                apiClient,
-                wsClient,
-                listOf(
-                    ExpectedBalance(
-                        btc,
-                        total = AssetAmount(bitcoinWallet.nativeSymbol, depositAmount),
-                        available = AssetAmount(bitcoinWallet.nativeSymbol, depositAmount - withdrawAmount),
-                    ),
-                ),
-            )
-        }
-    }
-
-    private fun waitForWithdrawal(apiClient: TestApiClient, bitcoinWallet: BitcoinWallet, wsClient: WsClient, btc: SymbolInfo, pendingBtcWithdrawal: Withdrawal, depositAmount: BigInteger, withdrawAmount: BigInteger) {
-        waitForCompletedWithdrawal(pendingBtcWithdrawal.id, WithdrawalStatus.Complete)
-
-        val btcWithdrawal = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
-        Assertions.assertEquals(WithdrawalStatus.Complete, btcWithdrawal.status)
-        Assertions.assertEquals(
-            listOf(btcWithdrawal.id),
-            apiClient.listWithdrawals().withdrawals.filter { it.symbol.value == btc.name }.map { it.id },
-        )
-        Assertions.assertEquals(btc.withdrawalFee, btcWithdrawal.fee)
-
-        waitForBalance(
-            apiClient,
-            wsClient,
-            listOf(
-                ExpectedBalance(AssetAmount(bitcoinWallet.nativeSymbol, depositAmount - withdrawAmount)),
-            ),
-        )
-
-        val withdrawal = apiClient.getWithdrawal(pendingBtcWithdrawal.id).withdrawal
-        waitForTx(bitcoinWallet.walletAddress, withdrawal.txHash!!)
-
-        // verify the wallet and fee account balance at the exchange
-        assertEquals(
-            depositAmount - withdrawAmount,
-            bitcoinWallet.getExchangeBalance(btc).inFundamentalUnits,
-        )
-    }
-
-    private fun waitForCompletedWithdrawal(id: WithdrawalId, expectedStatus: WithdrawalStatus) {
-        waitFor {
-            transaction {
-                WithdrawalEntity[id].status == expectedStatus
-            }
-        }
     }
 
     private fun getBalance(address: BitcoinAddress): Long {

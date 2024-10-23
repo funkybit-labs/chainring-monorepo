@@ -3,6 +3,7 @@ package xyz.funkybit.apps.ring
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -33,9 +34,12 @@ import xyz.funkybit.core.model.db.DeployedSmartContractEntity
 import xyz.funkybit.core.model.db.DepositEntity
 import xyz.funkybit.core.model.db.DepositStatus
 import xyz.funkybit.core.model.db.DepositTable
+import xyz.funkybit.core.model.db.OrderExecutionEntity
 import xyz.funkybit.core.model.db.SettlementBatchStatus
+import xyz.funkybit.core.model.db.SymbolId
 import xyz.funkybit.core.model.db.TradeEntity
 import xyz.funkybit.core.model.db.UpdateArchAccountBalanceIndexAssignment
+import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.model.db.WithdrawalStatus
 import xyz.funkybit.core.model.db.publishBroadcasterNotifications
@@ -50,6 +54,7 @@ import xyz.funkybit.core.utils.triggerRepeaterTask
 import xyz.funkybit.core.utils.tryAcquireAdvisoryLock
 import xyz.funkybit.sequencer.core.Asset
 import xyz.funkybit.sequencer.proto.SequencerError
+import java.math.BigInteger
 import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -223,7 +228,7 @@ class ArchTransactionHandler(
                         }
                         ArchAccountBalanceIndexEntity.updateToAssigned(assignments)
                     } else {
-                        // TODO CHAIN-523 - handle errors here
+                        ArchAccountBalanceIndexEntity.updateToPending(assigningBalanceIndexUpdates.map { it.entity })
                     }
                 }
             }
@@ -278,7 +283,8 @@ class ArchTransactionHandler(
                         )
                         DepositEntity.updateToSettling(sentToArchDeposits)
                     } else {
-                        // TODO CHAIN-523 - handle errors here
+                        // move back to confirmed - we will try again
+                        DepositEntity.updateToConfirmed(sentToArchDeposits)
                     }
                 }
             }
@@ -316,7 +322,7 @@ class ArchTransactionHandler(
                             onWithdrawalCompleteOnBitcoin(withdrawalEntity, "failed to confirm on bitcoin network")
                         }
                     } else {
-                        // TODO CHAIN-523 - handle errors here
+                        WithdrawalEntity.updateToPendingRollbackOnArch(rollingBackOnArchWithdrawals)
                     }
                 }
             }
@@ -333,10 +339,18 @@ class ArchTransactionHandler(
         }
         val settlingWithdrawals = WithdrawalEntity.findSettlingOnArch()
         return if (settlingWithdrawals.isNotEmpty()) {
+            logger.debug { }
             val archTransaction = settlingWithdrawals.first().archTransaction!!
             refreshSubmittedTransaction(archTransaction) { processedTx, error ->
                 if (error == null) {
                     archTransaction.markAsCompleted()
+                    val failedWithdrawalEvents = getFailedWithdrawalEvents()
+                    val (successfulWithdrawals, failedWithdrawals) = if (failedWithdrawalEvents.isNotEmpty()) {
+                        logger.warn { "received failed withdrawal events - $failedWithdrawalEvents" }
+                        partitionWithdrawals(settlingWithdrawals, failedWithdrawalEvents, archTransaction)
+                    } else {
+                        Pair(settlingWithdrawals, emptyList())
+                    }
                     if (processedTx.bitcoinTxId != null) {
                         val transaction = BlockchainTransactionEntity.create(
                             chainId = chainId,
@@ -345,15 +359,28 @@ class ArchTransactionHandler(
                             txHash = processedTx.bitcoinTxId,
                         )
                         transaction.flush()
-                        WithdrawalEntity.updateToSettling(settlingWithdrawals, transaction, emptyMap())
+                        if (successfulWithdrawals.isNotEmpty()) {
+                            WithdrawalEntity.updateToSettling(successfulWithdrawals, transaction, emptyMap())
+                        }
                     } else {
-                        settlingWithdrawals.forEach {
+                        successfulWithdrawals.forEach {
                             onWithdrawalCompleteOnBitcoin(it, "No bitcoin transaction returned")
+                        }
+                        archTransaction.txHash?.let {
+                            UtxoManager.releaseUtxos(it.value)
+                        }
+                    }
+                    if (failedWithdrawals.isNotEmpty()) {
+                        failedWithdrawals.forEach {
+                            onWithdrawalCompleteOnBitcoin(it, "Insufficient Balance")
                         }
                     }
                 } else {
                     settlingWithdrawals.forEach {
                         onWithdrawalCompleteOnBitcoin(it, error)
+                    }
+                    archTransaction.txHash?.let {
+                        UtxoManager.releaseUtxos(it.value)
                     }
                 }
             }
@@ -407,16 +434,44 @@ class ArchTransactionHandler(
                             tx = inProgressBatch.preparationTx,
                         ) { _, error ->
                             if (error == null) {
-                                val onChainBatchHash = getOnChainBatchHash(retryIfEmpty = true)
-                                if (onChainBatchHash.value != inProgressBatch.preparationTx.batchHash) {
+                                val (onChainBatchHash, failedEvents) = getOnChainBatchHashAndFailedEvents(retryIfEmpty = true)
+                                if (failedEvents.isNotEmpty()) {
+                                    val orderExecutions = OrderExecutionEntity.findForTrades(TradeEntity.findSettling())
+                                    val accounts = inProgressBatch.preparationTx.archAccounts()
+                                    failedEvents.forEach {
+                                        logger.warn { "Got a failed settlement event $it" }
+                                    }
+                                    val failedTradeIds = failedEvents.groupBy { it.accountIndex }
+                                        .mapValues { it.value.map { it.addressIndex } }
+                                        .mapNotNull { (accountIndex, addressIndexes) ->
+                                            val pubKey = accounts[accountIndex.toInt()].pubkey
+                                            val tokenAccountState =
+                                                ArchUtils.getAccountState<ArchAccountState.Token>(pubKey)
+                                            val walletAddresses =
+                                                addressIndexes.map { tokenAccountState.balances[it.toInt()].walletAddress }
+                                            val userGuids = walletAddresses.mapNotNull {
+                                                WalletEntity.findByAddresses(walletAddresses)?.userGuid
+                                            }
+                                            ArchAccountEntity.getByPubkey(pubKey)?.symbol?.name?.let { symbolName ->
+                                                orderExecutions.filter {
+                                                    userGuids.contains(it.userGuid) && it.marketGuid.value.hasSymbol(symbolName)
+                                                }.map { it.tradeGuid }
+                                            }
+                                        }.flatten().toSet()
+
+                                    TradeEntity.markAsFailedSettlingByGuid(
+                                        failedTradeIds,
+                                        "Insufficient Balance",
+                                    )
+                                }
+
+                                if (failedEvents.isEmpty() && onChainBatchHash.value != inProgressBatch.preparationTx.batchHash) {
                                     val errorMsg = "Batch hash mismatch for settlement batch ${inProgressBatch.guid.value}, on chain value: $onChainBatchHash, db value: ${inProgressBatch.preparationTx.batchHash}"
                                     logger.error { errorMsg }
                                     inProgressBatch.markAsFailed(errorMsg)
                                 } else {
                                     inProgressBatch.markAsPrepared()
                                 }
-                            } else {
-                                inProgressBatch.markAsFailed(error)
                             }
                         }
                     }
@@ -476,22 +531,30 @@ class ArchTransactionHandler(
         }
     }
 
-    private fun batchInProgressOnChain() = getOnChainBatchHash() != TxHash.emptyHashArch
+    private fun batchInProgressOnChain() = getOnChainBatchHashAndFailedEvents().first != TxHash.emptyHashArch
 
-    private fun getOnChainBatchHash(retryIfEmpty: Boolean = false): TxHash {
-        val batchHash = ArchUtils.getAccountState<ArchAccountState.Program>(programStateAccount.rpcPubkey()).settlementBatchHash
-        if (batchHash == TxHash.emptyHashArch && retryIfEmpty) {
+    private fun getOnChainBatchHashAndFailedEvents(retryIfEmpty: Boolean = false): Pair<TxHash, List<ArchAccountState.Event>> {
+        val archAccount = ArchUtils.getAccountState<ArchAccountState.Program>(programStateAccount.rpcPubkey())
+        if (archAccount.settlementBatchHash == TxHash.emptyHashArch && archAccount.events.isEmpty() && retryIfEmpty) {
             (1..3).forEach { i ->
                 logger.debug { "got an empty batch hash - retry $i" }
-                ArchUtils.getAccountState<ArchAccountState.Program>(programStateAccount.rpcPubkey()).settlementBatchHash.let {
-                    if (it != TxHash.emptyHashArch) {
-                        return it
+                ArchUtils.getAccountState<ArchAccountState.Program>(programStateAccount.rpcPubkey()).let {
+                    if (it.settlementBatchHash != TxHash.emptyHashArch) {
+                        return Pair(it.settlementBatchHash, it.events)
                     }
                     Thread.sleep(500)
                 }
             }
         }
-        return batchHash
+        return Pair(
+            archAccount.settlementBatchHash,
+            archAccount.events.filter { it.eventType == ArchAccountState.EventType.FailedSettlement.value },
+        )
+    }
+
+    private fun getFailedWithdrawalEvents(): List<ArchAccountState.Event> {
+        val archAccount = ArchUtils.getAccountState<ArchAccountState.Program>(programStateAccount.rpcPubkey())
+        return archAccount.events.filter { it.eventType == ArchAccountState.EventType.FailedWithdrawal.value }
     }
 
     private fun sendToSequencer(deposit: DepositEntity) {
@@ -578,7 +641,7 @@ class ArchTransactionHandler(
             val transaction = BlockchainTransactionEntity.create(
                 chainId = chainId,
                 transactionData = BlockchainTransactionData(
-                    instruction.serialize().toHex(),
+                    Json.encodeToString(instruction),
                     programPubkey.toContractAddress(),
                 ),
                 batchHash = null,
@@ -713,12 +776,42 @@ class ArchTransactionHandler(
                 tx.markAsCompleted()
             }
             ArchNetworkRpc.Status.Failed -> {
-                val error = processedTx.statusInfo.error ?: "Unknown Error"
+                val errorInfo = processedTx.statusInfo.errorInfo
+                logger.warn { "Arch RPC call failed with $errorInfo" }
+                val error = errorInfo?.msg ?: "Unknown Error"
                 onComplete(processedTx, error)
                 tx.markAsFailed(error)
             }
             else -> {}
         }
-        // TODO error handling once Arch returns errors
+    }
+
+    private fun partitionWithdrawals(settlingWithdrawals: List<WithdrawalEntity>, failedWithdrawals: List<ArchAccountState.Event>, archTransaction: BlockchainTransactionEntity): Pair<List<WithdrawalEntity>, List<WithdrawalEntity>> {
+        val accounts = archTransaction.archAccounts()
+        val failedWithdrawalGuids = failedWithdrawals.groupBy { it.accountIndex }
+            .mapNotNull { (accountIndex, failedEvents) ->
+                val pubKey = accounts[accountIndex.toInt()].pubkey
+                val tokenAccountState = ArchUtils.getAccountState<ArchAccountState.Token>(pubKey)
+                ArchAccountEntity.getByPubkey(pubKey)?.symbolGuid?.value?.let { symbolId ->
+                    val failedSet: List<Triple<SymbolId, BigInteger, BitcoinAddress>> =
+                        failedEvents.map {
+                            Triple(
+                                symbolId,
+                                it.requestedAmount.toLong().toBigInteger(),
+                                tokenAccountState.balances[it.addressIndex.toInt()].walletAddress,
+                            )
+                        }
+                    settlingWithdrawals.filter {
+                        failedSet.contains(
+                            Triple(
+                                it.symbolGuid.value,
+                                it.resolvedAmount(),
+                                it.wallet.address as BitcoinAddress,
+                            ),
+                        )
+                    }.map { it.guid }
+                }
+            }.flatten()
+        return settlingWithdrawals.partition { !failedWithdrawalGuids.contains(it.guid) }
     }
 }
