@@ -135,6 +135,7 @@ class OHLCEntity(guid: EntityID<OHLCId>) : GUIDEntity<OHLCId>(guid) {
                         updated_at = now()
                    RETURNING ${OHLCTable.columns.joinToString(", ") { it.name }}
                 """,
+                // instruct exposed to expect result set
                 explicitStatementType = StatementType.SELECT,
             ) { rs: ResultSet ->
                 val entityCache = TransactionManager.current().entityCache
@@ -142,15 +143,14 @@ class OHLCEntity(guid: EntityID<OHLCId>) : GUIDEntity<OHLCId>(guid) {
 
                 generateSequence {
                     if (rs.next()) {
-                        // remove entity from cache to make sure updated OHLC record is actually read from the result set
+                        // remove entities from the entity cache to make sure updated OHLC record is actually read from the result set
                         val entityId = EntityID(OHLCId(rs.getString(1)), OHLCTable)
                         entityCache.find(OHLCEntity, entityId)?.let {
                             entityCache.remove(OHLCTable, it)
                         }
 
-                        // read updated OHLC record
-                        val resultRow = ResultRow.create(rs, fieldsIndex)
-                        OHLCEntity.wrapRow(resultRow)
+                        // read the updated OHLC record
+                        OHLCEntity.wrapRow(ResultRow.create(rs, fieldsIndex))
                     } else {
                         null
                     }

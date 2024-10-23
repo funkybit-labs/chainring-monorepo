@@ -420,7 +420,7 @@ object SequencerResponseProcessorService {
             // instruct exposed to expect result set
             explicitStatementType = StatementType.SELECT,
         ) { rs ->
-            // remove all entities updated directly in the database from the entity cache
+            // remove all entities that were updated directly in the database from the entity cache
             val entityCache = TransactionManager.current().entityCache
             while (rs.next()) {
                 val entityId = EntityID(OrderId(rs.getString(1)), OrderTable)
