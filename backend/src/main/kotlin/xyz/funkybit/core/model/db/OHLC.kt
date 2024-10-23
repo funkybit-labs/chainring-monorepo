@@ -117,21 +117,23 @@ class OHLCEntity(guid: EntityID<OHLCId>) : GUIDEntity<OHLCId>(guid) {
         fun updateWith(market: MarketId, tradeTimestamp: Instant, tradePrice: BigDecimal, tradeAmount: BigInteger): List<OHLCEntity> {
             return TransactionManager.current().exec(
                 """
-                    INSERT INTO ${OHLCTable.tableName} (guid, market_guid, start, duration, open, high, low, close, amount, first_trade, last_trade, created_at)
+                    INSERT INTO ${OHLCTable.tableName} (${OHLCTable.guid.name}, ${OHLCTable.marketGuid.name}, ${OHLCTable.start.name}, ${OHLCTable.duration.name}, 
+                        ${OHLCTable.open.name}, ${OHLCTable.high.name}, ${OHLCTable.low.name}, ${OHLCTable.close.name}, ${OHLCTable.volume.name}, 
+                        ${OHLCTable.firstTrade.name}, ${OHLCTable.lastTrade.name}, ${OHLCTable.createdAt.name})
                     VALUES ${
                     OHLCDuration.entries.joinToString(",") { ohlcDuration ->
                         "('${OHLCId.generate()}', '$market', '${ohlcDuration.durationStart(tradeTimestamp)}', '$ohlcDuration'::ohlcduration, $tradePrice, $tradePrice, $tradePrice, $tradePrice, ${tradeAmount.toBigDecimal()}, '$tradeTimestamp', '$tradeTimestamp', now())"
                     }
                 }
-                    ON CONFLICT (market_guid, start, duration) DO UPDATE
+                    ON CONFLICT (${OHLCTable.marketGuid.name}, ${OHLCTable.start.name}, ${OHLCTable.duration.name}) DO UPDATE
                     SET
-                        open = CASE WHEN ${OHLCTable.tableName}.${firstTrade.name} > EXCLUDED.first_trade THEN EXCLUDED.open ELSE ${OHLCTable.tableName}.${open.name} END,
-                        high = CASE WHEN ${OHLCTable.tableName}.${high.name} < EXCLUDED.high THEN EXCLUDED.high ELSE ${OHLCTable.tableName}.${high.name} END,
-                        low = CASE WHEN ${OHLCTable.tableName}.${low.name} > EXCLUDED.low THEN EXCLUDED.low ELSE ${OHLCTable.tableName}.${low.name} END,
-                        close = CASE WHEN ${OHLCTable.tableName}.${lastTrade.name} <= EXCLUDED.last_trade THEN EXCLUDED.close ELSE ${OHLCTable.tableName}.${close.name} END,
-                        amount = ${OHLCTable.tableName}.${volume.name} + EXCLUDED.amount,
-                        first_trade = CASE WHEN ${OHLCTable.tableName}.${firstTrade.name} > EXCLUDED.first_trade THEN EXCLUDED.first_trade ELSE ${OHLCTable.tableName}.${firstTrade.name} END,
-                        last_trade = CASE WHEN ${OHLCTable.tableName}.${lastTrade.name} <= EXCLUDED.last_trade THEN EXCLUDED.last_trade ELSE ${OHLCTable.tableName}.${lastTrade.name} END,
+                        open = CASE WHEN ${OHLCTable.tableName}.${firstTrade.name} > EXCLUDED.${firstTrade.name} THEN EXCLUDED.${open.name} ELSE ${OHLCTable.tableName}.${open.name} END,
+                        high = CASE WHEN ${OHLCTable.tableName}.${high.name} < EXCLUDED.${high.name} THEN EXCLUDED.${high.name} ELSE ${OHLCTable.tableName}.${high.name} END,
+                        low = CASE WHEN ${OHLCTable.tableName}.${low.name} > EXCLUDED.${low.name} THEN EXCLUDED.${low.name} ELSE ${OHLCTable.tableName}.${low.name} END,
+                        close = CASE WHEN ${OHLCTable.tableName}.${lastTrade.name} <= EXCLUDED.${lastTrade.name} THEN EXCLUDED.${close.name} ELSE ${OHLCTable.tableName}.${close.name} END,
+                        amount = ${OHLCTable.tableName}.${volume.name} + EXCLUDED.${volume.name},
+                        first_trade = CASE WHEN ${OHLCTable.tableName}.${firstTrade.name} > EXCLUDED.${firstTrade.name} THEN EXCLUDED.${firstTrade.name} ELSE ${OHLCTable.tableName}.${firstTrade.name} END,
+                        last_trade = CASE WHEN ${OHLCTable.tableName}.${lastTrade.name} <= EXCLUDED.${lastTrade.name} THEN EXCLUDED.${lastTrade.name} ELSE ${OHLCTable.tableName}.${lastTrade.name} END,
                         updated_at = now()
                    RETURNING ${OHLCTable.columns.joinToString(", ") { it.name }}
                 """,
