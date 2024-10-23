@@ -6,12 +6,14 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
+import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.BatchOrdersApiRequest
 import xyz.funkybit.apps.api.model.CancelOrderApiRequest
 import xyz.funkybit.apps.api.model.CreateOrderApiRequest
 import xyz.funkybit.apps.api.model.MarketLimits
 import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.apps.api.model.OrderAmount
+import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.RequestStatus
 import xyz.funkybit.apps.api.model.websocket.OHLC
 import xyz.funkybit.apps.api.model.websocket.OrderBook
@@ -33,18 +35,20 @@ import xyz.funkybit.integrationtests.utils.MyExpectedTrade
 import xyz.funkybit.integrationtests.utils.assertAmount
 import xyz.funkybit.integrationtests.utils.assertBalances
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
+import xyz.funkybit.integrationtests.utils.assertError
 import xyz.funkybit.integrationtests.utils.assertFee
 import xyz.funkybit.integrationtests.utils.assertLimitsMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyLimitOrderCreatedMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyMarketOrderCreatedMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyOrderCreatedMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyOrderUpdatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyLimitOrdersCreatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyMarketOrdersCreatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyOrdersCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyOrdersMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyOrdersUpdatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyTradesCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyTradesMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyTradesUpdatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertOrderBookMessageReceived
 import xyz.funkybit.integrationtests.utils.assertPricesMessageReceived
+import xyz.funkybit.integrationtests.utils.assertSuccess
 import xyz.funkybit.integrationtests.utils.blocking
 import xyz.funkybit.integrationtests.utils.ofAsset
 import xyz.funkybit.integrationtests.utils.subscribeToLimits
@@ -112,7 +116,7 @@ class OrderExecutionTest : OrderBaseTest() {
             price = BigDecimal("17.500"),
             makerWallet,
         )
-        makerWsClient.assertMyLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
+        makerWsClient.assertMyLimitOrdersCreatedMessageReceived(limitBuyOrderApiResponse)
 
         listOf(makerWsClient, takerWsClient).forEach { wsClient ->
             wsClient.assertOrderBookMessageReceived(
@@ -134,10 +138,26 @@ class OrderExecutionTest : OrderBaseTest() {
                     btcbtcArchMarket?.let {
                         MarketLimits(it.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO)
                     },
-                    MarketLimits(btcbtc2Market.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO),
-                    MarketLimits(btcEthMarket.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = AssetAmount(eth, "1.99781802125").inFundamentalUnits),
-                    MarketLimits(btcEth2Market.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO),
-                    MarketLimits(btcUsdcMarket.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO),
+                    MarketLimits(
+                        btcbtc2Market.id,
+                        base = makerStartingBaseBalance.inFundamentalUnits,
+                        quote = BigInteger.ZERO,
+                    ),
+                    MarketLimits(
+                        btcEthMarket.id,
+                        base = makerStartingBaseBalance.inFundamentalUnits,
+                        quote = AssetAmount(eth, "1.99781802125").inFundamentalUnits,
+                    ),
+                    MarketLimits(
+                        btcEth2Market.id,
+                        base = makerStartingBaseBalance.inFundamentalUnits,
+                        quote = BigInteger.ZERO,
+                    ),
+                    MarketLimits(
+                        btcUsdcMarket.id,
+                        base = makerStartingBaseBalance.inFundamentalUnits,
+                        quote = BigInteger.ZERO,
+                    ),
                     MarketLimits(btc2Eth2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(btc2Usdc2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(usdcDaiMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
@@ -148,12 +168,28 @@ class OrderExecutionTest : OrderBaseTest() {
                     btcbtcArchMarket?.let {
                         MarketLimits(it.id, base = BigInteger.ZERO, quote = BigInteger.ZERO)
                     },
-                    MarketLimits(btcbtc2Market.id, base = BigInteger.ZERO, quote = makerStartingBaseBalance.inFundamentalUnits),
+                    MarketLimits(
+                        btcbtc2Market.id,
+                        base = BigInteger.ZERO,
+                        quote = makerStartingBaseBalance.inFundamentalUnits,
+                    ),
                     MarketLimits(btcEthMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
-                    MarketLimits(btcEth2Market.id, base = BigInteger.ZERO, quote = makerStartingQuoteBalance.inFundamentalUnits),
+                    MarketLimits(
+                        btcEth2Market.id,
+                        base = BigInteger.ZERO,
+                        quote = makerStartingQuoteBalance.inFundamentalUnits,
+                    ),
                     MarketLimits(btcUsdcMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
-                    MarketLimits(btc2Eth2Market.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = AssetAmount(eth2, "1.99781802125").inFundamentalUnits),
-                    MarketLimits(btc2Usdc2Market.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO),
+                    MarketLimits(
+                        btc2Eth2Market.id,
+                        base = makerStartingBaseBalance.inFundamentalUnits,
+                        quote = AssetAmount(eth2, "1.99781802125").inFundamentalUnits,
+                    ),
+                    MarketLimits(
+                        btc2Usdc2Market.id,
+                        base = makerStartingBaseBalance.inFundamentalUnits,
+                        quote = BigInteger.ZERO,
+                    ),
                     MarketLimits(usdcDaiMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(usdc2Dai2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                 )
@@ -169,7 +205,7 @@ class OrderExecutionTest : OrderBaseTest() {
             makerWallet,
         )
 
-        makerWsClient.assertMyLimitOrderCreatedMessageReceived(limitSellOrderApiResponse)
+        makerWsClient.assertMyLimitOrdersCreatedMessageReceived(limitSellOrderApiResponse)
 
         listOf(makerWsClient, takerWsClient).forEach { wsClient ->
             wsClient.assertOrderBookMessageReceived(
@@ -193,10 +229,26 @@ class OrderExecutionTest : OrderBaseTest() {
                     btcbtcArchMarket?.let {
                         MarketLimits(it.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO)
                     },
-                    MarketLimits(btcbtc2Market.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO),
-                    MarketLimits(btcEthMarket.id, base = AssetAmount(btc, "0.19945679").inFundamentalUnits, quote = AssetAmount(eth, "1.99781802125").inFundamentalUnits),
-                    MarketLimits(btcEth2Market.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO),
-                    MarketLimits(btcUsdcMarket.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO),
+                    MarketLimits(
+                        btcbtc2Market.id,
+                        base = makerStartingBaseBalance.inFundamentalUnits,
+                        quote = BigInteger.ZERO,
+                    ),
+                    MarketLimits(
+                        btcEthMarket.id,
+                        base = AssetAmount(btc, "0.19945679").inFundamentalUnits,
+                        quote = AssetAmount(eth, "1.99781802125").inFundamentalUnits,
+                    ),
+                    MarketLimits(
+                        btcEth2Market.id,
+                        base = makerStartingBaseBalance.inFundamentalUnits,
+                        quote = BigInteger.ZERO,
+                    ),
+                    MarketLimits(
+                        btcUsdcMarket.id,
+                        base = makerStartingBaseBalance.inFundamentalUnits,
+                        quote = BigInteger.ZERO,
+                    ),
                     MarketLimits(btc2Eth2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(btc2Usdc2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(usdcDaiMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
@@ -207,12 +259,28 @@ class OrderExecutionTest : OrderBaseTest() {
                     btcbtcArchMarket?.let {
                         MarketLimits(it.id, base = BigInteger.ZERO, quote = BigInteger.ZERO)
                     },
-                    MarketLimits(btcbtc2Market.id, base = BigInteger.ZERO, quote = makerStartingBaseBalance.inFundamentalUnits),
+                    MarketLimits(
+                        btcbtc2Market.id,
+                        base = BigInteger.ZERO,
+                        quote = makerStartingBaseBalance.inFundamentalUnits,
+                    ),
                     MarketLimits(btcEthMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
-                    MarketLimits(btcEth2Market.id, base = BigInteger.ZERO, quote = makerStartingQuoteBalance.inFundamentalUnits),
+                    MarketLimits(
+                        btcEth2Market.id,
+                        base = BigInteger.ZERO,
+                        quote = makerStartingQuoteBalance.inFundamentalUnits,
+                    ),
                     MarketLimits(btcUsdcMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
-                    MarketLimits(btc2Eth2Market.id, base = AssetAmount(btc2, "0.19945679").inFundamentalUnits, quote = AssetAmount(eth2, "1.99781802125").inFundamentalUnits),
-                    MarketLimits(btc2Usdc2Market.id, base = makerStartingBaseBalance.inFundamentalUnits, quote = BigInteger.ZERO),
+                    MarketLimits(
+                        btc2Eth2Market.id,
+                        base = AssetAmount(btc2, "0.19945679").inFundamentalUnits,
+                        quote = AssetAmount(eth2, "1.99781802125").inFundamentalUnits,
+                    ),
+                    MarketLimits(
+                        btc2Usdc2Market.id,
+                        base = makerStartingBaseBalance.inFundamentalUnits,
+                        quote = BigInteger.ZERO,
+                    ),
                     MarketLimits(usdcDaiMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     MarketLimits(usdc2Dai2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                 )
@@ -228,7 +296,7 @@ class OrderExecutionTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyMarketOrderCreatedMessageReceived(marketBuyOrderApiResponse)
+            assertMyMarketOrdersCreatedMessageReceived(marketBuyOrderApiResponse)
             assertMyTradesCreatedMessageReceived(
                 listOf(
                     MyExpectedTrade(
@@ -240,12 +308,15 @@ class OrderExecutionTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Filled, msg.order.status)
-                assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.00043210"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "17.550"), msg.order.executions[0].price)
-                assertEquals(ExecutionRole.Taker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(OrderStatus.Filled, order.status)
+                    assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.00043210"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "17.550"), order.executions[0].price)
+                    assertEquals(ExecutionRole.Taker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -267,12 +338,15 @@ class OrderExecutionTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Partial, msg.order.status)
-                assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.00043210"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "17.550"), msg.order.executions[0].price)
-                assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(OrderStatus.Partial, order.status)
+                    assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.00043210"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "17.550"), order.executions[0].price)
+                    assertEquals(ExecutionRole.Maker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -301,7 +375,10 @@ class OrderExecutionTest : OrderBaseTest() {
         val trade = getTradesForOrders(listOf(marketBuyOrderApiResponse.orderId)).first().also {
             assertAmount(AssetAmount(baseSymbol, "0.00043210"), it.amount)
             assertAmount(AssetAmount(quoteSymbol, "17.550"), it.price)
-            assertEquals(takerApiClient.getOrder(marketBuyOrderApiResponse.orderId).executions.first().tradeId, it.id.value)
+            assertEquals(
+                takerApiClient.getOrder(marketBuyOrderApiResponse.orderId).executions.first().tradeId,
+                it.id.value,
+            )
         }
 
         takerWsClient.apply {
@@ -340,12 +417,32 @@ class OrderExecutionTest : OrderBaseTest() {
                 if (market == btcEthMarket) {
                     listOfNotNull(
                         btcbtcArchMarket?.let {
-                            MarketLimits(it.id, base = AssetAmount(btc, "0.1995679").inFundamentalUnits, quote = BigInteger.ZERO)
+                            MarketLimits(
+                                it.id,
+                                base = AssetAmount(btc, "0.1995679").inFundamentalUnits,
+                                quote = BigInteger.ZERO,
+                            )
                         },
-                        MarketLimits(btcbtc2Market.id, base = AssetAmount(btc, "0.1995679").inFundamentalUnits, quote = BigInteger.ZERO),
-                        MarketLimits(btcEthMarket.id, base = AssetAmount(btc, "0.19945679").inFundamentalUnits, quote = AssetAmount(eth, "2.0053255427").inFundamentalUnits),
-                        MarketLimits(btcEth2Market.id, base = AssetAmount(btc, "0.1995679").inFundamentalUnits, quote = BigInteger.ZERO),
-                        MarketLimits(btcUsdcMarket.id, base = AssetAmount(btc, "0.1995679").inFundamentalUnits, quote = BigInteger.ZERO),
+                        MarketLimits(
+                            btcbtc2Market.id,
+                            base = AssetAmount(btc, "0.1995679").inFundamentalUnits,
+                            quote = BigInteger.ZERO,
+                        ),
+                        MarketLimits(
+                            btcEthMarket.id,
+                            base = AssetAmount(btc, "0.19945679").inFundamentalUnits,
+                            quote = AssetAmount(eth, "2.0053255427").inFundamentalUnits,
+                        ),
+                        MarketLimits(
+                            btcEth2Market.id,
+                            base = AssetAmount(btc, "0.1995679").inFundamentalUnits,
+                            quote = BigInteger.ZERO,
+                        ),
+                        MarketLimits(
+                            btcUsdcMarket.id,
+                            base = AssetAmount(btc, "0.1995679").inFundamentalUnits,
+                            quote = BigInteger.ZERO,
+                        ),
                         MarketLimits(btc2Eth2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                         MarketLimits(btc2Usdc2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                         MarketLimits(usdcDaiMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
@@ -356,12 +453,28 @@ class OrderExecutionTest : OrderBaseTest() {
                         btcbtcArchMarket?.let {
                             MarketLimits(it.id, base = BigInteger.ZERO, quote = BigInteger.ZERO)
                         },
-                        MarketLimits(btcbtc2Market.id, base = BigInteger.ZERO, quote = AssetAmount(btc2, "0.1995679").inFundamentalUnits),
+                        MarketLimits(
+                            btcbtc2Market.id,
+                            base = BigInteger.ZERO,
+                            quote = AssetAmount(btc2, "0.1995679").inFundamentalUnits,
+                        ),
                         MarketLimits(btcEthMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
-                        MarketLimits(btcEth2Market.id, base = BigInteger.ZERO, quote = AssetAmount(eth2, "2.00750752145").inFundamentalUnits),
+                        MarketLimits(
+                            btcEth2Market.id,
+                            base = BigInteger.ZERO,
+                            quote = AssetAmount(eth2, "2.00750752145").inFundamentalUnits,
+                        ),
                         MarketLimits(btcUsdcMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
-                        MarketLimits(btc2Eth2Market.id, base = AssetAmount(btc2, "0.19945679").inFundamentalUnits, quote = AssetAmount(eth2, "2.0053255427").inFundamentalUnits),
-                        MarketLimits(btc2Usdc2Market.id, base = AssetAmount(btc2, "0.1995679").inFundamentalUnits, quote = BigInteger.ZERO),
+                        MarketLimits(
+                            btc2Eth2Market.id,
+                            base = AssetAmount(btc2, "0.19945679").inFundamentalUnits,
+                            quote = AssetAmount(eth2, "2.0053255427").inFundamentalUnits,
+                        ),
+                        MarketLimits(
+                            btc2Usdc2Market.id,
+                            base = AssetAmount(btc2, "0.1995679").inFundamentalUnits,
+                            quote = BigInteger.ZERO,
+                        ),
                         MarketLimits(usdcDaiMarket.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                         MarketLimits(usdc2Dai2Market.id, base = BigInteger.ZERO, quote = BigInteger.ZERO),
                     )
@@ -424,7 +537,7 @@ class OrderExecutionTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
+            assertMyMarketOrdersCreatedMessageReceived(marketSellOrderApiResponse)
             assertMyTradesCreatedMessageReceived(
                 listOf(
                     MyExpectedTrade(
@@ -436,17 +549,24 @@ class OrderExecutionTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Partial, msg.order.status)
-                assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.00012345"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "17.500"), msg.order.executions[0].price)
-                assertEquals(ExecutionRole.Taker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(OrderStatus.Partial, order.status)
+                    assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.00012345"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "17.500"), order.executions[0].price)
+                    assertEquals(ExecutionRole.Taker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
                     ExpectedBalance(baseSymbol, total = BigDecimal("0.0004321"), available = BigDecimal("0.00030865")),
-                    ExpectedBalance(quoteSymbol, total = BigDecimal("1.9922649779"), available = BigDecimal("1.9943821454")),
+                    ExpectedBalance(
+                        quoteSymbol,
+                        total = BigDecimal("1.9922649779"),
+                        available = BigDecimal("1.9943821454"),
+                    ),
                 ),
             )
         }
@@ -463,17 +583,24 @@ class OrderExecutionTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Filled, msg.order.status)
-                assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.00012345"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "17.500"), msg.order.executions[0].price)
-                assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(OrderStatus.Filled, order.status)
+                    assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.00012345"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "17.500"), order.executions[0].price)
+                    assertEquals(ExecutionRole.Maker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
                     ExpectedBalance(baseSymbol, total = BigDecimal("0.1995679"), available = BigDecimal("0.19969135")),
-                    ExpectedBalance(quoteSymbol, total = BigDecimal("2.00750752145"), available = BigDecimal("2.0053255427")),
+                    ExpectedBalance(
+                        quoteSymbol,
+                        total = BigDecimal("2.00750752145"),
+                        available = BigDecimal("2.0053255427"),
+                    ),
                 ),
             )
         }
@@ -575,19 +702,35 @@ class OrderExecutionTest : OrderBaseTest() {
             }
         }
 
-        val takerOrderCount = takerApiClient.listOrders(statuses = listOf(OrderStatus.Open, OrderStatus.Partial)).orders.filterNot { it is Order.Market }.size
+        val takerOrderCount = takerApiClient.listOrders(
+            statuses = listOf(
+                OrderStatus.Open,
+                OrderStatus.Partial,
+            ),
+        ).orders.filterNot { it is Order.Market }.size
         takerApiClient.cancelOpenOrders()
         repeat(takerOrderCount) {
-            takerWsClient.assertMyOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Cancelled, msg.order.status)
+            takerWsClient.assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(OrderStatus.Cancelled, order.status)
+                }
             }
         }
 
-        val makerOrderCount = makerApiClient.listOrders(statuses = listOf(OrderStatus.Open, OrderStatus.Partial)).orders.filterNot { it is Order.Market }.size
+        val makerOrderCount = makerApiClient.listOrders(
+            statuses = listOf(
+                OrderStatus.Open,
+                OrderStatus.Partial,
+            ),
+        ).orders.filterNot { it is Order.Market }.size
         makerApiClient.cancelOpenOrders()
         repeat(makerOrderCount) {
-            makerWsClient.assertMyOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Cancelled, msg.order.status)
+            makerWsClient.assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(OrderStatus.Cancelled, order.status)
+                }
             }
         }
 
@@ -646,7 +789,12 @@ class OrderExecutionTest : OrderBaseTest() {
                     assertEquals(marketBuyOrderApiResponse.orderId, orderId)
                     assertEquals(marketBuyOrderApiResponse.order.marketId, marketId)
                     assertEquals(marketBuyOrderApiResponse.order.side, side)
-                    assertAmount((limitSellOrderApiResponse.order as CreateOrderApiRequest.Limit).price.ofAsset(quoteSymbol), price)
+                    assertAmount(
+                        (limitSellOrderApiResponse.order as CreateOrderApiRequest.Limit).price.ofAsset(
+                            quoteSymbol,
+                        ),
+                        price,
+                    )
                     assertAmount(AssetAmount(baseSymbol, marketBuyOrderApiResponse.order.amount.fixedAmount()), amount)
                     assertFee(AssetAmount(quoteSymbol, "0.0001516671"), feeAmount, feeSymbol)
                     assertEquals(SettlementStatus.Completed, settlementStatus)
@@ -740,7 +888,9 @@ class OrderExecutionTest : OrderBaseTest() {
         )
 
         assertEquals(3, createBatchLimitOrders.createdOrders.count())
-        repeat(3) { makerWsClient.assertMyOrderCreatedMessageReceived() }
+        makerWsClient.assertMyOrdersCreatedMessageReceived {
+            assertEquals(3, it.orders.size)
+        }
         makerWsClient
             .assertLimitsMessageReceived(market, base = BigDecimal("0.194"), quote = BigDecimal("500"))
             .also { wsMessage -> verifyApiReturnsSameLimits(makerApiClient, wsMessage) }
@@ -782,8 +932,10 @@ class OrderExecutionTest : OrderBaseTest() {
         assertEquals(1, batchOrderResponse.canceledOrders.count { it.requestStatus == RequestStatus.Accepted })
         assertEquals(1, batchOrderResponse.canceledOrders.count { it.requestStatus == RequestStatus.Rejected })
 
-        repeat(3) { makerWsClient.assertMyOrderCreatedMessageReceived() }
-        makerWsClient.assertMyOrderUpdatedMessageReceived()
+        makerWsClient.assertMyOrdersCreatedMessageReceived {
+            assertEquals(3, it.orders.size)
+        }
+        makerWsClient.assertMyOrdersUpdatedMessageReceived()
         makerWsClient
             .assertLimitsMessageReceived(market, base = BigDecimal("0.182"), quote = BigDecimal("500"))
             .also { wsMessage -> verifyApiReturnsSameLimits(makerApiClient, wsMessage) }
@@ -801,11 +953,11 @@ class OrderExecutionTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyOrderCreatedMessageReceived()
+            assertMyOrdersCreatedMessageReceived()
             assertMyTradesCreatedMessageReceived { msg ->
                 assertEquals(5, msg.trades.size)
             }
-            assertMyOrderUpdatedMessageReceived()
+            assertMyOrdersUpdatedMessageReceived()
             assertBalancesMessageReceived()
             assertPricesMessageReceived(market.id) { msg ->
                 assertEquals(
@@ -830,7 +982,9 @@ class OrderExecutionTest : OrderBaseTest() {
             assertMyTradesCreatedMessageReceived { msg ->
                 assertEquals(5, msg.trades.size)
             }
-            repeat(5) { assertMyOrderUpdatedMessageReceived() }
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(5, msg.orders.size)
+            }
             assertBalancesMessageReceived()
             assertPricesMessageReceived(market.id) { msg ->
                 assertEquals(
@@ -856,7 +1010,8 @@ class OrderExecutionTest : OrderBaseTest() {
 
         // now verify the trades
 
-        val expectedAmounts = listOf("0.001", "0.002", "0.004", "0.005", "0.006").map { AssetAmount(baseSymbol, it) }.toSet()
+        val expectedAmounts =
+            listOf("0.001", "0.002", "0.004", "0.005", "0.006").map { AssetAmount(baseSymbol, it) }.toSet()
         val trades = getTradesForOrders(takerOrders.map { it.id })
         val prices = trades.map { it.price }.toSet()
 
@@ -891,6 +1046,141 @@ class OrderExecutionTest : OrderBaseTest() {
 
         makerWsClient.close()
         takerWsClient.close()
+    }
+
+    @Test
+    fun `batch orders combined max size`() {
+        val (market, baseSymbol, quoteSymbol) = Triple(btcUsdcMarket, btc, usdc)
+
+        val (makerApiClient, makerWallet, makerWsClient) = setupTrader(
+            market.id,
+            airdrops = listOf(
+                AssetAmount(baseSymbol, "0.5"),
+                AssetAmount(quoteSymbol, "500"),
+            ),
+            deposits = listOf(
+                AssetAmount(baseSymbol, "0.2"),
+                AssetAmount(quoteSymbol, "500"),
+            ),
+            subscribeToOrderBook = false,
+        )
+
+        // can batch 100 create orders
+        makerApiClient.tryBatchOrders(
+            BatchOrdersApiRequest(
+                marketId = market.id,
+                createOrders = (1..100).map {
+                    makerWallet.signOrder(
+                        CreateOrderApiRequest.Limit(
+                            nonce = generateOrderNonce(),
+                            marketId = market.id,
+                            side = OrderSide.Sell,
+                            amount = OrderAmount.Fixed(AssetAmount(baseSymbol, BigDecimal(it).movePointLeft(5)).inFundamentalUnits),
+                            price = BigDecimal("68400.000"),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    )
+                },
+                cancelOrders = emptyList(),
+            ),
+        ).assertSuccess()
+
+        // fail on 101 create order
+        makerApiClient.tryBatchOrders(
+            BatchOrdersApiRequest(
+                marketId = market.id,
+                createOrders = (1..101).map {
+                    makerWallet.signOrder(
+                        CreateOrderApiRequest.Limit(
+                            nonce = generateOrderNonce(),
+                            marketId = market.id,
+                            side = OrderSide.Sell,
+                            amount = OrderAmount.Fixed(AssetAmount(baseSymbol, BigDecimal(it).movePointLeft(5)).inFundamentalUnits),
+                            price = BigDecimal("68400.000"),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    )
+                },
+                cancelOrders = emptyList(),
+            ),
+        ).assertError(ApiError(ReasonCode.BatchSizeExceeded, "Batch size exceeds the maximum limit of 100 orders."))
+
+        // can batch 100 cancel orders
+        makerApiClient.tryBatchOrders(
+            BatchOrdersApiRequest(
+                marketId = market.id,
+                createOrders = emptyList(),
+                cancelOrders = (1..100).map {
+                    makerWallet.signCancelOrder(
+                        CancelOrderApiRequest(
+                            orderId = OrderId.generate(),
+                            marketId = market.id,
+                            amount = BigInteger.ZERO,
+                            side = OrderSide.Buy,
+                            nonce = generateOrderNonce(),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    )
+                },
+            ),
+        ).assertSuccess()
+
+        // fail to batch 101 cancel orders
+        makerApiClient.tryBatchOrders(
+            BatchOrdersApiRequest(
+                marketId = market.id,
+                createOrders = emptyList(),
+                cancelOrders = (1..101).map {
+                    makerWallet.signCancelOrder(
+                        CancelOrderApiRequest(
+                            orderId = OrderId.generate(),
+                            marketId = market.id,
+                            amount = BigInteger.ZERO,
+                            side = OrderSide.Buy,
+                            nonce = generateOrderNonce(),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    )
+                },
+            ),
+        ).assertError(ApiError(ReasonCode.BatchSizeExceeded, "Batch size exceeds the maximum limit of 100 orders."))
+
+        // max batch size counts for both create and cancel orders
+        makerApiClient.tryBatchOrders(
+            BatchOrdersApiRequest(
+                marketId = market.id,
+                createOrders = (1..51).map {
+                    makerWallet.signOrder(
+                        CreateOrderApiRequest.Limit(
+                            nonce = generateOrderNonce(),
+                            marketId = market.id,
+                            side = OrderSide.Sell,
+                            amount = OrderAmount.Fixed(AssetAmount(baseSymbol, BigDecimal(it).movePointLeft(5)).inFundamentalUnits),
+                            price = BigDecimal("68400.000"),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    )
+                },
+                cancelOrders = (1..51).map {
+                    makerWallet.signCancelOrder(
+                        CancelOrderApiRequest(
+                            orderId = OrderId.generate(),
+                            marketId = market.id,
+                            amount = BigInteger.ZERO,
+                            side = OrderSide.Buy,
+                            nonce = generateOrderNonce(),
+                            signature = EvmSignature.emptySignature(),
+                            verifyingChainId = ChainId.empty,
+                        ),
+                    )
+                },
+            ),
+        ).assertError(ApiError(ReasonCode.BatchSizeExceeded, "Batch size exceeds the maximum limit of 100 orders."))
     }
 
     @Test
@@ -945,7 +1235,7 @@ class OrderExecutionTest : OrderBaseTest() {
             makerWallet,
         )
         makerWsClient.apply {
-            assertMyLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
+            assertMyLimitOrdersCreatedMessageReceived(limitBuyOrderApiResponse)
             assertLimitsMessageReceived(market, base = BigDecimal("0.4"), quote = BigDecimal("0.4789212"))
         }
 
@@ -959,7 +1249,7 @@ class OrderExecutionTest : OrderBaseTest() {
         )
 
         makerWsClient.apply {
-            assertMyLimitOrderCreatedMessageReceived(limitSellOrderApiResponse)
+            assertMyLimitOrdersCreatedMessageReceived(limitSellOrderApiResponse)
             assertLimitsMessageReceived(market, base = BigDecimal("0.180"), quote = BigDecimal("0.4789212"))
         }
 
@@ -972,7 +1262,7 @@ class OrderExecutionTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyMarketOrderCreatedMessageReceived(marketBuyOrderApiResponse)
+            assertMyMarketOrdersCreatedMessageReceived(marketBuyOrderApiResponse)
             assertMyTradesCreatedMessageReceived(
                 listOf(
                     MyExpectedTrade(
@@ -984,12 +1274,15 @@ class OrderExecutionTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Filled, msg.order.status)
-                assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.05"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "1.002"), msg.order.executions[0].price)
-                assertEquals(ExecutionRole.Taker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(OrderStatus.Filled, order.status)
+                    assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.05"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "1.002"), order.executions[0].price)
+                    assertEquals(ExecutionRole.Taker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -1011,12 +1304,15 @@ class OrderExecutionTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Partial, msg.order.status)
-                assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.05"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "1.002"), msg.order.executions[0].price)
-                assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(OrderStatus.Partial, order.status)
+                    assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.05"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "1.002"), order.executions[0].price)
+                    assertEquals(ExecutionRole.Maker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -1094,7 +1390,7 @@ class OrderExecutionTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyMarketOrderCreatedMessageReceived(marketSellOrderApiResponse)
+            assertMyMarketOrdersCreatedMessageReceived(marketSellOrderApiResponse)
             assertMyTradesCreatedMessageReceived(
                 listOf(
                     MyExpectedTrade(
@@ -1106,17 +1402,24 @@ class OrderExecutionTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Filled, msg.order.status)
-                assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.012345"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "0.999"), msg.order.executions[0].price)
-                assertEquals(ExecutionRole.Taker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(OrderStatus.Filled, order.status)
+                    assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.012345"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "0.999"), order.executions[0].price)
+                    assertEquals(ExecutionRole.Taker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
                     ExpectedBalance(baseSymbol, total = BigDecimal("0.05"), available = BigDecimal("0.037655")),
-                    ExpectedBalance(quoteSymbol, total = BigDecimal("0.448898"), available = BigDecimal("0.4609840019")),
+                    ExpectedBalance(
+                        quoteSymbol,
+                        total = BigDecimal("0.448898"),
+                        available = BigDecimal("0.4609840019"),
+                    ),
                 ),
             )
         }
@@ -1133,17 +1436,24 @@ class OrderExecutionTest : OrderBaseTest() {
                     ),
                 ),
             )
-            assertMyOrderUpdatedMessageReceived { msg ->
-                assertEquals(OrderStatus.Partial, msg.order.status)
-                assertEquals(1, msg.order.executions.size)
-                assertAmount(AssetAmount(baseSymbol, "0.012345"), msg.order.executions[0].amount)
-                assertAmount(AssetAmount(quoteSymbol, "0.999"), msg.order.executions[0].price)
-                assertEquals(ExecutionRole.Maker, msg.order.executions[0].role)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(OrderStatus.Partial, order.status)
+                    assertEquals(1, order.executions.size)
+                    assertAmount(AssetAmount(baseSymbol, "0.012345"), order.executions[0].amount)
+                    assertAmount(AssetAmount(quoteSymbol, "0.999"), order.executions[0].price)
+                    assertEquals(ExecutionRole.Maker, order.executions[0].role)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
                     ExpectedBalance(baseSymbol, total = BigDecimal("0.35"), available = BigDecimal("0.362345")),
-                    ExpectedBalance(quoteSymbol, total = BigDecimal("0.649599"), available = BigDecimal("0.63714301845")),
+                    ExpectedBalance(
+                        quoteSymbol,
+                        total = BigDecimal("0.649599"),
+                        available = BigDecimal("0.63714301845"),
+                    ),
                 ),
             )
         }
@@ -1281,7 +1591,9 @@ class OrderExecutionTest : OrderBaseTest() {
         )
 
         assertEquals(3, createBatchLimitOrders.createdOrders.count())
-        repeat(3) { makerWsClient.assertMyOrderCreatedMessageReceived() }
+        makerWsClient.assertMyOrdersCreatedMessageReceived {
+            assertEquals(3, it.orders.size)
+        }
         makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.1940"), quote = BigDecimal("1.8"))
 
         val batchOrderResponse = makerApiClient.batchOrders(
@@ -1321,8 +1633,10 @@ class OrderExecutionTest : OrderBaseTest() {
         assertEquals(1, batchOrderResponse.canceledOrders.count { it.requestStatus == RequestStatus.Accepted })
         assertEquals(1, batchOrderResponse.canceledOrders.count { it.requestStatus == RequestStatus.Rejected })
 
-        repeat(3) { makerWsClient.assertMyOrderCreatedMessageReceived() }
-        makerWsClient.assertMyOrderUpdatedMessageReceived()
+        makerWsClient.assertMyOrdersCreatedMessageReceived {
+            assertEquals(3, it.orders.size)
+        }
+        makerWsClient.assertMyOrdersUpdatedMessageReceived()
         makerWsClient.assertLimitsMessageReceived(market, base = BigDecimal("0.182"), quote = BigDecimal("1.8"))
 
         assertEquals(5, makerApiClient.listOrders().orders.count { it.status == OrderStatus.Open })
@@ -1338,11 +1652,11 @@ class OrderExecutionTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyOrderCreatedMessageReceived()
+            assertMyOrdersCreatedMessageReceived()
             assertMyTradesCreatedMessageReceived { msg ->
                 assertEquals(5, msg.trades.size)
             }
-            assertMyOrderUpdatedMessageReceived()
+            assertMyOrdersUpdatedMessageReceived()
             assertBalancesMessageReceived()
             assertLimitsMessageReceived(market, base = BigDecimal("0.018"), quote = BigDecimal("1.78162164"))
         }
@@ -1351,7 +1665,9 @@ class OrderExecutionTest : OrderBaseTest() {
             assertMyTradesCreatedMessageReceived { msg ->
                 assertEquals(5, msg.trades.size)
             }
-            repeat(5) { assertMyOrderUpdatedMessageReceived() }
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(5, msg.orders.size)
+            }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived(market, base = BigDecimal("0.182"), quote = BigDecimal("1.81783782"))
         }
@@ -1363,7 +1679,8 @@ class OrderExecutionTest : OrderBaseTest() {
 
         // now verify the trades
 
-        val expectedAmounts = listOf("0.001", "0.002", "0.004", "0.005", "0.006").map { AssetAmount(baseSymbol, it) }.toSet()
+        val expectedAmounts =
+            listOf("0.001", "0.002", "0.004", "0.005", "0.006").map { AssetAmount(baseSymbol, it) }.toSet()
         val trades = getTradesForOrders(takerOrders.map { it.id })
         val prices = trades.map { it.price }.toSet()
 

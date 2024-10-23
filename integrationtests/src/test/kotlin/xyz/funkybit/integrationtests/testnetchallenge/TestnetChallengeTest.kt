@@ -56,7 +56,7 @@ import xyz.funkybit.integrationtests.utils.Faucet
 import xyz.funkybit.integrationtests.utils.TestApiClient
 import xyz.funkybit.integrationtests.utils.Wallet
 import xyz.funkybit.integrationtests.utils.assertError
-import xyz.funkybit.integrationtests.utils.assertMyLimitOrderCreatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyLimitOrdersCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.signAuthorizeBitcoinWalletRequest
 import java.math.BigDecimal
 import java.math.BigInteger
@@ -206,7 +206,7 @@ class TestnetChallengeTest : OrderBaseTest() {
         // once the user places an order, they shouldn't get the Enrolled card
         val response = trader.a.createLimitOrder(btcUsdcMarket, OrderSide.Buy, BigDecimal.ONE, BigDecimal.valueOf(25), trader.w)
         trader.ws.apply {
-            assertMyLimitOrderCreatedMessageReceived(response)
+            assertMyLimitOrdersCreatedMessageReceived(response)
         }
         cards = trader.a.getCards()
         assertEquals(4, cards.size)

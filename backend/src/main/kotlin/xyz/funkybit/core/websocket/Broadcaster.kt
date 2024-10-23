@@ -12,9 +12,9 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.model.websocket.Balances
 import xyz.funkybit.apps.api.model.websocket.Limits
 import xyz.funkybit.apps.api.model.websocket.MarketTradesCreated
-import xyz.funkybit.apps.api.model.websocket.MyOrderCreated
-import xyz.funkybit.apps.api.model.websocket.MyOrderUpdated
 import xyz.funkybit.apps.api.model.websocket.MyOrders
+import xyz.funkybit.apps.api.model.websocket.MyOrdersCreated
+import xyz.funkybit.apps.api.model.websocket.MyOrdersUpdated
 import xyz.funkybit.apps.api.model.websocket.MyTrades
 import xyz.funkybit.apps.api.model.websocket.MyTradesCreated
 import xyz.funkybit.apps.api.model.websocket.MyTradesUpdated
@@ -337,7 +337,7 @@ class Broadcaster(val db: Database) {
                 SubscriptionTopic.OrderBook(notification.message.marketId)
             }
             is OrderBookDiff -> SubscriptionTopic.IncrementalOrderBook(notification.message.marketId)
-            is MyOrders, is MyOrderCreated, is MyOrderUpdated -> SubscriptionTopic.MyOrders
+            is MyOrders, is MyOrdersCreated, is MyOrdersUpdated -> SubscriptionTopic.MyOrders
             is Prices -> {
                 updatePrices(notification.message)
                 SubscriptionTopic.Prices(notification.message.market, notification.message.duration)

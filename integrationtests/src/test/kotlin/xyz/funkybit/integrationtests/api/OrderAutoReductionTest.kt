@@ -10,8 +10,8 @@ import xyz.funkybit.integrationtests.testutils.OrderBaseTest
 import xyz.funkybit.integrationtests.testutils.waitForFinalizedWithdrawal
 import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyLimitOrderCreatedMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyOrderUpdatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyLimitOrdersCreatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyOrdersUpdatedMessageReceived
 import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertIs
@@ -46,15 +46,15 @@ class OrderAutoReductionTest : OrderBaseTest() {
             price = BigDecimal("17.500"),
             makerWallet,
         )
-        makerWsClient.assertMyLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
+        makerWsClient.assertMyLimitOrdersCreatedMessageReceived(limitBuyOrderApiResponse)
 
         val btcWithdrawalAmount = AssetAmount(btc, "0.1")
 
         val pendingBtcWithdrawal = makerApiClient.createWithdrawal(makerWallet.signWithdraw(btc.name, btcWithdrawalAmount.inFundamentalUnits)).withdrawal
         assertEquals(WithdrawalStatus.Pending, pendingBtcWithdrawal.status)
 
-        makerWsClient.assertMyOrderUpdatedMessageReceived { msg ->
-            msg.order.also { order ->
+        makerWsClient.assertMyOrdersUpdatedMessageReceived { msg ->
+            msg.orders.first().also { order ->
                 assertEquals(limitBuyOrderApiResponse.orderId, order.id)
                 assertIs<Order.Limit>(order)
                 assertTrue(order.autoReduced)

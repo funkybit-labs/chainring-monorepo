@@ -27,10 +27,10 @@ import xyz.funkybit.integrationtests.utils.WalletKeyPair
 import xyz.funkybit.integrationtests.utils.assertAmount
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
 import xyz.funkybit.integrationtests.utils.assertError
-import xyz.funkybit.integrationtests.utils.assertMyLimitOrderCreatedMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyMarketOrderCreatedMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyOrderUpdatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyLimitOrdersCreatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyMarketOrdersCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyOrdersMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyOrdersUpdatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyTradesCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyTradesMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyTradesUpdatedMessageReceived
@@ -270,7 +270,7 @@ class AuthorizeWalletTest : OrderBaseTest() {
 
         val limitBuyOrderApiResponse = apiClient.createLimitOrder(market, OrderSide.Sell, amount, price, wallet)
 
-        wsClient.assertMyLimitOrderCreatedMessageReceived(limitBuyOrderApiResponse)
+        wsClient.assertMyLimitOrdersCreatedMessageReceived(limitBuyOrderApiResponse)
         wsClient.close()
     }
 
@@ -293,9 +293,9 @@ class AuthorizeWalletTest : OrderBaseTest() {
         val marketBuyOrderApiResponse = apiClient.createMarketOrder(market, OrderSide.Buy, btcBuyAmount, wallet)
 
         wsClient.apply {
-            assertMyMarketOrderCreatedMessageReceived(marketBuyOrderApiResponse)
+            assertMyMarketOrdersCreatedMessageReceived(marketBuyOrderApiResponse)
             assertMyTradesCreatedMessageReceived {}
-            assertMyOrderUpdatedMessageReceived {}
+            assertMyOrdersUpdatedMessageReceived {}
             assertBalancesMessageReceived {}
         }
 

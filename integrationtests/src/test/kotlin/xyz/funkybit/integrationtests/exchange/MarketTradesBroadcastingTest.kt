@@ -22,8 +22,8 @@ import xyz.funkybit.integrationtests.utils.AssetAmount
 import xyz.funkybit.integrationtests.utils.TestApiClient
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMarketTradesCreatedMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyOrderCreatedMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyOrderUpdatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyOrdersCreatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyOrdersUpdatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyTradesCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.blocking
 import xyz.funkybit.integrationtests.utils.subscribeToMarketTrades
@@ -94,7 +94,9 @@ class MarketTradesBroadcastingTest : OrderBaseTest() {
         )
 
         assertEquals(3, createBatchLimitOrders.createdOrders.count())
-        repeat(3) { makerWsClient.assertMyOrderCreatedMessageReceived() }
+        makerWsClient.assertMyOrdersCreatedMessageReceived {
+            assertEquals(3, it.orders.size)
+        }
 
         val batchOrderResponse = makerApiClient.batchOrders(
             BatchOrdersApiRequest(
@@ -133,8 +135,10 @@ class MarketTradesBroadcastingTest : OrderBaseTest() {
         assertEquals(1, batchOrderResponse.canceledOrders.count { it.requestStatus == RequestStatus.Accepted })
         assertEquals(1, batchOrderResponse.canceledOrders.count { it.requestStatus == RequestStatus.Rejected })
 
-        repeat(3) { makerWsClient.assertMyOrderCreatedMessageReceived() }
-        makerWsClient.assertMyOrderUpdatedMessageReceived()
+        makerWsClient.assertMyOrdersCreatedMessageReceived {
+            assertEquals(3, it.orders.size)
+        }
+        makerWsClient.assertMyOrdersUpdatedMessageReceived()
 
         assertEquals(5, makerApiClient.listOrders(listOf(OrderStatus.Open), null).orders.size)
 
@@ -149,11 +153,11 @@ class MarketTradesBroadcastingTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyOrderCreatedMessageReceived()
+            assertMyOrdersCreatedMessageReceived()
             assertMyTradesCreatedMessageReceived { msg ->
                 assertEquals(5, msg.trades.size)
             }
-            assertMyOrderUpdatedMessageReceived()
+            assertMyOrdersUpdatedMessageReceived()
             assertBalancesMessageReceived()
         }
 
@@ -161,7 +165,9 @@ class MarketTradesBroadcastingTest : OrderBaseTest() {
             assertMyTradesCreatedMessageReceived { msg ->
                 assertEquals(5, msg.trades.size)
             }
-            repeat(5) { assertMyOrderUpdatedMessageReceived() }
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(5, msg.orders.size)
+            }
             assertBalancesMessageReceived()
         }
 
@@ -209,7 +215,9 @@ class MarketTradesBroadcastingTest : OrderBaseTest() {
             ),
         )
 
-        repeat(2) { makerWsClient.assertMyOrderCreatedMessageReceived() }
+        makerWsClient.assertMyOrdersCreatedMessageReceived {
+            assertEquals(2, it.orders.size)
+        }
 
         takerApiClient.createMarketOrder(
             market,
@@ -219,11 +227,11 @@ class MarketTradesBroadcastingTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyOrderCreatedMessageReceived()
+            assertMyOrdersCreatedMessageReceived()
             assertMyTradesCreatedMessageReceived { msg ->
                 assertEquals(2, msg.trades.size)
             }
-            assertMyOrderUpdatedMessageReceived()
+            assertMyOrdersUpdatedMessageReceived()
             assertBalancesMessageReceived()
         }
 
@@ -231,7 +239,9 @@ class MarketTradesBroadcastingTest : OrderBaseTest() {
             assertMyTradesCreatedMessageReceived { msg ->
                 assertEquals(2, msg.trades.size)
             }
-            repeat(2) { assertMyOrderUpdatedMessageReceived() }
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(2, msg.orders.size)
+            }
             assertBalancesMessageReceived()
         }
 

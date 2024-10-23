@@ -112,17 +112,17 @@ export const BalancesSchema = z.object({
 })
 export type Balances = z.infer<typeof BalancesSchema>
 
-export const MyOrderCreatedSchema = z.object({
-  type: z.literal('MyOrderCreated'),
-  order: OrderSchema
+export const MyOrdersCreatedSchema = z.object({
+  type: z.literal('MyOrdersCreated'),
+  orders: z.array(OrderSchema)
 })
-export type MyOrderCreated = z.infer<typeof MyOrderCreatedSchema>
+export type MyOrdersCreated = z.infer<typeof MyOrdersCreatedSchema>
 
-export const MyOrderUpdatedSchema = z.object({
-  type: z.literal('MyOrderUpdated'),
-  order: OrderSchema
+export const MyOrdersUpdatedSchema = z.object({
+  type: z.literal('MyOrdersUpdated'),
+  orders: z.array(OrderSchema)
 })
-export type MyOrderUpdated = z.infer<typeof MyOrderUpdatedSchema>
+export type MyOrdersUpdated = z.infer<typeof MyOrdersUpdatedSchema>
 
 export const MarketLimitsSchema = z
   .tuple([
@@ -160,8 +160,8 @@ export const PublishableSchema = z.discriminatedUnion('type', [
   MyTradesUpdatedSchema,
   MyOrdersSchema,
   BalancesSchema,
-  MyOrderCreatedSchema,
-  MyOrderUpdatedSchema,
+  MyOrdersCreatedSchema,
+  MyOrdersUpdatedSchema,
   LimitsSchema
 ])
 export type Publishable = z.infer<typeof PublishableSchema>

@@ -21,8 +21,8 @@ import xyz.funkybit.integrationtests.utils.ExpectedBalance
 import xyz.funkybit.integrationtests.utils.assertBalances
 import xyz.funkybit.integrationtests.utils.assertBalancesMessageReceived
 import xyz.funkybit.integrationtests.utils.assertLimitsMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyOrderCreatedMessageReceived
-import xyz.funkybit.integrationtests.utils.assertMyOrderUpdatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyOrdersCreatedMessageReceived
+import xyz.funkybit.integrationtests.utils.assertMyOrdersUpdatedMessageReceived
 import xyz.funkybit.integrationtests.utils.assertMyTradesCreatedMessageReceived
 import xyz.funkybit.integrationtests.utils.ofAsset
 import xyz.funkybit.sequencer.core.notional
@@ -115,7 +115,7 @@ class BackToBackOrderTest : OrderBaseTest() {
         assertEquals(1, limitBuyOrder2.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
 
         repeat(2) {
-            makerWsClient.assertMyOrderCreatedMessageReceived()
+            makerWsClient.assertMyOrdersCreatedMessageReceived()
             makerWsClient.assertLimitsMessageReceived()
         }
 
@@ -130,7 +130,7 @@ class BackToBackOrderTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyOrderCreatedMessageReceived()
+            assertMyOrdersCreatedMessageReceived()
             assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
 
@@ -148,9 +148,12 @@ class BackToBackOrderTest : OrderBaseTest() {
                 assertEquals(BigInteger.ZERO, it.trades[1].feeAmount)
                 assertEquals(eth2.name, it.trades[1].feeSymbol.value)
             }
-            assertMyOrderUpdatedMessageReceived {
-                assertEquals(BigDecimal("0.6").toFundamentalUnits(market.baseDecimals), it.order.amount)
-                assertEquals(it.order.status, OrderStatus.Filled)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(BigDecimal("0.6").toFundamentalUnits(market.baseDecimals), order.amount)
+                    assertEquals(order.status, OrderStatus.Filled)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -165,7 +168,9 @@ class BackToBackOrderTest : OrderBaseTest() {
             assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
             }
-            repeat(2) { assertMyOrderUpdatedMessageReceived() }
+            assertMyOrdersUpdatedMessageReceived {
+                assertEquals(2, it.orders.size)
+            }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived()
         }
@@ -301,7 +306,7 @@ class BackToBackOrderTest : OrderBaseTest() {
         assertEquals(1, limitBuyOrder2.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
 
         repeat(2) {
-            makerWsClient.assertMyOrderCreatedMessageReceived()
+            makerWsClient.assertMyOrdersCreatedMessageReceived()
             makerWsClient.assertLimitsMessageReceived()
         }
 
@@ -316,7 +321,7 @@ class BackToBackOrderTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyOrderCreatedMessageReceived()
+            assertMyOrdersCreatedMessageReceived()
             assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
 
@@ -333,9 +338,12 @@ class BackToBackOrderTest : OrderBaseTest() {
                 assertEquals(BigInteger.ZERO, it.trades[1].feeAmount)
                 assertEquals(usdc2.name, it.trades[1].feeSymbol.value)
             }
-            assertMyOrderUpdatedMessageReceived {
-                assertEquals(BigDecimal("3.9").toFundamentalUnits(market.baseDecimals), it.order.amount)
-                assertEquals(it.order.status, OrderStatus.Partial)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(BigDecimal("3.9").toFundamentalUnits(market.baseDecimals), order.amount)
+                    assertEquals(order.status, OrderStatus.Partial)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -350,7 +358,9 @@ class BackToBackOrderTest : OrderBaseTest() {
             assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
             }
-            repeat(2) { assertMyOrderUpdatedMessageReceived() }
+            assertMyOrdersUpdatedMessageReceived {
+                assertEquals(2, it.orders.size)
+            }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived()
         }
@@ -491,7 +501,7 @@ class BackToBackOrderTest : OrderBaseTest() {
         assertEquals(1, limitSellOrder.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
 
         repeat(2) {
-            makerWsClient.assertMyOrderCreatedMessageReceived()
+            makerWsClient.assertMyOrdersCreatedMessageReceived()
             makerWsClient.assertLimitsMessageReceived()
         }
 
@@ -505,7 +515,7 @@ class BackToBackOrderTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyOrderCreatedMessageReceived()
+            assertMyOrdersCreatedMessageReceived()
             assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
 
@@ -524,9 +534,12 @@ class BackToBackOrderTest : OrderBaseTest() {
                 assertEquals(BigInteger.valueOf(4), it.trades[1].feeAmount)
                 assertEquals(eth2.name, it.trades[1].feeSymbol.value)
             }
-            assertMyOrderUpdatedMessageReceived {
-                assertEquals(inputOrderAmount.inFundamentalUnits, it.order.amount)
-                assertEquals(it.order.status, OrderStatus.Filled)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(inputOrderAmount.inFundamentalUnits, order.amount)
+                    assertEquals(order.status, OrderStatus.Filled)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -541,7 +554,9 @@ class BackToBackOrderTest : OrderBaseTest() {
             assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
             }
-            repeat(2) { assertMyOrderUpdatedMessageReceived() }
+            assertMyOrdersUpdatedMessageReceived {
+                assertEquals(2, it.orders.size)
+            }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived()
         }
@@ -691,7 +706,7 @@ class BackToBackOrderTest : OrderBaseTest() {
         assertEquals(1, limitSellOrder.createdOrders.count { it.requestStatus == RequestStatus.Accepted })
 
         repeat(2) {
-            makerWsClient.assertMyOrderCreatedMessageReceived()
+            makerWsClient.assertMyOrdersCreatedMessageReceived()
             makerWsClient.assertLimitsMessageReceived()
         }
 
@@ -705,7 +720,7 @@ class BackToBackOrderTest : OrderBaseTest() {
         )
 
         takerWsClient.apply {
-            assertMyOrderCreatedMessageReceived()
+            assertMyOrdersCreatedMessageReceived()
             assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
 
@@ -723,9 +738,12 @@ class BackToBackOrderTest : OrderBaseTest() {
                 assertEquals(BigInteger.ZERO, it.trades[1].feeAmount)
                 assertEquals(eth2.name, it.trades[1].feeSymbol.value)
             }
-            assertMyOrderUpdatedMessageReceived {
-                assertEquals(bridgeOrderAmount.inFundamentalUnits, it.order.amount)
-                assertEquals(it.order.status, OrderStatus.Filled)
+            assertMyOrdersUpdatedMessageReceived { msg ->
+                assertEquals(1, msg.orders.size)
+                msg.orders.first().let { order ->
+                    assertEquals(bridgeOrderAmount.inFundamentalUnits, order.amount)
+                    assertEquals(order.status, OrderStatus.Filled)
+                }
             }
             assertBalancesMessageReceived(
                 listOf(
@@ -740,7 +758,9 @@ class BackToBackOrderTest : OrderBaseTest() {
             assertMyTradesCreatedMessageReceived {
                 assertEquals(2, it.trades.size)
             }
-            repeat(2) { assertMyOrderUpdatedMessageReceived() }
+            assertMyOrdersUpdatedMessageReceived {
+                assertEquals(2, it.orders.size)
+            }
             assertBalancesMessageReceived()
             assertLimitsMessageReceived()
         }

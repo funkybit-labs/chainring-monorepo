@@ -7,8 +7,6 @@ import xyz.funkybit.apps.api.model.Market
 import xyz.funkybit.apps.api.model.Order
 import xyz.funkybit.apps.api.model.OrderAmount
 import xyz.funkybit.apps.api.model.websocket.Balances
-import xyz.funkybit.apps.api.model.websocket.MyOrderCreated
-import xyz.funkybit.apps.api.model.websocket.MyOrderUpdated
 import xyz.funkybit.apps.api.model.websocket.MyOrders
 import xyz.funkybit.apps.api.model.websocket.Prices
 import xyz.funkybit.apps.api.model.websocket.Publishable
@@ -41,6 +39,8 @@ import kotlin.random.Random
 import kotlinx.datetime.Clock
 import org.knowm.xchart.SwingWrapper
 import org.knowm.xchart.XYChartBuilder
+import xyz.funkybit.apps.api.model.websocket.MyOrdersCreated
+import xyz.funkybit.apps.api.model.websocket.MyOrdersUpdated
 import xyz.funkybit.core.utils.PriceFeed
 import xyz.funkybit.integrationtests.utils.WalletKeyPair
 
@@ -161,11 +161,11 @@ class Maker(
                 logger.info { "$id: received balance update ${message.balances}" }
             }
 
-            is MyOrders, is MyOrderCreated, is MyOrderUpdated -> {
+            is MyOrders, is MyOrdersCreated, is MyOrdersUpdated -> {
                 val orders = when (message) {
                     is MyOrders -> message.orders
-                    is MyOrderCreated -> listOf(message.order)
-                    is MyOrderUpdated -> listOf(message.order)
+                    is MyOrdersCreated -> message.orders
+                    is MyOrdersUpdated -> message.orders
                     else -> emptyList()
                 }
                 orders.forEach { order ->
