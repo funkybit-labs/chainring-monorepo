@@ -37,7 +37,7 @@ data "aws_acm_certificate" "funkybit_fun" {
 
 variable "blocked_country_codes" {
   default = [
-    "US", #United States
+    "KP", # North Korea
   ]
 }
 
