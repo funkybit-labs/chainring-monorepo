@@ -4,6 +4,7 @@ import { signAuthToken } from 'contexts/auth'
 import { apiClient, noAuthApiClient, NetworkType } from 'apiClient'
 import { bitcoinSignMessage, evmSignTypedData } from 'utils/signingUtils'
 import { abbreviatedAddress } from 'utils'
+import { emitter } from 'emitter'
 
 export type WalletAuthorizationParams = {
   authorizedAddress: string
@@ -146,20 +147,22 @@ export async function authorizeWallet(
         return
       }
 
-      await noAuthApiClient.authorizeWallet(
-        {
-          authorizedAddress: authorizationParams.authorizedAddress,
-          chainId: authorizationParams.authorizingWalletChainId,
-          address: authorizationParams.authorizingWalletAddress,
-          timestamp: authorizationParams.timestamp,
-          signature: authorizationParams.authorizingWalletSignature
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${authorizationParams.authorizedWalletAuthToken}`
+      await noAuthApiClient
+        .authorizeWallet(
+          {
+            authorizedAddress: authorizationParams.authorizedAddress,
+            chainId: authorizationParams.authorizingWalletChainId,
+            address: authorizationParams.authorizingWalletAddress,
+            timestamp: authorizationParams.timestamp,
+            signature: authorizationParams.authorizingWalletSignature
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${authorizationParams.authorizedWalletAuthToken}`
+            }
           }
-        }
-      )
+        )
+        .then(() => emitter.emit('authorizedWallet'))
     }
   } catch (error) {
     console.log('Error during wallet authorization', error)

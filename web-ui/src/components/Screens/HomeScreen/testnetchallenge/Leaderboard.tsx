@@ -20,10 +20,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   apiClient,
   ApiErrorsSchema,
-  LeaderboardType,
-  Leaderboard as LB,
+  Balance,
   Card,
-  Balance
+  Leaderboard as LB,
+  LeaderboardType
 } from 'apiClient'
 import { Modal } from 'components/common/Modal'
 import { Tab, Widget } from 'components/Screens/Header'
@@ -33,6 +33,7 @@ import { accountConfigQueryKey } from 'components/Screens/HomeScreen'
 import TradingSymbol from 'tradingSymbol'
 import TradingSymbols from 'tradingSymbols'
 import Decimal from 'decimal.js'
+import { emitter } from 'emitter'
 
 type EditMode = 'none' | 'name' | 'icon'
 
@@ -41,6 +42,8 @@ const rowsPerPage = 20
 export const webInviteBaseUrl = import.meta.env.ENV_WEB_URL + '/invite'
 const discordClientId = import.meta.env.ENV_DISCORD_CLIENT_ID
 const discordCallback = import.meta.env.ENV_WEB_URL + '/discord-callback'
+
+export const cardsQueryKey = ['cards']
 
 function Board({
   type,
@@ -408,9 +411,23 @@ export function Leaderboard({
   })
 
   const cardQuery = useQuery({
-    queryKey: ['cards'],
+    queryKey: cardsQueryKey,
     queryFn: apiClient.testnetChallengeGetCards
   })
+
+  useEffect(() => {
+    const authorizationHandler = () => {
+      // refresh balance and cards
+      queryClient.invalidateQueries({ queryKey: accountConfigQueryKey })
+      queryClient.invalidateQueries({ queryKey: cardsQueryKey })
+    }
+
+    emitter.on('authorizedWallet', authorizationHandler)
+
+    return () => {
+      emitter.off('authorizedWallet', authorizationHandler)
+    }
+  }, [queryClient])
 
   const [newName, setNewName] = useState<string>()
   const [editMode, setEditMode] = useState<EditMode>('none')
