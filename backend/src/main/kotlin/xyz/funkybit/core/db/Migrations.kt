@@ -1,6 +1,7 @@
 package xyz.funkybit.core.db
 
 import xyz.funkybit.core.model.db.migrations.V100_AddDiscordUserIdToUser
+import xyz.funkybit.core.model.db.migrations.V101_OHLCTimestampWithTimezone
 import xyz.funkybit.core.model.db.migrations.V10_WithdrawalTable
 import xyz.funkybit.core.model.db.migrations.V11_NonNullableDeployedContractProxyAddress
 import xyz.funkybit.core.model.db.migrations.V12_BigDecimalPrice
@@ -202,4 +203,5 @@ val migrations = listOf(
     V98_AddUserGuidToOrderAndExecution(),
     V99_AddArchRollbackTransactionToWithdrawal(),
     V100_AddDiscordUserIdToUser(),
+    V101_OHLCTimestampWithTimezone(),
 )
