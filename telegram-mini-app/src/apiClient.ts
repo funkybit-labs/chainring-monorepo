@@ -170,6 +170,19 @@ export const apiClient = new Zodios(apiBaseUrl, [
         schema: ApiErrorsSchema
       }
     ]
+  },
+  {
+    method: 'post',
+    path: '/v1/oauth-relay-auth-token',
+    alias: 'oauthRelayAuthToken',
+    parameters: [],
+    response: z.string(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
   }
 ])
 

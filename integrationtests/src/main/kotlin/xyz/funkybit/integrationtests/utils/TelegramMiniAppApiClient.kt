@@ -15,6 +15,7 @@ import xyz.funkybit.apps.api.model.tma.ReactionTimeApiRequest
 import xyz.funkybit.apps.api.model.tma.ReactionsTimeApiResponse
 import xyz.funkybit.apps.api.model.tma.SingUpApiRequest
 import xyz.funkybit.core.model.telegram.TelegramUserId
+import xyz.funkybit.core.model.telegram.miniapp.OauthRelayToken
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppInviteCode
 import java.net.HttpURLConnection
 
@@ -113,6 +114,30 @@ class TelegramMiniAppApiClient(val telegramUserId: TelegramUserId) {
                 .build()
         }
     }
+
+    fun getOauthRelayToken(): OauthRelayToken =
+        tryGetOauthRelayToken().assertSuccess()
+
+    fun tryGetOauthRelayToken(): Either<ApiCallFailure, OauthRelayToken> =
+        httpClient.newCall(
+            Request.Builder()
+                .url("$apiServerRootUrl/tma/v1/oauth-relay-auth-token")
+                .post("".toRequestBody(applicationJson))
+                .build()
+                .withAuthHeaders(telegramUserId),
+        ).execute().toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
+    fun completeDiscordLinking(code: String, relayToken: OauthRelayToken): Unit =
+        tryCompleteDiscordLinking(code, relayToken).assertSuccess()
+
+    fun tryCompleteDiscordLinking(code: String, relayToken: OauthRelayToken): Either<ApiCallFailure, Unit> =
+        httpClient.newCall(
+            Request.Builder()
+                .url("$apiServerRootUrl/tma/v1/oauth-relay/discord/$code")
+                .post("".toRequestBody(applicationJson))
+                .header("Authorization", "Bearer ${relayToken.value}")
+                .build(),
+        ).execute().toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_OK)
 }
 
 fun Request.withAuthHeaders(telegramUserId: TelegramUserId?): Request =
