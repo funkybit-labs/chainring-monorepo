@@ -1,5 +1,6 @@
 package xyz.funkybit.core.model.telegram.miniapp
 
+import aws.smithy.kotlin.runtime.text.encoding.encodeBase64String
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.dao.EntityClass
@@ -15,9 +16,12 @@ import xyz.funkybit.core.model.db.GUIDTable
 import xyz.funkybit.core.model.db.PGEnum
 import xyz.funkybit.core.model.db.UserEntity
 import xyz.funkybit.core.model.db.UserTable
+import xyz.funkybit.core.model.db.UserTable.nullable
 import xyz.funkybit.core.model.telegram.TelegramUserId
 import java.math.BigDecimal
+import java.security.SecureRandom
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.minutes
 
 @Serializable
 @JvmInline
@@ -49,6 +53,21 @@ value class TelegramMiniAppInviteCode(val value: String) {
     override fun toString(): String = value
 }
 
+@Serializable
+@JvmInline
+value class OauthRelayToken(val value: String) {
+    companion object {
+        private val rnd = SecureRandom()
+        fun generate(): OauthRelayToken {
+            val entropy = ByteArray(64)
+            rnd.nextBytes(entropy)
+            return OauthRelayToken(entropy.encodeBase64String())
+        }
+    }
+
+    override fun toString(): String = value
+}
+
 enum class TelegramMiniAppUserIsBot {
     No,
     Maybe,
@@ -74,6 +93,8 @@ object TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_min
         { PGEnum("TelegramMiniAppUserIsBot", it) },
     ).index().default(TelegramMiniAppUserIsBot.No)
     val userGuid = reference("user_guid", UserTable)
+    val oauthRelayAuthToken = varchar("oauth_relay_auth_token", 10485760).nullable().uniqueIndex()
+    val oauthRelayAuthTokenExpiresAt = timestamp("oauth_relay_auth_token_expires_at").nullable()
 }
 
 class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEntity<TelegramMiniAppUserId>(guid) {
@@ -109,6 +130,15 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
                 TelegramMiniAppUserTable.inviteCode.eq(code.value)
             }.firstOrNull()
         }
+
+        fun findByOauthRelayAuthToken(token: OauthRelayToken): TelegramMiniAppUserEntity? {
+            val now = Clock.System.now()
+            return TelegramMiniAppUserEntity.find {
+                TelegramMiniAppUserTable.oauthRelayAuthToken.eq(token.value).and(
+                    TelegramMiniAppUserTable.oauthRelayAuthTokenExpiresAt.greater(now),
+                )
+            }.firstOrNull()
+        }
     }
 
     var createdAt by TelegramMiniAppUserTable.createdAt
@@ -131,6 +161,12 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
     var invitedBy by TelegramMiniAppUserEntity optionalReferencedOn TelegramMiniAppUserTable.invitedBy
     var isBot by TelegramMiniAppUserTable.isBot
     var userGuid by TelegramMiniAppUserTable.userGuid
+    var user by UserEntity referencedOn TelegramMiniAppUserTable.userGuid
+    var oauthRelayAuthToken by TelegramMiniAppUserTable.oauthRelayAuthToken.transform(
+        toColumn = { it?.value },
+        toReal = { it?.let { OauthRelayToken(it) } },
+    )
+    var oauthRelayAuthTokenExpiresAt by TelegramMiniAppUserTable.oauthRelayAuthTokenExpiresAt
 
     fun pointsBalances(): Map<TelegramMiniAppUserRewardType, BigDecimal> {
         val sumColumn = TelegramMiniAppUserRewardTable.amount.sum().alias("amount_sum")
@@ -154,10 +190,15 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
                 it[TelegramMiniAppUserRewardTable.goalId]?.let { id -> TelegramMiniAppGoal.Id.valueOf(id) }
             }.toSet()
 
-    fun grantReward(goalId: TelegramMiniAppGoal.Id) {
-        val goal = TelegramMiniAppGoal.allPossible.first { it.id == goalId }
-        TelegramMiniAppUserRewardEntity.createGoalAchievementReward(this, goal.reward, goal.id)
+    private fun grantReward(goalId: TelegramMiniAppGoal.Id, verified: Boolean) {
+        TelegramMiniAppGoal.allPossible.firstOrNull { it.id == goalId && it.verified == verified }?.let {
+            TelegramMiniAppUserRewardEntity.createGoalAchievementReward(this, it.reward, it.id)
+        }
     }
+
+    fun grantVerifiedReward(goalId: TelegramMiniAppGoal.Id) = grantReward(goalId, verified = true)
+
+    fun grantReward(goalId: TelegramMiniAppGoal.Id) = grantReward(goalId, verified = false)
 
     fun lockForUpdate(): TelegramMiniAppUserEntity {
         return TelegramMiniAppUserEntity.find { TelegramMiniAppUserTable.telegramUserId eq telegramUserId.value }.forUpdate().single()
@@ -191,6 +232,13 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
         TelegramMiniAppUserRewardEntity.createReactionGameReward(this, percentile.toBigDecimal())
 
         return percentile
+    }
+
+    fun createOauthRelayToken(): OauthRelayToken {
+        this.oauthRelayAuthTokenExpiresAt = Clock.System.now().plus(5.minutes)
+        return OauthRelayToken.generate().also {
+            this.oauthRelayAuthToken = it
+        }
     }
 }
 

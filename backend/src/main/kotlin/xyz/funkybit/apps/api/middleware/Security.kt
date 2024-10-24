@@ -36,6 +36,7 @@ import xyz.funkybit.core.model.EvmAddress
 import xyz.funkybit.core.model.db.ChainId
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.telegram.TelegramUserId
+import xyz.funkybit.core.model.telegram.miniapp.OauthRelayToken
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserEntity
 import xyz.funkybit.core.model.toEvmSignature
 import xyz.funkybit.core.sequencer.SequencerClient
@@ -324,3 +325,52 @@ val telegramMiniAppSecurity = object : Security {
             ?: ApiError(ReasonCode.AuthenticationError, "User data is missing").left()
     }
 }
+
+data class OauthRelayPrincipal(
+    val telegramMiniAppUser: TelegramMiniAppUserEntity?,
+)
+
+private val oauthRelayPrincipalRequestContextKey =
+    RequestContextKey.optional<OauthRelayPrincipal>(requestContexts)
+
+val Request.oauthRelayPrincipal: OauthRelayPrincipal
+    get() = oauthRelayPrincipalRequestContextKey(this)
+        ?: throw RequestProcessingError(Status.UNAUTHORIZED, ApiError(ReasonCode.AuthenticationError, "Unauthorized"))
+
+val oauthRelaySecurity = object : Security {
+    override val filter = Filter { next -> wrapWithAuthentication(next) }
+
+    private fun wrapWithAuthentication(httpHandler: HttpHandler): HttpHandler = { request ->
+        authenticate(request).fold(
+            ifLeft = { error ->
+                logger.info { "Authentication failed with error $error" }
+                errorResponse(Status.UNAUTHORIZED, error)
+            },
+            ifRight = { user ->
+                val requestWithPrincipal = request.with(
+                    oauthRelayPrincipalRequestContextKey of OauthRelayPrincipal(user),
+                )
+                httpHandler(requestWithPrincipal)
+            },
+        )
+    }
+
+    private fun authenticate(request: Request): Either<ApiError, TelegramMiniAppUserEntity> {
+        val authHeader = request.header("Authorization")?.trim()
+            ?: return ApiError(ReasonCode.AuthenticationError, "Authorization header is missing").left()
+
+        if (!authHeader.startsWith(AUTHORIZATION_SCHEME_PREFIX, ignoreCase = true)) {
+            return ApiError(ReasonCode.AuthenticationError, "Invalid authentication scheme").left()
+        }
+
+        val authToken = authHeader.removePrefix(AUTHORIZATION_SCHEME_PREFIX)
+        return transaction {
+            TelegramMiniAppUserEntity.findByOauthRelayAuthToken(OauthRelayToken(authToken))
+        }?.right() ?: ApiError(ReasonCode.AuthenticationError, "Token not found or expired").left()
+    }
+}
+
+val Request.oauthRelayTelegramMiniAppUser: TelegramMiniAppUserEntity
+    get() =
+        oauthRelayPrincipal.telegramMiniAppUser
+            ?: throw RequestProcessingError(Status.UNAUTHORIZED, ApiError(ReasonCode.AuthenticationError, "Unauthorized"))

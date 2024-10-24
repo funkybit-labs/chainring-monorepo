@@ -17,13 +17,14 @@ import Logo from 'components/common/Logo'
 import { useClose } from '@headlessui/react'
 
 function GoalAchieved({ goalAchieved }: { goalAchieved?: UserGoal }) {
-  const [goalAchievedIconSrc, goalAchievedDescription] = useMemo(() => {
-    if (goalAchieved) {
-      return goalInfo(goalAchieved.id)
-    } else {
-      return ['', '']
-    }
-  }, [goalAchieved])
+  const { iconSrc: goalAchievedIconSrc, description: goalAchievedDescription } =
+    useMemo(() => {
+      if (goalAchieved) {
+        return goalInfo(goalAchieved.id)
+      } else {
+        return { iconSrc: '', description: '', url: '', verified: false }
+      }
+    }, [goalAchieved])
 
   const close = useClose()
 
@@ -115,17 +116,33 @@ export default function GoalsTab({ user }: { user: User }) {
 function goalInfo(goalId: GoalId) {
   switch (goalId) {
     case 'GithubSubscription':
-      return [GithubIconSvg, 'Github', 'https://github.com/funkybit-labs']
+      return {
+        iconSrc: GithubIconSvg,
+        description: 'Github',
+        url: 'https://github.com/funkybit-labs',
+        verified: false
+      }
     case 'DiscordSubscription':
-      return [DiscordIconSvg, 'Discord', 'https://discord.gg/ZMarUVW7']
+      return {
+        iconSrc: DiscordIconSvg,
+        description: 'Discord',
+        url: `${import.meta.env.ENV_WEB_URL}/oauth-relay?flow=discord`,
+        verified: true
+      }
     case 'LinkedinSubscription':
-      return [
-        LinkedInIconSvg,
-        'LinkedIn',
-        'https://www.linkedin.com/company/funkybit-inc/'
-      ]
+      return {
+        iconSrc: LinkedInIconSvg,
+        description: 'LinkedIn',
+        url: 'https://www.linkedin.com/company/funkybit-inc/',
+        verified: false
+      }
     case 'XSubscription':
-      return [XIconSvg, 'X (Twitter)', 'https://x.com/funkybit_fun']
+      return {
+        iconSrc: XIconSvg,
+        description: 'X (Twitter)',
+        url: 'https://x.com/funkybit_fun',
+        verified: false
+      }
   }
 }
 
@@ -144,6 +161,15 @@ function GoalRow({
     'notAchieved' | 'linkOpened' | 'rewardReady' | 'achieved'
   >(goal.achieved ? 'achieved' : 'notAchieved')
 
+  const startVerifiedRewardFlow = useMutation({
+    mutationFn: async (url: string) => {
+      apiClient.oauthRelayAuthToken(undefined).then((token) => {
+        telegramWebApp.openLink(url + `&token=${encodeURIComponent(token)}`)
+        setStatus('linkOpened')
+      })
+    }
+  })
+
   const claimRewardMutation = useMutation({
     mutationFn: async () => apiClient.claimReward({ goalId: goal.id }),
     onSuccess: () => {
@@ -156,7 +182,7 @@ function GoalRow({
     }
   })
 
-  const [iconSrc, description, url] = goalInfo(goal.id)
+  const { iconSrc, description, url, verified } = goalInfo(goal.id)
 
   return (
     <InfoPanel icon={iconSrc} rounded={isLast ? 'bottom' : 'none'}>
@@ -190,8 +216,12 @@ function GoalRow({
             )}
             onClick={() => {
               if (status == 'notAchieved') {
-                telegramWebApp.openLink(url)
-                setStatus('linkOpened')
+                if (verified) {
+                  startVerifiedRewardFlow.mutate(url)
+                } else {
+                  telegramWebApp.openLink(url)
+                  setStatus('linkOpened')
+                }
                 window.setTimeout(() => {
                   setStatus('rewardReady')
                 }, 4000)

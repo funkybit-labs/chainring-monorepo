@@ -1,14 +1,19 @@
 import { createRoot } from 'react-dom/client'
 import 'tailwindcss/tailwind.css'
-import App from 'components/App'
 import { initializeWagmiConfig, wagmiConfig } from 'wagmiConfig'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import Spinner from 'components/common/Spinner'
 import React, { useEffect, useState } from 'react'
 import { useAccessRestriction } from 'apiClient'
 import { WalletProvider } from 'contexts/walletProvider'
 import { testnetChallengeInviteCodeKey } from 'components/Screens/HomeScreen/testnetchallenge/TestnetChallengeTab'
 import { AuthProvider } from 'contexts/auth'
+import App from 'components/App'
+import Spinner from 'components/common/Spinner'
+import OauthRelay, { OAuthRelayFlow } from 'components/Screens/OauthRelay'
+import {
+  getOauthRelayAuthFlow,
+  storeOauthRelayAuthTokenAndFlow
+} from 'contexts/oauthRelayAuth'
 
 const container = document.getElementById('root') as HTMLDivElement
 const root = createRoot(container)
@@ -17,22 +22,35 @@ const queryClient = new QueryClient()
 const Root = () => {
   const accessRestriction = useAccessRestriction()
   const [, setIsConfigInitialized] = useState(false)
+  const [oauthRelayFlow, setOauthRelayFlow] = useState<OAuthRelayFlow>()
 
   useEffect(() => {
     const urlPath = window.location.pathname
-    if (urlPath.includes('/invite/')) {
-      const code = urlPath.split('/').pop()
-      if (code) {
-        localStorage.setItem(testnetChallengeInviteCodeKey, code)
+    if (urlPath.includes('/oauth-relay')) {
+      const query = new URLSearchParams(window.location.search)
+      const flow = query.get('flow') as OAuthRelayFlow
+      storeOauthRelayAuthTokenAndFlow(query.get('token') ?? '', flow)
+      setOauthRelayFlow(flow)
+    } else if (
+      urlPath.includes('/discord-callback') &&
+      getOauthRelayAuthFlow() !== undefined
+    ) {
+      setOauthRelayFlow(getOauthRelayAuthFlow())
+    } else {
+      if (urlPath.includes('/invite/')) {
+        const code = urlPath.split('/').pop()
+        if (code) {
+          localStorage.setItem(testnetChallengeInviteCodeKey, code)
+        }
       }
-    }
 
-    const initConfig = async () => {
-      await initializeWagmiConfig()
-      setIsConfigInitialized(true)
-    }
+      const initConfig = async () => {
+        await initializeWagmiConfig()
+        setIsConfigInitialized(true)
+      }
 
-    initConfig()
+      initConfig()
+    }
   }, [])
 
   if (accessRestriction == 'geoBlocked') {
@@ -70,7 +88,11 @@ const Root = () => {
           </span>
         </div>
       )}
-      {wagmiConfig ? (
+      {oauthRelayFlow !== undefined ? (
+        <QueryClientProvider client={queryClient}>
+          <OauthRelay flow={oauthRelayFlow} />
+        </QueryClientProvider>
+      ) : wagmiConfig ? (
         <WalletProvider>
           <AuthProvider>
             <QueryClientProvider client={queryClient}>

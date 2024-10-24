@@ -1,14 +1,24 @@
 package xyz.funkybit.integrationtests.api
 
 import arrow.core.Either
+import io.mockk.Runs
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockkObject
+import io.mockk.unmockkAll
+import io.mockk.verify
 import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import okhttp3.Headers
 import okhttp3.Headers.Companion.toHeaders
+import org.http4k.core.Status.Companion.BAD_REQUEST
+import org.http4k.core.Status.Companion.INTERNAL_SERVER_ERROR
 import org.http4k.core.toUrlFormEncoded
 import org.http4k.format.KotlinxSerialization.json
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.extension.ExtendWith
 import xyz.funkybit.apps.api.middleware.TelegramMiniAppUserData
 import xyz.funkybit.apps.api.model.ApiError
@@ -16,13 +26,18 @@ import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.tma.ClaimRewardApiRequest
 import xyz.funkybit.apps.api.model.tma.GetUserApiResponse
 import xyz.funkybit.apps.api.model.tma.ReactionTimeApiRequest
+import xyz.funkybit.core.model.db.UserLinkedAccountType
 import xyz.funkybit.core.model.telegram.TelegramUserId
+import xyz.funkybit.core.model.telegram.miniapp.OauthRelayToken
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppGoal
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserEntity
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserIsBot
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppUserRewardEntity
+import xyz.funkybit.core.utils.DiscordClient
+import xyz.funkybit.core.utils.OAuth2
 import xyz.funkybit.core.utils.crPoints
 import xyz.funkybit.integrationtests.testutils.AppUnderTestRunner
+import xyz.funkybit.integrationtests.testutils.isTestEnvRun
 import xyz.funkybit.integrationtests.testutils.triggerRepeaterTaskAndWaitForCompletion
 import xyz.funkybit.integrationtests.utils.ApiCallFailure
 import xyz.funkybit.integrationtests.utils.TelegramMiniAppApiClient
@@ -30,6 +45,7 @@ import xyz.funkybit.integrationtests.utils.assertError
 import xyz.funkybit.integrationtests.utils.empty
 import java.math.BigDecimal
 import java.net.HttpURLConnection.HTTP_UNAUTHORIZED
+import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlin.random.Random
@@ -644,6 +660,150 @@ class TelegramMiniAppApiTest {
             assertEquals("20".crPoints(), it.balance)
             assertEquals(0, it.referralBalance.compareTo("0".crPoints()))
         }
+    }
+
+    @Test
+    fun oauthRelayToken() {
+        val apiClient = TelegramMiniAppApiClient(TelegramUserId(123L))
+        apiClient.signUp()
+
+        // Get initial token
+        val initialToken = apiClient.getOauthRelayToken().also { token ->
+            // Verify token format (base64 encoded 64 bytes)
+            assertTrue(token.value.length >= 86) // minimum base64 length for 64 bytes
+            assertTrue(Base64.getDecoder().decode(token.value).size == 64)
+        }
+
+        // Verify token is stored and expiration is set
+        transaction {
+            val user = TelegramMiniAppUserEntity.findByTelegramUserId(apiClient.telegramUserId)
+            assertNotNull(user)
+            assertEquals(initialToken, user.oauthRelayAuthToken)
+            assertNotNull(user.oauthRelayAuthTokenExpiresAt)
+            assertTrue(user.oauthRelayAuthTokenExpiresAt!! > Clock.System.now())
+            assertTrue(user.oauthRelayAuthTokenExpiresAt!! <= Clock.System.now() + 5.minutes)
+        }
+
+        // Get new token - should be different from initial
+        val newToken = apiClient.getOauthRelayToken()
+        assertNotEquals(initialToken, newToken)
+
+        // Verify the new token is stored
+        transaction {
+            val user = TelegramMiniAppUserEntity.findByTelegramUserId(apiClient.telegramUserId)
+            assertNotNull(user)
+            assertEquals(newToken, user.oauthRelayAuthToken)
+        }
+
+        // Test expired token cleanup
+        updateUser(apiClient.telegramUserId) {
+            it.oauthRelayAuthTokenExpiresAt = Clock.System.now() - 1.minutes
+        }
+
+        // Get another token after expiration
+        val tokenAfterExpiration = apiClient.getOauthRelayToken()
+        assertNotEquals(newToken, tokenAfterExpiration)
+
+        // Verify token storage after expiration
+        transaction {
+            val user = TelegramMiniAppUserEntity.findByTelegramUserId(apiClient.telegramUserId)
+            assertNotNull(user)
+            assertEquals(tokenAfterExpiration, user.oauthRelayAuthToken)
+            assertTrue(user.oauthRelayAuthTokenExpiresAt!! > Clock.System.now())
+        }
+    }
+
+    @Test
+    fun discordLinking() {
+        Assumptions.assumeFalse(isTestEnvRun())
+        val apiClient = TelegramMiniAppApiClient(TelegramUserId(123L))
+        apiClient.signUp()
+
+        // Get OAuth relay token
+        val relayToken = apiClient.getOauthRelayToken()
+
+        // Mock successful Discord flow
+        val expectedAccessToken = "discord_access_token_123"
+        val expectedRefreshToken = "discord_refresh_token_456"
+        val expectedDiscordUserId = "discord_user_789"
+        val expectedOauth2Tokens = OAuth2.Tokens(expectedAccessToken, expectedRefreshToken)
+
+        mockkObject(DiscordClient)
+        every {
+            DiscordClient.getAuthTokens(any())
+        } returns expectedOauth2Tokens
+        every {
+            DiscordClient.getUserId(expectedOauth2Tokens)
+        } returns expectedDiscordUserId
+        every {
+            DiscordClient.joinFunkybitDiscord(expectedDiscordUserId, expectedAccessToken)
+        } just Runs
+
+        // Complete Discord linking
+        apiClient.completeDiscordLinking("some_code", relayToken)
+
+        // Verify Discord client calls
+        verify(exactly = 1) { DiscordClient.getAuthTokens(OAuth2.AuthorizationCode("some_code")) }
+        verify(exactly = 1) { DiscordClient.getUserId(expectedOauth2Tokens) }
+        verify(exactly = 1) { DiscordClient.joinFunkybitDiscord(expectedDiscordUserId, expectedAccessToken) }
+
+        // Verify user state after linking
+        transaction {
+            val tmaUser = TelegramMiniAppUserEntity.findByTelegramUserId(apiClient.telegramUserId)
+            assertNotNull(tmaUser)
+            assertTrue(tmaUser.user.hasLinkedAccount(UserLinkedAccountType.Discord))
+            val discordLinkedAccount = tmaUser.user.linkedAccounts.first { it.type == UserLinkedAccountType.Discord }
+            assertEquals(expectedAccessToken, discordLinkedAccount.oauth2AccessToken)
+            assertEquals(expectedRefreshToken, discordLinkedAccount.oauth2RefreshToken)
+            assertEquals(expectedDiscordUserId, discordLinkedAccount.accountId)
+
+            // Verify Discord subscription goal was awarded
+            assertTrue(tmaUser.achievedGoals().contains(TelegramMiniAppGoal.Id.DiscordSubscription))
+        }
+
+        // Test error cases
+
+        // 1. Invalid relay token
+        apiClient.tryCompleteDiscordLinking("some_code", OauthRelayToken("invalid_token"))
+            .assertError(
+                expectedHttpCode = HTTP_UNAUTHORIZED,
+                expectedError = ApiError(ReasonCode.AuthenticationError, "Token not found or expired"),
+            )
+
+        // 2. Expired relay token
+        updateUser(apiClient.telegramUserId) {
+            it.oauthRelayAuthTokenExpiresAt = Clock.System.now() - 1.minutes
+        }
+        apiClient.tryCompleteDiscordLinking("some_code", relayToken)
+            .assertError(
+                expectedHttpCode = HTTP_UNAUTHORIZED,
+                expectedError = ApiError(ReasonCode.AuthenticationError, "Token not found or expired"),
+            )
+
+        // 3. Discord getUserId returns ""
+        every {
+            DiscordClient.getUserId(any())
+        } returns ""
+
+        val newRelayToken = apiClient.getOauthRelayToken()
+        apiClient.tryCompleteDiscordLinking("some_code", newRelayToken)
+            .assertError(
+                expectedHttpCode = BAD_REQUEST.code,
+                expectedError = ApiError(ReasonCode.ProcessingError, "Could not identify discord user id"),
+            )
+
+        // 4. Discord throws exception
+        every {
+            DiscordClient.getAuthTokens(any())
+        } throws Exception("Discord API error")
+
+        apiClient.tryCompleteDiscordLinking("some_code", newRelayToken)
+            .assertError(
+                expectedHttpCode = INTERNAL_SERVER_ERROR.code,
+                expectedError = ApiError(ReasonCode.UnexpectedError, "An unexpected error has occurred. Please, contact support if this issue persists."),
+            )
+
+        unmockkAll()
     }
 
     private fun updateUser(telegramUserId: TelegramUserId, fn: (TelegramMiniAppUserEntity) -> Unit) {

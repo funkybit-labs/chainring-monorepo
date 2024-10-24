@@ -37,6 +37,7 @@ import xyz.funkybit.core.model.db.SymbolTable
 import xyz.funkybit.core.model.db.TestnetChallengePNLTable
 import xyz.funkybit.core.model.db.TestnetChallengeUserRewardTable
 import xyz.funkybit.core.model.db.TradeTable
+import xyz.funkybit.core.model.db.UserLinkedAccountTable
 import xyz.funkybit.core.model.db.UserTable
 import xyz.funkybit.core.model.db.WalletLinkedSignerTable
 import xyz.funkybit.core.model.db.WalletTable
@@ -91,6 +92,7 @@ open class TestWithDb {
             TestnetChallengePNLTable.deleteAll()
             TestnetChallengeUserRewardTable.deleteAll()
             WalletTable.deleteAll()
+            UserLinkedAccountTable.deleteAll()
             UserTable.deleteAll()
             OHLCTable.deleteAll()
             FaucetDripTable.deleteAll()

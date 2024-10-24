@@ -2,6 +2,7 @@ import z from 'zod'
 import { Zodios } from '@zodios/core'
 import { pluginToken } from '@zodios/plugins'
 import { loadAuthToken } from 'contexts/auth'
+import { getOAuthRelayAuthToken } from 'contexts/oauthRelayAuth'
 import Decimal from 'decimal.js'
 import { useEffect, useState } from 'react'
 import { FEE_RATE_PIPS_MAX_VALUE } from 'utils'
@@ -1082,6 +1083,48 @@ export const noAuthApiClient = new Zodios(apiBaseUrl, [
   }
 ])
 
+export const oauthRelayApiClient = new Zodios(apiBaseUrl, [
+  {
+    method: 'post',
+    path: '/tma/v1/oauth-relay/discord/:code',
+    alias: 'oauthRelayCompleteDiscordLinking',
+    parameters: [
+      {
+        name: 'code',
+        type: 'Path',
+        schema: z.string()
+      }
+    ],
+    response: z.undefined(),
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  }
+])
+
+oauthRelayApiClient.use(
+  pluginToken({
+    getToken: async () => {
+      return new Promise((resolve) => {
+        const interval = setInterval(() => {
+          const token = getOAuthRelayAuthToken()
+          if (token !== '') {
+            clearInterval(interval)
+            resolve(token)
+          }
+        }, 100)
+      })
+    },
+    renewToken: async () => {
+      const token = getOAuthRelayAuthToken()
+      return Promise.resolve(token)
+    }
+  })
+)
+
 export type AccessRestriction =
   | 'none'
   | 'underMaintenance'
@@ -1118,10 +1161,12 @@ export function useAccessRestriction(): AccessRestriction {
 
     const id1 = setupInterceptors(apiClient)
     const id2 = setupInterceptors(noAuthApiClient)
+    const id3 = setupInterceptors(oauthRelayApiClient)
 
     return () => {
       apiClient.axios.interceptors.response.eject(id1)
       apiClient.axios.interceptors.response.eject(id2)
+      apiClient.axios.interceptors.response.eject(id3)
     }
   }, [])
   return restriction

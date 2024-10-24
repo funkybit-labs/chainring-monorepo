@@ -492,7 +492,8 @@ export function Leaderboard({
 
   useEffect(() => {
     if (window.location.pathname.includes('/discord-callback')) {
-      const code = window.location.search.replace('?code=', '')
+      const query = new URLSearchParams(window.location.search)
+      const code = query.get('code')
       if (code && !completeAccountLinking.isPending) {
         completeAccountLinking.mutate({ accountType: 'Discord', code })
       }

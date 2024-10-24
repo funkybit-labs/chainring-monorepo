@@ -3,9 +3,13 @@ package xyz.funkybit.core.utils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.FormBody
+import okhttp3.Headers.Companion.toHeaders
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.http4k.core.Uri
 import org.http4k.core.query
 
@@ -14,12 +18,16 @@ object DiscordClient {
     private val clientSecret = System.getenv("DISCORD_CLIENT_SECRET") ?: ""
     private val redirectUri = System.getenv("DISCORD_REDIRECT_URI") ?: "http://localhost:3000/discord-callback"
     private val urlBase = System.getenv("DISCORD_API_URL") ?: "https://discord.com/api"
+    private val funkybitGuildId = System.getenv("DISCORD_FUNKYBIT_GUILD_ID") ?: "1206128759485374474"
+    private val botToken = System.getenv("DISCORD_BOT_TOKEN") ?: ""
     private val logging = KotlinLogging.logger {}
 
     private val httpClient = HttpClient
         .newBuilder()
         .withLogging(logging)
         .build()
+
+    private val mediaType = "application/json".toMediaTypeOrNull()
 
     @OptIn(ExperimentalSerializationApi::class)
     private val json = Json {
@@ -38,6 +46,15 @@ object DiscordClient {
             .query("response_type", "code")
             .toString()
 
+    private inline fun <reified T> jsonCall(request: Request): T {
+        val httpResponse = httpClient.newCall(request).execute()
+        val httpResponseBody = httpResponse.body?.string() ?: ""
+        return when (httpResponse.code) {
+            in 200..204 -> json.decodeFromString<T>(httpResponseBody)
+            else -> throw Exception("Got an error (${httpResponse.code}) - $httpResponseBody")
+        }
+    }
+
     fun getAuthTokens(authorizationCode: OAuth2.AuthorizationCode): OAuth2.Tokens {
         val httpRequest = Request.Builder()
             .url("$urlBase/oauth2/token")
@@ -51,11 +68,19 @@ object DiscordClient {
                     .build(),
             )
             .build()
+        return jsonCall(httpRequest)
+    }
+
+    fun joinFunkybitDiscord(userId: String, accessToken: String) {
+        val headers = mapOf("Authorization" to "Bot $botToken").toHeaders()
+        val httpRequest = Request.Builder()
+            .url("$urlBase/guilds/$funkybitGuildId/members/$userId")
+            .put(json.encodeToString(mapOf("access_token" to accessToken)).toRequestBody(mediaType))
+            .headers(headers)
+            .build()
         val httpResponse = httpClient.newCall(httpRequest).execute()
-        val httpResponseBody = httpResponse.body?.string() ?: ""
-        return when (httpResponse.code) {
-            in 200..204 -> json.decodeFromString<OAuth2.Tokens>(httpResponseBody)
-            else -> throw Exception("Got an error (${httpResponse.code}) - $httpResponseBody")
+        if (!httpResponse.isSuccessful) {
+            throw Exception("Got an error (${httpResponse.code}) - ${httpResponse.body?.string()}")
         }
     }
 
@@ -69,11 +94,6 @@ object DiscordClient {
             .header("User-Agent", "DiscordBot ($urlBase, 10)")
             .build()
 
-        val httpResponse = httpClient.newCall(httpRequest).execute()
-        val httpResponseBody = httpResponse.body?.string() ?: ""
-        return when (httpResponse.code) {
-            in 200..204 -> json.decodeFromString<UsersMeResponse>(httpResponseBody).id
-            else -> throw Exception("Got an error (${httpResponse.code}) - $httpResponseBody")
-        }
+        return jsonCall<UsersMeResponse>(httpRequest).id
     }
 }
