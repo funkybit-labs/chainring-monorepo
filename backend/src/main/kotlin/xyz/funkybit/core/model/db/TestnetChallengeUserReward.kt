@@ -36,6 +36,8 @@ enum class TestnetChallengeUserRewardType {
     EvmWithdrawalDeposit,
     BitcoinWalletConnected,
     BitcoinWithdrawalDeposit,
+    DiscordAccountLinked,
+    XAccountLinked,
 }
 
 object RewardPointsConfig {
@@ -44,6 +46,8 @@ object RewardPointsConfig {
         TestnetChallengeUserRewardType.EvmWithdrawalDeposit to 250.toBigDecimal(),
         TestnetChallengeUserRewardType.BitcoinWalletConnected to 500.toBigDecimal(),
         TestnetChallengeUserRewardType.BitcoinWithdrawalDeposit to 500.toBigDecimal(),
+        TestnetChallengeUserRewardType.DiscordAccountLinked to 250.toBigDecimal(),
+        TestnetChallengeUserRewardType.XAccountLinked to 250.toBigDecimal(),
     )
 
     fun getPointsForRewardType(rewardType: TestnetChallengeUserRewardType): BigDecimal? {
@@ -149,7 +153,7 @@ class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserReward
                 is BitcoinAddress -> TestnetChallengeUserRewardType.BitcoinWalletConnected
                 is EvmAddress -> TestnetChallengeUserRewardType.EvmWalletConnected
             }
-            createIfNotExists(user, wallet, rewardType)
+            createIfNotExists(user, rewardType)
         }
 
         fun createWithdrawalReward(user: UserEntity, wallet: WalletEntity) {
@@ -159,7 +163,7 @@ class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserReward
             }
 
             // both withdrawal and deposit are required for the award.
-            createIfNotExists(user, wallet, rewardType, prerequisites = { DepositEntity.existsCompletedForWallet(wallet) })
+            createIfNotExists(user, rewardType, prerequisites = { DepositEntity.existsCompletedForWallet(wallet) })
         }
 
         fun createDepositReward(user: UserEntity, wallet: WalletEntity) {
@@ -169,14 +173,22 @@ class TestnetChallengeUserRewardEntity(guid: EntityID<TestnetChallengeUserReward
             }
 
             // both withdrawal and deposit are required for the award.
-            createIfNotExists(user, wallet, rewardType, prerequisites = { WithdrawalEntity.existsCompletedForWallet(wallet) })
+            createIfNotExists(user, rewardType, prerequisites = { WithdrawalEntity.existsCompletedForWallet(wallet) })
         }
 
-        private fun createIfNotExists(user: UserEntity, wallet: WalletEntity, rewardType: TestnetChallengeUserRewardType, prerequisites: (WalletEntity) -> Boolean = { true }) {
+        fun createAccountLinkingdReward(user: UserEntity, accountType: UserLinkedAccountType) {
+            val rewardType = when (accountType) {
+                UserLinkedAccountType.Discord -> TestnetChallengeUserRewardType.DiscordAccountLinked
+                UserLinkedAccountType.X -> TestnetChallengeUserRewardType.XAccountLinked
+            }
+            createIfNotExists(user, rewardType)
+        }
+
+        private fun createIfNotExists(user: UserEntity, rewardType: TestnetChallengeUserRewardType, prerequisites: () -> Boolean = { true }) {
             val pointsForRewardType = RewardPointsConfig.getPointsForRewardType(rewardType)
 
             pointsForRewardType?.let { points ->
-                if (!rewardExists(user, rewardType) && prerequisites(wallet)) {
+                if (!rewardExists(user, rewardType) && prerequisites()) {
                     create(user, rewardType, points)
                 }
             }

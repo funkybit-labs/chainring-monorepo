@@ -311,24 +311,25 @@ class TestnetChallengeRoutes {
             )
         } bindContract Method.PUT to { accountType ->
             { request ->
-                when (accountType) {
-                    UserLinkedAccountType.Discord -> {
-                        val authorizationCode = requestBody(request).authorizationCode
-                        val authTokens = DiscordClient.getAuthTokens(authorizationCode)
-                        val discordUserId = DiscordClient.getUserId(authTokens)
-                        transaction {
-                            UserLinkedAccountEntity.create(request.principal.user, UserLinkedAccountType.Discord, discordUserId, authTokens)
+                transaction {
+                    val authorizationCode = requestBody(request).authorizationCode
+
+                    val (accountId, authTokens) = when (accountType) {
+                        UserLinkedAccountType.Discord -> {
+                            val authTokens = DiscordClient.getAuthTokens(authorizationCode)
+                            val discordUserId = DiscordClient.getUserId(authTokens)
+                            Pair(discordUserId, authTokens)
                         }
-                    }
-                    UserLinkedAccountType.X -> {
-                        val authorizationCode = requestBody(request).authorizationCode
-                        transaction {
+                        UserLinkedAccountType.X -> {
                             val intent = UserAccountLinkingIntentEntity.getForUser(request.principal.user, accountType)
                             val authTokens = XClient.getAuthTokens(authorizationCode, intent.oauth2CodeVerifier!!)
                             val xUserId = XClient.getUserId(authTokens)
-                            UserLinkedAccountEntity.create(request.principal.user, UserLinkedAccountType.X, xUserId, authTokens)
+                            Pair(xUserId, authTokens)
                         }
                     }
+
+                    UserLinkedAccountEntity.create(request.principal.user, accountType, accountId, authTokens)
+                    TestnetChallengeUserRewardEntity.createAccountLinkingdReward(request.principal.user, accountType)
                 }
                 Response(Status.OK)
             }
