@@ -1086,13 +1086,37 @@ export const noAuthApiClient = new Zodios(apiBaseUrl, [
 export const oauthRelayApiClient = new Zodios(apiBaseUrl, [
   {
     method: 'post',
-    path: '/tma/v1/oauth-relay/discord/:code',
-    alias: 'oauthRelayCompleteDiscordLinking',
+    path: '/tma/v1/oauth-relay/:accountType',
+    alias: 'oauthRelayStartAccountLinking',
     parameters: [
       {
-        name: 'code',
+        name: 'accountType',
         type: 'Path',
-        schema: z.string()
+        schema: UserLinkedAccountTypeSchema
+      }
+    ],
+    response: StartOAuth2AccountLinkingApiResponse,
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'put',
+    path: '/tma/v1/oauth-relay/:accountType',
+    alias: 'oauthRelayCompleteAccountLinking',
+    parameters: [
+      {
+        name: 'accountType',
+        type: 'Path',
+        schema: UserLinkedAccountTypeSchema
+      },
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: CompleteOAuth2AccountLinkingApiRequestSchema
       }
     ],
     response: z.undefined(),

@@ -713,6 +713,9 @@ class TelegramMiniAppApiTest {
         }
     }
 
+    private fun discordMock() {
+    }
+
     @Test
     fun discordLinking() {
         Assumptions.assumeFalse(isTestEnvRun())
@@ -739,11 +742,15 @@ class TelegramMiniAppApiTest {
             DiscordClient.joinFunkybitDiscord(expectedDiscordUserId, expectedAccessToken)
         } just Runs
 
-        // Complete Discord linking
-        apiClient.completeDiscordLinking("some_code", relayToken)
+        // Start Discord linking
+        val url = apiClient.startOauthAccountLinking(UserLinkedAccountType.Discord, relayToken).authorizeUrl
+        assertTrue("^https://discord\\.com/api/oauth2/authorize.*scope=guilds.join\\+identify$".toRegex().matches(url))
+
+        val authCode = OAuth2.AuthorizationCode("some_code")
+        apiClient.completeOauthAccountLinking(authCode, UserLinkedAccountType.Discord, relayToken)
 
         // Verify Discord client calls
-        verify(exactly = 1) { DiscordClient.getAuthTokens(OAuth2.AuthorizationCode("some_code")) }
+        verify(exactly = 1) { DiscordClient.getAuthTokens(authCode) }
         verify(exactly = 1) { DiscordClient.getUserId(expectedOauth2Tokens) }
         verify(exactly = 1) { DiscordClient.joinFunkybitDiscord(expectedDiscordUserId, expectedAccessToken) }
 
@@ -760,11 +767,42 @@ class TelegramMiniAppApiTest {
             // Verify Discord subscription goal was awarded
             assertTrue(tmaUser.achievedGoals().contains(TelegramMiniAppGoal.Id.DiscordSubscription))
         }
+    }
 
-        // Test error cases
+    @Test
+    fun `test discord linking error cases`() {
+        Assumptions.assumeFalse(isTestEnvRun())
+        val apiClient = TelegramMiniAppApiClient(TelegramUserId(123L))
+        apiClient.signUp()
+
+        val authCode = OAuth2.AuthorizationCode("some_code")
+
+        // Mock successful Discord flow
+        val expectedAccessToken = "discord_access_token_123"
+        val expectedRefreshToken = "discord_refresh_token_456"
+        val expectedDiscordUserId = "discord_user_789"
+        val expectedOauth2Tokens = OAuth2.Tokens(expectedAccessToken, expectedRefreshToken)
+
+        mockkObject(DiscordClient)
+        every {
+            DiscordClient.getAuthTokens(any())
+        } returns expectedOauth2Tokens
+        every {
+            DiscordClient.getUserId(expectedOauth2Tokens)
+        } returns expectedDiscordUserId
+        every {
+            DiscordClient.joinFunkybitDiscord(expectedDiscordUserId, expectedAccessToken)
+        } just Runs
+
+        // Get OAuth relay token
+        val relayToken = apiClient.getOauthRelayToken()
 
         // 1. Invalid relay token
-        apiClient.tryCompleteDiscordLinking("some_code", OauthRelayToken("invalid_token"))
+        apiClient.tryCompleteOauthAccountLinking(
+            authCode,
+            UserLinkedAccountType.Discord,
+            OauthRelayToken("invalid_token"),
+        )
             .assertError(
                 expectedHttpCode = HTTP_UNAUTHORIZED,
                 expectedError = ApiError(ReasonCode.AuthenticationError, "Token not found or expired"),
@@ -774,7 +812,7 @@ class TelegramMiniAppApiTest {
         updateUser(apiClient.telegramUserId) {
             it.oauthRelayAuthTokenExpiresAt = Clock.System.now() - 1.minutes
         }
-        apiClient.tryCompleteDiscordLinking("some_code", relayToken)
+        apiClient.tryCompleteOauthAccountLinking(authCode, UserLinkedAccountType.Discord, relayToken)
             .assertError(
                 expectedHttpCode = HTTP_UNAUTHORIZED,
                 expectedError = ApiError(ReasonCode.AuthenticationError, "Token not found or expired"),
@@ -786,10 +824,10 @@ class TelegramMiniAppApiTest {
         } returns ""
 
         val newRelayToken = apiClient.getOauthRelayToken()
-        apiClient.tryCompleteDiscordLinking("some_code", newRelayToken)
+        apiClient.tryCompleteOauthAccountLinking(authCode, UserLinkedAccountType.Discord, newRelayToken)
             .assertError(
                 expectedHttpCode = BAD_REQUEST.code,
-                expectedError = ApiError(ReasonCode.ProcessingError, "Could not identify discord user id"),
+                expectedError = ApiError(ReasonCode.ProcessingError, "Could not identify Discord user id"),
             )
 
         // 4. Discord throws exception
@@ -797,10 +835,13 @@ class TelegramMiniAppApiTest {
             DiscordClient.getAuthTokens(any())
         } throws Exception("Discord API error")
 
-        apiClient.tryCompleteDiscordLinking("some_code", newRelayToken)
+        apiClient.tryCompleteOauthAccountLinking(authCode, UserLinkedAccountType.Discord, newRelayToken)
             .assertError(
                 expectedHttpCode = INTERNAL_SERVER_ERROR.code,
-                expectedError = ApiError(ReasonCode.UnexpectedError, "An unexpected error has occurred. Please, contact support if this issue persists."),
+                expectedError = ApiError(
+                    ReasonCode.UnexpectedError,
+                    "An unexpected error has occurred. Please, contact support if this issue persists.",
+                ),
             )
 
         unmockkAll()

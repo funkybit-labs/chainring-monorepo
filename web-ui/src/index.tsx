@@ -32,7 +32,7 @@ const Root = () => {
       storeOauthRelayAuthTokenAndFlow(query.get('token') ?? '', flow)
       setOauthRelayFlow(flow)
     } else if (
-      urlPath.includes('/discord-callback') &&
+      urlPath.search('/\\w+-callback') > -1 &&
       getOauthRelayAuthFlow() !== undefined
     ) {
       setOauthRelayFlow(getOauthRelayAuthFlow())

@@ -178,7 +178,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                             TelegramMiniAppRoutes.claimReward,
                             TelegramMiniAppRoutes.recordReactionTime,
                             TelegramMiniAppRoutes.oauthRelayAuthToken,
-                            TelegramMiniAppRoutes.completeDiscordLinking,
+                            TelegramMiniAppRoutes.startAccountLinking,
+                            TelegramMiniAppRoutes.completeAccountLinking,
                         )
                     },
             ),

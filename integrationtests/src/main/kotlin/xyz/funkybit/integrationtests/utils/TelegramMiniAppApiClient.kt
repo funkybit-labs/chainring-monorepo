@@ -9,14 +9,18 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.http4k.core.toUrlFormEncoded
 import org.http4k.security.HmacSha256.hmacSHA256
 import xyz.funkybit.apps.api.middleware.TelegramMiniAppUserData
+import xyz.funkybit.apps.api.model.CompleteOAuth2AccountLinkingApiRequest
+import xyz.funkybit.apps.api.model.StartOAuth2AccountLinkingApiResponse
 import xyz.funkybit.apps.api.model.tma.ClaimRewardApiRequest
 import xyz.funkybit.apps.api.model.tma.GetUserApiResponse
 import xyz.funkybit.apps.api.model.tma.ReactionTimeApiRequest
 import xyz.funkybit.apps.api.model.tma.ReactionsTimeApiResponse
 import xyz.funkybit.apps.api.model.tma.SingUpApiRequest
+import xyz.funkybit.core.model.db.UserLinkedAccountType
 import xyz.funkybit.core.model.telegram.TelegramUserId
 import xyz.funkybit.core.model.telegram.miniapp.OauthRelayToken
 import xyz.funkybit.core.model.telegram.miniapp.TelegramMiniAppInviteCode
+import xyz.funkybit.core.utils.OAuth2
 import java.net.HttpURLConnection
 
 class TelegramMiniAppApiClient(val telegramUserId: TelegramUserId) {
@@ -127,14 +131,26 @@ class TelegramMiniAppApiClient(val telegramUserId: TelegramUserId) {
                 .withAuthHeaders(telegramUserId),
         ).execute().toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
 
-    fun completeDiscordLinking(code: String, relayToken: OauthRelayToken): Unit =
-        tryCompleteDiscordLinking(code, relayToken).assertSuccess()
+    fun startOauthAccountLinking(linkType: UserLinkedAccountType, relayToken: OauthRelayToken): StartOAuth2AccountLinkingApiResponse =
+        tryStartOauthAccountLinking(linkType, relayToken).assertSuccess()
 
-    fun tryCompleteDiscordLinking(code: String, relayToken: OauthRelayToken): Either<ApiCallFailure, Unit> =
+    fun tryStartOauthAccountLinking(linkType: UserLinkedAccountType, relayToken: OauthRelayToken): Either<ApiCallFailure, StartOAuth2AccountLinkingApiResponse> =
         httpClient.newCall(
             Request.Builder()
-                .url("$apiServerRootUrl/tma/v1/oauth-relay/discord/$code")
+                .url("$apiServerRootUrl/tma/v1/oauth-relay/$linkType")
                 .post("".toRequestBody(applicationJson))
+                .header("Authorization", "Bearer ${relayToken.value}")
+                .build(),
+        ).execute().toErrorOrPayload(expectedStatusCode = HttpURLConnection.HTTP_OK)
+
+    fun completeOauthAccountLinking(code: OAuth2.AuthorizationCode, linkType: UserLinkedAccountType, relayToken: OauthRelayToken): Unit =
+        tryCompleteOauthAccountLinking(code, linkType, relayToken).assertSuccess()
+
+    fun tryCompleteOauthAccountLinking(code: OAuth2.AuthorizationCode, linkType: UserLinkedAccountType, relayToken: OauthRelayToken): Either<ApiCallFailure, Unit> =
+        httpClient.newCall(
+            Request.Builder()
+                .url("$apiServerRootUrl/tma/v1/oauth-relay/$linkType")
+                .put(json.encodeToString(CompleteOAuth2AccountLinkingApiRequest(code)).toRequestBody(applicationJson))
                 .header("Authorization", "Bearer ${relayToken.value}")
                 .build(),
         ).execute().toErrorOrUnit(expectedStatusCode = HttpURLConnection.HTTP_OK)

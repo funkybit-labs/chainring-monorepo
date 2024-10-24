@@ -37,12 +37,12 @@ object DiscordClient {
         explicitNulls = false
     }
 
-    fun getOAuth2AuthorizeUrl(): String =
+    fun getOAuth2AuthorizeUrl(scope: String = "identify"): String =
         Uri
             .of("$urlBase/oauth2/authorize")
             .query("client_id", clientId)
             .query("redirect_uri", redirectUri)
-            .query("scope", "identify")
+            .query("scope", scope)
             .query("response_type", "code")
             .toString()
 

@@ -140,8 +140,8 @@ function goalInfo(goalId: GoalId) {
       return {
         iconSrc: XIconSvg,
         description: 'X (Twitter)',
-        url: 'https://x.com/funkybit_fun',
-        verified: false
+        url: `${import.meta.env.ENV_WEB_URL}/oauth-relay?flow=x`,
+        verified: true
       }
   }
 }
