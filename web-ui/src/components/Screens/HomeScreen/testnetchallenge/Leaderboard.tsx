@@ -8,6 +8,7 @@ import BtcSvg from 'assets/btc.svg'
 import LightBulbSvg from 'assets/lightbulb.svg'
 import CopySvg from 'assets/copy.svg'
 import DiscordSvg from 'assets/discord-icon.svg'
+import XSvg from 'assets/twitter-x-icon.svg'
 import React, {
   ChangeEvent,
   Fragment,
@@ -23,7 +24,8 @@ import {
   Balance,
   Card,
   Leaderboard as LB,
-  LeaderboardType
+  LeaderboardType,
+  UserLinkedAccountType
 } from 'apiClient'
 import { Modal } from 'components/common/Modal'
 import { Tab, Widget } from 'components/Screens/Header'
@@ -40,8 +42,6 @@ type EditMode = 'none' | 'name' | 'icon'
 const rowsPerPage = 20
 
 export const webInviteBaseUrl = import.meta.env.ENV_WEB_URL + '/invite'
-const discordClientId = import.meta.env.ENV_DISCORD_CLIENT_ID
-const discordCallback = import.meta.env.ENV_WEB_URL + '/discord-callback'
 
 export const cardsQueryKey = ['cards']
 
@@ -159,6 +159,7 @@ type CTA =
   | 'BitcoinWithdrawal'
   | 'EvmWithdrawal'
   | 'LinkDiscord'
+  | 'LinkX'
 
 function CardCarousel({
   cards,
@@ -209,18 +210,25 @@ function CardCarousel({
                   <div className="my-auto">
                     <span
                       className="cursor-pointer underline"
-                      onClick={() => {
-                        window.open(
-                          `https://discord.com/api/oauth2/authorize?client_id=${discordClientId}&redirect_uri=${encodeURIComponent(
-                            discordCallback
-                          )}&response_type=code&scope=identify`,
-                          '_self'
-                        )
-                      }}
+                      onClick={() => onCallToAction(card.type)}
                     >
                       Link
                     </span>{' '}
                     your Discord account to earn more points!
+                  </div>
+                </>
+              )}
+              {card.type === 'LinkX' && (
+                <>
+                  <img src={XSvg} alt={'x'} className="mx-4 my-auto size-12" />
+                  <div className="my-auto">
+                    <span
+                      className="cursor-pointer underline"
+                      onClick={() => onCallToAction(card.type)}
+                    >
+                      Link
+                    </span>{' '}
+                    your X account to earn more points!
                   </div>
                 </>
               )}
@@ -447,17 +455,37 @@ export function Leaderboard({
   const [avatarSaveError, setAvatarSaveError] = useState('')
   const [nicknameSaveError, setNicknameSaveError] = useState('')
 
-  const completeDiscordLinking = useMutation({
-    mutationFn: (code: string) => {
-      return apiClient.testnetChallengeCompleteDiscordLinking(undefined, {
-        params: { code }
+  const startAccountLinking = useMutation({
+    mutationFn: (accountType: UserLinkedAccountType) => {
+      return apiClient.testnetChallengeStartAccountLinking(undefined, {
+        params: { accountType }
       })
+    },
+    onSuccess: (response) => {
+      window.open(response.authorizeUrl, '_self')
+    },
+    onError: (error, accountType) => {
+      alert(`Unable to link your ${accountType} account`)
+    }
+  })
+
+  const completeAccountLinking = useMutation({
+    mutationFn: (params: {
+      accountType: UserLinkedAccountType
+      code: string
+    }) => {
+      return apiClient.testnetChallengeCompleteAccountLinking(
+        {
+          authorizationCode: params.code
+        },
+        { params: { accountType: params.accountType } }
+      )
     },
     onSuccess: () => {
       window.location.href = '/'
     },
-    onError: () => {
-      alert('Unable to link your discord account')
+    onError: (error, params) => {
+      alert(`Unable to link your ${params.accountType} account`)
       window.location.href = '/'
     }
   })
@@ -465,11 +493,20 @@ export function Leaderboard({
   useEffect(() => {
     if (window.location.pathname.includes('/discord-callback')) {
       const code = window.location.search.replace('?code=', '')
-      if (code) {
-        completeDiscordLinking.mutate(code)
+      if (code && !completeAccountLinking.isPending) {
+        completeAccountLinking.mutate({ accountType: 'Discord', code })
       }
     }
-  }, [completeDiscordLinking])
+  }, [completeAccountLinking])
+
+  useEffect(() => {
+    if (window.location.pathname.includes('/x-callback')) {
+      const code = new URLSearchParams(window.location.search).get('code')
+      if (code && !completeAccountLinking.isPending) {
+        completeAccountLinking.mutate({ accountType: 'X', code })
+      }
+    }
+  }, [completeAccountLinking])
 
   const onSelectIconFile = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) {
@@ -579,6 +616,10 @@ export function Leaderboard({
       } else {
         onChangeTab('Dashboard', 'Balances')
       }
+    } else if (type == 'LinkDiscord') {
+      startAccountLinking.mutate('Discord')
+    } else if (type == 'LinkX') {
+      startAccountLinking.mutate('X')
     }
   }
 

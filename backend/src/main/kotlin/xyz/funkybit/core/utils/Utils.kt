@@ -45,6 +45,15 @@ fun generateRandomBytes(length: Int): ByteArray {
     return bytes
 }
 
+object SecureRandomString {
+    private val random = SecureRandom()
+    private const val ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+    fun next(length: Int): String {
+        return (1..length).map { ALPHABET[random.nextInt(ALPHABET.length)] }.joinToString("")
+    }
+}
+
 fun generateOrderNonce() = generateHexString(32)
 
 @OptIn(ExperimentalStdlibApi::class)

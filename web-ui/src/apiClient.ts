@@ -472,6 +472,17 @@ const SetAvatarUrlSchema = z.object({
   url: z.string()
 })
 
+const UserLinkedAccountTypeSchema = z.enum(['Discord', 'X'])
+export type UserLinkedAccountType = z.infer<typeof UserLinkedAccountTypeSchema>
+
+const StartOAuth2AccountLinkingApiResponse = z.object({
+  authorizeUrl: z.string()
+})
+
+const CompleteOAuth2AccountLinkingApiRequestSchema = z.object({
+  authorizationCode: z.string()
+})
+
 const LeaderboardTypeSchema = z.enum(['DailyPNL', 'WeeklyPNL', 'OverallPNL'])
 
 export type LeaderboardType = z.infer<typeof LeaderboardTypeSchema>
@@ -512,6 +523,10 @@ const LinkDiscordCardSchema = z.object({
   type: z.literal('LinkDiscord')
 })
 
+const LinkXCardSchema = z.object({
+  type: z.literal('LinkX')
+})
+
 const PointTypeSchema = z.enum([
   'DailyReward',
   'WeeklyReward',
@@ -547,7 +562,8 @@ const CardSchema = z.discriminatedUnion('type', [
   BitcoinConnectCardSchema,
   BitcoinWithdrawalCardSchema,
   EvmWithdrawalCardSchema,
-  LinkDiscordCardSchema
+  LinkDiscordCardSchema,
+  LinkXCardSchema
 ])
 
 export type Card = z.infer<typeof CardSchema>
@@ -984,13 +1000,37 @@ export const apiClient = new Zodios(apiBaseUrl, [
   },
   {
     method: 'post',
-    path: '/v1/testnet-challenge/discord/:code',
-    alias: 'testnetChallengeCompleteDiscordLinking',
+    path: '/v1/testnet-challenge/account-link/:accountType',
+    alias: 'testnetChallengeStartAccountLinking',
     parameters: [
       {
-        name: 'code',
+        name: 'accountType',
         type: 'Path',
-        schema: z.string()
+        schema: UserLinkedAccountTypeSchema
+      }
+    ],
+    response: StartOAuth2AccountLinkingApiResponse,
+    errors: [
+      {
+        status: 'default',
+        schema: ApiErrorsSchema
+      }
+    ]
+  },
+  {
+    method: 'put',
+    path: '/v1/testnet-challenge/account-link/:accountType',
+    alias: 'testnetChallengeCompleteAccountLinking',
+    parameters: [
+      {
+        name: 'accountType',
+        type: 'Path',
+        schema: UserLinkedAccountTypeSchema
+      },
+      {
+        name: 'payload',
+        type: 'Body',
+        schema: CompleteOAuth2AccountLinkingApiRequestSchema
       }
     ],
     response: z.undefined(),

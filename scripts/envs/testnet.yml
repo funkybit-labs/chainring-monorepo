@@ -28,6 +28,8 @@ environment:
     TESTNET_CHALLENGE_GAS_AMOUNT: "0.0002"
     DISCORD_REDIRECT_URI: "https://testnet.funkybit.fun/discord-callback"
     DISCORD_CLIENT_ID: "1296545058736050297"
+    X_REDIRECT_URI: "https://testnet.funkybit.fun/x-callback"
+    X_CLIENT_ID: "UFd5WWVVRUxQTUw5QzRQUTdwbGU6MTpjaQ"
   sequencer:
     QUEUE_HOME: "/data/queues/testnet"
     CHECKPOINTS_ENABLED: "true"
@@ -67,6 +69,7 @@ services:
       EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/api/EVM_CONTRACT_MANAGEMENT_PRIVATE_KEY-7XFaCF
       EVM_AIRDROPPER_PRIVATE_KEY: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/api/EVM_AIR_DROPPER_PRIVATE_KEY-6OVkDo
       DISCORD_CLIENT_SECRET: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/api/DISCORD_CLIENT_SECRET-XQybt5
+      X_CLIENT_SECRET: arn:aws:secretsmanager:us-east-2:851725450525:secret:testnet/api/X_CLIENT_SECRET-CKCYxQ
   ring:
     image: 851725450525.dkr.ecr.us-east-2.amazonaws.com/backend
     count: 1
