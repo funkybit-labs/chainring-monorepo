@@ -1097,25 +1097,23 @@ class SequencerApp(
 
         // moveToCycle moves tailer to the start of the cycle
         if (inputTailer.moveToCycle(currentCycle)) {
-            // restore from previous cycle's checkpoint unless we are in the first cycle
-            if (currentCycle != inputQueue.firstCycle()) {
-                var expectedCycle = inputQueue.nextCycle(currentCycle, TailerDirection.BACKWARD)
-                while (expectedCycle != inputQueue.firstCycle()) {
-                    logger.debug { "Restoring from checkpoint with expected cycle $expectedCycle" }
-                    try {
-                        state.load(
-                            checkpointsQueue,
-                            expectedCycle = expectedCycle,
-                        )
-                        break
-                    } catch (e: Exception) {
-                        if (e.message?.contains("Invalid cycle in the checkpoint") == true) {
-                            inputTailer.moveToCycle(expectedCycle)
-                            expectedCycle = inputQueue.nextCycle(expectedCycle, TailerDirection.BACKWARD)
-                            logger.debug { "Could not find expected cycle, going backwards" }
-                        } else {
-                            throw(e)
-                        }
+            // restore from current cycle's checkpoint unless we are in the first cycle
+            var expectedCycle = currentCycle
+            while (expectedCycle != inputQueue.firstCycle()) {
+                logger.debug { "Restoring from checkpoint with expected cycle $expectedCycle" }
+                try {
+                    state.load(
+                        checkpointsQueue,
+                        expectedCycle = expectedCycle,
+                    )
+                    break
+                } catch (e: Exception) {
+                    if (e.message?.contains("Invalid cycle in the checkpoint") == true) {
+                        inputTailer.moveToCycle(expectedCycle)
+                        expectedCycle = inputQueue.nextCycle(expectedCycle, TailerDirection.BACKWARD)
+                        logger.debug { "Could not find expected cycle, going backwards (${e.message})" }
+                    } else {
+                        throw (e)
                     }
                 }
                 logger.debug { "Restored from checkpoint" }
