@@ -59,16 +59,18 @@ object UserTable : GUIDTable<UserId>("user", ::UserId) {
 class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
 
     companion object : EntityClass<UserId, UserEntity>(UserTable) {
-        fun create(createdBy: Address): UserEntity {
+        fun create(createdBy: String): UserEntity {
             val userId = UserId.generate()
             return UserEntity.new(userId) {
                 this.createdAt = Clock.System.now()
-                this.createdBy = createdBy.canonicalize().toString()
+                this.createdBy = createdBy
                 this.sequencerId = userId.toSequencerId()
                 this.inviteCode = TestnetChallengeUtils.inviteCode()
                 this.testnetChallengeStatus = TestnetChallengeStatus.Unenrolled
             }
         }
+
+        fun create(createdBy: Address) = create(createdBy.canonicalize().toString())
 
         fun getBySequencerIds(sequencerIds: Set<SequencerAccountId>): List<UserEntity> {
             return UserEntity.find {
