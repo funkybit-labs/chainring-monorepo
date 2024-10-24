@@ -26,9 +26,7 @@ import org.http4k.server.Netty
 import org.http4k.server.PolyHandler
 import org.http4k.server.ServerConfig
 import org.http4k.server.asServer
-import org.web3j.crypto.ECKeyPair
 import org.web3j.crypto.Keys
-import org.web3j.utils.Numeric
 import xyz.funkybit.integrationtests.utils.WalletKeyPair
 
 fun main() {
@@ -147,7 +145,8 @@ class MockerApp(
                         baseAssetAmount = params.initialBaseBalance * BigDecimal(100),
                         quoteAssetAmount = params.initialBaseBalance * params.priceBaseline * BigDecimal(100),
                         keyPair = WalletKeyPair.EVM.fromPrivateKeyHex(params.makerPrivateKeyHex),
-                        usePriceFeed = System.getenv("MAKER_USE_PRICE_FEED")?.toBoolean() ?: false
+                        usePriceFeed = System.getenv("MAKER_USE_PRICE_FEED")?.toBoolean() ?: false,
+                        maxOrdersBatchSize = System.getenv("BATCH_ORDERS_MAX_SIZE")?.toIntOrNull() ?: 100
                     )
                 )
             }

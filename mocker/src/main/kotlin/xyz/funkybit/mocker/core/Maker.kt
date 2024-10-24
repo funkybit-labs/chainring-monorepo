@@ -62,7 +62,8 @@ class Maker(
     nativeAssets: Map<String, BigInteger>,
     assets: Map<String, BigInteger>,
     keyPair: WalletKeyPair = WalletKeyPair.EVM.generate(),
-    private val usePriceFeed: Boolean = false
+    private val usePriceFeed: Boolean = false,
+    private val maxOrdersBatchSize: Int,
 ) : Actor(marketIds, nativeAssets, assets, keyPair) {
     private val marketPriceOverrideFunction: PriceFunction? = marketPriceOverride?.let { PriceFunction.generateDeterministicHarmonicMovement(initialValue = it.toDouble(), maxFluctuation = 0.01) }
     override val id: String = "mm_${keyPair.address().canonicalize()}"
@@ -331,16 +332,25 @@ class Maker(
             )
         }
 
-        apiClient.tryBatchOrders(
-            BatchOrdersApiRequest(
-                marketId = marketId,
-                createOrders = createOrders,
-                cancelOrders = cancelOrders
-            )
-        ).onLeft {
-            logger.warn { "$id could not apply batch: ${it.error?.message}" }
-        }.onRight {
-            logger.info { "$id: applied update batch: created ${createOrders.size}, cancelled ${cancelOrders.size}" }
+
+        // split into multiple batch requests if exceeding batch size.
+        // cancellations are processed first as they influence limits
+        val allOrders = (cancelOrders + createOrders).chunked(maxOrdersBatchSize)
+        for (chunk in allOrders) {
+            val cancelOrdersChunk = chunk.filterIsInstance<CancelOrderApiRequest>()
+            val createOrdersChunk = chunk.filterIsInstance<CreateOrderApiRequest.Limit>()
+
+            apiClient.tryBatchOrders(
+                BatchOrdersApiRequest(
+                    marketId = marketId,
+                    createOrders = createOrdersChunk,
+                    cancelOrders = cancelOrdersChunk,
+                )
+            ).onLeft {
+                logger.warn { "$id could not apply batch: ${it.error?.message}" }
+            }.onRight {
+                logger.info { "$id: applied update batch: created ${createOrders.size}, cancelled ${cancelOrders.size}" }
+            }
         }
     }
 
