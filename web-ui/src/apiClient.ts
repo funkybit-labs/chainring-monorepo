@@ -535,7 +535,9 @@ const PointTypeSchema = z.enum([
   'EvmWalletConnected',
   'EvmWithdrawalDeposit',
   'BitcoinWalletConnected',
-  'BitcoinWithdrawalDeposit'
+  'BitcoinWithdrawalDeposit',
+  'DiscordAccountLinked',
+  'XAccountLinked'
 ])
 
 const RewardCategorySchema = z.enum([

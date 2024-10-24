@@ -12,8 +12,12 @@ import org.http4k.core.query
 import java.util.UUID
 
 object XClient {
-    private val clientId = System.getenv("X_CLIENT_ID") ?: ""
-    private val clientSecret = System.getenv("X_CLIENT_SECRET") ?: ""
+    private val clientId = System.getenv("X_CLIENT_ID")
+        ?: "VDJzZS1fV20zTEFWYVVRcHBqbTI6MTpjaQ" // X app for dev testing
+
+    private val clientSecret = System.getenv("X_CLIENT_SECRET")
+        ?: "94QEgXcvOMCCGuOPjiUC823QfEwo3HUIBKQIgL8wWsSM-Hpxck" // X app for dev testing
+
     private val redirectUri = System.getenv("X_REDIRECT_URI") ?: "http://localhost:3000/x-callback"
     private val urlBase = System.getenv("X_API_URL") ?: "https://api.x.com"
     private val logging = KotlinLogging.logger {}

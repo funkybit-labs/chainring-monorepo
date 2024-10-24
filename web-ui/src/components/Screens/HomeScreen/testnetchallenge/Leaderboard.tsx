@@ -325,6 +325,12 @@ function CardCarousel({
                     {card.pointType === 'BitcoinWalletConnected' && (
                       <>for connecting your Bitcoin wallet.</>
                     )}
+                    {card.pointType === 'DiscordAccountLinked' && (
+                      <>for linking your Discord account.</>
+                    )}
+                    {card.pointType === 'XAccountLinked' && (
+                      <>for linking your X account.</>
+                    )}
                   </div>
                 </>
               )}

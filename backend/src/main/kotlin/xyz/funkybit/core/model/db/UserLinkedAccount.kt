@@ -97,7 +97,7 @@ object UserLinkedAccountTable : IntIdTable("user_linked_account") {
 
 class UserLinkedAccountEntity(id: EntityID<Int>) : IntEntity(id) {
     companion object : IntEntityClass<UserLinkedAccountEntity>(UserLinkedAccountTable) {
-        fun create(user: UserEntity, accountType: UserLinkedAccountType, accountId: String, oauth2Tokens: OAuth2.Tokens) {
+        fun create(user: UserEntity, accountType: UserLinkedAccountType, accountId: String, oauth2Tokens: OAuth2.Tokens): UserLinkedAccountEntity =
             UserLinkedAccountEntity.new {
                 this.userGuid = user.guid
                 this.type = accountType
@@ -106,7 +106,6 @@ class UserLinkedAccountEntity(id: EntityID<Int>) : IntEntity(id) {
                 this.oauth2RefreshToken = oauth2Tokens.refresh
                 this.createdAt = Clock.System.now()
             }
-        }
     }
 
     var userGuid by UserLinkedAccountTable.userGuid
