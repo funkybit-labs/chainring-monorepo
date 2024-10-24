@@ -3,14 +3,13 @@ package xyz.funkybit.core.utils
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.http4k.base64Encode
-import java.util.UUID
 
 object OAuth2 {
     @JvmInline
     value class CodeVerifier(val value: String) {
         companion object {
             fun generate(): CodeVerifier =
-                CodeVerifier(UUID.randomUUID().toString().replace("-", ""))
+                CodeVerifier(SecureRandomString.next(64))
         }
 
         fun toChallenge(): CodeChallenge =

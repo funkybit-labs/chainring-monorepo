@@ -13,7 +13,7 @@ import java.util.UUID
 
 object XClient {
     private val clientId = System.getenv("X_CLIENT_ID") ?: ""
-    private val clientSecret = System.getenv("X_CLIENT_SECRET") ?: "-Hpxck"
+    private val clientSecret = System.getenv("X_CLIENT_SECRET") ?: ""
     private val redirectUri = System.getenv("X_REDIRECT_URI") ?: "http://localhost:3000/x-callback"
     private val urlBase = System.getenv("X_API_URL") ?: "https://api.x.com"
     private val logging = KotlinLogging.logger {}
