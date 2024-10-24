@@ -2,7 +2,6 @@ package xyz.funkybit.sequencer.apps
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import net.openhft.chronicle.queue.ExcerptTailer
-import net.openhft.chronicle.queue.TailerDirection
 import net.openhft.chronicle.queue.impl.RollingChronicleQueue
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.core.model.db.OrderSide
@@ -1093,31 +1092,14 @@ class SequencerApp(
     }
 
     private fun restoreFromCheckpoint(inputTailer: ExcerptTailer, checkpointsQueue: RollingChronicleQueue) {
-        val currentCycle = inputTailer.cycle()
+        val restoredFromCycle = state.load(checkpointsQueue)
 
-        // moveToCycle moves tailer to the start of the cycle
-        if (inputTailer.moveToCycle(currentCycle)) {
-            // restore from current cycle's checkpoint unless we are in the first cycle
-            var expectedCycle = currentCycle
-            while (expectedCycle != inputQueue.firstCycle()) {
-                logger.debug { "Restoring from checkpoint with expected cycle $expectedCycle" }
-                try {
-                    state.load(
-                        checkpointsQueue,
-                        expectedCycle = expectedCycle,
-                    )
-                    break
-                } catch (e: Exception) {
-                    if (e.message?.contains("Invalid cycle in the checkpoint") == true) {
-                        inputTailer.moveToCycle(expectedCycle)
-                        expectedCycle = inputQueue.nextCycle(expectedCycle, TailerDirection.BACKWARD)
-                        logger.debug { "Could not find expected cycle, going backwards (${e.message})" }
-                    } else {
-                        throw (e)
-                    }
-                }
-                logger.debug { "Restored from checkpoint" }
-            }
+        if (restoredFromCycle != null) {
+            inputTailer.moveToCycle(restoredFromCycle)
+            logger.debug { "Restored from checkpoint" }
+        } else {
+            inputTailer.toStart()
+            logger.debug { "No checkpoints found, moved to start" }
         }
     }
 

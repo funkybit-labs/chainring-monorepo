@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import xyz.funkybit.core.model.Symbol
 import xyz.funkybit.sequencer.apps.GatewayApp
 import xyz.funkybit.sequencer.apps.GatewayConfig
@@ -985,22 +984,15 @@ class TestSequencerCheckpoints {
         )
     }
 
-    @Test
-    fun `restoring from checkpoint throws on cycle mismatch`() {
-        val initialState = SequencerState()
-        initialState.persist(checkpointsQueue, 1)
-
-        assertThrows<RuntimeException>("Invalid cycle in the checkpoint. Expected 2, got 1") {
-            SequencerState().apply { load(checkpointsQueue, 2) }
-        }
-    }
-
     private fun verifySerialization(initialState: SequencerState) {
         verifyMarketsCheckpoints(initialState)
 
         initialState.persist(checkpointsQueue, 1)
 
-        val restoredState = SequencerState().apply { load(checkpointsQueue, 1) }
+        val restoredState = SequencerState().apply {
+            val restoredFromCycle = load(checkpointsQueue)
+            assertEquals(1, restoredFromCycle)
+        }
 
         initialState.markets.values.forEach { initialStateMarket ->
             val restoredStateMarket = restoredState.markets.getValue(initialStateMarket.id)
