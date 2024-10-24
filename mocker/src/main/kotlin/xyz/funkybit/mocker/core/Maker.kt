@@ -349,7 +349,7 @@ class Maker(
             ).onLeft {
                 logger.warn { "$id could not apply batch: ${it.error?.message}" }
             }.onRight {
-                logger.info { "$id: applied update batch: created ${createOrders.size}, cancelled ${cancelOrders.size}" }
+                logger.info { "$id: applied update batch: created ${createOrdersChunk.size}, cancelled ${cancelOrdersChunk.size}" }
             }
         }
     }
