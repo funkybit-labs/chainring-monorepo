@@ -115,6 +115,13 @@ class DepositEntity(guid: EntityID<DepositId>) : GUIDEntity<DepositId>(guid) {
             }
         }
 
+        fun updateToConfirmed(depositEntities: List<DepositEntity>) {
+            DepositTable.update({ DepositTable.guid.inList(depositEntities.map { it.guid }) }) {
+                it[archTransactionGuid] = null
+                it[status] = DepositStatus.Confirmed
+            }
+        }
+
         private fun getForUpdate(chainId: ChainId, status: DepositStatus, limit: Int? = null): List<DepositEntity> =
             DepositTable
                 .join(SymbolTable, JoinType.INNER, SymbolTable.guid, DepositTable.symbolGuid)

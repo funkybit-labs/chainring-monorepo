@@ -625,7 +625,6 @@ class SettlementTest : OrderBaseTest() {
         var completedTradeUpdates = 0
         takerWsClient.apply {
             assertMessagesReceived(5) { messages ->
-                println(messages)
                 messages.filter { it.topic == SubscriptionTopic.MyTrades && it.data is MyTradesUpdated }.map { it.data as MyTradesUpdated }.forEach { msg ->
                     msg.trades.forEach { trade ->
                         when (trade.settlementStatus) {
@@ -1128,7 +1127,6 @@ class SettlementTest : OrderBaseTest() {
         var completedTradeUpdates = 0
         takerWsClient.apply {
             assertMessagesReceived(5) { messages ->
-                println(messages)
                 messages.filter { it.topic == SubscriptionTopic.MyTrades && it.data is MyTradesUpdated }.map { it.data as MyTradesUpdated }.forEach { msg ->
                     msg.trades.forEach { trade ->
                         when (trade.settlementStatus) {

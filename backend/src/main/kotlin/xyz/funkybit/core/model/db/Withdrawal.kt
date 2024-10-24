@@ -8,6 +8,7 @@ import org.jetbrains.exposed.dao.EntityClass
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andIfNotNull
 import org.jetbrains.exposed.sql.json.jsonb
@@ -16,6 +17,7 @@ import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.statements.BatchUpdateStatement
 import org.jetbrains.exposed.sql.transactions.TransactionManager
+import org.jetbrains.exposed.sql.update
 import xyz.funkybit.core.blockchain.bitcoin.bitcoinConfig
 import xyz.funkybit.core.model.BitcoinAddress
 import xyz.funkybit.core.model.EvmAddress
@@ -296,6 +298,13 @@ class WithdrawalEntity(guid: EntityID<WithdrawalId>) : GUIDEntity<WithdrawalId>(
                     this[WithdrawalTable.archTransactionGuid] = archTransactionEntity.guid.value
                 }
                 execute(TransactionManager.current())
+            }
+        }
+
+        fun updateToPendingRollbackOnArch(withdrawals: List<WithdrawalEntity>) {
+            WithdrawalTable.update({ WithdrawalTable.guid.inList(withdrawals.map { it.guid }) }) {
+                it[archRollbackTransactionGuid] = null
+                it[status] = WithdrawalStatus.PendingRollback
             }
         }
 

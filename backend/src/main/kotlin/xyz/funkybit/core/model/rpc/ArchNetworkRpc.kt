@@ -5,12 +5,16 @@ import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.descriptors.buildSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.encodeCollection
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonTransformingSerializer
 import kotlinx.serialization.serializer
 import org.bitcoinj.core.ECKey
 import org.web3j.crypto.Keys
@@ -24,6 +28,7 @@ import xyz.funkybit.core.utils.doubleSha256FromHex
 import xyz.funkybit.core.utils.schnorr.Point
 import xyz.funkybit.core.utils.toHex
 import xyz.funkybit.core.utils.toHexBytes
+import xyz.funkybit.core.utils.toJsonElement
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.*
@@ -75,6 +80,33 @@ object ArchRpcParamsSerializer : KSerializer<ArchRpcParams> {
 
 @OptIn(ExperimentalUnsignedTypes::class)
 sealed class ArchNetworkRpc {
+
+    enum class ContractError(code: Int) {
+        INVALID_ADDRESS_INDEX(601),
+        INVALID_ACCOUNT_INDEX(602),
+        INSUFFICIENT_BALANCE(603),
+        ADDRESS_MISMATCH(604),
+        SETTLEMENT_IN_PROGRESS(605),
+        NO_SETTLEMENT_IN_PROGRESS(606),
+        SETTLEMENT_BATCH_MISMATCH(607),
+        NETTING(608),
+        ALREADY_INITIALIZED(609),
+        PROGRAM_STATE_MISMATCH(610),
+        NO_OUTPUTS_ALLOWED(611),
+        INVALID_ADDRESS(612),
+        INVALID_SIGNER(613),
+        VALUE_TOO_LONG(614),
+        WALLET_LAST4_MISMATCH(615),
+        INVALID_ADDRESS_NETWORK(616),
+        INVALID_INPUT_TX(617),
+        ;
+
+        companion object {
+            fun fromCode(code: Int): ContractError? {
+                return entries.firstOrNull { it.ordinal == code - 601 }
+            }
+        }
+    }
 
     @Serializable
     data class RuntimeTransaction(
@@ -267,31 +299,23 @@ sealed class ArchNetworkRpc {
         Failed,
     }
 
-    @Serializable(with = StatusInfoSerializer::class)
-    data class StatusInfo(
-        val status: Status,
-        val error: String?,
+    data class ErrorInfo(
+        val msg: String,
+        val code: ContractError?,
     )
 
-    @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
-    object StatusInfoSerializer : KSerializer<StatusInfo> {
-        @OptIn(InternalSerializationApi::class, ExperimentalSerializationApi::class)
-        override val descriptor: SerialDescriptor = buildSerialDescriptor("StatusInfo", StructureKind.OBJECT)
+    data class StatusInfo(
+        val status: Status,
+        val errorInfo: ErrorInfo?,
+    )
 
-        override fun serialize(encoder: Encoder, value: StatusInfo) {
-            throw Exception("Not implemented")
-        }
-
-        @OptIn(InternalSerializationApi::class)
-        override fun deserialize(decoder: Decoder): StatusInfo {
-            val status = String::class.serializer().deserialize(decoder)
-            return when {
-                status == "Processing" -> StatusInfo(Status.Processing, null)
-                status == "Processed" -> StatusInfo(Status.Processed, null)
-                status.startsWith("Failed(") -> StatusInfo(Status.Failed, status.substring(7, status.lastIndex - 1))
-                else -> throw Exception("unrecognized status $status")
+    object StatusSerializer : JsonTransformingSerializer<String>(serializer()) {
+        override fun transformDeserialize(element: JsonElement): JsonElement =
+            if (element is JsonObject) {
+                element["Failed"] ?: "unknown".toJsonElement()
+            } else {
+                element
             }
-        }
     }
 
     @Serializable
@@ -299,10 +323,28 @@ sealed class ArchNetworkRpc {
         @SerialName("runtime_transaction")
         val runtimeTransaction: RuntimeTransaction,
         @SerialName("status")
-        val statusInfo: StatusInfo,
+        @Serializable(with = StatusSerializer::class)
+        val rawStatus: String,
         @SerialName("bitcoin_txid")
         val bitcoinTxId: TxHash?,
-    )
+    ) {
+        @OptIn(ExperimentalStdlibApi::class)
+        @Transient
+        val statusInfo: StatusInfo = when (rawStatus) {
+            "Processed" -> StatusInfo(Status.Processed, null)
+            "Processing" -> StatusInfo(Status.Processing, null)
+            else -> {
+                val errorCode = Regex(".*Custom program error: (.*)$").matchEntire(rawStatus)?.let { match ->
+                    if (match.groups.size == 2) {
+                        ContractError.fromCode(match.groups[1]!!.value.hexToInt(HexFormat { number.prefix = "0x" }))
+                    } else {
+                        null
+                    }
+                }
+                StatusInfo(Status.Failed, ErrorInfo(rawStatus, errorCode))
+            }
+        }
+    }
 
     companion object {
         fun createNewAccountInstruction(pubkey: Pubkey, utxoMeta: UtxoMeta): Instruction {
