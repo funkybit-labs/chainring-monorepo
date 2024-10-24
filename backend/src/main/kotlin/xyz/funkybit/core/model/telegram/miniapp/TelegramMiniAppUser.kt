@@ -13,6 +13,8 @@ import xyz.funkybit.core.model.db.EntityId
 import xyz.funkybit.core.model.db.GUIDEntity
 import xyz.funkybit.core.model.db.GUIDTable
 import xyz.funkybit.core.model.db.PGEnum
+import xyz.funkybit.core.model.db.UserEntity
+import xyz.funkybit.core.model.db.UserTable
 import xyz.funkybit.core.model.telegram.TelegramUserId
 import java.math.BigDecimal
 import kotlin.random.Random
@@ -71,6 +73,7 @@ object TelegramMiniAppUserTable : GUIDTable<TelegramMiniAppUserId>("telegram_min
         { value -> TelegramMiniAppUserIsBot.valueOf(value as String) },
         { PGEnum("TelegramMiniAppUserIsBot", it) },
     ).index().default(TelegramMiniAppUserIsBot.No)
+    val userGuid = reference("user_guid", UserTable)
 }
 
 class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEntity<TelegramMiniAppUserId>(guid) {
@@ -82,6 +85,8 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
                 it.invites -= 1
             }
 
+            val user = UserEntity.create("tma:$telegramUserId")
+
             return TelegramMiniAppUserEntity.new(TelegramMiniAppUserId.generate(telegramUserId)) {
                 this.telegramUserId = telegramUserId
                 this.createdAt = Clock.System.now()
@@ -89,9 +94,8 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
                 this.createdBy = "telegramBot"
                 this.inviteCode = TelegramMiniAppInviteCode.generate()
                 this.invitedBy = invitedBy
-            }.also { user ->
-                user.flush()
-            }
+                this.userGuid = user.guid
+            }.also { it.flush() }
         }
 
         fun findByTelegramUserId(telegramUserId: TelegramUserId): TelegramMiniAppUserEntity? {
@@ -126,6 +130,7 @@ class TelegramMiniAppUserEntity(guid: EntityID<TelegramMiniAppUserId>) : GUIDEnt
     )
     var invitedBy by TelegramMiniAppUserEntity optionalReferencedOn TelegramMiniAppUserTable.invitedBy
     var isBot by TelegramMiniAppUserTable.isBot
+    var userGuid by TelegramMiniAppUserTable.userGuid
 
     fun pointsBalances(): Map<TelegramMiniAppUserRewardType, BigDecimal> {
         val sumColumn = TelegramMiniAppUserRewardTable.amount.sum().alias("amount_sum")
