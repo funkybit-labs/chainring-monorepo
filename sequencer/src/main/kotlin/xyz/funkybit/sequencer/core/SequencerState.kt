@@ -61,17 +61,14 @@ data class SequencerState(
         withdrawalFees.clear()
     }
 
-    fun load(checkpointsQueue: RollingChronicleQueue, expectedCycle: Int) {
+    fun load(checkpointsQueue: RollingChronicleQueue): Int? {
+        var cycle: Int?
         measureNanoTime {
             val checkpointsTailer = checkpointsQueue.createTailer()
             checkpointsTailer.moveToIndex(checkpointsQueue.lastIndex())
             checkpointsTailer.readingDocument().use { docCtx ->
                 val wire = docCtx.wire()!!
-                val cycle = wire.read("cycle").readInt()
-
-                if (cycle != expectedCycle) {
-                    throw RuntimeException("Invalid cycle in the checkpoint. Expected $expectedCycle, got $cycle")
-                }
+                cycle = wire.read("cycle").readInt()
 
                 logger.debug { "Restoring from checkpoint for cycle $cycle" }
 
@@ -129,6 +126,7 @@ data class SequencerState(
         }.let {
             logger.debug { "load of checkpoint took ${humanReadableNanoseconds(it)}" }
         }
+        return cycle
     }
 
     fun persist(checkpointsQueue: RollingChronicleQueue, currentCycle: Int) {
