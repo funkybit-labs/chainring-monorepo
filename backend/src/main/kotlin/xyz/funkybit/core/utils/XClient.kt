@@ -6,14 +6,16 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.FormBody
 import okhttp3.Request
+import org.http4k.base64Encode
 import org.http4k.core.Uri
 import org.http4k.core.query
+import java.util.UUID
 
-object DiscordClient {
-    private val clientId = System.getenv("DISCORD_CLIENT_ID") ?: ""
-    private val clientSecret = System.getenv("DISCORD_CLIENT_SECRET") ?: ""
-    private val redirectUri = System.getenv("DISCORD_REDIRECT_URI") ?: "http://localhost:3000/discord-callback"
-    private val urlBase = System.getenv("DISCORD_API_URL") ?: "https://discord.com/api"
+object XClient {
+    private val clientId = System.getenv("X_CLIENT_ID") ?: ""
+    private val clientSecret = System.getenv("X_CLIENT_SECRET") ?: ""
+    private val redirectUri = System.getenv("X_REDIRECT_URI") ?: "http://localhost:3000/x-callback"
+    private val urlBase = System.getenv("X_API_URL") ?: "https://api.x.com"
     private val logging = KotlinLogging.logger {}
 
     private val httpClient = HttpClient
@@ -29,28 +31,34 @@ object DiscordClient {
         explicitNulls = false
     }
 
-    fun getOAuth2AuthorizeUrl(): String =
+    fun getOAuth2AuthorizeUrl(codeChallenge: OAuth2.CodeChallenge): String =
         Uri
-            .of("$urlBase/oauth2/authorize")
+            .of("https://x.com/i/oauth2/authorize")
             .query("client_id", clientId)
             .query("redirect_uri", redirectUri)
-            .query("scope", "identify")
+            .query("scope", listOf("offline.access", "users.read", "tweet.read").joinToString(" "))
             .query("response_type", "code")
+            .query("code_challenge", codeChallenge.value)
+            .query("code_challenge_method", "S256")
+            .query("state", UUID.randomUUID().toString().replace("-", ""))
             .toString()
 
-    fun getAuthTokens(authorizationCode: OAuth2.AuthorizationCode): OAuth2.Tokens {
+    fun getAuthTokens(authorizationCode: OAuth2.AuthorizationCode, codeVerifier: OAuth2.CodeVerifier): OAuth2.Tokens {
+        val credentials = "$clientId:$clientSecret".base64Encode()
         val httpRequest = Request.Builder()
-            .url("$urlBase/oauth2/token")
+            .url("$urlBase/2/oauth2/token")
             .post(
                 FormBody.Builder()
                     .add("client_id", clientId)
-                    .add("client_secret", clientSecret)
                     .add("grant_type", "authorization_code")
                     .add("code", authorizationCode.value)
+                    .add("code_verifier", codeVerifier.value)
                     .add("redirect_uri", redirectUri)
                     .build(),
             )
+            .addHeader("Authorization", "Basic $credentials")
             .build()
+
         val httpResponse = httpClient.newCall(httpRequest).execute()
         val httpResponseBody = httpResponse.body?.string() ?: ""
         return when (httpResponse.code) {
@@ -60,19 +68,21 @@ object DiscordClient {
     }
 
     @Serializable
-    private data class UsersMeResponse(val id: String)
+    private data class UsersMeResponse(val data: Data) {
+        @Serializable
+        data class Data(val id: String)
+    }
 
     fun getUserId(authTokens: OAuth2.Tokens): String {
         val httpRequest = Request.Builder()
-            .url("$urlBase/users/@me")
+            .url("$urlBase/2/users/me")
             .header("Authorization", "Bearer ${authTokens.access}")
-            .header("User-Agent", "DiscordBot ($urlBase, 10)")
             .build()
 
         val httpResponse = httpClient.newCall(httpRequest).execute()
         val httpResponseBody = httpResponse.body?.string() ?: ""
         return when (httpResponse.code) {
-            in 200..204 -> json.decodeFromString<UsersMeResponse>(httpResponseBody).id
+            in 200..204 -> json.decodeFromString<UsersMeResponse>(httpResponseBody).data.id
             else -> throw Exception("Got an error (${httpResponse.code}) - $httpResponseBody")
         }
     }

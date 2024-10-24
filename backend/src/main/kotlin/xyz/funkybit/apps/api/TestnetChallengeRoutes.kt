@@ -15,12 +15,12 @@ import org.http4k.format.KotlinxSerialization.auto
 import org.http4k.lens.Path
 import org.http4k.lens.Query
 import org.http4k.lens.int
-import org.http4k.lens.string
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.funkybit.apps.api.middleware.principal
 import xyz.funkybit.apps.api.middleware.signedTokenSecurity
 import xyz.funkybit.apps.api.model.ApiError
 import xyz.funkybit.apps.api.model.Card
+import xyz.funkybit.apps.api.model.CompleteOAuth2AccountLinkingApiRequest
 import xyz.funkybit.apps.api.model.Enroll
 import xyz.funkybit.apps.api.model.Leaderboard
 import xyz.funkybit.apps.api.model.LeaderboardEntry
@@ -28,6 +28,7 @@ import xyz.funkybit.apps.api.model.ReasonCode
 import xyz.funkybit.apps.api.model.RequestProcessingError
 import xyz.funkybit.apps.api.model.SetAvatarUrl
 import xyz.funkybit.apps.api.model.SetNickname
+import xyz.funkybit.apps.api.model.StartOAuth2AccountLinkingApiResponse
 import xyz.funkybit.apps.api.model.errorResponse
 import xyz.funkybit.apps.api.model.processingError
 import xyz.funkybit.apps.api.model.testnetChallengeDisqualifiedError
@@ -40,13 +41,18 @@ import xyz.funkybit.core.model.db.TestnetChallengePNLEntity
 import xyz.funkybit.core.model.db.TestnetChallengePNLType
 import xyz.funkybit.core.model.db.TestnetChallengeStatus
 import xyz.funkybit.core.model.db.TestnetChallengeUserRewardEntity
+import xyz.funkybit.core.model.db.UserAccountLinkingIntentEntity
 import xyz.funkybit.core.model.db.UserEntity
+import xyz.funkybit.core.model.db.UserLinkedAccountEntity
+import xyz.funkybit.core.model.db.UserLinkedAccountType
 import xyz.funkybit.core.model.db.WalletEntity
 import xyz.funkybit.core.model.db.WithdrawalEntity
 import xyz.funkybit.core.utils.DiscordClient
 import xyz.funkybit.core.utils.IconUtils.resolveSymbolUrl
 import xyz.funkybit.core.utils.IconUtils.sanitizeImageUrl
+import xyz.funkybit.core.utils.OAuth2
 import xyz.funkybit.core.utils.TestnetChallengeUtils
+import xyz.funkybit.core.utils.XClient
 
 class TestnetChallengeRoutes {
     private val logger = KotlinLogging.logger { }
@@ -231,9 +237,11 @@ class TestnetChallengeRoutes {
                         ),
                     )
                 }
-                if (request.principal.user.discordUserId == null) {
-                    // have they linked their discord account?
+                if (!request.principal.user.hasLinkedAccount(UserLinkedAccountType.Discord)) {
                     cards.add(Card.LinkDiscord)
+                }
+                if (!request.principal.user.hasLinkedAccount(UserLinkedAccountType.X)) {
+                    cards.add(Card.LinkX)
                 }
                 // have they ever connected a bitcoin wallet?
                 if (WalletEntity.existsForUserAndNetworkType(request.principal.user, NetworkType.Bitcoin)) {
@@ -251,26 +259,76 @@ class TestnetChallengeRoutes {
         }
     }
 
-    private val discordLinkCodePathParam =
-        Path.string().of("code", "Discord linking code")
+    private val accountLinkTypePathParam =
+        Path.map(UserLinkedAccountType::valueOf, UserLinkedAccountType::name).of("account-type", "Account link type")
 
-    val completeDiscordLinking: ContractRoute = run {
-        "testnet-challenge/discord" / discordLinkCodePathParam meta {
-            operationId = "testnet-challenge-complete-discord-link"
-            summary = "Complete Discord Linking"
+    val startAccountLinking: ContractRoute = run {
+        val responseBody = Body.auto<StartOAuth2AccountLinkingApiResponse>().toLens()
+
+        "testnet-challenge/account-link" / accountLinkTypePathParam meta {
+            operationId = "testnet-challenge-start-account-linking"
+            summary = "Start OAuth2 account linking"
             tags += listOf(Tag("testnet-challenge"))
             security = signedTokenSecurity
             returning(
                 Status.OK,
+                responseBody to StartOAuth2AccountLinkingApiResponse(authorizeUrl = "https://x.com/i/oauth2/authorize?response_type=code&client_id=M1M5R3BMVy13QmpScXkzTUt5OE46MTpjaQ&redirect_uri=https://www.example.com&scope=tweet.read%20users.read%20follows.read%20offline.access&state=state&code_challenge=challenge&code_challenge_method=plain"),
             )
-        } bindContract Method.POST to { code ->
+        } bindContract Method.POST to { accountType ->
             { request ->
-                val(accessToken, refreshToken) = DiscordClient.exchangeCodeForTokens(code)
-                val discordUserId = DiscordClient.getDiscordUserId(accessToken)
-                transaction {
-                    request.principal.user.discordAccessToken = accessToken
-                    request.principal.user.discordRefreshToken = refreshToken
-                    request.principal.user.discordUserId = discordUserId
+                val authorizeUrl = transaction {
+                    UserAccountLinkingIntentEntity.create(request.principal.user, accountType)
+                    when (accountType) {
+                        UserLinkedAccountType.Discord -> {
+                            DiscordClient.getOAuth2AuthorizeUrl()
+                        }
+                        UserLinkedAccountType.X -> {
+                            val intent = UserAccountLinkingIntentEntity.getForUser(request.principal.user, accountType)
+                            XClient.getOAuth2AuthorizeUrl(intent.oauth2CodeVerifier!!.toChallenge())
+                        }
+                    }
+                }
+                Response(Status.OK).with(
+                    responseBody of StartOAuth2AccountLinkingApiResponse(
+                        authorizeUrl = authorizeUrl,
+                    ),
+                )
+            }
+        }
+    }
+
+    val completeAccountLinking: ContractRoute = run {
+        val requestBody = Body.auto<CompleteOAuth2AccountLinkingApiRequest>().toLens()
+
+        "testnet-challenge/account-link" / accountLinkTypePathParam meta {
+            operationId = "testnet-challenge-complete-account-linking"
+            summary = "Complete OAuth2 account linking"
+            tags += listOf(Tag("testnet-challenge"))
+            security = signedTokenSecurity
+            receiving(requestBody to CompleteOAuth2AccountLinkingApiRequest(OAuth2.AuthorizationCode("code")))
+            returning(
+                Status.OK,
+            )
+        } bindContract Method.PUT to { accountType ->
+            { request ->
+                when (accountType) {
+                    UserLinkedAccountType.Discord -> {
+                        val authorizationCode = requestBody(request).authorizationCode
+                        val authTokens = DiscordClient.getAuthTokens(authorizationCode)
+                        val discordUserId = DiscordClient.getUserId(authTokens)
+                        transaction {
+                            UserLinkedAccountEntity.create(request.principal.user, UserLinkedAccountType.Discord, discordUserId, authTokens)
+                        }
+                    }
+                    UserLinkedAccountType.X -> {
+                        val authorizationCode = requestBody(request).authorizationCode
+                        transaction {
+                            val intent = UserAccountLinkingIntentEntity.getForUser(request.principal.user, accountType)
+                            val authTokens = XClient.getAuthTokens(authorizationCode, intent.oauth2CodeVerifier!!)
+                            val xUserId = XClient.getUserId(authTokens)
+                            UserLinkedAccountEntity.create(request.principal.user, UserLinkedAccountType.X, xUserId, authTokens)
+                        }
+                    }
                 }
                 Response(Status.OK)
             }

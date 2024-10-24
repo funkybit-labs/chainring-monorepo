@@ -54,9 +54,6 @@ object UserTable : GUIDTable<UserId>("user", ::UserId) {
     val inviteCode = varchar("invite_code", 10485760).uniqueIndex()
     val invitedBy = reference("invited_by", UserTable).index().nullable()
     val testnetAirdropTxHash = varchar("testnet_airdrop_tx_hash", 10485760).nullable()
-    val discordAccessToken = varchar("discord_access_token", 10485760).nullable()
-    val discordRefreshToken = varchar("discord_refresh_token", 10485760).nullable()
-    val discordUserId = varchar("discord_user_id", 10485760).nullable()
 }
 
 class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
@@ -140,7 +137,9 @@ class UserEntity(guid: EntityID<UserId>) : GUIDEntity<UserId>(guid) {
     var inviteCode by UserTable.inviteCode
     var invitedBy by UserTable.invitedBy
     var testnetAirdropTxHash by UserTable.testnetAirdropTxHash
-    var discordUserId by UserTable.discordUserId
-    var discordAccessToken by UserTable.discordAccessToken
-    var discordRefreshToken by UserTable.discordRefreshToken
+
+    val linkedAccounts by UserLinkedAccountEntity referrersOn UserLinkedAccountTable.userGuid
+
+    fun hasLinkedAccount(type: UserLinkedAccountType): Boolean =
+        this.linkedAccounts.any { it.type == type }
 }

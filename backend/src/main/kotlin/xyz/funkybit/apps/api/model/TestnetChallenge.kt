@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 import xyz.funkybit.core.model.db.TestnetChallengePNLType
 import xyz.funkybit.core.model.db.TestnetChallengeRewardCategory
 import xyz.funkybit.core.model.db.TestnetChallengeUserRewardType
+import xyz.funkybit.core.utils.OAuth2
 
 @Serializable
 data class SetNickname(val name: String)
@@ -64,4 +65,18 @@ sealed class Card {
     @Serializable
     @SerialName("LinkDiscord")
     data object LinkDiscord : Card()
+
+    @Serializable
+    @SerialName("LinkX")
+    data object LinkX : Card()
 }
+
+@Serializable
+data class StartOAuth2AccountLinkingApiResponse(
+    val authorizeUrl: String,
+)
+
+@Serializable
+data class CompleteOAuth2AccountLinkingApiRequest(
+    val authorizationCode: OAuth2.AuthorizationCode,
+)

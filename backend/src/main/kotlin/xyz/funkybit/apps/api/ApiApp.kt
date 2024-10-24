@@ -165,7 +165,8 @@ class ApiApp(config: ApiAppConfig = ApiAppConfig()) : BaseApp(config.dbConfig) {
                                 testnetChallengeRoutes.setAvatarUrl,
                                 testnetChallengeRoutes.getLeaderboard,
                                 testnetChallengeRoutes.getCards,
-                                testnetChallengeRoutes.completeDiscordLinking,
+                                testnetChallengeRoutes.startAccountLinking,
+                                testnetChallengeRoutes.completeAccountLinking,
                             )
                         }
                     },
